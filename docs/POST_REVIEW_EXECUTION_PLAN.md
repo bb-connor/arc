@@ -120,11 +120,11 @@ That qualification command reruns the in-repo authority, receipt, revocation, bu
 
 ## Milestone Gates
 
-### Gate G1: workspace stability
+### Gate G1: workspace stability for E9
 
-- `cargo test --workspace` is green in repeated CI runs
-- targeted trust-cluster stress coverage proves budget, revocation, receipt, and authority visibility under failover and load
-- no known flaky tests remain in the control-plane path
+- `cargo test --workspace` is green in the normal CI lane, including the default single-run `trust_control_cluster_replicates_state_and_survives_leader_failover` coverage.
+- `cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` is green in E9 qualification, repeating the authority, receipt, revocation, budget, and leader-failover path five times in-repo.
+- "Workspace stability" for this gate means no known flaky trust-control path remains in the clustered control-plane flow above; broader release hardening still belongs to `E14`.
 
 ### Gate G2: roots are enforceable
 
