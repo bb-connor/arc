@@ -148,8 +148,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 07-01: Remove deny_unknown_fields from all 18 serialized types in pact-core and add forward-compatibility test fixtures.
-- [ ] 07-02: Add MonetaryAmount type, monetary budget fields to ToolGrant, and cost-reduction Attenuation variants with is_subset_of enforcement.
+- [x] 07-01: Remove deny_unknown_fields from all 18 serialized types in pact-core and add forward-compatibility test fixtures.
+- [x] 07-02: Add MonetaryAmount type, monetary budget fields to ToolGrant, and cost-reduction Attenuation variants with is_subset_of enforcement.
 
 ### Phase 8: Core Enforcement
 **Goal**: Monetary budget limits, Merkle-committed receipt batches, and velocity throttling are all enforced at kernel evaluation time.
@@ -161,13 +161,13 @@ Plans:
   3. A batch of 100 receipts produces a Merkle root and signed kernel checkpoint statement; a single receipt's inclusion proof verifies against it.
   4. An agent that exceeds a configured invocation or spend window is denied by the velocity guard without kernel panics or executor nesting.
   5. The monetary HA overrun bound under split-brain is explicitly documented and covered by a named concurrent-charge test.
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 08-01: Implement try_charge_cost in BudgetStore with SQLite IMMEDIATE transactions and FinancialReceiptMetadata population.
-- [ ] 08-02: Implement checkpoint.rs in pact-kernel with batch-N Merkle signing and receipt inclusion proof verification.
-- [ ] 08-03: Implement VelocityGuard in pact-guards using synchronous token bucket (std::sync::Mutex, no async).
-- [ ] 08-04: Wire monetary enforcement, Merkle checkpointing, and velocity guard into the kernel evaluation pipeline and add integration tests.
+- [ ] 08-01-PLAN.md -- Monetary budget enforcement: FinancialReceiptMetadata, try_charge_cost in BudgetStore, ToolInvocationCost
+- [ ] 08-02-PLAN.md -- Merkle checkpoint: KernelCheckpoint, batch signing, inclusion proofs, kernel_checkpoints table
+- [ ] 08-03-PLAN.md -- Velocity guard: VelocityGuard with synchronous token bucket in pact-guards
+- [ ] 08-04-PLAN.md -- Integration wiring: monetary enforcement, Merkle checkpointing, and velocity guard into kernel pipeline
 
 ### Phase 9: Compliance and DPoP
 **Goal**: Colorado and EU AI Act compliance documents are filed against tested and shipped code, receipt retention is configurable, and DPoP proof-of-possession closes the stolen-token replay story.
