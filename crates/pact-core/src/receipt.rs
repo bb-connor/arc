@@ -274,6 +274,42 @@ pub struct GuardEvidence {
     pub details: Option<String>,
 }
 
+/// Financial metadata attached to receipts for monetary grant invocations.
+///
+/// For allow receipts under a monetary grant, this struct is serialized under
+/// the "financial" key in `PactReceiptBody::metadata`.
+///
+/// For denial receipts caused by budget exhaustion, `attempted_cost` is
+/// populated with the cost that would have been charged.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FinancialReceiptMetadata {
+    /// Index of the matching grant in the capability token's scope.
+    pub grant_index: u32,
+    /// Cost charged for this invocation in currency minor units (e.g. cents for USD).
+    pub cost_charged: u64,
+    /// ISO 4217 currency code (e.g. "USD").
+    pub currency: String,
+    /// Remaining budget after this charge, in currency minor units.
+    pub budget_remaining: u64,
+    /// Total budget for this grant, in currency minor units.
+    pub budget_total: u64,
+    /// Depth of the delegation chain at the time of invocation.
+    pub delegation_depth: u32,
+    /// Identifier of the root budget holder in the delegation chain.
+    pub root_budget_holder: String,
+    /// Optional payment reference for external settlement systems.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_reference: Option<String>,
+    /// Settlement status for this charge (e.g. "pending", "settled", "failed").
+    pub settlement_status: String,
+    /// Optional itemized cost breakdown for audit purposes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_breakdown: Option<serde_json::Value>,
+    /// Cost that was attempted but denied (populated only on denial receipts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempted_cost: Option<u64>,
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -499,6 +535,88 @@ mod tests {
         assert!(receipt.verify_signature().unwrap());
         assert_eq!(receipt.operation_kind, OperationKind::CreateMessage);
         assert_eq!(receipt.request_id, RequestId::new("child-001"));
+    }
+
+    #[test]
+    fn financial_receipt_metadata_serde_roundtrip() {
+        let meta = FinancialReceiptMetadata {
+            grant_index: 2,
+            cost_charged: 150,
+            currency: "USD".to_string(),
+            budget_remaining: 850,
+            budget_total: 1000,
+            delegation_depth: 1,
+            root_budget_holder: "agent-root-001".to_string(),
+            payment_reference: Some("ref-abc123".to_string()),
+            settlement_status: "pending".to_string(),
+            cost_breakdown: Some(serde_json::json!({"compute": 100, "io": 50})),
+            attempted_cost: None,
+        };
+
+        let json = serde_json::to_string(&meta).unwrap();
+        let restored: FinancialReceiptMetadata = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(meta.grant_index, restored.grant_index);
+        assert_eq!(meta.cost_charged, restored.cost_charged);
+        assert_eq!(meta.currency, restored.currency);
+        assert_eq!(meta.budget_remaining, restored.budget_remaining);
+        assert_eq!(meta.budget_total, restored.budget_total);
+        assert_eq!(meta.delegation_depth, restored.delegation_depth);
+        assert_eq!(meta.root_budget_holder, restored.root_budget_holder);
+        assert_eq!(meta.settlement_status, restored.settlement_status);
+        assert_eq!(meta.payment_reference, restored.payment_reference);
+        assert!(restored.attempted_cost.is_none());
+    }
+
+    #[test]
+    fn financial_receipt_metadata_under_financial_key() {
+        let meta = FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged: 200,
+            currency: "USD".to_string(),
+            budget_remaining: 800,
+            budget_total: 1000,
+            delegation_depth: 0,
+            root_budget_holder: "agent-root-001".to_string(),
+            payment_reference: None,
+            settlement_status: "settled".to_string(),
+            cost_breakdown: None,
+            attempted_cost: None,
+        };
+
+        let wrapped = serde_json::json!({"financial": meta});
+        let extracted: FinancialReceiptMetadata =
+            serde_json::from_value(wrapped["financial"].clone()).unwrap();
+        assert_eq!(extracted.cost_charged, 200);
+        assert_eq!(extracted.settlement_status, "settled");
+    }
+
+    #[test]
+    fn financial_receipt_metadata_attempted_cost_optional() {
+        // With attempted_cost Some: field present in JSON
+        let meta_with = FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged: 0,
+            currency: "USD".to_string(),
+            budget_remaining: 0,
+            budget_total: 1000,
+            delegation_depth: 0,
+            root_budget_holder: "agent-root-001".to_string(),
+            payment_reference: None,
+            settlement_status: "denied".to_string(),
+            cost_breakdown: None,
+            attempted_cost: Some(500),
+        };
+        let json_with = serde_json::to_string(&meta_with).unwrap();
+        assert!(json_with.contains("attempted_cost"));
+
+        // Without attempted_cost: field absent from JSON
+        let meta_without = FinancialReceiptMetadata {
+            attempted_cost: None,
+            ..meta_with
+        };
+        let json_without = serde_json::to_string(&meta_without).unwrap();
+        assert!(!json_without.contains("attempted_cost"));
     }
 
     #[test]

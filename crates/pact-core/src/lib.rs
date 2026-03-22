@@ -32,8 +32,8 @@ pub use manifest::{ToolAnnotations, ToolDefinition, ToolManifest, ToolManifestBo
 pub use merkle::{MerkleProof, MerkleTree};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
 pub use receipt::{
-    ChildRequestReceipt, ChildRequestReceiptBody, Decision, GuardEvidence, PactReceipt,
-    PactReceiptBody, ToolCallAction,
+    ChildRequestReceipt, ChildRequestReceiptBody, Decision, FinancialReceiptMetadata,
+    GuardEvidence, PactReceipt, PactReceiptBody, ToolCallAction,
 };
 pub use session::{
     CompleteOperation, CompletionArgument, CompletionReference, CompletionResult,
