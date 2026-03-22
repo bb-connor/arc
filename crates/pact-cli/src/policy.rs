@@ -1231,6 +1231,7 @@ guards:
             agent_id: &agent_id,
             server_id: &server_id,
             session_filesystem_roots: Some(session_roots.as_slice()),
+            matched_grant_index: None,
         };
 
         let result = pipeline.evaluate(&ctx);
