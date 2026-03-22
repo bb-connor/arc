@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 08-03-PLAN.md (VelocityGuard implementation)
-last_updated: "2026-03-22T15:22:12.299Z"
+stopped_at: Completed 08-02-PLAN.md (Merkle checkpoint and receipt store persistence)
+last_updated: "2026-03-22T15:22:44.273Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
@@ -59,6 +59,8 @@ Recent decisions affecting current work:
 - [Phase 08]: invoke_with_cost default returns None cost; servers that track costs override it -- no breaking changes to existing ToolServerConnection implementors
 - [Phase 08]: VelocityGuard uses elapsed-time refill in try_consume (synchronous, no background thread)
 - [Phase 08]: matched_grant_index defaults to None in all existing GuardContext sites; populated in plan 08-04
+- [Phase 08-core-enforcement]: KernelCheckpointBody is the signed unit (canonical JSON of body is signed, not the full checkpoint)
+- [Phase 08-core-enforcement]: receipts_canonical_bytes_range deserializes to PactReceipt then applies canonical_json_bytes for RFC 8785 determinism in Merkle leaves
 
 ### Pending Todos
 
@@ -73,6 +75,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T15:22:12.297Z
-Stopped at: Completed 08-03-PLAN.md (VelocityGuard implementation)
+Last session: 2026-03-22T15:22:44.271Z
+Stopped at: Completed 08-02-PLAN.md (Merkle checkpoint and receipt store persistence)
 Resume file: None
