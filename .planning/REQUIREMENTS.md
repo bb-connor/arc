@@ -1,108 +1,83 @@
-# Requirements: PACT
+# Requirements: PACT v2.0 Agent Economy Foundation
 
-**Defined:** 2026-03-19
-**Core Value:** PACT must provide deterministic, least-privilege agent access with auditable outcomes across local and remote deployments.
+**Defined:** 2026-03-21
+**Core Value:** PACT must provide deterministic, least-privilege agent access with auditable outcomes, and produce cryptographic proof artifacts that enable economic metering, regulatory compliance, and agent reputation.
 
 ## v1 Requirements
 
-### Deterministic Trust Control
+### Schema & Foundation
 
-- [x] **HA-01**: Repeated `cargo test --workspace` runs complete without trust-cluster flakes.
-- [x] **HA-02**: Forwarded trust-control writes have one documented read-after-write visibility contract.
-- [x] **HA-03**: Budget, authority, receipt, and revocation replication remain correct across leader failover.
-- [x] **HA-04**: Cluster diagnostics expose leader identity, cursor/convergence state, and replication failures clearly enough to debug production issues.
+- [ ] **SCHEMA-01**: pact-core types tolerate unknown fields (deny_unknown_fields removed from 18 types across capability.rs, receipt.rs, manifest.rs)
+- [ ] **SCHEMA-02**: ToolGrant supports monetary budget fields (max_cost_per_invocation, max_total_cost as MonetaryAmount with u64 minor-unit amounts)
+- [ ] **SCHEMA-03**: Attenuation enum supports cost reduction variants (ReduceCostPerInvocation, ReduceTotalCost)
+- [ ] **SCHEMA-04**: BudgetStore supports try_charge_cost for monetary budget enforcement with single-currency semantics
+- [ ] **SCHEMA-05**: Tool servers can report invocation cost via ToolInvocationCost struct
+- [ ] **SCHEMA-06**: Financial receipt metadata (FinancialReceiptMetadata) populated in receipt.metadata for monetary grants, including grant_index, cost_charged, budget_remaining, settlement_status
 
-### Security Boundary Enforcement
+### Security
 
-- [ ] **SEC-01**: Roots are normalized consistently across supported transports and platforms for filesystem-shaped access.
-- [ ] **SEC-02**: Filesystem-shaped tool access outside allowed roots fails closed with signed evidence.
-- [ ] **SEC-03**: Filesystem-backed resource reads outside allowed roots fail closed with signed evidence.
-- [ ] **SEC-04**: Missing, empty, or stale roots never silently widen access.
+- [ ] **SEC-01**: Receipt batches produce Merkle roots with signed kernel checkpoint statements
+- [ ] **SEC-02**: Receipt inclusion proofs verify against published checkpoint roots
+- [ ] **SEC-03**: DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce (PACT-native proof message, not HTTP-shaped)
+- [ ] **SEC-04**: DPoP nonce replay store rejects reused nonces within configurable TTL window
+- [ ] **SEC-05**: Velocity guard denies requests exceeding configured invocation or spend windows per agent/grant using synchronous token bucket
 
-### Remote Runtime Hardening
+### Compliance
 
-- [ ] **REM-01**: Remote sessions support one documented reconnect and resume contract.
-- [ ] **REM-02**: GET-based SSE streaming is available where the compatibility surface expects it.
-- [ ] **REM-03**: Stale-session cleanup, drain, and shutdown behavior are deterministic and tested.
-- [ ] **REM-04**: Hosted runtime ownership can scale beyond one subprocess per remote session.
+- [ ] **COMP-01**: Published document maps PACT receipts to Colorado SB 24-205 requirements for AI system output records
+- [ ] **COMP-02**: Published document maps PACT to EU AI Act Article 19 traceability requirements for high-risk AI systems
+- [ ] **COMP-03**: Receipt retention policies are configurable (time-based and size-based rotation)
+- [ ] **COMP-04**: Archived receipts remain verifiable via stored Merkle checkpoint roots
+- [ ] **COMP-05**: At least 2 SIEM exporters functional and tested (ported from ClawdStrike: Splunk, Elastic, Datadog, Sumo Logic, Webhooks, or Alerting)
 
-### Cross-Transport Concurrency
+### Product Surface
 
-- [ ] **CON-01**: One transport-neutral ownership model defines active work, stream emission, and terminal state updates.
-- [ ] **CON-02**: `tasks-cancel` passes in the remote conformance story instead of remaining `xfail`.
-- [ ] **CON-03**: Late async completions and notifications are durable and session-owned, not request-local accidents.
-- [ ] **CON-04**: Cancellation races produce deterministic receipts and terminal states across direct, wrapped, and remote paths.
-
-### Policy and Adoption
-
-- [ ] **POL-01**: One canonical policy authoring path is explicitly documented for operators.
-- [ ] **POL-02**: All shipped guards are configurable through the supported policy path.
-- [ ] **POL-03**: Wrapped-MCP-to-native migration guidance and maintained examples exist.
-- [ ] **POL-04**: A higher-level native authoring surface exists and is covered by tests and examples.
-
-### Release Qualification
-
-- [ ] **REL-01**: Workspace build, lint, and test gates are green in CI and repeat locally.
-- [ ] **REL-02**: Supported guarantees, limits, and explicit non-goals are documented for operators and adopters.
-- [ ] **REL-03**: Failure-mode, conformance, and example coverage back the claims made in release docs.
-- [ ] **REL-04**: No post-review closing finding remains unowned or relegated to an undefined hardening bucket.
+- [ ] **PROD-01**: Receipt query API supports filtering by capability, tool, time range, outcome, and budget impact
+- [ ] **PROD-02**: Capability lineage index persists capability snapshots keyed by capability_id with subject, issuer, grants, and delegation metadata
+- [ ] **PROD-03**: Agent-centric receipt queries resolve through capability lineage index without replaying issuance logs
+- [ ] **PROD-04**: Web-based receipt dashboard renders receipts filterable by agent/tool/outcome/time with delegation chain inspection
+- [ ] **PROD-05**: Non-engineer stakeholders can answer "what did agent X do?" via dashboard without CLI access
+- [ ] **PROD-06**: TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning
 
 ## v2 Requirements
 
-### Distributed Control and Sandboxing
+### Economic Integration (Q4 2026 - Q1 2027)
 
-- **FUT-01**: Support a stronger distributed-control model than the current HA leader/follower design.
-- **FUT-02**: Add deeper sandbox orchestration beyond root-aware filesystem boundaries.
-- **FUT-03**: Complete the stronger formal/theorem-prover artifacts described in the draft protocol.
+- **ECON-01**: Multi-currency monetary budgets with exchange-rate binding at grant issuance
+- **ECON-02**: Payment rail bridge connecting PACT receipts to Stripe ACP or x402 settlement
+- **ECON-03**: A2A trust adapter mediating agent-to-agent interactions with capability enforcement
+- **ECON-04**: Cross-org delegation with federated capability delegation and bilateral receipt sharing
+- **ECON-05**: Python SDK at 1.0 on PyPI, Go SDK at 1.0
 
-### Extended Platform Surface
+### Reputation (Q1-Q2 2027)
 
-- **FUT-04**: Expand identity-provider and token-exchange federation beyond the current hosted-runtime needs.
-- **FUT-05**: Add large-scale performance optimization once semantic stability and operator clarity are complete.
+- **REP-01**: Receipt-derived local reputation scores (reliability, compliance, scope discipline, budget adherence)
+- **REP-02**: HushSpec reputation policy extensions for tier-gated capability issuance
+- **REP-03**: Agent Passport v1 as W3C Verifiable Credential with did:pact DID method
+- **REP-04**: PACT Certify v1 certification program for tool servers
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Multi-region consensus trust plane | Not required to close current release blockers; would turn the milestone into a new distributed-systems program |
-| Full OS sandbox manager | The immediate security gap is roots enforcement, not a general sandbox product |
-| Theorem-prover completion | Valuable research work, but not the next blocker for shipping an operational release candidate |
-| Performance-first rewrite | Current risks are determinism, security boundaries, and product-surface coherence |
+| Custom payment rail | PACT is authorization/attestation, not settlement. Complement Stripe/x402/Coinbase. |
+| Multi-region Byzantine consensus | HA leader/follower serves current scale. Byzantine tolerance premature. |
+| Full OS sandbox manager | Root enforcement is the right abstraction. Sandboxing is a different product. |
+| ML/LLM-based guards | Application-layer concern. Belongs in ClawdStrike, not protocol. |
+| Fleet management | ClawdStrike's domain. PACT is the protocol, not the control plane. |
+| Agent reputation (this milestone) | Requires capability lineage index and receipt analytics first. Q1 2027. |
+| Multi-currency budgets (this milestone) | Single currency first. Multi-currency deferred to Q4 2026. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HA-01 | Phase 1 | Complete |
-| HA-02 | Phase 1 | Complete |
-| HA-03 | Phase 1 | Complete |
-| HA-04 | Phase 1 | Complete |
-| SEC-01 | Phase 2 | Pending |
-| SEC-02 | Phase 2 | Pending |
-| SEC-03 | Phase 2 | Pending |
-| SEC-04 | Phase 2 | Pending |
-| REM-01 | Phase 3 | Pending |
-| REM-02 | Phase 3 | Pending |
-| REM-03 | Phase 3 | Pending |
-| REM-04 | Phase 3 | Pending |
-| CON-01 | Phase 4 | Pending |
-| CON-02 | Phase 4 | Pending |
-| CON-03 | Phase 4 | Pending |
-| CON-04 | Phase 4 | Pending |
-| POL-01 | Phase 5 | Pending |
-| POL-02 | Phase 5 | Pending |
-| POL-03 | Phase 5 | Pending |
-| POL-04 | Phase 5 | Pending |
-| REL-01 | Phase 6 | Pending |
-| REL-02 | Phase 6 | Pending |
-| REL-03 | Phase 6 | Pending |
-| REL-04 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 24 total
-- Mapped to phases: 24
-- Unmapped: 0 ✓
+- v1 requirements: 22 total
+- Mapped to phases: 0
+- Unmapped: 22 (roadmap pending)
 
 ---
-*Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after reconciling closing-cycle epics into the GSD roadmap*
+*Requirements defined: 2026-03-21*
+*Last updated: 2026-03-21 after milestone v2.0 initialization*
