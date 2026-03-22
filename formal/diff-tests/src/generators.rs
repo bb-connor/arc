@@ -266,6 +266,7 @@ pub fn arb_impl_tool_grant() -> impl Strategy<Value = pact_core::capability::Too
                     max_invocations,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 }
             },
         )
@@ -310,6 +311,7 @@ fn spec_grant_to_impl(g: &SpecToolGrant) -> pact_core::capability::ToolGrant {
         max_invocations: g.max_invocations,
         max_cost_per_invocation: None,
         max_total_cost: None,
+        dpop_required: None,
     }
 }
 

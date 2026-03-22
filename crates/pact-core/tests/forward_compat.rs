@@ -39,6 +39,7 @@ fn make_token_body(issuer_kp: &Keypair) -> CapabilityTokenBody {
                 max_invocations: Some(10),
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             resource_grants: vec![],
             prompt_grants: vec![],

@@ -5092,6 +5092,7 @@ mod tests {
             max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
         };
         let mut kernel = PactKernel::new(config);
         kernel.register_tool_server(Box::new(EchoServer));
@@ -5127,6 +5128,7 @@ mod tests {
                                 max_invocations: None,
                                 max_cost_per_invocation: None,
                                 max_total_cost: None,
+                                dpop_required: None,
                             },
                             ToolGrant {
                                 server_id: "stream-srv".to_string(),
@@ -5136,6 +5138,7 @@ mod tests {
                                 max_invocations: None,
                                 max_cost_per_invocation: None,
                                 max_total_cost: None,
+                                dpop_required: None,
                             },
                         ],
                         resource_grants: vec![],
@@ -5181,6 +5184,7 @@ mod tests {
                             max_invocations: None,
                             max_cost_per_invocation: None,
                             max_total_cost: None,
+                            dpop_required: None,
                         },
                         ToolGrant {
                             server_id: "srv".to_string(),
@@ -5190,6 +5194,7 @@ mod tests {
                             max_invocations: None,
                             max_cost_per_invocation: None,
                             max_total_cost: None,
+                            dpop_required: None,
                         },
                     ],
                     resource_grants,
@@ -5342,6 +5347,7 @@ mod tests {
             max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
         };
         let mut kernel = PactKernel::new(config);
         kernel.register_tool_server(Box::new(UrlRequiredServer));
@@ -5358,6 +5364,7 @@ mod tests {
                         max_invocations: None,
                         max_cost_per_invocation: None,
                         max_total_cost: None,
+                        dpop_required: None,
                     }],
                     resource_grants: vec![],
                     prompt_grants: vec![],
@@ -5405,6 +5412,7 @@ mod tests {
             max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
             checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
         };
         let mut kernel = PactKernel::new(config);
         kernel.register_tool_server(Box::new(AsyncEventServerConnection(server)));

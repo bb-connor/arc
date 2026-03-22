@@ -713,6 +713,7 @@ fn build_default_capability_map(
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             });
     }
 
@@ -807,6 +808,7 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<PactScope>
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         });
@@ -824,6 +826,7 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<PactScope>
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             })
             .collect(),
         ..PactScope::default()

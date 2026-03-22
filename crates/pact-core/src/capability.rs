@@ -187,6 +187,10 @@ pub struct ToolGrant {
     /// Maximum aggregate monetary cost across all invocations under this grant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_total_cost: Option<MonetaryAmount>,
+    /// If Some(true), the kernel requires a valid DPoP proof for every invocation.
+    /// None and Some(false) both mean DPoP is not required.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_required: Option<bool>,
 }
 
 impl ToolGrant {
@@ -527,6 +531,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }
     }
 
@@ -694,6 +699,7 @@ mod tests {
             max_invocations: Some(10),
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
         let child_ok = ToolGrant {
             max_invocations: Some(5),
@@ -723,6 +729,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
         // Child has parent's constraint + an extra one (more restrictive)
         let child = ToolGrant {
@@ -752,6 +759,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
         let child = ToolGrant {
             server_id: "filesystem".to_string(),
@@ -761,6 +769,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
 
         assert!(child.is_subset_of(&parent));

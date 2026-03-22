@@ -32,6 +32,7 @@ fn make_kernel_with_guards() -> (PactKernel, Keypair) {
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
     };
     let mut kernel = PactKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
@@ -53,6 +54,7 @@ fn make_kernel_bare() -> (PactKernel, Keypair) {
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
     };
     let mut kernel = PactKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
@@ -73,6 +75,7 @@ fn issue_wildcard_cap(kernel: &PactKernel, agent_pk: &pact_core::PublicKey) -> C
                     max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 }],
                 ..PactScope::default()
             },
@@ -100,6 +103,7 @@ fn issue_tool_cap(
                     max_invocations: None,
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 }],
                 ..PactScope::default()
             },
@@ -345,6 +349,7 @@ fn full_flow_revocation_cascade() {
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         },
@@ -500,6 +505,7 @@ fn full_flow_guard_pipeline_mixed_verdicts() {
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
     };
     let mut kernel = PactKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
@@ -573,6 +579,7 @@ fn full_flow_budget_exhaustion() {
                     max_invocations: Some(2),
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 }],
                 ..PactScope::default()
             },
@@ -669,6 +676,7 @@ fn full_flow_untrusted_issuer() {
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         },

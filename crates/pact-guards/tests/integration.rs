@@ -36,6 +36,7 @@ fn make_kernel() -> (PactKernel, Keypair) {
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
     };
     let mut kernel = PactKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer));
@@ -57,6 +58,7 @@ fn make_request(
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }],
         ..PactScope::default()
     };
@@ -323,6 +325,7 @@ fn filesystem_tool_session_roots_allow_in_root_path() {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }],
         ..PactScope::default()
     };
@@ -379,6 +382,7 @@ fn filesystem_tool_session_roots_deny_out_of_root_path() {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }],
         ..PactScope::default()
     };
@@ -426,6 +430,7 @@ fn filesystem_tool_session_roots_fail_closed_when_missing() {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }],
         ..PactScope::default()
     };

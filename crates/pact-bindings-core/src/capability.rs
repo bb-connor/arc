@@ -78,6 +78,7 @@ mod tests {
                 max_invocations: Some(3),
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             resource_grants: vec![],
             prompt_grants: vec![],

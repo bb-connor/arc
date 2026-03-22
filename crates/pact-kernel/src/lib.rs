@@ -24,6 +24,7 @@
 pub mod authority;
 pub mod budget_store;
 pub mod checkpoint;
+pub mod dpop;
 pub mod receipt_store;
 pub mod revocation_store;
 pub mod session;
@@ -63,6 +64,9 @@ pub use budget_store::{
 pub use checkpoint::{
     build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, CheckpointError,
     KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
+};
+pub use dpop::{
+    verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA,
 };
 pub use receipt_store::{
     ReceiptStore, ReceiptStoreError, SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
@@ -305,6 +309,9 @@ pub enum KernelError {
 
     #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("DPoP proof verification failed: {0}")]
+    DpopVerificationFailed(String),
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
@@ -691,11 +698,20 @@ pub struct KernelConfig {
     ///
     /// Set to 0 to disable automatic checkpointing.
     pub checkpoint_batch_size: u64,
+
+    /// Optional receipt retention configuration.
+    ///
+    /// When `None` (default), retention is disabled and receipts accumulate
+    /// indefinitely. When `Some(config)`, the kernel will archive receipts
+    /// that exceed the time or size threshold.
+    pub retention_config: Option<crate::receipt_store::RetentionConfig>,
 }
 
 pub const DEFAULT_MAX_STREAM_DURATION_SECS: u64 = 300;
 pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
 pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
+pub const DEFAULT_RETENTION_DAYS: u64 = 90;
+pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 
 /// The PACT Runtime Kernel.
 ///
@@ -3774,6 +3790,7 @@ mod tests {
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
         }
     }
 
@@ -6865,6 +6882,7 @@ mod tests {
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
         }
     }
 

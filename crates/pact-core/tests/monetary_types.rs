@@ -52,6 +52,7 @@ fn make_grant_no_monetary(server: &str, tool: &str) -> ToolGrant {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: None,
+        dpop_required: None,
     }
 }
 
@@ -97,6 +98,7 @@ fn tool_grant_with_monetary_fields_roundtrip() {
         max_invocations: None,
         max_cost_per_invocation: Some(usd(1000)),
         max_total_cost: Some(usd(50_000)),
+        dpop_required: None,
     };
 
     let json = serde_json::to_string_pretty(&grant).unwrap();
@@ -162,6 +164,7 @@ fn monetary_fields_skip_when_none() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: None,
+        dpop_required: None,
     };
 
     let json = serde_json::to_string(&grant).unwrap();
@@ -251,6 +254,7 @@ fn subset_monetary_child_within_parent() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: Some(usd(1000)),
+        dpop_required: None,
     };
     let child = ToolGrant {
         max_total_cost: Some(usd(500)),
@@ -276,6 +280,7 @@ fn subset_monetary_child_exceeds_parent() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: Some(usd(1000)),
+        dpop_required: None,
     };
     let child = ToolGrant {
         max_total_cost: Some(usd(1500)),
@@ -301,6 +306,7 @@ fn subset_monetary_uncapped_child_of_capped_parent() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: Some(usd(1000)),
+        dpop_required: None,
     };
     let child = ToolGrant {
         max_total_cost: None,
@@ -326,6 +332,7 @@ fn subset_monetary_capped_child_of_uncapped_parent() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: None, // parent has no total cost cap
+        dpop_required: None,
     };
     let child = ToolGrant {
         max_total_cost: Some(usd(500)), // child restricts further
@@ -351,6 +358,7 @@ fn subset_monetary_currency_mismatch() {
         max_invocations: None,
         max_cost_per_invocation: None,
         max_total_cost: Some(usd(1000)),
+        dpop_required: None,
     };
     let child = ToolGrant {
         max_total_cost: Some(eur(500)), // same units but different currency
@@ -376,6 +384,7 @@ fn subset_per_invocation_cost() {
         max_invocations: None,
         max_cost_per_invocation: Some(usd(100)),
         max_total_cost: None,
+        dpop_required: None,
     };
 
     // Child within per-invocation budget: OK
@@ -445,6 +454,7 @@ fn signed_token_with_monetary_grant_roundtrip() {
         max_invocations: Some(10),
         max_cost_per_invocation: Some(usd(1500)),
         max_total_cost: Some(usd(10_000)),
+        dpop_required: None,
     };
 
     let body = CapabilityTokenBody {
