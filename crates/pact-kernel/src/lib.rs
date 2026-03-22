@@ -457,6 +457,23 @@ impl RevocationStore for InMemoryRevocationStore {
     }
 }
 
+/// Cost reported by a tool server after invocation.
+///
+/// Tool servers that track monetary costs override `invoke_with_cost` and
+/// return this struct. Servers that do not override return `None` via the
+/// default implementation, and the kernel charges `max_cost_per_invocation`
+/// as a worst-case debit.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ToolInvocationCost {
+    /// Cost in the currency's smallest unit (e.g. cents for USD).
+    pub units: u64,
+    /// ISO 4217 currency code.
+    pub currency: String,
+    /// Optional cost breakdown for audit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breakdown: Option<serde_json::Value>,
+}
+
 /// Trait representing a connection to a tool server.
 ///
 /// The kernel holds one `ToolServerConnection` per registered server. In
@@ -477,6 +494,22 @@ pub trait ToolServerConnection: Send + Sync {
         arguments: serde_json::Value,
         nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError>;
+
+    /// Invoke a tool and optionally report the actual cost of the invocation.
+    ///
+    /// Tool servers that track monetary costs should override this method.
+    /// The default implementation delegates to `invoke` and returns `None`
+    /// cost, meaning the kernel will charge `max_cost_per_invocation` as
+    /// the worst-case debit.
+    fn invoke_with_cost(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        let value = self.invoke(tool_name, arguments, nested_flow_bridge)?;
+        Ok((value, None))
+    }
 
     /// Invoke a tool that can emit multiple streamed chunks before its final terminal state.
     ///
@@ -6315,5 +6348,41 @@ mod tests {
             }),
         );
         assert!(matches!(denied, Err(KernelError::OutOfScopePrompt { .. })));
+    }
+
+    #[test]
+    fn tool_invocation_cost_serde_roundtrip() {
+        let cost = ToolInvocationCost {
+            units: 500,
+            currency: "USD".to_string(),
+            breakdown: None,
+        };
+        let json = serde_json::to_string(&cost).unwrap();
+        let restored: ToolInvocationCost = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.units, 500);
+        assert_eq!(restored.currency, "USD");
+        assert!(restored.breakdown.is_none());
+
+        // With breakdown
+        let cost_with = ToolInvocationCost {
+            units: 200,
+            currency: "EUR".to_string(),
+            breakdown: Some(serde_json::json!({"compute": 150, "network": 50})),
+        };
+        let json_with = serde_json::to_string(&cost_with).unwrap();
+        let restored_with: ToolInvocationCost = serde_json::from_str(&json_with).unwrap();
+        assert_eq!(restored_with.units, 200);
+        assert!(restored_with.breakdown.is_some());
+    }
+
+    #[test]
+    fn echo_server_invoke_with_cost_returns_none() {
+        let server = EchoServer::new("srv-a", vec!["echo"]);
+        let args = serde_json::json!({"msg": "hello"});
+        let (value, cost) = server
+            .invoke_with_cost("echo", args, None)
+            .expect("invoke_with_cost should succeed");
+        assert!(cost.is_none(), "EchoServer should return None cost");
+        assert!(value.is_object());
     }
 }
