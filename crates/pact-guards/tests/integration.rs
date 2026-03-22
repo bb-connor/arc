@@ -35,6 +35,7 @@ fn make_kernel() -> (PactKernel, Keypair) {
         allow_elicitation: false,
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
     };
     let mut kernel = PactKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer));

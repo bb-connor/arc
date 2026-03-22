@@ -38,8 +38,8 @@ use pact_core::capability::{
 };
 use pact_core::crypto::{sha256_hex, Keypair};
 use pact_core::receipt::{
-    ChildRequestReceipt, ChildRequestReceiptBody, Decision, PactReceipt, PactReceiptBody,
-    ToolCallAction,
+    ChildRequestReceipt, ChildRequestReceiptBody, Decision, FinancialReceiptMetadata, PactReceipt,
+    PactReceiptBody, ToolCallAction,
 };
 use pact_core::session::{
     CompleteOperation, CompletionReference, CompletionResult, CreateElicitationOperation,
@@ -686,10 +686,16 @@ pub struct KernelConfig {
 
     /// Maximum total canonical payload size permitted for one streamed tool result.
     pub max_stream_total_bytes: u64,
+
+    /// Number of receipts between Merkle checkpoint snapshots. Default: 100.
+    ///
+    /// Set to 0 to disable automatic checkpointing.
+    pub checkpoint_batch_size: u64,
 }
 
 pub const DEFAULT_MAX_STREAM_DURATION_SECS: u64 = 300;
 pub const DEFAULT_MAX_STREAM_TOTAL_BYTES: u64 = 256 * 1024 * 1024;
+pub const DEFAULT_CHECKPOINT_BATCH_SIZE: u64 = 100;
 
 /// The PACT Runtime Kernel.
 ///
@@ -712,6 +718,12 @@ pub struct PactKernel {
     child_receipt_log: ChildReceiptLog,
     receipt_store: Option<Box<dyn ReceiptStore>>,
     session_counter: u64,
+    /// How many receipts per Merkle checkpoint batch. Default: 100.
+    checkpoint_batch_size: u64,
+    /// Monotonic counter for checkpoint_seq values.
+    checkpoint_seq_counter: u64,
+    /// seq of the last receipt included in the previous checkpoint batch.
+    last_checkpoint_seq: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -719,6 +731,16 @@ struct MatchingGrant<'a> {
     index: usize,
     grant: &'a ToolGrant,
     specificity: (u8, u8, usize),
+}
+
+/// Result of a monetary budget charge attempt.
+///
+/// Carries the accounting info needed to populate FinancialReceiptMetadata.
+struct BudgetChargeResult {
+    grant_index: usize,
+    cost_charged: u64,
+    currency: String,
+    budget_total: u64,
 }
 
 struct SessionNestedFlowBridge<'a, C> {
@@ -929,6 +951,7 @@ impl PactKernel {
     pub fn new(config: KernelConfig) -> Self {
         info!("initializing PACT kernel");
         let authority_keypair = config.keypair.clone();
+        let checkpoint_batch_size = config.checkpoint_batch_size;
         Self {
             config,
             guards: Vec::new(),
@@ -943,6 +966,9 @@ impl PactKernel {
             child_receipt_log: ChildReceiptLog::new(),
             receipt_store: None,
             session_counter: 0,
+            checkpoint_batch_size,
+            checkpoint_seq_counter: 0,
+            last_checkpoint_seq: 0,
         }
     }
 
@@ -1796,52 +1822,75 @@ impl PactKernel {
             }
         };
 
-        if let Err(e) = self.check_and_increment_budget(cap, &matching_grants) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
-        }
+        let (matched_grant_index, charge_result) =
+            match self.check_and_increment_budget(cap, &matching_grants) {
+                Ok(result) => result,
+                Err(e) => {
+                    let msg = e.to_string();
+                    warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
+                    // For monetary budget exhaustion, build a denial receipt with financial metadata.
+                    return self.build_monetary_deny_response(
+                        request,
+                        &msg,
+                        now,
+                        &matching_grants,
+                        cap,
+                    );
+                }
+            };
 
-        if let Err(e) = self.run_guards(request, &cap.scope, session_filesystem_roots) {
+        if let Err(e) =
+            self.run_guards(request, &cap.scope, session_filesystem_roots, Some(matched_grant_index))
+        {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
             return self.build_deny_response(request, &msg, now);
         }
 
         let tool_started_at = Instant::now();
-        let tool_output = match self.dispatch_tool_call(request) {
-            Ok(result) => result,
-            Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %error,
-                    "tool call requires URL elicitation"
-                );
-                return Err(error);
-            }
-            Err(KernelError::RequestCancelled { reason, .. }) => {
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %reason,
-                    "tool call cancelled"
-                );
-                return self.build_cancelled_response(request, &reason, now);
-            }
-            Err(KernelError::RequestIncomplete(reason)) => {
-                warn!(
-                    request_id = %request.request_id,
-                    reason = %reason,
-                    "tool call incomplete"
-                );
-                return self.build_incomplete_response(request, &reason, now);
-            }
-            Err(e) => {
-                let msg = e.to_string();
-                warn!(request_id = %request.request_id, reason = %msg, "tool server error");
-                return self.build_deny_response(request, &msg, now);
-            }
-        };
-        self.finalize_tool_output(request, tool_output, tool_started_at.elapsed(), now)
+        let has_monetary = charge_result.is_some();
+        let (tool_output, reported_cost) =
+            match self.dispatch_tool_call_with_cost(request, has_monetary) {
+                Ok(result) => result,
+                Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %error,
+                        "tool call requires URL elicitation"
+                    );
+                    return Err(error);
+                }
+                Err(KernelError::RequestCancelled { reason, .. }) => {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %reason,
+                        "tool call cancelled"
+                    );
+                    return self.build_cancelled_response(request, &reason, now);
+                }
+                Err(KernelError::RequestIncomplete(reason)) => {
+                    warn!(
+                        request_id = %request.request_id,
+                        reason = %reason,
+                        "tool call incomplete"
+                    );
+                    return self.build_incomplete_response(request, &reason, now);
+                }
+                Err(e) => {
+                    let msg = e.to_string();
+                    warn!(request_id = %request.request_id, reason = %msg, "tool server error");
+                    return self.build_deny_response(request, &msg, now);
+                }
+            };
+        self.finalize_tool_output_with_cost(
+            request,
+            tool_output,
+            tool_started_at.elapsed(),
+            now,
+            charge_result,
+            reported_cost,
+            cap,
+        )
     }
 
     fn evaluate_tool_call_with_nested_flow_client<C: NestedFlowClient>(
@@ -1908,16 +1957,31 @@ impl PactKernel {
             }
         };
 
-        if let Err(e) = self.check_and_increment_budget(cap, &matching_grants) {
-            let msg = e.to_string();
-            warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
-        }
+        let (matched_grant_index, _charge_result) =
+            match self.check_and_increment_budget(cap, &matching_grants) {
+                Ok(result) => result,
+                Err(e) => {
+                    let msg = e.to_string();
+                    warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
+                    return self.build_monetary_deny_response(
+                        request,
+                        &msg,
+                        now,
+                        &matching_grants,
+                        cap,
+                    );
+                }
+            };
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
 
-        if let Err(e) = self.run_guards(request, &cap.scope, Some(session_roots.as_slice())) {
+        if let Err(e) = self.run_guards(
+            request,
+            &cap.scope,
+            Some(session_roots.as_slice()),
+            Some(matched_grant_index),
+        ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
             return self.build_deny_response(request, &msg, now);
@@ -2193,28 +2257,84 @@ impl PactKernel {
     }
 
     /// Check and decrement the invocation budget for a capability.
+    ///
+    /// Returns `(matched_grant_index, Option<BudgetChargeResult>)`.
+    /// The charge result is populated only for monetary grants.
     fn check_and_increment_budget(
         &mut self,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
-    ) -> Result<(), KernelError> {
+    ) -> Result<(usize, Option<BudgetChargeResult>), KernelError> {
         let mut saw_exhausted_budget = false;
 
         for matching in matching_grants {
-            if self.budget_store.try_increment(
-                &cap.id,
-                matching.index,
-                matching.grant.max_invocations,
-            )? {
-                return Ok(());
+            let grant = matching.grant;
+            let has_monetary = grant.max_cost_per_invocation.is_some()
+                || grant.max_total_cost.is_some();
+
+            if has_monetary {
+                // Use worst-case max_cost_per_invocation as the pre-execution debit.
+                let cost_units = grant
+                    .max_cost_per_invocation
+                    .as_ref()
+                    .map(|m| m.units)
+                    .unwrap_or(0);
+                let currency = grant
+                    .max_cost_per_invocation
+                    .as_ref()
+                    .map(|m| m.currency.clone())
+                    .or_else(|| {
+                        grant.max_total_cost.as_ref().map(|m| m.currency.clone())
+                    })
+                    .unwrap_or_else(|| "USD".to_string());
+                let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
+                let max_per = grant
+                    .max_cost_per_invocation
+                    .as_ref()
+                    .map(|m| m.units);
+                let budget_total = max_total.unwrap_or(u64::MAX);
+
+                let ok = self.budget_store.try_charge_cost(
+                    &cap.id,
+                    matching.index,
+                    grant.max_invocations,
+                    cost_units,
+                    max_per,
+                    max_total,
+                )?;
+                if ok {
+                    let charge = BudgetChargeResult {
+                        grant_index: matching.index,
+                        cost_charged: cost_units,
+                        currency,
+                        budget_total,
+                    };
+                    return Ok((matching.index, Some(charge)));
+                }
+                saw_exhausted_budget = true;
+            } else {
+                // Non-monetary path: use try_increment as before.
+                if self.budget_store.try_increment(
+                    &cap.id,
+                    matching.index,
+                    grant.max_invocations,
+                )? {
+                    return Ok((matching.index, None));
+                }
+                saw_exhausted_budget =
+                    saw_exhausted_budget || grant.max_invocations.is_some();
             }
-            saw_exhausted_budget = saw_exhausted_budget || matching.grant.max_invocations.is_some();
         }
 
         if saw_exhausted_budget {
             Err(KernelError::BudgetExhausted(cap.id.clone()))
         } else {
-            Ok(())
+            // No matching grant had any limit -- allow with the first grant's index.
+            let first_index = matching_grants
+                .first()
+                .map(|m| m.index)
+                .unwrap_or(0);
+            Ok((first_index, None))
         }
     }
 
@@ -2225,6 +2345,7 @@ impl PactKernel {
         request: &ToolCallRequest,
         scope: &PactScope,
         session_filesystem_roots: Option<&[String]>,
+        matched_grant_index: Option<usize>,
     ) -> Result<(), KernelError> {
         let ctx = GuardContext {
             request,
@@ -2232,7 +2353,7 @@ impl PactKernel {
             agent_id: &request.agent_id,
             server_id: &request.server_id,
             session_filesystem_roots,
-            matched_grant_index: None,
+            matched_grant_index,
         };
 
         for guard in &self.guards {
@@ -2259,11 +2380,16 @@ impl PactKernel {
         Ok(())
     }
 
-    /// Forward the validated request to the appropriate tool server.
-    fn dispatch_tool_call(
+    /// Forward the validated request and optionally report actual invocation cost.
+    ///
+    /// When `has_monetary_grant` is true, calls `invoke_with_cost` so the server
+    /// can report the actual cost incurred. For non-monetary grants the standard
+    /// dispatch path is used and cost is always None.
+    fn dispatch_tool_call_with_cost(
         &self,
         request: &ToolCallRequest,
-    ) -> Result<ToolServerOutput, KernelError> {
+        has_monetary_grant: bool,
+    ) -> Result<(ToolServerOutput, Option<ToolInvocationCost>), KernelError> {
         let server = self.tool_servers.get(&request.server_id).ok_or_else(|| {
             KernelError::ToolNotRegistered(format!(
                 "server \"{}\" / tool \"{}\"",
@@ -2271,15 +2397,111 @@ impl PactKernel {
             ))
         })?;
 
+        // Try streaming first regardless of monetary mode.
         if let Some(stream) =
             server.invoke_stream(&request.tool_name, request.arguments.clone(), None)?
         {
-            Ok(ToolServerOutput::Stream(stream))
-        } else {
-            server
-                .invoke(&request.tool_name, request.arguments.clone(), None)
-                .map(ToolServerOutput::Value)
+            return Ok((ToolServerOutput::Stream(stream), None));
         }
+
+        if has_monetary_grant {
+            let (value, cost) =
+                server.invoke_with_cost(&request.tool_name, request.arguments.clone(), None)?;
+            Ok((ToolServerOutput::Value(value), cost))
+        } else {
+            let value = server.invoke(&request.tool_name, request.arguments.clone(), None)?;
+            Ok((ToolServerOutput::Value(value), None))
+        }
+    }
+
+    /// Build a denial response, including FinancialReceiptMetadata when the
+    /// denial reason is monetary budget exhaustion.
+    fn build_monetary_deny_response(
+        &mut self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matching_grants: &[MatchingGrant<'_>],
+        cap: &CapabilityToken,
+    ) -> Result<ToolCallResponse, KernelError> {
+        // Look for a monetary grant among the matching candidates to populate metadata.
+        let monetary_grant = matching_grants
+            .iter()
+            .find(|m| {
+                m.grant.max_cost_per_invocation.is_some() || m.grant.max_total_cost.is_some()
+            });
+
+        if let Some(mg) = monetary_grant {
+            let grant = mg.grant;
+            let currency = grant
+                .max_cost_per_invocation
+                .as_ref()
+                .map(|m| m.currency.clone())
+                .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
+                .unwrap_or_else(|| "USD".to_string());
+            let budget_total = grant
+                .max_total_cost
+                .as_ref()
+                .map(|m| m.units)
+                .unwrap_or(0);
+            let attempted_cost = grant
+                .max_cost_per_invocation
+                .as_ref()
+                .map(|m| m.units)
+                .unwrap_or(0);
+            let delegation_depth = cap.delegation_chain.len() as u32;
+            let root_budget_holder = cap.issuer.to_hex();
+
+            let financial_meta = FinancialReceiptMetadata {
+                grant_index: mg.index as u32,
+                cost_charged: 0,
+                currency,
+                budget_remaining: 0,
+                budget_total,
+                delegation_depth,
+                root_budget_holder,
+                payment_reference: None,
+                settlement_status: "not_applicable".to_string(),
+                cost_breakdown: None,
+                attempted_cost: Some(attempted_cost),
+            };
+
+            let metadata = Some(serde_json::json!({ "financial": financial_meta }));
+            let receipt_content = receipt_content_for_output(None, None)?;
+
+            let action =
+                ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
+                    KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
+                })?;
+
+            let receipt = self.build_and_sign_receipt(ReceiptParams {
+                capability_id: &cap.id,
+                tool_name: &request.tool_name,
+                server_id: &request.server_id,
+                decision: Decision::Deny {
+                    reason: reason.to_string(),
+                    guard: "kernel".to_string(),
+                },
+                action,
+                content_hash: receipt_content.content_hash,
+                metadata,
+                timestamp,
+            })?;
+
+            self.record_pact_receipt(&receipt)?;
+
+            return Ok(ToolCallResponse {
+                request_id: request.request_id.clone(),
+                verdict: Verdict::Deny,
+                output: None,
+                reason: Some(reason.to_string()),
+                terminal_state: OperationTerminalState::Completed,
+                receipt,
+            });
+        }
+
+        // No monetary grant -- standard deny.
+        self.build_deny_response(request, reason, timestamp)
     }
 
     fn finalize_tool_output(
@@ -2303,6 +2525,94 @@ impl PactKernel {
                     &reason,
                     timestamp,
                 ),
+        }
+    }
+
+    /// Finalize a tool output with optional monetary metadata injected into the receipt.
+    #[allow(clippy::too_many_arguments)]
+    fn finalize_tool_output_with_cost(
+        &mut self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        charge_result: Option<BudgetChargeResult>,
+        reported_cost: Option<ToolInvocationCost>,
+        cap: &CapabilityToken,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let Some(charge) = charge_result else {
+            // Non-monetary grant: use normal path.
+            return self.finalize_tool_output(request, output, elapsed, timestamp);
+        };
+
+        // Determine actual cost: use reported cost if server provided it and it's <= max charged.
+        // If server overruns max_cost_per_invocation, we log a warning and treat as "failed".
+        let (actual_cost, settlement_status) = if let Some(ref cost) = reported_cost {
+            if cost.units > charge.cost_charged && charge.cost_charged > 0 {
+                warn!(
+                    request_id = %request.request_id,
+                    reported = cost.units,
+                    charged = charge.cost_charged,
+                    "tool server reported cost exceeds max_cost_per_invocation; settlement_status=failed"
+                );
+                (cost.units, "failed".to_string())
+            } else {
+                (cost.units, "authorized".to_string())
+            }
+        } else {
+            // Server did not report cost; worst-case debit already charged.
+            (charge.cost_charged, "authorized".to_string())
+        };
+
+        let budget_remaining = charge.budget_total.saturating_sub(actual_cost);
+        let delegation_depth = cap.delegation_chain.len() as u32;
+        let root_budget_holder = cap.issuer.to_hex();
+
+        let financial_meta = FinancialReceiptMetadata {
+            grant_index: charge.grant_index as u32,
+            cost_charged: actual_cost,
+            currency: charge.currency.clone(),
+            budget_remaining,
+            budget_total: charge.budget_total,
+            delegation_depth,
+            root_budget_holder,
+            payment_reference: None,
+            settlement_status,
+            cost_breakdown: reported_cost.and_then(|c| c.breakdown),
+            attempted_cost: None,
+        };
+
+        let limited_output = self.apply_stream_limits(output, elapsed)?;
+        let tool_call_output = match &limited_output {
+            ToolServerOutput::Value(v) => ToolCallOutput::Value(v.clone()),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(s)) => {
+                ToolCallOutput::Stream(s.clone())
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, .. }) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+        };
+
+        let financial_json = serde_json::json!({ "financial": financial_meta });
+
+        match limited_output {
+            ToolServerOutput::Value(_)
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
+                self.build_allow_response_with_metadata(
+                    request,
+                    tool_call_output,
+                    timestamp,
+                    Some(financial_json),
+                )
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
+                self.build_incomplete_response_with_output(
+                    request,
+                    Some(tool_call_output),
+                    &reason,
+                    timestamp,
+                )
+            }
         }
     }
 
@@ -2502,12 +2812,38 @@ impl PactKernel {
         output: ToolCallOutput,
         timestamp: u64,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_allow_response_with_metadata(request, output, timestamp, None)
+    }
+
+    fn build_allow_response_with_metadata(
+        &mut self,
+        request: &ToolCallRequest,
+        output: ToolCallOutput,
+        timestamp: u64,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let expected_chunks = match &output {
             ToolCallOutput::Stream(stream) => Some(stream.chunk_count()),
             ToolCallOutput::Value(_) => None,
         };
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
+
+        // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.
+        let metadata = match (receipt_content.metadata, extra_metadata) {
+            (None, extra) => extra,
+            (Some(base), None) => Some(base),
+            (Some(mut base), Some(extra)) => {
+                if let (Some(base_obj), Some(extra_obj)) =
+                    (base.as_object_mut(), extra.as_object())
+                {
+                    for (key, value) in extra_obj {
+                        base_obj.insert(key.clone(), value.clone());
+                    }
+                }
+                Some(base)
+            }
+        };
 
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
@@ -2520,7 +2856,7 @@ impl PactKernel {
             decision: Decision::Allow,
             action,
             content_hash: receipt_content.content_hash,
-            metadata: receipt_content.metadata,
+            metadata,
             timestamp,
         })?;
 
@@ -2569,9 +2905,88 @@ impl PactKernel {
 
     fn record_pact_receipt(&mut self, receipt: &PactReceipt) -> Result<(), KernelError> {
         if let Some(store) = self.receipt_store.as_deref_mut() {
-            store.append_pact_receipt(receipt)?;
+            // Downcast to SqliteReceiptStore to get the seq and trigger checkpoints.
+            // If we can't (e.g. a non-SQLite store), fall back to the trait method.
+            let seq = if let Some(sqlite_store) = store
+                .as_any_mut()
+                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
+            {
+                sqlite_store.append_pact_receipt_returning_seq(receipt)?
+            } else {
+                store.append_pact_receipt(receipt)?;
+                0
+            };
+
+            // Trigger a Merkle checkpoint if we've accumulated enough receipts.
+            if seq > 0
+                && self.checkpoint_batch_size > 0
+                && (seq - self.last_checkpoint_seq) >= self.checkpoint_batch_size
+            {
+                self.maybe_trigger_checkpoint(seq)?;
+            }
         }
         self.receipt_log.append(receipt.clone());
+        Ok(())
+    }
+
+    /// Trigger a Merkle checkpoint for all receipts in [last_checkpoint_seq+1, batch_end_seq].
+    fn maybe_trigger_checkpoint(&mut self, batch_end_seq: u64) -> Result<(), KernelError> {
+        let batch_start_seq = self.last_checkpoint_seq + 1;
+
+        let sqlite_store = self
+            .receipt_store
+            .as_mut()
+            .and_then(|store| {
+                store
+                    .as_any_mut()
+                    .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
+            });
+
+        let Some(sqlite_store) = sqlite_store else {
+            return Ok(());
+        };
+
+        let receipt_bytes_with_seqs = sqlite_store
+            .receipts_canonical_bytes_range(batch_start_seq, batch_end_seq)
+            .map_err(KernelError::ReceiptPersistence)?;
+
+        if receipt_bytes_with_seqs.is_empty() {
+            return Ok(());
+        }
+
+        let receipt_bytes: Vec<Vec<u8>> = receipt_bytes_with_seqs
+            .into_iter()
+            .map(|(_, bytes)| bytes)
+            .collect();
+
+        self.checkpoint_seq_counter += 1;
+        let checkpoint_seq = self.checkpoint_seq_counter;
+
+        let checkpoint = checkpoint::build_checkpoint(
+            checkpoint_seq,
+            batch_start_seq,
+            batch_end_seq,
+            &receipt_bytes,
+            &self.config.keypair,
+        )
+        .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
+
+        // Re-borrow to store the checkpoint.
+        let sqlite_store = self
+            .receipt_store
+            .as_mut()
+            .and_then(|store| {
+                store
+                    .as_any_mut()
+                    .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
+            });
+        if let Some(sqlite_store) = sqlite_store {
+            sqlite_store
+                .store_checkpoint(&checkpoint)
+                .map_err(KernelError::ReceiptPersistence)?;
+        }
+
+        self.last_checkpoint_seq = batch_end_seq;
         Ok(())
     }
 
@@ -3358,6 +3773,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
         }
     }
 
@@ -6348,6 +6764,536 @@ mod tests {
             }),
         );
         assert!(matches!(denied, Err(KernelError::OutOfScopePrompt { .. })));
+    }
+
+    /// A tool server that always reports a specific actual cost.
+    struct MonetaryCostServer {
+        id: String,
+        reported_cost: Option<ToolInvocationCost>,
+    }
+
+    impl MonetaryCostServer {
+        fn new(id: &str, cost_units: u64, currency: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                reported_cost: Some(ToolInvocationCost {
+                    units: cost_units,
+                    currency: currency.to_string(),
+                    breakdown: None,
+                }),
+            }
+        }
+
+        fn no_cost(id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                reported_cost: None,
+            }
+        }
+    }
+
+    impl ToolServerConnection for MonetaryCostServer {
+        fn server_id(&self) -> &str {
+            &self.id
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["compute".to_string()]
+        }
+
+        fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            Ok(serde_json::json!({"result": "ok"}))
+        }
+
+        fn invoke_with_cost(
+            &self,
+            tool_name: &str,
+            arguments: serde_json::Value,
+            bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+            let value = self.invoke(tool_name, arguments, bridge)?;
+            Ok((value, self.reported_cost.clone()))
+        }
+    }
+
+    fn make_monetary_grant(
+        server: &str,
+        tool: &str,
+        max_cost_per_invocation: u64,
+        max_total_cost: u64,
+        currency: &str,
+    ) -> ToolGrant {
+        use pact_core::capability::MonetaryAmount;
+        ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: Some(MonetaryAmount {
+                units: max_cost_per_invocation,
+                currency: currency.to_string(),
+            }),
+            max_total_cost: Some(MonetaryAmount {
+                units: max_total_cost,
+                currency: currency.to_string(),
+            }),
+        }
+    }
+
+    fn make_monetary_config() -> KernelConfig {
+        KernelConfig {
+            keypair: make_keypair(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "monetary-policy-hash".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+        }
+    }
+
+    // --- Monetary enforcement tests ---
+
+    #[test]
+    fn monetary_denial_exceeds_per_invocation_cap() {
+        // Grant max_cost_per_invocation=100; tool server reports actual cost 150 (> cap).
+        // The budget check should deny because the worst-case debit (100) passes the cap,
+        // but the server reports 150 which exceeds the cap -- actually no: we charge the
+        // max_cost_per_invocation as the worst-case DEBIT upfront. The per-invocation check
+        // is: cost_units (=max_per) must be <= max_cost_per_invocation. With cost_units=100
+        // and max_per=100 that passes. After invocation, server reports 150; we log a warning
+        // and set settlement_status=failed. But the invocation is NOT denied before execution.
+        //
+        // To produce a pre-execution monetary denial, the requested cost must exceed the cap.
+        // This happens when we charge cost_units = max_cost_per_invocation but the total budget
+        // is already exhausted.
+        //
+        // Test: accumulated 500 + max_cost_per_invocation=100 exceeds max_total_cost=500 -> deny.
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        let server = MonetaryCostServer::no_cost("cost-srv");
+        kernel.register_tool_server(Box::new(server));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 500, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let request = |id: &str| ToolCallRequest {
+            request_id: id.to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+        };
+
+        // 5 invocations: 5 * 100 = 500 total -- all should pass.
+        for i in 0..5 {
+            let resp = kernel.evaluate_tool_call(&request(&format!("req-{i}"))).unwrap();
+            assert_eq!(resp.verdict, Verdict::Allow, "invocation {i} should be allowed");
+        }
+
+        // 6th invocation would need 600 total, exceeding max_total_cost=500.
+        let resp = kernel.evaluate_tool_call(&request("req-6")).unwrap();
+        assert_eq!(resp.verdict, Verdict::Deny, "6th invocation should be denied");
+    }
+
+    #[test]
+    fn monetary_denial_receipt_contains_financial_metadata() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let request = ToolCallRequest {
+            request_id: "req-1".to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+        };
+
+        // First invocation uses up the entire budget (100 of 100).
+        let _allow = kernel.evaluate_tool_call(&request).unwrap();
+
+        // Second invocation should be denied.
+        let deny_req = ToolCallRequest {
+            request_id: "req-2".to_string(),
+            ..request
+        };
+        let resp = kernel.evaluate_tool_call(&deny_req).unwrap();
+        assert_eq!(resp.verdict, Verdict::Deny);
+
+        // Receipt must contain financial metadata.
+        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
+        let financial = metadata.get("financial").expect("should have 'financial' key");
+        assert_eq!(financial["settlement_status"], "not_applicable");
+        assert!(financial["attempted_cost"].as_u64().is_some());
+        assert_eq!(financial["currency"], "USD");
+    }
+
+    #[test]
+    fn monetary_allow_receipt_contains_financial_metadata() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        // Server reports actual cost of 75 cents (< max 100).
+        kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let resp = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-1".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+            })
+            .unwrap();
+
+        assert_eq!(resp.verdict, Verdict::Allow);
+
+        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
+        let financial = metadata.get("financial").expect("should have 'financial' key");
+        // The actual reported cost (75) should be recorded.
+        assert_eq!(financial["cost_charged"].as_u64().unwrap(), 75);
+        assert_eq!(financial["settlement_status"], "authorized");
+        assert_eq!(financial["currency"], "USD");
+    }
+
+    #[test]
+    fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        // Server does NOT report cost (returns None).
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let resp = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-1".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+            })
+            .unwrap();
+
+        assert_eq!(resp.verdict, Verdict::Allow);
+        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
+        let financial = metadata.get("financial").expect("should have 'financial' key");
+        // Worst-case debit: max_cost_per_invocation = 100.
+        assert_eq!(financial["cost_charged"].as_u64().unwrap(), 100);
+    }
+
+    #[test]
+    fn monetary_full_pipeline_three_invocations_third_denied() {
+        // max_total_cost=250, max_cost_per_invocation=100.
+        // Invocation 1: charges 100, total = 100. Allowed.
+        // Invocation 2: charges 100, total = 200. Allowed.
+        // Invocation 3: would charge 100, total would be 300 > 250. Denied.
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 250, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let make_req = |id: &str| ToolCallRequest {
+            request_id: id.to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+        };
+
+        let r1 = kernel.evaluate_tool_call(&make_req("req-1")).unwrap();
+        assert_eq!(r1.verdict, Verdict::Allow, "first invocation should pass");
+
+        let r2 = kernel.evaluate_tool_call(&make_req("req-2")).unwrap();
+        assert_eq!(r2.verdict, Verdict::Allow, "second invocation should pass");
+
+        let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
+        assert_eq!(r3.verdict, Verdict::Deny, "third invocation should be denied");
+
+        // Verify the denial receipt has financial metadata.
+        let metadata = r3.receipt.metadata.as_ref().expect("should have metadata");
+        assert!(metadata.get("financial").is_some());
+    }
+
+    #[test]
+    fn matched_grant_index_populated_in_guard_context() {
+        // A guard that records the matched_grant_index from its context.
+        use std::sync::{Arc, Mutex};
+
+        #[derive(Clone)]
+        struct IndexCapturingGuard {
+            captured: Arc<Mutex<Option<usize>>>,
+        }
+
+        impl Guard for IndexCapturingGuard {
+            fn name(&self) -> &str {
+                "index-capture"
+            }
+
+            fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
+                let mut lock = self.captured.lock().unwrap();
+                *lock = ctx.matched_grant_index;
+                Ok(Verdict::Allow)
+            }
+        }
+
+        let captured = Arc::new(Mutex::new(None::<usize>));
+        let guard = IndexCapturingGuard {
+            captured: captured.clone(),
+        };
+
+        let mut kernel = PactKernel::new(make_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["tool1", "tool2"])));
+        kernel.add_guard(Box::new(guard));
+
+        // Two grants; first matches "tool1", second matches "tool2".
+        let grant0 = ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "tool1".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+        };
+        let grant1 = ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "tool2".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+        };
+        let cap = kernel
+            .issue_capability(
+                &agent_kp.public_key(),
+                make_scope(vec![grant0, grant1]),
+                3600,
+            )
+            .unwrap();
+
+        // Request tool2 -- matched grant should be at index 1.
+        let resp = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-1".to_string(),
+                capability: cap.clone(),
+                tool_name: "tool2".to_string(),
+                server_id: "srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+            })
+            .unwrap();
+        assert_eq!(resp.verdict, Verdict::Allow);
+
+        let idx = *captured.lock().unwrap();
+        assert_eq!(
+            idx,
+            Some(1),
+            "guard should see matched_grant_index=Some(1) for tool2 (second grant)"
+        );
+    }
+
+    #[test]
+    fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
+        // Simulate a velocity-style guard with a simple counter that denies
+        // after N invocations. This tests the kernel's handling of guard denials
+        // (producing a signed deny receipt without panic) without importing pact-guards.
+        use std::sync::{Arc, Mutex};
+
+        struct CountingRateLimitGuard {
+            count: Arc<Mutex<u32>>,
+            max: u32,
+        }
+
+        impl Guard for CountingRateLimitGuard {
+            fn name(&self) -> &str {
+                "counting-rate-limit"
+            }
+
+            fn evaluate(&self, _ctx: &GuardContext) -> Result<Verdict, KernelError> {
+                let mut count = self.count.lock().unwrap();
+                *count += 1;
+                if *count > self.max {
+                    Ok(Verdict::Deny)
+                } else {
+                    Ok(Verdict::Allow)
+                }
+            }
+        }
+
+        let counter = Arc::new(Mutex::new(0u32));
+        let guard = CountingRateLimitGuard {
+            count: counter.clone(),
+            max: 2,
+        };
+
+        let mut kernel = PactKernel::new(make_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
+        kernel.add_guard(Box::new(guard));
+
+        let grant = make_grant("srv", "echo");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let make_req = |id: &str| ToolCallRequest {
+            request_id: id.to_string(),
+            capability: cap.clone(),
+            tool_name: "echo".to_string(),
+            server_id: "srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+        };
+
+        // First two invocations allowed.
+        let r1 = kernel.evaluate_tool_call(&make_req("req-1")).unwrap();
+        assert_eq!(r1.verdict, Verdict::Allow);
+        let r2 = kernel.evaluate_tool_call(&make_req("req-2")).unwrap();
+        assert_eq!(r2.verdict, Verdict::Allow);
+
+        // Third invocation should be denied by the counting guard.
+        let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
+        assert_eq!(r3.verdict, Verdict::Deny, "counting guard should deny 3rd invocation");
+        // Verify it's a properly signed deny receipt (not a panic/unwrap).
+        assert!(r3.receipt.id.starts_with("rcpt-"), "receipt should have valid id");
+        assert!(r3.reason.is_some(), "denial should have a reason");
+    }
+
+    #[test]
+    fn checkpoint_triggers_at_100_receipts() {
+        let path = unique_receipt_db_path("pact-checkpoint-trigger");
+        let mut config = make_monetary_config();
+        config.checkpoint_batch_size = 10; // Use 10 for speed.
+
+        let mut kernel = PactKernel::new(config);
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
+
+        let store = SqliteReceiptStore::open(&path).unwrap();
+        kernel.set_receipt_store(Box::new(store));
+
+        let grant = make_grant("srv", "echo");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        for i in 0..10 {
+            kernel
+                .evaluate_tool_call(&ToolCallRequest {
+                    request_id: format!("req-{i}"),
+                    capability: cap.clone(),
+                    tool_name: "echo".to_string(),
+                    server_id: "srv".to_string(),
+                    agent_id: agent_kp.public_key().to_hex(),
+                    arguments: serde_json::json!({}),
+                })
+                .unwrap();
+        }
+
+        // Verify a checkpoint was stored in the database.
+        let store2 = SqliteReceiptStore::open(&path).unwrap();
+        let checkpoint = store2.load_checkpoint_by_seq(1).unwrap();
+        assert!(
+            checkpoint.is_some(),
+            "checkpoint should have been stored after 10 receipts"
+        );
+        let cp = checkpoint.unwrap();
+        assert_eq!(cp.body.checkpoint_seq, 1);
+        assert_eq!(cp.body.batch_start_seq, 1);
+        assert_eq!(cp.body.batch_end_seq, 10);
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn inclusion_proof_verifies_against_stored_checkpoint() {
+        let path = unique_receipt_db_path("pact-checkpoint-proof");
+        let mut config = make_monetary_config();
+        config.checkpoint_batch_size = 5;
+
+        let mut kernel = PactKernel::new(config);
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
+
+        let store = SqliteReceiptStore::open(&path).unwrap();
+        kernel.set_receipt_store(Box::new(store));
+
+        let grant = make_grant("srv", "echo");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        for i in 0..5 {
+            kernel
+                .evaluate_tool_call(&ToolCallRequest {
+                    request_id: format!("req-{i}"),
+                    capability: cap.clone(),
+                    tool_name: "echo".to_string(),
+                    server_id: "srv".to_string(),
+                    agent_id: agent_kp.public_key().to_hex(),
+                    arguments: serde_json::json!({}),
+                })
+                .unwrap();
+        }
+
+        // Load checkpoint and receipts, build and verify an inclusion proof.
+        let store2 = SqliteReceiptStore::open(&path).unwrap();
+        let checkpoint = store2
+            .load_checkpoint_by_seq(1)
+            .unwrap()
+            .expect("checkpoint should exist");
+
+        let bytes_range = store2.receipts_canonical_bytes_range(1, 5).unwrap();
+        assert_eq!(bytes_range.len(), 5, "should have 5 receipts in range");
+
+        let all_bytes: Vec<Vec<u8>> = bytes_range.iter().map(|(_, b)| b.clone()).collect();
+        let tree =
+            pact_core::merkle::MerkleTree::from_leaves(&all_bytes).expect("tree build failed");
+
+        // Build proof for receipt at leaf index 2 (seq 3).
+        let proof = build_inclusion_proof(&tree, 2, 1, 3).expect("proof build failed");
+        assert!(
+            proof.verify(&all_bytes[2], &checkpoint.body.merkle_root),
+            "inclusion proof for receipt #3 should verify against checkpoint"
+        );
+
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

@@ -33,6 +33,15 @@ pub trait ReceiptStore: Send {
         &mut self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError>;
+
+    /// Return a mutable `Any` reference for downcasting to concrete types.
+    ///
+    /// This allows the kernel to downcast to `SqliteReceiptStore` when it
+    /// needs access to seq-returning and checkpoint methods that are not
+    /// part of the minimal trait.
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        None
+    }
 }
 
 pub struct SqliteReceiptStore {
@@ -445,6 +454,10 @@ impl ReceiptStore for SqliteReceiptStore {
             ],
         )?;
         Ok(())
+    }
+
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
     }
 
     fn append_child_receipt(
