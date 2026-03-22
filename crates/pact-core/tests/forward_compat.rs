@@ -39,6 +39,8 @@ fn make_token_body(issuer_kp: &Keypair) -> CapabilityTokenBody {
                 operations: vec![Operation::Invoke],
                 constraints: vec![],
                 max_invocations: Some(10),
+                max_cost_per_invocation: None,
+                max_total_cost: None,
             }],
             resource_grants: vec![],
             prompt_grants: vec![],
@@ -168,9 +170,9 @@ fn v2_token_with_unknown_fields_accepted() {
     value["future_field"] = serde_json::Value::String("some_future_value".to_string());
     value["v3_data"] = serde_json::json!({"nested_key": true, "count": 42});
 
-    // Inject inside scope.grants[0] (simulates monetary budget fields)
+    // Inject inside scope.grants[0] (simulates future v3.0 unknown fields)
     if let Some(grant) = value["scope"]["grants"].get_mut(0) {
-        grant["max_cost_per_invocation"] = serde_json::json!({"amount": 100, "currency": "USDC"});
+        grant["v3_billing_ref"] = serde_json::json!("billing-acct-001");
         grant["v3_priority"] = serde_json::Value::Number(serde_json::Number::from(5));
     }
 

@@ -154,6 +154,18 @@ impl PactScope {
     }
 }
 
+/// A monetary amount with currency denomination.
+///
+/// Uses minor-unit integers to avoid floating-point precision issues.
+/// For USD, 1 dollar = 100 units (cents). For JPY, 1 yen = 1 unit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MonetaryAmount {
+    /// Amount in the currency's smallest unit (e.g. cents for USD).
+    pub units: u64,
+    /// ISO 4217 currency code. Examples: "USD", "EUR", "JPY".
+    pub currency: String,
+}
+
 /// Authorization for a single tool on a single server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolGrant {
@@ -169,6 +181,12 @@ pub struct ToolGrant {
     /// Maximum number of invocations allowed under this grant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_invocations: Option<u32>,
+    /// Maximum monetary cost per single invocation under this grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_cost_per_invocation: Option<MonetaryAmount>,
+    /// Maximum aggregate monetary cost across all invocations under this grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_total_cost: Option<MonetaryAmount>,
 }
 
 impl ToolGrant {
@@ -215,6 +233,26 @@ impl ToolGrant {
             .all(|pc| self.constraints.contains(pc));
         if !constraints_ok {
             return false;
+        }
+
+        // If parent has a per-invocation cost cap, child must too and it must be <=
+        if let Some(ref parent_cost) = parent.max_cost_per_invocation {
+            match &self.max_cost_per_invocation {
+                Some(child_cost)
+                    if child_cost.currency == parent_cost.currency
+                        && child_cost.units <= parent_cost.units => {}
+                _ => return false,
+            }
+        }
+
+        // If parent has a total cost cap, child must too and it must be <=
+        if let Some(ref parent_cost) = parent.max_total_cost {
+            match &self.max_total_cost {
+                Some(child_cost)
+                    if child_cost.currency == parent_cost.currency
+                        && child_cost.units <= parent_cost.units => {}
+                _ => return false,
+            }
         }
 
         true
@@ -402,6 +440,18 @@ pub enum Attenuation {
     },
     /// The expiration was shortened.
     ShortenExpiry { new_expires_at: u64 },
+    /// The per-invocation cost cap was tightened during delegation.
+    ReduceCostPerInvocation {
+        server_id: String,
+        tool_name: String,
+        max_cost_per_invocation: MonetaryAmount,
+    },
+    /// The total cost budget was reduced during delegation.
+    ReduceTotalCost {
+        server_id: String,
+        tool_name: String,
+        max_total_cost: MonetaryAmount,
+    },
 }
 
 /// Validate an entire delegation chain.
@@ -475,6 +525,8 @@ mod tests {
             operations: ops,
             constraints: vec![],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
         }
     }
 
@@ -640,6 +692,8 @@ mod tests {
             operations: vec![Operation::Invoke],
             constraints: vec![],
             max_invocations: Some(10),
+            max_cost_per_invocation: None,
+            max_total_cost: None,
         };
         let child_ok = ToolGrant {
             max_invocations: Some(5),
@@ -667,6 +721,8 @@ mod tests {
             operations: vec![Operation::Invoke],
             constraints: vec![Constraint::PathPrefix("/app".to_string())],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
         };
         // Child has parent's constraint + an extra one (more restrictive)
         let child = ToolGrant {
@@ -694,6 +750,8 @@ mod tests {
             operations: vec![Operation::Invoke],
             constraints: vec![],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
         };
         let child = ToolGrant {
             server_id: "filesystem".to_string(),
@@ -701,6 +759,8 @@ mod tests {
             operations: vec![Operation::Invoke],
             constraints: vec![],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
         };
 
         assert!(child.is_subset_of(&parent));
