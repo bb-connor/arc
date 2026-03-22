@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 09-02-PLAN.md (DPoP proof-of-possession with LRU nonce replay rejection)
-last_updated: "2026-03-22T23:33:08.991Z"
+stopped_at: "Completed 09-01-PLAN.md (receipt retention: RetentionConfig, archive_receipts_before, rotate_if_needed)"
+last_updated: "2026-03-22T23:34:26.397Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -68,6 +68,8 @@ Recent decisions affecting current work:
 - [Phase 09-02]: DpopNonceStore uses std::sync::Mutex with LruCache keyed by (nonce, capability_id) -- synchronous, fits Guard pipeline
 - [Phase 09-02]: verify_dpop_proof checks nonce replay AFTER signature verification -- invalid signatures cannot poison nonce store
 - [Phase 09-02]: dpop_required: Option<bool> with serde(default, skip_serializing_if = Option::is_none) -- SCHEMA-01 forward compatibility
+- [Phase 09]: SQLite ATTACH DATABASE for archive writes (zero-copy, WAL-atomic)
+- [Phase 09]: retention_config: None default preserves existing kernel behavior (retention disabled by default)
 
 ### Pending Todos
 
@@ -82,6 +84,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T23:33:08.989Z
-Stopped at: Completed 09-02-PLAN.md (DPoP proof-of-possession with LRU nonce replay rejection)
+Last session: 2026-03-22T23:34:26.395Z
+Stopped at: Completed 09-01-PLAN.md (receipt retention: RetentionConfig, archive_receipts_before, rotate_if_needed)
 Resume file: None
