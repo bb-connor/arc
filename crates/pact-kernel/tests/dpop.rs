@@ -57,7 +57,10 @@ fn default_config() -> DpopConfig {
 
 /// Helper: default nonce store.
 fn default_store(config: &DpopConfig) -> DpopNonceStore {
-    DpopNonceStore::new(config.nonce_store_capacity, Duration::from_secs(config.proof_ttl_secs))
+    DpopNonceStore::new(
+        config.nonce_store_capacity,
+        Duration::from_secs(config.proof_ttl_secs),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -254,7 +257,10 @@ fn dpop_nonce_replay_within_ttl_rejected() {
         &store,
         &config,
     );
-    assert!(result1.is_ok(), "first use of nonce should succeed: {result1:?}");
+    assert!(
+        result1.is_ok(),
+        "first use of nonce should succeed: {result1:?}"
+    );
 
     // Second invocation reusing the same nonce -- must be rejected.
     let body2 = DpopProofBody {
@@ -376,7 +382,10 @@ fn dpop_required_field_roundtrip() {
     };
 
     let json = serde_json::to_string(&grant_required).expect("serialize");
-    assert!(json.contains("dpop_required"), "dpop_required must appear in JSON when Some(true)");
+    assert!(
+        json.contains("dpop_required"),
+        "dpop_required must appear in JSON when Some(true)"
+    );
 
     let restored: ToolGrant = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(restored.dpop_required, Some(true));

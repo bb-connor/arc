@@ -118,9 +118,7 @@ impl Guard for VelocityGuard {
             let refill_rate = max_inv as f64 / window_secs;
 
             let mut buckets = self.invocation_buckets.lock().map_err(|_| {
-                KernelError::Internal(
-                    "velocity guard invocation lock poisoned".to_string(),
-                )
+                KernelError::Internal("velocity guard invocation lock poisoned".to_string())
             })?;
             let bucket = buckets
                 .entry(key.clone())
@@ -137,9 +135,7 @@ impl Guard for VelocityGuard {
             let refill_rate = max_spend as f64 / window_secs;
 
             let mut buckets = self.spend_buckets.lock().map_err(|_| {
-                KernelError::Internal(
-                    "velocity guard spend lock poisoned".to_string(),
-                )
+                KernelError::Internal("velocity guard spend lock poisoned".to_string())
             })?;
             let bucket = buckets
                 .entry(key)
@@ -169,7 +165,11 @@ mod tests {
     use super::*;
 
     // Helper: build a minimal ToolCallRequest.
-    fn make_request(cap: &CapabilityToken, agent_id: &str, server_id: &str) -> pact_kernel::ToolCallRequest {
+    fn make_request(
+        cap: &CapabilityToken,
+        agent_id: &str,
+        server_id: &str,
+    ) -> pact_kernel::ToolCallRequest {
         pact_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),
             capability: cap.clone(),
@@ -452,11 +452,7 @@ mod tests {
         let ctx = guard_ctx(&request, &scope, &agent, &server, None);
         let result = guard.evaluate(&ctx);
         assert!(result.is_ok(), "rate limit must return Ok, not Err");
-        assert_eq!(
-            result.expect("ok"),
-            Verdict::Deny,
-            "must be Verdict::Deny"
-        );
+        assert_eq!(result.expect("ok"), Verdict::Deny, "must be Verdict::Deny");
     }
 
     #[test]
@@ -487,10 +483,6 @@ mod tests {
 
         let ctx = guard_ctx(&request, &scope, &agent, &server, None);
         let result = guard.evaluate(&ctx).expect("should not error");
-        assert_eq!(
-            result,
-            Verdict::Deny,
-            "4th spend request should be denied"
-        );
+        assert_eq!(result, Verdict::Deny, "4th spend request should be denied");
     }
 }

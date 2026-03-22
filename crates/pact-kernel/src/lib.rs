@@ -1855,9 +1855,12 @@ impl PactKernel {
                 }
             };
 
-        if let Err(e) =
-            self.run_guards(request, &cap.scope, session_filesystem_roots, Some(matched_grant_index))
-        {
+        if let Err(e) = self.run_guards(
+            request,
+            &cap.scope,
+            session_filesystem_roots,
+            Some(matched_grant_index),
+        ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
             return self.build_deny_response(request, &msg, now);
@@ -2285,8 +2288,8 @@ impl PactKernel {
 
         for matching in matching_grants {
             let grant = matching.grant;
-            let has_monetary = grant.max_cost_per_invocation.is_some()
-                || grant.max_total_cost.is_some();
+            let has_monetary =
+                grant.max_cost_per_invocation.is_some() || grant.max_total_cost.is_some();
 
             if has_monetary {
                 // Use worst-case max_cost_per_invocation as the pre-execution debit.
@@ -2299,15 +2302,10 @@ impl PactKernel {
                     .max_cost_per_invocation
                     .as_ref()
                     .map(|m| m.currency.clone())
-                    .or_else(|| {
-                        grant.max_total_cost.as_ref().map(|m| m.currency.clone())
-                    })
+                    .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
                     .unwrap_or_else(|| "USD".to_string());
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
-                let max_per = grant
-                    .max_cost_per_invocation
-                    .as_ref()
-                    .map(|m| m.units);
+                let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
 
                 let ok = self.budget_store.try_charge_cost(
@@ -2337,8 +2335,7 @@ impl PactKernel {
                 )? {
                     return Ok((matching.index, None));
                 }
-                saw_exhausted_budget =
-                    saw_exhausted_budget || grant.max_invocations.is_some();
+                saw_exhausted_budget = saw_exhausted_budget || grant.max_invocations.is_some();
             }
         }
 
@@ -2346,10 +2343,7 @@ impl PactKernel {
             Err(KernelError::BudgetExhausted(cap.id.clone()))
         } else {
             // No matching grant had any limit -- allow with the first grant's index.
-            let first_index = matching_grants
-                .first()
-                .map(|m| m.index)
-                .unwrap_or(0);
+            let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
             Ok((first_index, None))
         }
     }
@@ -2441,11 +2435,9 @@ impl PactKernel {
         cap: &CapabilityToken,
     ) -> Result<ToolCallResponse, KernelError> {
         // Look for a monetary grant among the matching candidates to populate metadata.
-        let monetary_grant = matching_grants
-            .iter()
-            .find(|m| {
-                m.grant.max_cost_per_invocation.is_some() || m.grant.max_total_cost.is_some()
-            });
+        let monetary_grant = matching_grants.iter().find(|m| {
+            m.grant.max_cost_per_invocation.is_some() || m.grant.max_total_cost.is_some()
+        });
 
         if let Some(mg) = monetary_grant {
             let grant = mg.grant;
@@ -2455,11 +2447,7 @@ impl PactKernel {
                 .map(|m| m.currency.clone())
                 .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
                 .unwrap_or_else(|| "USD".to_string());
-            let budget_total = grant
-                .max_total_cost
-                .as_ref()
-                .map(|m| m.units)
-                .unwrap_or(0);
+            let budget_total = grant.max_total_cost.as_ref().map(|m| m.units).unwrap_or(0);
             let attempted_cost = grant
                 .max_cost_per_invocation
                 .as_ref()
@@ -2613,22 +2601,20 @@ impl PactKernel {
 
         match limited_output {
             ToolServerOutput::Value(_)
-            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => {
-                self.build_allow_response_with_metadata(
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
+                .build_allow_response_with_metadata(
                     request,
                     tool_call_output,
                     timestamp,
                     Some(financial_json),
-                )
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => {
-                self.build_incomplete_response_with_output(
+                ),
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
+                .build_incomplete_response_with_output(
                     request,
                     Some(tool_call_output),
                     &reason,
                     timestamp,
-                )
-            }
+                ),
         }
     }
 
@@ -2850,8 +2836,7 @@ impl PactKernel {
             (None, extra) => extra,
             (Some(base), None) => Some(base),
             (Some(mut base), Some(extra)) => {
-                if let (Some(base_obj), Some(extra_obj)) =
-                    (base.as_object_mut(), extra.as_object())
+                if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra.as_object())
                 {
                     for (key, value) in extra_obj {
                         base_obj.insert(key.clone(), value.clone());
@@ -2949,14 +2934,11 @@ impl PactKernel {
     fn maybe_trigger_checkpoint(&mut self, batch_end_seq: u64) -> Result<(), KernelError> {
         let batch_start_seq = self.last_checkpoint_seq + 1;
 
-        let sqlite_store = self
-            .receipt_store
-            .as_mut()
-            .and_then(|store| {
-                store
-                    .as_any_mut()
-                    .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
-            });
+        let sqlite_store = self.receipt_store.as_mut().and_then(|store| {
+            store
+                .as_any_mut()
+                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
+        });
 
         let Some(sqlite_store) = sqlite_store else {
             return Ok(());
@@ -2988,14 +2970,11 @@ impl PactKernel {
         .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
 
         // Re-borrow to store the checkpoint.
-        let sqlite_store = self
-            .receipt_store
-            .as_mut()
-            .and_then(|store| {
-                store
-                    .as_any_mut()
-                    .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
-            });
+        let sqlite_store = self.receipt_store.as_mut().and_then(|store| {
+            store
+                .as_any_mut()
+                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
+        });
         if let Some(sqlite_store) = sqlite_store {
             sqlite_store
                 .store_checkpoint(&checkpoint)
@@ -6924,13 +6903,23 @@ mod tests {
 
         // 5 invocations: 5 * 100 = 500 total -- all should pass.
         for i in 0..5 {
-            let resp = kernel.evaluate_tool_call(&request(&format!("req-{i}"))).unwrap();
-            assert_eq!(resp.verdict, Verdict::Allow, "invocation {i} should be allowed");
+            let resp = kernel
+                .evaluate_tool_call(&request(&format!("req-{i}")))
+                .unwrap();
+            assert_eq!(
+                resp.verdict,
+                Verdict::Allow,
+                "invocation {i} should be allowed"
+            );
         }
 
         // 6th invocation would need 600 total, exceeding max_total_cost=500.
         let resp = kernel.evaluate_tool_call(&request("req-6")).unwrap();
-        assert_eq!(resp.verdict, Verdict::Deny, "6th invocation should be denied");
+        assert_eq!(
+            resp.verdict,
+            Verdict::Deny,
+            "6th invocation should be denied"
+        );
     }
 
     #[test]
@@ -6965,8 +6954,14 @@ mod tests {
         assert_eq!(resp.verdict, Verdict::Deny);
 
         // Receipt must contain financial metadata.
-        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
-        let financial = metadata.get("financial").expect("should have 'financial' key");
+        let metadata = resp
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let financial = metadata
+            .get("financial")
+            .expect("should have 'financial' key");
         assert_eq!(financial["settlement_status"], "not_applicable");
         assert!(financial["attempted_cost"].as_u64().is_some());
         assert_eq!(financial["currency"], "USD");
@@ -6997,8 +6992,14 @@ mod tests {
 
         assert_eq!(resp.verdict, Verdict::Allow);
 
-        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
-        let financial = metadata.get("financial").expect("should have 'financial' key");
+        let metadata = resp
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let financial = metadata
+            .get("financial")
+            .expect("should have 'financial' key");
         // The actual reported cost (75) should be recorded.
         assert_eq!(financial["cost_charged"].as_u64().unwrap(), 75);
         assert_eq!(financial["settlement_status"], "authorized");
@@ -7029,8 +7030,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(resp.verdict, Verdict::Allow);
-        let metadata = resp.receipt.metadata.as_ref().expect("should have metadata");
-        let financial = metadata.get("financial").expect("should have 'financial' key");
+        let metadata = resp
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let financial = metadata
+            .get("financial")
+            .expect("should have 'financial' key");
         // Worst-case debit: max_cost_per_invocation = 100.
         assert_eq!(financial["cost_charged"].as_u64().unwrap(), 100);
     }
@@ -7066,7 +7073,11 @@ mod tests {
         assert_eq!(r2.verdict, Verdict::Allow, "second invocation should pass");
 
         let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
-        assert_eq!(r3.verdict, Verdict::Deny, "third invocation should be denied");
+        assert_eq!(
+            r3.verdict,
+            Verdict::Deny,
+            "third invocation should be denied"
+        );
 
         // Verify the denial receipt has financial metadata.
         let metadata = r3.receipt.metadata.as_ref().expect("should have metadata");
@@ -7216,9 +7227,16 @@ mod tests {
 
         // Third invocation should be denied by the counting guard.
         let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
-        assert_eq!(r3.verdict, Verdict::Deny, "counting guard should deny 3rd invocation");
+        assert_eq!(
+            r3.verdict,
+            Verdict::Deny,
+            "counting guard should deny 3rd invocation"
+        );
         // Verify it's a properly signed deny receipt (not a panic/unwrap).
-        assert!(r3.receipt.id.starts_with("rcpt-"), "receipt should have valid id");
+        assert!(
+            r3.receipt.id.starts_with("rcpt-"),
+            "receipt should have valid id"
+        );
         assert!(r3.reason.is_some(), "denial should have a reason");
     }
 
