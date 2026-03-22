@@ -250,7 +250,7 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 6. E14 Hardening and Release Candidate | v1.0 | 4/4 | Complete | 2026-03-20 |
 | 7. Schema Compatibility and Monetary Foundation | 2/2 | Complete   | 2026-03-22 | - |
 | 8. Core Enforcement | 4/4 | Complete   | 2026-03-22 | - |
-| 9. Compliance and DPoP | v2.0 | 0/3 | Not started | - |
+| 9. Compliance and DPoP | 1/3 | In Progress|  | - |
 | 10. Receipt Query API and TypeScript SDK 1.0 | v2.0 | 0/3 | Not started | - |
 | 11. SIEM Integration | v2.0 | 0/3 | Not started | - |
 | 12. Capability Lineage Index and Receipt Dashboard | v2.0 | 0/4 | Not started | - |

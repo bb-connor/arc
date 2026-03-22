@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: "Completed 08-04-PLAN.md (kernel enforcement integration: monetary, Merkle checkpoint, velocity guard)"
-last_updated: "2026-03-22T15:57:16.470Z"
+stopped_at: Completed 09-02-PLAN.md (DPoP proof-of-possession with LRU nonce replay rejection)
+last_updated: "2026-03-22T23:33:08.991Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 9
+  completed_plans: 7
   percent: 0
 ---
 
@@ -64,6 +64,10 @@ Recent decisions affecting current work:
 - [Phase 08-core-enforcement]: BudgetChargeResult is a private struct; threads budget charge info from check_and_increment_budget through to receipt metadata construction
 - [Phase 08-core-enforcement]: Downcast via ReceiptStore.as_any_mut() avoids adding checkpoint methods to the minimal ReceiptStore trait; only SqliteReceiptStore gets real checkpoint behavior
 - [Phase 08-core-enforcement]: dispatch_tool_call removed as dead code; dispatch_tool_call_with_cost covers both monetary and non-monetary paths
+- [Phase 09-02]: DPoP proof message is PACT-native (capability_id + tool_server + tool_name + action_hash + nonce) -- not HTTP-shaped
+- [Phase 09-02]: DpopNonceStore uses std::sync::Mutex with LruCache keyed by (nonce, capability_id) -- synchronous, fits Guard pipeline
+- [Phase 09-02]: verify_dpop_proof checks nonce replay AFTER signature verification -- invalid signatures cannot poison nonce store
+- [Phase 09-02]: dpop_required: Option<bool> with serde(default, skip_serializing_if = Option::is_none) -- SCHEMA-01 forward compatibility
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T15:48:37.339Z
-Stopped at: Completed 08-04-PLAN.md (kernel enforcement integration: monetary, Merkle checkpoint, velocity guard)
+Last session: 2026-03-22T23:33:08.989Z
+Stopped at: Completed 09-02-PLAN.md (DPoP proof-of-possession with LRU nonce replay rejection)
 Resume file: None

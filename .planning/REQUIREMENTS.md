@@ -18,8 +18,8 @@
 
 - [x] **SEC-01**: Receipt batches produce Merkle roots with signed kernel checkpoint statements
 - [x] **SEC-02**: Receipt inclusion proofs verify against published checkpoint roots
-- [ ] **SEC-03**: DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce (PACT-native proof message, not HTTP-shaped)
-- [ ] **SEC-04**: DPoP nonce replay store rejects reused nonces within configurable TTL window
+- [x] **SEC-03**: DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce (PACT-native proof message, not HTTP-shaped)
+- [x] **SEC-04**: DPoP nonce replay store rejects reused nonces within configurable TTL window
 - [x] **SEC-05**: Velocity guard denies requests exceeding configured invocation or spend windows per agent/grant using synchronous token bucket
 
 ### Compliance
@@ -80,8 +80,8 @@
 | SCHEMA-06 | Phase 8 | Complete |
 | SEC-01 | Phase 8 | Complete |
 | SEC-02 | Phase 8 | Complete |
-| SEC-03 | Phase 9 | Pending |
-| SEC-04 | Phase 9 | Pending |
+| SEC-03 | Phase 9 | Complete |
+| SEC-04 | Phase 9 | Complete |
 | SEC-05 | Phase 8 | Complete |
 | COMP-01 | Phase 9 | Pending |
 | COMP-02 | Phase 9 | Pending |
