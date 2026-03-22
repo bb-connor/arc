@@ -11,16 +11,14 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use pact_core::crypto::sha256_hex;
+use pact_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 use pact_core::{
     CapabilityToken, CapabilityTokenBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
     DelegationLink, DelegationLinkBody, GuardEvidence, Keypair, Operation, PactReceipt,
     PactReceiptBody, PactScope, ToolAnnotations, ToolCallAction, ToolDefinition, ToolGrant,
     ToolManifest, ToolManifestBody,
 };
-use pact_core::session::{
-    OperationKind, OperationTerminalState, RequestId, SessionId,
-};
-use pact_core::crypto::sha256_hex;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -225,8 +223,8 @@ fn v2_receipt_with_unknown_fields_accepted() {
 
     let json_with_unknowns = serde_json::to_string(&value).unwrap();
 
-    let restored: PactReceipt = serde_json::from_str(&json_with_unknowns)
-        .expect("PactReceipt must accept unknown fields");
+    let restored: PactReceipt =
+        serde_json::from_str(&json_with_unknowns).expect("PactReceipt must accept unknown fields");
 
     assert_eq!(original_id, restored.id);
     assert_eq!(receipt.capability_id, restored.capability_id);
@@ -265,8 +263,8 @@ fn v2_manifest_with_unknown_fields_accepted() {
 
     let json_with_unknowns = serde_json::to_string(&value).unwrap();
 
-    let restored: ToolManifest = serde_json::from_str(&json_with_unknowns)
-        .expect("ToolManifest must accept unknown fields");
+    let restored: ToolManifest =
+        serde_json::from_str(&json_with_unknowns).expect("ToolManifest must accept unknown fields");
 
     assert_eq!(original_server_id, restored.server_id);
     assert_eq!(manifest.server_key, restored.server_key);
