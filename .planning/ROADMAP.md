@@ -179,13 +179,12 @@ Plans:
   3. Receipt retention policy is configurable with both time-based and size-based rotation; archived receipts verify against stored Merkle checkpoint roots.
   4. A DPoP proof for invocation A is rejected when replayed for invocation B (cross-invocation replay test passes).
   5. A reused DPoP nonce within the configured TTL window is rejected by the nonce replay store.
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 09-01: Implement receipt retention and rotation policy (time-based and size-based) with archived receipt Merkle verification.
-- [ ] 09-02: Implement DPoP proof-of-possession in pact-kernel (PACT-native proof message binding capability_id + tool_server + tool_name + arg_hash + nonce) with LRU nonce replay store.
-- [ ] 09-03: Draft and publish Colorado SB 24-205 compliance mapping document against Phase 8 acceptance tests.
-- [ ] 09-04: Draft and publish EU AI Act Article 19 compliance mapping document against Phase 8 and 9-01 acceptance tests.
+- [ ] 09-01-PLAN.md -- Receipt retention and rotation policy (time-based and size-based) with archived receipt Merkle verification.
+- [ ] 09-02-PLAN.md -- DPoP proof-of-possession (PACT-native Ed25519 proof with LRU nonce replay store) and dpop_required on ToolGrant.
+- [ ] 09-03-PLAN.md -- Colorado SB 24-205 and EU AI Act Article 19 compliance mapping documents against Phase 8 and 9 acceptance tests.
 
 ### Phase 10: Receipt Query API and TypeScript SDK 1.0
 **Goal**: Receipts are queryable through a stable API and the TypeScript SDK is published at 1.0 with DPoP proof generation helpers.
@@ -251,7 +250,7 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 6. E14 Hardening and Release Candidate | v1.0 | 4/4 | Complete | 2026-03-20 |
 | 7. Schema Compatibility and Monetary Foundation | 2/2 | Complete   | 2026-03-22 | - |
 | 8. Core Enforcement | 4/4 | Complete   | 2026-03-22 | - |
-| 9. Compliance and DPoP | v2.0 | 0/4 | Not started | - |
+| 9. Compliance and DPoP | v2.0 | 0/3 | Not started | - |
 | 10. Receipt Query API and TypeScript SDK 1.0 | v2.0 | 0/3 | Not started | - |
 | 11. SIEM Integration | v2.0 | 0/3 | Not started | - |
 | 12. Capability Lineage Index and Receipt Dashboard | v2.0 | 0/4 | Not started | - |
