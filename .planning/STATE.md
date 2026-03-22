@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 07-01-PLAN.md (schema forward compatibility gate)
-last_updated: "2026-03-22T03:32:10.514Z"
+stopped_at: Completed 07-02-PLAN.md (monetary types foundation)
+last_updated: "2026-03-22T03:52:47.725Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -52,6 +52,8 @@ Recent decisions affecting current work:
 - 2026-03-21: DPoP proof message is PACT-native (capability_id + tool_server + tool_name + arg_hash + nonce), not HTTP-shaped
 - [Phase 07]: Removed all 18 deny_unknown_fields annotations: serde silent-ignore is the correct v2.0 wire posture for pact-core types
 - [Phase 07]: Forward-compat tests use serde_json::Value mutation strategy over string patching for robust nested injection
+- [Phase 07]: MonetaryAmount uses u64 minor-unit integers (cents for USD) -- no float precision issues, matches AGENT_ECONOMY.md reference design
+- [Phase 07]: Currency matching in is_subset_of uses string equality -- mismatched currencies return false (fail-closed, no conversion logic needed at this layer)
 
 ### Pending Todos
 
@@ -66,6 +68,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T03:32:10.512Z
-Stopped at: Completed 07-01-PLAN.md (schema forward compatibility gate)
+Last session: 2026-03-22T03:52:47.723Z
+Stopped at: Completed 07-02-PLAN.md (monetary types foundation)
 Resume file: None
