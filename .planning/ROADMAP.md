@@ -145,11 +145,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. ToolGrant fields max_cost_per_invocation and max_total_cost are present and round-trip correctly via canonical JSON.
   4. Attenuation enum variants ReduceCostPerInvocation and ReduceTotalCost serialize and deserialize correctly.
   5. A cross-version round-trip test passes in CI covering pre-existing SQLite databases.
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 07-01: Remove deny_unknown_fields from all 18 serialized types in pact-core and add forward-compatibility test fixtures.
-- [ ] 07-02: Add MonetaryAmount, ToolInvocationCost, and monetary fields to ToolGrant and Attenuation enum.
+- [ ] 07-02: Add MonetaryAmount type, monetary budget fields to ToolGrant, and cost-reduction Attenuation variants with is_subset_of enforcement.
 
 ### Phase 8: Core Enforcement
 **Goal**: Monetary budget limits, Merkle-committed receipt batches, and velocity throttling are all enforced at kernel evaluation time.
