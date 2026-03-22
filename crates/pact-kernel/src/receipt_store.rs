@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use pact_core::canonical::canonical_json_bytes;
 use pact_core::crypto::Signature;
@@ -8,6 +9,31 @@ use pact_core::session::OperationTerminalState;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
+
+/// Configuration for receipt retention and archival.
+///
+/// When set on `KernelConfig`, the kernel can archive aged-out or oversized
+/// receipt databases to a separate read-only SQLite file while keeping archived
+/// receipts verifiable against their Merkle checkpoint roots.
+#[derive(Debug, Clone)]
+pub struct RetentionConfig {
+    /// Number of days to retain receipts in the live database. Default: 90.
+    pub retention_days: u64,
+    /// Maximum size in bytes before the live database is rotated. Default: 10 GB.
+    pub max_size_bytes: u64,
+    /// Path for the archive SQLite file. Must be writable on first rotation.
+    pub archive_path: String,
+}
+
+impl Default for RetentionConfig {
+    fn default() -> Self {
+        Self {
+            retention_days: 90,
+            max_size_bytes: 10_737_418_240,
+            archive_path: "receipts-archive.sqlite3".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ReceiptStoreError {
@@ -371,12 +397,7 @@ impl SqliteReceiptStore {
                 WHERE checkpoint_seq = ?1
                 "#,
                 params![checkpoint_seq as i64],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, String>(1)?,
-                    ))
-                },
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
             )
             .optional()?;
 
@@ -407,10 +428,9 @@ impl SqliteReceiptStore {
             ORDER BY seq ASC
             "#,
         )?;
-        let rows = statement.query_map(
-            params![start_seq as i64, end_seq as i64],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-        )?;
+        let rows = statement.query_map(params![start_seq as i64, end_seq as i64], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
         let mut result = Vec::new();
         for row in rows {
             let (seq, raw_json) = row?;
@@ -420,6 +440,171 @@ impl SqliteReceiptStore {
             result.push((seq.max(0) as u64, canonical));
         }
         Ok(result)
+    }
+
+    /// Return the current on-disk size of the database in bytes.
+    ///
+    /// Uses `PRAGMA page_count` and `PRAGMA page_size` to compute the size
+    /// without requiring a filesystem stat, which is consistent in WAL mode.
+    pub fn db_size_bytes(&self) -> Result<u64, ReceiptStoreError> {
+        let page_count: i64 = self
+            .connection
+            .query_row("PRAGMA page_count", [], |row| row.get(0))?;
+        let page_size: i64 = self
+            .connection
+            .query_row("PRAGMA page_size", [], |row| row.get(0))?;
+        Ok((page_count.max(0) as u64) * (page_size.max(0) as u64))
+    }
+
+    /// Return the Unix timestamp (seconds) of the oldest receipt in the live
+    /// database, or `None` if there are no receipts.
+    pub fn oldest_receipt_timestamp(&self) -> Result<Option<u64>, ReceiptStoreError> {
+        let ts = self.connection.query_row(
+            "SELECT MIN(timestamp) FROM pact_tool_receipts",
+            [],
+            |row| row.get::<_, Option<i64>>(0),
+        )?;
+        Ok(ts.map(|t| t.max(0) as u64))
+    }
+
+    /// Archive all receipts with `timestamp < cutoff_unix_secs` to an external
+    /// SQLite file, then delete them from the live database.
+    ///
+    /// Checkpoint rows whose entire batch (`batch_end_seq`) falls within the
+    /// archived receipt range are also copied to the archive. Partial batches
+    /// are never archived to avoid breaking inclusion proofs.
+    ///
+    /// Returns the number of receipt rows deleted from the live database.
+    pub fn archive_receipts_before(
+        &mut self,
+        cutoff_unix_secs: u64,
+        archive_path: &str,
+    ) -> Result<u64, ReceiptStoreError> {
+        // Escape single quotes in the path to safely embed it in an ATTACH statement.
+        let escaped_path = archive_path.replace('\'', "''");
+
+        // Attach the archive database.
+        self.connection
+            .execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
+
+        // Create archive tables with the same schema as the main database.
+        self.connection.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS archive.pact_tool_receipts (
+                seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id TEXT NOT NULL UNIQUE,
+                timestamp INTEGER NOT NULL,
+                capability_id TEXT NOT NULL,
+                tool_server TEXT NOT NULL,
+                tool_name TEXT NOT NULL,
+                decision_kind TEXT NOT NULL,
+                policy_hash TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                raw_json TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS archive.kernel_checkpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                checkpoint_seq INTEGER NOT NULL UNIQUE,
+                batch_start_seq INTEGER NOT NULL,
+                batch_end_seq INTEGER NOT NULL,
+                tree_size INTEGER NOT NULL,
+                merkle_root TEXT NOT NULL,
+                issued_at INTEGER NOT NULL,
+                statement_json TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                kernel_key TEXT NOT NULL
+            );
+            "#,
+        )?;
+
+        let cutoff = cutoff_unix_secs as i64;
+
+        // Copy qualifying receipts to the archive (ignore duplicates from prior runs).
+        self.connection.execute(
+            "INSERT OR IGNORE INTO archive.pact_tool_receipts \
+             SELECT * FROM main.pact_tool_receipts WHERE timestamp < ?1",
+            params![cutoff],
+        )?;
+
+        // Find the maximum seq among archived receipts (for checkpoint filtering).
+        let max_archived_seq: Option<i64> = self.connection.query_row(
+            "SELECT MAX(seq) FROM main.pact_tool_receipts WHERE timestamp < ?1",
+            params![cutoff],
+            |row| row.get(0),
+        )?;
+
+        if let Some(max_seq) = max_archived_seq {
+            // Copy checkpoint rows whose full batch is covered by the archived receipts.
+            // Never archive a checkpoint whose batch_end_seq exceeds the max archived seq
+            // because that would leave a partial batch in the archive.
+            self.connection.execute(
+                "INSERT OR IGNORE INTO archive.kernel_checkpoints \
+                 SELECT * FROM main.kernel_checkpoints WHERE batch_end_seq <= ?1",
+                params![max_seq],
+            )?;
+        }
+
+        // Delete archived receipts from the live database.
+        let deleted = self.connection.execute(
+            "DELETE FROM main.pact_tool_receipts WHERE timestamp < ?1",
+            params![cutoff],
+        )? as u64;
+
+        // Detach the archive and checkpoint WAL.
+        self.connection.execute_batch("DETACH DATABASE archive")?;
+        self.connection
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
+
+        Ok(deleted)
+    }
+
+    /// Check time and size thresholds and archive receipts if either is exceeded.
+    ///
+    /// - Time threshold: receipts older than `config.retention_days` days are archived.
+    /// - Size threshold: if `db_size_bytes()` exceeds `config.max_size_bytes`, receipts
+    ///   older than the median timestamp are archived (removes roughly half the receipts).
+    ///
+    /// Returns the number of receipt rows archived (0 if no threshold was exceeded).
+    pub fn rotate_if_needed(&mut self, config: &RetentionConfig) -> Result<u64, ReceiptStoreError> {
+        // Check time threshold.
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let time_cutoff = now.saturating_sub(config.retention_days.saturating_mul(86_400));
+        let oldest = self.oldest_receipt_timestamp()?;
+
+        if let Some(oldest_ts) = oldest {
+            if oldest_ts < time_cutoff {
+                return self.archive_receipts_before(time_cutoff, &config.archive_path);
+            }
+        }
+
+        // Check size threshold.
+        let size = self.db_size_bytes()?;
+        if size > config.max_size_bytes {
+            // Use the median timestamp as the cutoff to archive roughly half the receipts.
+            let median_cutoff: Option<i64> = self
+                .connection
+                .query_row(
+                    r#"
+                    SELECT timestamp FROM pact_tool_receipts
+                    ORDER BY timestamp
+                    LIMIT 1
+                    OFFSET (SELECT COUNT(*) FROM pact_tool_receipts) / 2
+                    "#,
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            if let Some(cutoff) = median_cutoff {
+                return self.archive_receipts_before(cutoff.max(0) as u64, &config.archive_path);
+            }
+        }
+
+        Ok(0)
     }
 }
 

@@ -9,7 +9,6 @@ mod retention {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use pact_core::canonical::canonical_json_bytes;
     use pact_core::crypto::Keypair;
     use pact_core::merkle::MerkleTree;
     use pact_core::receipt::{Decision, PactReceipt, PactReceiptBody, ToolCallAction};
@@ -125,7 +124,10 @@ mod retention {
         };
 
         let archived = store.rotate_if_needed(&config).unwrap();
-        assert!(archived > 0, "size-triggered rotation should archive some receipts");
+        assert!(
+            archived > 0,
+            "size-triggered rotation should archive some receipts"
+        );
 
         // After rotation live DB should have fewer receipts.
         let remaining = store.tool_receipt_count().unwrap();

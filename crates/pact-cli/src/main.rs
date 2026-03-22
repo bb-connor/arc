@@ -1044,6 +1044,7 @@ pub(crate) fn build_kernel(loaded_policy: LoadedPolicy, kernel_kp: &Keypair) -> 
         max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
         checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        retention_config: None,
     };
 
     let mut kernel = PactKernel::new(config);
