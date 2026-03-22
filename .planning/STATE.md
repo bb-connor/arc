@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 08-02-PLAN.md (Merkle checkpoint and receipt store persistence)
-last_updated: "2026-03-22T15:22:44.273Z"
+stopped_at: "Completed 08-04-PLAN.md (kernel enforcement integration: monetary, Merkle checkpoint, velocity guard)"
+last_updated: "2026-03-22T15:48:37.341Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - [Phase 08]: matched_grant_index defaults to None in all existing GuardContext sites; populated in plan 08-04
 - [Phase 08-core-enforcement]: KernelCheckpointBody is the signed unit (canonical JSON of body is signed, not the full checkpoint)
 - [Phase 08-core-enforcement]: receipts_canonical_bytes_range deserializes to PactReceipt then applies canonical_json_bytes for RFC 8785 determinism in Merkle leaves
+- [Phase 08-core-enforcement]: BudgetChargeResult is a private struct; threads budget charge info from check_and_increment_budget through to receipt metadata construction
+- [Phase 08-core-enforcement]: Downcast via ReceiptStore.as_any_mut() avoids adding checkpoint methods to the minimal ReceiptStore trait; only SqliteReceiptStore gets real checkpoint behavior
+- [Phase 08-core-enforcement]: dispatch_tool_call removed as dead code; dispatch_tool_call_with_cost covers both monetary and non-monetary paths
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T15:22:44.271Z
-Stopped at: Completed 08-02-PLAN.md (Merkle checkpoint and receipt store persistence)
+Last session: 2026-03-22T15:48:37.339Z
+Stopped at: Completed 08-04-PLAN.md (kernel enforcement integration: monetary, Merkle checkpoint, velocity guard)
 Resume file: None
