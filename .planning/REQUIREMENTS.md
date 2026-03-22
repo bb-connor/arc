@@ -72,12 +72,34 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SCHEMA-01 | Phase 7 | Pending |
+| SCHEMA-02 | Phase 7 | Pending |
+| SCHEMA-03 | Phase 7 | Pending |
+| SCHEMA-04 | Phase 8 | Pending |
+| SCHEMA-05 | Phase 8 | Pending |
+| SCHEMA-06 | Phase 8 | Pending |
+| SEC-01 | Phase 8 | Pending |
+| SEC-02 | Phase 8 | Pending |
+| SEC-03 | Phase 9 | Pending |
+| SEC-04 | Phase 9 | Pending |
+| SEC-05 | Phase 8 | Pending |
+| COMP-01 | Phase 9 | Pending |
+| COMP-02 | Phase 9 | Pending |
+| COMP-03 | Phase 9 | Pending |
+| COMP-04 | Phase 9 | Pending |
+| COMP-05 | Phase 11 | Pending |
+| PROD-01 | Phase 10 | Pending |
+| PROD-02 | Phase 12 | Pending |
+| PROD-03 | Phase 12 | Pending |
+| PROD-04 | Phase 12 | Pending |
+| PROD-05 | Phase 12 | Pending |
+| PROD-06 | Phase 10 | Pending |
 
 **Coverage:**
 - v1 requirements: 22 total
-- Mapped to phases: 0
-- Unmapped: 22 (roadmap pending)
+- Mapped to phases: 22
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-21*
-*Last updated: 2026-03-21 after milestone v2.0 initialization*
+*Last updated: 2026-03-21 after milestone v2.0 roadmap creation*
