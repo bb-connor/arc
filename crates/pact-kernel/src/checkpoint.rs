@@ -216,7 +216,6 @@ mod tests {
 
     #[test]
     fn inclusion_proof_verifies_for_leaf_n() {
-        let kp = Keypair::generate();
         let batch = make_receipt_bytes(10);
         let tree = MerkleTree::from_leaves(&batch).expect("tree build failed");
         let root = tree.root();
@@ -229,7 +228,6 @@ mod tests {
 
     #[test]
     fn inclusion_proof_tampered_bytes_fail() {
-        let kp = Keypair::generate();
         let batch = make_receipt_bytes(10);
         let tree = MerkleTree::from_leaves(&batch).expect("tree build failed");
         let root = tree.root();
@@ -238,7 +236,6 @@ mod tests {
             !proof.verify(b"tampered bytes that are not in the tree", &root),
             "tampered bytes should not verify"
         );
-        let _ = kp; // suppress unused
     }
 
     #[test]
