@@ -23,6 +23,7 @@
 
 pub mod authority;
 pub mod budget_store;
+pub mod checkpoint;
 pub mod receipt_store;
 pub mod revocation_store;
 pub mod session;
@@ -58,6 +59,10 @@ pub use authority::{
 };
 pub use budget_store::{
     BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore, SqliteBudgetStore,
+};
+pub use checkpoint::{
+    build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, CheckpointError,
+    KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
 };
 pub use receipt_store::{
     ReceiptStore, ReceiptStoreError, SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
@@ -331,6 +336,9 @@ pub struct GuardContext<'a> {
     /// Session-scoped enforceable filesystem roots, when the request is being
     /// evaluated through the supported session-backed runtime path.
     pub session_filesystem_roots: Option<&'a [String]>,
+    /// Index of the matched grant in the capability's scope, populated by
+    /// check_and_increment_budget before guards run.
+    pub matched_grant_index: Option<usize>,
 }
 
 /// Trait for checking whether a capability has been revoked.
@@ -2191,6 +2199,7 @@ impl PactKernel {
             agent_id: &request.agent_id,
             server_id: &request.server_id,
             session_filesystem_roots,
+            matched_grant_index: None,
         };
 
         for guard in &self.guards {
