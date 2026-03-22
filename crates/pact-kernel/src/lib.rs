@@ -3803,6 +3803,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         }
     }
 
@@ -4575,6 +4576,7 @@ mod tests {
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         };
@@ -4623,6 +4625,7 @@ mod tests {
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         };
@@ -4668,6 +4671,7 @@ mod tests {
                 max_invocations: Some(2),
                 max_cost_per_invocation: None,
                 max_total_cost: None,
+                dpop_required: None,
             }],
             ..PactScope::default()
         };
@@ -4707,6 +4711,7 @@ mod tests {
                     max_invocations: Some(2),
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 },
                 ToolGrant {
                     server_id: "srv-a".to_string(),
@@ -4716,6 +4721,7 @@ mod tests {
                     max_invocations: Some(1),
                     max_cost_per_invocation: None,
                     max_total_cost: None,
+                    dpop_required: None,
                 },
             ],
             ..PactScope::default()
@@ -6843,6 +6849,7 @@ mod tests {
                 units: max_total_cost,
                 currency: currency.to_string(),
             }),
+            dpop_required: None,
         }
     }
 
@@ -7089,6 +7096,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
         let grant1 = ToolGrant {
             server_id: "srv".to_string(),
@@ -7098,6 +7106,7 @@ mod tests {
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
+            dpop_required: None,
         };
         let cap = kernel
             .issue_capability(
