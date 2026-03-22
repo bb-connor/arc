@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 07-02-PLAN.md (monetary types foundation)
-last_updated: "2026-03-22T04:02:20.245Z"
+stopped_at: Completed 08-03-PLAN.md (VelocityGuard implementation)
+last_updated: "2026-03-22T15:22:12.299Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 6
+  completed_plans: 5
   percent: 0
 ---
 
@@ -54,6 +54,11 @@ Recent decisions affecting current work:
 - [Phase 07]: Forward-compat tests use serde_json::Value mutation strategy over string patching for robust nested injection
 - [Phase 07]: MonetaryAmount uses u64 minor-unit integers (cents for USD) -- no float precision issues, matches AGENT_ECONOMY.md reference design
 - [Phase 07]: Currency matching in is_subset_of uses string equality -- mismatched currencies return false (fail-closed, no conversion logic needed at this layer)
+- [Phase 08]: try_charge_cost uses IMMEDIATE SQLite transaction for atomic read-check-write monetary budget enforcement
+- [Phase 08]: HA overrun bound documented: max_cost_per_invocation x node_count -- named test concurrent_charge_overrun_bound
+- [Phase 08]: invoke_with_cost default returns None cost; servers that track costs override it -- no breaking changes to existing ToolServerConnection implementors
+- [Phase 08]: VelocityGuard uses elapsed-time refill in try_consume (synchronous, no background thread)
+- [Phase 08]: matched_grant_index defaults to None in all existing GuardContext sites; populated in plan 08-04
 
 ### Pending Todos
 
@@ -68,6 +73,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T03:52:47.723Z
-Stopped at: Completed 07-02-PLAN.md (monetary types foundation)
+Last session: 2026-03-22T15:22:12.297Z
+Stopped at: Completed 08-03-PLAN.md (VelocityGuard implementation)
 Resume file: None

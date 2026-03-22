@@ -10,9 +10,9 @@
 - [x] **SCHEMA-01**: pact-core types tolerate unknown fields (deny_unknown_fields removed from 18 types across capability.rs, receipt.rs, manifest.rs)
 - [x] **SCHEMA-02**: ToolGrant supports monetary budget fields (max_cost_per_invocation, max_total_cost as MonetaryAmount with u64 minor-unit amounts)
 - [x] **SCHEMA-03**: Attenuation enum supports cost reduction variants (ReduceCostPerInvocation, ReduceTotalCost)
-- [ ] **SCHEMA-04**: BudgetStore supports try_charge_cost for monetary budget enforcement with single-currency semantics
-- [ ] **SCHEMA-05**: Tool servers can report invocation cost via ToolInvocationCost struct
-- [ ] **SCHEMA-06**: Financial receipt metadata (FinancialReceiptMetadata) populated in receipt.metadata for monetary grants, including grant_index, cost_charged, budget_remaining, settlement_status
+- [x] **SCHEMA-04**: BudgetStore supports try_charge_cost for monetary budget enforcement with single-currency semantics
+- [x] **SCHEMA-05**: Tool servers can report invocation cost via ToolInvocationCost struct
+- [x] **SCHEMA-06**: Financial receipt metadata (FinancialReceiptMetadata) populated in receipt.metadata for monetary grants, including grant_index, cost_charged, budget_remaining, settlement_status
 
 ### Security
 
@@ -75,9 +75,9 @@
 | SCHEMA-01 | Phase 7 | Complete |
 | SCHEMA-02 | Phase 7 | Complete |
 | SCHEMA-03 | Phase 7 | Complete |
-| SCHEMA-04 | Phase 8 | Pending |
-| SCHEMA-05 | Phase 8 | Pending |
-| SCHEMA-06 | Phase 8 | Pending |
+| SCHEMA-04 | Phase 8 | Complete |
+| SCHEMA-05 | Phase 8 | Complete |
+| SCHEMA-06 | Phase 8 | Complete |
 | SEC-01 | Phase 8 | Pending |
 | SEC-02 | Phase 8 | Pending |
 | SEC-03 | Phase 9 | Pending |
