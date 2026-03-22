@@ -7,7 +7,7 @@
 
 ### Schema & Foundation
 
-- [ ] **SCHEMA-01**: pact-core types tolerate unknown fields (deny_unknown_fields removed from 18 types across capability.rs, receipt.rs, manifest.rs)
+- [x] **SCHEMA-01**: pact-core types tolerate unknown fields (deny_unknown_fields removed from 18 types across capability.rs, receipt.rs, manifest.rs)
 - [ ] **SCHEMA-02**: ToolGrant supports monetary budget fields (max_cost_per_invocation, max_total_cost as MonetaryAmount with u64 minor-unit amounts)
 - [ ] **SCHEMA-03**: Attenuation enum supports cost reduction variants (ReduceCostPerInvocation, ReduceTotalCost)
 - [ ] **SCHEMA-04**: BudgetStore supports try_charge_cost for monetary budget enforcement with single-currency semantics
@@ -72,7 +72,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-01 | Phase 7 | Pending |
+| SCHEMA-01 | Phase 7 | Complete |
 | SCHEMA-02 | Phase 7 | Pending |
 | SCHEMA-03 | Phase 7 | Pending |
 | SCHEMA-04 | Phase 8 | Pending |

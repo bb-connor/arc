@@ -249,7 +249,7 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 4. E11 Cross-Transport Concurrency Semantics | v1.0 | 4/4 | Complete | 2026-03-20 |
 | 5. E13 Policy and Adoption Unification | v1.0 | 4/4 | Complete | 2026-03-19 |
 | 6. E14 Hardening and Release Candidate | v1.0 | 4/4 | Complete | 2026-03-20 |
-| 7. Schema Compatibility and Monetary Foundation | v2.0 | 0/2 | Not started | - |
+| 7. Schema Compatibility and Monetary Foundation | 1/2 | In Progress|  | - |
 | 8. Core Enforcement | v2.0 | 0/4 | Not started | - |
 | 9. Compliance and DPoP | v2.0 | 0/4 | Not started | - |
 | 10. Receipt Query API and TypeScript SDK 1.0 | v2.0 | 0/3 | Not started | - |
