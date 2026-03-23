@@ -1864,6 +1864,20 @@ impl PactKernel {
             }
         };
 
+        // DPoP enforcement before budget charge: if any matching grant requires
+        // DPoP, verify the proof now so an attacker cannot drain the budget with
+        // a valid capability token but missing or invalid DPoP proof.
+        if matching_grants
+            .iter()
+            .any(|m| m.grant.dpop_required == Some(true))
+        {
+            if let Err(e) = self.verify_dpop_for_request(request, cap) {
+                let msg = e.to_string();
+                warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
+                return self.build_deny_response(request, &msg, now);
+            }
+        }
+
         let (matched_grant_index, charge_result) =
             match self.check_and_increment_budget(cap, &matching_grants) {
                 Ok(result) => result,
@@ -1880,17 +1894,6 @@ impl PactKernel {
                     );
                 }
             };
-
-        // DPoP enforcement: if the matched grant requires DPoP, verify the proof.
-        if let Some(matched_grant) = cap.scope.grants.get(matched_grant_index) {
-            if matched_grant.dpop_required == Some(true) {
-                if let Err(e) = self.verify_dpop_for_request(request, cap) {
-                    let msg = e.to_string();
-                    warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
-                    return self.build_deny_response(request, &msg, now);
-                }
-            }
-        }
 
         if let Err(e) = self.run_guards(
             request,
@@ -2013,6 +2016,20 @@ impl PactKernel {
             }
         };
 
+        // DPoP enforcement before budget charge: if any matching grant requires
+        // DPoP, verify the proof now so an attacker cannot drain the budget with
+        // a valid capability token but missing or invalid DPoP proof.
+        if matching_grants
+            .iter()
+            .any(|m| m.grant.dpop_required == Some(true))
+        {
+            if let Err(e) = self.verify_dpop_for_request(request, cap) {
+                let msg = e.to_string();
+                warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
+                return self.build_deny_response(request, &msg, now);
+            }
+        }
+
         let (matched_grant_index, charge_result) =
             match self.check_and_increment_budget(cap, &matching_grants) {
                 Ok(result) => result,
@@ -2028,17 +2045,6 @@ impl PactKernel {
                     );
                 }
             };
-
-        // DPoP enforcement: if the matched grant requires DPoP, verify the proof.
-        if let Some(matched_grant) = cap.scope.grants.get(matched_grant_index) {
-            if matched_grant.dpop_required == Some(true) {
-                if let Err(e) = self.verify_dpop_for_request(request, cap) {
-                    let msg = e.to_string();
-                    warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
-                    return self.build_deny_response(request, &msg, now);
-                }
-            }
-        }
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
