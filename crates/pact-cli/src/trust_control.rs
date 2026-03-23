@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use axum::extract::{Query, State};
+use axum::extract::{Path as AxumPath, Query, State};
 use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -48,6 +48,9 @@ const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/del
 const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
 const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
 const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
+const LINEAGE_PATH: &str = "/v1/lineage/:capability_id";
+const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/:capability_id/chain";
+const AGENT_RECEIPTS_PATH: &str = "/v1/agents/:subject_key/receipts";
 const DEFAULT_LIST_LIMIT: usize = 50;
 const MAX_LIST_LIMIT: usize = 200;
 const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
@@ -235,6 +238,18 @@ pub struct ReceiptQueryHttpQuery {
     pub min_cost: Option<u64>,
     #[serde(default)]
     pub max_cost: Option<u64>,
+    #[serde(default)]
+    pub cursor: Option<u64>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+    #[serde(default)]
+    pub agent_subject: Option<String>,
+}
+
+/// Query parameters for GET /v1/agents/:subject_key/receipts.
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentReceiptsHttpQuery {
     #[serde(default)]
     pub cursor: Option<u64>,
     #[serde(default)]
@@ -541,6 +556,9 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             get(handle_internal_budgets_delta),
         )
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
+        .route(LINEAGE_PATH, get(handle_get_lineage))
+        .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
+        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts))
         .with_state(state);
 
     info!(listen_addr = %local_addr, "serving PACT trust control service");
@@ -1423,6 +1441,106 @@ async fn handle_query_receipts(
         max_cost: query.max_cost,
         cursor: query.cursor,
         limit: list_limit(query.limit),
+        agent_subject: query.agent_subject.clone(),
+    };
+    let result = match store.query_receipts(&kernel_query) {
+        Ok(result) => result,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
+    let receipts = match result
+        .receipts
+        .into_iter()
+        .map(|stored| serde_json::to_value(stored.receipt))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(receipts) => receipts,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
+    Json(ReceiptQueryResponse {
+        total_count: result.total_count,
+        next_cursor: result.next_cursor,
+        receipts,
+    })
+    .into_response()
+}
+
+/// GET /v1/lineage/:capability_id
+///
+/// Returns the CapabilitySnapshot for the given capability ID, or 404 if not found.
+async fn handle_get_lineage(
+    State(state): State<TrustServiceState>,
+    AxumPath(capability_id): AxumPath<String>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    match store.get_lineage(&capability_id) {
+        Ok(Some(snapshot)) => Json(snapshot).into_response(),
+        Ok(None) => plain_http_error(
+            StatusCode::NOT_FOUND,
+            &format!("capability not found: {capability_id}"),
+        ),
+        Err(error) => {
+            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    }
+}
+
+/// GET /v1/lineage/:capability_id/chain
+///
+/// Returns the full delegation chain for the given capability ID, root-first.
+async fn handle_get_delegation_chain(
+    State(state): State<TrustServiceState>,
+    AxumPath(capability_id): AxumPath<String>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    match store.get_delegation_chain(&capability_id) {
+        Ok(chain) => Json(chain).into_response(),
+        Err(error) => {
+            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    }
+}
+
+/// GET /v1/agents/:subject_key/receipts
+///
+/// Convenience endpoint: returns receipts for a given agent subject key.
+/// Delegates to the same query_receipts call as GET /v1/receipts/query with
+/// agentSubject set, passing through limit and cursor from query params.
+async fn handle_agent_receipts(
+    State(state): State<TrustServiceState>,
+    AxumPath(subject_key): AxumPath<String>,
+    Query(query): Query<AgentReceiptsHttpQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let kernel_query = ReceiptQuery {
+        agent_subject: Some(subject_key),
+        cursor: query.cursor,
+        limit: list_limit(query.limit),
+        ..Default::default()
     };
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,

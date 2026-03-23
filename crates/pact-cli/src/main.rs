@@ -1454,6 +1454,7 @@ fn cmd_receipt_list(
             max_cost,
             cursor,
             limit: Some(limit),
+            agent_subject: None,
         };
         let response = client.query_receipts(&query)?;
         for receipt in &response.receipts {
@@ -1480,6 +1481,7 @@ fn cmd_receipt_list(
             max_cost,
             cursor,
             limit,
+            agent_subject: None,
         };
         let result = store.query_receipts(&kernel_query)?;
         for stored in &result.receipts {
