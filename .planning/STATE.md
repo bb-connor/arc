@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 12-02-PLAN.md (agent-centric receipt query and lineage HTTP endpoints)
-last_updated: "2026-03-23T02:28:30.015Z"
+stopped_at: Completed 12-04-PLAN.md (ServeDir SPA wiring and lineage integration tests) -- awaiting Task 2 human-verify checkpoint
+last_updated: "2026-03-23T02:37:35.442Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
   percent: 0
 ---
 
@@ -97,6 +97,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Minor-unit monetary formatting uses integer arithmetic only (Math.floor + modulo) -- no float conversion
 - [Phase 12]: agent_subject placed as ?9 in SQL query params; cursor moved to ?10 and limit to ?11 -- sequential numbering is more maintainable
 - [Phase 12]: LEFT JOIN (not INNER JOIN) in query_receipts_impl preserves all receipts when agent_subject is None -- NULL-safe backwards-compatible filter
+- [Phase 12]: Conditional ServeDir wiring: only wire SPA nest_service if dashboard/dist/index.html exists -- CI and API-only deployments start without requiring a frontend build
+- [Phase 12]: axum 0.8 route syntax: {param} not :param -- route constants must use curly-brace capture groups or the router panics at initialization
 
 ### Pending Todos
 
@@ -111,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T02:28:30.012Z
-Stopped at: Completed 12-02-PLAN.md (agent-centric receipt query and lineage HTTP endpoints)
+Last session: 2026-03-23T02:37:35.440Z
+Stopped at: Completed 12-04-PLAN.md (ServeDir SPA wiring and lineage integration tests) -- awaiting Task 2 human-verify checkpoint
 Resume file: None
