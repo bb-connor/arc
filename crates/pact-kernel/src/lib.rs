@@ -767,6 +767,8 @@ struct BudgetChargeResult {
     cost_charged: u64,
     currency: String,
     budget_total: u64,
+    /// Running total cost after this charge (used to compute budget_remaining).
+    new_total_cost_charged: u64,
 }
 
 struct SessionNestedFlowBridge<'a, C> {
@@ -2363,11 +2365,25 @@ impl PactKernel {
                     max_total,
                 )?;
                 if ok {
+                    // Read the new running total from the store so budget_remaining
+                    // is computed against cumulative spend, not just this invocation.
+                    let new_total_cost_charged = self
+                        .budget_store
+                        .list_usages(1, Some(&cap.id))
+                        .ok()
+                        .and_then(|records| {
+                            records
+                                .into_iter()
+                                .find(|r| r.grant_index == matching.index as u32)
+                                .map(|r| r.total_cost_charged)
+                        })
+                        .unwrap_or(cost_units);
                     let charge = BudgetChargeResult {
                         grant_index: matching.index,
                         cost_charged: cost_units,
                         currency,
                         budget_total,
+                        new_total_cost_charged,
                     };
                     return Ok((matching.index, Some(charge)));
                 }
@@ -2662,7 +2678,11 @@ impl PactKernel {
             (charge.cost_charged, "authorized".to_string())
         };
 
-        let budget_remaining = charge.budget_total.saturating_sub(actual_cost);
+        // Use the running total charged so far (not just this invocation) so that
+        // budget_remaining reflects cumulative spend across all prior invocations.
+        let budget_remaining = charge
+            .budget_total
+            .saturating_sub(charge.new_total_cost_charged);
         let delegation_depth = cap.delegation_chain.len() as u32;
         let root_budget_holder = cap.issuer.to_hex();
 
