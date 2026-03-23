@@ -1,0 +1,28 @@
+[advisories]
+# In cargo-deny 0.14+ the old severity fields (vulnerability, unmaintained)
+# were removed (see https://github.com/EmbarkStudios/cargo-deny/pull/611).
+# Vulnerabilities are denied by default. unmaintained now takes a scope:
+# "all" | "workspace" | "transitive" | "none".
+unmaintained = "all"
+ignore = []
+
+[licenses]
+# In cargo-deny 0.14+ the `unlicensed` severity field was removed.
+# Unlicensed crates are denied by default when not in the allow list.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
