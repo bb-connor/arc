@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: "Completed 09-03-PLAN.md (compliance docs: colorado-sb-24-205.md, eu-ai-act-article-19.md)"
-last_updated: "2026-03-22T23:57:13.085Z"
+stopped_at: "Completed 10-03-PLAN.md (TypeScript SDK 1.0: errors, DPoP proofs, ReceiptQueryClient)"
+last_updated: "2026-03-23T00:29:47.970Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 12
+  completed_plans: 10
   percent: 0
 ---
 
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 09]: retention_config: None default preserves existing kernel behavior (retention disabled by default)
 - [Phase 09]: Compliance docs reference only tests confirmed passing -- no planned features cited
 - [Phase 09]: docs/compliance/ directory is the canonical home for regulatory mapping documents in the PACT repository
+- [Phase 10-03]: DpopProofBody fields use snake_case matching Rust serde for cross-language verifiability
+- [Phase 10-03]: PactError (SDK layer) is distinct from PactInvariantError (invariant layer) -- different abstraction levels
+- [Phase 10-03]: QueryError status is a positional constructor arg for typed HTTP status access (err.status)
 
 ### Pending Todos
 
@@ -86,6 +89,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-22T23:44:28.210Z
-Stopped at: Completed 09-03-PLAN.md (compliance docs: colorado-sb-24-205.md, eu-ai-act-article-19.md)
+Last session: 2026-03-23T00:29:47.968Z
+Stopped at: Completed 10-03-PLAN.md (TypeScript SDK 1.0: errors, DPoP proofs, ReceiptQueryClient)
 Resume file: None

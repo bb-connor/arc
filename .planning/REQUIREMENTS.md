@@ -37,7 +37,7 @@
 - [ ] **PROD-03**: Agent-centric receipt queries resolve through capability lineage index without replaying issuance logs
 - [ ] **PROD-04**: Web-based receipt dashboard renders receipts filterable by agent/tool/outcome/time with delegation chain inspection
 - [ ] **PROD-05**: Non-engineer stakeholders can answer "what did agent X do?" via dashboard without CLI access
-- [ ] **PROD-06**: TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning
+- [x] **PROD-06**: TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning
 
 ## v2 Requirements
 
@@ -93,7 +93,7 @@
 | PROD-03 | Phase 12 | Pending |
 | PROD-04 | Phase 12 | Pending |
 | PROD-05 | Phase 12 | Pending |
-| PROD-06 | Phase 10 | Pending |
+| PROD-06 | Phase 10 | Complete |
 
 **Coverage:**
 - v1 requirements: 22 total
