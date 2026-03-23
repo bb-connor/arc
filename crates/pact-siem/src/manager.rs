@@ -1,6 +1,7 @@
 //! ExporterManager: cursor-pull loop that reads receipts from SQLite and fans out to exporters.
 
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::params;
@@ -62,23 +63,44 @@ impl Default for SiemConfig {
 /// The cursor is NOT persisted to disk. On restart, the manager re-exports all
 /// receipts from seq=0. Both Splunk HEC (timestamp dedup) and Elasticsearch
 /// (_id upsert) handle duplicate events idempotently.
+///
+/// A single read-only SQLite connection is opened at construction time and
+/// reused across all poll cycles. This avoids the overhead of re-opening the
+/// file on every tick and keeps WAL-mode shared-read semantics stable.
+///
+/// The connection is wrapped in `Mutex` so that `ExporterManager` remains
+/// `Send + Sync` and can be moved into a `tokio::spawn` task. The mutex is
+/// only locked during the synchronous DB read phase of each poll cycle; it is
+/// always released before any `.await` point.
 pub struct ExporterManager {
     exporters: Vec<Box<dyn Exporter>>,
     dlq: DeadLetterQueue,
     cursor: u64,
     config: SiemConfig,
+    /// Persistent read-only connection to the receipt database.
+    conn: Mutex<rusqlite::Connection>,
 }
 
 impl ExporterManager {
     /// Create a new ExporterManager with the given configuration.
-    pub fn new(config: SiemConfig) -> Self {
+    ///
+    /// Opens the SQLite database at `config.db_path` immediately and returns
+    /// an error if the file cannot be opened.
+    pub fn new(config: SiemConfig) -> Result<Self, SiemError> {
+        let conn = rusqlite::Connection::open_with_flags(
+            &config.db_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|e| SiemError::DbError(e.to_string()))?;
+
         let dlq = DeadLetterQueue::new(config.dlq_capacity);
-        Self {
+        Ok(Self {
             exporters: Vec::new(),
             dlq,
             cursor: 0,
             config,
-        }
+            conn: Mutex::new(conn),
+        })
     }
 
     /// Register an exporter to receive receipt batches.
@@ -93,9 +115,9 @@ impl ExporterManager {
 
     /// Run the cursor-pull loop until the cancellation channel signals true.
     ///
-    /// On each tick, opens a fresh read-only rusqlite connection, fetches the
-    /// next batch of receipts after the current cursor, builds SiemEvents, and
-    /// fans them out to all registered exporters with exponential backoff retry.
+    /// On each tick, fetches the next batch of receipts after the current
+    /// cursor using the persistent connection, builds SiemEvents, and fans
+    /// them out to all registered exporters with exponential backoff retry.
     /// Events that exhaust all retries are placed on the DLQ. The cursor is
     /// advanced past the batch after all exporters have processed it (whether
     /// successful or DLQ'd).
@@ -120,19 +142,18 @@ impl ExporterManager {
     }
 
     /// Execute one poll cycle: fetch a batch of receipts, fan out to exporters.
+    ///
+    /// Uses the persistent `self.conn` rather than opening a new connection
+    /// on every tick.
     async fn poll_once(&mut self) -> Result<(), SiemError> {
-        let db_path = self.config.db_path.clone();
         let cursor = self.cursor;
         let batch_size = self.config.batch_size;
 
-        // Open a fresh connection per-poll in spawn_blocking to avoid holding a
-        // read lock across polls. WAL-mode readers do not block kernel writers.
-        let rows = tokio::task::spawn_blocking(move || -> Result<Vec<(u64, String)>, SiemError> {
-            let conn = rusqlite::Connection::open_with_flags(
-                &db_path,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-            )
-            .map_err(|e| SiemError::DbError(e.to_string()))?;
+        // Lock the connection only for the synchronous DB read; release before any await.
+        let rows: Vec<(u64, String)> = {
+            let conn = self.conn.lock().map_err(|_| {
+                SiemError::DbError("receipt db connection lock poisoned".to_string())
+            })?;
 
             let mut stmt = conn
                 .prepare(
@@ -144,22 +165,20 @@ impl ExporterManager {
                 )
                 .map_err(|e| SiemError::DbError(e.to_string()))?;
 
-            let rows = stmt
+            let mapped = stmt
                 .query_map(params![cursor as i64, batch_size as i64], |row| {
                     Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
                 })
                 .map_err(|e| SiemError::DbError(e.to_string()))?;
 
             let mut result = Vec::new();
-            for row in rows {
+            for row in mapped {
                 let (seq, raw_json) = row.map_err(|e| SiemError::DbError(e.to_string()))?;
                 result.push((seq.max(0) as u64, raw_json));
             }
-            Ok(result)
-        })
-        .await
-        .map_err(|e| SiemError::DbError(format!("spawn_blocking join error: {e}")))?
-        .map_err(|e| SiemError::DbError(e.to_string()))?;
+            result
+            // `conn` MutexGuard and `stmt` are dropped here -- lock released before any await.
+        };
 
         if rows.is_empty() {
             return Ok(());

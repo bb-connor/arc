@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS pact_tool_receipts (
 
 fn create_db(path: &PathBuf) -> Connection {
     let conn = Connection::open(path).expect("open SQLite");
-    conn.execute_batch(CREATE_RECEIPTS_TABLE).expect("create schema");
+    conn.execute_batch(CREATE_RECEIPTS_TABLE)
+        .expect("create schema");
     conn
 }
 
@@ -148,9 +149,7 @@ impl Exporter for FailingExporter {
     }
 
     fn export_batch<'a>(&'a self, _events: &'a [SiemEvent]) -> ExportFuture<'a> {
-        Box::pin(async move {
-            Err(ExportError::HttpError("simulated failure".to_string()))
-        })
+        Box::pin(async move { Err(ExportError::HttpError("simulated failure".to_string())) })
     }
 }
 
@@ -178,7 +177,7 @@ async fn manager_cursor_advance_after_export() {
         dlq_capacity: 100,
     };
 
-    let mut manager = ExporterManager::new(config.clone());
+    let mut manager = ExporterManager::new(config.clone()).expect("open ExporterManager");
     manager.add_exporter(Box::new(counter.clone()));
 
     let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -195,7 +194,11 @@ async fn manager_cursor_advance_after_export() {
     let manager = run_handle.await.expect("manager task completes");
 
     assert_eq!(counter.total(), 5, "all 5 receipts should be exported");
-    assert_eq!(manager.dlq_len(), 0, "DLQ should be empty after successful export");
+    assert_eq!(
+        manager.dlq_len(),
+        0,
+        "DLQ should be empty after successful export"
+    );
 
     // Second run: insert 3 more receipts; new ExporterManager starts from cursor=0
     // so it will see all 8 receipts. This confirms idempotent re-export behavior.
@@ -206,7 +209,7 @@ async fn manager_cursor_advance_after_export() {
     drop(conn2);
 
     let counter2 = CountingExporter::new();
-    let mut manager2 = ExporterManager::new(config);
+    let mut manager2 = ExporterManager::new(config).expect("open second ExporterManager");
     manager2.add_exporter(Box::new(counter2.clone()));
 
     let (cancel_tx2, cancel_rx2) = watch::channel(false);
@@ -251,7 +254,7 @@ async fn manager_failure_isolation_dlq() {
         dlq_capacity: 100,
     };
 
-    let mut manager = ExporterManager::new(config);
+    let mut manager = ExporterManager::new(config).expect("open ExporterManager");
     manager.add_exporter(Box::new(FailingExporter));
 
     let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -266,11 +269,14 @@ async fn manager_failure_isolation_dlq() {
     cancel_tx.send(true).expect("cancel signal sends");
 
     // If we reach this point without panic, failure isolation holds.
-    let manager = run_handle.await.expect("manager task must complete without panic");
+    let manager = run_handle
+        .await
+        .expect("manager task must complete without panic");
 
     assert!(
         manager.dlq_len() > 0,
-        "failed events must be DLQ'd (dlq_len was {})", manager.dlq_len()
+        "failed events must be DLQ'd (dlq_len was {})",
+        manager.dlq_len()
     );
 
     let _ = std::fs::remove_file(&db_path);
@@ -304,7 +310,8 @@ async fn manager_cursor_advances_past_dlq() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
-    });
+    })
+    .expect("open mgr1");
     mgr1.add_exporter(Box::new(FailingExporter));
 
     let (tx1, rx1) = watch::channel(false);
@@ -334,7 +341,8 @@ async fn manager_cursor_advances_past_dlq() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
-    });
+    })
+    .expect("open mgr2");
     mgr2.add_exporter(Box::new(counter.clone()));
 
     let (tx2, rx2) = watch::channel(false);
