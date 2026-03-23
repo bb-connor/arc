@@ -32,6 +32,7 @@ use pact_core::canonical::canonical_json_bytes;
 use pact_core::capability::CapabilityToken;
 use pact_core::crypto::{Keypair, PublicKey, Signature};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::KernelError;
 
@@ -157,24 +158,30 @@ impl DpopNonceStore {
 
     /// Check a nonce and insert it if not already live.
     ///
-    /// Returns `true` if the nonce is fresh (accepted).
-    /// Returns `false` if the nonce was already used within the TTL window
+    /// Returns `Ok(true)` if the nonce is fresh (accepted).
+    /// Returns `Ok(false)` if the nonce was already used within the TTL window
     /// (rejected -- replay detected).
-    pub fn check_and_insert(&self, nonce: &str, capability_id: &str) -> bool {
+    /// Returns `Err` if the internal mutex is poisoned (fail-closed: deny).
+    pub fn check_and_insert(&self, nonce: &str, capability_id: &str) -> Result<bool, KernelError> {
         let key = (nonce.to_string(), capability_id.to_string());
-        let mut cache = self.inner.lock().unwrap_or_else(|p| p.into_inner());
+        let mut cache = self.inner.lock().map_err(|_| {
+            error!("DPoP nonce store mutex is poisoned; denying proof as fail-closed");
+            KernelError::DpopVerificationFailed(
+                "nonce store mutex poisoned; cannot verify replay safety".to_string(),
+            )
+        })?;
 
         if let Some(first_seen) = cache.peek(&key) {
             if first_seen.elapsed() < self.ttl {
                 // Nonce is still live -- replay detected.
-                return false;
+                return Ok(false);
             }
             // TTL has elapsed; remove the stale entry so we can re-insert.
             cache.pop(&key);
         }
 
         cache.put(key, Instant::now());
-        true
+        Ok(true)
     }
 }
 
@@ -252,6 +259,18 @@ pub fn verify_dpop_proof(
         )));
     }
 
+    // Proof must not be too far in the past beyond TTL + clock skew.
+    // A valid proof satisfies: issued_at >= now - (proof_ttl_secs + max_clock_skew_secs).
+    // This guards against proofs with timestamps so old they predate any plausible clock skew.
+    let stale_threshold =
+        now_secs.saturating_sub(config.proof_ttl_secs + config.max_clock_skew_secs);
+    if proof.body.issued_at < stale_threshold {
+        return Err(KernelError::DpopVerificationFailed(format!(
+            "proof issued_at={} is too far in the past (now={}, ttl={}, skew={})",
+            proof.body.issued_at, now_secs, config.proof_ttl_secs, config.max_clock_skew_secs
+        )));
+    }
+
     // Step 5: Signature verification.
     let body_bytes = canonical_json_bytes(&proof.body).map_err(|e| {
         KernelError::DpopVerificationFailed(format!("failed to serialize proof body: {e}"))
@@ -263,7 +282,7 @@ pub fn verify_dpop_proof(
     }
 
     // Step 6: Nonce replay check.
-    if !nonce_store.check_and_insert(&proof.body.nonce, &proof.body.capability_id) {
+    if !nonce_store.check_and_insert(&proof.body.nonce, &proof.body.capability_id)? {
         return Err(KernelError::DpopVerificationFailed(
             "nonce replayed: this nonce has already been used within the TTL window".to_string(),
         ));
