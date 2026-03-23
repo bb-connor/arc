@@ -23,6 +23,7 @@
 
 pub mod authority;
 pub mod budget_store;
+pub mod capability_lineage;
 pub mod checkpoint;
 pub mod dpop;
 pub mod receipt_query;
@@ -59,6 +60,7 @@ pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, LocalCapabilityAuthority, SqliteCapabilityAuthority,
 };
+pub use capability_lineage::{CapabilityLineageError, CapabilitySnapshot};
 pub use budget_store::{
     BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore, SqliteBudgetStore,
 };

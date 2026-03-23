@@ -73,7 +73,7 @@ pub trait ReceiptStore: Send {
 }
 
 pub struct SqliteReceiptStore {
-    connection: Connection,
+    pub(crate) connection: Connection,
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +161,23 @@ impl SqliteReceiptStore {
             );
             CREATE INDEX IF NOT EXISTS idx_kernel_checkpoints_batch_end
                 ON kernel_checkpoints(batch_end_seq);
+
+            CREATE TABLE IF NOT EXISTS capability_lineage (
+                capability_id        TEXT PRIMARY KEY,
+                subject_key          TEXT NOT NULL,
+                issuer_key           TEXT NOT NULL,
+                issued_at            INTEGER NOT NULL,
+                expires_at           INTEGER NOT NULL,
+                grants_json          TEXT NOT NULL,
+                delegation_depth     INTEGER NOT NULL DEFAULT 0,
+                parent_capability_id TEXT REFERENCES capability_lineage(capability_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_capability_lineage_subject
+                ON capability_lineage(subject_key);
+            CREATE INDEX IF NOT EXISTS idx_capability_lineage_issued_at
+                ON capability_lineage(issued_at);
+            CREATE INDEX IF NOT EXISTS idx_capability_lineage_parent
+                ON capability_lineage(parent_capability_id);
             "#,
         )?;
 
