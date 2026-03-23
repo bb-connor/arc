@@ -2,7 +2,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use pact_core::crypto::Keypair;
-use pact_core::receipt::{Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ToolCallAction};
+use pact_core::receipt::{
+    Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ToolCallAction,
+};
 use pact_siem::event::SiemEvent;
 use pact_siem::exporter::ExportError;
 use pact_siem::exporters::splunk::{SplunkConfig, SplunkHecExporter};
@@ -88,10 +90,10 @@ async fn splunk_hec_sends_correct_envelope() {
     Mock::given(method("POST"))
         .and(path("/services/collector/event"))
         .and(header("Authorization", "Splunk test-token"))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"text":"Success","code":0}"#,
-            "application/json",
-        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(r#"{"text":"Success","code":0}"#, "application/json"),
+        )
         .expect(1)
         .mount(&server)
         .await;
@@ -103,7 +105,8 @@ async fn splunk_hec_sends_correct_envelope() {
         index: None,
         host: None,
     };
-    let exporter = SplunkHecExporter::new(config).expect("exporter builds");
+    // Use plaintext constructor -- wiremock runs on plain http:// for tests.
+    let exporter = SplunkHecExporter::new_plaintext_for_tests(config).expect("exporter builds");
 
     let receipt1 = sample_receipt("splunk-rcpt-001");
     let receipt2 = sample_receipt_with_financial("splunk-rcpt-002");
@@ -122,11 +125,18 @@ async fn splunk_hec_sends_correct_envelope() {
 
     let body_str = String::from_utf8(received[0].body.clone()).expect("body is valid UTF-8");
     let lines: Vec<&str> = body_str.split('\n').filter(|l| !l.is_empty()).collect();
-    assert_eq!(lines.len(), 2, "should have 2 newline-separated JSON objects in payload");
+    assert_eq!(
+        lines.len(),
+        2,
+        "should have 2 newline-separated JSON objects in payload"
+    );
 
     // Parse first object: plain receipt (no financial metadata).
     let obj0: serde_json::Value = serde_json::from_str(lines[0]).expect("line 0 is valid JSON");
-    assert!(obj0.get("time").and_then(|v| v.as_f64()).is_some(), "time field must be a number");
+    assert!(
+        obj0.get("time").and_then(|v| v.as_f64()).is_some(),
+        "time field must be a number"
+    );
     assert_eq!(
         obj0.get("sourcetype").and_then(|v| v.as_str()),
         Some("pact:receipt"),
@@ -162,10 +172,10 @@ async fn splunk_hec_returns_error_on_401() {
 
     Mock::given(method("POST"))
         .and(path("/services/collector/event"))
-        .respond_with(ResponseTemplate::new(401).set_body_raw(
-            r#"{"text":"Invalid token","code":4}"#,
-            "application/json",
-        ))
+        .respond_with(
+            ResponseTemplate::new(401)
+                .set_body_raw(r#"{"text":"Invalid token","code":4}"#, "application/json"),
+        )
         .mount(&server)
         .await;
 
@@ -176,7 +186,8 @@ async fn splunk_hec_returns_error_on_401() {
         index: None,
         host: None,
     };
-    let exporter = SplunkHecExporter::new(config).expect("exporter builds");
+    // Use plaintext constructor -- wiremock runs on plain http:// for tests.
+    let exporter = SplunkHecExporter::new_plaintext_for_tests(config).expect("exporter builds");
 
     let events = vec![SiemEvent::from_receipt(sample_receipt("splunk-rcpt-401"))];
     let result = exporter.export_batch(&events).await;
@@ -191,4 +202,48 @@ async fn splunk_hec_returns_error_on_401() {
         }
         other => panic!("expected ExportError::HttpError, got: {other:?}"),
     }
+}
+
+/// SplunkHecExporter::new rejects plaintext http:// endpoints to protect HEC tokens.
+#[test]
+fn splunk_hec_rejects_plaintext_http_endpoint() {
+    let config = SplunkConfig {
+        endpoint: "http://splunk.example.com:8088".to_string(),
+        hec_token: "secret-token".to_string(),
+        sourcetype: "pact:receipt".to_string(),
+        index: None,
+        host: None,
+    };
+    let result = SplunkHecExporter::new(config);
+    assert!(
+        result.is_err(),
+        "SplunkHecExporter::new must reject http:// endpoints"
+    );
+    match result.err().expect("checked is_err above") {
+        ExportError::HttpError(msg) => {
+            assert!(
+                msg.contains("https://"),
+                "error message should mention https://, got: {msg}"
+            );
+        }
+        other => panic!("expected ExportError::HttpError, got: {other:?}"),
+    }
+}
+
+/// SplunkHecExporter::new accepts https:// endpoints (build-time check only; no network call).
+#[test]
+fn splunk_hec_accepts_https_endpoint() {
+    let config = SplunkConfig {
+        endpoint: "https://splunk.example.com:8088".to_string(),
+        hec_token: "secret-token".to_string(),
+        sourcetype: "pact:receipt".to_string(),
+        index: None,
+        host: None,
+    };
+    // Construction should succeed; no network call is made here.
+    let result = SplunkHecExporter::new(config);
+    assert!(
+        result.is_ok(),
+        "SplunkHecExporter::new must accept https:// endpoints"
+    );
 }

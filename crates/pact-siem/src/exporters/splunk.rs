@@ -38,6 +38,9 @@ impl Default for SplunkConfig {
 ///
 /// Uses newline-separated JSON event envelopes (not a JSON array) as required
 /// by the Splunk HEC event endpoint (`/services/collector/event`).
+///
+/// SECURITY: HEC tokens must only be transmitted over TLS. Construction will
+/// return an error if the endpoint URL uses a plain `http://` scheme.
 pub struct SplunkHecExporter {
     config: SplunkConfig,
     client: reqwest::Client,
@@ -48,7 +51,31 @@ impl SplunkHecExporter {
     ///
     /// Builds a `reqwest::Client` with rustls TLS and returns an error if the
     /// client cannot be constructed.
+    ///
+    /// Returns an error if `config.endpoint` uses `http://` (plaintext). HEC
+    /// tokens must only be sent over a TLS-protected connection (`https://`).
     pub fn new(config: SplunkConfig) -> Result<Self, ExportError> {
+        if config.endpoint.starts_with("http://") {
+            return Err(ExportError::HttpError(
+                "Splunk HEC endpoint must use https:// -- sending HEC tokens over \
+                 plaintext http:// is not permitted"
+                    .to_string(),
+            ));
+        }
+
+        let client = reqwest::Client::builder()
+            .build()
+            .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
+        Ok(Self { config, client })
+    }
+
+    /// Create a SplunkHecExporter without TLS scheme validation.
+    ///
+    /// This constructor is intended for use in integration tests that run
+    /// against a local mock server over plain HTTP. Do NOT use this in
+    /// production code -- it bypasses the https:// enforcement that protects
+    /// HEC tokens from being sent in cleartext.
+    pub fn new_plaintext_for_tests(config: SplunkConfig) -> Result<Self, ExportError> {
         let client = reqwest::Client::builder()
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
@@ -85,7 +112,9 @@ impl Exporter for SplunkHecExporter {
                 }
 
                 let line = serde_json::to_string(&envelope).map_err(|e| {
-                    ExportError::SerializationError(format!("failed to serialize HEC envelope: {e}"))
+                    ExportError::SerializationError(format!(
+                        "failed to serialize HEC envelope: {e}"
+                    ))
                 })?;
                 parts.push(line);
             }
