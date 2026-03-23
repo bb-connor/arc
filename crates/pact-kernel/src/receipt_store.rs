@@ -53,6 +53,9 @@ pub enum ReceiptStoreError {
 
     #[error("canonical json error: {0}")]
     Canonical(String),
+
+    #[error("invalid outcome filter: {0}")]
+    InvalidOutcome(String),
 }
 
 pub trait ReceiptStore: Send {
@@ -562,6 +565,30 @@ impl SqliteReceiptStore {
                  SELECT * FROM main.kernel_checkpoints WHERE batch_end_seq <= ?1",
                 params![max_seq],
             )?;
+
+            // Verify that every checkpoint covering the archived range is now present
+            // in the archive. If any checkpoint failed to transfer, refuse to delete the
+            // receipts from the live database to preserve inclusion-proof integrity.
+            let live_count: i64 = self.connection.query_row(
+                "SELECT COUNT(*) FROM main.kernel_checkpoints WHERE batch_end_seq <= ?1",
+                params![max_seq],
+                |row| row.get(0),
+            )?;
+            let archive_count: i64 = self.connection.query_row(
+                "SELECT COUNT(*) FROM archive.kernel_checkpoints WHERE batch_end_seq <= ?1",
+                params![max_seq],
+                |row| row.get(0),
+            )?;
+            if archive_count < live_count {
+                // Detach the archive before returning the error to avoid leaving
+                // the database in an attached state.
+                let _ = self.connection.execute_batch("DETACH DATABASE archive");
+                return Err(ReceiptStoreError::Canonical(format!(
+                    "checkpoint co-archival incomplete: {live_count} checkpoints in live, \
+                     only {archive_count} transferred to archive; aborting receipt deletion \
+                     to preserve inclusion-proof integrity"
+                )));
+            }
         }
 
         // Delete archived receipts from the live database.
@@ -633,6 +660,19 @@ impl SqliteReceiptStore {
         &self,
         query: &ReceiptQuery,
     ) -> Result<ReceiptQueryResult, ReceiptStoreError> {
+        // Validate the `outcome` filter against the known decision_kind values.
+        // Silently accepting unknown values would return zero results and could
+        // mask caller bugs; fail explicitly instead.
+        const VALID_OUTCOMES: &[&str] = &["allow", "deny", "cancelled", "incomplete"];
+        if let Some(outcome) = query.outcome.as_deref() {
+            if !VALID_OUTCOMES.contains(&outcome) {
+                return Err(ReceiptStoreError::InvalidOutcome(format!(
+                    "unknown outcome filter {:?}; valid values are: allow, deny, cancelled, incomplete",
+                    outcome
+                )));
+            }
+        }
+
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
 
         // Both queries share the same 9 filter parameters.
@@ -734,14 +774,7 @@ impl SqliteReceiptStore {
             .query_row(
                 count_sql,
                 params![
-                    cap_id,
-                    tool_srv,
-                    tool_nm,
-                    outcome,
-                    since,
-                    until,
-                    min_cost,
-                    max_cost,
+                    cap_id, tool_srv, tool_nm, outcome, since, until, min_cost, max_cost,
                     agent_sub,
                 ],
                 |row| row.get::<_, i64>(0),
