@@ -10,6 +10,7 @@ export interface ReceiptQueryParams {
   until?: number;
   minCost?: number;
   maxCost?: number;
+  agentSubject?: string;
   cursor?: number;
   limit?: number;
 }
