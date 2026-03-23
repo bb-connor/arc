@@ -6,3 +6,4 @@ export * from "./transport/index.ts";
 export * from "./invariants/index.ts";
 export * from "./errors.ts";
 export * from "./dpop.ts";
+export * from "./receipt_query_client.ts";
