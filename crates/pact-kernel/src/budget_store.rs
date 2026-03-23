@@ -12,6 +12,9 @@ pub enum BudgetStoreError {
 
     #[error("failed to prepare budget store directory: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("budget arithmetic overflow: {0}")]
+    Overflow(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,7 +145,17 @@ impl BudgetStore for InMemoryBudgetStore {
 
         // Check total cost cap
         if let Some(max_total) = max_total_cost_units {
-            if entry.total_cost_charged.saturating_add(cost_units) > max_total {
+            // Use checked_add to detect overflow: if the addition overflows, deny
+            // fail-closed -- an overflowing total cannot be safely compared.
+            let new_total = entry
+                .total_cost_charged
+                .checked_add(cost_units)
+                .ok_or_else(|| {
+                    BudgetStoreError::Overflow(
+                        "total_cost_charged + cost_units overflowed u64".to_string(),
+                    )
+                })?;
+            if new_total > max_total {
                 return Ok(false);
             }
         }
@@ -151,6 +164,8 @@ impl BudgetStore for InMemoryBudgetStore {
         let next_seq = self.next_seq.saturating_add(1);
         self.next_seq = next_seq;
         entry.invocation_count = entry.invocation_count.saturating_add(1);
+        // Safe: we already verified no overflow above when max_total is set;
+        // when there is no cap, use saturating_add as a defensive measure.
         entry.total_cost_charged = entry.total_cost_charged.saturating_add(cost_units);
         entry.updated_at = unix_now();
         entry.seq = next_seq;
@@ -416,13 +431,23 @@ impl BudgetStore for SqliteBudgetStore {
 
         // Check total cost cap
         if let Some(max_total) = max_total_cost_units {
-            if current_cost.saturating_add(cost_units) > max_total {
+            // Use checked_add to detect overflow: if the addition overflows, deny
+            // fail-closed -- an overflowing total cannot be safely compared.
+            let new_total = current_cost.checked_add(cost_units).ok_or_else(|| {
+                BudgetStoreError::Overflow(
+                    "total_cost_charged + cost_units overflowed u64".to_string(),
+                )
+            })?;
+            if new_total > max_total {
                 transaction.rollback()?;
                 return Ok(false);
             }
         }
 
-        // All checks passed: write incremented counts
+        // All checks passed: write incremented counts.
+        // Safe: we already verified no overflow above when max_total is set;
+        // when there is no cap, use saturating_add as a defensive measure.
+        let new_total_cost = current_cost.saturating_add(cost_units);
         let updated_at = unix_now();
         let seq = allocate_budget_replication_seq(&transaction)?;
         transaction.execute(
@@ -447,7 +472,7 @@ impl BudgetStore for SqliteBudgetStore {
                 (current_count.saturating_add(1)) as i64,
                 updated_at,
                 seq as i64,
-                (current_cost.saturating_add(cost_units)) as i64,
+                new_total_cost as i64,
             ],
         )?;
         transaction.commit()?;
@@ -514,6 +539,16 @@ fn ensure_total_cost_charged_column(connection: &Connection) -> Result<(), Budge
     Ok(())
 }
 
+/// Initialize the replication sequence counter from existing rows on first open.
+///
+/// Uses an IMMEDIATE transaction, which acquires a write lock before any reads
+/// or writes occur. In SQLite WAL mode, IMMEDIATE transactions are serialized:
+/// concurrent reads can proceed, but no two processes can both hold IMMEDIATE
+/// (or EXCLUSIVE) transactions simultaneously. This means two processes calling
+/// `initialize_budget_replication_seq` concurrently will be serialized by
+/// SQLite's locking protocol -- the second caller blocks until the first commits,
+/// then runs with the updated seq floor already in place. No additional
+/// application-level locking is required.
 fn initialize_budget_replication_seq(connection: &mut Connection) -> Result<(), BudgetStoreError> {
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let mut next_seq =
