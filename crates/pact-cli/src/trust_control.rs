@@ -25,6 +25,7 @@ use pact_kernel::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use tower_http::services::{ServeDir, ServeFile};
 use tracing::{info, warn};
 use ureq::Agent;
 
@@ -48,9 +49,10 @@ const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/del
 const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
 const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
 const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
-const LINEAGE_PATH: &str = "/v1/lineage/:capability_id";
-const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/:capability_id/chain";
-const AGENT_RECEIPTS_PATH: &str = "/v1/agents/:subject_key/receipts";
+const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
+const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
+const AGENT_RECEIPTS_PATH: &str = "/v1/agents/{subject_key}/receipts";
+const DASHBOARD_DIST_DIR: &str = "dashboard/dist";
 const DEFAULT_LIST_LIMIT: usize = 50;
 const MAX_LIST_LIMIT: usize = 200;
 const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
@@ -558,8 +560,26 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
         .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
         .route(LINEAGE_PATH, get(handle_get_lineage))
         .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
-        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts))
-        .with_state(state);
+        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts));
+
+    // Wire the dashboard SPA after all API routes so it acts as a catch-all.
+    // API routes registered above take priority over the nest_service wildcard.
+    // The conditional avoids a hard startup failure when the dashboard has not
+    // been built (e.g. in CI or API-only deployments).
+    let dashboard_dir = std::path::Path::new(DASHBOARD_DIST_DIR);
+    let router = if dashboard_dir.join("index.html").exists() {
+        let spa_fallback = ServeFile::new(dashboard_dir.join("index.html"));
+        let spa_service = ServeDir::new(dashboard_dir).not_found_service(spa_fallback);
+        router.nest_service("/", spa_service)
+    } else {
+        warn!(
+            "dashboard/dist/index.html not found -- dashboard UI will not be served. \
+             Run 'npm run build' in crates/pact-cli/dashboard/ to enable."
+        );
+        router
+    };
+
+    let router = router.with_state(state);
 
     info!(listen_addr = %local_addr, "serving PACT trust control service");
     eprintln!("PACT trust control service listening on http://{local_addr}");

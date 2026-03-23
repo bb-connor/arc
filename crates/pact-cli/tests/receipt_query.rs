@@ -1,6 +1,7 @@
 //! Integration tests for GET /v1/receipts/query endpoint.
 //!
 //! Tests verify filtering, cursor pagination, total_count, and auth enforcement.
+//! Also covers lineage endpoints (GET /v1/lineage/:id, /chain) and agent filter.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
@@ -8,10 +9,11 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use pact_core::capability::{CapabilityToken, CapabilityTokenBody, PactScope};
 use pact_core::crypto::Keypair;
 use pact_core::receipt::{Decision, PactReceipt, PactReceiptBody, ToolCallAction};
-use pact_kernel::SqliteReceiptStore;
 use pact_kernel::ReceiptStore;
+use pact_kernel::SqliteReceiptStore;
 use reqwest::blocking::Client;
 
 // --- Test helpers ---
@@ -383,6 +385,352 @@ fn test_receipt_query_requires_auth() {
         response.status(),
         reqwest::StatusCode::UNAUTHORIZED,
         "request without auth should return 401"
+    );
+
+    let _ = std::fs::remove_dir_all(&setup.dir);
+}
+
+// --- Lineage helper ---
+
+/// Build a minimal CapabilityToken for test lineage insertion.
+fn make_capability_token(id: &str, subject_keypair: &Keypair, issuer_keypair: &Keypair) -> CapabilityToken {
+    let body = CapabilityTokenBody {
+        id: id.to_string(),
+        issuer: issuer_keypair.public_key(),
+        subject: subject_keypair.public_key(),
+        scope: PactScope::default(),
+        issued_at: 1000,
+        expires_at: 9999999999,
+        delegation_chain: vec![],
+    };
+    CapabilityToken::sign(body, issuer_keypair).expect("sign capability token")
+}
+
+/// Pre-populate the capability_lineage table before the service starts.
+fn prepopulate_lineage(
+    db_path: &PathBuf,
+    entries: &[(&CapabilityToken, Option<&str>)],
+) {
+    let mut store = SqliteReceiptStore::open(db_path).expect("open receipt store for lineage");
+    for (token, parent_id) in entries {
+        store
+            .record_capability_snapshot(token, *parent_id)
+            .expect("record_capability_snapshot");
+    }
+}
+
+// --- Lineage endpoint tests ---
+
+/// GET /v1/lineage/:capability_id returns 200 with matching snapshot fields.
+#[test]
+fn test_lineage_get_capability_snapshot() {
+    let dir = unique_dir("pact-lineage-get");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let issuer_kp = Keypair::generate();
+    let subject_kp = Keypair::generate();
+    let token = make_capability_token("cap-lineage-1", &subject_kp, &issuer_kp);
+    let subject_hex = subject_kp.public_key().to_hex();
+    let issuer_hex = issuer_kp.public_key().to_hex();
+
+    prepopulate_lineage(&receipt_db_path, &[(&token, None)]);
+
+    let listen = reserve_listen_addr();
+    let service_token = "lineage-get-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/lineage/cap-lineage-1"))
+        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .send()
+        .expect("send lineage request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for lineage GET");
+    let body: serde_json::Value = response.json().expect("parse lineage json");
+    assert_eq!(body["capability_id"].as_str().expect("capability_id"), "cap-lineage-1");
+    assert_eq!(body["subject_key"].as_str().expect("subject_key"), subject_hex);
+    assert_eq!(body["issuer_key"].as_str().expect("issuer_key"), issuer_hex);
+    assert_eq!(body["delegation_depth"].as_u64().expect("delegation_depth"), 0);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// GET /v1/lineage/:capability_id/chain returns root-first delegation chain.
+#[test]
+fn test_lineage_get_delegation_chain() {
+    let dir = unique_dir("pact-lineage-chain");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let issuer_kp = Keypair::generate();
+    let subj_kp = Keypair::generate();
+
+    // 3-level chain: root -> parent -> child
+    let root = make_capability_token("chain-root", &subj_kp, &issuer_kp);
+    let parent = make_capability_token("chain-parent", &subj_kp, &issuer_kp);
+    let child = make_capability_token("chain-child", &subj_kp, &issuer_kp);
+
+    prepopulate_lineage(
+        &receipt_db_path,
+        &[
+            (&root, None),
+            (&parent, Some("chain-root")),
+            (&child, Some("chain-parent")),
+        ],
+    );
+
+    let listen = reserve_listen_addr();
+    let service_token = "chain-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/lineage/chain-child/chain"))
+        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .send()
+        .expect("send chain request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for chain GET");
+    let chain: Vec<serde_json::Value> = response.json().expect("parse chain json");
+    assert_eq!(chain.len(), 3, "chain should have 3 entries");
+
+    // Root-first ordering: delegation_depth 0, 1, 2
+    assert_eq!(chain[0]["capability_id"].as_str().expect("id"), "chain-root");
+    assert_eq!(chain[0]["delegation_depth"].as_u64().expect("depth"), 0);
+    assert_eq!(chain[1]["capability_id"].as_str().expect("id"), "chain-parent");
+    assert_eq!(chain[1]["delegation_depth"].as_u64().expect("depth"), 1);
+    assert_eq!(chain[2]["capability_id"].as_str().expect("id"), "chain-child");
+    assert_eq!(chain[2]["delegation_depth"].as_u64().expect("depth"), 2);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// GET /v1/lineage/:capability_id returns 404 for unknown capability_id.
+#[test]
+fn test_lineage_not_found() {
+    let setup = setup_with_receipts("pact-lineage-404");
+
+    let response = setup
+        .client
+        .get(format!("{}/v1/lineage/nonexistent-cap-id", setup.base_url))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", setup.service_token),
+        )
+        .send()
+        .expect("send lineage 404 request");
+
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::NOT_FOUND,
+        "unknown capability_id should return 404"
+    );
+
+    let _ = std::fs::remove_dir_all(&setup.dir);
+}
+
+/// GET /v1/lineage/:capability_id requires Authorization header.
+#[test]
+fn test_lineage_requires_auth() {
+    let setup = setup_with_receipts("pact-lineage-auth");
+
+    let response = setup
+        .client
+        .get(format!("{}/v1/lineage/any-cap-id", setup.base_url))
+        .send()
+        .expect("send unauthenticated lineage request");
+
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::UNAUTHORIZED,
+        "lineage endpoint without auth should return 401"
+    );
+
+    let _ = std::fs::remove_dir_all(&setup.dir);
+}
+
+/// GET /v1/receipts/query?agentSubject=<hex> filters receipts by agent subject.
+#[test]
+fn test_agent_subject_filter_via_http() {
+    let dir = unique_dir("pact-agent-filter");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let issuer_kp = Keypair::generate();
+    let agent1_kp = Keypair::generate();
+    let agent2_kp = Keypair::generate();
+    let agent1_hex = agent1_kp.public_key().to_hex();
+
+    // Two capability tokens, one per agent
+    let cap1 = make_capability_token("cap-agent1", &agent1_kp, &issuer_kp);
+    let cap2 = make_capability_token("cap-agent2", &agent2_kp, &issuer_kp);
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
+        store.record_capability_snapshot(&cap1, None).expect("record cap1");
+        store.record_capability_snapshot(&cap2, None).expect("record cap2");
+
+        // 2 receipts for agent1, 1 for agent2
+        store.append_pact_receipt(&make_receipt("ra-1", "cap-agent1", "shell", "bash", Decision::Allow, 1000, None)).unwrap();
+        store.append_pact_receipt(&make_receipt("ra-2", "cap-agent1", "files", "read", Decision::Allow, 1001, None)).unwrap();
+        store.append_pact_receipt(&make_receipt("ra-3", "cap-agent2", "shell", "bash", Decision::Allow, 1002, None)).unwrap();
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "agent-filter-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/receipts/query"))
+        .query(&[("agentSubject", agent1_hex.as_str())])
+        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .send()
+        .expect("send agent filter request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for agent filter");
+    let body: serde_json::Value = response.json().expect("parse json");
+    let receipts = body["receipts"].as_array().expect("receipts array");
+    assert_eq!(receipts.len(), 2, "only agent1's 2 receipts should be returned");
+    for r in receipts {
+        assert_eq!(
+            r["capability_id"].as_str().expect("capability_id"),
+            "cap-agent1",
+            "all returned receipts must belong to agent1"
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// GET /v1/agents/:subject_key/receipts returns receipts for the given agent.
+#[test]
+fn test_agent_receipts_endpoint() {
+    let dir = unique_dir("pact-agent-receipts");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let issuer_kp = Keypair::generate();
+    let agent1_kp = Keypair::generate();
+    let agent2_kp = Keypair::generate();
+    let agent1_hex = agent1_kp.public_key().to_hex();
+
+    let cap1 = make_capability_token("cap-ar-agent1", &agent1_kp, &issuer_kp);
+    let cap2 = make_capability_token("cap-ar-agent2", &agent2_kp, &issuer_kp);
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
+        store.record_capability_snapshot(&cap1, None).expect("record cap1");
+        store.record_capability_snapshot(&cap2, None).expect("record cap2");
+
+        store.append_pact_receipt(&make_receipt("rb-1", "cap-ar-agent1", "shell", "bash", Decision::Allow, 1000, None)).unwrap();
+        store.append_pact_receipt(&make_receipt("rb-2", "cap-ar-agent1", "files", "read", Decision::Allow, 1001, None)).unwrap();
+        store.append_pact_receipt(&make_receipt("rb-3", "cap-ar-agent2", "shell", "bash", Decision::Allow, 1002, None)).unwrap();
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "agent-receipts-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/agents/{agent1_hex}/receipts"))
+        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .send()
+        .expect("send agent receipts request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for agent receipts");
+    let body: serde_json::Value = response.json().expect("parse json");
+    let receipts = body["receipts"].as_array().expect("receipts array");
+    assert_eq!(receipts.len(), 2, "only agent1's 2 receipts should be returned");
+    for r in receipts {
+        assert_eq!(
+            r["capability_id"].as_str().expect("capability_id"),
+            "cap-ar-agent1",
+            "all returned receipts must belong to agent1"
+        );
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// GET /v1/receipts/query returns JSON (not HTML) even when SPA dist/ does not exist.
+/// This verifies API routes take priority over the SPA catch-all.
+#[test]
+fn test_api_routes_not_shadowed_by_spa() {
+    let setup = setup_with_receipts("pact-api-priority");
+
+    let response = setup
+        .client
+        .get(format!("{}/v1/receipts/query", setup.base_url))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {}", setup.service_token),
+        )
+        .send()
+        .expect("send API request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK, "API should return 200");
+
+    // The Content-Type must be application/json, not text/html.
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.contains("application/json"),
+        "API response Content-Type should be application/json, got: {content_type}"
     );
 
     let _ = std::fs::remove_dir_all(&setup.dir);
