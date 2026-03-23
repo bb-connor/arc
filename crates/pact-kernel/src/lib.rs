@@ -2537,7 +2537,11 @@ impl PactKernel {
                 .map(|m| m.currency.clone())
                 .or_else(|| grant.max_total_cost.as_ref().map(|m| m.currency.clone()))
                 .unwrap_or_else(|| "USD".to_string());
-            let budget_total = grant.max_total_cost.as_ref().map(|m| m.units).unwrap_or(0);
+            let budget_total = grant
+                .max_total_cost
+                .as_ref()
+                .map(|m| m.units)
+                .unwrap_or(u64::MAX);
             let attempted_cost = grant
                 .max_cost_per_invocation
                 .as_ref()
