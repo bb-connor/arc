@@ -177,6 +177,7 @@ mod tests {
             server_id: server_id.to_string(),
             agent_id: agent_id.to_string(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         }
     }
 
@@ -397,6 +398,7 @@ mod tests {
             server_id: server.clone(),
             agent_id: agent.clone(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
         let request_b = pact_kernel::ToolCallRequest {
             request_id: "req-b".to_string(),
@@ -405,6 +407,7 @@ mod tests {
             server_id: server.clone(),
             agent_id: agent.clone(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         // Exhaust cap-a.

@@ -277,6 +277,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({"command": "rm -rf /"}),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
@@ -320,6 +321,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
@@ -342,6 +344,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({"path": "/app/main.rs"}),
+            dpop_proof: None,
         };
 
         let ctx2 = pact_kernel::GuardContext {
@@ -392,6 +395,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: large_args,
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {

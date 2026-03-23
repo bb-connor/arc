@@ -126,6 +126,7 @@ fn make_request(
         server_id: "srv".to_string(),
         agent_id: cap.subject.to_hex(),
         arguments: args,
+        dpop_proof: None,
     }
 }
 
@@ -367,6 +368,7 @@ fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "before revocation"}),
+        dpop_proof: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).unwrap();
     assert_eq!(
@@ -386,6 +388,7 @@ fn full_flow_revocation_cascade() {
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "after revocation"}),
+        dpop_proof: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).unwrap();
 
@@ -693,6 +696,7 @@ fn full_flow_untrusted_issuer() {
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
+        dpop_proof: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).unwrap();

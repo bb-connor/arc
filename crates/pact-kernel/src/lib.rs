@@ -60,10 +60,10 @@ pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, LocalCapabilityAuthority, SqliteCapabilityAuthority,
 };
-pub use capability_lineage::{CapabilityLineageError, CapabilitySnapshot};
 pub use budget_store::{
     BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore, SqliteBudgetStore,
 };
+pub use capability_lineage::{CapabilityLineageError, CapabilitySnapshot};
 pub use checkpoint::{
     build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, CheckpointError,
     KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
@@ -118,6 +118,8 @@ pub struct ToolCallRequest {
     pub agent_id: AgentId,
     /// Tool arguments.
     pub arguments: serde_json::Value,
+    /// Optional DPoP proof. Required when the matched grant has `dpop_required == Some(true)`.
+    pub dpop_proof: Option<dpop::DpopProof>,
 }
 
 /// The kernel's response to a tool call request.
@@ -744,6 +746,10 @@ pub struct PactKernel {
     checkpoint_seq_counter: u64,
     /// seq of the last receipt included in the previous checkpoint batch.
     last_checkpoint_seq: u64,
+    /// Nonce replay store for DPoP proof verification. Required when any grant has dpop_required.
+    dpop_nonce_store: Option<dpop::DpopNonceStore>,
+    /// Configuration for DPoP proof verification TTLs and clock skew.
+    dpop_config: Option<dpop::DpopConfig>,
 }
 
 #[derive(Clone, Copy)]
@@ -989,6 +995,8 @@ impl PactKernel {
             checkpoint_batch_size,
             checkpoint_seq_counter: 0,
             last_checkpoint_seq: 0,
+            dpop_nonce_store: None,
+            dpop_config: None,
         }
     }
 
@@ -1006,6 +1014,16 @@ impl PactKernel {
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.budget_store = budget_store;
+    }
+
+    /// Install a DPoP nonce replay store and verification config.
+    ///
+    /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`
+    /// must carry a valid `DpopProof` on the `ToolCallRequest`. Requests that lack a proof
+    /// or whose proof fails verification are denied fail-closed.
+    pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
+        self.dpop_nonce_store = Some(nonce_store);
+        self.dpop_config = Some(config);
     }
 
     /// Register a policy guard. Guards are evaluated in registration order.
@@ -1419,6 +1437,7 @@ impl PactKernel {
             server_id: operation.server_id.clone(),
             agent_id: context.agent_id.clone(),
             arguments: operation.arguments.clone(),
+            dpop_proof: None,
         };
 
         let result = self.evaluate_tool_call_with_nested_flow_client(context, &request, client);
@@ -1479,6 +1498,7 @@ impl PactKernel {
                     server_id: tool_call.server_id.clone(),
                     agent_id: context.agent_id.clone(),
                     arguments: tool_call.arguments.clone(),
+                    dpop_proof: None,
                 };
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
@@ -1859,6 +1879,17 @@ impl PactKernel {
                 }
             };
 
+        // DPoP enforcement: if the matched grant requires DPoP, verify the proof.
+        if let Some(matched_grant) = cap.scope.grants.get(matched_grant_index) {
+            if matched_grant.dpop_required == Some(true) {
+                if let Err(e) = self.verify_dpop_for_request(request, cap) {
+                    let msg = e.to_string();
+                    warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
+                    return self.build_deny_response(request, &msg, now);
+                }
+            }
+        }
+
         if let Err(e) = self.run_guards(
             request,
             &cap.scope,
@@ -1995,6 +2026,17 @@ impl PactKernel {
                     );
                 }
             };
+
+        // DPoP enforcement: if the matched grant requires DPoP, verify the proof.
+        if let Some(matched_grant) = cap.scope.grants.get(matched_grant_index) {
+            if matched_grant.dpop_required == Some(true) {
+                if let Err(e) = self.verify_dpop_for_request(request, cap) {
+                    let msg = e.to_string();
+                    warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
+                    return self.build_deny_response(request, &msg, now);
+                }
+            }
+        }
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
@@ -2350,6 +2392,50 @@ impl PactKernel {
             let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
             Ok((first_index, None))
         }
+    }
+
+    /// Verify a DPoP proof carried on the request against the capability.
+    ///
+    /// Fails closed: if no proof is present, or if the nonce store / config is
+    /// absent (misconfigured kernel), or if verification fails, the call is denied.
+    fn verify_dpop_for_request(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+    ) -> Result<(), KernelError> {
+        let proof = request.dpop_proof.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed(
+                "grant requires DPoP proof but none was provided".to_string(),
+            )
+        })?;
+
+        let nonce_store = self.dpop_nonce_store.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed(
+                "kernel DPoP nonce store not configured".to_string(),
+            )
+        })?;
+
+        let config = self.dpop_config.as_ref().ok_or_else(|| {
+            KernelError::DpopVerificationFailed("kernel DPoP config not configured".to_string())
+        })?;
+
+        // Compute action hash from the serialized arguments.
+        let args_bytes = canonical_json_bytes(&request.arguments).map_err(|e| {
+            KernelError::DpopVerificationFailed(format!(
+                "failed to serialize arguments for action hash: {e}"
+            ))
+        })?;
+        let action_hash = sha256_hex(&args_bytes);
+
+        dpop::verify_dpop_proof(
+            proof,
+            cap,
+            &request.server_id,
+            &request.tool_name,
+            &action_hash,
+            nonce_store,
+            config,
+        )
     }
 
     /// Run all registered guards. Fail-closed: any error from a guard is
@@ -3854,6 +3940,7 @@ mod tests {
             server_id: server.to_string(),
             agent_id: cap.subject.to_hex(),
             arguments,
+            dpop_proof: None,
         }
     }
 
@@ -4854,6 +4941,7 @@ mod tests {
             server_id: "srv-a".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         let response = kernel.evaluate_tool_call(&request).unwrap();
@@ -6903,6 +6991,7 @@ mod tests {
             server_id: "cost-srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         // 5 invocations: 5 * 100 = 500 total -- all should pass.
@@ -6944,6 +7033,7 @@ mod tests {
             server_id: "cost-srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         // First invocation uses up the entire budget (100 of 100).
@@ -6991,6 +7081,7 @@ mod tests {
                 server_id: "cost-srv".to_string(),
                 agent_id: agent_kp.public_key().to_hex(),
                 arguments: serde_json::json!({}),
+                dpop_proof: None,
             })
             .unwrap();
 
@@ -7030,6 +7121,7 @@ mod tests {
                 server_id: "cost-srv".to_string(),
                 agent_id: agent_kp.public_key().to_hex(),
                 arguments: serde_json::json!({}),
+                dpop_proof: None,
             })
             .unwrap();
 
@@ -7068,6 +7160,7 @@ mod tests {
             server_id: "cost-srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         let r1 = kernel.evaluate_tool_call(&make_req("req-1")).unwrap();
@@ -7158,6 +7251,7 @@ mod tests {
                 server_id: "srv".to_string(),
                 agent_id: agent_kp.public_key().to_hex(),
                 arguments: serde_json::json!({}),
+                dpop_proof: None,
             })
             .unwrap();
         assert_eq!(resp.verdict, Verdict::Allow);
@@ -7221,6 +7315,7 @@ mod tests {
             server_id: "srv".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({}),
+            dpop_proof: None,
         };
 
         // First two invocations allowed.
@@ -7271,6 +7366,7 @@ mod tests {
                     server_id: "srv".to_string(),
                     agent_id: agent_kp.public_key().to_hex(),
                     arguments: serde_json::json!({}),
+                    dpop_proof: None,
                 })
                 .unwrap();
         }
@@ -7317,6 +7413,7 @@ mod tests {
                     server_id: "srv".to_string(),
                     agent_id: agent_kp.public_key().to_hex(),
                     arguments: serde_json::json!({}),
+                    dpop_proof: None,
                 })
                 .unwrap();
         }
@@ -7379,5 +7476,200 @@ mod tests {
             .expect("invoke_with_cost should succeed");
         assert!(cost.is_none(), "EchoServer should return None cost");
         assert!(value.is_object());
+    }
+
+    // ---------------------------------------------------------------------------
+    // DPoP wiring tests
+    // ---------------------------------------------------------------------------
+
+    fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {
+        ToolGrant {
+            server_id: server.to_string(),
+            tool_name: tool.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: Some(true),
+        }
+    }
+
+    /// Build a kernel that has a DPoP store configured and a single DPoP-required grant.
+    fn make_dpop_kernel_and_cap(
+        agent_kp: &Keypair,
+        server: &str,
+        tool: &str,
+    ) -> (PactKernel, CapabilityToken) {
+        let config = KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "dpop-test-policy".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        };
+        let mut kernel = PactKernel::new(config);
+        kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
+
+        let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300));
+        kernel.set_dpop_store(nonce_store, dpop::DpopConfig::default());
+
+        let grant = make_dpop_grant(server, tool);
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        (kernel, cap)
+    }
+
+    /// Build a valid DPoP proof for a given request context.
+    fn make_dpop_proof(
+        agent_kp: &Keypair,
+        cap: &CapabilityToken,
+        server: &str,
+        tool: &str,
+        arguments: &serde_json::Value,
+        nonce: &str,
+    ) -> dpop::DpopProof {
+        let args_bytes = pact_core::canonical::canonical_json_bytes(arguments)
+            .expect("canonical_json_bytes failed");
+        let action_hash = pact_core::crypto::sha256_hex(&args_bytes);
+        let now_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("time error")
+            .as_secs();
+        let body = dpop::DpopProofBody {
+            schema: dpop::DPOP_SCHEMA.to_string(),
+            capability_id: cap.id.clone(),
+            tool_server: server.to_string(),
+            tool_name: tool.to_string(),
+            action_hash,
+            nonce: nonce.to_string(),
+            issued_at: now_secs,
+            agent_key: agent_kp.public_key(),
+        };
+        dpop::DpopProof::sign(body, agent_kp).expect("DPoP sign failed")
+    }
+
+    #[test]
+    fn dpop_required_grant_allows_when_valid_proof_provided() {
+        let agent_kp = Keypair::generate();
+        let server = "dpop-srv";
+        let tool = "secure_op";
+        let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+
+        let arguments = serde_json::json!({"action": "read"});
+        let proof = make_dpop_proof(&agent_kp, &cap, server, tool, &arguments, "nonce-abc-001");
+
+        let request = ToolCallRequest {
+            request_id: "req-dpop-allow".to_string(),
+            capability: cap,
+            tool_name: tool.to_string(),
+            server_id: server.to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments,
+            dpop_proof: Some(proof),
+        };
+
+        let response = kernel.evaluate_tool_call(&request).unwrap();
+        assert_eq!(
+            response.verdict,
+            Verdict::Allow,
+            "valid DPoP proof should allow; reason: {:?}",
+            response.reason
+        );
+    }
+
+    #[test]
+    fn dpop_required_grant_denies_when_no_proof_provided() {
+        let agent_kp = Keypair::generate();
+        let server = "dpop-srv";
+        let tool = "secure_op";
+        let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+
+        let request = ToolCallRequest {
+            request_id: "req-dpop-deny-no-proof".to_string(),
+            capability: cap,
+            tool_name: tool.to_string(),
+            server_id: server.to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({"action": "read"}),
+            dpop_proof: None,
+        };
+
+        let response = kernel.evaluate_tool_call(&request).unwrap();
+        assert_eq!(
+            response.verdict,
+            Verdict::Deny,
+            "missing DPoP proof should deny"
+        );
+        let reason = response.reason.as_deref().unwrap_or("");
+        assert!(
+            reason.contains("DPoP proof"),
+            "denial reason should mention DPoP; got: {reason}"
+        );
+    }
+
+    #[test]
+    fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
+        let agent_kp = Keypair::generate();
+        let server = "dpop-srv";
+        let tool = "secure_op";
+        let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+
+        let arguments = serde_json::json!({"action": "read"});
+        // Proof claims wrong tool name -- binding check should fail.
+        let proof = make_dpop_proof(
+            &agent_kp,
+            &cap,
+            server,
+            "other_tool",
+            &arguments,
+            "nonce-bad-001",
+        );
+
+        let request = ToolCallRequest {
+            request_id: "req-dpop-deny-wrong-tool".to_string(),
+            capability: cap,
+            tool_name: tool.to_string(),
+            server_id: server.to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments,
+            dpop_proof: Some(proof),
+        };
+
+        let response = kernel.evaluate_tool_call(&request).unwrap();
+        assert_eq!(
+            response.verdict,
+            Verdict::Deny,
+            "proof with wrong tool name should deny"
+        );
+    }
+
+    #[test]
+    fn dpop_not_required_grant_allows_without_proof() {
+        // Verify non-DPoP grants are unaffected.
+        let mut kernel = PactKernel::new(make_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["echo"])));
+
+        let grant = make_grant("srv", "echo");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let request = make_request("req-no-dpop", &cap, "echo", "srv");
+        let response = kernel.evaluate_tool_call(&request).unwrap();
+        assert_eq!(
+            response.verdict,
+            Verdict::Allow,
+            "non-DPoP grant should allow without proof"
+        );
     }
 }

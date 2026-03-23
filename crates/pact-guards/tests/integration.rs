@@ -73,6 +73,7 @@ fn make_request(
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
         arguments: args,
+        dpop_proof: None,
     }
 }
 

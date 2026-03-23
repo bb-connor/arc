@@ -1226,6 +1226,7 @@ guards:
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({"path": "/etc/passwd"}),
+            dpop_proof: None,
         };
         let session_roots = vec!["/workspace/project".to_string()];
         let ctx = pact_kernel::GuardContext {

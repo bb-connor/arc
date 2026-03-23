@@ -316,6 +316,7 @@ mod tests {
                 "path": "file.txt",
                 "diff": "+added line\n-deleted line",
             }),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
@@ -361,6 +362,7 @@ mod tests {
                 "path": "file.py",
                 "diff": "+eval(user_input)",
             }),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
@@ -410,6 +412,7 @@ mod tests {
                 "path": "file.py",
                 "diff": "+eval(user_input)\n+reverse_shell()",
             }),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {

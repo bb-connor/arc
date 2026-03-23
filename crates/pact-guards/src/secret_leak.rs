@@ -410,6 +410,7 @@ mod tests {
                 "path": "/app/config.py",
                 "content": secret_content,
             }),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
@@ -435,6 +436,7 @@ mod tests {
                 "path": "/app/main.rs",
                 "content": "fn main() { println!(\"Hello\"); }",
             }),
+            dpop_proof: None,
         };
 
         let ctx2 = pact_kernel::GuardContext {
@@ -482,6 +484,7 @@ mod tests {
                 "path": "/app/tests/fixtures/sample.json",
                 "content": secret_content,
             }),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {

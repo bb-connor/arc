@@ -145,6 +145,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+            dpop_proof: None,
         };
 
         (request, scope, agent_id, server_id)

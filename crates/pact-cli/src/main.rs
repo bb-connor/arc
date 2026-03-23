@@ -1461,7 +1461,10 @@ fn cmd_receipt_list(
             println!("{}", serde_json::to_string(receipt)?);
         }
         if let Some(next_cursor) = response.next_cursor {
-            eprintln!("next_cursor={next_cursor} total_count={}", response.total_count);
+            eprintln!(
+                "next_cursor={next_cursor} total_count={}",
+                response.total_count
+            );
         }
     } else {
         let path = receipt_db.ok_or_else(|| {
@@ -1488,7 +1491,10 @@ fn cmd_receipt_list(
             println!("{}", serde_json::to_string(&stored.receipt)?);
         }
         if let Some(next_cursor) = result.next_cursor {
-            eprintln!("next_cursor={next_cursor} total_count={}", result.total_count);
+            eprintln!(
+                "next_cursor={next_cursor} total_count={}",
+                result.total_count
+            );
         }
     }
     Ok(())
@@ -1586,6 +1592,7 @@ fn handle_agent_message(
                     server_id: tool_call.server_id,
                     agent_id: session_agent_id.to_string(),
                     arguments: tool_call.arguments,
+                    dpop_proof: None,
                 };
 
                 vec![KernelMessage::ToolCallResponse {
@@ -2048,6 +2055,7 @@ capabilities:
             server_id: "*".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+            dpop_proof: None,
         };
 
         let response = restarted.evaluate_tool_call(&request).unwrap();
@@ -2220,6 +2228,7 @@ capabilities:
             server_id: "*".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+            dpop_proof: None,
         };
 
         let response = kernel.evaluate_tool_call(&request).unwrap();
@@ -2259,6 +2268,7 @@ capabilities:
             server_id: "*".to_string(),
             agent_id: agent_kp.public_key().to_hex(),
             arguments: serde_json::json!({"path": "/home/user/.ssh/id_rsa"}),
+            dpop_proof: None,
         };
 
         let response = kernel.evaluate_tool_call(&request).unwrap();

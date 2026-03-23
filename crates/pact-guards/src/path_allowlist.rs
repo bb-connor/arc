@@ -248,6 +248,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments,
+            dpop_proof: None,
         }));
 
         pact_kernel::GuardContext {
@@ -349,6 +350,7 @@ mod tests {
             server_id: server_id.clone(),
             agent_id: agent_id.clone(),
             arguments: serde_json::json!({"path": "/etc/passwd", "content": "bad"}),
+            dpop_proof: None,
         };
 
         let ctx = pact_kernel::GuardContext {
