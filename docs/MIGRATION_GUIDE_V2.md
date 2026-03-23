@@ -1,0 +1,265 @@
+# PACT v2.0 Migration Guide
+
+This guide covers what changed between PACT v1.0 and v2.0 and how to update
+your deployment and code.
+
+---
+
+## What Changed
+
+PACT v2.0 adds enforcement, compliance, and observability features on top of
+the v1.0 protocol. The core capability model, receipt format, and wire
+protocol are backward-compatible. New fields are optional in all structures.
+No existing API endpoints were removed.
+
+### New in v2.0
+
+| Feature | Crate | Summary |
+|---------|-------|---------|
+| Monetary budgets | `pact-core`, `pact-kernel` | `ToolGrant` gains `max_cost_per_invocation` and `max_total_cost` |
+| DPoP proof binding | `pact-kernel` | Per-invocation Ed25519 proof-of-possession |
+| Receipt Merkle checkpointing | `pact-kernel` | Count-triggered signed tree heads with inclusion proofs |
+| Receipt query API | `pact-cli` | `GET /v1/receipts/query` with 9 filter dimensions and cursor pagination |
+| Agent-subject receipt filter | `pact-cli` | Filter receipts by agent's Ed25519 public key |
+| Nested flow receipts | `pact-core`, `pact-kernel` | `ChildRequestReceipt` for sub-operations |
+| SIEM exporter pipeline | `pact-siem` | Cursor-pull loop exporting to Splunk HEC and Elasticsearch |
+| Financial receipt metadata | `pact-core` | `FinancialReceiptMetadata` attached to monetary receipts |
+
+---
+
+## New ToolGrant Fields
+
+Two optional fields were added to `ToolGrant`:
+
+```rust
+pub struct ToolGrant {
+    // ... existing fields unchanged ...
+
+    /// Maximum monetary cost per single invocation.
+    pub max_cost_per_invocation: Option<MonetaryAmount>,
+
+    /// Maximum aggregate monetary cost across all invocations.
+    pub max_total_cost: Option<MonetaryAmount>,
+
+    /// If Some(true), require a valid DPoP proof for every invocation.
+    pub dpop_required: Option<bool>,
+}
+
+pub struct MonetaryAmount {
+    pub units:    u64,    // Minor units (e.g. cents for USD)
+    pub currency: String, // ISO 4217 code
+}
+```
+
+These fields default to `None` (skipped in serialization). Existing grants
+without these fields continue to work exactly as before.
+
+### Forward Compatibility
+
+Existing v1.0 capability tokens serialize and deserialize correctly with the
+v2.0 `ToolGrant` type. The new fields are tagged with
+`#[serde(default, skip_serializing_if = "Option::is_none")]`, so:
+
+- A v1.0 token deserialized by a v2.0 Kernel has all three new fields as
+  `None` and behaves identically to v1.0.
+- A v2.0 token with monetary fields is rejected by a v1.0 Kernel (unknown
+  fields trigger a deserialization error depending on serde configuration).
+  Do not issue v2.0 tokens with monetary fields to v1.0 Kernels.
+
+---
+
+## How to Enable Monetary Budgets
+
+**1. Issue a capability token with monetary limits.**
+
+```rust
+use pact_core::capability::{MonetaryAmount, ToolGrant};
+
+let grant = ToolGrant {
+    server_id: "payments-server".to_string(),
+    tool_name: "charge_card".to_string(),
+    operations: vec![Operation::Invoke],
+    constraints: vec![],
+    max_invocations: Some(10),
+    max_cost_per_invocation: Some(MonetaryAmount {
+        units: 500,        // $5.00 USD
+        currency: "USD".to_string(),
+    }),
+    max_total_cost: Some(MonetaryAmount {
+        units: 2000,       // $20.00 USD
+        currency: "USD".to_string(),
+    }),
+    dpop_required: None,
+};
+```
+
+**2. Pass cost to the Kernel on each invocation.**
+
+When the Kernel processes a tool call under a monetary grant, it calls
+`BudgetStore::try_charge_cost` atomically. You must provide the cost in minor
+units at dispatch time. The cost is determined by the tool server's reported
+price; the Kernel enforces that it does not exceed `max_cost_per_invocation`
+or push `total_cost_charged` beyond `max_total_cost`.
+
+**3. Read financial metadata from receipts.**
+
+Allowed invocations produce a `PactReceipt` with financial metadata under the
+`"financial"` key in `metadata`:
+
+```rust
+if let Some(meta) = receipt.metadata.as_ref() {
+    if let Some(financial) = meta.get("financial") {
+        let fin: FinancialReceiptMetadata = serde_json::from_value(financial.clone())?;
+        println!("Charged: {} {}", fin.cost_charged, fin.currency);
+        println!("Remaining: {}", fin.budget_remaining);
+    }
+}
+```
+
+Denial receipts due to budget exhaustion have `decision = Deny` and
+`attempted_cost` set in the financial metadata.
+
+---
+
+## How to Enable DPoP
+
+**1. Mark a grant as requiring DPoP.**
+
+```rust
+let grant = ToolGrant {
+    dpop_required: Some(true),
+    // ... other fields ...
+};
+```
+
+**2. Build a DPoP proof in the agent before each invocation.**
+
+```rust
+use pact_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+use pact_core::crypto::sha256_hex;
+use pact_core::canonical::canonical_json_bytes;
+
+let action_hash = sha256_hex(&canonical_json_bytes(&arguments)?);
+
+let body = DpopProofBody {
+    schema: DPOP_SCHEMA.to_string(),
+    capability_id: capability.id.clone(),
+    tool_server: server_id.clone(),
+    tool_name: tool_name.clone(),
+    action_hash,
+    nonce: generate_random_nonce(),  // unique per invocation
+    issued_at: unix_now_secs(),
+    agent_key: agent_keypair.public_key(),
+};
+let proof = DpopProof::sign(body, &agent_keypair)?;
+```
+
+**3. Pass the proof in the ToolCallRequest.**
+
+```rust
+let request = ToolCallRequest {
+    dpop_proof: Some(proof),
+    // ... other fields ...
+};
+```
+
+The Kernel's `DpopNonceStore` has a default capacity of 8192 entries and a
+TTL of 300 seconds. Nonces must be unique per `(nonce, capability_id)` pair
+within the TTL window. Use a random string of at least 16 bytes for the nonce.
+
+---
+
+## How to Set Up SIEM
+
+The `pact-siem` crate provides a cursor-pull loop that reads signed receipts
+from the Kernel's SQLite database and forwards them to Splunk HEC or
+Elasticsearch.
+
+**1. Add `pact-siem` to your binary.**
+
+```toml
+[dependencies]
+pact-siem = { path = "../crates/pact-siem" }
+```
+
+**2. Configure and run the ExporterManager.**
+
+```rust
+use pact_siem::manager::{ExporterManager, SiemConfig};
+use pact_siem::exporters::splunk::SplunkExporter;
+
+let config = SiemConfig {
+    db_path: "/var/lib/pact/receipts.sqlite3".into(),
+    poll_interval: Duration::from_secs(5),
+    batch_size: 100,
+    max_retries: 3,
+    base_backoff_ms: 500,
+    dlq_capacity: 1000,
+};
+
+let mut manager = ExporterManager::new(config)?;
+manager.add_exporter(Box::new(SplunkExporter::new(
+    "https://splunk.example.com:8088".to_string(),
+    "your-hec-token".to_string(),
+)));
+
+let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+manager.run(cancel_rx).await;
+```
+
+`pact-siem` opens the receipt database read-only. The Kernel does not need to
+be stopped during SIEM export. On restart, the manager re-exports from seq=0;
+ensure your SIEM backend is configured for idempotent ingest.
+
+---
+
+## How to Access the Receipt Query API
+
+The `GET /v1/receipts/query` endpoint is served by the `pact-cli` trust
+control server.
+
+**Basic query:**
+
+```
+GET /v1/receipts/query?limit=50
+Authorization: Bearer <service-token>
+```
+
+**Filtered query:**
+
+```
+GET /v1/receipts/query?toolServer=payments-server&outcome=deny&since=1711000000&limit=20
+```
+
+**Paginated query:**
+
+```
+# First page
+GET /v1/receipts/query?limit=50
+
+# Next page (use nextCursor from previous response)
+GET /v1/receipts/query?limit=50&cursor=137
+```
+
+**Filter by agent public key:**
+
+```
+GET /v1/receipts/query?agentSubject=<hex-encoded-ed25519-pubkey>&limit=50
+```
+
+All filter parameters are optional and combinable. Filters are applied with
+AND semantics. See `ReceiptQueryHttpQuery` in `pact-cli/src/trust_control.rs`
+for the full parameter list.
+
+The response includes `totalCount` (full filtered set, not just this page),
+`nextCursor` (present when more pages exist), and `receipts` (array of
+`PactReceipt` objects, ordered by `seq` ascending).
+
+---
+
+## HA Overrun Note
+
+If you use monetary budgets in an HA deployment with multiple Kernel nodes,
+read ADR-0006. The maximum possible budget overrun is
+`max_cost_per_invocation * node_count`. Set your total budget with this
+bound in mind.
