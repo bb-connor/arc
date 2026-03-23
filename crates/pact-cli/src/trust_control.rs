@@ -18,7 +18,7 @@ use pact_core::receipt::{ChildRequestReceipt, Decision, PactReceipt};
 use pact_core::session::OperationTerminalState;
 use pact_kernel::{
     AuthoritySnapshot, AuthorityStatus, BudgetStore, BudgetStoreError, BudgetUsageRecord,
-    CapabilityAuthority, LocalCapabilityAuthority, ReceiptStore, ReceiptStoreError,
+    CapabilityAuthority, LocalCapabilityAuthority, ReceiptQuery, ReceiptStore, ReceiptStoreError,
     RevocationRecord, RevocationStore, RevocationStoreError, SqliteBudgetStore,
     SqliteCapabilityAuthority, SqliteReceiptStore, SqliteRevocationStore, StoredChildReceipt,
     StoredToolReceipt,
@@ -47,6 +47,7 @@ const INTERNAL_REVOCATIONS_DELTA_PATH: &str = "/v1/internal/revocations/delta";
 const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/delta";
 const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
 const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
+const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
 const DEFAULT_LIST_LIMIT: usize = 50;
 const MAX_LIST_LIMIT: usize = 200;
 const AUTHORITY_CACHE_TTL: Duration = Duration::from_secs(2);
@@ -211,6 +212,42 @@ pub struct ToolReceiptQuery {
     pub decision: Option<String>,
     #[serde(default)]
     pub limit: Option<usize>,
+}
+
+/// HTTP query parameters for the GET /v1/receipts/query endpoint.
+/// Supports all 8 filter dimensions plus cursor pagination.
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptQueryHttpQuery {
+    #[serde(default)]
+    pub capability_id: Option<String>,
+    #[serde(default)]
+    pub tool_server: Option<String>,
+    #[serde(default)]
+    pub tool_name: Option<String>,
+    #[serde(default)]
+    pub outcome: Option<String>,
+    #[serde(default)]
+    pub since: Option<u64>,
+    #[serde(default)]
+    pub until: Option<u64>,
+    #[serde(default)]
+    pub min_cost: Option<u64>,
+    #[serde(default)]
+    pub max_cost: Option<u64>,
+    #[serde(default)]
+    pub cursor: Option<u64>,
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+/// Response body for GET /v1/receipts/query.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptQueryResponse {
+    pub total_count: u64,
+    pub next_cursor: Option<u64>,
+    pub receipts: Vec<Value>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
@@ -503,6 +540,7 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             INTERNAL_BUDGETS_DELTA_PATH,
             get(handle_internal_budgets_delta),
         )
+        .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
         .with_state(state);
 
     info!(listen_addr = %local_addr, "serving PACT trust control service");
@@ -634,6 +672,13 @@ impl TrustControlClient {
         query: &ChildReceiptQuery,
     ) -> Result<ReceiptListResponse, CliError> {
         self.get_json_with_query(CHILD_RECEIPTS_PATH, query)
+    }
+
+    pub fn query_receipts(
+        &self,
+        query: &ReceiptQueryHttpQuery,
+    ) -> Result<ReceiptQueryResponse, CliError> {
+        self.get_json_with_query(RECEIPT_QUERY_PATH, query)
     }
 
     pub fn append_tool_receipt(&self, receipt: &PactReceipt) -> Result<(), CliError> {
@@ -1350,6 +1395,55 @@ async fn handle_list_child_receipts(
             "operationKind": query.operation_kind,
             "terminalState": query.terminal_state,
         }),
+        receipts,
+    })
+    .into_response()
+}
+
+async fn handle_query_receipts(
+    State(state): State<TrustServiceState>,
+    Query(query): Query<ReceiptQueryHttpQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    let store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let kernel_query = ReceiptQuery {
+        capability_id: query.capability_id.clone(),
+        tool_server: query.tool_server.clone(),
+        tool_name: query.tool_name.clone(),
+        outcome: query.outcome.clone(),
+        since: query.since,
+        until: query.until,
+        min_cost: query.min_cost,
+        max_cost: query.max_cost,
+        cursor: query.cursor,
+        limit: list_limit(query.limit),
+    };
+    let result = match store.query_receipts(&kernel_query) {
+        Ok(result) => result,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
+    let receipts = match result
+        .receipts
+        .into_iter()
+        .map(|stored| serde_json::to_value(stored.receipt))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(receipts) => receipts,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
+    Json(ReceiptQueryResponse {
+        total_count: result.total_count,
+        next_cursor: result.next_cursor,
         receipts,
     })
     .into_response()
