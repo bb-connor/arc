@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 11-01-PLAN.md (pact-siem crate foundation, Exporter trait, DeadLetterQueue, ExporterManager cursor-pull loop)
-last_updated: "2026-03-23T01:13:29.154Z"
+stopped_at: Completed 11-02-PLAN.md (SplunkHecExporter and ElasticsearchExporter)
+last_updated: "2026-03-23T01:17:12.699Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -83,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 11]: pact-siem Exporter trait uses Pin<Box<dyn Future>> for dyn compatibility -- impl Trait returns are not object-safe
 - [Phase 11]: pact-siem cursor not persisted to disk -- restart re-exports from seq=0; Splunk HEC and Elasticsearch handle idempotent re-export
 - [Phase 11]: pact-siem depends only on pact-core (not pact-kernel) -- kernel TCB has zero SIEM/HTTP transitive dependencies, verified by cargo tree
+- [Phase 11]: SplunkConfig.sourcetype defaults to pact:receipt -- allows Splunk teams to write sourcetype-based searches
+- [Phase 11]: ElasticAuthConfig is an enum (ApiKey vs Basic) -- makes invalid auth states unrepresentable at the type level
+- [Phase 11]: ES partial failure detection iterates items array only when errors field is true -- avoids JSON traversal on happy path
 
 ### Pending Todos
 
@@ -97,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T01:13:29.152Z
-Stopped at: Completed 11-01-PLAN.md (pact-siem crate foundation, Exporter trait, DeadLetterQueue, ExporterManager cursor-pull loop)
+Last session: 2026-03-23T01:17:12.697Z
+Stopped at: Completed 11-02-PLAN.md (SplunkHecExporter and ElasticsearchExporter)
 Resume file: None
