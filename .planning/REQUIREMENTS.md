@@ -32,7 +32,7 @@
 
 ### Product Surface
 
-- [ ] **PROD-01**: Receipt query API supports filtering by capability, tool, time range, outcome, and budget impact
+- [x] **PROD-01**: Receipt query API supports filtering by capability, tool, time range, outcome, and budget impact
 - [ ] **PROD-02**: Capability lineage index persists capability snapshots keyed by capability_id with subject, issuer, grants, and delegation metadata
 - [ ] **PROD-03**: Agent-centric receipt queries resolve through capability lineage index without replaying issuance logs
 - [ ] **PROD-04**: Web-based receipt dashboard renders receipts filterable by agent/tool/outcome/time with delegation chain inspection
@@ -88,7 +88,7 @@
 | COMP-03 | Phase 9 | Complete |
 | COMP-04 | Phase 9 | Complete |
 | COMP-05 | Phase 11 | Pending |
-| PROD-01 | Phase 10 | Pending |
+| PROD-01 | Phase 10 | Complete |
 | PROD-02 | Phase 12 | Pending |
 | PROD-03 | Phase 12 | Pending |
 | PROD-04 | Phase 12 | Pending |

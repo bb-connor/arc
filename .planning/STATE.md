@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: "Completed 10-03-PLAN.md (TypeScript SDK 1.0: errors, DPoP proofs, ReceiptQueryClient)"
-last_updated: "2026-03-23T00:29:47.970Z"
+stopped_at: "Completed 10-01-PLAN.md (receipt_query module: ReceiptQuery, ReceiptQueryResult, query_receipts)"
+last_updated: "2026-03-23T00:31:54.356Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -75,6 +75,9 @@ Recent decisions affecting current work:
 - [Phase 10-03]: DpopProofBody fields use snake_case matching Rust serde for cross-language verifiability
 - [Phase 10-03]: PactError (SDK layer) is distinct from PactInvariantError (invariant layer) -- different abstraction levels
 - [Phase 10-03]: QueryError status is a positional constructor arg for typed HTTP status access (err.status)
+- [Phase 10-01]: query_receipts_impl lives in receipt_store.rs (private connection), public API types and shell in receipt_query.rs
+- [Phase 10-01]: total_count uses separate COUNT(*) without cursor filter -- reflects full filtered set size
+- [Phase 10-01]: Financial cost filters use json_extract(raw_json, '$.metadata.financial.cost_charged') -- NULL rows excluded by >= / <= comparison
 
 ### Pending Todos
 
@@ -89,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:29:47.968Z
-Stopped at: Completed 10-03-PLAN.md (TypeScript SDK 1.0: errors, DPoP proofs, ReceiptQueryClient)
+Last session: 2026-03-23T00:31:54.354Z
+Stopped at: Completed 10-01-PLAN.md (receipt_query module: ReceiptQuery, ReceiptQueryResult, query_receipts)
 Resume file: None
