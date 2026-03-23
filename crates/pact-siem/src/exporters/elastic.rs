@@ -7,17 +7,28 @@
 //! Partial failures (HTTP 200 with `errors: true`) are detected by parsing
 //! the bulk response body and counting per-item status codes.
 
+use zeroize::Zeroizing;
+
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 
 /// Authentication configuration for the Elasticsearch exporter.
+///
+/// SECURITY: The `Basic` variant wraps the password in `Zeroizing<String>` so
+/// that the credential bytes are overwritten when the value is dropped.
 #[derive(Debug, Clone)]
 pub enum ElasticAuthConfig {
     /// API key authentication: sends `Authorization: ApiKey <key>` header.
     ApiKey(String),
     /// HTTP Basic authentication: encodes credentials via reqwest's built-in
     /// `basic_auth` helper (no manual base64 encoding needed).
-    Basic { username: String, password: String },
+    ///
+    /// The password is stored in a `Zeroizing<String>` wrapper to ensure the
+    /// memory is zeroed on drop.
+    Basic {
+        username: String,
+        password: Zeroizing<String>,
+    },
 }
 
 /// Configuration for the Elasticsearch bulk exporter.
@@ -111,7 +122,7 @@ impl Exporter for ElasticsearchExporter {
                     builder.header("Authorization", format!("ApiKey {key}"))
                 }
                 ElasticAuthConfig::Basic { username, password } => {
-                    builder.basic_auth(username, Some(password))
+                    builder.basic_auth(username, Some(password.as_str()))
                 }
             };
 
