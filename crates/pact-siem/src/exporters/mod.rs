@@ -1,3 +1,6 @@
 //! SIEM backend exporter implementations.
 //!
-//! Splunk HEC and Elasticsearch exporters will be added in plan 11-02.
+//! Each module implements the `Exporter` trait for a specific SIEM backend.
+
+pub mod elastic;
+pub mod splunk;

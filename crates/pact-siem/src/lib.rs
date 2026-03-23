@@ -23,4 +23,6 @@ pub mod manager;
 pub use dlq::{DeadLetterQueue, FailedEvent};
 pub use event::SiemEvent;
 pub use exporter::{ExportError, ExportFuture, Exporter};
+pub use exporters::elastic::{ElasticAuthConfig, ElasticConfig, ElasticsearchExporter};
+pub use exporters::splunk::{SplunkConfig, SplunkHecExporter};
 pub use manager::{ExporterManager, SiemConfig, SiemError};
