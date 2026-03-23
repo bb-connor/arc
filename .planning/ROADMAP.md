@@ -211,12 +211,12 @@ Plans:
   2. The pact-kernel TCB has no HTTP client dependencies; all SIEM I/O is isolated in the pact-siem crate.
   3. Exporter failure does not block kernel execution; a bounded dead-letter queue absorbs export failures without unbounded memory growth.
   4. Receipt events delivered to a SIEM include FinancialReceiptMetadata when the source receipt carries monetary grants.
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 11-01: Create pact-siem crate behind feature flag; implement ExporterManager with cursor-pull against receipt store and bounded DLQ.
-- [ ] 11-02: Implement Splunk HEC and Elasticsearch bulk exporters with ECS/Native schema formats and per-exporter rate limiting.
-- [ ] 11-03: Add integration tests for both exporters; verify FinancialReceiptMetadata enrichment and DLQ bounded-growth behavior.
+- [ ] 11-01-PLAN.md -- pact-siem crate foundation: Exporter trait, SiemEvent, DeadLetterQueue, ExporterManager cursor-pull loop, workspace and feature flag integration.
+- [ ] 11-02-PLAN.md -- Splunk HEC and Elasticsearch bulk exporters implementing Exporter trait with protocol-specific serialization.
+- [ ] 11-03-PLAN.md -- Integration tests for both exporters, FinancialReceiptMetadata enrichment, DLQ bounded growth, and ExporterManager failure isolation.
 
 ### Phase 12: Capability Lineage Index and Receipt Dashboard
 **Goal**: Operators and compliance officers can answer "what did agent X do?" through a web dashboard backed by a persistent capability lineage index.
