@@ -24,7 +24,7 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 - Default output format: JSON lines (one receipt per line) -- pipeable, machine-readable
 - Auto-paginate with --limit (default 50) and --cursor for manual cursor-walking
 - Filter flags map 1:1 to query API: --capability, --tool, --since, --until, --outcome, --min-cost, --max-cost
-- HTTP API endpoint: GET /receipts on existing trust-control axum server
+- HTTP API endpoint: GET /v1/receipts/query on existing trust-control axum server (versioned path)
 
 ### TypeScript SDK 1.0 Scope
 - Typed error classes extending PactError base: DpopSignError, QueryError, TransportError with error codes
