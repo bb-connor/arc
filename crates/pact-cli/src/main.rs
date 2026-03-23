@@ -1595,13 +1595,23 @@ fn handle_agent_message(
                     dpop_proof: None,
                 };
 
-                vec![KernelMessage::ToolCallResponse {
-                    id: context.request_id.to_string(),
-                    result: ToolCallResult::Err {
-                        error: ToolCallError::InternalError(e.to_string()),
-                    },
-                    receipt: Box::new(make_error_receipt(kernel, &request)),
-                }]
+                match make_error_receipt(kernel, &request) {
+                    Ok(receipt) => vec![KernelMessage::ToolCallResponse {
+                        id: context.request_id.to_string(),
+                        result: ToolCallResult::Err {
+                            error: ToolCallError::InternalError(e.to_string()),
+                        },
+                        receipt: Box::new(receipt),
+                    }],
+                    Err(sign_err) => {
+                        error!(
+                            error = %sign_err,
+                            request_id = %context.request_id,
+                            "failed to sign error receipt; dropping tool call response"
+                        );
+                        vec![]
+                    }
+                }
             }
             SessionOperation::ListCapabilities => {
                 error!(error = %e, session_id = %session_id, "failed to list capabilities");
@@ -1753,7 +1763,7 @@ fn control_request_id(session_id: &SessionId, suffix: &str) -> RequestId {
 fn make_error_receipt(
     _kernel: &mut PactKernel,
     request: &KernelToolCallRequest,
-) -> pact_core::PactReceipt {
+) -> Result<pact_core::PactReceipt, pact_core::error::Error> {
     // Attempt to build a proper deny receipt through the kernel.
     // If that also fails (unlikely), produce a minimal placeholder.
     let action = pact_core::receipt::ToolCallAction::from_parameters(request.arguments.clone());
@@ -1795,10 +1805,7 @@ fn make_error_receipt(
         kernel_key: kp.public_key(),
     };
 
-    pact_core::receipt::PactReceipt::sign(body, &kp).unwrap_or_else(|_| {
-        // Absolute last resort: this should never happen.
-        panic!("failed to sign error receipt");
-    })
+    pact_core::receipt::PactReceipt::sign(body, &kp)
 }
 
 struct StubToolServer {
