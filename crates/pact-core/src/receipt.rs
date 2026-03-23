@@ -281,6 +281,23 @@ pub struct GuardEvidence {
 ///
 /// For denial receipts caused by budget exhaustion, `attempted_cost` is
 /// populated with the cost that would have been charged.
+///
+/// # Field Invariants
+///
+/// Callers constructing this struct must uphold the following invariants:
+///
+/// - `cost_charged <= budget_total`: the amount charged for a single invocation
+///   must not exceed the total budget allocation.
+/// - `budget_remaining == budget_total - cost_charged` (approximately): the
+///   remaining budget field should reflect the post-charge balance. Due to HA
+///   split-brain scenarios, `budget_remaining` may be a best-effort snapshot
+///   rather than a strict invariant at read time, but callers must ensure it is
+///   computed correctly at write time.
+/// - For denial receipts, `cost_charged` should be 0 and `attempted_cost`
+///   should hold the cost that was rejected.
+///
+/// These invariants are not enforced by the type system and must be upheld by
+/// the kernel when constructing financial metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinancialReceiptMetadata {
     /// Index of the matching grant in the capability token's scope.

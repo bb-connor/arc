@@ -94,7 +94,7 @@ impl SqliteReceiptStore {
                 .optional()?
                 .map(|d: i64| d.max(0) as u64);
 
-            parent_depth.map(|d| d + 1).unwrap_or(1)
+            parent_depth.map(|d| d.saturating_add(1)).unwrap_or(1)
         } else {
             0
         };
@@ -497,11 +497,9 @@ mod tests {
         // Query the table to verify it exists; COUNT(*) fails if the table is absent.
         let count: i64 = store
             .connection
-            .query_row(
-                "SELECT COUNT(*) FROM capability_lineage",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT COUNT(*) FROM capability_lineage", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert_eq!(count, 0, "table should exist and be empty");
 
