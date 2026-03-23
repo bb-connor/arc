@@ -29,6 +29,9 @@ pub struct ReceiptQuery {
     pub cursor: Option<u64>,
     /// Maximum number of receipts to return per page (capped at MAX_QUERY_LIMIT).
     pub limit: usize,
+    /// Filter by agent subject public key (hex-encoded Ed25519). Resolved through
+    /// capability_lineage JOIN -- does not replay issuance logs.
+    pub agent_subject: Option<String>,
 }
 
 /// Result of a receipt query, including pagination state.

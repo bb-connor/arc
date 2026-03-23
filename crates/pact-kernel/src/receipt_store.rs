@@ -635,7 +635,7 @@ impl SqliteReceiptStore {
     ) -> Result<ReceiptQueryResult, ReceiptStoreError> {
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
 
-        // Both queries share the same 8 filter parameters.
+        // Both queries share the same 9 filter parameters.
         // Parameters:
         //   ?1  capability_id
         //   ?2  tool_server
@@ -645,39 +645,47 @@ impl SqliteReceiptStore {
         //   ?6  until (timestamp <=, inclusive)
         //   ?7  min_cost (json_extract cost_charged >=)
         //   ?8  max_cost (json_extract cost_charged <=)
+        //   ?9  agent_subject (capability_lineage.subject_key via LEFT JOIN)
         //
         // Data query also uses:
-        //   ?9  cursor (seq >, exclusive)
-        //   ?10 limit
+        //   ?10 cursor (seq >, exclusive)
+        //   ?11 limit
+        //
+        // When agent_subject is None, the LEFT JOIN produces NULL for cl.subject_key,
+        // and the (?9 IS NULL OR ...) guard passes -- no rows are filtered out.
         let data_sql = r#"
-            SELECT seq, raw_json
-            FROM pact_tool_receipts
-            WHERE (?1 IS NULL OR capability_id = ?1)
-              AND (?2 IS NULL OR tool_server = ?2)
-              AND (?3 IS NULL OR tool_name = ?3)
-              AND (?4 IS NULL OR decision_kind = ?4)
-              AND (?5 IS NULL OR timestamp >= ?5)
-              AND (?6 IS NULL OR timestamp <= ?6)
-              AND (?7 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
-              AND (?8 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
-              AND (?9 IS NULL OR seq > ?9)
-            ORDER BY seq ASC
-            LIMIT ?10
+            SELECT r.seq, r.raw_json
+            FROM pact_tool_receipts r
+            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+            WHERE (?1 IS NULL OR r.capability_id = ?1)
+              AND (?2 IS NULL OR r.tool_server = ?2)
+              AND (?3 IS NULL OR r.tool_name = ?3)
+              AND (?4 IS NULL OR r.decision_kind = ?4)
+              AND (?5 IS NULL OR r.timestamp >= ?5)
+              AND (?6 IS NULL OR r.timestamp <= ?6)
+              AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
+              AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
+              AND (?9 IS NULL OR cl.subject_key = ?9)
+              AND (?10 IS NULL OR r.seq > ?10)
+            ORDER BY r.seq ASC
+            LIMIT ?11
         "#;
 
         // Count query uses identical WHERE clause but no cursor and no LIMIT.
         // total_count reflects the full filtered set regardless of pagination.
         let count_sql = r#"
             SELECT COUNT(*)
-            FROM pact_tool_receipts
-            WHERE (?1 IS NULL OR capability_id = ?1)
-              AND (?2 IS NULL OR tool_server = ?2)
-              AND (?3 IS NULL OR tool_name = ?3)
-              AND (?4 IS NULL OR decision_kind = ?4)
-              AND (?5 IS NULL OR timestamp >= ?5)
-              AND (?6 IS NULL OR timestamp <= ?6)
-              AND (?7 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
-              AND (?8 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
+            FROM pact_tool_receipts r
+            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+            WHERE (?1 IS NULL OR r.capability_id = ?1)
+              AND (?2 IS NULL OR r.tool_server = ?2)
+              AND (?3 IS NULL OR r.tool_name = ?3)
+              AND (?4 IS NULL OR r.decision_kind = ?4)
+              AND (?5 IS NULL OR r.timestamp >= ?5)
+              AND (?6 IS NULL OR r.timestamp <= ?6)
+              AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
+              AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
+              AND (?9 IS NULL OR cl.subject_key = ?9)
         "#;
 
         let cap_id = query.capability_id.as_deref();
@@ -688,6 +696,7 @@ impl SqliteReceiptStore {
         let until = query.until.map(|v| v as i64);
         let min_cost = query.min_cost.map(|v| v as i64);
         let max_cost = query.max_cost.map(|v| v as i64);
+        let agent_sub = query.agent_subject.as_deref();
         let cursor = query.cursor.map(|v| v as i64);
 
         // Execute data query.
@@ -702,6 +711,7 @@ impl SqliteReceiptStore {
                 until,
                 min_cost,
                 max_cost,
+                agent_sub,
                 cursor,
                 limit as i64,
             ],
@@ -732,6 +742,7 @@ impl SqliteReceiptStore {
                     until,
                     min_cost,
                     max_cost,
+                    agent_sub,
                 ],
                 |row| row.get::<_, i64>(0),
             )
