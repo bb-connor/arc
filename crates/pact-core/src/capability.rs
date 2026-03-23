@@ -259,6 +259,12 @@ impl ToolGrant {
             }
         }
 
+        // If parent requires DPoP, child must also require DPoP.
+        // If parent does not require DPoP (None or Some(false)), child may do anything.
+        if parent.dpop_required == Some(true) && self.dpop_required != Some(true) {
+            return false;
+        }
+
         true
     }
 }
