@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: "Completed 10-01-PLAN.md (receipt_query module: ReceiptQuery, ReceiptQueryResult, query_receipts)"
-last_updated: "2026-03-23T00:31:54.356Z"
+stopped_at: Completed 10-02-PLAN.md (GET /v1/receipts/query, pact receipt list CLI, 5 integration tests)
+last_updated: "2026-03-23T00:40:03.981Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -78,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase 10-01]: query_receipts_impl lives in receipt_store.rs (private connection), public API types and shell in receipt_query.rs
 - [Phase 10-01]: total_count uses separate COUNT(*) without cursor filter -- reflects full filtered set size
 - [Phase 10-01]: Financial cost filters use json_extract(raw_json, '$.metadata.financial.cost_charged') -- NULL rows excluded by >= / <= comparison
+- [Phase 10]: Receipts in ReceiptQueryResponse serialized from stored.receipt (PactReceipt), not StoredToolReceipt -- StoredToolReceipt does not implement Serialize
+- [Phase 10]: pact receipt list uses JSON Lines to stdout, pagination metadata to stderr -- stdout stays machine-parseable
 
 ### Pending Todos
 
@@ -92,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:31:54.354Z
-Stopped at: Completed 10-01-PLAN.md (receipt_query module: ReceiptQuery, ReceiptQueryResult, query_receipts)
+Last session: 2026-03-23T00:40:03.979Z
+Stopped at: Completed 10-02-PLAN.md (GET /v1/receipts/query, pact receipt list CLI, 5 integration tests)
 Resume file: None
