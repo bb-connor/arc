@@ -135,6 +135,12 @@ enum Commands {
         #[command(subcommand)]
         command: TrustCommands,
     },
+
+    /// Query and list receipts from the receipt store.
+    Receipt {
+        #[command(subcommand)]
+        command: ReceiptCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -322,6 +328,43 @@ enum TrustCommands {
     },
 }
 
+#[derive(Subcommand)]
+enum ReceiptCommands {
+    /// List receipts with optional filters. Output: one JSON receipt per line (JSON Lines).
+    List {
+        /// Filter by capability ID.
+        #[arg(long)]
+        capability: Option<String>,
+        /// Filter by tool server ID.
+        #[arg(long)]
+        tool_server: Option<String>,
+        /// Filter by tool name.
+        #[arg(long)]
+        tool_name: Option<String>,
+        /// Filter by decision outcome (allow, deny, cancelled, incomplete).
+        #[arg(long)]
+        outcome: Option<String>,
+        /// Filter: receipts with timestamp >= this Unix seconds value.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Filter: receipts with timestamp <= this Unix seconds value.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Filter: minimum cost in minor currency units (only financial receipts).
+        #[arg(long)]
+        min_cost: Option<u64>,
+        /// Filter: maximum cost in minor currency units (only financial receipts).
+        #[arg(long)]
+        max_cost: Option<u64>,
+        /// Maximum number of receipts per page.
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        /// Cursor for pagination (seq value to start after).
+        #[arg(long)]
+        cursor: Option<u64>,
+    },
+}
+
 fn main() {
     let cli = Cli::parse();
     let receipt_db = cli.receipt_db.clone();
@@ -498,6 +541,34 @@ fn main() {
                 &capability_id,
                 cli.json,
                 revocation_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+            ),
+        },
+        Commands::Receipt { command } => match command {
+            ReceiptCommands::List {
+                capability,
+                tool_server,
+                tool_name,
+                outcome,
+                since,
+                until,
+                min_cost,
+                max_cost,
+                limit,
+                cursor,
+            } => cmd_receipt_list(
+                capability.as_deref(),
+                tool_server.as_deref(),
+                tool_name.as_deref(),
+                outcome.as_deref(),
+                since,
+                until,
+                min_cost,
+                max_cost,
+                limit,
+                cursor,
+                receipt_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
             ),
@@ -1350,6 +1421,74 @@ fn cmd_trust_status(
         println!("backend:       {backend_label}");
     }
 
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_receipt_list(
+    capability: Option<&str>,
+    tool_server: Option<&str>,
+    tool_name: Option<&str>,
+    outcome: Option<&str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    min_cost: Option<u64>,
+    max_cost: Option<u64>,
+    limit: usize,
+    cursor: Option<u64>,
+    receipt_db: Option<&std::path::Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let client = trust_control::build_client(url, token)?;
+        let query = trust_control::ReceiptQueryHttpQuery {
+            capability_id: capability.map(ToOwned::to_owned),
+            tool_server: tool_server.map(ToOwned::to_owned),
+            tool_name: tool_name.map(ToOwned::to_owned),
+            outcome: outcome.map(ToOwned::to_owned),
+            since,
+            until,
+            min_cost,
+            max_cost,
+            cursor,
+            limit: Some(limit),
+        };
+        let response = client.query_receipts(&query)?;
+        for receipt in &response.receipts {
+            println!("{}", serde_json::to_string(receipt)?);
+        }
+        if let Some(next_cursor) = response.next_cursor {
+            eprintln!("next_cursor={next_cursor} total_count={}", response.total_count);
+        }
+    } else {
+        let path = receipt_db.ok_or_else(|| {
+            CliError::Other(
+                "receipt commands require --receipt-db <path> or --control-url".to_string(),
+            )
+        })?;
+        let store = pact_kernel::SqliteReceiptStore::open(path)?;
+        let kernel_query = pact_kernel::ReceiptQuery {
+            capability_id: capability.map(ToOwned::to_owned),
+            tool_server: tool_server.map(ToOwned::to_owned),
+            tool_name: tool_name.map(ToOwned::to_owned),
+            outcome: outcome.map(ToOwned::to_owned),
+            since,
+            until,
+            min_cost,
+            max_cost,
+            cursor,
+            limit,
+        };
+        let result = store.query_receipts(&kernel_query)?;
+        for stored in &result.receipts {
+            println!("{}", serde_json::to_string(&stored.receipt)?);
+        }
+        if let Some(next_cursor) = result.next_cursor {
+            eprintln!("next_cursor={next_cursor} total_count={}", result.total_count);
+        }
+    }
     Ok(())
 }
 
