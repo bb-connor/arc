@@ -4,6 +4,10 @@
 //! (capability_id, grant_index) pair using a token bucket algorithm.
 //! The guard uses `std::sync::Mutex` (synchronous, no async) and fits
 //! into the existing `Guard` pipeline.
+//!
+//! All arithmetic uses integer milli-tokens (u64) to eliminate accumulated
+//! floating-point drift. The refill rate is expressed as milli-tokens per
+//! millisecond.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -15,36 +19,70 @@ use pact_kernel::{Guard, GuardContext, KernelError, Verdict};
 // TokenBucket (private)
 // ---------------------------------------------------------------------------
 
+/// Token bucket using integer milli-token arithmetic to avoid floating-point
+/// drift. One logical token == 1_000 milli-tokens.
+///
+/// Fields:
+///   capacity_mt     -- maximum bucket level in milli-tokens
+///   tokens_mt       -- current level in milli-tokens
+///   refill_rate_mpm -- refill rate in milli-tokens per millisecond
+///   last_refill     -- wall-clock instant of last refill
 struct TokenBucket {
-    capacity: f64,
-    tokens: f64,
-    refill_rate: f64, // tokens per second
+    capacity_mt: u64,
+    tokens_mt: u64,
+    /// Milli-tokens added per millisecond of elapsed time.
+    refill_rate_mpm: u64,
     last_refill: Instant,
 }
 
+/// Milli-tokens per logical token.
+const MT_PER_TOKEN: u64 = 1_000;
+
 impl TokenBucket {
-    fn new(capacity: f64, refill_rate: f64) -> Self {
+    /// Create a new bucket.
+    ///
+    /// `capacity_tokens`   -- maximum logical tokens (burst ceiling)
+    /// `window_secs`       -- window duration used to derive the refill rate
+    /// `max_per_window`    -- logical tokens added per window
+    fn new(capacity_tokens: u64, max_per_window: u64, window_secs: u64) -> Self {
+        // refill_rate_mpm = (max_per_window * MT_PER_TOKEN) / (window_secs * 1000 ms/s)
+        // We keep a minimum rate of 1 milli-token/ms to avoid divide-by-zero and
+        // ensure very slow rates still make progress.
+        let window_ms = window_secs.saturating_mul(1_000).max(1);
+        let refill_rate_mpm = (max_per_window.saturating_mul(MT_PER_TOKEN))
+            .checked_div(window_ms)
+            .unwrap_or(1)
+            .max(1);
+
         Self {
-            capacity,
-            tokens: capacity,
-            refill_rate,
+            capacity_mt: capacity_tokens.saturating_mul(MT_PER_TOKEN),
+            tokens_mt: capacity_tokens.saturating_mul(MT_PER_TOKEN),
+            refill_rate_mpm,
             last_refill: Instant::now(),
         }
     }
 
-    fn try_consume(&mut self, amount: f64) -> bool {
+    /// Attempt to consume `amount_tokens` logical tokens. Returns true on
+    /// success (tokens were available), false if the bucket is too empty.
+    fn try_consume(&mut self, amount_tokens: u64) -> bool {
         self.refill();
-        if self.tokens >= amount {
-            self.tokens -= amount;
+        let cost_mt = amount_tokens.saturating_mul(MT_PER_TOKEN);
+        if self.tokens_mt >= cost_mt {
+            self.tokens_mt -= cost_mt;
             true
         } else {
             false
         }
     }
 
+    /// Refill the bucket based on elapsed time since the last refill.
     fn refill(&mut self) {
-        let elapsed = self.last_refill.elapsed().as_secs_f64();
-        self.tokens = (self.tokens + elapsed * self.refill_rate).min(self.capacity);
+        let elapsed_ms = self.last_refill.elapsed().as_millis() as u64;
+        if elapsed_ms == 0 {
+            return;
+        }
+        let added = elapsed_ms.saturating_mul(self.refill_rate_mpm);
+        self.tokens_mt = self.tokens_mt.saturating_add(added).min(self.capacity_mt);
         self.last_refill = Instant::now();
     }
 }
@@ -111,37 +149,36 @@ impl Guard for VelocityGuard {
         let grant_index = ctx.matched_grant_index.unwrap_or(0);
         let key = (ctx.request.capability.id.clone(), grant_index);
 
-        // Check invocation rate limit
+        let window_secs = self.config.window_secs.max(1);
+
+        // Check invocation rate limit.
         if let Some(max_inv) = self.config.max_invocations_per_window {
-            let capacity = max_inv as f64 * self.config.burst_factor;
-            let window_secs = self.config.window_secs.max(1) as f64;
-            let refill_rate = max_inv as f64 / window_secs;
+            // Burst capacity: max_inv * burst_factor, rounded to nearest integer.
+            let capacity = ((max_inv as f64 * self.config.burst_factor).round() as u64).max(1);
 
             let mut buckets = self.invocation_buckets.lock().map_err(|_| {
                 KernelError::Internal("velocity guard invocation lock poisoned".to_string())
             })?;
             let bucket = buckets
                 .entry(key.clone())
-                .or_insert_with(|| TokenBucket::new(capacity, refill_rate));
-            if !bucket.try_consume(1.0) {
+                .or_insert_with(|| TokenBucket::new(capacity, max_inv as u64, window_secs));
+            if !bucket.try_consume(1) {
                 return Ok(Verdict::Deny);
             }
         }
 
-        // Check spend rate limit
+        // Check spend rate limit.
         if let Some(max_spend) = self.config.max_spend_per_window {
-            let capacity = max_spend as f64 * self.config.burst_factor;
-            let window_secs = self.config.window_secs.max(1) as f64;
-            let refill_rate = max_spend as f64 / window_secs;
+            let capacity = ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
 
             let mut buckets = self.spend_buckets.lock().map_err(|_| {
                 KernelError::Internal("velocity guard spend lock poisoned".to_string())
             })?;
             let bucket = buckets
                 .entry(key)
-                .or_insert_with(|| TokenBucket::new(capacity, refill_rate));
+                .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs));
             // Consume 1 unit per invocation; Phase 8 integration will pass actual cost.
-            if !bucket.try_consume(1.0) {
+            if !bucket.try_consume(1) {
                 return Ok(Verdict::Deny);
             }
         }
