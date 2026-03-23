@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 11-02-PLAN.md (SplunkHecExporter and ElasticsearchExporter)
-last_updated: "2026-03-23T01:17:12.699Z"
+stopped_at: Completed 11-03-PLAN.md (SIEM integration tests)
+last_updated: "2026-03-23T01:26:40.625Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -86,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 11]: SplunkConfig.sourcetype defaults to pact:receipt -- allows Splunk teams to write sourcetype-based searches
 - [Phase 11]: ElasticAuthConfig is an enum (ApiKey vs Basic) -- makes invalid auth states unrepresentable at the type level
 - [Phase 11]: ES partial failure detection iterates items array only when errors field is true -- avoids JSON traversal on happy path
+- [Phase 11]: ToggleExporter removed: two-instance manager test pattern used instead (Arc-based toggle not dyn-compatible without impl-on-Arc)
+- [Phase 11]: manager tests use max_retries=0/base_backoff_ms=0 to eliminate 3.5s retry delay per test
 
 ### Pending Todos
 
@@ -100,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T01:17:12.697Z
-Stopped at: Completed 11-02-PLAN.md (SplunkHecExporter and ElasticsearchExporter)
+Last session: 2026-03-23T01:26:40.623Z
+Stopped at: Completed 11-03-PLAN.md (SIEM integration tests)
 Resume file: None

@@ -130,7 +130,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Core Enforcement** - Wire monetary budget enforcement, Merkle checkpoint batching, and velocity guard into the kernel execution path. (completed 2026-03-22)
 - [ ] **Phase 9: Compliance and DPoP** - Ship Colorado and EU AI Act compliance documents against verified code, add receipt retention, and add DPoP proof-of-possession.
 - [x] **Phase 10: Receipt Query API and TypeScript SDK 1.0** - Make receipts queryable via API and publish the TypeScript SDK at stable 1.0. (completed 2026-03-23)
-- [ ] **Phase 11: SIEM Integration** - Ship pact-siem crate with at least 2 exporters for enterprise security stack integration.
+- [x] **Phase 11: SIEM Integration** - Ship pact-siem crate with at least 2 exporters for enterprise security stack integration. (completed 2026-03-23)
 - [ ] **Phase 12: Capability Lineage Index and Receipt Dashboard** - Build the agent-centric lineage index and the compliance officer receipt dashboard on top of it.
 
 ## Phase Details
@@ -252,5 +252,5 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 8. Core Enforcement | 4/4 | Complete   | 2026-03-22 | - |
 | 9. Compliance and DPoP | 2/3 | In Progress|  | - |
 | 10. Receipt Query API and TypeScript SDK 1.0 | 3/3 | Complete    | 2026-03-23 | - |
-| 11. SIEM Integration | 2/3 | In Progress|  | - |
+| 11. SIEM Integration | 3/3 | Complete   | 2026-03-23 | - |
 | 12. Capability Lineage Index and Receipt Dashboard | v2.0 | 0/4 | Not started | - |
