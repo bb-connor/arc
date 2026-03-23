@@ -78,19 +78,19 @@ The following items that appear as planned work elsewhere in this document shipp
 
 ### Monetary budgets (shipped in v2.0)
 
-`MonetaryAmount`, `max_cost_per_invocation`, and `max_total_cost` on `ToolGrant` are implemented in `crates/pact-core/src/capability.rs`. `BudgetStore::try_charge_cost` enforces atomic monetary limits in `crates/pact-kernel/src/budget_store.rs`. `FinancialReceiptMetadata` is embedded in the receipt `metadata` field for every monetized invocation. See [AGENT_ECONOMY.md](AGENT_ECONOMY.md) for the full design; Phase 1 of that document is now implemented.
+`MonetaryAmount`, `max_cost_per_invocation`, and `max_total_cost` on `ToolGrant` are implemented in `crates/pact-core/src/capability.rs`. `BudgetStore::try_charge_cost` enforces atomic monetary limits in `crates/pact-kernel/src/budget_store.rs`. `FinancialReceiptMetadata` is embedded in the receipt `metadata` field for every monetized invocation. See [AGENT_ECONOMY.md](AGENT_ECONOMY.md) for the full design; Phase 1 of that document is now implemented. Operator guide: [MONETARY_BUDGETS_GUIDE.md](MONETARY_BUDGETS_GUIDE.md).
 
 ### DPoP proof-of-possession (shipped in v2.0)
 
-`ToolGrant.dpop_required` enables per-grant DPoP enforcement. The kernel validates `pact.dpop_proof.v1` proofs with nonce replay prevention. Implementation is in `crates/pact-kernel/src/dpop.rs`.
+`ToolGrant.dpop_required` enables per-grant DPoP enforcement. The kernel validates `pact.dpop_proof.v1` proofs with nonce replay prevention. Implementation is in `crates/pact-kernel/src/dpop.rs`. Operator guide: [DPOP_INTEGRATION_GUIDE.md](DPOP_INTEGRATION_GUIDE.md).
 
 ### Receipt query API (shipped in v2.0)
 
-`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `pact receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/pact-kernel/src/receipt_query.rs` and `crates/pact-kernel/src/capability_lineage.rs`.
+`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `pact receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/pact-kernel/src/receipt_query.rs` and `crates/pact-kernel/src/capability_lineage.rs`. Operator guide: [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md).
 
 ### Velocity guard (shipped in v2.0)
 
-`VelocityGuard` token-bucket rate limiting per `(capability_id, grant_index)` is in `crates/pact-guards/src/velocity.rs`. It runs in the standard guard pipeline before any tool server invocation.
+`VelocityGuard` token-bucket rate limiting per `(capability_id, grant_index)` is in `crates/pact-guards/src/velocity.rs`. It runs in the standard guard pipeline before any tool server invocation. Operator guide: [VELOCITY_GUARDS.md](VELOCITY_GUARDS.md).
 
 ### Merkle-committed receipt batches (shipped in v2.0)
 

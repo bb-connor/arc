@@ -717,6 +717,13 @@ Spending analytics and anomaly detection.
 
 **Phase 1 features shipped in v2.0.** The economic primitives described in Phase 1 are implemented and available in the current codebase. Future-tense language in sections 3.1 through 3.5 describes what was designed and built; sections 3.6 (Payment Rail Integration) and Phases 2-4 remain planned.
 
+Operational guides for v2.0 features:
+
+- [MONETARY_BUDGETS_GUIDE.md](MONETARY_BUDGETS_GUIDE.md): configuring `max_cost_per_invocation`, `max_total_cost`, and financial receipt metadata
+- [VELOCITY_GUARDS.md](VELOCITY_GUARDS.md): token-bucket rate limiting per grant
+- [DPOP_INTEGRATION_GUIDE.md](DPOP_INTEGRATION_GUIDE.md): DPoP proof-of-possession setup and verification
+- [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md): `GET /v1/receipts/query` filters, pagination, and CLI usage
+
 ### Phase 1: Economic Primitives -- SHIPPED in v2.0
 
 All Phase 1 deliverables shipped in v2.0:
