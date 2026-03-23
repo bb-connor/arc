@@ -8,6 +8,8 @@ use pact_core::receipt::{ChildRequestReceipt, Decision, PactReceipt};
 use pact_core::session::OperationTerminalState;
 use rusqlite::{params, Connection, OptionalExtension};
 
+use crate::receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
+
 use crate::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
 
 /// Configuration for receipt retention and archival.
@@ -605,6 +607,131 @@ impl SqliteReceiptStore {
         }
 
         Ok(0)
+    }
+
+    /// Internal implementation for `query_receipts` (called from `receipt_query` module).
+    ///
+    /// Requires access to the private `connection` field, so it lives here in `receipt_store`.
+    pub(crate) fn query_receipts_impl(
+        &self,
+        query: &ReceiptQuery,
+    ) -> Result<ReceiptQueryResult, ReceiptStoreError> {
+        let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
+
+        // Both queries share the same 8 filter parameters.
+        // Parameters:
+        //   ?1  capability_id
+        //   ?2  tool_server
+        //   ?3  tool_name
+        //   ?4  outcome (decision_kind)
+        //   ?5  since (timestamp >=, inclusive)
+        //   ?6  until (timestamp <=, inclusive)
+        //   ?7  min_cost (json_extract cost_charged >=)
+        //   ?8  max_cost (json_extract cost_charged <=)
+        //
+        // Data query also uses:
+        //   ?9  cursor (seq >, exclusive)
+        //   ?10 limit
+        let data_sql = r#"
+            SELECT seq, raw_json
+            FROM pact_tool_receipts
+            WHERE (?1 IS NULL OR capability_id = ?1)
+              AND (?2 IS NULL OR tool_server = ?2)
+              AND (?3 IS NULL OR tool_name = ?3)
+              AND (?4 IS NULL OR decision_kind = ?4)
+              AND (?5 IS NULL OR timestamp >= ?5)
+              AND (?6 IS NULL OR timestamp <= ?6)
+              AND (?7 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
+              AND (?8 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
+              AND (?9 IS NULL OR seq > ?9)
+            ORDER BY seq ASC
+            LIMIT ?10
+        "#;
+
+        // Count query uses identical WHERE clause but no cursor and no LIMIT.
+        // total_count reflects the full filtered set regardless of pagination.
+        let count_sql = r#"
+            SELECT COUNT(*)
+            FROM pact_tool_receipts
+            WHERE (?1 IS NULL OR capability_id = ?1)
+              AND (?2 IS NULL OR tool_server = ?2)
+              AND (?3 IS NULL OR tool_name = ?3)
+              AND (?4 IS NULL OR decision_kind = ?4)
+              AND (?5 IS NULL OR timestamp >= ?5)
+              AND (?6 IS NULL OR timestamp <= ?6)
+              AND (?7 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
+              AND (?8 IS NULL OR CAST(json_extract(raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
+        "#;
+
+        let cap_id = query.capability_id.as_deref();
+        let tool_srv = query.tool_server.as_deref();
+        let tool_nm = query.tool_name.as_deref();
+        let outcome = query.outcome.as_deref();
+        let since = query.since.map(|v| v as i64);
+        let until = query.until.map(|v| v as i64);
+        let min_cost = query.min_cost.map(|v| v as i64);
+        let max_cost = query.max_cost.map(|v| v as i64);
+        let cursor = query.cursor.map(|v| v as i64);
+
+        // Execute data query.
+        let mut stmt = self.connection.prepare(data_sql)?;
+        let rows = stmt.query_map(
+            params![
+                cap_id,
+                tool_srv,
+                tool_nm,
+                outcome,
+                since,
+                until,
+                min_cost,
+                max_cost,
+                cursor,
+                limit as i64,
+            ],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )?;
+
+        let mut receipts = Vec::new();
+        for row in rows {
+            let (seq, raw_json) = row?;
+            let receipt: PactReceipt = serde_json::from_str(&raw_json)?;
+            receipts.push(StoredToolReceipt {
+                seq: seq.max(0) as u64,
+                receipt,
+            });
+        }
+
+        // Execute count query (same filters, no cursor, no limit).
+        let total_count: u64 = self
+            .connection
+            .query_row(
+                count_sql,
+                params![
+                    cap_id,
+                    tool_srv,
+                    tool_nm,
+                    outcome,
+                    since,
+                    until,
+                    min_cost,
+                    max_cost,
+                ],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|n| n.max(0) as u64)?;
+
+        // next_cursor is Some(last_seq) when the page is full (more results may exist).
+        let next_cursor = if receipts.len() == limit {
+            receipts.last().map(|r| r.seq)
+        } else {
+            None
+        };
+
+        Ok(ReceiptQueryResult {
+            receipts,
+            total_count,
+            next_cursor,
+        })
     }
 }
 

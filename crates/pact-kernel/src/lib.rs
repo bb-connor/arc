@@ -25,6 +25,7 @@ pub mod authority;
 pub mod budget_store;
 pub mod checkpoint;
 pub mod dpop;
+pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
 pub mod session;
@@ -68,6 +69,7 @@ pub use checkpoint::{
 pub use dpop::{
     verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA,
 };
+pub use receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
 pub use receipt_store::{
     ReceiptStore, ReceiptStoreError, SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
 };
