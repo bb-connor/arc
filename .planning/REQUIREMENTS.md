@@ -34,7 +34,7 @@
 
 - [x] **PROD-01**: Receipt query API supports filtering by capability, tool, time range, outcome, and budget impact
 - [x] **PROD-02**: Capability lineage index persists capability snapshots keyed by capability_id with subject, issuer, grants, and delegation metadata
-- [ ] **PROD-03**: Agent-centric receipt queries resolve through capability lineage index without replaying issuance logs
+- [x] **PROD-03**: Agent-centric receipt queries resolve through capability lineage index without replaying issuance logs
 - [x] **PROD-04**: Web-based receipt dashboard renders receipts filterable by agent/tool/outcome/time with delegation chain inspection
 - [x] **PROD-05**: Non-engineer stakeholders can answer "what did agent X do?" via dashboard without CLI access
 - [x] **PROD-06**: TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning
@@ -90,7 +90,7 @@
 | COMP-05 | Phase 11 | Complete |
 | PROD-01 | Phase 10 | Complete |
 | PROD-02 | Phase 12 | Complete |
-| PROD-03 | Phase 12 | Pending |
+| PROD-03 | Phase 12 | Complete |
 | PROD-04 | Phase 12 | Complete |
 | PROD-05 | Phase 12 | Complete |
 | PROD-06 | Phase 10 | Complete |
