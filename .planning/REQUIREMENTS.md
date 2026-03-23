@@ -28,7 +28,7 @@
 - [x] **COMP-02**: Published document maps PACT to EU AI Act Article 19 traceability requirements for high-risk AI systems
 - [x] **COMP-03**: Receipt retention policies are configurable (time-based and size-based rotation)
 - [x] **COMP-04**: Archived receipts remain verifiable via stored Merkle checkpoint roots
-- [ ] **COMP-05**: At least 2 SIEM exporters functional and tested (ported from ClawdStrike: Splunk, Elastic, Datadog, Sumo Logic, Webhooks, or Alerting)
+- [x] **COMP-05**: At least 2 SIEM exporters functional and tested (ported from ClawdStrike: Splunk, Elastic, Datadog, Sumo Logic, Webhooks, or Alerting)
 
 ### Product Surface
 
@@ -87,7 +87,7 @@
 | COMP-02 | Phase 9 | Complete |
 | COMP-03 | Phase 9 | Complete |
 | COMP-04 | Phase 9 | Complete |
-| COMP-05 | Phase 11 | Pending |
+| COMP-05 | Phase 11 | Complete |
 | PROD-01 | Phase 10 | Complete |
 | PROD-02 | Phase 12 | Pending |
 | PROD-03 | Phase 12 | Pending |

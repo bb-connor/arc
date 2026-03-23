@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 10-02-PLAN.md (GET /v1/receipts/query, pact receipt list CLI, 5 integration tests)
-last_updated: "2026-03-23T00:43:54.609Z"
+stopped_at: Completed 11-01-PLAN.md (pact-siem crate foundation, Exporter trait, DeadLetterQueue, ExporterManager cursor-pull loop)
+last_updated: "2026-03-23T01:13:29.154Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
   percent: 0
 ---
 
@@ -80,6 +80,9 @@ Recent decisions affecting current work:
 - [Phase 10-01]: Financial cost filters use json_extract(raw_json, '$.metadata.financial.cost_charged') -- NULL rows excluded by >= / <= comparison
 - [Phase 10]: Receipts in ReceiptQueryResponse serialized from stored.receipt (PactReceipt), not StoredToolReceipt -- StoredToolReceipt does not implement Serialize
 - [Phase 10]: pact receipt list uses JSON Lines to stdout, pagination metadata to stderr -- stdout stays machine-parseable
+- [Phase 11]: pact-siem Exporter trait uses Pin<Box<dyn Future>> for dyn compatibility -- impl Trait returns are not object-safe
+- [Phase 11]: pact-siem cursor not persisted to disk -- restart re-exports from seq=0; Splunk HEC and Elasticsearch handle idempotent re-export
+- [Phase 11]: pact-siem depends only on pact-core (not pact-kernel) -- kernel TCB has zero SIEM/HTTP transitive dependencies, verified by cargo tree
 
 ### Pending Todos
 
@@ -94,6 +97,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T00:40:03.979Z
-Stopped at: Completed 10-02-PLAN.md (GET /v1/receipts/query, pact receipt list CLI, 5 integration tests)
+Last session: 2026-03-23T01:13:29.152Z
+Stopped at: Completed 11-01-PLAN.md (pact-siem crate foundation, Exporter trait, DeadLetterQueue, ExporterManager cursor-pull loop)
 Resume file: None
