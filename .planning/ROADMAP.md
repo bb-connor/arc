@@ -227,13 +227,13 @@ Plans:
   2. Agent-centric receipt queries resolve through the lineage index without replaying issuance logs.
   3. A non-engineer stakeholder can open the receipt dashboard and filter by agent, tool, outcome, and time without CLI access.
   4. The dashboard shows delegation chain inspection and budget views for receipts with monetary grants.
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 12-01: Implement capability_index.rs in pact-kernel with snapshot persistence at issuance and subject_key index for agent-centric joins.
-- [ ] 12-02: Expose agent-centric receipt queries through the query API using the capability lineage index.
-- [ ] 12-03: Build receipt dashboard SPA (React 18 / Vite 6 / TanStack Table 8 / Recharts 2) with filter, drill-down, delegation chain, and budget views.
-- [ ] 12-04: Integrate dashboard SPA into axum server via tower_http::ServeDir; verify non-engineer stakeholder use case end to end.
+- [ ] 12-01-PLAN.md -- Capability lineage SQLite table and CapabilityLineageStore with snapshot persistence, delegation chain via WITH RECURSIVE CTE.
+- [ ] 12-02-PLAN.md -- Agent-centric receipt query via LEFT JOIN capability_lineage; lineage HTTP endpoints for snapshots and delegation chains.
+- [ ] 12-03-PLAN.md -- Receipt dashboard SPA (React 18 / Vite 6 / TanStack Table 8 / Recharts 2) with filter sidebar, receipt table, delegation chain, and budget sparkline.
+- [ ] 12-04-PLAN.md -- Wire dashboard SPA into axum via tower_http::ServeDir; integration tests for lineage endpoints and end-to-end dashboard verification.
 
 ## Progress
 
