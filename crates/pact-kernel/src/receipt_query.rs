@@ -1440,6 +1440,48 @@ mod tests {
     }
 
     #[test]
+    fn test_query_cursor_u64_max_returns_empty() {
+        // Querying with cursor=u64::MAX means "return receipts with seq > u64::MAX",
+        // which is impossible -- the result must always be empty.
+        let path = unique_db_path("rq-cursor-u64max");
+        let mut store = SqliteReceiptStore::open(&path).unwrap();
+
+        // Insert a few receipts so the store is non-empty.
+        for i in 0..5usize {
+            let r = make_receipt(
+                &format!("r-max-{i}"),
+                "cap-1",
+                "s",
+                "t",
+                Decision::Allow,
+                100 + i as u64,
+                None,
+            );
+            store.append_pact_receipt(&r).unwrap();
+        }
+
+        let result = store
+            .query_receipts(&ReceiptQuery {
+                cursor: Some(u64::MAX),
+                limit: 10,
+                ..Default::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            result.receipts.len(),
+            0,
+            "cursor=u64::MAX should return no receipts (no seq can exceed u64::MAX)"
+        );
+        assert!(
+            result.next_cursor.is_none(),
+            "next_cursor should be None when result is empty"
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn test_query_combined_filters() {
         let path = unique_db_path("rq-combined");
         let mut store = SqliteReceiptStore::open(&path).unwrap();

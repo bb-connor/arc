@@ -178,23 +178,68 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
 
         // 3 receipts with cap-1
-        store.append_pact_receipt(&make_receipt("r-1", "cap-1", "shell", "bash", Decision::Allow, 1000, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("r-2", "cap-1", "shell", "bash", Decision::Allow, 1001, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("r-3", "cap-1", "files", "read", Decision::Allow, 1002, None)).unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "r-1",
+                "cap-1",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1000,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "r-2",
+                "cap-1",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1001,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "r-3",
+                "cap-1",
+                "files",
+                "read",
+                Decision::Allow,
+                1002,
+                None,
+            ))
+            .unwrap();
 
         // 1 receipt with cap-2
-        store.append_pact_receipt(&make_receipt("r-4", "cap-2", "shell", "bash", Decision::Allow, 1003, None)).unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "r-4",
+                "cap-2",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1003,
+                None,
+            ))
+            .unwrap();
 
         // 1 denied receipt with cap-1
-        store.append_pact_receipt(&make_receipt(
-            "r-5",
-            "cap-1",
-            "shell",
-            "bash",
-            Decision::Deny { reason: "policy".to_string(), guard: "allow_guard".to_string() },
-            1004,
-            Some(200),
-        )).unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "r-5",
+                "cap-1",
+                "shell",
+                "bash",
+                Decision::Deny {
+                    reason: "policy".to_string(),
+                    guard: "allow_guard".to_string(),
+                },
+                1004,
+                Some(200),
+            ))
+            .unwrap();
     }
 
     let listen = reserve_listen_addr();
@@ -247,8 +292,15 @@ fn test_receipt_query_no_filters() {
     let total_count = body["totalCount"].as_u64().expect("totalCount is u64");
     let receipts = body["receipts"].as_array().expect("receipts is array");
 
-    assert_eq!(total_count, 5, "all 5 inserted receipts should be in totalCount");
-    assert_eq!(receipts.len(), 5, "all 5 receipts should be returned with default limit");
+    assert_eq!(
+        total_count, 5,
+        "all 5 inserted receipts should be in totalCount"
+    );
+    assert_eq!(
+        receipts.len(),
+        5,
+        "all 5 receipts should be returned with default limit"
+    );
 
     let _ = std::fs::remove_dir_all(&setup.dir);
 }
@@ -311,7 +363,9 @@ fn test_receipt_query_cursor_pagination() {
     let receipts1 = body1["receipts"].as_array().expect("receipts page 1");
     assert_eq!(receipts1.len(), 2, "first page should have 2 receipts");
 
-    let next_cursor = body1["nextCursor"].as_u64().expect("nextCursor should be present after page 1");
+    let next_cursor = body1["nextCursor"]
+        .as_u64()
+        .expect("nextCursor should be present after page 1");
 
     // Second page: use cursor
     let response2 = setup
@@ -331,10 +385,19 @@ fn test_receipt_query_cursor_pagination() {
     assert_eq!(receipts2.len(), 2, "second page should have 2 receipts");
 
     // The two pages must not overlap (receipts have unique ids).
-    let ids1: Vec<&str> = receipts1.iter().map(|r| r["id"].as_str().expect("receipt id")).collect();
-    let ids2: Vec<&str> = receipts2.iter().map(|r| r["id"].as_str().expect("receipt id")).collect();
+    let ids1: Vec<&str> = receipts1
+        .iter()
+        .map(|r| r["id"].as_str().expect("receipt id"))
+        .collect();
+    let ids2: Vec<&str> = receipts2
+        .iter()
+        .map(|r| r["id"].as_str().expect("receipt id"))
+        .collect();
     for id in &ids1 {
-        assert!(!ids2.contains(id), "receipt {id} appeared on both page 1 and page 2");
+        assert!(
+            !ids2.contains(id),
+            "receipt {id} appeared on both page 1 and page 2"
+        );
     }
 
     let _ = std::fs::remove_dir_all(&setup.dir);
@@ -393,7 +456,11 @@ fn test_receipt_query_requires_auth() {
 // --- Lineage helper ---
 
 /// Build a minimal CapabilityToken for test lineage insertion.
-fn make_capability_token(id: &str, subject_keypair: &Keypair, issuer_keypair: &Keypair) -> CapabilityToken {
+fn make_capability_token(
+    id: &str,
+    subject_keypair: &Keypair,
+    issuer_keypair: &Keypair,
+) -> CapabilityToken {
     let body = CapabilityTokenBody {
         id: id.to_string(),
         issuer: issuer_keypair.public_key(),
@@ -407,10 +474,7 @@ fn make_capability_token(id: &str, subject_keypair: &Keypair, issuer_keypair: &K
 }
 
 /// Pre-populate the capability_lineage table before the service starts.
-fn prepopulate_lineage(
-    db_path: &PathBuf,
-    entries: &[(&CapabilityToken, Option<&str>)],
-) {
+fn prepopulate_lineage(db_path: &PathBuf, entries: &[(&CapabilityToken, Option<&str>)]) {
     let mut store = SqliteReceiptStore::open(db_path).expect("open receipt store for lineage");
     for (token, parent_id) in entries {
         store
@@ -455,16 +519,32 @@ fn test_lineage_get_capability_snapshot() {
 
     let response = client
         .get(format!("{base_url}/v1/lineage/cap-lineage-1"))
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
         .send()
         .expect("send lineage request");
 
-    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for lineage GET");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "expected 200 for lineage GET"
+    );
     let body: serde_json::Value = response.json().expect("parse lineage json");
-    assert_eq!(body["capability_id"].as_str().expect("capability_id"), "cap-lineage-1");
-    assert_eq!(body["subject_key"].as_str().expect("subject_key"), subject_hex);
+    assert_eq!(
+        body["capability_id"].as_str().expect("capability_id"),
+        "cap-lineage-1"
+    );
+    assert_eq!(
+        body["subject_key"].as_str().expect("subject_key"),
+        subject_hex
+    );
     assert_eq!(body["issuer_key"].as_str().expect("issuer_key"), issuer_hex);
-    assert_eq!(body["delegation_depth"].as_u64().expect("delegation_depth"), 0);
+    assert_eq!(
+        body["delegation_depth"].as_u64().expect("delegation_depth"),
+        0
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -512,20 +592,36 @@ fn test_lineage_get_delegation_chain() {
 
     let response = client
         .get(format!("{base_url}/v1/lineage/chain-child/chain"))
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
         .send()
         .expect("send chain request");
 
-    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for chain GET");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "expected 200 for chain GET"
+    );
     let chain: Vec<serde_json::Value> = response.json().expect("parse chain json");
     assert_eq!(chain.len(), 3, "chain should have 3 entries");
 
     // Root-first ordering: delegation_depth 0, 1, 2
-    assert_eq!(chain[0]["capability_id"].as_str().expect("id"), "chain-root");
+    assert_eq!(
+        chain[0]["capability_id"].as_str().expect("id"),
+        "chain-root"
+    );
     assert_eq!(chain[0]["delegation_depth"].as_u64().expect("depth"), 0);
-    assert_eq!(chain[1]["capability_id"].as_str().expect("id"), "chain-parent");
+    assert_eq!(
+        chain[1]["capability_id"].as_str().expect("id"),
+        "chain-parent"
+    );
     assert_eq!(chain[1]["delegation_depth"].as_u64().expect("depth"), 1);
-    assert_eq!(chain[2]["capability_id"].as_str().expect("id"), "chain-child");
+    assert_eq!(
+        chain[2]["capability_id"].as_str().expect("id"),
+        "chain-child"
+    );
     assert_eq!(chain[2]["delegation_depth"].as_u64().expect("depth"), 2);
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -596,13 +692,47 @@ fn test_agent_subject_filter_via_http() {
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
-        store.record_capability_snapshot(&cap1, None).expect("record cap1");
-        store.record_capability_snapshot(&cap2, None).expect("record cap2");
+        store
+            .record_capability_snapshot(&cap1, None)
+            .expect("record cap1");
+        store
+            .record_capability_snapshot(&cap2, None)
+            .expect("record cap2");
 
         // 2 receipts for agent1, 1 for agent2
-        store.append_pact_receipt(&make_receipt("ra-1", "cap-agent1", "shell", "bash", Decision::Allow, 1000, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("ra-2", "cap-agent1", "files", "read", Decision::Allow, 1001, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("ra-3", "cap-agent2", "shell", "bash", Decision::Allow, 1002, None)).unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "ra-1",
+                "cap-agent1",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1000,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "ra-2",
+                "cap-agent1",
+                "files",
+                "read",
+                Decision::Allow,
+                1001,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "ra-3",
+                "cap-agent2",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1002,
+                None,
+            ))
+            .unwrap();
     }
 
     let listen = reserve_listen_addr();
@@ -622,14 +752,25 @@ fn test_agent_subject_filter_via_http() {
     let response = client
         .get(format!("{base_url}/v1/receipts/query"))
         .query(&[("agentSubject", agent1_hex.as_str())])
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
         .send()
         .expect("send agent filter request");
 
-    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for agent filter");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "expected 200 for agent filter"
+    );
     let body: serde_json::Value = response.json().expect("parse json");
     let receipts = body["receipts"].as_array().expect("receipts array");
-    assert_eq!(receipts.len(), 2, "only agent1's 2 receipts should be returned");
+    assert_eq!(
+        receipts.len(),
+        2,
+        "only agent1's 2 receipts should be returned"
+    );
     for r in receipts {
         assert_eq!(
             r["capability_id"].as_str().expect("capability_id"),
@@ -661,12 +802,46 @@ fn test_agent_receipts_endpoint() {
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
-        store.record_capability_snapshot(&cap1, None).expect("record cap1");
-        store.record_capability_snapshot(&cap2, None).expect("record cap2");
+        store
+            .record_capability_snapshot(&cap1, None)
+            .expect("record cap1");
+        store
+            .record_capability_snapshot(&cap2, None)
+            .expect("record cap2");
 
-        store.append_pact_receipt(&make_receipt("rb-1", "cap-ar-agent1", "shell", "bash", Decision::Allow, 1000, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("rb-2", "cap-ar-agent1", "files", "read", Decision::Allow, 1001, None)).unwrap();
-        store.append_pact_receipt(&make_receipt("rb-3", "cap-ar-agent2", "shell", "bash", Decision::Allow, 1002, None)).unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "rb-1",
+                "cap-ar-agent1",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1000,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "rb-2",
+                "cap-ar-agent1",
+                "files",
+                "read",
+                Decision::Allow,
+                1001,
+                None,
+            ))
+            .unwrap();
+        store
+            .append_pact_receipt(&make_receipt(
+                "rb-3",
+                "cap-ar-agent2",
+                "shell",
+                "bash",
+                Decision::Allow,
+                1002,
+                None,
+            ))
+            .unwrap();
     }
 
     let listen = reserve_listen_addr();
@@ -685,14 +860,25 @@ fn test_agent_receipts_endpoint() {
 
     let response = client
         .get(format!("{base_url}/v1/agents/{agent1_hex}/receipts"))
-        .header(reqwest::header::AUTHORIZATION, format!("Bearer {service_token}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
         .send()
         .expect("send agent receipts request");
 
-    assert_eq!(response.status(), reqwest::StatusCode::OK, "expected 200 for agent receipts");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "expected 200 for agent receipts"
+    );
     let body: serde_json::Value = response.json().expect("parse json");
     let receipts = body["receipts"].as_array().expect("receipts array");
-    assert_eq!(receipts.len(), 2, "only agent1's 2 receipts should be returned");
+    assert_eq!(
+        receipts.len(),
+        2,
+        "only agent1's 2 receipts should be returned"
+    );
     for r in receipts {
         assert_eq!(
             r["capability_id"].as_str().expect("capability_id"),
@@ -720,7 +906,11 @@ fn test_api_routes_not_shadowed_by_spa() {
         .send()
         .expect("send API request");
 
-    assert_eq!(response.status(), reqwest::StatusCode::OK, "API should return 200");
+    assert_eq!(
+        response.status(),
+        reqwest::StatusCode::OK,
+        "API should return 200"
+    );
 
     // The Content-Type must be application/json, not text/html.
     let content_type = response

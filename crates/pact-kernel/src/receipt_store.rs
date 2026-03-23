@@ -737,7 +737,37 @@ impl SqliteReceiptStore {
         let min_cost = query.min_cost.map(|v| v as i64);
         let max_cost = query.max_cost.map(|v| v as i64);
         let agent_sub = query.agent_subject.as_deref();
-        let cursor = query.cursor.map(|v| v as i64);
+        // Convert cursor to signed i64 for SQLite. SQLite AUTOINCREMENT seq
+        // values are bounded by i64::MAX; a cursor above that can never be
+        // exceeded. Convert with a checked cast: on overflow return an empty
+        // receipts page (the cursor excludes everything) while still reporting
+        // the correct total_count for the uncursored filter set.
+        let cursor_i64: Option<i64> = match query.cursor {
+            None => None,
+            Some(c) => match i64::try_from(c) {
+                Ok(v) => Some(v),
+                Err(_) => {
+                    // cursor > i64::MAX: no AUTOINCREMENT seq can exceed it.
+                    // Run only the count query (no cursor applied) and return empty.
+                    let total_count: u64 = self
+                        .connection
+                        .query_row(
+                            count_sql,
+                            params![
+                                cap_id, tool_srv, tool_nm, outcome, since, until, min_cost,
+                                max_cost, agent_sub,
+                            ],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .map(|n| n.max(0) as u64)?;
+                    return Ok(ReceiptQueryResult {
+                        receipts: Vec::new(),
+                        total_count,
+                        next_cursor: None,
+                    });
+                }
+            },
+        };
 
         // Execute data query.
         let mut stmt = self.connection.prepare(data_sql)?;
@@ -752,7 +782,7 @@ impl SqliteReceiptStore {
                 min_cost,
                 max_cost,
                 agent_sub,
-                cursor,
+                cursor_i64,
                 limit as i64,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),

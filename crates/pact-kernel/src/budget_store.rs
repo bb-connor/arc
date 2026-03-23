@@ -966,4 +966,83 @@ mod tests {
         let _ = fs::remove_file(path_a);
         let _ = fs::remove_file(path_b);
     }
+
+    #[test]
+    fn budget_store_zero_max_total_denies_any_charge_inmemory() {
+        // A grant with max_total_cost = 0 must deny even a charge of 1 unit.
+        let mut store = InMemoryBudgetStore::new();
+        let ok = store
+            .try_charge_cost("cap-zero-budget", 0, None, 1, None, Some(0))
+            .unwrap();
+        assert!(
+            !ok,
+            "any charge against a zero-unit total budget must be denied"
+        );
+        let records = store.list_usages(10, Some("cap-zero-budget")).unwrap();
+        assert!(
+            records.is_empty() || records[0].invocation_count == 0,
+            "no invocations should be recorded against a zero-unit budget"
+        );
+    }
+
+    #[test]
+    fn budget_store_zero_max_total_denies_any_charge_sqlite() {
+        let path = unique_db_path("pact-zero-budget-sqlite");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        let ok = store
+            .try_charge_cost("cap-zero-budget", 0, None, 1, None, Some(0))
+            .unwrap();
+        assert!(
+            !ok,
+            "any charge against a zero-unit total budget must be denied"
+        );
+        let records = store.list_usages(10, Some("cap-zero-budget")).unwrap();
+        assert!(
+            records.is_empty() || records[0].invocation_count == 0,
+            "no invocations should be recorded against a zero-unit budget"
+        );
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn budget_store_zero_cost_invocation_succeeds_and_records_zero_inmemory() {
+        // A zero-cost invocation against a monetary grant should succeed and
+        // record cost_charged = 0.
+        let mut store = InMemoryBudgetStore::new();
+        let ok = store
+            .try_charge_cost("cap-zero-cost", 0, None, 0, None, Some(1000))
+            .unwrap();
+        assert!(
+            ok,
+            "zero-cost invocation should succeed when budget is available"
+        );
+        let records = store.list_usages(10, Some("cap-zero-cost")).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].invocation_count, 1);
+        assert_eq!(
+            records[0].total_cost_charged, 0,
+            "cost_charged should be 0 for a zero-cost invocation"
+        );
+    }
+
+    #[test]
+    fn budget_store_zero_cost_invocation_succeeds_and_records_zero_sqlite() {
+        let path = unique_db_path("pact-zero-cost-sqlite");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        let ok = store
+            .try_charge_cost("cap-zero-cost", 0, None, 0, None, Some(1000))
+            .unwrap();
+        assert!(
+            ok,
+            "zero-cost invocation should succeed when budget is available"
+        );
+        let records = store.list_usages(10, Some("cap-zero-cost")).unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].invocation_count, 1);
+        assert_eq!(
+            records[0].total_cost_charged, 0,
+            "cost_charged should be 0 for a zero-cost invocation"
+        );
+        let _ = fs::remove_file(path);
+    }
 }

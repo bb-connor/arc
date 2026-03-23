@@ -243,19 +243,24 @@ pub fn verify_dpop_proof(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    // Proof must not be expired: issued_at + ttl >= now
-    if proof.body.issued_at + config.proof_ttl_secs < now_secs {
-        return Err(KernelError::DpopVerificationFailed(format!(
-            "proof expired: issued_at={} ttl={} now={}",
-            proof.body.issued_at, config.proof_ttl_secs, now_secs
-        )));
-    }
-
-    // Proof must not be future-dated beyond clock skew tolerance: issued_at <= now + skew
-    if proof.body.issued_at > now_secs + config.max_clock_skew_secs {
+    // Proof must not be future-dated beyond clock skew tolerance: issued_at <= now + skew.
+    // Check this first so that an astronomically large issued_at (e.g. u64::MAX) is
+    // rejected here before the expiry arithmetic below can overflow.
+    if proof.body.issued_at > now_secs.saturating_add(config.max_clock_skew_secs) {
         return Err(KernelError::DpopVerificationFailed(format!(
             "proof issued_at={} is too far in the future (now={}, skew={})",
             proof.body.issued_at, now_secs, config.max_clock_skew_secs
+        )));
+    }
+
+    // Proof must not be expired: issued_at + ttl >= now.
+    // Use saturating_add as a defence-in-depth measure; the future-dated check
+    // above ensures issued_at is near now, so saturation should never trigger
+    // in practice for well-formed proofs.
+    if proof.body.issued_at.saturating_add(config.proof_ttl_secs) < now_secs {
+        return Err(KernelError::DpopVerificationFailed(format!(
+            "proof expired: issued_at={} ttl={} now={}",
+            proof.body.issued_at, config.proof_ttl_secs, now_secs
         )));
     }
 

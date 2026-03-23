@@ -34,7 +34,8 @@ fn dlq_bounded_growth() {
         assert_eq!(
             ev.error,
             format!("error-{}", i + 5),
-            "remaining entry at position {i} should be error-{}", i + 5
+            "remaining entry at position {i} should be error-{}",
+            i + 5
         );
     }
 }
@@ -60,7 +61,10 @@ fn dlq_drop_oldest_on_overflow() {
     );
     assert!(errors.contains(&"error-1"), "error-1 must be retained");
     assert!(errors.contains(&"error-2"), "error-2 must be retained");
-    assert!(errors.contains(&"error-3"), "error-3 (newest) must be retained");
+    assert!(
+        errors.contains(&"error-3"),
+        "error-3 (newest) must be retained"
+    );
 }
 
 /// Empty queue operations work correctly: is_empty, len, and drain all return valid results.
@@ -72,8 +76,14 @@ fn dlq_empty_operations() {
     assert_eq!(dlq.len(), 0, "freshly created DLQ must have len 0");
 
     let drained = dlq.drain();
-    assert!(drained.is_empty(), "draining an empty DLQ must return an empty vec");
+    assert!(
+        drained.is_empty(),
+        "draining an empty DLQ must return an empty vec"
+    );
 
     // After drain, the queue should still be empty.
-    assert!(dlq.is_empty(), "DLQ must still be empty after draining nothing");
+    assert!(
+        dlq.is_empty(),
+        "DLQ must still be empty after draining nothing"
+    );
 }

@@ -410,3 +410,42 @@ fn dpop_required_field_roundtrip() {
     let restored_none: ToolGrant = serde_json::from_str(&json_none).expect("deserialize");
     assert_eq!(restored_none.dpop_required, None);
 }
+
+#[test]
+fn dpop_issued_at_u64_max_rejected_as_future_dated() {
+    let agent_kp = Keypair::generate();
+    let cap = make_capability(&agent_kp);
+
+    // u64::MAX is astronomically far in the future -- must exceed the clock-skew window.
+    let body = DpopProofBody {
+        schema: DPOP_SCHEMA.to_string(),
+        capability_id: cap.id.clone(),
+        tool_server: "srv-a".to_string(),
+        tool_name: "read_file".to_string(),
+        action_hash: sha256_hex(b"{}"),
+        nonce: "nonce-u64-max-001".to_string(),
+        issued_at: u64::MAX,
+        agent_key: agent_kp.public_key(),
+    };
+    let proof = DpopProof::sign(body, &agent_kp).expect("sign proof");
+
+    let config = default_config();
+    let store = default_store(&config);
+
+    let result = verify_dpop_proof(
+        &proof,
+        &cap,
+        "srv-a",
+        "read_file",
+        &sha256_hex(b"{}"),
+        &store,
+        &config,
+    );
+
+    assert!(result.is_err(), "issued_at=u64::MAX should be rejected");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("too far in the future"),
+        "unexpected error message: {err_msg}"
+    );
+}

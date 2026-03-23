@@ -116,8 +116,8 @@ pub fn build_checkpoint(
         issued_at: unix_now(),
         kernel_key: keypair.public_key(),
     };
-    let body_bytes = canonical_json_bytes(&body)
-        .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+    let body_bytes =
+        canonical_json_bytes(&body).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
     let signature = keypair.sign(&body_bytes);
     Ok(KernelCheckpoint { body, signature })
 }
@@ -203,6 +203,30 @@ mod tests {
         assert!(
             verify_checkpoint_signature(&cp).expect("verify failed"),
             "single-receipt checkpoint should have valid signature"
+        );
+    }
+
+    #[test]
+    fn build_checkpoint_single_receipt_merkle_root_equals_leaf_hash() {
+        // Degenerate case: a single-receipt batch must produce a Merkle root
+        // equal to the leaf hash of that receipt's canonical bytes (per RFC 6962:
+        // LeafHash(bytes) = SHA256(0x00 || bytes)).
+        use pact_core::merkle::leaf_hash;
+
+        let kp = Keypair::generate();
+        let leaf_bytes = b"single-receipt-canonical-bytes";
+        let batch = vec![leaf_bytes.to_vec()];
+        let cp = build_checkpoint(1, 1, 1, &batch, &kp).expect("build_checkpoint failed");
+
+        let expected_root = leaf_hash(leaf_bytes);
+        assert_eq!(
+            cp.body.merkle_root, expected_root,
+            "single-receipt checkpoint merkle_root must equal leaf_hash of the receipt bytes"
+        );
+        assert_eq!(cp.body.tree_size, 1);
+        assert!(
+            verify_checkpoint_signature(&cp).expect("verify failed"),
+            "single-receipt checkpoint signature should verify"
         );
     }
 

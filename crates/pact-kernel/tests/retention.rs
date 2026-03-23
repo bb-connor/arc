@@ -290,4 +290,57 @@ mod retention {
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);
     }
+
+    /// Archive with no checkpoints: storing receipts without any checkpoint rows
+    /// and calling archive_receipts_before should succeed without error.
+    ///
+    /// This covers the degenerate case where co-archival has nothing to do.
+    #[test]
+    fn archive_with_no_checkpoints_succeeds() {
+        let live_path = unique_db_path("retention-no-cp-live");
+        let archive_path = unique_db_path("retention-no-cp-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+
+        // Insert 5 receipts, but store NO checkpoints.
+        for i in 0..5usize {
+            let receipt = receipt_with_ts(&format!("rcpt-no-cp-{i}"), 100 + i as u64);
+            store.append_pact_receipt_returning_seq(&receipt).unwrap();
+        }
+
+        // Verify no checkpoints exist before archiving (seq 1 is absent).
+        assert!(
+            store.load_checkpoint_by_seq(1).unwrap().is_none(),
+            "should have no checkpoints before archive"
+        );
+
+        // archive_receipts_before must succeed even with no checkpoint rows.
+        let archived = store
+            .archive_receipts_before(500, archive_path.to_str().unwrap())
+            .unwrap();
+        assert_eq!(archived, 5, "should have archived 5 receipts");
+
+        // Live DB should be empty.
+        assert_eq!(
+            store.tool_receipt_count().unwrap(),
+            0,
+            "live DB should be empty after archiving all receipts"
+        );
+
+        // Archive DB should have 5 receipts and 0 checkpoints.
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(
+            archive_store.tool_receipt_count().unwrap(),
+            5,
+            "archive DB should have 5 receipts"
+        );
+        // Archive DB should have no checkpoints (none were stored before archiving).
+        assert!(
+            archive_store.load_checkpoint_by_seq(1).unwrap().is_none(),
+            "archive DB should have no checkpoints"
+        );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
 }

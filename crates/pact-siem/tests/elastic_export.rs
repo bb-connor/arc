@@ -2,7 +2,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use pact_core::crypto::Keypair;
-use pact_core::receipt::{Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ToolCallAction};
+use pact_core::receipt::{
+    Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ToolCallAction,
+};
 use pact_siem::event::SiemEvent;
 use pact_siem::exporter::ExportError;
 use pact_siem::exporters::elastic::{ElasticAuthConfig, ElasticConfig, ElasticsearchExporter};
@@ -96,10 +98,10 @@ async fn elastic_bulk_sends_correct_ndjson() {
     Mock::given(method("POST"))
         .and(path("/_bulk"))
         .and(header("Content-Type", "application/x-ndjson"))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"errors":false,"items":[]}"#,
-            "application/json",
-        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(r#"{"errors":false,"items":[]}"#, "application/json"),
+        )
         .expect(1)
         .mount(&server)
         .await;
@@ -124,7 +126,11 @@ async fn elastic_bulk_sends_correct_ndjson() {
 
     let body_str = String::from_utf8(received[0].body.clone()).expect("body is valid UTF-8");
     let lines: Vec<&str> = body_str.split('\n').filter(|l| !l.is_empty()).collect();
-    assert_eq!(lines.len(), 4, "should have 4 non-empty NDJSON lines (2 action + 2 document)");
+    assert_eq!(
+        lines.len(),
+        4,
+        "should have 4 non-empty NDJSON lines (2 action + 2 document)"
+    );
 
     // Parse first action line.
     let action0: serde_json::Value = serde_json::from_str(lines[0]).expect("line 0 is valid JSON");
@@ -154,7 +160,9 @@ async fn elastic_bulk_sends_correct_ndjson() {
 
     // Parse second action line.
     let action1: serde_json::Value = serde_json::from_str(lines[2]).expect("line 2 is valid JSON");
-    let index1 = action1.get("index").expect("second action must have 'index' key");
+    let index1 = action1
+        .get("index")
+        .expect("second action must have 'index' key");
     assert_eq!(
         index1.get("_id").and_then(|v| v.as_str()),
         Some("es-rcpt-002"),
@@ -204,10 +212,15 @@ async fn elastic_bulk_detects_partial_failure() {
     ];
 
     let result = exporter.export_batch(&events).await;
-    assert!(result.is_err(), "export_batch should return Err for partial failure");
+    assert!(
+        result.is_err(),
+        "export_batch should return Err for partial failure"
+    );
 
     match result.unwrap_err() {
-        ExportError::PartialFailure { succeeded, failed, .. } => {
+        ExportError::PartialFailure {
+            succeeded, failed, ..
+        } => {
             assert_eq!(succeeded, 1, "1 event should succeed");
             assert_eq!(failed, 1, "1 event should fail");
         }
@@ -222,10 +235,10 @@ async fn elastic_financial_metadata_in_payload() {
 
     Mock::given(method("POST"))
         .and(path("/_bulk"))
-        .respond_with(ResponseTemplate::new(200).set_body_raw(
-            r#"{"errors":false,"items":[]}"#,
-            "application/json",
-        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_raw(r#"{"errors":false,"items":[]}"#, "application/json"),
+        )
         .mount(&server)
         .await;
 
@@ -245,7 +258,8 @@ async fn elastic_financial_metadata_in_payload() {
     assert!(lines.len() >= 2, "must have at least 2 NDJSON lines");
 
     // Line 1 is the document.
-    let doc: serde_json::Value = serde_json::from_str(lines[1]).expect("document line is valid JSON");
+    let doc: serde_json::Value =
+        serde_json::from_str(lines[1]).expect("document line is valid JSON");
 
     let cost = doc
         .get("metadata")
