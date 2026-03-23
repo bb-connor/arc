@@ -195,12 +195,12 @@ Plans:
   2. The TypeScript SDK is published to npm at a stable 1.0 version with semantic versioning and documented error handling.
   3. TypeScript SDK DPoP proof generation helpers produce proofs that the Phase 9 kernel verifier accepts.
   4. The pact receipt list CLI subcommand returns paginated results using the same underlying query API.
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 10-01: Implement receipt_query.rs in pact-kernel with filtering (capability, tool, time range, outcome, budget impact) and pagination.
-- [ ] 10-02: Expose receipt query via pact-cli receipt list subcommand and HTTP API endpoint.
-- [ ] 10-03: Harden TypeScript SDK to 1.0: stable error types, retry semantics, DPoP proof generation helpers, npm publish pipeline.
+- [ ] 10-01-PLAN.md -- Implement receipt_query.rs in pact-kernel with ReceiptQuery struct, cursor-based pagination, and 7-filter SQL query.
+- [ ] 10-02-PLAN.md -- Expose receipt query via GET /v1/receipts/query HTTP endpoint and pact receipt list CLI subcommand with JSON Lines output.
+- [ ] 10-03-PLAN.md -- Harden TypeScript SDK to @pact-protocol/sdk 1.0.0: typed PactError hierarchy, DPoP proof generation, ReceiptQueryClient, build pipeline.
 
 ### Phase 11: SIEM Integration
 **Goal**: Enterprise security teams can receive PACT receipt events in their existing SIEM via at least 2 tested exporters.
