@@ -2013,7 +2013,7 @@ impl PactKernel {
             }
         };
 
-        let (matched_grant_index, _charge_result) =
+        let (matched_grant_index, charge_result) =
             match self.check_and_increment_budget(cap, &matching_grants) {
                 Ok(result) => result,
                 Err(e) => {
@@ -2129,7 +2129,15 @@ impl PactKernel {
                 return self.build_deny_response(request, &msg, now);
             }
         };
-        self.finalize_tool_output(request, tool_output, tool_started_at.elapsed(), now)
+        self.finalize_tool_output_with_cost(
+            request,
+            tool_output,
+            tool_started_at.elapsed(),
+            now,
+            charge_result,
+            None,
+            cap,
+        )
     }
 
     /// Issue a new capability for an agent.
