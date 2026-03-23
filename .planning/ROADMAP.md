@@ -253,4 +253,4 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 9. Compliance and DPoP | 2/3 | In Progress|  | - |
 | 10. Receipt Query API and TypeScript SDK 1.0 | 3/3 | Complete    | 2026-03-23 | - |
 | 11. SIEM Integration | 3/3 | Complete    | 2026-03-23 | - |
-| 12. Capability Lineage Index and Receipt Dashboard | 4/4 | Complete   | 2026-03-23 | - |
+| 12. Capability Lineage Index and Receipt Dashboard | 4/4 | Complete    | 2026-03-23 | - |
