@@ -1,0 +1,30 @@
+# Build artifacts
+/target/
+**/*.rs.bk
+
+# Editor files
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Debug
+*.pdb
+
+# Generated conformance artifacts
+/tests/conformance/results/generated/
+/tests/conformance/reports/generated/
+
+# Dashboard node_modules and build output
+crates/pact-cli/dashboard/node_modules/
+crates/pact-cli/dashboard/dist/
