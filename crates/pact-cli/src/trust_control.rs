@@ -1196,7 +1196,33 @@ async fn handle_issue_capability(
     match load_capability_authority(&state.config) {
         Ok(authority) => {
             match authority.issue_capability(&subject, payload.scope, payload.ttl_seconds) {
-                Ok(capability) => Json(IssueCapabilityResponse { capability }).into_response(),
+                Ok(capability) => {
+                    // Record the capability snapshot in the lineage index immediately after
+                    // issuance. This is best-effort: if the receipt DB is not configured or
+                    // the write fails, we log a warning but still return the capability.
+                    if let Some(path) = state.config.receipt_db_path.as_deref() {
+                        match SqliteReceiptStore::open(path) {
+                            Ok(mut store) => {
+                                if let Err(e) = store.record_capability_snapshot(&capability, None)
+                                {
+                                    warn!(
+                                        capability_id = %capability.id,
+                                        error = %e,
+                                        "failed to record capability lineage snapshot"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    capability_id = %capability.id,
+                                    error = %e,
+                                    "failed to open receipt store for capability lineage"
+                                );
+                            }
+                        }
+                    }
+                    Json(IssueCapabilityResponse { capability }).into_response()
+                }
                 Err(error) => {
                     plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
                 }
@@ -1509,9 +1535,7 @@ async fn handle_get_lineage(
             StatusCode::NOT_FOUND,
             &format!("capability not found: {capability_id}"),
         ),
-        Err(error) => {
-            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 
@@ -1532,9 +1556,7 @@ async fn handle_get_delegation_chain(
     };
     match store.get_delegation_chain(&capability_id) {
         Ok(chain) => Json(chain).into_response(),
-        Err(error) => {
-            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 
