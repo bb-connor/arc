@@ -26,6 +26,7 @@ use pact_kernel::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
 use ureq::Agent;
 
@@ -33,6 +34,12 @@ use crate::{
     authority_public_key_from_seed_file, load_or_create_authority_keypair,
     rotate_authority_keypair, CliError,
 };
+
+// Content Security Policy applied to all responses from the dashboard/API server.
+// Restricts resource loading to same-origin only; unsafe-inline is allowed for
+// styles because Vite injects inline style tags at build time.
+const CSP_VALUE: &str = "default-src 'self'; script-src 'self'; \
+    style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:";
 
 const HEALTH_PATH: &str = "/health";
 const AUTHORITY_PATH: &str = "/v1/authority";
@@ -580,6 +587,18 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     };
 
     let router = router.with_state(state);
+
+    // Dashboard SPA is served from the same origin via ServeDir -- no CORS
+    // headers needed. If the dashboard is ever served from a separate origin,
+    // add tower-http CorsLayer.
+
+    // Apply Content-Security-Policy to every response to restrict resource
+    // loading to same-origin and prevent XSS escalation.
+    let csp_value = HeaderValue::from_static(CSP_VALUE);
+    let router = router.layer(SetResponseHeaderLayer::overriding(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        csp_value,
+    ));
 
     info!(listen_addr = %local_addr, "serving PACT trust control service");
     eprintln!("PACT trust control service listening on http://{local_addr}");
