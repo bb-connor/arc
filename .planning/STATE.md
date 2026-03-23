@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Agent Economy Foundation
 status: planning
-stopped_at: Completed 11-03-PLAN.md (SIEM integration tests)
-last_updated: "2026-03-23T01:30:51.055Z"
+stopped_at: Completed 12-03-PLAN.md (receipt dashboard SPA)
+last_updated: "2026-03-23T02:19:07.563Z"
 last_activity: 2026-03-21 -- v2.0 roadmap written, 22 requirements mapped to 6 phases
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 15
-  completed_plans: 15
+  total_plans: 19
+  completed_plans: 17
   percent: 0
 ---
 
@@ -88,6 +88,13 @@ Recent decisions affecting current work:
 - [Phase 11]: ES partial failure detection iterates items array only when errors field is true -- avoids JSON traversal on happy path
 - [Phase 11]: ToggleExporter removed: two-instance manager test pattern used instead (Arc-based toggle not dyn-compatible without impl-on-Arc)
 - [Phase 11]: manager tests use max_retries=0/base_backoff_ms=0 to eliminate 3.5s retry delay per test
+- [Phase 12]: pub(crate) on SqliteReceiptStore.connection field allows capability_lineage.rs to implement methods without a separate accessor
+- [Phase 12]: snapshot_from_row free function (not closure) eliminates type annotation boilerplate across all capability_lineage query sites
+- [Phase 12]: delegation_depth stored at insert time (not computed at query time) -- depth is stable, avoids recursive computation on every read
+- [Phase 12]: ORDER BY level DESC in WITH RECURSIVE CTE produces root-first ordering -- root discovered at highest recursion level
+- [Phase 12]: Bearer token from ?token= URL param stored in sessionStorage -- no unauthenticated config endpoint needed
+- [Phase 12]: Cursor stack (push/pop array) for back-navigation with TanStack Table manualPagination: true and pageCount: -1
+- [Phase 12]: Minor-unit monetary formatting uses integer arithmetic only (Math.floor + modulo) -- no float conversion
 
 ### Pending Todos
 
@@ -102,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-23T01:26:40.623Z
-Stopped at: Completed 11-03-PLAN.md (SIEM integration tests)
+Last session: 2026-03-23T02:19:07.561Z
+Stopped at: Completed 12-03-PLAN.md (receipt dashboard SPA)
 Resume file: None
