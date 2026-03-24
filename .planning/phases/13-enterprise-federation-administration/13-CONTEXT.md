@@ -23,6 +23,7 @@ Phase 13 turns the shipped bearer-authenticated identity-federation alpha into a
 - JWT, introspection, SCIM, and SAML inputs must normalize into one canonical enterprise-origin envelope that preserves provider, tenant, organization, object/client identifiers, roles, groups, and raw subject identifiers.
 - Stable PACT subject derivation must be keyed from provider-scoped canonical principal identifiers, not mutable display attributes such as email or display name.
 - Groups and roles are preserved as normalized lists plus provider-native provenance so policy/debugging can explain exactly which source attribute produced each value.
+- Enterprise identity and downstream audit outputs must preserve source-attribute provenance for canonical principal, tenant, organization, groups, roles, and the trust material reference that authorized the provider record.
 - Ambiguous or partial mappings deny admission; PACT must not silently drop unresolved tenant/org/role/group context and continue with widened trust.
 
 ### Policy Admission Semantics
@@ -30,11 +31,13 @@ Phase 13 turns the shipped bearer-authenticated identity-federation alpha into a
 - Policy evaluation must distinguish issuer/provider identity from subject membership attributes so a token or assertion cannot satisfy both by accident through fallback matching.
 - Portable-trust admission decisions must retain the normalized federation context that was evaluated, including which provider record and which policy clause allowed or denied the request.
 - Existing bearer federation flows remain supported, but once a request enters the enterprise-provider lane it must use the provider-admin config and enterprise policy path rather than bypassing them with ad hoc raw flags.
+- A request enters the enterprise-provider lane only when it resolves to a validated provider-admin record or arrives through an explicit SCIM/SAML provider path. Bearer federation may still emit enterprise observability fields without entering that lane; in that case legacy bearer admission remains supported and must be regression-tested.
 
 ### Operator Provenance and Diagnostics
 - Admin and trust-control surfaces should show the source provider, federation method (`jwt`, `introspection`, `scim`, `saml`), normalized principal, derived subject key, and the tenant/org/role/group context used for admission.
 - Deny and parse-failure responses should explain which required field, policy clause, or trust anchor check failed without exposing secrets or raw credentials.
 - CLI and HTTP diagnostics should share one truth model so operator debugging matches what automated tests and remote clients observe.
+- Provider-admin and admission diagnostics must expose provider-record provenance, trust-boundary metadata, and source-attribute provenance for normalized principal/group/role values so operators can trace exactly why admission was allowed or denied.
 - End-to-end coverage should use realistic provider fixtures (Generic/Auth0/Okta/Azure AD plus SCIM/SAML samples) to prove no trust widening across mixed enterprise inputs.
 
 ### Claude's Discretion
