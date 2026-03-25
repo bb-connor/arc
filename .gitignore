@@ -25,6 +25,14 @@ Thumbs.db
 /tests/conformance/results/generated/
 /tests/conformance/reports/generated/
 
+# Generated Python packaging and cache artifacts
+__pycache__/
+*.py[cod]
+packages/sdk/pact-py/build/
+packages/sdk/pact-py/src/*.egg-info/
+packages/sdk/pact-ts/node_modules/
+packages/sdk/pact-ts/dist/
+
 # Dashboard node_modules and build output
 crates/pact-cli/dashboard/node_modules/
 crates/pact-cli/dashboard/dist/

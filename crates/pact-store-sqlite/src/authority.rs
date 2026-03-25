@@ -1,0 +1,487 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+
+use pact_core::capability::{CapabilityToken, CapabilityTokenBody, PactScope};
+use pact_core::crypto::{Keypair, PublicKey};
+use pact_kernel::{
+    AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
+    CapabilityAuthority, KernelError,
+};
+use rusqlite::{params, Connection};
+use uuid::Uuid;
+
+pub struct SqliteCapabilityAuthority {
+    path: PathBuf,
+    cached_public_key: Mutex<PublicKey>,
+    cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
+}
+
+impl SqliteCapabilityAuthority {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError> {
+        let path = path.as_ref().to_path_buf();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        let bootstrap = Keypair::generate();
+        let connection = Self::open_connection(&path)?;
+        connection.execute(
+            r#"
+            INSERT INTO authority_state (singleton_id, seed_hex, generation, rotated_at)
+            VALUES (1, ?1, 1, ?2)
+            ON CONFLICT(singleton_id) DO NOTHING
+            "#,
+            params![bootstrap.seed_hex(), unix_now() as i64],
+        )?;
+        let current_public_key = connection
+            .query_row(
+                r#"
+                SELECT seed_hex
+                FROM authority_state
+                WHERE singleton_id = 1
+                "#,
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|seed_hex| Keypair::from_seed_hex(seed_hex.trim()))
+            .map_err(AuthorityStoreError::from)??;
+        connection.execute(
+            r#"
+            INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
+            VALUES (?1, 1, ?2)
+            ON CONFLICT(public_key_hex) DO NOTHING
+            "#,
+            params![current_public_key.public_key().to_hex(), unix_now() as i64],
+        )?;
+        let status = Self::read_status_from_connection(&connection)?;
+        Ok(Self {
+            path,
+            cached_public_key: Mutex::new(status.public_key),
+            cached_trusted_public_keys: Mutex::new(status.trusted_public_keys),
+        })
+    }
+
+    pub fn status(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let status = Self::read_status_from_connection(&connection)?;
+        self.update_cached_public_key(status.public_key.clone());
+        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
+        Ok(status)
+    }
+
+    pub fn rotate(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let (_, generation, _) = Self::read_keypair_from_connection(&connection)?;
+        let keypair = Keypair::generate();
+        let rotated_at = unix_now();
+        let next_generation = generation.saturating_add(1);
+
+        connection.execute(
+            r#"
+            UPDATE authority_state
+            SET seed_hex = ?1, generation = ?2, rotated_at = ?3
+            WHERE singleton_id = 1
+            "#,
+            params![
+                keypair.seed_hex(),
+                next_generation as i64,
+                rotated_at as i64
+            ],
+        )?;
+        connection.execute(
+            r#"
+            INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
+            VALUES (?1, ?2, ?3)
+            ON CONFLICT(public_key_hex) DO NOTHING
+            "#,
+            params![
+                keypair.public_key().to_hex(),
+                next_generation as i64,
+                rotated_at as i64
+            ],
+        )?;
+
+        let status = Self::read_status_from_connection(&connection)?;
+        self.update_cached_public_key(status.public_key.clone());
+        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
+        Ok(status)
+    }
+
+    pub fn snapshot(&self) -> Result<AuthoritySnapshot, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let (keypair, generation, rotated_at) = Self::read_keypair_from_connection(&connection)?;
+        Ok(AuthoritySnapshot {
+            seed_hex: keypair.seed_hex(),
+            public_key_hex: keypair.public_key().to_hex(),
+            generation,
+            rotated_at,
+            trusted_keys: Self::read_trusted_key_snapshots(&connection)?,
+        })
+    }
+
+    pub fn apply_snapshot(
+        &self,
+        snapshot: &AuthoritySnapshot,
+    ) -> Result<bool, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let local_snapshot = self.snapshot()?;
+        let remote_keypair = Keypair::from_seed_hex(snapshot.seed_hex.trim())?;
+        if remote_keypair.public_key().to_hex() != snapshot.public_key_hex {
+            return Err(AuthorityStoreError::Core(
+                pact_core::error::Error::InvalidPublicKey(
+                    "authority snapshot public key does not match seed".to_string(),
+                ),
+            ));
+        }
+
+        for trusted_key in &snapshot.trusted_keys {
+            connection.execute(
+                r#"
+                INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
+                VALUES (?1, ?2, ?3)
+                ON CONFLICT(public_key_hex) DO UPDATE SET
+                    generation = MAX(generation, excluded.generation),
+                    activated_at = MIN(activated_at, excluded.activated_at)
+                "#,
+                params![
+                    trusted_key.public_key_hex,
+                    trusted_key.generation as i64,
+                    trusted_key.activated_at as i64
+                ],
+            )?;
+        }
+
+        let should_replace = snapshot.generation > local_snapshot.generation
+            || (snapshot.generation == local_snapshot.generation
+                && (snapshot.rotated_at, snapshot.public_key_hex.as_str())
+                    > (
+                        local_snapshot.rotated_at,
+                        local_snapshot.public_key_hex.as_str(),
+                    ));
+        if should_replace {
+            connection.execute(
+                r#"
+                UPDATE authority_state
+                SET seed_hex = ?1, generation = ?2, rotated_at = ?3
+                WHERE singleton_id = 1
+                "#,
+                params![
+                    snapshot.seed_hex,
+                    snapshot.generation as i64,
+                    snapshot.rotated_at as i64
+                ],
+            )?;
+        }
+
+        let status = Self::read_status_from_connection(&connection)?;
+        self.update_cached_public_key(status.public_key);
+        self.update_cached_trusted_public_keys(status.trusted_public_keys);
+        Ok(should_replace)
+    }
+
+    fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
+        let connection = Connection::open(path)?;
+        connection.execute_batch(
+            r#"
+            PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = FULL;
+            PRAGMA busy_timeout = 5000;
+
+            CREATE TABLE IF NOT EXISTS authority_state (
+                singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                seed_hex TEXT NOT NULL,
+                generation INTEGER NOT NULL,
+                rotated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS authority_trusted_keys (
+                public_key_hex TEXT PRIMARY KEY,
+                generation INTEGER NOT NULL,
+                activated_at INTEGER NOT NULL
+            );
+            "#,
+        )?;
+        Ok(connection)
+    }
+
+    fn read_status_from_connection(
+        connection: &Connection,
+    ) -> Result<AuthorityStatus, AuthorityStoreError> {
+        let (keypair, generation, rotated_at) = Self::read_keypair_from_connection(connection)?;
+        Ok(AuthorityStatus {
+            public_key: keypair.public_key(),
+            generation,
+            rotated_at,
+            trusted_public_keys: Self::read_trusted_public_keys(connection)?,
+        })
+    }
+
+    fn read_keypair_from_connection(
+        connection: &Connection,
+    ) -> Result<(Keypair, u64, u64), AuthorityStoreError> {
+        let (seed_hex, generation, rotated_at) = connection.query_row(
+            r#"
+            SELECT seed_hex, generation, rotated_at
+            FROM authority_state
+            WHERE singleton_id = 1
+            "#,
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )?;
+        Ok((
+            Keypair::from_seed_hex(seed_hex.trim())?,
+            generation.max(0) as u64,
+            rotated_at.max(0) as u64,
+        ))
+    }
+
+    fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let (keypair, _, _) = Self::read_keypair_from_connection(&connection)?;
+        self.update_cached_public_key(keypair.public_key());
+        Ok(keypair)
+    }
+
+    fn update_cached_public_key(&self, public_key: PublicKey) {
+        match self.cached_public_key.lock() {
+            Ok(mut guard) => *guard = public_key,
+            Err(poisoned) => *poisoned.into_inner() = public_key,
+        }
+    }
+
+    fn update_cached_trusted_public_keys(&self, public_keys: Vec<PublicKey>) {
+        match self.cached_trusted_public_keys.lock() {
+            Ok(mut guard) => *guard = public_keys,
+            Err(poisoned) => *poisoned.into_inner() = public_keys,
+        }
+    }
+
+    fn cached_public_key(&self) -> PublicKey {
+        match self.cached_public_key.lock() {
+            Ok(guard) => guard.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+
+    fn cached_trusted_public_keys(&self) -> Vec<PublicKey> {
+        match self.cached_trusted_public_keys.lock() {
+            Ok(guard) => guard.clone(),
+            Err(poisoned) => poisoned.into_inner().clone(),
+        }
+    }
+
+    fn read_trusted_public_keys(
+        connection: &Connection,
+    ) -> Result<Vec<PublicKey>, AuthorityStoreError> {
+        let mut statement = connection.prepare(
+            r#"
+            SELECT public_key_hex
+            FROM authority_trusted_keys
+            ORDER BY generation ASC, activated_at ASC
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+        rows.map(|row| {
+            let public_key_hex = row?;
+            PublicKey::from_hex(public_key_hex.trim()).map_err(AuthorityStoreError::from)
+        })
+        .collect()
+    }
+
+    fn read_trusted_key_snapshots(
+        connection: &Connection,
+    ) -> Result<Vec<AuthorityTrustedKeySnapshot>, AuthorityStoreError> {
+        let mut statement = connection.prepare(
+            r#"
+            SELECT public_key_hex, generation, activated_at
+            FROM authority_trusted_keys
+            ORDER BY generation ASC, activated_at ASC, public_key_hex ASC
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(AuthorityTrustedKeySnapshot {
+                public_key_hex: row.get(0)?,
+                generation: row.get::<_, i64>(1)?.max(0) as u64,
+                activated_at: row.get::<_, i64>(2)?.max(0) as u64,
+            })
+        })?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+}
+
+impl CapabilityAuthority for SqliteCapabilityAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.status()
+            .map(|status| status.public_key)
+            .unwrap_or_else(|_| self.cached_public_key())
+    }
+
+    fn trusted_public_keys(&self) -> Vec<PublicKey> {
+        self.status()
+            .map(|status| status.trusted_public_keys)
+            .unwrap_or_else(|_| self.cached_trusted_public_keys())
+    }
+
+    fn issue_capability(
+        &self,
+        subject: &PublicKey,
+        scope: PactScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, KernelError> {
+        let keypair = self
+            .read_current_keypair()
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
+        let now = unix_now();
+        let body = CapabilityTokenBody {
+            id: format!("cap-{}", Uuid::now_v7()),
+            issuer: keypair.public_key(),
+            subject: subject.clone(),
+            scope,
+            issued_at: now,
+            expires_at: now.saturating_add(ttl_seconds),
+            delegation_chain: vec![],
+        };
+
+        CapabilityToken::sign(body, &keypair)
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
+    }
+}
+
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+    use pact_core::capability::{Operation, ToolGrant};
+    use pact_kernel::LocalCapabilityAuthority;
+
+    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    }
+
+    #[test]
+    fn local_capability_authority_signs_capabilities() {
+        let authority = LocalCapabilityAuthority::new(Keypair::generate());
+        let subject = Keypair::generate().public_key();
+        let capability = authority
+            .issue_capability(
+                &subject,
+                PactScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "read_file".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                300,
+            )
+            .unwrap();
+
+        assert_eq!(capability.subject, subject);
+        assert_eq!(capability.issuer, authority.authority_public_key());
+        assert!(capability.id.starts_with("cap-"));
+        assert!(capability.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn sqlite_capability_authority_persists_and_rotates_across_handles() {
+        let path = unique_db_path("pact-authority");
+        let authority_a = SqliteCapabilityAuthority::open(&path).unwrap();
+        let authority_b = SqliteCapabilityAuthority::open(&path).unwrap();
+
+        let before = authority_a.status().unwrap();
+        assert_eq!(before.generation, 1);
+        assert_eq!(authority_b.status().unwrap().public_key, before.public_key);
+
+        let rotated = authority_a.rotate().unwrap();
+        assert_eq!(rotated.generation, 2);
+        assert_ne!(rotated.public_key, before.public_key);
+
+        let observed = authority_b.status().unwrap();
+        assert_eq!(observed.public_key, rotated.public_key);
+        assert_eq!(observed.generation, rotated.generation);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_issues_with_current_rotated_key() {
+        let path = unique_db_path("pact-authority-issue");
+        let authority = SqliteCapabilityAuthority::open(&path).unwrap();
+        let subject = Keypair::generate().public_key();
+        let first = authority
+            .issue_capability(
+                &subject,
+                PactScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "read_file".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                300,
+            )
+            .unwrap();
+        let rotated = authority.rotate().unwrap();
+        let second = authority
+            .issue_capability(
+                &subject,
+                PactScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "read_file".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: vec![],
+                    prompt_grants: vec![],
+                },
+                300,
+            )
+            .unwrap();
+
+        assert_ne!(first.issuer, second.issuer);
+        assert_eq!(second.issuer, rotated.public_key);
+        assert!(second.verify_signature().unwrap());
+
+        let _ = fs::remove_file(path);
+    }
+}

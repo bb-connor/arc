@@ -4,8 +4,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::remote_mcp::JwtProviderProfile;
 use crate::CliError;
+use crate::JwtProviderProfile;
 
 pub const ENTERPRISE_PROVIDER_REGISTRY_VERSION: &str = "pact.enterprise-providers.v1";
 
@@ -311,7 +311,7 @@ fn is_blank(value: Option<&str>) -> bool {
 mod jwt_provider_profile_serde {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    use crate::remote_mcp::JwtProviderProfile;
+    use crate::JwtProviderProfile;
 
     pub fn serialize<S>(
         value: &Option<JwtProviderProfile>,
@@ -360,7 +360,7 @@ mod tests {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use crate::remote_mcp::JwtProviderProfile;
+    use crate::JwtProviderProfile;
 
     use super::{
         EnterpriseProviderKind, EnterpriseProviderProvenance, EnterpriseProviderRecord,

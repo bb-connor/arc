@@ -661,8 +661,7 @@ fn materialize_reputation_issuance_policy(
     }))
 }
 
-/// Parse a policy from a YAML string (for testing).
-#[cfg(test)]
+/// Parse a policy from a YAML string.
 pub fn parse_policy(yaml: &str) -> Result<PactPolicy, PolicyError> {
     let policy: PactPolicy = serde_yaml::from_str(yaml)?;
     Ok(policy)
@@ -805,7 +804,6 @@ pub fn build_runtime_default_capabilities(
 }
 
 /// Convert policy tool grant configs into one or more capabilities grouped by TTL.
-#[cfg(test)]
 pub fn build_default_capabilities(
     config: &CapabilityPolicyConfig,
     max_capability_ttl: u64,

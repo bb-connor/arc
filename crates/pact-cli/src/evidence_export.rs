@@ -12,8 +12,9 @@ use pact_kernel::{
     verify_checkpoint_signature, CapabilitySnapshot, EvidenceChildReceiptRecord,
     EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
     EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
-    KernelCheckpoint, ReceiptInclusionProof, SqliteReceiptStore,
+    KernelCheckpoint, ReceiptInclusionProof,
 };
+use pact_store_sqlite::SqliteReceiptStore;
 
 use crate::policy::load_policy;
 use crate::{load_or_create_authority_keypair, CliError};
@@ -85,14 +86,14 @@ pub(crate) struct FederationPolicyBody {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct FederationPolicyDocument {
+pub struct FederationPolicyDocument {
     body: FederationPolicyBody,
     signature: Signature,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RemoteEvidenceExportRequest {
+pub struct RemoteEvidenceExportRequest {
     #[serde(default)]
     pub query: EvidenceExportQuery,
     #[serde(default)]
@@ -103,7 +104,7 @@ pub(crate) struct RemoteEvidenceExportRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RemoteEvidenceExportResponse {
+pub struct RemoteEvidenceExportResponse {
     pub bundle: EvidenceExportBundle,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federation_policy: Option<FederationPolicyDocument>,
@@ -111,7 +112,7 @@ pub(crate) struct RemoteEvidenceExportResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct EvidenceImportPackage {
+pub struct EvidenceImportPackage {
     manifest: EvidenceExportManifest,
     bundle: EvidenceExportBundle,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -120,13 +121,13 @@ pub(crate) struct EvidenceImportPackage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RemoteEvidenceImportRequest {
+pub struct RemoteEvidenceImportRequest {
     pub package: EvidenceImportPackage,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct RemoteEvidenceImportResponse {
+pub struct RemoteEvidenceImportResponse {
     pub share: pact_kernel::FederatedEvidenceShareSummary,
 }
 
@@ -673,7 +674,7 @@ fn verify_tool_receipts(
 ) -> Result<BTreeMap<u64, &PactReceipt>, CliError> {
     let mut by_seq = BTreeMap::new();
     for record in tool_receipts {
-        if !by_seq.insert(record.seq, &record.receipt).is_none() {
+        if by_seq.insert(record.seq, &record.receipt).is_some() {
             return Err(CliError::Other(format!(
                 "duplicate tool receipt seq in evidence package: {}",
                 record.seq
@@ -1223,7 +1224,7 @@ fn write_evidence_package(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_evidence_federation_policy_create(
+pub fn cmd_evidence_federation_policy_create(
     output: &Path,
     signing_seed_file: &Path,
     issuer: &str,
@@ -1290,7 +1291,7 @@ pub(crate) fn cmd_evidence_federation_policy_create(
     Ok(())
 }
 
-pub(crate) fn cmd_evidence_export(
+pub fn cmd_evidence_export(
     output: &Path,
     capability_id: Option<&str>,
     agent_subject: Option<&str>,
@@ -1357,7 +1358,7 @@ pub(crate) fn cmd_evidence_export(
     )
 }
 
-pub(crate) fn cmd_evidence_import(
+pub fn cmd_evidence_import(
     input: &Path,
     receipt_db: Option<&Path>,
     control_url: Option<&str>,
@@ -1408,7 +1409,7 @@ pub(crate) fn cmd_evidence_import(
     Ok(())
 }
 
-pub(crate) fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
+pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let package = load_verified_evidence_package(input)?;
     let manifest = package.manifest;
 

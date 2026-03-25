@@ -33,11 +33,13 @@ pub mod payment;
 pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
+pub mod revocation_runtime;
 pub mod revocation_store;
+pub mod runtime;
 pub mod session;
 pub mod transport;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use pact_core::canonical::canonical_json_bytes;
@@ -63,11 +65,9 @@ use uuid::Uuid;
 
 pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
-    CapabilityAuthority, LocalCapabilityAuthority, SqliteCapabilityAuthority,
+    CapabilityAuthority, LocalCapabilityAuthority,
 };
-pub use budget_store::{
-    BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore, SqliteBudgetStore,
-};
+pub use budget_store::{BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore};
 pub use capability_lineage::{
     CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
 };
@@ -105,9 +105,15 @@ pub use receipt_analytics::{
 pub use receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
 pub use receipt_store::{
     FederatedEvidenceShareImport, FederatedEvidenceShareSummary, ReceiptStore, ReceiptStoreError,
-    SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
+    RetentionConfig, StoredChildReceipt, StoredToolReceipt,
 };
-pub use revocation_store::{RevocationRecord, RevocationStoreError, SqliteRevocationStore};
+pub use revocation_runtime::{InMemoryRevocationStore, RevocationStore};
+pub use revocation_store::{RevocationRecord, RevocationStoreError};
+pub use runtime::{
+    NestedFlowBridge, NestedFlowClient, ToolCallChunk, ToolCallOutput, ToolCallRequest,
+    ToolCallResponse, ToolCallStream, ToolInvocationCost, ToolServerConnection, ToolServerEvent,
+    ToolServerOutput, ToolServerStreamResult, Verdict,
+};
 pub use session::{
     InflightRegistry, InflightRequest, LateSessionEvent, PeerCapabilities, Session, SessionError,
     SessionOperationResponse, SessionState, SubscriptionRegistry, TerminalRegistry,
@@ -121,97 +127,6 @@ pub type CapabilityId = String;
 
 /// A string-typed server identifier.
 pub type ServerId = String;
-
-/// Verdict of a guard or capability evaluation.
-///
-/// This is the kernel's own verdict type, distinct from `pact_core::Decision`.
-/// The kernel uses this internally; it maps to `pact_core::Decision` when
-/// building receipts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Verdict {
-    /// The action is allowed.
-    Allow,
-    /// The action is denied.
-    Deny,
-}
-
-/// A tool call request as seen by the kernel.
-#[derive(Debug)]
-pub struct ToolCallRequest {
-    /// Unique request identifier.
-    pub request_id: String,
-    /// The signed capability token authorizing this call.
-    pub capability: CapabilityToken,
-    /// The tool to invoke.
-    pub tool_name: String,
-    /// The server hosting the tool.
-    pub server_id: ServerId,
-    /// The calling agent's identifier (hex-encoded public key).
-    pub agent_id: AgentId,
-    /// Tool arguments.
-    pub arguments: serde_json::Value,
-    /// Optional DPoP proof. Required when the matched grant has `dpop_required == Some(true)`.
-    pub dpop_proof: Option<dpop::DpopProof>,
-}
-
-/// The kernel's response to a tool call request.
-#[derive(Debug)]
-pub struct ToolCallResponse {
-    /// Correlation identifier (matches the request).
-    pub request_id: String,
-    /// The kernel's verdict.
-    pub verdict: Verdict,
-    /// The tool's output payload, which may be a direct value or a stream.
-    pub output: Option<ToolCallOutput>,
-    /// Denial reason (populated when verdict is Deny).
-    pub reason: Option<String>,
-    /// Explicit terminal lifecycle state for this request.
-    pub terminal_state: OperationTerminalState,
-    /// Signed receipt attesting to this decision.
-    pub receipt: PactReceipt,
-}
-
-/// Streamed tool output emitted before the final tool response frame.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ToolCallChunk {
-    pub data: serde_json::Value,
-}
-
-/// Complete streamed output captured by the kernel.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ToolCallStream {
-    pub chunks: Vec<ToolCallChunk>,
-}
-
-impl ToolCallStream {
-    pub fn chunk_count(&self) -> u64 {
-        self.chunks.len() as u64
-    }
-}
-
-/// Output produced by a tool invocation.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ToolCallOutput {
-    Value(serde_json::Value),
-    Stream(ToolCallStream),
-}
-
-/// Stream-capable tool-server result.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ToolServerStreamResult {
-    Complete(ToolCallStream),
-    Incomplete {
-        stream: ToolCallStream,
-        reason: String,
-    },
-}
-
-/// Tool-server output produced after validation and guard checks.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ToolServerOutput {
-    Value(serde_json::Value),
-    Stream(ToolServerStreamResult),
-}
 
 #[derive(Debug)]
 struct ReceiptContent {
@@ -387,207 +302,6 @@ pub struct GuardContext<'a> {
     /// Index of the matched grant in the capability's scope, populated by
     /// check_and_increment_budget before guards run.
     pub matched_grant_index: Option<usize>,
-}
-
-/// Trait for checking whether a capability has been revoked.
-///
-/// Implementations may be in-memory, SQLite-backed, or subscribe to a
-/// distributed revocation feed via Spine/NATS.
-pub trait RevocationStore: Send {
-    /// Check if a capability ID has been revoked.
-    fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError>;
-
-    /// Revoke a capability. Returns `true` if it was newly revoked.
-    fn revoke(&mut self, capability_id: &str) -> Result<bool, RevocationStoreError>;
-}
-
-/// Bridge exposed to tool-server implementations while a parent request is in flight.
-///
-/// Wrapped servers can use this to trigger negotiated server-to-client requests such as
-/// `roots/list` and `sampling/createMessage`, or to surface wrapped MCP notifications,
-/// without escaping kernel mediation.
-pub trait NestedFlowBridge {
-    fn parent_request_id(&self) -> &RequestId;
-
-    fn poll_parent_cancellation(&mut self) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn list_roots(&mut self) -> Result<Vec<RootDefinition>, KernelError>;
-
-    fn create_message(
-        &mut self,
-        operation: CreateMessageOperation,
-    ) -> Result<CreateMessageResult, KernelError>;
-
-    fn create_elicitation(
-        &mut self,
-        operation: CreateElicitationOperation,
-    ) -> Result<CreateElicitationResult, KernelError>;
-
-    fn notify_elicitation_completed(&mut self, elicitation_id: &str) -> Result<(), KernelError>;
-
-    fn notify_resource_updated(&mut self, uri: &str) -> Result<(), KernelError>;
-
-    fn notify_resources_list_changed(&mut self) -> Result<(), KernelError>;
-}
-
-/// Raw client transport used by the kernel to service nested flows on behalf of a parent request.
-///
-/// The kernel owns lineage, policy, and in-flight bookkeeping. Implementors only move the nested
-/// request or notification across the client transport and return the decoded response.
-pub trait NestedFlowClient {
-    fn poll_parent_cancellation(
-        &mut self,
-        _parent_context: &OperationContext,
-    ) -> Result<(), KernelError> {
-        Ok(())
-    }
-
-    fn list_roots(
-        &mut self,
-        parent_context: &OperationContext,
-        child_context: &OperationContext,
-    ) -> Result<Vec<RootDefinition>, KernelError>;
-
-    fn create_message(
-        &mut self,
-        parent_context: &OperationContext,
-        child_context: &OperationContext,
-        operation: &CreateMessageOperation,
-    ) -> Result<CreateMessageResult, KernelError>;
-
-    fn create_elicitation(
-        &mut self,
-        parent_context: &OperationContext,
-        child_context: &OperationContext,
-        operation: &CreateElicitationOperation,
-    ) -> Result<CreateElicitationResult, KernelError>;
-
-    fn notify_elicitation_completed(
-        &mut self,
-        parent_context: &OperationContext,
-        elicitation_id: &str,
-    ) -> Result<(), KernelError>;
-
-    fn notify_resource_updated(
-        &mut self,
-        parent_context: &OperationContext,
-        uri: &str,
-    ) -> Result<(), KernelError>;
-
-    fn notify_resources_list_changed(
-        &mut self,
-        parent_context: &OperationContext,
-    ) -> Result<(), KernelError>;
-}
-
-/// In-memory revocation store for development and testing.
-#[derive(Debug, Default)]
-pub struct InMemoryRevocationStore {
-    revoked: HashSet<String>,
-}
-
-impl InMemoryRevocationStore {
-    /// Create an empty revocation store.
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl RevocationStore for InMemoryRevocationStore {
-    fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
-        Ok(self.revoked.contains(capability_id))
-    }
-
-    fn revoke(&mut self, capability_id: &str) -> Result<bool, RevocationStoreError> {
-        Ok(self.revoked.insert(capability_id.to_owned()))
-    }
-}
-
-/// Cost reported by a tool server after invocation.
-///
-/// Tool servers that track monetary costs override `invoke_with_cost` and
-/// return this struct. Servers that do not override return `None` via the
-/// default implementation, and the kernel charges `max_cost_per_invocation`
-/// as a worst-case debit.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ToolInvocationCost {
-    /// Cost in the currency's smallest unit (e.g. cents for USD).
-    pub units: u64,
-    /// ISO 4217 currency code.
-    pub currency: String,
-    /// Optional cost breakdown for audit.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub breakdown: Option<serde_json::Value>,
-}
-
-/// Trait representing a connection to a tool server.
-///
-/// The kernel holds one `ToolServerConnection` per registered server. In
-/// production this is an mTLS connection over UDS or TCP. For testing,
-/// an in-process implementation can be used.
-pub trait ToolServerConnection: Send + Sync {
-    /// The server's unique identifier.
-    fn server_id(&self) -> &str;
-
-    /// List the tool names available on this server.
-    fn tool_names(&self) -> Vec<String>;
-
-    /// Invoke a tool on this server. The kernel has already validated the
-    /// capability and run guards before calling this.
-    fn invoke(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<serde_json::Value, KernelError>;
-
-    /// Invoke a tool and optionally report the actual cost of the invocation.
-    ///
-    /// Tool servers that track monetary costs should override this method.
-    /// The default implementation delegates to `invoke` and returns `None`
-    /// cost, meaning the kernel will charge `max_cost_per_invocation` as
-    /// the worst-case debit.
-    fn invoke_with_cost(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
-        let value = self.invoke(tool_name, arguments, nested_flow_bridge)?;
-        Ok((value, None))
-    }
-
-    /// Invoke a tool that can emit multiple streamed chunks before its final terminal state.
-    ///
-    /// Servers that do not support streaming can ignore this and rely on `invoke`.
-    fn invoke_stream(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
-        let _ = (tool_name, arguments, nested_flow_bridge);
-        Ok(None)
-    }
-
-    /// Drain asynchronous events emitted after a tool invocation has already returned.
-    ///
-    /// Native tool servers can use this to surface late URL-elicitation completions and
-    /// catalog/resource notifications without depending on a still-live request-local bridge.
-    fn drain_events(&self) -> Result<Vec<ToolServerEvent>, KernelError> {
-        Ok(vec![])
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ToolServerEvent {
-    ElicitationCompleted { elicitation_id: String },
-    ResourceUpdated { uri: String },
-    ResourcesListChanged,
-    ToolsListChanged,
-    PromptsListChanged,
 }
 
 /// Trait representing a resource provider.
@@ -3575,17 +3289,9 @@ impl PactKernel {
 
     fn record_pact_receipt(&mut self, receipt: &PactReceipt) -> Result<(), KernelError> {
         if let Some(store) = self.receipt_store.as_deref_mut() {
-            // Downcast to SqliteReceiptStore to get the seq and trigger checkpoints.
-            // If we can't (e.g. a non-SQLite store), fall back to the trait method.
-            let seq = if let Some(sqlite_store) = store
-                .as_any_mut()
-                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
-            {
-                sqlite_store.append_pact_receipt_returning_seq(receipt)?
-            } else {
-                store.append_pact_receipt(receipt)?;
-                0
-            };
+            let seq = store
+                .append_pact_receipt_returning_seq(receipt)?
+                .unwrap_or(0);
 
             // Trigger a Merkle checkpoint if we've accumulated enough receipts.
             if seq > 0
@@ -3603,17 +3309,11 @@ impl PactKernel {
     fn maybe_trigger_checkpoint(&mut self, batch_end_seq: u64) -> Result<(), KernelError> {
         let batch_start_seq = self.last_checkpoint_seq + 1;
 
-        let sqlite_store = self.receipt_store.as_mut().and_then(|store| {
-            store
-                .as_any_mut()
-                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
-        });
-
-        let Some(sqlite_store) = sqlite_store else {
+        let Some(store) = self.receipt_store.as_deref_mut() else {
             return Ok(());
         };
 
-        let receipt_bytes_with_seqs = sqlite_store
+        let receipt_bytes_with_seqs = store
             .receipts_canonical_bytes_range(batch_start_seq, batch_end_seq)
             .map_err(KernelError::ReceiptPersistence)?;
 
@@ -3638,17 +3338,9 @@ impl PactKernel {
         )
         .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
 
-        // Re-borrow to store the checkpoint.
-        let sqlite_store = self.receipt_store.as_mut().and_then(|store| {
-            store
-                .as_any_mut()
-                .and_then(|any| any.downcast_mut::<SqliteReceiptStore>())
-        });
-        if let Some(sqlite_store) = sqlite_store {
-            sqlite_store
-                .store_checkpoint(&checkpoint)
-                .map_err(KernelError::ReceiptPersistence)?;
-        }
+        store
+            .store_checkpoint(&checkpoint)
+            .map_err(KernelError::ReceiptPersistence)?;
 
         self.last_checkpoint_seq = batch_end_seq;
         Ok(())
@@ -4439,6 +4131,8 @@ fn current_unix_timestamp() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::{Path, PathBuf};
+
     use pact_core::capability::{
         CapabilityToken, CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody,
         Operation, PactScope, PromptGrant, ResourceGrant, ToolGrant,
@@ -4453,6 +4147,360 @@ mod tests {
         PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
         ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
     };
+    use rusqlite::{params, Connection, OptionalExtension, Row};
+
+    struct SqliteReceiptStore {
+        connection: Connection,
+    }
+
+    impl SqliteReceiptStore {
+        fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
+            let path = path.as_ref();
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let connection = Connection::open(path)?;
+            connection.execute_batch(
+                r#"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+
+                CREATE TABLE IF NOT EXISTS pact_tool_receipts (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id TEXT NOT NULL UNIQUE,
+                    timestamp INTEGER NOT NULL,
+                    capability_id TEXT NOT NULL,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS pact_child_receipts (
+                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                    receipt_id TEXT NOT NULL UNIQUE,
+                    timestamp INTEGER NOT NULL,
+                    session_id TEXT NOT NULL,
+                    parent_request_id TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    operation_kind TEXT NOT NULL,
+                    terminal_state TEXT NOT NULL,
+                    policy_hash TEXT NOT NULL,
+                    outcome_hash TEXT NOT NULL,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS kernel_checkpoints (
+                    checkpoint_seq INTEGER PRIMARY KEY,
+                    raw_json TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS capability_lineage (
+                    capability_id TEXT PRIMARY KEY,
+                    subject_key TEXT NOT NULL,
+                    issuer_key TEXT NOT NULL,
+                    issued_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    grants_json TEXT NOT NULL,
+                    delegation_depth INTEGER NOT NULL DEFAULT 0,
+                    parent_capability_id TEXT
+                );
+                "#,
+            )?;
+            Ok(Self { connection })
+        }
+
+        fn load_checkpoint_by_seq(
+            &self,
+            checkpoint_seq: u64,
+        ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+            self.connection
+                .query_row(
+                    "SELECT raw_json FROM kernel_checkpoints WHERE checkpoint_seq = ?1",
+                    params![checkpoint_seq as i64],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| serde_json::from_str(&raw_json))
+                .transpose()
+                .map_err(Into::into)
+        }
+
+        fn get_delegation_chain(
+            &self,
+            capability_id: &str,
+        ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
+            fn snapshot_from_row(row: &Row<'_>) -> rusqlite::Result<CapabilitySnapshot> {
+                Ok(CapabilitySnapshot {
+                    capability_id: row.get::<_, String>(0)?,
+                    subject_key: row.get::<_, String>(1)?,
+                    issuer_key: row.get::<_, String>(2)?,
+                    issued_at: row.get::<_, i64>(3)?.max(0) as u64,
+                    expires_at: row.get::<_, i64>(4)?.max(0) as u64,
+                    grants_json: row.get::<_, String>(5)?,
+                    delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
+                    parent_capability_id: row.get::<_, Option<String>>(7)?,
+                })
+            }
+
+            let mut chain = Vec::new();
+            let mut current = Some(capability_id.to_string());
+
+            while let Some(current_id) = current.take() {
+                let snapshot = self
+                    .connection
+                    .query_row(
+                        r#"
+                        SELECT
+                            capability_id,
+                            subject_key,
+                            issuer_key,
+                            issued_at,
+                            expires_at,
+                            grants_json,
+                            delegation_depth,
+                            parent_capability_id
+                        FROM capability_lineage
+                        WHERE capability_id = ?1
+                        "#,
+                        params![current_id],
+                        snapshot_from_row,
+                    )
+                    .optional()?;
+                let Some(snapshot) = snapshot else {
+                    break;
+                };
+                current = snapshot.parent_capability_id.clone();
+                chain.push(snapshot);
+            }
+
+            chain.reverse();
+            Ok(chain)
+        }
+    }
+
+    impl ReceiptStore for SqliteReceiptStore {
+        fn append_pact_receipt(&mut self, receipt: &PactReceipt) -> Result<(), ReceiptStoreError> {
+            self.append_pact_receipt_returning_seq(receipt)?;
+            Ok(())
+        }
+
+        fn append_pact_receipt_returning_seq(
+            &mut self,
+            receipt: &PactReceipt,
+        ) -> Result<Option<u64>, ReceiptStoreError> {
+            let raw_json = serde_json::to_string(receipt)?;
+            let rows = self.connection.execute(
+                r#"
+                INSERT INTO pact_tool_receipts (
+                    receipt_id,
+                    timestamp,
+                    capability_id,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+                params![
+                    receipt.id,
+                    receipt.timestamp as i64,
+                    receipt.capability_id,
+                    raw_json,
+                ],
+            )?;
+            Ok((rows > 0).then(|| self.connection.last_insert_rowid().max(0) as u64))
+        }
+
+        fn append_child_receipt(
+            &mut self,
+            receipt: &ChildRequestReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            let raw_json = serde_json::to_string(receipt)?;
+            self.connection.execute(
+                r#"
+                INSERT INTO pact_child_receipts (
+                    receipt_id,
+                    timestamp,
+                    session_id,
+                    parent_request_id,
+                    request_id,
+                    operation_kind,
+                    terminal_state,
+                    policy_hash,
+                    outcome_hash,
+                    raw_json
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+                params![
+                    receipt.id,
+                    receipt.timestamp as i64,
+                    receipt.session_id.as_str(),
+                    receipt.parent_request_id.as_str(),
+                    receipt.request_id.as_str(),
+                    receipt.operation_kind.as_str(),
+                    match &receipt.terminal_state {
+                        OperationTerminalState::Completed => "completed",
+                        OperationTerminalState::Cancelled { .. } => "cancelled",
+                        OperationTerminalState::Incomplete { .. } => "incomplete",
+                    },
+                    receipt.policy_hash,
+                    receipt.outcome_hash,
+                    raw_json,
+                ],
+            )?;
+            Ok(())
+        }
+
+        fn receipts_canonical_bytes_range(
+            &self,
+            start_seq: u64,
+            end_seq: u64,
+        ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+            let mut statement = self.connection.prepare(
+                r#"
+                SELECT seq, raw_json
+                FROM pact_tool_receipts
+                WHERE seq >= ?1 AND seq <= ?2
+                ORDER BY seq ASC
+                "#,
+            )?;
+            let rows = statement.query_map(params![start_seq as i64, end_seq as i64], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?;
+
+            rows.map(|row| {
+                let (seq, raw_json) = row?;
+                let value = serde_json::from_str::<serde_json::Value>(&raw_json)?;
+                let bytes = canonical_json_bytes(&value)
+                    .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+                Ok((seq.max(0) as u64, bytes))
+            })
+            .collect()
+        }
+
+        fn store_checkpoint(
+            &mut self,
+            checkpoint: &KernelCheckpoint,
+        ) -> Result<(), ReceiptStoreError> {
+            let raw_json = serde_json::to_string(checkpoint)?;
+            self.connection.execute(
+                r#"
+                INSERT INTO kernel_checkpoints (checkpoint_seq, raw_json)
+                VALUES (?1, ?2)
+                ON CONFLICT(checkpoint_seq) DO UPDATE SET raw_json = excluded.raw_json
+                "#,
+                params![checkpoint.body.checkpoint_seq as i64, raw_json],
+            )?;
+            Ok(())
+        }
+
+        fn record_capability_snapshot(
+            &mut self,
+            token: &CapabilityToken,
+            parent_capability_id: Option<&str>,
+        ) -> Result<(), ReceiptStoreError> {
+            let grants_json = serde_json::to_string(&token.scope)?;
+            let subject_key = token.subject.to_hex();
+            let issuer_key = token.issuer.to_hex();
+            let delegation_depth = if let Some(parent_id) = parent_capability_id {
+                self.connection
+                    .query_row(
+                        "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
+                        params![parent_id],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .optional()?
+                    .map(|depth| depth.max(0) as u64 + 1)
+                    .unwrap_or(1)
+            } else {
+                0
+            };
+
+            self.connection.execute(
+                r#"
+                INSERT OR REPLACE INTO capability_lineage (
+                    capability_id,
+                    subject_key,
+                    issuer_key,
+                    issued_at,
+                    expires_at,
+                    grants_json,
+                    delegation_depth,
+                    parent_capability_id
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                "#,
+                params![
+                    token.id,
+                    subject_key,
+                    issuer_key,
+                    token.issued_at as i64,
+                    token.expires_at as i64,
+                    grants_json,
+                    delegation_depth as i64,
+                    parent_capability_id,
+                ],
+            )?;
+            Ok(())
+        }
+    }
+
+    struct SqliteRevocationStore {
+        path: PathBuf,
+    }
+
+    impl SqliteRevocationStore {
+        fn open(path: impl AsRef<Path>) -> Result<Self, RevocationStoreError> {
+            let path = path.as_ref().to_path_buf();
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let connection = rusqlite::Connection::open(&path)?;
+            connection.execute_batch(
+                r#"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = FULL;
+                PRAGMA busy_timeout = 5000;
+
+                CREATE TABLE IF NOT EXISTS revoked_capabilities (
+                    capability_id TEXT PRIMARY KEY,
+                    revoked_at INTEGER NOT NULL
+                );
+                "#,
+            )?;
+            Ok(Self { path })
+        }
+
+        fn connection(&self) -> Result<rusqlite::Connection, RevocationStoreError> {
+            Ok(rusqlite::Connection::open(&self.path)?)
+        }
+    }
+
+    impl RevocationStore for SqliteRevocationStore {
+        fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+            let connection = self.connection()?;
+            let exists = connection.query_row(
+                "SELECT EXISTS(SELECT 1 FROM revoked_capabilities WHERE capability_id = ?1)",
+                params![capability_id],
+                |row| row.get::<_, i64>(0),
+            )?;
+            Ok(exists != 0)
+        }
+
+        fn revoke(&mut self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+            let connection = self.connection()?;
+            let revoked_at = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(0);
+            let rows = connection.execute(
+                r#"
+                INSERT INTO revoked_capabilities (capability_id, revoked_at)
+                VALUES (?1, ?2)
+                ON CONFLICT(capability_id) DO NOTHING
+                "#,
+                params![capability_id, revoked_at],
+            )?;
+            Ok(rows > 0)
+        }
+    }
 
     fn make_keypair() -> Keypair {
         Keypair::generate()

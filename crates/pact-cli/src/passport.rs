@@ -15,8 +15,9 @@ use pact_credentials::{
     PassportVerifierPolicyReference, SignedPassportVerifierPolicy,
 };
 use pact_did::DidPact;
-use pact_kernel::{EvidenceExportQuery, SqliteReceiptStore};
+use pact_kernel::EvidenceExportQuery;
 use pact_reputation::{compute_local_scorecard, ReputationConfig};
+use pact_store_sqlite::SqliteReceiptStore;
 
 use crate::issuance::build_local_reputation_corpus;
 use crate::passport_verifier::{PassportVerifierChallengeStore, VerifierPolicyRegistry};

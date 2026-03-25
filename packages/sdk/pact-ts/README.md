@@ -1,6 +1,7 @@
-# `@pact/sdk`
+# `@pact-protocol/sdk`
 
-Production TypeScript SDK for the PACT edge.
+Production-candidate TypeScript SDK for the current PACT hosted-edge and
+invariant surface.
 
 Current scope:
 
@@ -12,6 +13,13 @@ Current scope:
 - shared vector-fixture verification against `tests/bindings/vectors`
 - no native addons
 - no stable high-level ergonomic SDK client yet
+
+Current release posture:
+
+- package name: `@pact-protocol/sdk`
+- release-qualified for clean build, pack, and consumer-install smoke tests
+- aligned to the `v2.3` production-candidate contract in `spec/PROTOCOL.md`
+- still intentionally narrow and Node-first rather than a broad browser SDK
 
 Current invariant coverage:
 
@@ -60,4 +68,10 @@ Run the current checks with:
 
 ```sh
 npm --prefix packages/sdk/pact-ts test
+```
+
+Run the release-artifact qualification with:
+
+```sh
+./scripts/check-pact-ts-release.sh
 ```

@@ -6,34 +6,33 @@ use pact_core::capability::{
     Constraint, Operation, PactScope, PromptGrant, ResourceGrant, ToolGrant,
 };
 use pact_core::crypto::PublicKey;
-use pact_kernel::{
-    BudgetStore, CapabilityAuthority, KernelError, SqliteBudgetStore, SqliteReceiptStore,
-};
+use pact_kernel::{BudgetStore, CapabilityAuthority, KernelError};
 use pact_reputation::{
     compute_local_scorecard, BudgetUsageRecord as ReputationBudgetUsageRecord,
     CapabilityLineageRecord, LocalReputationCorpus, LocalReputationScorecard, ReputationConfig,
 };
+use pact_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use serde::{Deserialize, Serialize};
 
 use crate::policy::{ReputationIssuancePolicy, ReputationTierPolicy, TierScopeCeiling};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum ReputationScoringSource {
+pub enum ReputationScoringSource {
     Default,
     IssuancePolicy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ProbationaryStatus {
+pub struct ProbationaryStatus {
     pub below_receipt_target: bool,
     pub below_day_target: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LocalReputationTierView {
+pub struct LocalReputationTierView {
     pub name: String,
     pub score_range: [f64; 2],
     pub max_scope: TierScopeCeiling,
@@ -41,7 +40,7 @@ pub(crate) struct LocalReputationTierView {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct LocalReputationInspection {
+pub struct LocalReputationInspection {
     pub subject_key: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since: Option<u64>,
@@ -61,7 +60,7 @@ pub(crate) struct LocalReputationInspection {
     pub scorecard: LocalReputationScorecard,
 }
 
-pub(crate) fn wrap_capability_authority(
+pub fn wrap_capability_authority(
     inner: Box<dyn CapabilityAuthority>,
     issuance_policy: Option<ReputationIssuancePolicy>,
     receipt_db_path: Option<&Path>,
@@ -207,7 +206,7 @@ pub(crate) fn inspect_local_reputation(
     })
 }
 
-pub(crate) fn build_local_reputation_corpus(
+pub fn build_local_reputation_corpus(
     subject_key: &str,
     receipt_db_path: Option<&Path>,
     budget_db_path: Option<&Path>,
@@ -288,15 +287,14 @@ pub(crate) fn build_local_reputation_corpus(
     })
 }
 
-fn resolve_tier<'a>(
-    policy: &'a ReputationIssuancePolicy,
+fn resolve_tier(
+    policy: &ReputationIssuancePolicy,
     effective_score: f64,
-) -> Option<&'a ReputationTierPolicy> {
+) -> Option<&ReputationTierPolicy> {
     policy
         .tiers
         .iter()
-        .filter(|tier| score_in_range(effective_score, tier.score_range))
-        .next_back()
+        .rfind(|tier| score_in_range(effective_score, tier.score_range))
         .or_else(|| policy.tiers.first())
 }
 
@@ -457,7 +455,8 @@ mod tests {
     use pact_core::receipt::{
         Decision, PactReceipt, PactReceiptBody, ReceiptAttributionMetadata, ToolCallAction,
     };
-    use pact_kernel::{ReceiptStore, SqliteReceiptStore};
+    use pact_kernel::ReceiptStore;
+    use pact_store_sqlite::SqliteReceiptStore;
 
     use crate::policy::TierScopeCeiling;
 

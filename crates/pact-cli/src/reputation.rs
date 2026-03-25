@@ -9,8 +9,9 @@ use pact_credentials::{
     ReputationCredential, SignedPassportVerifierPolicy,
 };
 use pact_did::DidPact;
-use pact_kernel::{SharedEvidenceQuery, SharedEvidenceReferenceReport, SqliteReceiptStore};
+use pact_kernel::{SharedEvidenceQuery, SharedEvidenceReferenceReport};
 use pact_reputation::MetricValue;
+use pact_store_sqlite::SqliteReceiptStore;
 use serde::{Deserialize, Serialize};
 
 use crate::issuance::{self, LocalReputationInspection, ReputationScoringSource};
@@ -24,7 +25,7 @@ fn unix_now() -> u64 {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_reputation_local(
+pub fn cmd_reputation_local(
     subject_public_key: &str,
     since: Option<u64>,
     until: Option<u64>,
@@ -74,7 +75,7 @@ pub(crate) fn cmd_reputation_local(
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ReputationMetricComparison {
+pub struct ReputationMetricComparison {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub portable: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -85,7 +86,7 @@ pub(crate) struct ReputationMetricComparison {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ReputationMetricDriftSet {
+pub struct ReputationMetricDriftSet {
     pub composite_score: ReputationMetricComparison,
     pub boundary_pressure: ReputationMetricComparison,
     pub resource_stewardship: ReputationMetricComparison,
@@ -99,7 +100,7 @@ pub(crate) struct ReputationMetricDriftSet {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PortableCredentialDrift {
+pub struct PortableCredentialDrift {
     pub index: usize,
     pub issuer: String,
     pub issuance_date: String,
@@ -114,7 +115,7 @@ pub(crate) struct PortableCredentialDrift {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct PortableReputationComparison {
+pub struct PortableReputationComparison {
     pub subject_key: String,
     pub passport_subject: String,
     pub subject_matches: bool,
@@ -128,7 +129,7 @@ pub(crate) struct PortableReputationComparison {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn cmd_reputation_compare(
+pub fn cmd_reputation_compare(
     subject_public_key: &str,
     passport_path: &Path,
     since: Option<u64>,

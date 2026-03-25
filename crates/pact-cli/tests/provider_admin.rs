@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -39,6 +40,16 @@ impl Drop for ServerGuard {
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
+}
+
+fn read_child_stderr(child: &mut Child) -> String {
+    let Some(stderr) = child.stderr.take() else {
+        return String::new();
+    };
+    let mut reader = std::io::BufReader::new(stderr);
+    let mut output = String::new();
+    let _ = reader.read_to_string(&mut output);
+    output
 }
 
 fn spawn_trust_service(
@@ -90,8 +101,14 @@ fn spawn_trust_service_with_policy_registry(
     ServerGuard { child }
 }
 
-fn wait_for_trust_service(client: &Client, base_url: &str) {
-    for _ in 0..100 {
+fn wait_for_trust_service(client: &Client, base_url: &str, service: &mut ServerGuard) {
+    for _ in 0..300 {
+        if let Some(status) = service.child.try_wait().expect("poll trust service child") {
+            panic!(
+                "trust service exited before becoming ready (status {status}): {}",
+                read_child_stderr(&mut service.child)
+            );
+        }
         match client.get(format!("{base_url}/health")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::OK => return,
             Ok(_) | Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
@@ -276,10 +293,10 @@ fn provider_admin_http_lists_invalid_provider_records_with_validation_errors() {
 
     let listen = reserve_listen_addr();
     let service_token = "provider-admin-http-token";
-    let _service = spawn_trust_service(listen, service_token, &registry_path);
+    let mut service = spawn_trust_service(listen, service_token, &registry_path);
     let client = Client::builder().build().expect("build reqwest client");
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service(&client, &base_url, &mut service);
 
     let list = client
         .get(format!("{base_url}/v1/federation/providers"))
@@ -338,7 +355,7 @@ fn passport_policy_admin_cli_supports_remote_upsert_list_get_and_delete() {
 
     let listen = reserve_listen_addr();
     let service_token = "passport-policy-admin-http-token";
-    let _service = spawn_trust_service_with_policy_registry(
+    let mut service = spawn_trust_service_with_policy_registry(
         listen,
         service_token,
         None,
@@ -346,7 +363,7 @@ fn passport_policy_admin_cli_supports_remote_upsert_list_get_and_delete() {
     );
     let client = Client::builder().build().expect("build reqwest client");
     let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    wait_for_trust_service(&client, &base_url, &mut service);
 
     let create = Command::new(env!("CARGO_BIN_EXE_pact"))
         .current_dir(workspace_root())
@@ -466,4 +483,93 @@ fn passport_policy_admin_cli_supports_remote_upsert_list_get_and_delete() {
         serde_json::from_slice(&delete.stdout).expect("parse delete output");
     assert_eq!(delete_body["policyId"], "rp-default");
     assert_eq!(delete_body["deleted"], true);
+}
+
+#[test]
+fn trust_service_health_reports_enterprise_and_verifier_policy_state() {
+    let dir = unique_dir("pact-cli-trust-health");
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let enterprise_providers_path = dir.join("enterprise-providers.json");
+    let verifier_policies_path = dir.join("verifier-policies.json");
+    let raw_policy_path = dir.join("verifier-policy.json");
+    let signed_policy_path = dir.join("signed-verifier-policy.json");
+    let verifier_seed_path = dir.join("verifier-seed.txt");
+
+    write_registry(
+        &enterprise_providers_path,
+        &[provider_record_json(
+            "enterprise-login",
+            true,
+            Some("jwks:enterprise-login"),
+        )],
+    );
+    fs::write(&raw_policy_path, "{}\n").expect("write raw verifier policy");
+
+    let listen = reserve_listen_addr();
+    let service_token = "trust-health-token";
+    let mut service = spawn_trust_service_with_policy_registry(
+        listen,
+        service_token,
+        Some(&enterprise_providers_path),
+        Some(&verifier_policies_path),
+    );
+    let client = Client::builder().build().expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url, &mut service);
+
+    let create = Command::new(env!("CARGO_BIN_EXE_pact"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--control-url",
+            &base_url,
+            "--control-token",
+            service_token,
+            "passport",
+            "policy",
+            "create",
+            "--output",
+            signed_policy_path
+                .to_str()
+                .expect("signed policy output path"),
+            "--policy-id",
+            "rp-health",
+            "--verifier",
+            "https://rp.example.com",
+            "--signing-seed-file",
+            verifier_seed_path.to_str().expect("verifier seed path"),
+            "--policy",
+            raw_policy_path.to_str().expect("raw policy path"),
+            "--expires-at",
+            "1900000000",
+        ])
+        .output()
+        .expect("run remote passport policy create");
+    assert!(
+        create.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&create.stdout),
+        String::from_utf8_lossy(&create.stderr)
+    );
+
+    let health = client
+        .get(format!("{base_url}/health"))
+        .send()
+        .expect("send health request");
+    assert_eq!(health.status(), reqwest::StatusCode::OK);
+    let health: serde_json::Value = health.json().expect("health json");
+    assert_eq!(health["ok"], true);
+    assert_eq!(health["stores"]["receiptsConfigured"], false);
+    assert_eq!(
+        health["federation"]["enterpriseProviders"]["configured"],
+        true
+    );
+    assert_eq!(health["federation"]["enterpriseProviders"]["count"], 1);
+    assert_eq!(
+        health["federation"]["enterpriseProviders"]["validatedCount"],
+        1
+    );
+    assert_eq!(health["federation"]["verifierPolicies"]["configured"], true);
+    assert_eq!(health["federation"]["verifierPolicies"]["count"], 1);
+    assert_eq!(health["federation"]["verifierPolicies"]["activeCount"], 1);
 }

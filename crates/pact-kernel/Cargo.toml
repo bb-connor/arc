@@ -20,6 +20,9 @@ rusqlite = { workspace = true }
 uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
 
+[dev-dependencies]
+pact-store-sqlite = { path = "../pact-store-sqlite" }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

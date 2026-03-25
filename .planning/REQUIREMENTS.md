@@ -1,74 +1,97 @@
-# Requirements: PACT v2.2 A2A and Ecosystem Hardening
+# Requirements: Archived v2.4 and Planned v2.5
 
 **Defined:** 2026-03-25
-**Core Value:** PACT must provide deterministic, least-privilege agent access with auditable outcomes, and produce cryptographic proof artifacts that enable economic metering, regulatory compliance, and portable trust across organizational boundaries.
+**Latest archived milestone:** v2.4 Architecture and Runtime Decomposition
+(archived 2026-03-25)
+**Next planned milestone:** v2.5 Commercial Trust Primitives
+**Core Value:** PACT must provide deterministic, least-privilege agent access
+with auditable outcomes, and produce cryptographic proof artifacts that enable
+economic metering, regulatory compliance, and portable trust across
+organizational boundaries.
 
-## v1 Requirements
+## Latest Archived Milestone: v2.4 Architecture and Runtime Decomposition
 
-### A2A Authentication
+### Service Boundary Extraction
 
-- [x] **A2A-01**: Operator can configure the remaining A2A peer auth schemes, including provider-specific or non-header credential delivery, through explicit adapter/admin surfaces instead of one-off code paths.
-- [x] **A2A-02**: A2A auth negotiation fails closed with clear operator-visible diagnostics when a peer's declared security requirements cannot be satisfied or conflict with configured credentials, tenant routing, or partner context.
+- [x] **ARCH-01**: `pact-cli` becomes a thin command shell that dispatches into
+  library crates instead of owning long-lived HTTP/runtime services directly.
+- [x] **ARCH-02**: Trust-control server/client logic currently in
+  `crates/pact-cli/src/trust_control.rs` is extracted into a new
+  `crates/pact-control-plane` crate with stable public APIs and no CLI behavior
+  regressions.
+- [x] **ARCH-03**: Hosted MCP runtime logic currently in
+  `crates/pact-cli/src/remote_mcp.rs` is extracted into a new
+  `crates/pact-hosted-mcp` crate with stable public APIs and no admin/runtime
+  behavior regressions.
 
-### A2A Lifecycle
+### Kernel and Store Decomposition
 
-- [x] **A2A-03**: Long-running A2A task flows preserve the original capability binding and truthful receipt semantics across retries, reconnects, delayed completions, and follow-up recovery.
-- [x] **A2A-04**: Push-notification and follow-up task state can be correlated, resumed, and validated against explicit lifecycle rules without silently skipping or inventing state transitions.
-- [x] **A2A-05**: Operators can apply per-partner federation and request-shaping policy for A2A peers so tenant/org routing and partner-specific behavior stay isolated and fail closed.
+- [x] **ARCH-04**: SQLite-backed receipt/query/budget/revocation/authority/
+  report/export implementations move out of `pact-kernel` into a new
+  `crates/pact-store-sqlite` crate, leaving `pact-kernel` as enforcement core
+  plus store traits/contracts.
+- [x] **ARCH-05**: `crates/pact-kernel/src/lib.rs` is reduced to a facade over
+  smaller engine/dispatch/session/receipt modules so kernel behavior is testable
+  without dragging storage and HTTP concerns through the TCB.
 
-### Certification Registry
+### Adapter Decomposition
 
-- [x] **CERT-01**: Signed certification artifacts can be stored, versioned, and retrieved through a registry surface with stable IDs and immutable artifact verification.
-- [x] **CERT-02**: Relying parties and operators can resolve the current certification status of a tool server, including superseded or revoked artifacts, without bespoke glue code.
+- [x] **ARCH-06**: MCP edge/session/task transport logic currently centered in
+  `crates/pact-mcp-adapter/src/edge.rs` is extracted into a new
+  `crates/pact-mcp-edge` crate, leaving `pact-mcp-adapter` focused on protocol
+  translation and manifest adaptation.
+- [x] **ARCH-07**: `crates/pact-a2a-adapter/src/lib.rs` is split into
+  maintainable internal modules (`config`, `discovery`, `auth`, `transport`,
+  `task_registry`, `partner_policy`, `mapping`, `invoke`) without breaking its
+  public API or conformance behavior.
 
-### Ecosystem Hardening
+### Domain Cleanup and Enforcement
 
-- [x] **ECO-01**: Conformance and CI coverage prove the new A2A auth, lifecycle, and certification-registry flows across the supported operator surfaces.
-- [x] **ECO-02**: Docs, examples, and operator/admin surfaces are sufficient to onboard an A2A partner or certified tool server without reading source code.
+- [x] **ARCH-08**: `pact-credentials`, `pact-reputation`, and `pact-policy`
+  are split into named internal modules so `lib.rs` or top-level entry modules
+  mostly re-export cohesive implementations rather than hosting monolith
+  behavior.
+- [x] **ARCH-09**: Workspace dependency layering and qualification gates prevent
+  regressions by keeping CLI/HTTP concerns out of domain crates and proving the
+  refactor through targeted plus workspace-level verification.
 
-## Future Requirements
-
-### v2.3 Production and Standards
-
-- **PROD-07**: Protocol specification v2 matches the shipped portable-trust and federation surface.
-- **PROD-08**: Production deployment, runbook, and scale-hardening surfaces are complete enough for broader launch.
-- **PROD-09**: Standards-submission artifacts exist for the receipt and portable-trust model.
-
-### v2.4 Commercial Trust Primitives
+## Next Planned Milestone: v2.5 Commercial Trust Primitives
 
 - **COMM-01**: Insurer-facing behavioral feed is defined and exportable.
-- **COMM-02**: Marketplace trust primitives build on PACT capabilities, receipts, and portable reputation.
-- **COMM-03**: Reputation federation works across org boundaries without inventing unsupported trust claims.
+- **COMM-02**: Marketplace trust primitives build on PACT capabilities,
+  receipts, and portable reputation.
+- **COMM-03**: Reputation federation works across org boundaries without
+  inventing unsupported trust claims.
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Full public certification marketplace | v2.2 only needs registry/storage and status resolution, not a broad commercial network. |
-| Payment-rail settlement integration | Important, but it is a separate economics milestone from A2A/certification hardening. |
-| Protocol specification v2 rewrite | Spec alignment belongs in the following production-and-standards milestone. |
+| Insurer-facing behavioral feeds | Deferred to `v2.5`; this milestone is about architecture, not new product breadth. |
+| Marketplace trust primitives | Deferred to `v2.5`; they should land on top of steadier crate boundaries. |
+| Payment-rail settlement integration | Separate economics/commercial milestone after the refactor wave. |
 | Multi-region Byzantine consensus | Premature for the current deployment and trust model. |
-| Full OS sandbox manager | Root and capability enforcement remain the product boundary. |
+| Full OS sandbox manager | Different product layer from protocol and trust-control runtime decomposition. |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| A2A-01 | Phase 17 | Satisfied |
-| A2A-02 | Phase 17 | Satisfied |
-| A2A-03 | Phase 18 | Satisfied |
-| A2A-04 | Phase 18 | Satisfied |
-| A2A-05 | Phase 18 | Satisfied |
-| CERT-01 | Phase 19 | Satisfied |
-| CERT-02 | Phase 19 | Satisfied |
-| ECO-01 | Phase 20 | Satisfied |
-| ECO-02 | Phase 20 | Satisfied |
+| ARCH-01 | Phase 25 | Complete |
+| ARCH-02 | Phase 25 | Complete |
+| ARCH-03 | Phase 25 | Complete |
+| ARCH-04 | Phase 26 | Complete |
+| ARCH-05 | Phase 26 | Complete |
+| ARCH-06 | Phase 27 | Complete |
+| ARCH-07 | Phase 27 | Complete |
+| ARCH-08 | Phase 28 | Complete |
+| ARCH-09 | Phase 28 | Complete |
 
 **Coverage:**
-- v1 requirements: 9 total
+- Archived v2.4 requirements: 9 total
 - Mapped to phases: 9
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after milestone v2.2 completion*
+*Last updated: 2026-03-25 after archiving v2.4*

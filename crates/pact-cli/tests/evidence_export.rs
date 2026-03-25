@@ -15,7 +15,8 @@ use pact_core::receipt::{
 };
 use pact_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 use pact_core::sha256_hex;
-use pact_kernel::{build_checkpoint, ReceiptStore, SqliteReceiptStore};
+use pact_kernel::{build_checkpoint, ReceiptStore};
+use pact_store_sqlite::SqliteReceiptStore;
 use reqwest::blocking::Client;
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {

@@ -20,13 +20,13 @@ const CRITERIA_PROFILE_ALL_PASS_V1: &str = "conformance-all-pass-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum CertificationVerdict {
+pub enum CertificationVerdict {
     Pass,
     Fail,
 }
 
 impl CertificationVerdict {
-    pub(crate) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Pass => "pass",
             Self::Fail => "fail",
@@ -104,7 +104,7 @@ struct CertificationTarget {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationCheckBody {
+pub struct CertificationCheckBody {
     schema: String,
     criteria_profile: String,
     checked_at: u64,
@@ -118,22 +118,22 @@ pub(crate) struct CertificationCheckBody {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SignedCertificationCheck {
-    pub(crate) body: CertificationCheckBody,
-    pub(crate) signer_public_key: PublicKey,
-    pub(crate) signature: Signature,
+pub struct SignedCertificationCheck {
+    pub body: CertificationCheckBody,
+    pub signer_public_key: PublicKey,
+    pub signature: Signature,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum CertificationRegistryState {
+pub enum CertificationRegistryState {
     Active,
     Superseded,
     Revoked,
 }
 
 impl CertificationRegistryState {
-    pub(crate) fn label(self) -> &'static str {
+    pub fn label(self) -> &'static str {
         match self {
             Self::Active => "active",
             Self::Superseded => "superseded",
@@ -144,7 +144,7 @@ impl CertificationRegistryState {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum CertificationResolutionState {
+pub enum CertificationResolutionState {
     Active,
     Superseded,
     Revoked,
@@ -153,58 +153,58 @@ pub(crate) enum CertificationResolutionState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationRegistryEntry {
-    pub(crate) artifact_id: String,
-    pub(crate) artifact_sha256: String,
-    pub(crate) tool_server_id: String,
+pub struct CertificationRegistryEntry {
+    pub artifact_id: String,
+    pub artifact_sha256: String,
+    pub tool_server_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) tool_server_name: Option<String>,
-    pub(crate) verdict: CertificationVerdict,
-    pub(crate) checked_at: u64,
-    pub(crate) published_at: u64,
-    pub(crate) status: CertificationRegistryState,
+    pub tool_server_name: Option<String>,
+    pub verdict: CertificationVerdict,
+    pub checked_at: u64,
+    pub published_at: u64,
+    pub status: CertificationRegistryState,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) superseded_by: Option<String>,
+    pub superseded_by: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revoked_at: Option<u64>,
+    pub revoked_at: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revoked_reason: Option<String>,
-    pub(crate) artifact: SignedCertificationCheck,
+    pub revoked_reason: Option<String>,
+    pub artifact: SignedCertificationCheck,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationRegistry {
-    pub(crate) version: String,
+pub struct CertificationRegistry {
+    pub version: String,
     #[serde(default)]
-    pub(crate) artifacts: BTreeMap<String, CertificationRegistryEntry>,
+    pub artifacts: BTreeMap<String, CertificationRegistryEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationRegistryListResponse {
-    pub(crate) configured: bool,
-    pub(crate) count: usize,
-    pub(crate) artifacts: Vec<CertificationRegistryEntry>,
+pub struct CertificationRegistryListResponse {
+    pub configured: bool,
+    pub count: usize,
+    pub artifacts: Vec<CertificationRegistryEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationResolutionResponse {
-    pub(crate) tool_server_id: String,
-    pub(crate) state: CertificationResolutionState,
-    pub(crate) total_entries: usize,
+pub struct CertificationResolutionResponse {
+    pub tool_server_id: String,
+    pub state: CertificationResolutionState,
+    pub total_entries: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) current: Option<CertificationRegistryEntry>,
+    pub current: Option<CertificationRegistryEntry>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct CertificationRevocationRequest {
+pub struct CertificationRevocationRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) reason: Option<String>,
+    pub reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) revoked_at: Option<u64>,
+    pub revoked_at: Option<u64>,
 }
 
 struct EvaluationArtifacts {
@@ -621,10 +621,7 @@ impl CertificationRegistry {
         Ok(entry)
     }
 
-    pub(crate) fn resolve(
-        &self,
-        tool_server_id: &str,
-    ) -> CertificationResolutionResponse {
+    pub(crate) fn resolve(&self, tool_server_id: &str) -> CertificationResolutionResponse {
         let mut matches = self
             .artifacts
             .values()
@@ -691,9 +688,7 @@ impl CertificationRegistry {
     }
 }
 
-fn verify_certification_registry_entry(
-    entry: &CertificationRegistryEntry,
-) -> Result<(), CliError> {
+fn verify_certification_registry_entry(entry: &CertificationRegistryEntry) -> Result<(), CliError> {
     verify_signed_certification_check(&entry.artifact)?;
     let expected_artifact_id = certification_artifact_id(&entry.artifact)?;
     if entry.artifact_id != expected_artifact_id {
@@ -735,10 +730,7 @@ fn verify_certification_registry_entry(
     Ok(())
 }
 
-pub(crate) fn cmd_certify_verify(
-    input: &Path,
-    json_output: bool,
-) -> Result<(), CliError> {
+pub fn cmd_certify_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let artifact = load_signed_certification_check(input)?;
     let artifact_id = certification_artifact_id(&artifact)?;
     if json_output {
@@ -764,7 +756,7 @@ pub(crate) fn cmd_certify_verify(
     Ok(())
 }
 
-pub(crate) fn cmd_certify_check(
+pub fn cmd_certify_check(
     scenarios_dir: &Path,
     results_dir: &Path,
     output: &Path,
@@ -826,7 +818,7 @@ pub(crate) fn cmd_certify_check(
     Ok(())
 }
 
-pub(crate) fn cmd_certify_registry_publish_local(
+pub fn cmd_certify_registry_publish_local(
     input: &Path,
     registry_path: &Path,
     json_output: bool,
@@ -838,7 +830,7 @@ pub(crate) fn cmd_certify_registry_publish_local(
     emit_registry_entry("published certification artifact", &entry, json_output)
 }
 
-pub(crate) fn cmd_certify_registry_list_local(
+pub fn cmd_certify_registry_list_local(
     registry_path: &Path,
     json_output: bool,
 ) -> Result<(), CliError> {
@@ -865,7 +857,7 @@ pub(crate) fn cmd_certify_registry_list_local(
     Ok(())
 }
 
-pub(crate) fn cmd_certify_registry_get_local(
+pub fn cmd_certify_registry_get_local(
     artifact_id: &str,
     registry_path: &Path,
     json_output: bool,
@@ -879,7 +871,7 @@ pub(crate) fn cmd_certify_registry_get_local(
     emit_registry_entry("certification artifact", &entry, json_output)
 }
 
-pub(crate) fn cmd_certify_registry_resolve_local(
+pub fn cmd_certify_registry_resolve_local(
     tool_server_id: &str,
     registry_path: &Path,
     json_output: bool,
@@ -909,7 +901,7 @@ pub(crate) fn cmd_certify_registry_resolve_local(
     Ok(())
 }
 
-pub(crate) fn cmd_certify_registry_revoke_local(
+pub fn cmd_certify_registry_revoke_local(
     artifact_id: &str,
     registry_path: &Path,
     reason: Option<&str>,

@@ -2,24 +2,37 @@
 
 ---
 
-## Unreleased (v2.2 Work In Progress)
+## Unreleased (v2.3 Production Candidate Closeout)
 
-### A2A and Certify Hardening
+### Production And Standards
 
-- **A2A partner admission and durable task correlation**
-  (`pact-a2a-adapter`): the adapter now supports explicit provider-specific
-  request headers/query params/cookies, fail-closed `A2aPartnerPolicy`
-  admission checks for expected tenant/skills/security schemes/interface
-  origins, and an optional file-backed task registry that records observed task
-  ids and rejects mismatched follow-up or push-notification management calls
-  across adapter recreation.
+- **Release hygiene and structure** (`pact-cli`, packaging, scripts): generated
+  Python cache/build artifacts are now excluded from tracked release inputs,
+  release-input guard scripts fail fast when they reappear, and oversized CLI
+  admin handling has been split into `crates/pact-cli/src/admin.rs`.
 
-- **Certification registry surfaces** (`pact-cli`, trust-control): `pact certify`
-  now supports `verify` plus `registry publish|list|get|resolve|revoke`. The
-  trust-control service exposes matching registry-backed HTTP surfaces through
-  `--certification-registry-file`, preserving the signed
-  `pact.certify.check.v1` artifact as the immutable payload while tracking
-  operator-facing `active`, `superseded`, and `revoked` status.
+- **Qualification and operator runbooks** (`scripts`, workflows, docs): the
+  release lane now explicitly qualifies dashboard, TypeScript package, Python
+  wheel/sdist, Go module, live conformance waves, and repeat-run trust-cluster
+  behavior, while the runbook documents deployment, backup/restore, upgrade,
+  and rollback against those same surfaces.
+
+- **Observability contract** (`trust-control`, `remote_mcp`, docs): trust
+  service `/health` now reports authority, store, federation, and cluster
+  state; hosted MCP edges now expose `/admin/health`; and the new
+  `docs/release/OBSERVABILITY.md` defines the supported operator diagnostics
+  contract across trust-control, hosted sessions, federation, evidence, and
+  A2A task correlation.
+
+- **Protocol v2 alignment** (`spec`, docs): `spec/PROTOCOL.md` now describes
+  the shipped repository profile instead of the older aspirational draft,
+  including the real capability, receipt, trust-control, portable-trust, A2A,
+  certification, and compatibility contracts.
+
+- **Standards and launch artifacts** (`docs/release`, `docs/standards`,
+  `README`, SDK docs): release-candidate, audit, GA checklist, and risk
+  register docs now align to `v2.3`, while new receipts and portable-trust
+  standards profiles define the intended interoperable submission surface.
 
 ## v2.1.0 (2026-03-24)
 

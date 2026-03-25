@@ -10,10 +10,8 @@ use pact_core::crypto::Keypair;
 use pact_core::receipt::{
     Decision, PactReceipt, PactReceiptBody, ReceiptAttributionMetadata, ToolCallAction,
 };
-use pact_kernel::{
-    BudgetStore, CapabilityAuthority, LocalCapabilityAuthority, ReceiptStore, SqliteBudgetStore,
-    SqliteReceiptStore,
-};
+use pact_kernel::{BudgetStore, CapabilityAuthority, LocalCapabilityAuthority, ReceiptStore};
+use pact_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use reqwest::blocking::Client;
 
 fn unique_dir(prefix: &str) -> PathBuf {

@@ -14,8 +14,9 @@ use pact_credentials::{
     build_agent_passport, issue_reputation_credential, AttestationWindow, PactCredentialEvidence,
 };
 use pact_did::DidPact;
-use pact_kernel::{build_checkpoint, SqliteReceiptStore};
+use pact_kernel::build_checkpoint;
 use pact_reputation::{LocalReputationScorecard, MetricValue};
+use pact_store_sqlite::SqliteReceiptStore;
 
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()

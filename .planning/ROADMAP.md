@@ -4,12 +4,17 @@
 
 - [x] **v1.0 Closing Cycle** - Phases 1-6 (shipped 2026-03-20)
 - [x] **v2.0 Agent Economy Foundation** - Phases 7-12 (shipped 2026-03-24)
-- [x] **v2.1 Federation and Verifier Completion** - Phases 13-16 (shipped 2026-03-24)
-- [x] **v2.2 A2A and Ecosystem Hardening** - Phases 17-20 (completed 2026-03-25)
-- [ ] **v2.3 Production and Standards** - planned
-- [ ] **v2.4 Commercial Trust Primitives** - planned
+- [x] **v2.1 Federation and Verifier Completion** - Phases 13-16 (shipped
+  2026-03-24)
+- [x] **v2.2 A2A and Ecosystem Hardening** - Phases 17-20 (completed
+  2026-03-25)
+- [x] **v2.3 Production and Standards** - Phases 21-24 (completed
+  2026-03-25)
+- [x] **v2.4 Architecture and Runtime Decomposition** - Phases 25-28
+  (completed 2026-03-25)
+- [ ] **v2.5 Commercial Trust Primitives** - planned
 
-## Archived Milestone
+## Archived Milestones
 
 - `v2.1` roadmap: `.planning/milestones/v2.1-ROADMAP.md`
 - `v2.1` requirements: `.planning/milestones/v2.1-REQUIREMENTS.md`
@@ -17,102 +22,224 @@
 - `v2.2` roadmap: `.planning/milestones/v2.2-ROADMAP.md`
 - `v2.2` requirements: `.planning/milestones/v2.2-REQUIREMENTS.md`
 - `v2.2` audit: `.planning/milestones/v2.2-MILESTONE-AUDIT.md`
+- `v2.3` roadmap: `.planning/milestones/v2.3-ROADMAP.md`
+- `v2.3` requirements: `.planning/milestones/v2.3-REQUIREMENTS.md`
+- `v2.3` audit: `.planning/milestones/v2.3-MILESTONE-AUDIT.md`
+- `v2.4` roadmap: `.planning/milestones/v2.4-ROADMAP.md`
+- `v2.4` requirements: `.planning/milestones/v2.4-REQUIREMENTS.md`
+- `v2.4` audit: `.planning/milestones/v2.4-MILESTONE-AUDIT.md`
 
-## Current Milestone: v2.2 A2A and Ecosystem Hardening
+## Recently Completed Milestone: v2.4 Architecture and Runtime Decomposition
 
-**Milestone Goal:** Turn the shipped A2A adapter and certification skeleton into partner-hardened, operator-usable surfaces by closing the remaining auth/lifecycle gaps, adding certification registry distribution, and shipping the conformance/docs needed for real onboarding.
-**Status:** Complete on 2026-03-25. Archived snapshots now exist under
-`.planning/milestones/`; the next milestone definition has not been created yet.
+No milestone is currently active. `v2.5 Commercial Trust Primitives` is the
+next planned wave.
+
+**Milestone Goal:** Remove the remaining oversized mixed-concern runtime
+surfaces by extracting real service, storage, edge, and domain boundaries
+without breaking the shipped CLI, HTTP, MCP, A2A, and portable-trust behavior.
+
+**Why now:** `v2.3` proved releaseability, but the repo still concentrates too
+much behavior in a few giant files and a few crates with blurred ownership. The
+next major risk is maintainability and safe change velocity, not missing
+product breadth.
 
 **Phase Numbering:**
-- Integer phases 17-20: planned v2.2 milestone work
-- Future milestones continue from phase 21 onward
+- Integer phases 25-28: planned `v2.4` milestone work
+- Future milestones continue from phase 29 onward
 
-- [x] **Phase 17: A2A Auth Matrix and Partner Admission Hardening** - Close the remaining auth-matrix gaps, including provider-specific and non-header credential delivery, while keeping partner admission fail closed and operator-visible.
-- [x] **Phase 18: Durable A2A Task Lifecycle and Federation Hardening** - Complete long-running task recovery, follow-up correlation, and per-partner federation/request-shaping isolation for mediated A2A work.
-- [x] **Phase 19: Certification Registry and Trust Distribution** - Turn signed certification checks into registry-backed artifact publication, lookup, verification, supersession, and revocation surfaces.
-- [x] **Phase 20: Ecosystem Conformance and Operator Onboarding** - Harden the new A2A and certification lanes with conformance coverage, docs, examples, and operator/admin onboarding surfaces.
+- [x] **Phase 25: CLI Thinning and Service Boundary Extraction** - Pull
+  trust-control and hosted MCP runtime out of `pact-cli` first, while keeping
+  the command surface stable through compatibility facades.
+- [x] **Phase 26: Kernel and Store Decomposition** - Pull SQLite-backed stores,
+  query, report, and export logic out of `pact-kernel` so the kernel can return
+  to a smaller enforcement-core shape.
+- [x] **Phase 27: Adapter Decomposition** - Split MCP edge/runtime transport
+  from MCP translation and break the A2A adapter into maintainable concern-based
+  modules.
+- [x] **Phase 28: Domain Module Cleanup and Dependency Enforcement** - Finish
+  by splitting the remaining large domain files and enforcing the dependency
+  direction that the earlier extractions rely on.
 
 ## Phase Details
 
-### Phase 17: A2A Auth Matrix and Partner Admission Hardening
-**Goal**: Operators can mediate the remaining A2A peer auth schemes without bespoke glue while keeping negotiation, partner admission, and diagnostics fail closed.
-**Depends on**: Phase 16 and shipped A2A alpha
-**Requirements**: A2A-01, A2A-02
+### Phase 25: CLI Thinning and Service Boundary Extraction
+**Goal**: Move long-lived service/runtime ownership out of `pact-cli` before
+touching deeper kernel or adapter internals.
+**Depends on**: Phase 24 and archived v2.3
+**Requirements**: ARCH-01, ARCH-02, ARCH-03
+**Why first**: These are already real boundaries in the product surface, so
+they provide the highest maintainability win with the least semantic churn.
+**Crate moves**:
+- `crates/pact-cli/src/trust_control.rs` -> new `crates/pact-control-plane`
+  crate, split into `config.rs`, `client.rs`, `server.rs`, `models.rs`, and
+  handler modules for health, federation, certification, passport, receipts,
+  budgets, reports, and cluster sync
+- `crates/pact-cli/src/remote_mcp.rs` -> new `crates/pact-hosted-mcp` crate,
+  split into `config.rs`, `server.rs`, `auth.rs`, `oauth.rs`, `session.rs`,
+  `admin.rs`, `federation.rs`, and route modules for MCP, admin, and OAuth
+  surfaces
+- `crates/pact-cli/src/main.rs` -> thin CLI-only entrypoint with command wiring
+  and compatibility shims into the new crates
 **Success Criteria** (what must be TRUE):
-  1. An operator can configure provider-specific or non-header A2A credentials through explicit adapter or admin surfaces rather than patching per-call request code.
-  2. The adapter negotiates partner auth requirements fail closed across the remaining supported scheme matrix and never silently downgrades auth.
-  3. Rejected partner auth setups explain which security requirement, credential binding, or tenant context caused denial.
-  4. Integration coverage proves the new auth lanes through mediated A2A calls and truthful receipt generation.
-**Plans**: 3 plans completed
+  1. `pact-control-plane` and `pact-hosted-mcp` exist as workspace members.
+  2. `pact-cli` no longer owns trust-control or hosted MCP server logic
+     directly.
+  3. CLI commands and operator-facing HTTP behavior stay backward-compatible.
+  4. Existing integration tests around provider admin, certification, hosted
+     MCP, and federation still pass after the extraction.
+**Plans**: 3 plans
 
 Plans:
-- [x] 17-01: Define the remaining A2A auth-scheme model, config surfaces, and partner-admission contract.
-- [x] 17-02: Implement provider-specific and non-header credential delivery plus fail-closed negotiation and diagnostics.
-- [x] 17-03: Add fixtures, docs, and mediated integration tests for the completed auth matrix.
+- [x] 25-01: Define the public APIs and compatibility facades for the two new
+  service crates.
+- [x] 25-02: Extract trust-control into `pact-control-plane` and rewire CLI
+  callers.
+- [x] 25-03: Extract hosted MCP into `pact-hosted-mcp` and reduce `main.rs` to
+  thin dispatch.
 
-### Phase 18: Durable A2A Task Lifecycle and Federation Hardening
-**Goal**: Long-running A2A work remains truthful and recoverable across reconnects, delayed completions, and per-partner federation boundaries.
-**Depends on**: Phase 17
-**Requirements**: A2A-03, A2A-04, A2A-05
+### Phase 26: Kernel and Store Decomposition
+**Goal**: Separate the trusted enforcement core from SQLite-backed persistence,
+query, report, and export implementations.
+**Depends on**: Phase 25
+**Requirements**: ARCH-04, ARCH-05
+**Why second**: Once the CLI no longer owns the service runtimes, kernel/store
+contracts can move with fewer public callsites changing at once.
+**Crate moves**:
+- `crates/pact-kernel/src/authority.rs` -> new `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/budget_store.rs` -> new `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/receipt_store.rs` -> new `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/receipt_query.rs` -> new `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/receipt_analytics.rs` -> new
+  `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/operator_report.rs` -> new
+  `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/evidence_export.rs` -> new
+  `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/revocation_store.rs` -> new
+  `crates/pact-store-sqlite`
+- `crates/pact-kernel/src/lib.rs` -> facade over smaller kernel modules such as
+  `engine`, `dispatch`, `validation`, `receipts`, `streaming`, and `nested`
 **Success Criteria** (what must be TRUE):
-  1. Long-running A2A tasks preserve the original capability binding and receipt semantics across reconnect, retry, and delayed follow-up paths.
-  2. Push-notification and follow-up flows can be correlated back to the originating task and rejected when lifecycle state is inconsistent.
-  3. Partner-specific federation/request-shaping policy can isolate tenant and org routing without widening trust across peers.
-  4. Operator-facing evidence is sufficient to debug lifecycle or federation failures without replaying raw partner traffic by hand.
-**Plans**: 3 plans completed
+  1. `pact-store-sqlite` exists as a workspace member and owns the SQLite-backed
+     persistence, query, report, and export code.
+  2. `pact-kernel` exposes traits/contracts and enforcement behavior without
+     carrying the bulk of the storage implementation.
+  3. Kernel tests can exercise the core with lighter-weight fakes or in-memory
+     stores where appropriate.
+  4. Public behavior and storage-backed tests remain stable after the move.
+**Plans**: 3 plans
 
 Plans:
-- [x] 18-01: Define durable task-state recovery and lifecycle-correlation semantics for long-running A2A work.
-- [x] 18-02: Implement reconnect, resume, and delayed-completion handling with fail-closed lifecycle validation.
-- [x] 18-03: Add per-partner federation/request-shaping policy, diagnostics, and end-to-end lifecycle tests.
+- [x] 26-01: Define the kernel/store contracts and temporary compatibility
+  re-exports.
+- [x] 26-02: Move SQLite-backed implementations into `pact-store-sqlite` and
+  update dependents.
+- [x] 26-03: Reduce `pact-kernel/src/lib.rs` to a facade and requalify the
+  store-backed flows.
 
-### Phase 19: Certification Registry and Trust Distribution
-**Goal**: Signed certification artifacts become publishable and resolvable trust objects rather than local files only.
-**Depends on**: Phase 18
-**Requirements**: CERT-01, CERT-02
+### Phase 27: Adapter Decomposition
+**Goal**: Split transport/runtime responsibilities from protocol translation in
+the adapter layer without breaking conformance behavior.
+**Depends on**: Phase 26
+**Requirements**: ARCH-06, ARCH-07
+**Why third**: The adapter crates lean on kernel contracts, so they should move
+after the kernel and service boundaries are steadier.
+**Crate moves**:
+- `crates/pact-mcp-adapter/src/edge.rs` -> new `crates/pact-mcp-edge` crate,
+  split into `session.rs`, `tools.rs`, `resources.rs`, `prompts.rs`, `tasks.rs`,
+  `notifications.rs`, and `nested.rs`
+- `crates/pact-mcp-adapter` retains translation, manifests, and serialization
+  and depends on `pact-mcp-edge` instead of embedding the full edge runtime
+- `crates/pact-a2a-adapter/src/lib.rs` remains the crate entrypoint but is
+  split into `config.rs`, `discovery.rs`, `auth.rs`, `transport.rs`,
+  `task_registry.rs`, `partner_policy.rs`, `mapping.rs`, and `invoke.rs`
 **Success Criteria** (what must be TRUE):
-  1. Operators can publish and retrieve certification artifacts through a registry surface with stable identifiers and immutable artifact verification.
-  2. The system can resolve the current certification status for a tool server, including active, superseded, and revoked states.
-  3. CLI and service surfaces can verify registry-backed certification artifacts without bespoke glue code or manual file coordination.
-  4. Certification registry flows remain fail closed when artifact signatures, digests, or trust metadata do not match.
-**Plans**: 3 plans completed
+  1. `pact-mcp-edge` exists as a workspace member and owns MCP edge runtime
+     concerns.
+  2. `pact-mcp-adapter` is reduced to protocol translation, manifest handling,
+     and transport adaptation.
+  3. `pact-a2a-adapter` no longer concentrates most of its behavior in one
+     giant file.
+  4. MCP and A2A regression plus conformance flows stay green after the split.
+**Plans**: 3 plans
 
 Plans:
-- [x] 19-01: Define certification registry artifact IDs, metadata, storage semantics, and status model.
-- [x] 19-02: Implement publish/query/resolve/revoke flows across CLI and trust-control surfaces.
-- [x] 19-03: Add verification, supersession/revocation handling, and integration coverage for registry-backed certification.
+- [x] 27-01: Extract `pact-mcp-edge` and keep a compatibility facade in
+  `pact-mcp-adapter`.
+- [x] 27-02: Split `pact-a2a-adapter` internals by concern without changing the
+  public surface.
+- [x] 27-03: Requalify MCP and A2A integration plus conformance-critical flows.
 
-### Phase 20: Ecosystem Conformance and Operator Onboarding
-**Goal**: The new A2A and certification surfaces are supportable and adoptable by operators and design partners.
-**Depends on**: Phase 19
-**Requirements**: ECO-01, ECO-02
+### Phase 28: Domain Module Cleanup and Dependency Enforcement
+**Goal**: Clean up the remaining monolith domain files and make the intended
+workspace layering harder to regress.
+**Depends on**: Phase 27
+**Requirements**: ARCH-08, ARCH-09
+**Why last**: This phase should happen after the crate boundaries settle, so
+the final domain splits reflect the new architecture instead of fighting it.
+**Module moves**:
+- `crates/pact-credentials/src/lib.rs` -> `artifact.rs`, `challenge.rs`,
+  `passport.rs`, `policy.rs`, `presentation.rs`, `registry.rs`
+- `crates/pact-reputation/src/lib.rs` -> `compare.rs`, `issuance.rs`, `model.rs`,
+  `score.rs`
+- `crates/pact-policy/src/evaluate.rs` -> `evaluate/context.rs`,
+  `evaluate/engine.rs`, `evaluate/matchers.rs`, `evaluate/outcomes.rs`
 **Success Criteria** (what must be TRUE):
-  1. Conformance and CI lanes prove the newly shipped A2A auth, lifecycle, and certification-registry flows across supported operator surfaces.
-  2. Operators can onboard an A2A partner and a certified tool server by following docs and examples rather than inspecting source code.
-  3. Admin, reporting, and example surfaces expose enough context to support partner onboarding and troubleshooting.
-  4. The v2.2 milestone exits with docs, fixtures, and regression coverage aligned to the shipped behavior.
-**Plans**: 3 plans completed
+  1. The remaining large domain files are split into named modules with
+     `lib.rs` or top-level entry modules acting mostly as facades.
+  2. CLI and HTTP crates do not leak into domain crates through new
+     dependencies.
+  3. Layering expectations are documented and checked by qualification scripts
+     or equivalent guardrails.
+  4. The milestone closes with targeted regression proof plus workspace-level
+     qualification evidence.
+**Plans**: 3 plans
 
 Plans:
-- [x] 20-01: Extend conformance fixtures and CI coverage for the new A2A auth, lifecycle, and certification-registry lanes.
-- [x] 20-02: Add operator/admin docs, examples, and onboarding guides for A2A partners and certified tool servers.
-- [x] 20-03: Harden partner-facing reporting and regression coverage for milestone closeout.
+- [x] 28-01: Split credentials, reputation, and policy internals into cohesive
+  named modules.
+- [x] 28-02: Add dependency and layering guardrails and document the final
+  intended workspace shape.
+- [x] 28-03: Run the refactor qualification lane and assemble milestone closeout
+  evidence.
+
+## Previous Milestone: v2.3 Production and Standards
+
+**Milestone Goal:** Turn the broad feature surface into a release-qualifiable,
+maintainable, standards-aligned production candidate by cleaning release
+inputs, hardening deployment and observability, aligning the protocol spec to
+shipped behavior, and preparing launch/submission artifacts.
+
+**Archived detail:** see `.planning/milestones/v2.3-ROADMAP.md`
+
+**Completed phases:** 21-24
+
+- Release Hygiene and Codebase Structure
+- Qualification, Deployment, and Upgrade Hardening
+- Observability and Protocol v2 Alignment
+- Standards Submission and Launch Readiness
+
+**Closeout summary:**
+
+- release inputs are source-only and package guards fail closed
+- release qualification, dashboard build, and SDK package verification are
+  scripted and documented
+- trust-control and hosted-edge diagnostics are now a supported observability
+  contract
+- protocol, standards, README, SDK, and launch docs now align to one
+  production-candidate surface
 
 ## Future Milestone Outline
 
-- **v2.2 A2A and Ecosystem Hardening**
-  Remaining A2A auth matrix and provider-specific hardening, deeper long-running lifecycle coverage, certification registry/storage, and operator onboarding.
-- **v2.3 Production and Standards**
-  Protocol specification v2 alignment, deployment/runbook/launch hardening, and standards submission.
-- **v2.4 Commercial Trust Primitives**
-  Insurer-facing data feed, marketplace trust primitives, and reputation federation.
+- **v2.5 Commercial Trust Primitives**
+  Insurer-facing data feed, marketplace trust primitives, and reputation
+  federation on top of the restructured runtime.
 
 ## Progress
 
 **Execution Order:**
-v1.0, v2.0, v2.1, and v2.2 are complete. The next milestone definition will
-start v2.3 at Phase 21.
+v1.0 through v2.4 are complete. `v2.5 Commercial Trust Primitives` is the next
+planned milestone.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -136,3 +263,11 @@ start v2.3 at Phase 21.
 | 18. Durable A2A Task Lifecycle and Federation Hardening | v2.2 | 3/3 | Complete | 2026-03-25 |
 | 19. Certification Registry and Trust Distribution | v2.2 | 3/3 | Complete | 2026-03-25 |
 | 20. Ecosystem Conformance and Operator Onboarding | v2.2 | 3/3 | Complete | 2026-03-25 |
+| 21. Release Hygiene and Codebase Structure | v2.3 | 3/3 | Complete | 2026-03-25 |
+| 22. Qualification, Deployment, and Upgrade Hardening | v2.3 | 3/3 | Complete | 2026-03-25 |
+| 23. Observability and Protocol v2 Alignment | v2.3 | 3/3 | Complete | 2026-03-25 |
+| 24. Standards Submission and Launch Readiness | v2.3 | 3/3 | Complete | 2026-03-25 |
+| 25. CLI Thinning and Service Boundary Extraction | v2.4 | 3/3 | Complete | 2026-03-25 |
+| 26. Kernel and Store Decomposition | v2.4 | 3/3 | Complete | 2026-03-25 |
+| 27. Adapter Decomposition | v2.4 | 3/3 | Complete | 2026-03-25 |
+| 28. Domain Module Cleanup and Dependency Enforcement | v2.4 | 3/3 | Complete | 2026-03-25 |

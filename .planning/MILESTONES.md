@@ -1,5 +1,39 @@
 # Milestones
 
+## v2.4 Architecture and Runtime Decomposition (Completed: 2026-03-25)
+
+**Phases completed:** 4 phases, 12 plans, 0 tasks
+
+**Key accomplishments:**
+- Extracted `pact-control-plane` and `pact-hosted-mcp` so `pact-cli` no longer
+  owns long-lived service implementations directly.
+- Moved SQLite-backed store, query, report, and export implementations into
+  `pact-store-sqlite`, leaving `pact-kernel` closer to an enforcement-core
+  facade.
+- Split MCP runtime transport into `pact-mcp-edge` and decomposed
+  `pact-a2a-adapter` into concern-based modules with compatibility preserved.
+- Reduced `pact-credentials`, `pact-reputation`, and `pact-policy` entry files
+  to thin facades and added a fail-closed workspace layering guard.
+
+---
+
+## v2.3 Production and Standards (Completed: 2026-03-25)
+
+**Phases completed:** 4 phases, 12 plans, 0 tasks
+
+**Key accomplishments:**
+- Shipped source-only release inputs, packaging guards, and a cleaner CLI admin
+  ownership boundary.
+- Shipped one canonical release-qualification lane covering workspace,
+  dashboard, SDK packages, live conformance, and repeat-run trust-cluster
+  behavior.
+- Shipped supported observability and health contracts for trust-control,
+  hosted edges, federation, and A2A diagnostics.
+- Shipped protocol v2 alignment, standards-submission draft artifacts, and
+  launch-readiness evidence for the production candidate.
+
+---
+
 ## v2.2 A2A and Ecosystem Hardening (Completed: 2026-03-25)
 
 **Phases completed:** 4 phases, 12 plans

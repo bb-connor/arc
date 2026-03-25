@@ -1501,6 +1501,14 @@ fn get_admin_sessions(client: &Client, base_url: &str, token: &str) -> Response 
         .expect("send admin sessions get request")
 }
 
+fn get_admin_health(client: &Client, base_url: &str, token: &str) -> Response {
+    client
+        .get(format!("{base_url}/admin/health"))
+        .header(AUTHORIZATION, format!("Bearer {token}"))
+        .send()
+        .expect("send admin health request")
+}
+
 fn post_admin_session_revoke(
     client: &Client,
     base_url: &str,
@@ -4443,6 +4451,64 @@ fn mcp_serve_http_identity_federation_derives_stable_subjects_from_jwt_principal
             .filter(|subject| *subject == &subject_c)
             .count(),
         1
+    );
+}
+
+#[test]
+fn mcp_serve_http_admin_health_reports_runtime_state() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let issuer = "https://issuer.example";
+    let audience = "pact-mcp";
+    let admin_token = "admin-secret";
+    let federation_seed_path = dir.join("identity-federation.seed");
+    let jwt_signing_key = Keypair::generate();
+    let _server = spawn_http_server_with_jwt_auth_and_identity_federation(
+        &dir,
+        listen,
+        &jwt_signing_key.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+        Some(&federation_seed_path),
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let token = sign_jwt(
+        &jwt_signing_key,
+        &json!({
+            "iss": issuer,
+            "sub": "user-health",
+            "aud": audience,
+            "scope": "mcp:invoke tools.read",
+            "exp": SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("time after epoch")
+                .as_secs()
+                + 300,
+        }),
+    );
+    let _ = initialize_session(&client, &base_url, &token);
+
+    let health = get_admin_health(&client, &base_url, admin_token);
+    assert_eq!(health.status(), reqwest::StatusCode::OK);
+    let health: Value = health.json().expect("admin health json");
+    assert_eq!(health["ok"], true);
+    assert_eq!(health["server"]["serverId"], "wrapped-http-mock");
+    assert_eq!(health["auth"]["mode"], "jwt_bearer");
+    assert_eq!(health["stores"]["receiptsConfigured"], true);
+    assert_eq!(health["stores"]["revocationsConfigured"], true);
+    assert_eq!(health["federation"]["identityFederationConfigured"], true);
+    assert_eq!(health["server"]["sharedHostedOwner"], false);
+    assert!(
+        health["sessions"]["activeCount"].as_u64().unwrap_or(0) >= 1,
+        "expected at least one active session in admin health"
     );
 }
 

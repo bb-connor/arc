@@ -1,0 +1,262 @@
+# Operations Runbook
+
+This runbook covers the supported self-hosted operator surfaces for the current
+PACT release candidate:
+
+- `pact trust serve` for the trust-control plane
+- `pact mcp serve-http` for a hosted remote MCP edge
+- the receipt dashboard served from the trust-control process
+
+It is intentionally pragmatic and assumes one service owner is operating local
+or cluster-contained deployments backed by SQLite state.
+
+## 1. Required Runtime Inputs
+
+### Trust-Control
+
+Required:
+
+- `--listen`
+- `--service-token`
+
+Recommended persistent state:
+
+- `--receipt-db <path>`
+- `--revocation-db <path>`
+- `--authority-db <path>` for clustered or restart-stable authority state
+- `--budget-db <path>` when monetary enforcement is enabled
+
+Optional shared registries and federation state:
+
+- `--enterprise-providers-file <path>`
+- `--verifier-policies-file <path>`
+- `--verifier-challenge-db <path>`
+- `--certification-registry-file <path>`
+- `--policy <path>` when using reputation-gated issuance
+
+Clustered deployments additionally require:
+
+- `--advertise-url <public-base-url>`
+- one or more `--peer-url <peer-base-url>` values
+
+### Remote MCP Edge
+
+Required:
+
+- `pact mcp serve-http --policy <path> --server-id <id> --listen <addr> -- <wrapped command>`
+
+Recommended persistent state:
+
+- `--receipt-db <path>`
+- `--revocation-db <path>`
+- `--authority-db <path>` or `--authority-seed-file <path>`
+- `--budget-db <path>` when monetary enforcement is enabled
+- `--session-db <path>` for restart-stable tombstones
+
+Optional auth and federation inputs:
+
+- one auth mode: `--auth-token`, `--auth-jwt-public-key`, or `--auth-introspection-url`
+- `--admin-token <token>` for remote admin APIs
+- `--auth-server-seed-file <path>` for local JWT issuance
+- `--identity-federation-seed-file <path>` for stable subject derivation
+- `--enterprise-providers-file <path>` for enterprise-origin federation lanes
+
+## 2. Initial Deployment Procedure
+
+### Trust-Control
+
+1. Create a dedicated state directory, for example:
+
+   ```bash
+   mkdir -p /var/lib/pact /etc/pact
+   ```
+
+2. Place policy and registry files under `/etc/pact` and SQLite state under
+   `/var/lib/pact`.
+
+3. Start the service:
+
+   ```bash
+   pact trust serve \
+     --listen 127.0.0.1:8940 \
+     --service-token "$PACT_SERVICE_TOKEN" \
+     --receipt-db /var/lib/pact/receipts.sqlite3 \
+     --revocation-db /var/lib/pact/revocations.sqlite3 \
+     --authority-db /var/lib/pact/authority.sqlite3 \
+     --budget-db /var/lib/pact/budgets.sqlite3 \
+     --enterprise-providers-file /etc/pact/enterprise-providers.json \
+     --verifier-policies-file /etc/pact/verifier-policies.json \
+     --verifier-challenge-db /var/lib/pact/verifier-challenges.sqlite3 \
+     --certification-registry-file /etc/pact/certifications.json
+   ```
+
+4. Verify service readiness:
+
+   ```bash
+   curl -s http://127.0.0.1:8940/health | jq
+   curl -s -H "Authorization: Bearer $PACT_SERVICE_TOKEN" \
+     http://127.0.0.1:8940/v1/authority | jq
+   ```
+
+### Remote MCP Edge
+
+1. Start the wrapped edge with persistent state and explicit admin auth:
+
+   ```bash
+   pact mcp serve-http \
+     --policy examples/policies/canonical-hushspec.yaml \
+     --server-id demo-server \
+     --listen 127.0.0.1:8931 \
+     --auth-token "$PACT_EDGE_TOKEN" \
+     --admin-token "$PACT_ADMIN_TOKEN" \
+     --receipt-db /var/lib/pact/edge-receipts.sqlite3 \
+     --revocation-db /var/lib/pact/edge-revocations.sqlite3 \
+     --authority-db /var/lib/pact/edge-authority.sqlite3 \
+     --session-db /var/lib/pact/edge-sessions.sqlite3 \
+     -- \
+     python3 tests/conformance/fixtures/wave1/mock_mcp_server.py
+   ```
+
+2. Initialize one session and confirm the admin diagnostics surface:
+
+   ```bash
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/health | jq
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/sessions | jq
+   ```
+
+### Dashboard
+
+The dashboard is served by `pact trust serve` from `crates/pact-cli/dashboard/dist`.
+Build it before deployment:
+
+```bash
+./scripts/check-dashboard-release.sh
+```
+
+Then load:
+
+```text
+http://127.0.0.1:8940/?token=<service-token>
+```
+
+## 3. Configuration Checks Before Promotion
+
+Run the production qualification lane from the repo root:
+
+```bash
+./scripts/qualify-release.sh
+```
+
+Minimum deploy-time smoke checks:
+
+```bash
+./scripts/check-release-inputs.sh
+./scripts/check-dashboard-release.sh
+./scripts/check-pact-ts-release.sh
+./scripts/check-pact-py-release.sh
+./scripts/check-pact-go-release.sh
+```
+
+## 4. Backup Procedure
+
+Stop write traffic or place the service in a maintenance window before taking
+authoritative backups.
+
+Back up SQLite state:
+
+```bash
+sqlite3 /var/lib/pact/receipts.sqlite3 ".backup '/var/backups/pact/receipts.sqlite3'"
+sqlite3 /var/lib/pact/revocations.sqlite3 ".backup '/var/backups/pact/revocations.sqlite3'"
+sqlite3 /var/lib/pact/authority.sqlite3 ".backup '/var/backups/pact/authority.sqlite3'"
+sqlite3 /var/lib/pact/budgets.sqlite3 ".backup '/var/backups/pact/budgets.sqlite3'"
+sqlite3 /var/lib/pact/verifier-challenges.sqlite3 ".backup '/var/backups/pact/verifier-challenges.sqlite3'"
+sqlite3 /var/lib/pact/edge-sessions.sqlite3 ".backup '/var/backups/pact/edge-sessions.sqlite3'"
+```
+
+Back up file-backed registries and policies:
+
+```bash
+cp /etc/pact/enterprise-providers.json /var/backups/pact/
+cp /etc/pact/verifier-policies.json /var/backups/pact/
+cp /etc/pact/certifications.json /var/backups/pact/
+cp /etc/pact/*.yaml /var/backups/pact/
+```
+
+Record the binary version and git commit used for the backup snapshot.
+
+## 5. Restore Procedure
+
+1. Stop the affected `pact trust serve` or `pact mcp serve-http` process.
+2. Restore the SQLite files into the exact paths expected by the service.
+3. Restore the file-backed registries and policies.
+4. Restart the process with the same command-line arguments used before the
+   incident.
+5. Re-run the smoke checks:
+
+   ```bash
+   curl -s http://127.0.0.1:8940/health | jq
+   curl -s -H "Authorization: Bearer $PACT_SERVICE_TOKEN" \
+     http://127.0.0.1:8940/v1/authority | jq
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/health | jq
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/sessions | jq
+   ```
+
+## 6. Upgrade Procedure
+
+1. Run `./scripts/qualify-release.sh` on the candidate commit.
+2. Build or obtain the exact candidate binary set.
+3. Take backups using the backup procedure above.
+4. Stop write traffic or drain external callers.
+5. Stop the running PACT processes.
+6. Replace the binary with the qualified candidate.
+7. Restart `pact trust serve` first, then any dependent `pact mcp serve-http`
+   edges.
+8. Run post-upgrade smoke checks:
+
+   ```bash
+   curl -s http://127.0.0.1:8940/health | jq
+   curl -s -H "Authorization: Bearer $PACT_SERVICE_TOKEN" \
+     http://127.0.0.1:8940/v1/internal/cluster/status | jq
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/health | jq
+   curl -s -H "Authorization: Bearer $PACT_ADMIN_TOKEN" \
+     http://127.0.0.1:8931/admin/sessions | jq
+   ```
+
+9. If SDK artifacts are being published with the same release, run:
+
+   ```bash
+   ./scripts/check-pact-ts-release.sh
+   ./scripts/check-pact-py-release.sh
+   ./scripts/check-pact-go-release.sh
+   ```
+
+## 7. Rollback Procedure
+
+Rollback is a full binary-and-state rollback to the last known good backup.
+
+1. Stop the candidate processes.
+2. Restore the previous binaries.
+3. Restore the backed-up SQLite and registry files if the candidate performed
+   writes that must be discarded.
+4. Restart the previous version with the original arguments.
+5. Re-run the same health and admin smoke checks used in the upgrade procedure.
+6. Record the failed candidate commit and attach the qualification logs and any
+   cluster/admin diagnostics to the incident report.
+
+## 8. Incident Triage Pointers
+
+- Trust-control cluster convergence: check `/health` and
+  `/v1/internal/cluster/status`
+- Authority rotation or trust drift: check `/v1/authority`
+- Remote runtime lifecycle/auth failures: check `/admin/health`,
+  `/admin/sessions`, and `/admin/sessions/{session_id}/trust`
+- Receipt/export gaps: check `/v1/reports/operator`,
+  `/v1/federation/evidence-shares`, and the dashboard summary panels
+
+See [OBSERVABILITY.md](./OBSERVABILITY.md) for the diagnostic contract and the
+meaning of the main health/admin fields.

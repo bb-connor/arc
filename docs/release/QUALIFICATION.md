@@ -1,11 +1,14 @@
 # Release Qualification
 
-This document defines the proof path for the scoped `v1` release candidate.
+This document defines the production qualification lane for the current `v2.3`
+milestone surface.
 
 PACT now has two distinct gate types:
 
-- the regular workspace CI lane, which keeps day-to-day development honest
-- the release-qualification lane, which proves the closing-cycle guarantees, negative paths, and live interoperability claims
+- the regular workspace CI lane, which blocks routine regressions quickly
+- the release-qualification lane, which proves source-only release inputs,
+  dashboard and SDK packaging, conformance-critical behavior, and the repeat-run
+  HA control-plane path
 
 ## Environments
 
@@ -13,15 +16,21 @@ Regular workspace CI:
 
 - Rust stable with `rustfmt` and `clippy`
 - Rust `1.93.0` for the explicit MSRV lane
-- no external language runtimes required
+- `node`
+- `python3`
+- `go`
 
 Release qualification:
 
 - Rust stable with `rustfmt` and `clippy`
 - `node`
 - `python3`
+- `go`
 
-The live JS and Python conformance peers are mandatory for release qualification. If those runtimes are missing, release qualification must fail rather than silently skipping evidence.
+The dashboard build, TypeScript packaging, Python packaging, Go module
+qualification, live JS/Python conformance peers, and repeat-run trust-cluster
+proof are mandatory for release qualification. If one runtime is missing, the
+lane must fail rather than silently skipping that evidence.
 
 ## Commands
 
@@ -29,6 +38,7 @@ Regular workspace lane:
 
 ```bash
 ./scripts/ci-workspace.sh
+./scripts/check-sdk-parity.sh
 ```
 
 Release-qualification lane:
@@ -37,7 +47,20 @@ Release-qualification lane:
 ./scripts/qualify-release.sh
 ```
 
-The hosted workflow uses [`.github/workflows/release-qualification.yml`](../../.github/workflows/release-qualification.yml) and the same `./scripts/qualify-release.sh` entrypoint.
+Focused release-component lanes:
+
+```bash
+./scripts/check-release-inputs.sh
+./scripts/check-dashboard-release.sh
+./scripts/check-pact-ts-release.sh
+./scripts/check-pact-py-release.sh
+./scripts/check-pact-go-release.sh
+```
+
+The hosted workflow uses
+[`.github/workflows/release-qualification.yml`](../../.github/workflows/release-qualification.yml)
+and the same `./scripts/qualify-release.sh` entrypoint. The general CI workflow
+uses [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
 
 ## Qualification Artifacts
 
@@ -54,7 +77,8 @@ Each wave directory contains:
 - `results/` JSON result artifacts
 - `report.md` generated Markdown summary
 
-The release-qualification script also records the repeat-run trust-cluster proof at:
+The release-qualification script also records the repeat-run trust-cluster
+proof at:
 
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 
@@ -66,33 +90,32 @@ attestation for a selected tool server or release candidate. See
 
 | Release claim | Primary proving artifact | Qualification command |
 | --- | --- | --- |
-| HA trust-control is deterministic enough for the supported clustered control-plane flow | `crates/pact-cli/tests/trust_cluster.rs` repeat-run qualification plus the normal workspace lane | `cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` |
-| Roots are enforced as a real filesystem boundary for tools and filesystem-backed resources | `crates/pact-cli/tests/mcp_serve.rs`, `crates/pact-cli/tests/mcp_serve_http.rs`, `tests/e2e/tests/full_flow.rs` | `cargo test --workspace` |
-| Hosted remote sessions are reconnect-safe, drain/expire deterministically, and expose operator diagnostics | `crates/pact-cli/tests/mcp_serve_http.rs` | `cargo test --workspace` |
-| Task, stream, cancellation, and late async semantics are transport-consistent | `crates/pact-cli/tests/mcp_serve.rs`, `crates/pact-cli/tests/mcp_serve_http.rs`, `crates/pact-conformance/tests/` | `cargo test --workspace` plus live wave generation in `./scripts/qualify-release.sh` |
-| Policy authoring, migration, and native adoption are coherent | `README.md`, `docs/NATIVE_ADOPTION_GUIDE.md`, `examples/hello-tool/`, `examples/policies/`, `crates/pact-cli/src/policy.rs` | `cargo test --workspace` |
-| Malformed JSON-RPC, revocation/expiry, interrupted streams, and cancellation races are covered on the supported surface | `crates/pact-cli/tests/mcp_serve_http.rs`, `crates/pact-cli/tests/mcp_serve.rs`, `tests/e2e/tests/full_flow.rs` | `cargo test --workspace` |
-| The public release story matches what the repo actually ships | `README.md`, `docs/release/RELEASE_CANDIDATE.md`, `docs/release/RELEASE_AUDIT.md` | doc review plus the same workspace and qualification gates |
-
-## Former Findings To Release Evidence
-
-| Former finding | Owning epic | Release evidence |
-| --- | --- | --- |
-| HA trust-control flake | `E9` | workspace lane plus repeat-run trust-cluster qualification |
-| Roots not enforced | `E12` | tool/resource boundary regressions and end-to-end deny-receipt coverage |
-| Split policy surface | `E13` | README policy guidance, canonical HushSpec example, YAML compatibility coverage, native adoption guide |
-| Remote runtime not deployment-hard | `E10` | hosted HTTP lifecycle/reconnect/SSE regression coverage and release docs |
-| Transport-dependent long-running semantics | `E11` | direct, wrapped, and remote cancellation/late-event tests plus live remote conformance waves |
+| Release inputs come from source only and generated artifacts are not tracked | `scripts/check-release-inputs.sh`, root `.gitignore`, package-specific packaging manifests | `./scripts/check-release-inputs.sh` |
+| The main Rust workspace is format-clean, lint-clean, and test-clean | workspace crates plus integration/e2e suites | `./scripts/ci-workspace.sh` |
+| The dashboard is buildable and testable from a clean install | `crates/pact-cli/dashboard/package.json` and `dist/` output from a temp copy | `./scripts/check-dashboard-release.sh` |
+| The TypeScript SDK can be built, packed, and consumed as a package | `packages/sdk/pact-ts/package.json`, packed tarball, and consumer smoke install | `./scripts/check-pact-ts-release.sh` |
+| The Python SDK wheel and sdist are reproducible and install cleanly | `packages/sdk/pact-py/pyproject.toml`, built wheel/sdist, and clean venv smoke installs | `./scripts/check-pact-py-release.sh` |
+| The Go SDK module qualifies as a module release and consumer dependency | `packages/sdk/pact-go/go.mod`, `go install ./cmd/conformance-peer`, and consumer-module smoke build | `./scripts/check-pact-go-release.sh` |
+| HA trust-control remains deterministic on the supported clustered control-plane flow | `crates/pact-cli/tests/trust_cluster.rs` repeat-run qualification plus normal workspace coverage | `cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` |
+| Wrapped/runtime MCP compatibility remains truthful across live peer waves | live conformance results under `target/release-qualification/conformance/` | `./scripts/qualify-release.sh` |
 
 ## Release Rule
 
-Do not tag the milestone from a green workspace run alone.
+Do not tag or announce a production candidate from a green workspace run alone.
 
-Release readiness for the scoped `v1` surface requires:
+Release readiness for the current surface requires:
 
 1. `./scripts/ci-workspace.sh` green
-2. `./scripts/qualify-release.sh` green
-3. the explicit MSRV lane in `.github/workflows/ci.yml` green on Rust `1.93.0`
-4. [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md) and [RELEASE_AUDIT.md](RELEASE_AUDIT.md) updated together
+2. `./scripts/check-sdk-parity.sh` green
+3. `./scripts/qualify-release.sh` green
+4. the explicit MSRV lane in `.github/workflows/ci.yml` green on Rust `1.93.0`
+5. [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md),
+   [RELEASE_AUDIT.md](RELEASE_AUDIT.md), and
+   [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) updated together
+6. [OBSERVABILITY.md](OBSERVABILITY.md),
+   [GA_CHECKLIST.md](GA_CHECKLIST.md), and
+   [RISK_REGISTER.md](RISK_REGISTER.md) updated together
 
-If a hosted CI run cannot be observed from the current environment, record that as an explicit procedural note in the release audit instead of implying it happened.
+If a hosted CI run cannot be observed from the current environment, record that
+as an explicit procedural note in the release audit instead of implying it
+happened.

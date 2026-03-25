@@ -15,6 +15,7 @@ Current release posture:
 
 - release-ready beta with pure-Python transport and invariant coverage
 - distribution metadata, typed-package markers, wheel/sdist qualification, and clean-install smoke checks are in place
+- aligned to the current `v2.3` production-candidate protocol and release docs
 - public PyPI publication remains a later 1.0 milestone; current qualification targets internal and design-partner release quality
 
 Current invariant coverage:

@@ -13,7 +13,10 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+# ci-workspace runs the workspace layering guardrail before the wider release lane.
 ./scripts/ci-workspace.sh
+./scripts/check-dashboard-release.sh
+./scripts/check-pact-ts-release.sh
 ./scripts/check-pact-py-release.sh
 ./scripts/check-pact-go-release.sh
 

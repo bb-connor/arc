@@ -31,5 +31,9 @@
     "build": "tsc && node ./scripts/fix-dist-imports.mjs",
     "prepack": "npm run build",
     "test": "node --experimental-strip-types --test ./test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "~5.7.0"
   }
 }

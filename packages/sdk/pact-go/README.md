@@ -17,6 +17,7 @@ Current release posture:
 
 - release-ready beta with live conformance coverage through Waves 1-5
 - module version plumbing, consumer-build smoke checks, and release qualification are in place
+- aligned to the current `v2.3` production-candidate protocol and release docs
 - broader external publication through Git tags and proxy propagation remains a later 1.0 milestone
 
 Current live conformance coverage:

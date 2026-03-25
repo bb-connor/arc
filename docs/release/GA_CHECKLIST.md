@@ -1,0 +1,22 @@
+# GA Checklist
+
+Use this checklist before claiming general-availability readiness for the
+current production candidate.
+
+- [x] `./scripts/ci-workspace.sh` passes
+- [x] `./scripts/check-sdk-parity.sh` passes
+- [x] `./scripts/qualify-release.sh` passes
+- [x] release-input guards prevent generated artifacts from entering source
+- [x] dashboard release build and test lane is green
+- [x] TypeScript SDK pack/install qualification is green
+- [x] Python wheel and sdist qualification is green
+- [x] Go module release qualification is green
+- [x] trust-control deployment, backup/restore, upgrade, and rollback are documented
+- [x] hosted edge admin and health diagnostics are documented
+- [x] `spec/PROTOCOL.md` reflects the shipped repository profile
+- [x] standards-submission drafts exist for receipts and portable trust
+- [x] README and SDK docs align to the current production-candidate contract
+- [x] release audit and risk register are updated for this candidate
+- [ ] hosted `CI` workflow green on the candidate commit
+- [ ] hosted `Release Qualification` workflow green on the candidate commit
+- [ ] final release tag and publication decision taken by operator

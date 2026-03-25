@@ -9,6 +9,7 @@ repository.workspace = true
 
 [dependencies]
 pact-core = { path = "../pact-core" }
+pact-mcp-edge = { path = "../pact-mcp-edge" }
 pact-kernel = { path = "../pact-kernel" }
 pact-manifest = { path = "../pact-manifest" }
 chrono = { version = "0.4", features = ["clock"] }

@@ -16,19 +16,19 @@
 #![allow(clippy::large_enum_variant, clippy::too_many_arguments)]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
-mod certify;
+mod admin;
 mod did;
-mod enterprise_federation;
-mod evidence_export;
-mod issuance;
 mod passport;
-mod passport_verifier;
-mod policy;
-mod remote_mcp;
-mod reputation;
-mod trust_control;
 
-use std::fs;
+pub use pact_control_plane::{
+    authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
+    configure_capability_authority, configure_receipt_store, configure_revocation_store,
+    enterprise_federation, evidence_export, issuance, issue_default_capabilities,
+    load_or_create_authority_keypair, passport_verifier, policy, reputation, require_control_token,
+    rotate_authority_keypair, trust_control, CliError,
+};
+pub use pact_hosted_mcp as remote_mcp;
+
 use std::io::Write;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -46,13 +46,12 @@ use pact_core::session::{
 };
 use pact_kernel::transport::{PactTransport, TransportError};
 use pact_kernel::{
-    KernelConfig, PactKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
+    PactKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
     ToolCallRequest as KernelToolCallRequest, ToolCallStream,
 };
 use pact_mcp_adapter::{AdaptedMcpServer, McpAdapterConfig, McpEdgeConfig, PactMcpEdge};
 
-use crate::enterprise_federation::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
-use crate::policy::{load_policy, DefaultCapability, LoadedPolicy};
+use crate::policy::load_policy;
 
 /// PACT -- Provable Agent Capability Transport.
 ///
@@ -1273,7 +1272,7 @@ fn main() {
             TrustCommands::Provider { command } => match command {
                 TrustProviderCommands::List {
                     enterprise_providers_file,
-                } => cmd_trust_provider_list(
+                } => admin::cmd_trust_provider_list(
                     cli.json,
                     enterprise_providers_file.as_deref(),
                     control_url.as_deref(),
@@ -1282,7 +1281,7 @@ fn main() {
                 TrustProviderCommands::Get {
                     provider_id,
                     enterprise_providers_file,
-                } => cmd_trust_provider_get(
+                } => admin::cmd_trust_provider_get(
                     &provider_id,
                     cli.json,
                     enterprise_providers_file.as_deref(),
@@ -1292,7 +1291,7 @@ fn main() {
                 TrustProviderCommands::Upsert {
                     input,
                     enterprise_providers_file,
-                } => cmd_trust_provider_upsert(
+                } => admin::cmd_trust_provider_upsert(
                     &input,
                     cli.json,
                     enterprise_providers_file.as_deref(),
@@ -1302,7 +1301,7 @@ fn main() {
                 TrustProviderCommands::Delete {
                     provider_id,
                     enterprise_providers_file,
-                } => cmd_trust_provider_delete(
+                } => admin::cmd_trust_provider_delete(
                     &provider_id,
                     cli.json,
                     enterprise_providers_file.as_deref(),
@@ -1351,7 +1350,7 @@ fn main() {
                 enterprise_identity,
                 delegation_policy,
                 upstream_capability_id,
-            } => cmd_trust_federated_issue(
+            } => admin::cmd_trust_federated_issue(
                 &presentation_response,
                 &challenge,
                 &capability_policy,
@@ -1372,7 +1371,7 @@ fn main() {
                 expires_at,
                 purpose,
                 parent_capability_id,
-            } => cmd_trust_federated_delegation_policy_create(
+            } => admin::cmd_trust_federated_delegation_policy_create(
                 &output,
                 &signing_seed_file,
                 &issuer,
@@ -1508,7 +1507,7 @@ fn main() {
                 CertifyRegistryCommands::Publish {
                     input,
                     certification_registry_file,
-                } => cmd_certify_registry_publish(
+                } => admin::cmd_certify_registry_publish(
                     &input,
                     certification_registry_file.as_deref(),
                     cli.json,
@@ -1517,7 +1516,7 @@ fn main() {
                 ),
                 CertifyRegistryCommands::List {
                     certification_registry_file,
-                } => cmd_certify_registry_list(
+                } => admin::cmd_certify_registry_list(
                     certification_registry_file.as_deref(),
                     cli.json,
                     control_url.as_deref(),
@@ -1526,7 +1525,7 @@ fn main() {
                 CertifyRegistryCommands::Get {
                     artifact_id,
                     certification_registry_file,
-                } => cmd_certify_registry_get(
+                } => admin::cmd_certify_registry_get(
                     &artifact_id,
                     certification_registry_file.as_deref(),
                     cli.json,
@@ -1536,7 +1535,7 @@ fn main() {
                 CertifyRegistryCommands::Resolve {
                     tool_server_id,
                     certification_registry_file,
-                } => cmd_certify_registry_resolve(
+                } => admin::cmd_certify_registry_resolve(
                     &tool_server_id,
                     certification_registry_file.as_deref(),
                     cli.json,
@@ -1548,7 +1547,7 @@ fn main() {
                     reason,
                     revoked_at,
                     certification_registry_file,
-                } => cmd_certify_registry_revoke(
+                } => admin::cmd_certify_registry_revoke(
                     &artifact_id,
                     certification_registry_file.as_deref(),
                     reason.as_deref(),
@@ -1777,66 +1776,6 @@ fn main() {
         }
         std::process::exit(1);
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum CliError {
-    #[error("{0}")]
-    Core(#[from] pact_core::error::Error),
-
-    #[error("{0}")]
-    Policy(#[from] policy::PolicyError),
-
-    #[error("adapter error: {0}")]
-    Adapter(#[from] pact_mcp_adapter::AdapterError),
-
-    #[error("kernel error: {0}")]
-    Kernel(#[from] pact_kernel::KernelError),
-
-    #[error("checkpoint error: {0}")]
-    Checkpoint(#[from] pact_kernel::CheckpointError),
-
-    #[error("evidence export error: {0}")]
-    EvidenceExport(#[from] pact_kernel::EvidenceExportError),
-
-    #[error("credential error: {0}")]
-    Credential(#[from] pact_credentials::CredentialError),
-
-    #[error("receipt store error: {0}")]
-    ReceiptStore(#[from] pact_kernel::ReceiptStoreError),
-
-    #[error("conformance load error: {0}")]
-    ConformanceLoad(#[from] pact_conformance::LoadError),
-
-    #[error("revocation store error: {0}")]
-    RevocationStore(#[from] pact_kernel::RevocationStoreError),
-
-    #[error("authority store error: {0}")]
-    AuthorityStore(#[from] pact_kernel::AuthorityStoreError),
-
-    #[error("budget store error: {0}")]
-    BudgetStore(#[from] pact_kernel::BudgetStoreError),
-
-    #[error("sqlite error: {0}")]
-    Sqlite(#[from] rusqlite::Error),
-
-    #[error("transport error: {0}")]
-    Transport(#[from] TransportError),
-
-    #[error("i/o error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("json error: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
-
-    #[error("http error: {0}")]
-    Reqwest(#[from] reqwest::Error),
-
-    #[error("{0}")]
-    Other(String),
 }
 
 fn cmd_run(
@@ -2333,245 +2272,6 @@ fn cmd_mcp_serve_http(
     })
 }
 
-pub(crate) fn build_kernel(loaded_policy: LoadedPolicy, kernel_kp: &Keypair) -> PactKernel {
-    let LoadedPolicy {
-        identity,
-        kernel: kernel_policy,
-        guard_pipeline,
-        ..
-    } = loaded_policy;
-
-    let config = KernelConfig {
-        keypair: kernel_kp.clone(),
-        ca_public_keys: vec![],
-        max_delegation_depth: kernel_policy.delegation_depth_limit,
-        policy_hash: identity.runtime_hash,
-        allow_sampling: kernel_policy.allow_sampling,
-        allow_sampling_tool_use: kernel_policy.allow_sampling_tool_use,
-        allow_elicitation: kernel_policy.allow_elicitation,
-        max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
-        retention_config: None,
-    };
-
-    let mut kernel = PactKernel::new(config);
-
-    if !guard_pipeline.is_empty() {
-        info!(
-            guard_count = guard_pipeline.len(),
-            "registering guard pipeline"
-        );
-        kernel.add_guard(Box::new(guard_pipeline));
-    }
-
-    kernel
-}
-
-pub(crate) fn configure_receipt_store(
-    kernel: &mut PactKernel,
-    receipt_db_path: Option<&std::path::Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    match (receipt_db_path, control_url) {
-        (Some(_), Some(_)) => {
-            return Err(CliError::Other(
-                "use either --receipt-db or --control-url for receipt persistence, not both"
-                    .to_string(),
-            ));
-        }
-        (Some(path), None) => {
-            kernel.set_receipt_store(Box::new(pact_kernel::SqliteReceiptStore::open(path)?));
-        }
-        (None, Some(url)) => {
-            let token = require_control_token(control_token)?;
-            kernel.set_receipt_store(trust_control::build_remote_receipt_store(url, token)?);
-        }
-        (None, None) => {}
-    }
-    Ok(())
-}
-
-pub(crate) fn configure_revocation_store(
-    kernel: &mut PactKernel,
-    revocation_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    match (revocation_db_path, control_url) {
-        (Some(_), Some(_)) => {
-            return Err(CliError::Other(
-                "use either --revocation-db or --control-url for revocation state, not both"
-                    .to_string(),
-            ));
-        }
-        (Some(path), None) => {
-            kernel.set_revocation_store(Box::new(pact_kernel::SqliteRevocationStore::open(path)?));
-        }
-        (None, Some(url)) => {
-            let token = require_control_token(control_token)?;
-            kernel.set_revocation_store(trust_control::build_remote_revocation_store(url, token)?);
-        }
-        (None, None) => {}
-    }
-    Ok(())
-}
-
-pub(crate) fn configure_capability_authority(
-    kernel: &mut PactKernel,
-    default_authority_keypair: &Keypair,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-    issuance_policy: Option<policy::ReputationIssuancePolicy>,
-) -> Result<(), CliError> {
-    if control_url.is_some() && (authority_seed_path.is_some() || authority_db_path.is_some()) {
-        return Err(CliError::Other(
-            "use either local authority flags or --control-url, not both".to_string(),
-        ));
-    }
-    if let Some(url) = control_url {
-        if issuance_policy.is_some() {
-            return Err(CliError::Other(
-                "reputation-gated issuance must be enforced by the trust-control service itself; start `pact trust serve --policy <path>` instead of relying on client-side --control-url issuance".to_string(),
-            ));
-        }
-        let token = require_control_token(control_token)?;
-        kernel.set_capability_authority(trust_control::build_remote_capability_authority(
-            url, token,
-        )?);
-        return Ok(());
-    }
-
-    match (authority_seed_path, authority_db_path) {
-        (Some(_), Some(_)) => {
-            return Err(CliError::Other(
-                "use either --authority-seed-file or --authority-db, not both".to_string(),
-            ));
-        }
-        (Some(path), None) => {
-            let keypair = load_or_create_authority_keypair(path)?;
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
-                Box::new(pact_kernel::LocalCapabilityAuthority::new(keypair)),
-                issuance_policy,
-                receipt_db_path,
-                budget_db_path,
-            ));
-        }
-        (None, Some(path)) => {
-            kernel.set_capability_authority(issuance::wrap_capability_authority(
-                Box::new(pact_kernel::SqliteCapabilityAuthority::open(path)?),
-                issuance_policy,
-                receipt_db_path,
-                budget_db_path,
-            ));
-        }
-        (None, None) => {
-            if issuance_policy.is_some() || receipt_db_path.is_some() {
-                kernel.set_capability_authority(issuance::wrap_capability_authority(
-                    Box::new(pact_kernel::LocalCapabilityAuthority::new(
-                        default_authority_keypair.clone(),
-                    )),
-                    issuance_policy,
-                    receipt_db_path,
-                    budget_db_path,
-                ));
-            }
-        }
-    }
-    Ok(())
-}
-
-pub(crate) fn configure_budget_store(
-    kernel: &mut PactKernel,
-    budget_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    match (budget_db_path, control_url) {
-        (Some(_), Some(_)) => {
-            return Err(CliError::Other(
-                "use either --budget-db or --control-url for budget state, not both".to_string(),
-            ));
-        }
-        (Some(path), None) => {
-            kernel.set_budget_store(Box::new(pact_kernel::SqliteBudgetStore::open(path)?));
-        }
-        (None, Some(url)) => {
-            let token = require_control_token(control_token)?;
-            kernel.set_budget_store(trust_control::build_remote_budget_store(url, token)?);
-        }
-        (None, None) => {}
-    }
-    Ok(())
-}
-
-fn require_control_token(control_token: Option<&str>) -> Result<&str, CliError> {
-    control_token.ok_or_else(|| {
-        CliError::Other(
-            "--control-url requires --control-token so trust-service authentication is explicit"
-                .to_string(),
-        )
-    })
-}
-
-pub(crate) fn authority_public_key_from_seed_file(
-    path: &Path,
-) -> Result<Option<pact_core::PublicKey>, CliError> {
-    match fs::read_to_string(path) {
-        Ok(seed_hex) => Ok(Some(Keypair::from_seed_hex(seed_hex.trim())?.public_key())),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(CliError::Io(error)),
-    }
-}
-
-pub(crate) fn rotate_authority_keypair(path: &Path) -> Result<pact_core::PublicKey, CliError> {
-    let keypair = Keypair::generate();
-    write_authority_seed_file(path, &keypair)?;
-    Ok(keypair.public_key())
-}
-
-pub(crate) fn load_or_create_authority_keypair(path: &Path) -> Result<Keypair, CliError> {
-    match authority_public_key_from_seed_file(path)? {
-        Some(_) => {
-            let seed_hex = fs::read_to_string(path)?;
-            Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
-        }
-        None => {
-            let keypair = Keypair::generate();
-            write_authority_seed_file(path, &keypair)?;
-            Ok(keypair)
-        }
-    }
-}
-
-fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliError> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let temp_path = path.with_extension(format!(
-        "{}tmp",
-        path.extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| format!("{ext}."))
-            .unwrap_or_default()
-    ));
-    fs::write(&temp_path, format!("{}\n", keypair.seed_hex()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-
-        fs::set_permissions(&temp_path, fs::Permissions::from_mode(0o600))?;
-    }
-    fs::rename(temp_path, path)?;
-    Ok(())
-}
-
 fn require_revocation_db_path(revocation_db_path: Option<&Path>) -> Result<&Path, CliError> {
     revocation_db_path.ok_or_else(|| {
         CliError::Other(
@@ -2644,7 +2344,7 @@ fn cmd_trust_revoke(
         (response.newly_revoked, url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
-        let mut store = pact_kernel::SqliteRevocationStore::open(path)?;
+        let mut store = pact_store_sqlite::SqliteRevocationStore::open(path)?;
         (store.revoke(capability_id)?, path.display().to_string())
     };
 
@@ -2687,7 +2387,7 @@ fn cmd_trust_status(
         (response.revoked.unwrap_or(false), url.to_string())
     } else {
         let path = require_revocation_db_path(revocation_db_path)?;
-        let store = pact_kernel::SqliteRevocationStore::open(path)?;
+        let store = pact_store_sqlite::SqliteRevocationStore::open(path)?;
         (store.is_revoked(capability_id)?, path.display().to_string())
     };
 
@@ -2743,7 +2443,7 @@ fn cmd_trust_evidence_share_list(
         trust_control::build_client(url, token)?.shared_evidence_report(&query)?
     } else {
         let path = require_receipt_db_path(receipt_db_path)?;
-        let store = pact_kernel::SqliteReceiptStore::open(path)?;
+        let store = pact_store_sqlite::SqliteReceiptStore::open(path)?;
         store.query_shared_evidence_report(&query)?
     };
 
@@ -2786,506 +2486,6 @@ fn cmd_trust_evidence_share_list(
     }
 
     Ok(())
-}
-
-fn require_enterprise_providers_file(path: Option<&Path>) -> Result<&Path, CliError> {
-    path.ok_or_else(|| {
-        CliError::Other(
-            "provider admin requires --enterprise-providers-file when --control-url is not set"
-                .to_string(),
-        )
-    })
-}
-
-fn require_certification_registry_file(path: Option<&Path>) -> Result<&Path, CliError> {
-    path.ok_or_else(|| {
-        CliError::Other(
-            "certification registry commands require --certification-registry-file when --control-url is not set"
-                .to_string(),
-        )
-    })
-}
-
-fn load_enterprise_provider_registry_local(
-    path: &Path,
-) -> Result<EnterpriseProviderRegistry, CliError> {
-    if path.exists() {
-        EnterpriseProviderRegistry::load(path)
-    } else {
-        Ok(EnterpriseProviderRegistry::default())
-    }
-}
-
-fn load_admission_policy(path: &Path) -> Result<Option<pact_policy::HushSpec>, CliError> {
-    let contents = fs::read_to_string(path)?;
-    if pact_policy::is_hushspec_format(&contents) {
-        return pact_policy::resolve_from_path(path)
-            .map(Some)
-            .map_err(|error| CliError::Other(error.to_string()));
-    }
-    Ok(None)
-}
-
-fn cmd_trust_provider_list(
-    json_output: bool,
-    enterprise_providers_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let response = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        trust_control::build_client(url, token)?.list_enterprise_providers()?
-    } else {
-        let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let registry = load_enterprise_provider_registry_local(path)?;
-        trust_control::EnterpriseProviderListResponse {
-            configured: true,
-            count: registry.providers.len(),
-            providers: registry.providers.into_values().collect(),
-        }
-    };
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else {
-        println!("providers: {}", response.count);
-        for provider in response.providers {
-            println!(
-                "- {} [{}] enabled={} valid={}",
-                provider.provider_id,
-                serde_json::to_string(&provider.kind).unwrap_or_default(),
-                provider.enabled,
-                provider.validation_errors.is_empty()
-            );
-        }
-    }
-
-    Ok(())
-}
-
-fn cmd_trust_provider_get(
-    provider_id: &str,
-    json_output: bool,
-    enterprise_providers_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let provider = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        trust_control::build_client(url, token)?.get_enterprise_provider(provider_id)?
-    } else {
-        let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let registry = load_enterprise_provider_registry_local(path)?;
-        registry
-            .providers
-            .get(provider_id)
-            .cloned()
-            .ok_or_else(|| {
-                CliError::Other(format!("enterprise provider `{provider_id}` was not found"))
-            })?
-    };
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&provider)?);
-    } else {
-        println!("provider_id: {}", provider.provider_id);
-        println!(
-            "kind:        {}",
-            serde_json::to_string(&provider.kind).unwrap_or_default()
-        );
-        println!("enabled:     {}", provider.enabled);
-        println!(
-            "validated:   {}",
-            if provider.validation_errors.is_empty() {
-                "true"
-            } else {
-                "false"
-            }
-        );
-    }
-
-    Ok(())
-}
-
-fn cmd_trust_provider_upsert(
-    input_path: &Path,
-    json_output: bool,
-    enterprise_providers_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let provider: EnterpriseProviderRecord = serde_json::from_slice(&fs::read(input_path)?)?;
-    let response = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        trust_control::build_client(url, token)?
-            .upsert_enterprise_provider(&provider.provider_id, &provider)?
-    } else {
-        let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let mut registry = load_enterprise_provider_registry_local(path)?;
-        registry.upsert(provider.clone());
-        registry.save(path)?;
-        registry
-            .providers
-            .get(&provider.provider_id)
-            .cloned()
-            .ok_or_else(|| {
-                CliError::Other("provider upsert did not persist the requested record".to_string())
-            })?
-    };
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else {
-        println!("provider upserted: {}", response.provider_id);
-    }
-
-    Ok(())
-}
-
-fn cmd_trust_provider_delete(
-    provider_id: &str,
-    json_output: bool,
-    enterprise_providers_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let response = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        trust_control::build_client(url, token)?.delete_enterprise_provider(provider_id)?
-    } else {
-        let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let mut registry = load_enterprise_provider_registry_local(path)?;
-        let deleted = registry.remove(provider_id);
-        registry.save(path)?;
-        trust_control::EnterpriseProviderDeleteResponse {
-            provider_id: provider_id.to_string(),
-            deleted,
-        }
-    };
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else {
-        println!("provider_deleted: {}", response.deleted);
-        println!("provider_id:      {}", response.provider_id);
-    }
-
-    Ok(())
-}
-
-fn cmd_certify_registry_publish(
-    input_path: &Path,
-    certification_registry_file: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let artifact: certify::SignedCertificationCheck =
-            serde_json::from_slice(&fs::read(input_path)?)?;
-        let entry = trust_control::build_client(url, token)?.publish_certification(&artifact)?;
-        if json_output {
-            println!("{}", serde_json::to_string_pretty(&entry)?);
-        } else {
-            println!("published certification artifact");
-            println!("artifact_id:     {}", entry.artifact_id);
-            println!("tool_server_id:  {}", entry.tool_server_id);
-            println!("verdict:         {}", entry.verdict.label());
-            println!("status:          {}", entry.status.label());
-        }
-        Ok(())
-    } else {
-        let path = require_certification_registry_file(certification_registry_file)?;
-        certify::cmd_certify_registry_publish_local(input_path, path, json_output)
-    }
-}
-
-fn cmd_certify_registry_list(
-    certification_registry_file: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let response = trust_control::build_client(url, token)?.list_certifications()?;
-        if json_output {
-            println!("{}", serde_json::to_string_pretty(&response)?);
-        } else {
-            println!("certifications: {}", response.count);
-            for artifact in response.artifacts {
-                println!(
-                    "- {} server={} verdict={} status={}",
-                    artifact.artifact_id,
-                    artifact.tool_server_id,
-                    artifact.verdict.label(),
-                    artifact.status.label()
-                );
-            }
-        }
-        Ok(())
-    } else {
-        let path = require_certification_registry_file(certification_registry_file)?;
-        certify::cmd_certify_registry_list_local(path, json_output)
-    }
-}
-
-fn cmd_certify_registry_get(
-    artifact_id: &str,
-    certification_registry_file: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let entry = trust_control::build_client(url, token)?.get_certification(artifact_id)?;
-        if json_output {
-            println!("{}", serde_json::to_string_pretty(&entry)?);
-        } else {
-            println!("certification artifact");
-            println!("artifact_id:     {}", entry.artifact_id);
-            println!("tool_server_id:  {}", entry.tool_server_id);
-            println!("verdict:         {}", entry.verdict.label());
-            println!("status:          {}", entry.status.label());
-        }
-        Ok(())
-    } else {
-        let path = require_certification_registry_file(certification_registry_file)?;
-        certify::cmd_certify_registry_get_local(artifact_id, path, json_output)
-    }
-}
-
-fn cmd_certify_registry_resolve(
-    tool_server_id: &str,
-    certification_registry_file: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let response = trust_control::build_client(url, token)?
-            .resolve_certification(tool_server_id)?;
-        if json_output {
-            println!("{}", serde_json::to_string_pretty(&response)?);
-        } else {
-            println!("tool_server_id: {}", response.tool_server_id);
-            let state = match response.state {
-                certify::CertificationResolutionState::Active => "active",
-                certify::CertificationResolutionState::Superseded => "superseded",
-                certify::CertificationResolutionState::Revoked => "revoked",
-                certify::CertificationResolutionState::NotFound => "not-found",
-            };
-            println!("state:          {state}");
-            println!("total_entries:  {}", response.total_entries);
-            if let Some(current) = response.current {
-                println!("artifact_id:    {}", current.artifact_id);
-                println!("verdict:        {}", current.verdict.label());
-                println!("status:         {}", current.status.label());
-            }
-        }
-        Ok(())
-    } else {
-        let path = require_certification_registry_file(certification_registry_file)?;
-        certify::cmd_certify_registry_resolve_local(tool_server_id, path, json_output)
-    }
-}
-
-fn cmd_certify_registry_revoke(
-    artifact_id: &str,
-    certification_registry_file: Option<&Path>,
-    reason: Option<&str>,
-    revoked_at: Option<u64>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
-        let entry = trust_control::build_client(url, token)?.revoke_certification(
-            artifact_id,
-            &certify::CertificationRevocationRequest {
-                reason: reason.map(str::to_string),
-                revoked_at,
-            },
-        )?;
-        if json_output {
-            println!("{}", serde_json::to_string_pretty(&entry)?);
-        } else {
-            println!("revoked certification artifact");
-            println!("artifact_id:     {}", entry.artifact_id);
-            println!("tool_server_id:  {}", entry.tool_server_id);
-            println!("status:          {}", entry.status.label());
-            if let Some(revoked_at) = entry.revoked_at {
-                println!("revoked_at:      {revoked_at}");
-            }
-        }
-        Ok(())
-    } else {
-        let path = require_certification_registry_file(certification_registry_file)?;
-        certify::cmd_certify_registry_revoke_local(
-            artifact_id,
-            path,
-            reason,
-            revoked_at,
-            json_output,
-        )
-    }
-}
-
-fn cmd_trust_federated_issue(
-    presentation_response_path: &Path,
-    challenge_path: &Path,
-    capability_policy_path: &Path,
-    enterprise_identity_path: Option<&Path>,
-    delegation_policy_path: Option<&Path>,
-    upstream_capability_id: Option<&str>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
-    let control_url = control_url.ok_or_else(|| {
-        CliError::Other(
-            "federated issuance requires --control-url so the trust-control service enforces verifier and issuance policy centrally"
-                .to_string(),
-        )
-    })?;
-    let token = require_control_token(control_token)?;
-    let presentation: pact_credentials::PassportPresentationResponse =
-        serde_json::from_slice(&fs::read(presentation_response_path)?)?;
-    let expected_challenge: pact_credentials::PassportPresentationChallenge =
-        serde_json::from_slice(&fs::read(challenge_path)?)?;
-    let capability = load_single_default_capability(capability_policy_path)?;
-    let admission_policy = load_admission_policy(capability_policy_path)?;
-    let enterprise_identity = enterprise_identity_path
-        .map(|path| {
-            serde_json::from_slice::<pact_core::EnterpriseIdentityContext>(&fs::read(path)?)
-                .map_err(CliError::from)
-        })
-        .transpose()?;
-    let delegation_policy = delegation_policy_path
-        .map(|path| {
-            serde_json::from_slice::<trust_control::FederatedDelegationPolicyDocument>(&fs::read(
-                path,
-            )?)
-            .map_err(CliError::from)
-        })
-        .transpose()?;
-
-    let response = trust_control::build_client(control_url, token)?.federated_issue(
-        &trust_control::FederatedIssueRequest {
-            presentation,
-            expected_challenge,
-            capability,
-            admission_policy,
-            enterprise_identity,
-            delegation_policy,
-            upstream_capability_id: upstream_capability_id.map(str::to_string),
-        },
-    )?;
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&response)?);
-    } else {
-        println!("federated capability issued");
-        println!("subject:             {}", response.subject);
-        println!("subject_public_key:  {}", response.subject_public_key);
-        println!("verifier:            {}", response.verification.verifier);
-        println!("nonce:               {}", response.verification.nonce);
-        println!("presentation_accepted: {}", response.verification.accepted);
-        println!("capability_id:       {}", response.capability.id);
-        println!(
-            "issuer:              {}",
-            response.capability.issuer.to_hex()
-        );
-        println!("expires_at:          {}", response.capability.expires_at);
-        if let Some(audit) = response.enterprise_audit.as_ref() {
-            println!("enterprise_provider: {}", audit.provider_id);
-            if let Some(profile) = audit.matched_origin_profile.as_deref() {
-                println!("origin_profile:      {profile}");
-            }
-        }
-        if let Some(anchor_id) = response.delegation_anchor_capability_id.as_deref() {
-            println!("delegation_anchor:   {anchor_id}");
-        }
-    }
-
-    Ok(())
-}
-
-fn cmd_trust_federated_delegation_policy_create(
-    output_path: &Path,
-    signing_seed_file: &Path,
-    issuer: &str,
-    partner: &str,
-    verifier: &str,
-    capability_policy_path: &Path,
-    expires_at: u64,
-    purpose: Option<&str>,
-    parent_capability_id: Option<&str>,
-    json_output: bool,
-) -> Result<(), CliError> {
-    let capability = load_single_default_capability(capability_policy_path)?;
-    let keypair = load_or_create_authority_keypair(signing_seed_file)?;
-    let created_at = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or(0);
-    let body = trust_control::FederatedDelegationPolicyBody {
-        schema: "pact.federated-delegation-policy.v1".to_string(),
-        issuer: issuer.to_string(),
-        partner: partner.to_string(),
-        verifier: verifier.to_string(),
-        signer_public_key: keypair.public_key(),
-        created_at,
-        expires_at,
-        ttl_seconds: capability.ttl,
-        scope: capability.scope,
-        purpose: purpose.map(str::to_string),
-        parent_capability_id: parent_capability_id.map(str::to_string),
-    };
-    let (signature, _) = keypair.sign_canonical(&body)?;
-    let policy = trust_control::FederatedDelegationPolicyDocument { body, signature };
-    trust_control::verify_federated_delegation_policy(&policy)?;
-    fs::write(output_path, serde_json::to_vec_pretty(&policy)?)?;
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&policy)?);
-    } else {
-        println!("federated delegation policy created");
-        println!("output:              {}", output_path.display());
-        println!("issuer:              {}", policy.body.issuer);
-        println!("partner:             {}", policy.body.partner);
-        println!("verifier:            {}", policy.body.verifier);
-        println!(
-            "signer_public_key:   {}",
-            policy.body.signer_public_key.to_hex()
-        );
-        println!("ttl_seconds:         {}", policy.body.ttl_seconds);
-        println!("expires_at:          {}", policy.body.expires_at);
-        if let Some(parent_capability_id) = policy.body.parent_capability_id.as_deref() {
-            println!("parent_capability_id: {parent_capability_id}");
-        }
-    }
-
-    Ok(())
-}
-
-fn load_single_default_capability(path: &Path) -> Result<DefaultCapability, CliError> {
-    let loaded = load_policy(path)?;
-    match loaded.default_capabilities.as_slice() {
-        [capability] => Ok(capability.clone()),
-        [] => Err(CliError::Other(
-            "federated issuance requires a capability policy with exactly one default capability"
-                .to_string(),
-        )),
-        _ => Err(CliError::Other(
-            "federated issuance currently supports exactly one default capability per request"
-                .to_string(),
-        )),
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3336,7 +2536,7 @@ fn cmd_receipt_list(
                 "receipt commands require --receipt-db <path> or --control-url".to_string(),
             )
         })?;
-        let store = pact_kernel::SqliteReceiptStore::open(path)?;
+        let store = pact_store_sqlite::SqliteReceiptStore::open(path)?;
         let kernel_query = pact_kernel::ReceiptQuery {
             capability_id: capability.map(ToOwned::to_owned),
             tool_server: tool_server.map(ToOwned::to_owned),
@@ -3362,24 +2562,6 @@ fn cmd_receipt_list(
         }
     }
     Ok(())
-}
-
-pub(crate) fn issue_default_capabilities(
-    kernel: &PactKernel,
-    agent_pk: &pact_core::PublicKey,
-    default_capabilities: &[DefaultCapability],
-) -> Result<Vec<pact_core::CapabilityToken>, CliError> {
-    default_capabilities
-        .iter()
-        .cloned()
-        .map(|default_capability| {
-            kernel
-                .issue_capability(agent_pk, default_capability.scope, default_capability.ttl)
-                .map_err(|error| {
-                    CliError::Other(format!("failed to issue initial capability: {error}"))
-                })
-        })
-        .collect()
 }
 
 fn select_capability_for_request(
@@ -4053,7 +3235,8 @@ capabilities:
         .unwrap();
         let original_issuer = first_capability.issuer.clone();
 
-        let authority = pact_kernel::SqliteCapabilityAuthority::open(&authority_db_path).unwrap();
+        let authority =
+            pact_store_sqlite::SqliteCapabilityAuthority::open(&authority_db_path).unwrap();
         let rotated = authority.rotate().unwrap();
 
         let second_kp = Keypair::generate();

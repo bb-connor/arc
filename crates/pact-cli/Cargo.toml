@@ -12,15 +12,18 @@ name = "pact"
 path = "src/main.rs"
 
 [dependencies]
+pact-control-plane = { path = "../pact-control-plane" }
 pact-core = { path = "../pact-core" }
 pact-credentials = { path = "../pact-credentials" }
 pact-did = { path = "../pact-did" }
+pact-hosted-mcp = { path = "../pact-hosted-mcp" }
 pact-kernel = { path = "../pact-kernel" }
 pact-guards = { path = "../pact-guards" }
 pact-policy = { path = "../pact-policy" }
 pact-mcp-adapter = { path = "../pact-mcp-adapter" }
 pact-conformance = { path = "../pact-conformance" }
 pact-reputation = { path = "../pact-reputation" }
+pact-store-sqlite = { path = "../pact-store-sqlite" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"

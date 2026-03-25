@@ -1,23 +1,36 @@
 # Release Candidate Surface
 
-This document defines the supported `v1` release-candidate surface for this repository.
+This document defines the supported `v2.3` production-candidate surface for
+this repository.
 
-It is intentionally narrower than the broader protocol draft in [`spec/PROTOCOL.md`](../../spec/PROTOCOL.md).
+It is intentionally limited to behavior backed by the current codebase,
+qualification scripts, and release docs.
 
 ## Supported Guarantees
 
-- Capability-scoped tool access is mediated by the kernel rather than delegated directly to the agent.
-- Allow, deny, cancelled, and incomplete tool outcomes produce signed receipts.
-- Filesystem-shaped tool access and filesystem-backed resource reads fail closed outside negotiated roots.
-- Remote hosted sessions expose one documented lifecycle contract covering `ready`, `draining`, `deleted`, `expired`, and `closed`.
-- Remote HTTP supports POST request handling plus standalone GET `/mcp` SSE with bounded retained-notification replay.
-- Direct, wrapped, and remote paths share one ownership model for tasks, cancellation, and late async notifications.
-- The wrapped MCP compatibility surface now covers tools, resources, prompts, completions, nested flows, auth discovery, notifications, and the task slice exercised by the live JS and Python peers.
-- HushSpec is the canonical policy authoring path for new work; legacy PACT YAML remains a supported compatibility input.
+- capability-scoped mediation remains the root trust contract for local,
+  wrapped, and hosted runtime surfaces
+- allow, deny, cancelled, and incomplete outcomes always produce signed
+  receipts
+- trust-control centralizes authority, revocation, receipt, budget,
+  certification, and federation state for supported operator deployments
+- hosted remote sessions expose documented lifecycle and admin diagnostics
+  through `/admin/health`, `/admin/sessions`, and session trust detail
+- enterprise-provider and verifier-policy state is operator-visible through
+  trust-control health and registry surfaces
+- portable trust ships as `did:pact`, Agent Passport, signed verifier-policy
+  artifacts, challenge/response presentation, evidence export/import, and
+  parent-bound federated delegation continuation
+- `PACT Certify` ships as a signed operator evidence artifact plus a
+  fail-closed registry with `active`, `superseded`, `revoked`, and `not-found`
+  resolution states
+- the A2A adapter covers the current shipped matrix of discovery, blocking and
+  streaming message execution, follow-up task management, push-notification
+  config CRUD, durable task correlation, and fail-closed auth negotiation
+- the TypeScript, Python, and Go SDKs are release-qualified against the
+  supported HTTP/session surface rather than treated as unverified examples
 
 ## Supported Defaults And Limits
-
-These values are the current documented defaults or intentional bounds that operators can rely on unless they configure a stricter value.
 
 | Limit or default | Value | Source |
 | --- | --- | --- |
@@ -31,34 +44,43 @@ These values are the current documented defaults or intentional bounds that oper
 | remote session drain grace | `5 s` | `crates/pact-cli/src/remote_mcp.rs` |
 | remote session tombstone retention | `30 min` | `crates/pact-cli/src/remote_mcp.rs` |
 
-Release qualification depends on those defaults being covered by tests and on stricter user-provided values continuing to fail closed.
+Release qualification depends on those defaults being covered by tests and on
+stricter user-provided values continuing to fail closed.
 
 ## Explicit Non-Goals
 
-The scoped `v1` release candidate does not claim:
+The `v2.3` release candidate does not claim:
 
-- multi-region consensus or Byzantine trust replication
-- a full OS sandbox manager
-- complete theorem-prover coverage for the draft protocol
-- production networking, mTLS, and federation breadth described by the draft protocol
-- a performance-first rewrite or large-scale throughput tuning program
+- multi-region or consensus trust replication
+- a public certification marketplace
+- automatic SCIM provisioning lifecycle
+- synthetic cross-issuer passport trust aggregation
+- full theorem-prover completion for all protocol claims
+- performance-first throughput tuning beyond the documented qualification lane
 
 ## Migration Story
 
-- Existing wrapped MCP servers can be hosted through `pact mcp serve` and `pact mcp serve-http`.
-- New policy work should start from `examples/policies/canonical-hushspec.yaml`.
-- Existing deployments may keep using legacy PACT YAML as a compatibility input.
-- Native adoption starts from [`docs/NATIVE_ADOPTION_GUIDE.md`](../NATIVE_ADOPTION_GUIDE.md) and [`examples/hello-tool`](../../examples/hello-tool).
+- existing wrapped MCP servers can be hosted through `pact mcp serve` and
+  `pact mcp serve-http`
+- trust-control-backed deployments can centralize authority, revocation,
+  receipts, budgets, federation registries, and certification state through
+  `pact trust serve`
+- new policy work should start from
+  `examples/policies/canonical-hushspec.yaml`
+- existing deployments may keep using legacy PACT YAML as a compatibility input
+- portable trust and cross-org workflows start from
+  [AGENT_PASSPORT_GUIDE.md](../AGENT_PASSPORT_GUIDE.md) and
+  [IDENTITY_FEDERATION_GUIDE.md](../IDENTITY_FEDERATION_GUIDE.md)
+- A2A integrations start from [A2A_ADAPTER_GUIDE.md](../A2A_ADAPTER_GUIDE.md)
 
-## Extension Policy
+## Operator And Release Guidance
 
-- Keep MCP compatibility claims tied to the behavior exercised by the checked-in conformance scenarios and live peer runs.
-- Keep PACT-native extensions explicit rather than implying they are part of baseline MCP compatibility.
-- Add new release claims only when they are backed by a proving artifact in [QUALIFICATION.md](QUALIFICATION.md).
-- Do not move unresolved architectural work into the release candidate by renaming it as hardening.
-
-## Operator Guidance
-
-- Use `./scripts/ci-workspace.sh` for ordinary local validation.
-- Use `./scripts/qualify-release.sh` before treating a branch as release-candidate material.
-- Use [`docs/release/RELEASE_AUDIT.md`](RELEASE_AUDIT.md) as the go/no-go record instead of relying on tribal knowledge.
+- use `./scripts/ci-workspace.sh` for routine validation
+- use `./scripts/qualify-release.sh` before treating a branch as a production
+  candidate
+- use [QUALIFICATION.md](QUALIFICATION.md) as the release-proof matrix
+- use [OPERATIONS_RUNBOOK.md](OPERATIONS_RUNBOOK.md) and
+  [OBSERVABILITY.md](OBSERVABILITY.md) for deployment and incident response
+- use [RELEASE_AUDIT.md](RELEASE_AUDIT.md), [GA_CHECKLIST.md](GA_CHECKLIST.md),
+  and [RISK_REGISTER.md](RISK_REGISTER.md) as the go/no-go record instead of
+  relying on tribal knowledge

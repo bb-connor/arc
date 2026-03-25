@@ -1480,15 +1480,18 @@ dependencies = [
  "p256",
  "p384",
  "pact-conformance",
+ "pact-control-plane",
  "pact-core",
  "pact-credentials",
  "pact-did",
  "pact-guards",
+ "pact-hosted-mcp",
  "pact-kernel",
  "pact-mcp-adapter",
  "pact-policy",
  "pact-reputation",
  "pact-siem",
+ "pact-store-sqlite",
  "reqwest",
  "rsa",
  "rusqlite",
@@ -1514,6 +1517,38 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "pact-control-plane"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "clap",
+ "hex",
+ "pact-conformance",
+ "pact-core",
+ "pact-credentials",
+ "pact-did",
+ "pact-guards",
+ "pact-kernel",
+ "pact-mcp-adapter",
+ "pact-policy",
+ "pact-reputation",
+ "pact-store-sqlite",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yaml",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "ureq",
 ]
 
 [[package]]
@@ -1589,11 +1624,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact-hosted-mcp"
+version = "0.1.0"
+dependencies = [
+ "async-stream",
+ "axum",
+ "base64",
+ "p256",
+ "p384",
+ "pact-control-plane",
+ "pact-core",
+ "pact-kernel",
+ "pact-mcp-adapter",
+ "pact-store-sqlite",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "ureq",
+ "url",
+]
+
+[[package]]
 name = "pact-kernel"
 version = "0.1.0"
 dependencies = [
  "lru",
  "pact-core",
+ "pact-store-sqlite",
  "regex",
  "rusqlite",
  "serde",
@@ -1617,6 +1679,22 @@ dependencies = [
 
 [[package]]
 name = "pact-mcp-adapter"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "pact-core",
+ "pact-kernel",
+ "pact-manifest",
+ "pact-mcp-edge",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "pact-mcp-edge"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -1674,6 +1752,18 @@ dependencies = [
  "tracing",
  "wiremock",
  "zeroize",
+]
+
+[[package]]
+name = "pact-store-sqlite"
+version = "0.1.0"
+dependencies = [
+ "pact-core",
+ "pact-kernel",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]

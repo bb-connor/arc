@@ -49,6 +49,7 @@ use url::Url;
 
 use crate::policy::load_policy;
 use crate::trust_control::{self, ChildReceiptQuery, RevocationQuery, ToolReceiptQuery};
+use crate::JwtProviderProfile;
 use crate::{
     authority_public_key_from_seed_file, build_kernel, configure_budget_store,
     configure_capability_authority, configure_receipt_store, configure_revocation_store,
@@ -60,6 +61,7 @@ use crate::{
 };
 
 const MCP_ENDPOINT_PATH: &str = "/mcp";
+const ADMIN_HEALTH_PATH: &str = "/admin/health";
 const ADMIN_AUTHORITY_PATH: &str = "/admin/authority";
 const ADMIN_TOOL_RECEIPTS_PATH: &str = "/admin/receipts/tools";
 const ADMIN_CHILD_RECEIPTS_PATH: &str = "/admin/receipts/children";
@@ -98,14 +100,6 @@ const SESSION_TOMBSTONE_RETENTION_ENV: &str = "PACT_MCP_SESSION_TOMBSTONE_RETENT
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
 type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
 type NotificationSubscriberList = Arc<StdMutex<Vec<NotificationTapWeak>>>;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
-pub enum JwtProviderProfile {
-    Generic,
-    Auth0,
-    Okta,
-    AzureAd,
-}
 
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
@@ -349,6 +343,7 @@ impl Drop for NotificationStreamAttachment {
     }
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
 enum RemoteAuthMode {
     StaticBearer {
@@ -2339,6 +2334,7 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         )
         .route(LOCAL_TOKEN_PATH, post(handle_token_endpoint))
         .route(LOCAL_JWKS_PATH, get(handle_local_jwks))
+        .route(ADMIN_HEALTH_PATH, get(handle_admin_health))
         .route(
             ADMIN_AUTHORITY_PATH,
             get(handle_admin_authority).post(handle_admin_rotate_authority),
@@ -3007,6 +3003,101 @@ async fn handle_admin_authority(State(state): State<RemoteAppState>, request: Re
     }
 }
 
+async fn handle_admin_health(State(state): State<RemoteAppState>, request: Request) -> Response {
+    if let Err(response) = validate_origin(request.headers()) {
+        return response;
+    }
+    if let Err(response) = validate_admin_auth(request.headers(), state.admin_token.as_deref()) {
+        return response;
+    }
+
+    state.sessions.cleanup_due_sessions().await;
+    let (active, terminal) = state.sessions.snapshot().await;
+    let authority = match load_authority_status(&state) {
+        Ok(status) => status,
+        Err(response) => return response,
+    };
+
+    let enterprise_provider_summary = state
+        .enterprise_provider_registry
+        .as_deref()
+        .map(|registry| {
+            let validated_count = registry
+                .providers
+                .values()
+                .filter(|record| record.is_validated_enabled())
+                .count();
+            let invalid_count = registry
+                .providers
+                .values()
+                .filter(|record| !record.validation_errors.is_empty())
+                .count();
+            json!({
+                "configured": true,
+                "count": registry.providers.len(),
+                "validatedCount": validated_count,
+                "invalidCount": invalid_count,
+            })
+        })
+        .unwrap_or_else(|| {
+            json!({
+                "configured": false,
+                "count": 0,
+                "validatedCount": 0,
+                "invalidCount": 0,
+            })
+        });
+
+    Json(json!({
+        "ok": true,
+        "server": {
+            "serverId": &state.factory.config.server_id,
+            "serverName": &state.factory.config.server_name,
+            "serverVersion": &state.factory.config.server_version,
+            "sharedHostedOwner": state.factory.config.shared_hosted_owner,
+        },
+        "auth": {
+            "mode": remote_auth_mode_label(&state.auth_mode),
+            "scopes": &state.factory.config.auth_scopes,
+            "issuerConfigured": state.factory.config.auth_jwt_issuer.is_some(),
+            "audienceConfigured": state.factory.config.auth_jwt_audience.is_some(),
+            "adminTokenConfigured": state.admin_token.is_some(),
+        },
+        "controlPlane": {
+            "proxied": state.factory.config.control_url.is_some(),
+            "controlUrl": &state.factory.config.control_url,
+            "controlTokenConfigured": state.factory.config.control_token.is_some(),
+        },
+        "stores": {
+            "receiptsConfigured": state.factory.config.receipt_db_path.is_some(),
+            "revocationsConfigured": state.factory.config.revocation_db_path.is_some(),
+            "authorityDbConfigured": state.factory.config.authority_db_path.is_some(),
+            "authoritySeedConfigured": state.factory.config.authority_seed_path.is_some(),
+            "budgetsConfigured": state.factory.config.budget_db_path.is_some(),
+            "sessionTombstonesConfigured": state.factory.config.session_db_path.is_some(),
+        },
+        "sessions": {
+            "activeCount": active.len(),
+            "terminalCount": terminal.len(),
+            "idleExpiryMillis": state.factory.lifecycle_policy.idle_expiry_millis,
+            "drainGraceMillis": state.factory.lifecycle_policy.drain_grace_millis,
+            "reaperIntervalMillis": state.factory.lifecycle_policy.reaper_interval_millis,
+            "tombstoneRetentionMillis": state.factory.lifecycle_policy.tombstone_retention_millis,
+        },
+        "authority": authority,
+        "federation": {
+            "identityFederationConfigured": state.factory.config.identity_federation_seed_path.is_some(),
+            "enterpriseProviders": enterprise_provider_summary,
+        },
+        "oauth": {
+            "protectedResourceMetadata": state.protected_resource_metadata.is_some(),
+            "authorizationServerMetadata": state.authorization_server_metadata.is_some(),
+            "localAuthorizationServer": state.local_auth_server.is_some(),
+        },
+    }))
+    .into_response()
+}
+
 async fn handle_admin_rotate_authority(
     State(state): State<RemoteAppState>,
     request: Request,
@@ -3039,7 +3130,7 @@ async fn handle_admin_rotate_authority(
     }
 
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
-        return match pact_kernel::SqliteCapabilityAuthority::open(path)
+        return match pact_store_sqlite::SqliteCapabilityAuthority::open(path)
             .and_then(|authority| authority.rotate())
         {
             Ok(status) => Json(json!({
@@ -4652,6 +4743,14 @@ fn validate_admin_auth(headers: &HeaderMap, admin_token: Option<&str>) -> Result
     }
 }
 
+fn remote_auth_mode_label(auth_mode: &RemoteAuthMode) -> &'static str {
+    match auth_mode {
+        RemoteAuthMode::StaticBearer { .. } => "static_bearer",
+        RemoteAuthMode::JwtBearer { .. } => "jwt_bearer",
+        RemoteAuthMode::IntrospectionBearer { .. } => "introspection_bearer",
+    }
+}
+
 fn validate_session_auth_context(
     request_auth_context: &SessionAuthContext,
     session_auth_context: &SessionAuthContext,
@@ -4827,38 +4926,42 @@ fn control_client(
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
-fn open_receipt_store(state: &RemoteAppState) -> Result<pact_kernel::SqliteReceiptStore, Response> {
+fn open_receipt_store(
+    state: &RemoteAppState,
+) -> Result<pact_store_sqlite::SqliteReceiptStore, Response> {
     let Some(path) = state.factory.config.receipt_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
             "remote receipt admin requires --receipt-db",
         ));
     };
-    pact_kernel::SqliteReceiptStore::open(path)
+    pact_store_sqlite::SqliteReceiptStore::open(path)
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
 fn open_revocation_store(
     state: &RemoteAppState,
-) -> Result<pact_kernel::SqliteRevocationStore, Response> {
+) -> Result<pact_store_sqlite::SqliteRevocationStore, Response> {
     let Some(path) = state.factory.config.revocation_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
             "remote trust admin requires --revocation-db",
         ));
     };
-    pact_kernel::SqliteRevocationStore::open(path)
+    pact_store_sqlite::SqliteRevocationStore::open(path)
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
-fn open_budget_store(state: &RemoteAppState) -> Result<pact_kernel::SqliteBudgetStore, Response> {
+fn open_budget_store(
+    state: &RemoteAppState,
+) -> Result<pact_store_sqlite::SqliteBudgetStore, Response> {
     let Some(path) = state.factory.config.budget_db_path.as_deref() else {
         return Err(plain_http_error(
             StatusCode::CONFLICT,
             "remote budget admin requires --budget-db",
         ));
     };
-    pact_kernel::SqliteBudgetStore::open(path)
+    pact_store_sqlite::SqliteBudgetStore::open(path)
         .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
 }
 
@@ -4879,7 +4982,7 @@ fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
     }
 
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
-        let status = pact_kernel::SqliteCapabilityAuthority::open(path)
+        let status = pact_store_sqlite::SqliteCapabilityAuthority::open(path)
             .and_then(|authority| authority.status())
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())

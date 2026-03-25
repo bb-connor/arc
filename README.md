@@ -5,7 +5,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/MSRV-1.93-orange?style=flat-square&logo=rust" alt="MSRV: 1.93">
-  <img src="https://img.shields.io/badge/status-pre--release-yellow?style=flat-square" alt="Status: Pre-release">
+  <img src="https://img.shields.io/badge/status-production--candidate-yellow?style=flat-square" alt="Status: Production candidate">
 </p>
 
 <p align="center">
@@ -38,7 +38,7 @@
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
   <a href="#workspace-layout">Workspace</a>
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  <a href="spec/PROTOCOL.md">Protocol Draft</a>
+  <a href="spec/PROTOCOL.md">Protocol v2</a>
 </p>
 
 ---
@@ -56,7 +56,8 @@ PACT is an attempt to answer those questions with capability tokens, kernel medi
 
 ## What PACT Is In This Repo
 
-PACT is an experimental Rust workspace for capability-based tool access in agent systems.
+PACT is a production-candidate Rust workspace for capability-based tool access
+in agent systems.
 
 The repository currently includes:
 
@@ -64,13 +65,21 @@ The repository currently includes:
 - a runtime kernel that validates capabilities and evaluates guards
 - a CLI for single-call checks, agent subprocess mediation, and MCP edge serving
 - a library crate for adapting MCP servers into PACT tool servers and exposing a secured MCP edge
+- a trust-control service for authority, revocation, receipts, budgets, federation, and certification state
+- portable-trust artifacts including `did:pact`, Agent Passport, verifier policies, and federated evidence export/import
+- a thin A2A v1.0.0 adapter with fail-closed auth negotiation and durable task correlation
+- release-qualified TypeScript, Python, and Go SDK surfaces for the current hosted session contract
 - unit, integration, end-to-end, and differential tests
 
 ## Status
 
-This is a pre-release release candidate for the scoped `v1` surface documented in [docs/release/RELEASE_CANDIDATE.md](docs/release/RELEASE_CANDIDATE.md).
+This is a `v2.3` production candidate for the surface documented in
+[docs/release/RELEASE_CANDIDATE.md](docs/release/RELEASE_CANDIDATE.md).
 
-The design in [spec/PROTOCOL.md](spec/PROTOCOL.md) is broader than the code shipped here today. The README focuses on what is implemented in this repository right now, and calls out draft or incomplete areas when they matter.
+The protocol document in [spec/PROTOCOL.md](spec/PROTOCOL.md) now describes the
+shipped repository profile rather than a broader aspirational draft. The README
+focuses on what is implemented here today and calls out explicit boundaries
+when they matter.
 
 ## What PACT Does
 
@@ -81,28 +90,31 @@ PACT puts a mediation layer between an agent and its tools:
 3. The kernel runs policy guards before the tool executes.
 4. The kernel returns the tool result plus a signed receipt.
 
-In this workspace, those pieces are implemented as Rust crates rather than a full production deployment stack.
+In this workspace, those pieces are implemented as Rust crates, release
+scripts, and operator docs rather than a turnkey managed service.
 
 ## What Is Implemented Today
 
 - `pact-core`: capability tokens, canonical JSON helpers, signing, hashing, Merkle helpers, receipts, and wire message types including streamed tool chunk frames
 - `pact-kernel`: capability validation, guard execution, tool dispatch traits, revocation store, receipt creation, explicit terminal state tracking, and a length-prefixed stdio transport
 - `pact-guards`: guard implementations for forbidden paths, shell commands, egress allowlists, path allowlists, MCP tool filtering, secret leak detection, and patch integrity checks
-- `pact-cli`: `pact check`, `pact run`, `pact mcp serve`, and `pact mcp serve-http` for exposing MCP-compatible edges backed by the kernel
+- `pact-cli`: `pact check`, `pact run`, `pact mcp serve`, `pact mcp serve-http`, `pact trust serve`, portable-trust commands, and certification registry administration
 - `pact-manifest`: tool manifest types plus signing and verification
 - `pact-mcp-adapter`: MCP wrapping, transport, and edge support for tool flows plus first-class resource and prompt session handling in the in-process edge
+- `pact-a2a-adapter`: A2A v1.0.0 discovery, mediation, task follow-up, push-notification config CRUD, and fail-closed auth negotiation
+- `pact-did`, `pact-credentials`, and `pact-reputation`: self-certifying identity, portable trust, verifier policy, presentation, and reputation scoring layers
 - `examples/hello-tool`: maintained native-service example using `NativePactServiceBuilder` for a tool, resource, prompt, manifest signing flow, and manifest pricing metadata
 - `formal/diff-tests`: differential tests for scope semantics
 
 ## What Is Not Finished Yet
 
-- production networking, mTLS, and sandbox orchestration described in the protocol draft
-- full OAuth token-exchange, user federation, and richer hosted auth-server flows
-- hosted trust services beyond the current SQLite-backed admin APIs
-- broader native authoring ergonomics beyond the first `NativePactServiceBuilder` surface and maintained example
 - multi-region or consensus-style trust replication beyond the current deterministic HA leader/follower design
+- public certification marketplace discovery
+- automatic SCIM lifecycle management and broader enterprise federation workflows beyond the current provider-admin path
+- synthetic cross-issuer passport trust aggregation
+- broader native authoring ergonomics beyond the first `NativePactServiceBuilder` surface and maintained example
 - performance-first tuning beyond the documented defaults and qualification gates
-- theorem-prover artifacts for the stronger formal claims in the draft spec
+- theorem-prover completion for every protocol claim
 
 One important detail: the guard crate contains seven guard implementations, and the current CLI YAML loader now wires all seven:
 
@@ -126,14 +138,21 @@ Both inputs compile into the same runtime policy materialization inside `pact-cl
 
 For wrapped-MCP-to-native migration and the first higher-level native service surface, see [docs/NATIVE_ADOPTION_GUIDE.md](docs/NATIVE_ADOPTION_GUIDE.md).
 For advertised tool pricing and pre-invocation budget planning, see [docs/TOOL_PRICING_GUIDE.md](docs/TOOL_PRICING_GUIDE.md).
+For portable trust and federation, see [docs/AGENT_PASSPORT_GUIDE.md](docs/AGENT_PASSPORT_GUIDE.md) and [docs/IDENTITY_FEDERATION_GUIDE.md](docs/IDENTITY_FEDERATION_GUIDE.md).
+For A2A mediation, see [docs/A2A_ADAPTER_GUIDE.md](docs/A2A_ADAPTER_GUIDE.md).
+For certification, see [docs/PACT_CERTIFY_GUIDE.md](docs/PACT_CERTIFY_GUIDE.md).
 
 ## Release Qualification
 
-The release-proof documents for the scoped `v1` surface are:
+The release-proof documents for the current production-candidate surface are:
 
 - [docs/release/RELEASE_CANDIDATE.md](docs/release/RELEASE_CANDIDATE.md)
 - [docs/release/QUALIFICATION.md](docs/release/QUALIFICATION.md)
 - [docs/release/RELEASE_AUDIT.md](docs/release/RELEASE_AUDIT.md)
+- [docs/release/OPERATIONS_RUNBOOK.md](docs/release/OPERATIONS_RUNBOOK.md)
+- [docs/release/OBSERVABILITY.md](docs/release/OBSERVABILITY.md)
+- [docs/release/GA_CHECKLIST.md](docs/release/GA_CHECKLIST.md)
+- [docs/release/RISK_REGISTER.md](docs/release/RISK_REGISTER.md)
 
 For ordinary workspace validation run:
 
@@ -150,6 +169,9 @@ For release-candidate qualification run:
 ## Requirements
 
 - Rust 1.93 or newer
+- `node`
+- `python3`
+- `go`
 
 ## Quick Start
 
@@ -510,13 +532,15 @@ Operator-facing compliance references ship in `docs/compliance/`:
 | `packages/sdk/pact-ts` | TypeScript SDK (`@pact-protocol/sdk`) |
 | `packages/sdk/pact-py` | Python SDK |
 | `packages/sdk/pact-go` | Go SDK |
-| `spec/PROTOCOL.md` | Draft protocol design document |
+| `spec/PROTOCOL.md` | Shipped `v2` protocol and artifact contract |
 
-## Protocol Draft vs. Repository Reality
+## Protocol And Repository Reality
 
-The protocol draft describes a larger system: isolated tool servers, authenticated networking, a capability authority, and a transparency-style receipt log.
-
-This repository already exercises the core data model and enforcement loop, but not the full deployment architecture. If you are evaluating the project, read [spec/PROTOCOL.md](spec/PROTOCOL.md) as the intended design and this workspace as the current implementation slice.
+The protocol document now describes the shipped repository profile rather than a
+larger aspirational draft. It still calls out explicit non-goals such as
+multi-region consensus, public certification discovery, and full theorem-prover
+completion so release claims stay tied to what this workspace actually
+qualifies.
 
 ## Verification
 

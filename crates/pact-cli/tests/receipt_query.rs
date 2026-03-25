@@ -7,6 +7,8 @@
 
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::thread;
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use pact_core::capability::{
@@ -17,11 +19,11 @@ use pact_core::receipt::{
     Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ReceiptAttributionMetadata,
     SettlementStatus, ToolCallAction,
 };
-use pact_kernel::SqliteReceiptStore;
 use pact_kernel::{
     build_checkpoint, BudgetUsageRecord, CapabilitySnapshot, FederatedEvidenceShareImport,
-    ReceiptStore, SqliteBudgetStore, StoredToolReceipt,
+    ReceiptStore, StoredToolReceipt,
 };
+use pact_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use reqwest::blocking::Client;
 
 // --- Test helpers ---
@@ -60,6 +62,16 @@ impl Drop for ServerGuard {
     }
 }
 
+fn read_child_stderr(child: &mut Child) -> String {
+    let Some(stderr) = child.stderr.take() else {
+        return String::new();
+    };
+    let mut reader = std::io::BufReader::new(stderr);
+    let mut output = String::new();
+    let _ = std::io::Read::read_to_string(&mut reader, &mut output);
+    output
+}
+
 fn spawn_trust_service(
     listen: std::net::SocketAddr,
     service_token: &str,
@@ -94,11 +106,31 @@ fn spawn_trust_service(
     ServerGuard { child }
 }
 
+fn wait_for_trust_service_result(
+    client: &Client,
+    base_url: &str,
+    service: &mut ServerGuard,
+) -> Result<(), String> {
+    for _ in 0..300 {
+        if let Some(status) = service.child.try_wait().expect("poll trust service child") {
+            let stderr = read_child_stderr(&mut service.child);
+            return Err(format!(
+                "trust service exited before becoming ready (status {status}): {stderr}"
+            ));
+        }
+        match client.get(format!("{base_url}/health")).send() {
+            Ok(response) if response.status() == reqwest::StatusCode::OK => return Ok(()),
+            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
+        }
+    }
+    Err("trust service did not become ready before timeout".to_string())
+}
+
 fn wait_for_trust_service(client: &Client, base_url: &str) {
     for _ in 0..300 {
         match client.get(format!("{base_url}/health")).send() {
             Ok(response) if response.status() == reqwest::StatusCode::OK => return,
-            Ok(_) | Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+            Ok(_) | Err(_) => thread::sleep(Duration::from_millis(100)),
         }
     }
     panic!("trust service did not become ready");
@@ -305,19 +337,43 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
             .unwrap();
     }
 
-    let listen = reserve_listen_addr();
     let service_token = "test-secret-token".to_string();
-    let service = spawn_trust_service(
-        listen,
-        &service_token,
-        &receipt_db_path,
-        &revocation_db_path,
-        &authority_db_path,
-        &budget_db_path,
-    );
     let client = Client::builder().build().expect("build reqwest client");
-    let base_url = format!("http://{listen}");
-    wait_for_trust_service(&client, &base_url);
+    let mut startup_error = None;
+    let mut started = None;
+    for _ in 0..3 {
+        let listen = reserve_listen_addr();
+        let mut service = spawn_trust_service(
+            listen,
+            &service_token,
+            &receipt_db_path,
+            &revocation_db_path,
+            &authority_db_path,
+            &budget_db_path,
+        );
+        let base_url = format!("http://{listen}");
+        match wait_for_trust_service_result(&client, &base_url, &mut service) {
+            Ok(()) => {
+                started = Some((service, base_url));
+                break;
+            }
+            Err(error) => {
+                startup_error = Some(error);
+                drop(service);
+            }
+        }
+    }
+    let (service, base_url) = started.unwrap_or_else(|| {
+        panic!(
+            "trust service did not become ready after retries: {}",
+            startup_error
+                .clone()
+                .unwrap_or_else(|| "unknown startup failure".to_string())
+        )
+    });
+    if let Some(error) = startup_error.take() {
+        eprintln!("receipt_query startup retry recovered after: {error}");
+    }
 
     TestSetup {
         dir,

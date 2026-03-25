@@ -22,9 +22,9 @@ mod retention {
 
     use pact_kernel::build_checkpoint;
     use pact_kernel::build_inclusion_proof;
-    use pact_kernel::receipt_store::{RetentionConfig, SqliteReceiptStore};
     use pact_kernel::verify_checkpoint_signature;
-    use pact_kernel::ReceiptStore;
+    use pact_kernel::{ReceiptStore, RetentionConfig};
+    use pact_store_sqlite::SqliteReceiptStore;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()

@@ -452,11 +452,14 @@ fn certify_registry_local_publish_resolve_and_revoke_work() {
         .expect("artifacts array")
         .iter()
         .any(|entry| entry["artifactId"] == first_artifact_id && entry["status"] == "superseded"));
-    assert!(list_body["artifacts"]
-        .as_array()
-        .expect("artifacts array")
-        .iter()
-        .any(|entry| entry["artifactId"] == replacement_artifact_id && entry["status"] == "active"));
+    assert!(
+        list_body["artifacts"]
+            .as_array()
+            .expect("artifacts array")
+            .iter()
+            .any(|entry| entry["artifactId"] == replacement_artifact_id
+                && entry["status"] == "active")
+    );
 
     let get = Command::new(env!("CARGO_BIN_EXE_pact"))
         .current_dir(workspace_root())
@@ -506,7 +509,10 @@ fn certify_registry_local_publish_resolve_and_revoke_work() {
     let resolve_body: serde_json::Value =
         serde_json::from_slice(&resolve.stdout).expect("parse resolve output");
     assert_eq!(resolve_body["state"], "active");
-    assert_eq!(resolve_body["current"]["artifactId"], replacement_artifact_id);
+    assert_eq!(
+        resolve_body["current"]["artifactId"],
+        replacement_artifact_id
+    );
 
     let revoke = Command::new(env!("CARGO_BIN_EXE_pact"))
         .current_dir(workspace_root())
@@ -630,6 +636,27 @@ fn certify_registry_remote_publish_list_get_resolve_and_revoke_work() {
     assert_eq!(publish_body["toolServerId"], "demo-server-remote");
     assert_eq!(publish_body["status"], "active");
 
+    let health_after_publish = client
+        .get(format!("{base_url}/health"))
+        .send()
+        .expect("send health request after publish");
+    assert_eq!(health_after_publish.status(), reqwest::StatusCode::OK);
+    let health_after_publish: serde_json::Value = health_after_publish
+        .json()
+        .expect("health json after publish");
+    assert_eq!(
+        health_after_publish["federation"]["certifications"]["configured"],
+        true
+    );
+    assert_eq!(
+        health_after_publish["federation"]["certifications"]["count"],
+        1
+    );
+    assert_eq!(
+        health_after_publish["federation"]["certifications"]["activeCount"],
+        1
+    );
+
     let list = Command::new(env!("CARGO_BIN_EXE_pact"))
         .current_dir(workspace_root())
         .args([
@@ -737,6 +764,27 @@ fn certify_registry_remote_publish_list_get_resolve_and_revoke_work() {
     assert_eq!(revoke_body["artifactId"], artifact_id);
     assert_eq!(revoke_body["status"], "revoked");
     assert_eq!(revoke_body["revokedReason"], "remote-revocation");
+
+    let health_after_revoke = client
+        .get(format!("{base_url}/health"))
+        .send()
+        .expect("send health request after revoke");
+    assert_eq!(health_after_revoke.status(), reqwest::StatusCode::OK);
+    let health_after_revoke: serde_json::Value = health_after_revoke
+        .json()
+        .expect("health json after revoke");
+    assert_eq!(
+        health_after_revoke["federation"]["certifications"]["count"],
+        1
+    );
+    assert_eq!(
+        health_after_revoke["federation"]["certifications"]["activeCount"],
+        0
+    );
+    assert_eq!(
+        health_after_revoke["federation"]["certifications"]["revokedCount"],
+        1
+    );
 
     let _ = fs::remove_dir_all(scenarios_dir);
     let _ = fs::remove_dir_all(results_dir);

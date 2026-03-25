@@ -1,0 +1,40 @@
+[package]
+name = "pact-control-plane"
+description = "Trust-control service, client, and shared runtime support for PACT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+pact-core = { path = "../pact-core" }
+pact-credentials = { path = "../pact-credentials" }
+pact-did = { path = "../pact-did" }
+pact-kernel = { path = "../pact-kernel" }
+pact-guards = { path = "../pact-guards" }
+pact-policy = { path = "../pact-policy" }
+pact-reputation = { path = "../pact-reputation" }
+pact-conformance = { path = "../pact-conformance" }
+pact-mcp-adapter = { path = "../pact-mcp-adapter" }
+pact-store-sqlite = { path = "../pact-store-sqlite" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = { workspace = true }
+tokio = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+axum = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+ureq = { version = "2.10", features = ["json"] }
+serde_urlencoded = "0.7"
+rusqlite = { workspace = true }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
