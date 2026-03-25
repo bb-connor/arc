@@ -1,0 +1,19 @@
+[package]
+name = "pact-e2e"
+description = "End-to-end integration tests for the PACT runtime stack"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+pact-core = { path = "../../crates/pact-core" }
+pact-kernel = { path = "../../crates/pact-kernel" }
+pact-guards = { path = "../../crates/pact-guards" }
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

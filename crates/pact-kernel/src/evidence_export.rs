@@ -1,0 +1,579 @@
+use std::collections::BTreeMap;
+
+use pact_core::merkle::MerkleTree;
+use pact_core::receipt::{ChildRequestReceipt, PactReceipt};
+use rusqlite::params;
+use serde::{Deserialize, Serialize};
+
+use crate::capability_lineage::{CapabilityLineageError, CapabilitySnapshot};
+use crate::checkpoint::{
+    build_inclusion_proof, CheckpointError, KernelCheckpoint, ReceiptInclusionProof,
+};
+use crate::receipt_query::ReceiptQuery;
+use crate::receipt_store::{ReceiptStoreError, SqliteReceiptStore};
+
+/// Full-export query used for offline evidence packaging.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceExportQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<u64>,
+}
+
+/// Truthful coverage mode for child receipts in an export bundle.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceChildReceiptScope {
+    /// All child receipts matching the query window are included.
+    FullQueryWindow,
+    /// Child receipts are included only as time-window context because there is
+    /// no capability/agent join path for them yet.
+    TimeWindowContextOnly,
+    /// Child receipts are omitted because the export was capability/agent scoped
+    /// without a truthful join path or time-window fallback.
+    OmittedNoJoinPath,
+}
+
+/// Tool receipt plus its stable store sequence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceToolReceiptRecord {
+    pub seq: u64,
+    pub receipt: PactReceipt,
+}
+
+/// Child receipt plus its stable store sequence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceChildReceiptRecord {
+    pub seq: u64,
+    pub receipt: ChildRequestReceipt,
+}
+
+/// Receipt that was exported but does not currently have checkpoint coverage.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceUncheckpointedReceipt {
+    pub seq: u64,
+    pub receipt_id: String,
+}
+
+/// Live-database retention state captured at export time.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceRetentionMetadata {
+    pub live_db_size_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oldest_live_receipt_timestamp: Option<u64>,
+}
+
+/// Complete evidence bundle assembled from a local SQLite store.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceExportBundle {
+    pub query: EvidenceExportQuery,
+    pub tool_receipts: Vec<EvidenceToolReceiptRecord>,
+    pub child_receipts: Vec<EvidenceChildReceiptRecord>,
+    pub child_receipt_scope: EvidenceChildReceiptScope,
+    pub checkpoints: Vec<KernelCheckpoint>,
+    pub capability_lineage: Vec<CapabilitySnapshot>,
+    pub inclusion_proofs: Vec<ReceiptInclusionProof>,
+    pub uncheckpointed_receipts: Vec<EvidenceUncheckpointedReceipt>,
+    pub retention: EvidenceRetentionMetadata,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EvidenceExportError {
+    #[error("receipt store error: {0}")]
+    ReceiptStore(#[from] ReceiptStoreError),
+
+    #[error("capability lineage error: {0}")]
+    CapabilityLineage(#[from] CapabilityLineageError),
+
+    #[error("checkpoint error: {0}")]
+    Checkpoint(#[from] CheckpointError),
+
+    #[error("core error: {0}")]
+    Core(#[from] pact_core::Error),
+
+    #[error("sqlite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+impl EvidenceExportQuery {
+    fn as_receipt_query(&self, cursor: Option<u64>) -> ReceiptQuery {
+        ReceiptQuery {
+            capability_id: self.capability_id.clone(),
+            tool_server: None,
+            tool_name: None,
+            outcome: None,
+            since: self.since,
+            until: self.until,
+            min_cost: None,
+            max_cost: None,
+            cursor,
+            limit: crate::MAX_QUERY_LIMIT,
+            agent_subject: self.agent_subject.clone(),
+        }
+    }
+
+    fn has_subject_or_capability_scope(&self) -> bool {
+        self.capability_id.is_some() || self.agent_subject.is_some()
+    }
+
+    fn has_time_window(&self) -> bool {
+        self.since.is_some() || self.until.is_some()
+    }
+
+    #[must_use]
+    pub fn child_receipt_scope(&self) -> EvidenceChildReceiptScope {
+        if self.has_subject_or_capability_scope() {
+            if self.has_time_window() {
+                EvidenceChildReceiptScope::TimeWindowContextOnly
+            } else {
+                EvidenceChildReceiptScope::OmittedNoJoinPath
+            }
+        } else {
+            EvidenceChildReceiptScope::FullQueryWindow
+        }
+    }
+}
+
+impl SqliteReceiptStore {
+    /// Build a local-only evidence export bundle from the current SQLite store.
+    ///
+    /// This method never fabricates joins that the runtime does not persist.
+    /// Tool receipts can be scoped by capability or agent subject. Child
+    /// receipts do not currently have the same attribution fields, so they are
+    /// either included by query window or omitted with an explicit scope flag.
+    pub fn build_evidence_export_bundle(
+        &self,
+        query: &EvidenceExportQuery,
+    ) -> Result<EvidenceExportBundle, EvidenceExportError> {
+        let tool_receipts = self.collect_tool_receipts_for_export(query)?;
+        let child_receipt_scope = self.resolve_child_receipt_scope(query);
+        let child_receipts = self.collect_child_receipts_for_export(query, child_receipt_scope)?;
+        let checkpoints = self.collect_checkpoints_for_export(&tool_receipts)?;
+        let capability_lineage = self.collect_lineage_for_export(&tool_receipts)?;
+        let (inclusion_proofs, uncheckpointed_receipts) =
+            self.collect_inclusion_proofs_for_export(&tool_receipts, &checkpoints)?;
+        let retention = EvidenceRetentionMetadata {
+            live_db_size_bytes: self.db_size_bytes()?,
+            oldest_live_receipt_timestamp: self.oldest_receipt_timestamp()?,
+        };
+
+        Ok(EvidenceExportBundle {
+            query: query.clone(),
+            tool_receipts,
+            child_receipts,
+            child_receipt_scope,
+            checkpoints,
+            capability_lineage,
+            inclusion_proofs,
+            uncheckpointed_receipts,
+            retention,
+        })
+    }
+
+    fn collect_tool_receipts_for_export(
+        &self,
+        query: &EvidenceExportQuery,
+    ) -> Result<Vec<EvidenceToolReceiptRecord>, EvidenceExportError> {
+        let mut cursor = None;
+        let mut records = Vec::new();
+
+        loop {
+            let page = self.query_receipts(&query.as_receipt_query(cursor))?;
+            if page.receipts.is_empty() {
+                break;
+            }
+            let next_cursor = page.next_cursor;
+            records.extend(
+                page.receipts
+                    .into_iter()
+                    .map(|stored| EvidenceToolReceiptRecord {
+                        seq: stored.seq,
+                        receipt: stored.receipt,
+                    }),
+            );
+            match next_cursor {
+                Some(next) => cursor = Some(next),
+                None => break,
+            }
+        }
+
+        Ok(records)
+    }
+
+    fn resolve_child_receipt_scope(
+        &self,
+        query: &EvidenceExportQuery,
+    ) -> EvidenceChildReceiptScope {
+        query.child_receipt_scope()
+    }
+
+    fn collect_child_receipts_for_export(
+        &self,
+        query: &EvidenceExportQuery,
+        scope: EvidenceChildReceiptScope,
+    ) -> Result<Vec<EvidenceChildReceiptRecord>, EvidenceExportError> {
+        if matches!(scope, EvidenceChildReceiptScope::OmittedNoJoinPath) {
+            return Ok(Vec::new());
+        }
+
+        let since = query.since.map(|value| value as i64);
+        let until = query.until.map(|value| value as i64);
+        let mut statement = self.connection.prepare(
+            r#"
+            SELECT seq, raw_json
+            FROM pact_child_receipts
+            WHERE (?1 IS NULL OR timestamp >= ?1)
+              AND (?2 IS NULL OR timestamp <= ?2)
+            ORDER BY seq ASC
+            "#,
+        )?;
+        let rows = statement.query_map(params![since, until], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        rows.map(|row| {
+            let (seq, raw_json) = row?;
+            Ok(EvidenceChildReceiptRecord {
+                seq: seq.max(0) as u64,
+                receipt: serde_json::from_str(&raw_json)?,
+            })
+        })
+        .collect()
+    }
+
+    fn collect_checkpoints_for_export(
+        &self,
+        tool_receipts: &[EvidenceToolReceiptRecord],
+    ) -> Result<Vec<KernelCheckpoint>, EvidenceExportError> {
+        let (Some(min_seq), Some(max_seq)) = (
+            tool_receipts.first().map(|record| record.seq),
+            tool_receipts.last().map(|record| record.seq),
+        ) else {
+            return Ok(Vec::new());
+        };
+
+        let mut statement = self.connection.prepare(
+            r#"
+            SELECT checkpoint_seq
+            FROM kernel_checkpoints
+            WHERE batch_end_seq >= ?1
+              AND batch_start_seq <= ?2
+            ORDER BY checkpoint_seq ASC
+            "#,
+        )?;
+        let rows = statement.query_map(params![min_seq as i64, max_seq as i64], |row| {
+            row.get::<_, i64>(0)
+        })?;
+
+        let mut checkpoints = Vec::new();
+        for row in rows {
+            let checkpoint_seq = row?.max(0) as u64;
+            if let Some(checkpoint) = self.load_checkpoint_by_seq(checkpoint_seq)? {
+                checkpoints.push(checkpoint);
+            }
+        }
+
+        Ok(checkpoints)
+    }
+
+    fn collect_lineage_for_export(
+        &self,
+        tool_receipts: &[EvidenceToolReceiptRecord],
+    ) -> Result<Vec<CapabilitySnapshot>, EvidenceExportError> {
+        let mut snapshots = BTreeMap::<String, CapabilitySnapshot>::new();
+        for record in tool_receipts {
+            for snapshot in self.get_combined_delegation_chain(&record.receipt.capability_id)? {
+                snapshots
+                    .entry(snapshot.capability_id.clone())
+                    .or_insert(snapshot);
+            }
+        }
+        Ok(snapshots.into_values().collect())
+    }
+
+    fn collect_inclusion_proofs_for_export(
+        &self,
+        tool_receipts: &[EvidenceToolReceiptRecord],
+        checkpoints: &[KernelCheckpoint],
+    ) -> Result<
+        (
+            Vec<ReceiptInclusionProof>,
+            Vec<EvidenceUncheckpointedReceipt>,
+        ),
+        EvidenceExportError,
+    > {
+        let exported_by_seq = tool_receipts
+            .iter()
+            .map(|record| (record.seq, record.receipt.id.as_str()))
+            .collect::<BTreeMap<_, _>>();
+        let mut proofs = Vec::new();
+        let mut covered_seqs = BTreeMap::<u64, ()>::new();
+
+        for checkpoint in checkpoints {
+            let canonical_bytes = self.receipts_canonical_bytes_range(
+                checkpoint.body.batch_start_seq,
+                checkpoint.body.batch_end_seq,
+            )?;
+            if canonical_bytes.is_empty() {
+                continue;
+            }
+
+            let leaves = canonical_bytes
+                .iter()
+                .map(|(_, bytes)| bytes.clone())
+                .collect::<Vec<_>>();
+            let tree = MerkleTree::from_leaves(&leaves)?;
+            let leaf_index_by_seq = canonical_bytes
+                .iter()
+                .enumerate()
+                .map(|(index, (seq, _))| (*seq, index))
+                .collect::<BTreeMap<_, _>>();
+
+            for (seq, _) in exported_by_seq
+                .range(checkpoint.body.batch_start_seq..=checkpoint.body.batch_end_seq)
+            {
+                if let Some(leaf_index) = leaf_index_by_seq.get(seq) {
+                    proofs.push(build_inclusion_proof(
+                        &tree,
+                        *leaf_index,
+                        checkpoint.body.checkpoint_seq,
+                        *seq,
+                    )?);
+                    covered_seqs.insert(*seq, ());
+                }
+            }
+        }
+
+        let uncheckpointed_receipts = tool_receipts
+            .iter()
+            .filter(|record| !covered_seqs.contains_key(&record.seq))
+            .map(|record| EvidenceUncheckpointedReceipt {
+                seq: record.seq,
+                receipt_id: record.receipt.id.clone(),
+            })
+            .collect();
+
+        Ok((proofs, uncheckpointed_receipts))
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use pact_core::capability::{
+        CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation,
+        PactScope, ToolGrant,
+    };
+    use pact_core::crypto::Keypair;
+    use pact_core::receipt::{ChildRequestReceiptBody, Decision, PactReceiptBody, ToolCallAction};
+    use pact_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+
+    use super::*;
+    use crate::checkpoint::build_checkpoint;
+    use crate::receipt_store::ReceiptStore;
+
+    fn unique_db_path(prefix: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time before epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    }
+
+    fn capability_with_id(
+        id: &str,
+        subject: &Keypair,
+        issuer: &Keypair,
+        parent_capability_id: Option<&str>,
+    ) -> CapabilityToken {
+        let mut delegation_chain = Vec::new();
+        if let Some(parent) = parent_capability_id {
+            delegation_chain.push(
+                DelegationLink::sign(
+                    DelegationLinkBody {
+                        capability_id: parent.to_string(),
+                        delegator: issuer.public_key(),
+                        delegatee: subject.public_key(),
+                        attenuations: Vec::new(),
+                        timestamp: 100,
+                    },
+                    issuer,
+                )
+                .expect("sign delegation link"),
+            );
+        }
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: PactScope {
+                    grants: vec![ToolGrant {
+                        server_id: "shell".to_string(),
+                        tool_name: "bash".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..PactScope::default()
+                },
+                issued_at: 100,
+                expires_at: 10_000,
+                delegation_chain,
+            },
+            issuer,
+        )
+        .expect("sign capability")
+    }
+
+    fn receipt_with_ts(id: &str, capability_id: &str, timestamp: u64) -> PactReceipt {
+        let keypair = Keypair::generate();
+        PactReceipt::sign(
+            PactReceiptBody {
+                id: id.to_string(),
+                timestamp,
+                capability_id: capability_id.to_string(),
+                tool_server: "shell".to_string(),
+                tool_name: "bash".to_string(),
+                action: ToolCallAction::from_parameters(serde_json::json!({"cmd":"echo hi"}))
+                    .expect("action"),
+                decision: Decision::Allow,
+                content_hash: "content-1".to_string(),
+                policy_hash: "policy-1".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign receipt")
+    }
+
+    fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
+        let keypair = Keypair::generate();
+        ChildRequestReceipt::sign(
+            ChildRequestReceiptBody {
+                id: id.to_string(),
+                timestamp,
+                session_id: SessionId::new("sess-evidence"),
+                parent_request_id: RequestId::new("parent-evidence"),
+                request_id: RequestId::new(format!("request-{id}")),
+                operation_kind: OperationKind::CreateMessage,
+                terminal_state: OperationTerminalState::Completed,
+                outcome_hash: format!("outcome-{id}"),
+                policy_hash: "policy-evidence".to_string(),
+                metadata: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign child receipt")
+    }
+
+    #[test]
+    fn builds_bundle_with_receipts_lineage_and_proofs() {
+        let path = unique_db_path("evidence-export");
+        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let root = capability_with_id("cap-root", &subject, &issuer, None);
+        let child = capability_with_id("cap-child", &subject, &issuer, Some("cap-root"));
+
+        store.record_capability_snapshot(&root, None).unwrap();
+        store
+            .record_capability_snapshot(&child, Some("cap-root"))
+            .unwrap();
+
+        let seq1 = store
+            .append_pact_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-child", 100))
+            .unwrap();
+        let seq2 = store
+            .append_pact_receipt_returning_seq(&receipt_with_ts("rcpt-2", "cap-child", 101))
+            .unwrap();
+        store
+            .append_child_receipt(&child_receipt_with_ts("child-1", 100))
+            .unwrap();
+
+        let canonical = store.receipts_canonical_bytes_range(seq1, seq2).unwrap();
+        let checkpoint = build_checkpoint(
+            1,
+            seq1,
+            seq2,
+            &canonical
+                .into_iter()
+                .map(|(_, bytes)| bytes)
+                .collect::<Vec<_>>(),
+            &issuer,
+        )
+        .unwrap();
+        store.store_checkpoint(&checkpoint).unwrap();
+
+        let bundle = store
+            .build_evidence_export_bundle(&EvidenceExportQuery::default())
+            .unwrap();
+
+        assert_eq!(bundle.tool_receipts.len(), 2);
+        assert_eq!(bundle.child_receipts.len(), 1);
+        assert_eq!(
+            bundle.child_receipt_scope,
+            EvidenceChildReceiptScope::FullQueryWindow
+        );
+        assert_eq!(bundle.checkpoints.len(), 1);
+        assert_eq!(bundle.inclusion_proofs.len(), 2);
+        assert!(bundle.uncheckpointed_receipts.is_empty());
+        assert_eq!(bundle.capability_lineage.len(), 2);
+        assert!(bundle.retention.live_db_size_bytes > 0);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn omits_child_receipts_for_capability_scoped_export_without_time_window() {
+        let path = unique_db_path("evidence-export-scope");
+        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = capability_with_id("cap-scoped", &subject, &issuer, None);
+        store.record_capability_snapshot(&capability, None).unwrap();
+        store
+            .append_pact_receipt_returning_seq(&receipt_with_ts("rcpt-1", "cap-scoped", 100))
+            .unwrap();
+        store
+            .append_child_receipt(&child_receipt_with_ts("child-1", 100))
+            .unwrap();
+
+        let bundle = store
+            .build_evidence_export_bundle(&EvidenceExportQuery {
+                capability_id: Some("cap-scoped".to_string()),
+                ..EvidenceExportQuery::default()
+            })
+            .unwrap();
+
+        assert_eq!(
+            bundle.child_receipt_scope,
+            EvidenceChildReceiptScope::OmittedNoJoinPath
+        );
+        assert!(bundle.child_receipts.is_empty());
+
+        let _ = std::fs::remove_file(path);
+    }
+}

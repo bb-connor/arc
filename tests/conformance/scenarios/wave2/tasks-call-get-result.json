@@ -1,0 +1,17 @@
+{
+  "id": "tasks-call-get-result",
+  "title": "Create a task-augmented tool call and resolve it through tasks/get and tasks/result",
+  "area": "tasks",
+  "category": "mcp-experimental",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_pact_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools", "tasks"],
+    "client": []
+  },
+  "tags": ["wave2", "tasks"],
+  "expected": "pass",
+  "timeoutMs": 10000
+}

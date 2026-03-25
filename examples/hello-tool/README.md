@@ -1,0 +1,54 @@
+# hello-tool
+
+This example is the maintained native-side landing zone for wrapped-MCP-to-native migration work.
+
+## What it shows
+
+- a native PACT service built with `NativePactServiceBuilder`
+- one tool (`greet`)
+- one resource (`memory://hello/template`)
+- one prompt (`compose_greeting`)
+- manifest signing with a real generated keypair
+- advertised manifest pricing for pre-invocation budget planning
+
+## Why this example exists
+
+The repo already has strong wrapped-MCP support through `pact mcp serve` and `pact mcp serve-http`.
+
+This example shows the next step after that adapter layer:
+
+1. keep the same policy and trust model
+2. move policy authoring to HushSpec for new work
+3. replace the wrapped subprocess with a native service value
+4. register that service with the kernel and edge surfaces
+
+## Migration map
+
+| Wrapped MCP shape | Native PACT shape |
+| --- | --- |
+| upstream `tools/list` | `NativeTool` definitions in `NativePactServiceBuilder` |
+| upstream `tools/call` | Rust handler closures registered on the builder |
+| adapted manifest generation | `NativePactService::manifest()` |
+| adapter-backed resource / prompt providers | `NativeResource` and `NativePrompt` registrations |
+| late upstream notifications | `NativePactService::emit_event()` and `drain_events()` |
+
+The example is intentionally small. If you need resource templates, advanced completion, or transport bootstrapping, drop down to the lower-level traits and edge types directly.
+
+## Pricing
+
+The `greet` tool now advertises manifest pricing:
+
+- pricing model: `per_invocation`
+- quoted price: `25` minor units in `USD`
+- billing unit: `invocation`
+
+That metadata is advisory, not enforcement by itself. The actual hard stop still
+comes from the capability grant's `max_cost_per_invocation` and
+`max_total_cost` fields. The point of the example is to show the operator and
+authority flow:
+
+1. inspect tool pricing from the signed manifest
+2. choose a safe per-call ceiling and total budget
+3. issue a capability whose monetary budget is consistent with that quote
+
+For the end-to-end planning flow, see [TOOL_PRICING_GUIDE.md](../../docs/TOOL_PRICING_GUIDE.md).

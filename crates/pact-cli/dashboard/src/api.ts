@@ -1,8 +1,17 @@
-// Typed fetch wrappers for PACT receipt query and lineage endpoints.
+// Typed fetch wrappers for PACT receipt query, analytics, and lineage endpoints.
 // All endpoints require Bearer auth. Token is read from URL ?token= param on
 // first load and stored in sessionStorage for subsequent calls.
 
-import type { CapabilitySnapshot, Filters, Receipt, ReceiptQueryResponse } from './types'
+import type {
+  CapabilitySnapshot,
+  Filters,
+  OperatorReport,
+  PortableReputationComparison,
+  Receipt,
+  ReceiptAnalyticsFilters,
+  ReceiptAnalyticsResponse,
+  ReceiptQueryResponse,
+} from './types'
 
 const TOKEN_KEY = 'pact_token'
 
@@ -109,29 +118,85 @@ export async function fetchAgentReceipts(
 }
 
 /**
- * Fetch all receipts for an agent and compute per-day cost data for the sparkline.
+ * Fetch aggregate receipt analytics for the requested scope.
+ */
+export async function fetchReceiptAnalytics(
+  filters: ReceiptAnalyticsFilters,
+): Promise<ReceiptAnalyticsResponse> {
+  const query = buildQuery({
+    capabilityId: filters.capabilityId,
+    agentSubject: filters.agentSubject,
+    toolServer: filters.toolServer,
+    toolName: filters.toolName,
+    since: filters.since,
+    until: filters.until,
+    groupLimit: filters.groupLimit,
+    timeBucket: filters.timeBucket,
+  })
+  const res = await apiFetch(`/v1/receipts/analytics${query}`)
+  return res.json() as Promise<ReceiptAnalyticsResponse>
+}
+
+/**
+ * Fetch a composed operator report for the current dashboard filters.
+ */
+export async function fetchOperatorReport(filters: Filters): Promise<OperatorReport> {
+  const query = buildQuery({
+    agentSubject: filters.agentSubject,
+    toolServer: filters.toolServer,
+    toolName: filters.toolName,
+    since: filters.since,
+    until: filters.until,
+    groupLimit: 10,
+    timeBucket: 'day',
+    attributionLimit: 10,
+    budgetLimit: 10,
+  })
+  const res = await apiFetch(`/v1/reports/operator${query}`)
+  return res.json() as Promise<OperatorReport>
+}
+
+/**
+ * Compare a portable passport artifact against the live local reputation view for one subject.
+ */
+export async function fetchReputationComparison(
+  subjectKey: string,
+  passport: unknown,
+): Promise<PortableReputationComparison> {
+  const encoded = encodeURIComponent(subjectKey)
+  const res = await apiFetch(`/v1/reputation/compare/${encoded}`, {
+    method: 'POST',
+    body: JSON.stringify({ passport }),
+  })
+  return res.json() as Promise<PortableReputationComparison>
+}
+
+/**
+ * Fetch backend-side cost history for an agent.
  * Returns an array of { time: string (date label), cost: number (minor units) }.
  */
 export async function fetchAgentCostSeries(
   subjectKey: string,
 ): Promise<{ time: string; cost: number }[]> {
-  // Fetch up to 200 receipts to build sparkline data
-  const result = await fetchAgentReceipts(subjectKey, null, 200)
-  const buckets = new Map<string, number>()
+  const analytics = await fetchReceiptAnalytics({
+    agentSubject: subjectKey,
+    groupLimit: 180,
+    timeBucket: 'day',
+  })
 
-  for (const receipt of result.receipts) {
-    const financial = receipt.metadata?.financial
-    if (!financial) continue
-    const date = new Date(receipt.timestamp * 1000)
-    // Format as YYYY-MM-DD
-    const key = date.toISOString().slice(0, 10)
-    buckets.set(key, (buckets.get(key) ?? 0) + financial.cost_charged)
-  }
-
-  return Array.from(buckets.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([time, cost]) => ({ time, cost }))
+  return analytics.byTime.map((bucket) => ({
+    time: new Date(bucket.bucketStart * 1000).toISOString().slice(0, 10),
+    cost: bucket.metrics.totalCostCharged,
+  }))
 }
 
 // Re-export Receipt type for convenience
-export type { Receipt, ReceiptQueryResponse, CapabilitySnapshot, Filters }
+export type {
+  Receipt,
+  ReceiptAnalyticsResponse,
+  ReceiptQueryResponse,
+  CapabilitySnapshot,
+  OperatorReport,
+  Filters,
+  PortableReputationComparison,
+}

@@ -7,6 +7,7 @@ The PACT receipt dashboard is a React SPA that visualizes the kernel's receipt l
 ```bash
 cd crates/pact-cli/dashboard
 npm install
+npm run test
 npm run build
 ```
 
@@ -34,6 +35,7 @@ http://localhost:7391/?token=my-service-token
 ```
 
 After the first load the token is stored in `sessionStorage` for the session. Closing the tab clears it.
+If no token is present, the dashboard shows an explicit operator guidance state instead of issuing unauthenticated API requests.
 
 ## Filtering Receipts
 
@@ -47,6 +49,52 @@ The left sidebar exposes the following filters:
 
 All filters map directly to the parameters on `GET /v1/receipts/query` (see `docs/RECEIPT_QUERY_API.md`). Changing any filter resets pagination to page 1. Results are shown 50 per page with Previous and Next pagination buttons backed by cursor-based pagination.
 
+## Operator Report Summary
+
+Above the receipt table, the dashboard renders a composed operator summary backed by `GET /v1/reports/operator`. It is not a client-side reconstruction over paged receipts. The summary cards surface:
+
+- Activity totals for the filtered corpus
+- Spend totals plus the top root subject in the attribution slice
+- Budget pressure (`matchingGrants`, `nearLimitCount`, `exhaustedCount`)
+- Compliance posture (`checkpointCoverageRate`, `lineageCoverageRate`, `uncheckpointedReceipts`)
+- Settlement/export readiness (`pendingSettlementReceipts`, `failedSettlementReceipts`, proof completeness, and export-scope caveats)
+- Shared remote evidence reference counts plus the latest referenced partner/share
+
+This is the primary operator view for "is this agent/tool slice healthy and exportable right now?" The receipt table and detail panel remain the drill-down surface.
+
+## Portable Reputation Comparison
+
+When the **Agent Subject** filter is set, the dashboard also exposes a
+portable comparison panel above the receipt table. Operators can upload a
+passport JSON artifact and the dashboard will call
+`POST /v1/reputation/compare/{subject_key}` on the trust-control service.
+
+The panel renders:
+
+- subject match vs mismatch between the live local subject key and the passport subject DID
+- current local effective score and resolved tier
+- optional relying-party acceptance state if the compared artifact already carries a verifier-evaluation result
+- per-credential drift for composite score, reliability, delegation hygiene, and resource stewardship
+- shared-evidence provenance for the local subject, including partner/share IDs,
+  remote capability IDs, local anchor capability IDs, and local receipt counts
+
+This keeps the browser on the same comparison contract already used by
+`pact reputation compare --control-url ...`; the dashboard does not invent a
+second local scoring path.
+
+## Shared Evidence API Surface
+
+Trust-control now also exposes `GET /v1/federation/evidence-shares`, which
+returns the same shared-evidence report shape used inside operator reports and
+portable reputation comparison. The CLI wrapper is:
+
+```bash
+pact trust evidence-share list --agent-subject <subject-hex> --json
+```
+
+This surfaces imported remote evidence references directly without merging
+foreign receipts into native local receipt history.
+
 ## Receipt Detail Panel
 
 Clicking any row in the receipt table opens a detail panel on the right. The panel shows:
@@ -56,7 +104,8 @@ Clicking any row in the receipt table opens a detail panel on the right. The pan
 - Formatted timestamp
 - Full capability ID
 - Financial metadata (if present): cost charged, budget remaining, total budget, delegation depth, and settlement status, all formatted from minor units
-- Cost over Time sparkline (per-day cost aggregated from the last 200 receipts for the capability's agent)
+- Agent subject key (when attribution metadata is present)
+- Cost over Time sparkline (per-day cost aggregated by the backend analytics API for the receipt subject)
 - Delegation chain view (fetched from `GET /v1/lineage/{capability_id}/chain`)
 - Raw tool call parameters
 - Full receipt JSON
@@ -67,6 +116,4 @@ The `DelegationChain` component fetches from `GET /v1/lineage/{capability_id}/ch
 
 ## Budget Sparkline
 
-The `BudgetSparkline` component is shown in the detail panel when the selected receipt has financial metadata. It fetches up to 200 receipts for the same capability's agent via `GET /v1/agents/{subject_key}/receipts` and aggregates `cost_charged` by calendar day (UTC). The resulting time series is rendered as a line chart using recharts. The sparkline gives a visual cost-over-time view without requiring a separate analytics backend.
-
-The sparkline requires no `siem` feature flag; it is computed client-side from the existing receipt query API.
+The `BudgetSparkline` component is shown in the detail panel when the selected receipt has financial metadata. It is backed by `GET /v1/receipts/analytics?agentSubject=...&timeBucket=day`, using the receipt's attribution subject key (or the capability lineage fallback when attribution metadata is absent). The chart is rendered with lightweight inline SVG rather than a charting framework, which keeps the dashboard bundle small while still giving operators a useful spend trend.

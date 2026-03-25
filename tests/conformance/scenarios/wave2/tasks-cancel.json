@@ -1,0 +1,18 @@
+{
+  "id": "tasks-cancel",
+  "title": "Cancel a task-augmented tool call and observe a cancelled terminal result",
+  "area": "tasks",
+  "category": "mcp-experimental",
+  "specVersions": ["2025-11-25"],
+  "transport": ["streamable-http"],
+  "peerRoles": ["client_to_pact_server"],
+  "deploymentModes": ["remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools", "tasks"],
+    "client": []
+  },
+  "tags": ["wave2", "tasks"],
+  "expected": "pass",
+  "timeoutMs": 10000,
+  "notes": "Remote HTTP wrapped-tool task cancellation should succeed within the runtime's bounded pre-execution window and return a cancelled terminal result."
+}

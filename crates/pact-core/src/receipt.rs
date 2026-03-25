@@ -317,14 +317,46 @@ pub struct FinancialReceiptMetadata {
     /// Optional payment reference for external settlement systems.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_reference: Option<String>,
-    /// Settlement status for this charge (e.g. "pending", "settled", "failed").
-    pub settlement_status: String,
+    /// Settlement status for this charge.
+    pub settlement_status: SettlementStatus,
     /// Optional itemized cost breakdown for audit purposes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_breakdown: Option<serde_json::Value>,
     /// Cost that was attempted but denied (populated only on denial receipts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempted_cost: Option<u64>,
+}
+
+/// Canonical settlement states for receipt-side financial metadata.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SettlementStatus {
+    /// No external settlement applies to this receipt (for example, a pre-execution denial).
+    NotApplicable,
+    /// Settlement has been initiated but is not yet final.
+    Pending,
+    /// The recorded charge is final for the current execution path.
+    Settled,
+    /// Execution completed, but settlement failed or became invalid.
+    Failed,
+}
+
+/// Universal receipt-side attribution for capability context.
+///
+/// This metadata gives downstream analytics a deterministic local join path
+/// from a receipt to the capability subject and, when available, the matched
+/// grant within the capability scope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReceiptAttributionMetadata {
+    /// Hex-encoded subject public key of the capability holder.
+    pub subject_key: String,
+    /// Hex-encoded issuer public key of the capability issuer.
+    pub issuer_key: String,
+    /// Delegation depth of the capability used for this receipt.
+    pub delegation_depth: u32,
+    /// Index of the matched grant when the request resolved to a specific grant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grant_index: Option<u32>,
 }
 
 #[cfg(test)]
@@ -565,7 +597,7 @@ mod tests {
             delegation_depth: 1,
             root_budget_holder: "agent-root-001".to_string(),
             payment_reference: Some("ref-abc123".to_string()),
-            settlement_status: "pending".to_string(),
+            settlement_status: SettlementStatus::Pending,
             cost_breakdown: Some(serde_json::json!({"compute": 100, "io": 50})),
             attempted_cost: None,
         };
@@ -596,7 +628,7 @@ mod tests {
             delegation_depth: 0,
             root_budget_holder: "agent-root-001".to_string(),
             payment_reference: None,
-            settlement_status: "settled".to_string(),
+            settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
             attempted_cost: None,
         };
@@ -605,7 +637,7 @@ mod tests {
         let extracted: FinancialReceiptMetadata =
             serde_json::from_value(wrapped["financial"].clone()).unwrap();
         assert_eq!(extracted.cost_charged, 200);
-        assert_eq!(extracted.settlement_status, "settled");
+        assert_eq!(extracted.settlement_status, SettlementStatus::Settled);
     }
 
     #[test]
@@ -620,7 +652,7 @@ mod tests {
             delegation_depth: 0,
             root_budget_holder: "agent-root-001".to_string(),
             payment_reference: None,
-            settlement_status: "denied".to_string(),
+            settlement_status: SettlementStatus::NotApplicable,
             cost_breakdown: None,
             attempted_cost: Some(500),
         };
@@ -634,6 +666,29 @@ mod tests {
         };
         let json_without = serde_json::to_string(&meta_without).unwrap();
         assert!(!json_without.contains("attempted_cost"));
+    }
+
+    #[test]
+    fn settlement_status_serde_roundtrip() {
+        let status = SettlementStatus::Failed;
+        let json = serde_json::to_string(&status).unwrap();
+        assert_eq!(json, "\"failed\"");
+        let restored: SettlementStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, SettlementStatus::Failed);
+    }
+
+    #[test]
+    fn receipt_attribution_metadata_serde_roundtrip() {
+        let metadata = ReceiptAttributionMetadata {
+            subject_key: "subject-key".to_string(),
+            issuer_key: "issuer-key".to_string(),
+            delegation_depth: 2,
+            grant_index: Some(1),
+        };
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        let restored: ReceiptAttributionMetadata = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, metadata);
     }
 
     #[test]

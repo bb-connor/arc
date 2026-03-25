@@ -25,7 +25,12 @@ pub mod authority;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod checkpoint;
+pub mod cost_attribution;
 pub mod dpop;
+pub mod evidence_export;
+pub mod operator_report;
+pub mod payment;
+pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
 pub mod revocation_store;
@@ -42,7 +47,7 @@ use pact_core::capability::{
 use pact_core::crypto::{sha256_hex, Keypair};
 use pact_core::receipt::{
     ChildRequestReceipt, ChildRequestReceiptBody, Decision, FinancialReceiptMetadata, PactReceipt,
-    PactReceiptBody, ToolCallAction,
+    PactReceiptBody, ReceiptAttributionMetadata, SettlementStatus, ToolCallAction,
 };
 use pact_core::session::{
     CompleteOperation, CompletionReference, CompletionResult, CreateElicitationOperation,
@@ -63,17 +68,44 @@ pub use authority::{
 pub use budget_store::{
     BudgetStore, BudgetStoreError, BudgetUsageRecord, InMemoryBudgetStore, SqliteBudgetStore,
 };
-pub use capability_lineage::{CapabilityLineageError, CapabilitySnapshot};
+pub use capability_lineage::{
+    CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
+};
 pub use checkpoint::{
     build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, CheckpointError,
     KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
 };
+pub use cost_attribution::{
+    CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
+    CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
+    MAX_COST_ATTRIBUTION_LIMIT,
+};
 pub use dpop::{
     verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA,
 };
+pub use evidence_export::{
+    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
+    EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+    EvidenceUncheckpointedReceipt,
+};
+pub use operator_report::{
+    BudgetUtilizationReport, BudgetUtilizationRow, BudgetUtilizationSummary, ComplianceReport,
+    OperatorReport, OperatorReportQuery, SharedEvidenceQuery, SharedEvidenceReferenceReport,
+    SharedEvidenceReferenceRow, SharedEvidenceReferenceSummary, MAX_OPERATOR_BUDGET_LIMIT,
+    MAX_SHARED_EVIDENCE_LIMIT,
+};
+pub use payment::{
+    PaymentAdapter, PaymentAuthorization, PaymentError, PaymentResult, RailSettlementStatus,
+    ReceiptSettlement, X402PaymentAdapter,
+};
+pub use receipt_analytics::{
+    AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
+    ReceiptAnalyticsResponse, TimeAnalyticsRow, ToolAnalyticsRow, MAX_ANALYTICS_GROUP_LIMIT,
+};
 pub use receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
 pub use receipt_store::{
-    ReceiptStore, ReceiptStoreError, SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, ReceiptStore, ReceiptStoreError,
+    SqliteReceiptStore, StoredChildReceipt, StoredToolReceipt,
 };
 pub use revocation_store::{RevocationRecord, RevocationStoreError, SqliteRevocationStore};
 pub use session::{
@@ -213,6 +245,9 @@ pub enum KernelError {
 
     #[error("capability issuance failed: {0}")]
     CapabilityIssuanceFailed(String),
+
+    #[error("capability issuance denied: {0}")]
+    CapabilityIssuanceDenied(String),
 
     #[error("requested tool {tool} on server {server} is not in capability scope")]
     OutOfScope { tool: String, server: String },
@@ -739,6 +774,7 @@ pub struct PactKernel {
     receipt_log: ReceiptLog,
     child_receipt_log: ChildReceiptLog,
     receipt_store: Option<Box<dyn ReceiptStore>>,
+    payment_adapter: Option<Box<dyn PaymentAdapter>>,
     session_counter: u64,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
     checkpoint_batch_size: u64,
@@ -993,6 +1029,7 @@ impl PactKernel {
             receipt_log: ReceiptLog::new(),
             child_receipt_log: ChildReceiptLog::new(),
             receipt_store: None,
+            payment_adapter: None,
             session_counter: 0,
             checkpoint_batch_size,
             checkpoint_seq_counter: 0,
@@ -1004,6 +1041,10 @@ impl PactKernel {
 
     pub fn set_receipt_store(&mut self, receipt_store: Box<dyn ReceiptStore>) {
         self.receipt_store = Some(receipt_store);
+    }
+
+    pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
+        self.payment_adapter = Some(payment_adapter);
     }
 
     pub fn set_revocation_store(&mut self, revocation_store: Box<dyn RevocationStore>) {
@@ -1237,11 +1278,14 @@ impl PactKernel {
             },
             action,
             content_hash: receipt_content.content_hash,
-            metadata: Some(serde_json::json!({
-                "resource": {
-                    "uri": &operation.uri,
-                }
-            })),
+            metadata: merge_metadata_objects(
+                Some(serde_json::json!({
+                    "resource": {
+                        "uri": &operation.uri,
+                    }
+                })),
+                receipt_attribution_metadata(&operation.capability, None),
+            ),
             timestamp: current_unix_timestamp(),
         })?;
 
@@ -1820,25 +1864,25 @@ impl PactKernel {
         if let Err(reason) = self.verify_capability_signature(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = check_time_bounds(cap, now) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = self.check_revocation(cap) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         let matching_grants = match resolve_matching_grants(
@@ -1855,12 +1899,12 @@ impl PactKernel {
                 };
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
             Err(e) => {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
         };
 
@@ -1874,8 +1918,20 @@ impl PactKernel {
             if let Err(e) = self.verify_dpop_for_request(request, cap) {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
+        }
+
+        if let Err(e) = self.ensure_registered_tool_target(request) {
+            let msg = e.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "tool target not registered");
+            return self.build_deny_response(request, &msg, now, None);
+        }
+
+        if let Err(error) = self.record_observed_capability_snapshot(cap) {
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "failed to persist capability lineage");
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         let (matched_grant_index, charge_result) =
@@ -1903,8 +1959,42 @@ impl PactKernel {
         ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
-            return self.build_deny_response(request, &msg, now);
+            if let Some(ref charge) = charge_result {
+                let total_cost_charged_after_release =
+                    self.reverse_budget_charge(&cap.id, charge)?;
+                return self.build_pre_execution_monetary_deny_response(
+                    request,
+                    &msg,
+                    now,
+                    charge,
+                    total_cost_charged_after_release,
+                    cap,
+                );
+            }
+            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
         }
+
+        let payment_authorization =
+            match self.authorize_payment_if_needed(request, charge_result.as_ref()) {
+                Ok(authorization) => authorization,
+                Err(error) => {
+                    let msg = format!("payment authorization failed: {error}");
+                    warn!(request_id = %request.request_id, reason = %msg, "payment denied");
+                    if let Some(ref charge) = charge_result {
+                        let total_cost_charged_after_release =
+                            self.reverse_budget_charge(&cap.id, charge)?;
+                        return self.build_pre_execution_monetary_deny_response(
+                            request,
+                            &msg,
+                            now,
+                            charge,
+                            total_cost_charged_after_release,
+                            cap,
+                        );
+                    }
+                    return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+                }
+            };
 
         let tool_started_at = Instant::now();
         let has_monetary = charge_result.is_some();
@@ -1912,6 +2002,12 @@ impl PactKernel {
             match self.dispatch_tool_call_with_cost(request, has_monetary) {
                 Ok(result) => result,
                 Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+                    self.unwind_aborted_monetary_invocation(
+                        request,
+                        cap,
+                        charge_result.as_ref(),
+                        payment_authorization.as_ref(),
+                    )?;
                     warn!(
                         request_id = %request.request_id,
                         reason = %error,
@@ -1920,25 +2016,53 @@ impl PactKernel {
                     return Err(error);
                 }
                 Err(KernelError::RequestCancelled { reason, .. }) => {
+                    self.unwind_aborted_monetary_invocation(
+                        request,
+                        cap,
+                        charge_result.as_ref(),
+                        payment_authorization.as_ref(),
+                    )?;
                     warn!(
                         request_id = %request.request_id,
                         reason = %reason,
                         "tool call cancelled"
                     );
-                    return self.build_cancelled_response(request, &reason, now);
+                    return self.build_cancelled_response(
+                        request,
+                        &reason,
+                        now,
+                        Some(matched_grant_index),
+                    );
                 }
                 Err(KernelError::RequestIncomplete(reason)) => {
+                    self.unwind_aborted_monetary_invocation(
+                        request,
+                        cap,
+                        charge_result.as_ref(),
+                        payment_authorization.as_ref(),
+                    )?;
                     warn!(
                         request_id = %request.request_id,
                         reason = %reason,
                         "tool call incomplete"
                     );
-                    return self.build_incomplete_response(request, &reason, now);
+                    return self.build_incomplete_response(
+                        request,
+                        &reason,
+                        now,
+                        Some(matched_grant_index),
+                    );
                 }
                 Err(e) => {
+                    self.unwind_aborted_monetary_invocation(
+                        request,
+                        cap,
+                        charge_result.as_ref(),
+                        payment_authorization.as_ref(),
+                    )?;
                     let msg = e.to_string();
                     warn!(request_id = %request.request_id, reason = %msg, "tool server error");
-                    return self.build_deny_response(request, &msg, now);
+                    return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
                 }
             };
         self.finalize_tool_output_with_cost(
@@ -1946,8 +2070,10 @@ impl PactKernel {
             tool_output,
             tool_started_at.elapsed(),
             now,
+            matched_grant_index,
             charge_result,
             reported_cost,
+            payment_authorization,
             cap,
         )
     }
@@ -1972,25 +2098,25 @@ impl PactKernel {
         if let Err(reason) = self.verify_capability_signature(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = check_time_bounds(cap, now) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = self.check_revocation(cap) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now);
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         let matching_grants = match resolve_matching_grants(
@@ -2007,12 +2133,12 @@ impl PactKernel {
                 };
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
             Err(e) => {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
         };
 
@@ -2026,8 +2152,20 @@ impl PactKernel {
             if let Err(e) = self.verify_dpop_for_request(request, cap) {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, None);
             }
+        }
+
+        if let Err(e) = self.ensure_registered_tool_target(request) {
+            let msg = e.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "tool target not registered");
+            return self.build_deny_response(request, &msg, now, None);
+        }
+
+        if let Err(error) = self.record_observed_capability_snapshot(cap) {
+            let msg = error.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "failed to persist capability lineage");
+            return self.build_deny_response(request, &msg, now, None);
         }
 
         let (matched_grant_index, charge_result) =
@@ -2057,8 +2195,42 @@ impl PactKernel {
         ) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
-            return self.build_deny_response(request, &msg, now);
+            if let Some(ref charge) = charge_result {
+                let total_cost_charged_after_release =
+                    self.reverse_budget_charge(&cap.id, charge)?;
+                return self.build_pre_execution_monetary_deny_response(
+                    request,
+                    &msg,
+                    now,
+                    charge,
+                    total_cost_charged_after_release,
+                    cap,
+                );
+            }
+            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
         }
+
+        let payment_authorization =
+            match self.authorize_payment_if_needed(request, charge_result.as_ref()) {
+                Ok(authorization) => authorization,
+                Err(error) => {
+                    let msg = format!("payment authorization failed: {error}");
+                    warn!(request_id = %request.request_id, reason = %msg, "payment denied");
+                    if let Some(ref charge) = charge_result {
+                        let total_cost_charged_after_release =
+                            self.reverse_budget_charge(&cap.id, charge)?;
+                        return self.build_pre_execution_monetary_deny_response(
+                            request,
+                            &msg,
+                            now,
+                            charge,
+                            total_cost_charged_after_release,
+                            cap,
+                        );
+                    }
+                    return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+                }
+            };
 
         let tool_started_at = Instant::now();
         let mut child_receipts = Vec::new();
@@ -2102,6 +2274,12 @@ impl PactKernel {
         let tool_output = match tool_output_result {
             Ok(output) => output,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
+                self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    charge_result.as_ref(),
+                    payment_authorization.as_ref(),
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %error,
@@ -2110,6 +2288,12 @@ impl PactKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { request_id, reason }) => {
+                self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    charge_result.as_ref(),
+                    payment_authorization.as_ref(),
+                )?;
                 if request_id == parent_context.request_id {
                     self.session_mut(&parent_context.session_id)?
                         .request_cancellation(&parent_context.request_id)?;
@@ -2119,20 +2303,42 @@ impl PactKernel {
                     reason = %reason,
                     "tool call cancelled"
                 );
-                return self.build_cancelled_response(request, &reason, now);
+                return self.build_cancelled_response(
+                    request,
+                    &reason,
+                    now,
+                    Some(matched_grant_index),
+                );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
+                self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    charge_result.as_ref(),
+                    payment_authorization.as_ref(),
+                )?;
                 warn!(
                     request_id = %request.request_id,
                     reason = %reason,
                     "tool call incomplete"
                 );
-                return self.build_incomplete_response(request, &reason, now);
+                return self.build_incomplete_response(
+                    request,
+                    &reason,
+                    now,
+                    Some(matched_grant_index),
+                );
             }
             Err(error) => {
+                self.unwind_aborted_monetary_invocation(
+                    request,
+                    cap,
+                    charge_result.as_ref(),
+                    payment_authorization.as_ref(),
+                )?;
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "tool server error");
-                return self.build_deny_response(request, &msg, now);
+                return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
             }
         };
         self.finalize_tool_output_with_cost(
@@ -2140,8 +2346,10 @@ impl PactKernel {
             tool_output,
             tool_started_at.elapsed(),
             now,
+            matched_grant_index,
             charge_result,
             None,
+            payment_authorization,
             cap,
         )
     }
@@ -2383,14 +2591,10 @@ impl PactKernel {
                     // is computed against cumulative spend, not just this invocation.
                     let new_total_cost_charged = self
                         .budget_store
-                        .list_usages(1, Some(&cap.id))
+                        .get_usage(&cap.id, matching.index)
                         .ok()
-                        .and_then(|records| {
-                            records
-                                .into_iter()
-                                .find(|r| r.grant_index == matching.index as u32)
-                                .map(|r| r.total_cost_charged)
-                        })
+                        .flatten()
+                        .map(|record| record.total_cost_charged)
                         .unwrap_or(cost_units);
                     let charge = BudgetChargeResult {
                         grant_index: matching.index,
@@ -2422,6 +2626,130 @@ impl PactKernel {
             let first_index = matching_grants.first().map(|m| m.index).unwrap_or(0);
             Ok((first_index, None))
         }
+    }
+
+    fn reverse_budget_charge(
+        &mut self,
+        capability_id: &str,
+        charge: &BudgetChargeResult,
+    ) -> Result<u64, KernelError> {
+        self.budget_store.reverse_charge_cost(
+            capability_id,
+            charge.grant_index,
+            charge.cost_charged,
+        )?;
+        Ok(self
+            .budget_store
+            .get_usage(capability_id, charge.grant_index)?
+            .map(|record| record.total_cost_charged)
+            .unwrap_or(0))
+    }
+
+    fn reduce_budget_charge_to_actual(
+        &mut self,
+        capability_id: &str,
+        charge: &BudgetChargeResult,
+        actual_cost_units: u64,
+    ) -> Result<u64, KernelError> {
+        if actual_cost_units >= charge.cost_charged {
+            return Ok(charge.new_total_cost_charged);
+        }
+
+        self.budget_store.reduce_charge_cost(
+            capability_id,
+            charge.grant_index,
+            charge.cost_charged - actual_cost_units,
+        )?;
+        Ok(self
+            .budget_store
+            .get_usage(capability_id, charge.grant_index)?
+            .map(|record| record.total_cost_charged)
+            .unwrap_or(actual_cost_units))
+    }
+
+    fn ensure_registered_tool_target(&self, request: &ToolCallRequest) -> Result<(), KernelError> {
+        self.tool_servers.get(&request.server_id).ok_or_else(|| {
+            KernelError::ToolNotRegistered(format!(
+                "server \"{}\" / tool \"{}\"",
+                request.server_id, request.tool_name
+            ))
+        })?;
+        Ok(())
+    }
+
+    fn authorize_payment_if_needed(
+        &self,
+        request: &ToolCallRequest,
+        charge_result: Option<&BudgetChargeResult>,
+    ) -> Result<Option<PaymentAuthorization>, PaymentError> {
+        let Some(charge) = charge_result else {
+            return Ok(None);
+        };
+        let Some(adapter) = self.payment_adapter.as_ref() else {
+            return Ok(None);
+        };
+
+        adapter
+            .authorize(
+                charge.cost_charged,
+                &charge.currency,
+                &request.agent_id,
+                &request.server_id,
+                &request.request_id,
+            )
+            .map(Some)
+    }
+
+    fn unwind_aborted_monetary_invocation(
+        &mut self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        charge_result: Option<&BudgetChargeResult>,
+        payment_authorization: Option<&PaymentAuthorization>,
+    ) -> Result<(), KernelError> {
+        let Some(charge) = charge_result else {
+            return Ok(());
+        };
+
+        if let Some(authorization) = payment_authorization {
+            let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                KernelError::Internal(
+                    "payment authorization present without configured adapter".to_string(),
+                )
+            })?;
+            let unwind_result = if authorization.settled {
+                adapter.refund(
+                    &authorization.authorization_id,
+                    charge.cost_charged,
+                    &charge.currency,
+                    &request.request_id,
+                )
+            } else {
+                adapter.release(&authorization.authorization_id, &request.request_id)
+            };
+            if let Err(error) = unwind_result {
+                return Err(KernelError::Internal(format!(
+                    "failed to unwind payment after aborted tool invocation: {error}"
+                )));
+            }
+        }
+
+        self.reverse_budget_charge(&cap.id, charge)?;
+        Ok(())
+    }
+
+    fn record_observed_capability_snapshot(
+        &mut self,
+        capability: &CapabilityToken,
+    ) -> Result<(), KernelError> {
+        let parent_capability_id = capability
+            .delegation_chain
+            .last()
+            .map(|link| link.capability_id.as_str());
+        if let Some(store) = self.receipt_store.as_deref_mut() {
+            store.record_capability_snapshot(capability, parent_capability_id)?;
+        }
+        Ok(())
     }
 
     /// Verify a DPoP proof carried on the request against the capability.
@@ -2579,6 +2907,8 @@ impl PactKernel {
                 .unwrap_or(0);
             let delegation_depth = cap.delegation_chain.len() as u32;
             let root_budget_holder = cap.issuer.to_hex();
+            let (payment_reference, settlement_status) =
+                ReceiptSettlement::not_applicable().into_receipt_parts();
 
             let financial_meta = FinancialReceiptMetadata {
                 grant_index: mg.index as u32,
@@ -2588,13 +2918,16 @@ impl PactKernel {
                 budget_total,
                 delegation_depth,
                 root_budget_holder,
-                payment_reference: None,
-                settlement_status: "not_applicable".to_string(),
+                payment_reference,
+                settlement_status,
                 cost_breakdown: None,
                 attempted_cost: Some(attempted_cost),
             };
 
-            let metadata = Some(serde_json::json!({ "financial": financial_meta }));
+            let metadata = merge_metadata_objects(
+                receipt_attribution_metadata(cap, Some(mg.index)),
+                Some(serde_json::json!({ "financial": financial_meta })),
+            );
             let receipt_content = receipt_content_for_output(None, None)?;
 
             let action =
@@ -2629,7 +2962,72 @@ impl PactKernel {
         }
 
         // No monetary grant -- standard deny.
-        self.build_deny_response(request, reason, timestamp)
+        self.build_deny_response(request, reason, timestamp, None)
+    }
+
+    fn build_pre_execution_monetary_deny_response(
+        &mut self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        charge: &BudgetChargeResult,
+        total_cost_charged_after_release: u64,
+        cap: &CapabilityToken,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let delegation_depth = cap.delegation_chain.len() as u32;
+        let root_budget_holder = cap.issuer.to_hex();
+        let (payment_reference, settlement_status) =
+            ReceiptSettlement::not_applicable().into_receipt_parts();
+        let budget_remaining = charge
+            .budget_total
+            .saturating_sub(total_cost_charged_after_release);
+
+        let financial_meta = FinancialReceiptMetadata {
+            grant_index: charge.grant_index as u32,
+            cost_charged: 0,
+            currency: charge.currency.clone(),
+            budget_remaining,
+            budget_total: charge.budget_total,
+            delegation_depth,
+            root_budget_holder,
+            payment_reference,
+            settlement_status,
+            cost_breakdown: None,
+            attempted_cost: Some(charge.cost_charged),
+        };
+
+        let receipt_content = receipt_content_for_output(None, None)?;
+        let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
+            KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
+        })?;
+
+        let receipt = self.build_and_sign_receipt(ReceiptParams {
+            capability_id: &cap.id,
+            tool_name: &request.tool_name,
+            server_id: &request.server_id,
+            decision: Decision::Deny {
+                reason: reason.to_string(),
+                guard: "kernel".to_string(),
+            },
+            action,
+            content_hash: receipt_content.content_hash,
+            metadata: merge_metadata_objects(
+                receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                Some(serde_json::json!({ "financial": financial_meta })),
+            ),
+            timestamp,
+        })?;
+
+        self.record_pact_receipt(&receipt)?;
+
+        Ok(ToolCallResponse {
+            request_id: request.request_id.clone(),
+            verdict: Verdict::Deny,
+            output: None,
+            reason: Some(reason.to_string()),
+            terminal_state: OperationTerminalState::Completed,
+            receipt,
+        })
     }
 
     fn finalize_tool_output(
@@ -2638,20 +3036,29 @@ impl PactKernel {
         output: ToolServerOutput,
         elapsed: Duration,
         timestamp: u64,
+        matched_grant_index: usize,
     ) -> Result<ToolCallResponse, KernelError> {
         match self.apply_stream_limits(output, elapsed)? {
-            ToolServerOutput::Value(value) => {
-                self.build_allow_response(request, ToolCallOutput::Value(value), timestamp)
-            }
-            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
-                self.build_allow_response(request, ToolCallOutput::Stream(stream), timestamp)
-            }
+            ToolServerOutput::Value(value) => self.build_allow_response(
+                request,
+                ToolCallOutput::Value(value),
+                timestamp,
+                Some(matched_grant_index),
+            ),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
+                .build_allow_response(
+                    request,
+                    ToolCallOutput::Stream(stream),
+                    timestamp,
+                    Some(matched_grant_index),
+                ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
                 .build_incomplete_response_with_output(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,
                     timestamp,
+                    Some(matched_grant_index),
                 ),
         }
     }
@@ -2664,53 +3071,167 @@ impl PactKernel {
         output: ToolServerOutput,
         elapsed: Duration,
         timestamp: u64,
+        matched_grant_index: usize,
         charge_result: Option<BudgetChargeResult>,
         reported_cost: Option<ToolInvocationCost>,
+        payment_authorization: Option<PaymentAuthorization>,
         cap: &CapabilityToken,
     ) -> Result<ToolCallResponse, KernelError> {
         let Some(charge) = charge_result else {
             // Non-monetary grant: use normal path.
-            return self.finalize_tool_output(request, output, elapsed, timestamp);
+            return self.finalize_tool_output(
+                request,
+                output,
+                elapsed,
+                timestamp,
+                matched_grant_index,
+            );
         };
 
-        // Determine actual cost: use reported cost if server provided it and it's <= max charged.
-        // If server overruns max_cost_per_invocation, we log a warning and treat as "failed".
-        let (actual_cost, settlement_status) = if let Some(ref cost) = reported_cost {
-            if cost.units > charge.cost_charged && charge.cost_charged > 0 {
-                warn!(
-                    request_id = %request.request_id,
-                    reported = cost.units,
-                    charged = charge.cost_charged,
-                    "tool server reported cost exceeds max_cost_per_invocation; settlement_status=failed"
-                );
-                (cost.units, "failed".to_string())
+        let reported_cost_ref = reported_cost.as_ref();
+        let currency_mismatch = reported_cost_ref
+            .map(|cost| cost.currency != charge.currency)
+            .unwrap_or(false);
+
+        if let Some(cost) = reported_cost_ref.filter(|cost| cost.currency != charge.currency) {
+            warn!(
+                request_id = %request.request_id,
+                reported_currency = %cost.currency,
+                charged_currency = %charge.currency,
+                "tool server reported cost in a different currency; keeping provisional charge"
+            );
+        }
+
+        let actual_cost = if currency_mismatch {
+            charge.cost_charged
+        } else {
+            reported_cost_ref
+                .map(|cost| cost.units)
+                .unwrap_or(charge.cost_charged)
+        };
+        let keep_provisional_charge =
+            matches!(payment_authorization.as_ref(), Some(authorization) if authorization.settled);
+        let cost_overrun =
+            !currency_mismatch && actual_cost > charge.cost_charged && charge.cost_charged > 0;
+
+        if cost_overrun {
+            warn!(
+                request_id = %request.request_id,
+                reported = actual_cost,
+                charged = charge.cost_charged,
+                "tool server reported cost exceeds max_cost_per_invocation; settlement_status=failed"
+            );
+        }
+
+        let running_total_cost_charged =
+            if keep_provisional_charge || currency_mismatch || cost_overrun {
+                charge.new_total_cost_charged
             } else {
-                (cost.units, "authorized".to_string())
+                self.reduce_budget_charge_to_actual(&cap.id, &charge, actual_cost)?
+            };
+
+        let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
+            if authorization.settled || currency_mismatch || cost_overrun {
+                None
+            } else {
+                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                    KernelError::Internal(
+                        "payment authorization present without configured adapter".to_string(),
+                    )
+                })?;
+                Some(if actual_cost == 0 {
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                } else {
+                    adapter.capture(
+                        &authorization.authorization_id,
+                        actual_cost,
+                        &charge.currency,
+                        &request.request_id,
+                    )
+                })
             }
         } else {
-            // Server did not report cost; worst-case debit already charged.
-            (charge.cost_charged, "authorized".to_string())
+            None
+        };
+
+        let settlement = if currency_mismatch || cost_overrun {
+            ReceiptSettlement {
+                payment_reference: payment_authorization
+                    .as_ref()
+                    .map(|authorization| authorization.authorization_id.clone()),
+                settlement_status: SettlementStatus::Failed,
+            }
+        } else if let Some(authorization) = payment_authorization.as_ref() {
+            if authorization.settled {
+                ReceiptSettlement::from_authorization(authorization)
+            } else if let Some(payment_result) = payment_result.as_ref() {
+                match payment_result {
+                    Ok(result) => ReceiptSettlement::from_payment_result(result),
+                    Err(error) => {
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %error,
+                            "post-execution payment settlement failed"
+                        );
+                        ReceiptSettlement {
+                            payment_reference: Some(authorization.authorization_id.clone()),
+                            settlement_status: SettlementStatus::Failed,
+                        }
+                    }
+                }
+            } else {
+                warn!(
+                    request_id = %request.request_id,
+                    authorization_id = %authorization.authorization_id,
+                    "unsettled authorization completed without a payment result"
+                );
+                ReceiptSettlement {
+                    payment_reference: Some(authorization.authorization_id.clone()),
+                    settlement_status: SettlementStatus::Failed,
+                }
+            }
+        } else {
+            ReceiptSettlement::settled()
+        };
+        let recorded_cost = if keep_provisional_charge && !currency_mismatch && !cost_overrun {
+            charge.cost_charged
+        } else {
+            actual_cost
         };
 
         // Use the running total charged so far (not just this invocation) so that
         // budget_remaining reflects cumulative spend across all prior invocations.
         let budget_remaining = charge
             .budget_total
-            .saturating_sub(charge.new_total_cost_charged);
+            .saturating_sub(running_total_cost_charged);
         let delegation_depth = cap.delegation_chain.len() as u32;
         let root_budget_holder = cap.issuer.to_hex();
+        let (payment_reference, settlement_status) = settlement.into_receipt_parts();
+        let payment_breakdown = payment_authorization.as_ref().map(|authorization| {
+            serde_json::json!({
+                "payment": {
+                    "authorization_id": authorization.authorization_id,
+                    "adapter_metadata": authorization.metadata,
+                    "preauthorized_units": charge.cost_charged,
+                    "recorded_units": recorded_cost
+                }
+            })
+        });
 
         let financial_meta = FinancialReceiptMetadata {
             grant_index: charge.grant_index as u32,
-            cost_charged: actual_cost,
+            cost_charged: recorded_cost,
             currency: charge.currency.clone(),
             budget_remaining,
             budget_total: charge.budget_total,
             delegation_depth,
             root_budget_holder,
-            payment_reference: None,
+            payment_reference,
             settlement_status,
-            cost_breakdown: reported_cost.and_then(|c| c.breakdown),
+            cost_breakdown: merge_metadata_objects(
+                reported_cost_ref.and_then(|cost| cost.breakdown.clone()),
+                payment_breakdown,
+            ),
             attempted_cost: None,
         };
 
@@ -2734,6 +3255,7 @@ impl PactKernel {
                     request,
                     tool_call_output,
                     timestamp,
+                    Some(charge.grant_index),
                     Some(financial_json),
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
@@ -2742,6 +3264,7 @@ impl PactKernel {
                     Some(tool_call_output),
                     &reason,
                     timestamp,
+                    Some(charge.grant_index),
                 ),
         }
     }
@@ -2809,6 +3332,7 @@ impl PactKernel {
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -2827,7 +3351,10 @@ impl PactKernel {
             },
             action,
             content_hash: receipt_content.content_hash,
-            metadata: receipt_content.metadata,
+            metadata: merge_metadata_objects(
+                receipt_content.metadata,
+                receipt_attribution_metadata(cap, matched_grant_index),
+            ),
             timestamp,
         })?;
 
@@ -2849,6 +3376,7 @@ impl PactKernel {
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
@@ -2866,7 +3394,10 @@ impl PactKernel {
             },
             action,
             content_hash: receipt_content.content_hash,
-            metadata: receipt_content.metadata,
+            metadata: merge_metadata_objects(
+                receipt_content.metadata,
+                receipt_attribution_metadata(cap, matched_grant_index),
+            ),
             timestamp,
         })?;
 
@@ -2890,8 +3421,15 @@ impl PactKernel {
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.build_incomplete_response_with_output(request, None, reason, timestamp)
+        self.build_incomplete_response_with_output(
+            request,
+            None,
+            reason,
+            timestamp,
+            matched_grant_index,
+        )
     }
 
     /// Build an incomplete response with optional partial output and a signed incomplete receipt.
@@ -2901,6 +3439,7 @@ impl PactKernel {
         output: Option<ToolCallOutput>,
         reason: &str,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(output.as_ref(), None)?;
@@ -2918,7 +3457,10 @@ impl PactKernel {
             },
             action,
             content_hash: receipt_content.content_hash,
-            metadata: receipt_content.metadata,
+            metadata: merge_metadata_objects(
+                receipt_content.metadata,
+                receipt_attribution_metadata(cap, matched_grant_index),
+            ),
             timestamp,
         })?;
 
@@ -2941,8 +3483,15 @@ impl PactKernel {
         request: &ToolCallRequest,
         output: ToolCallOutput,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.build_allow_response_with_metadata(request, output, timestamp, None)
+        self.build_allow_response_with_metadata(
+            request,
+            output,
+            timestamp,
+            matched_grant_index,
+            None,
+        )
     }
 
     fn build_allow_response_with_metadata(
@@ -2950,6 +3499,7 @@ impl PactKernel {
         request: &ToolCallRequest,
         output: ToolCallOutput,
         timestamp: u64,
+        matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
@@ -2960,19 +3510,10 @@ impl PactKernel {
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
 
         // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.
-        let metadata = match (receipt_content.metadata, extra_metadata) {
-            (None, extra) => extra,
-            (Some(base), None) => Some(base),
-            (Some(mut base), Some(extra)) => {
-                if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra.as_object())
-                {
-                    for (key, value) in extra_obj {
-                        base_obj.insert(key.clone(), value.clone());
-                    }
-                }
-                Some(base)
-            }
-        };
+        let metadata = merge_metadata_objects(
+            merge_metadata_objects(receipt_content.metadata, extra_metadata),
+            receipt_attribution_metadata(cap, matched_grant_index),
+        );
 
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
             KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
@@ -3177,6 +3718,38 @@ fn build_child_request_receipt(
 
 fn next_receipt_id(prefix: &str) -> String {
     format!("{prefix}-{}", Uuid::now_v7())
+}
+
+fn merge_metadata_objects(
+    base: Option<serde_json::Value>,
+    extra: Option<serde_json::Value>,
+) -> Option<serde_json::Value> {
+    match (base, extra) {
+        (None, extra) => extra,
+        (Some(base), None) => Some(base),
+        (Some(mut base), Some(extra)) => {
+            if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra.as_object()) {
+                for (key, value) in extra_obj {
+                    base_obj.insert(key.clone(), value.clone());
+                }
+            }
+            Some(base)
+        }
+    }
+}
+
+fn receipt_attribution_metadata(
+    capability: &CapabilityToken,
+    matched_grant_index: Option<usize>,
+) -> Option<serde_json::Value> {
+    Some(serde_json::json!({
+        "attribution": ReceiptAttributionMetadata {
+            subject_key: capability.subject.to_hex(),
+            issuer_key: capability.issuer.to_hex(),
+            delegation_depth: capability.delegation_chain.len() as u32,
+            grant_index: matched_grant_index.map(|index| index as u32),
+        }
+    }))
 }
 
 fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_json::Value> {
@@ -4045,6 +4618,9 @@ mod tests {
     struct DocsResourceProvider;
     struct FilesystemResourceProvider;
     struct ExamplePromptProvider;
+    struct StubPaymentAdapter;
+    struct DecliningPaymentAdapter;
+    struct PrepaidSettledPaymentAdapter;
 
     impl EchoServer {
         fn new(id: &str, tools: Vec<&str>) -> Self {
@@ -4052,6 +4628,165 @@ mod tests {
                 id: id.to_string(),
                 tools: tools.into_iter().map(String::from).collect(),
             }
+        }
+    }
+
+    impl PaymentAdapter for StubPaymentAdapter {
+        fn authorize(
+            &self,
+            _amount_units: u64,
+            _currency: &str,
+            _payer: &str,
+            _payee: &str,
+            _reference: &str,
+        ) -> Result<PaymentAuthorization, PaymentError> {
+            Ok(PaymentAuthorization {
+                authorization_id: "auth_stub".to_string(),
+                settled: false,
+                metadata: serde_json::json!({ "adapter": "stub" }),
+            })
+        }
+
+        fn capture(
+            &self,
+            _authorization_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: "txn_stub".to_string(),
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({ "adapter": "stub" }),
+            })
+        }
+
+        fn release(
+            &self,
+            _authorization_id: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: "release_stub".to_string(),
+                settlement_status: RailSettlementStatus::Released,
+                metadata: serde_json::json!({ "adapter": "stub" }),
+            })
+        }
+
+        fn refund(
+            &self,
+            _transaction_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: "refund_stub".to_string(),
+                settlement_status: RailSettlementStatus::Refunded,
+                metadata: serde_json::json!({ "adapter": "stub" }),
+            })
+        }
+    }
+
+    impl PaymentAdapter for DecliningPaymentAdapter {
+        fn authorize(
+            &self,
+            _amount_units: u64,
+            _currency: &str,
+            _payer: &str,
+            _payee: &str,
+            _reference: &str,
+        ) -> Result<PaymentAuthorization, PaymentError> {
+            Err(PaymentError::InsufficientFunds)
+        }
+
+        fn capture(
+            &self,
+            _authorization_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Err(PaymentError::RailError(
+                "capture should not run".to_string(),
+            ))
+        }
+
+        fn release(
+            &self,
+            _authorization_id: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Err(PaymentError::RailError(
+                "release should not run".to_string(),
+            ))
+        }
+
+        fn refund(
+            &self,
+            _transaction_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Err(PaymentError::RailError("refund should not run".to_string()))
+        }
+    }
+
+    impl PaymentAdapter for PrepaidSettledPaymentAdapter {
+        fn authorize(
+            &self,
+            _amount_units: u64,
+            _currency: &str,
+            _payer: &str,
+            _payee: &str,
+            _reference: &str,
+        ) -> Result<PaymentAuthorization, PaymentError> {
+            Ok(PaymentAuthorization {
+                authorization_id: "x402_txn_paid".to_string(),
+                settled: true,
+                metadata: serde_json::json!({ "adapter": "x402" }),
+            })
+        }
+
+        fn capture(
+            &self,
+            authorization_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: authorization_id.to_string(),
+                settlement_status: RailSettlementStatus::Settled,
+                metadata: serde_json::json!({ "adapter": "x402" }),
+            })
+        }
+
+        fn release(
+            &self,
+            authorization_id: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: authorization_id.to_string(),
+                settlement_status: RailSettlementStatus::Released,
+                metadata: serde_json::json!({ "adapter": "x402" }),
+            })
+        }
+
+        fn refund(
+            &self,
+            transaction_id: &str,
+            _amount_units: u64,
+            _currency: &str,
+            _reference: &str,
+        ) -> Result<PaymentResult, PaymentError> {
+            Ok(PaymentResult {
+                transaction_id: transaction_id.to_string(),
+                settlement_status: RailSettlementStatus::Refunded,
+                metadata: serde_json::json!({ "adapter": "x402" }),
+            })
         }
     }
 
@@ -5064,6 +5799,60 @@ mod tests {
             .as_deref()
             .unwrap_or("")
             .contains(&parent.id));
+    }
+
+    #[test]
+    fn delegated_tool_call_records_observed_capability_lineage() {
+        let path = unique_receipt_db_path("pact-kernel-observed-lineage");
+        let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+        let mut kernel = PactKernel::new(make_config());
+        kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+        let parent_kp = make_keypair();
+        let child_kp = make_keypair();
+        let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+        let parent = make_capability(&kernel, &parent_kp, scope.clone(), 300);
+        seed_store
+            .record_capability_snapshot(&parent, None)
+            .unwrap();
+        drop(seed_store);
+
+        kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+        let link = make_delegation_link(&parent.id, &kernel.config.keypair, &child_kp, 100);
+        let child = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-observed-child".to_string(),
+                issuer: kernel.config.keypair.public_key(),
+                subject: child_kp.public_key(),
+                scope,
+                issued_at: current_unix_timestamp(),
+                expires_at: current_unix_timestamp() + 300,
+                delegation_chain: vec![link],
+            },
+            &kernel.config.keypair,
+        )
+        .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&make_request("req-observed", &child, "read_file", "srv-a"))
+            .unwrap();
+        assert_eq!(response.verdict, Verdict::Allow);
+
+        let reopened = SqliteReceiptStore::open(&path).unwrap();
+        let chain = reopened.get_delegation_chain(&child.id).unwrap();
+        assert_eq!(chain.len(), 2);
+        assert_eq!(chain[0].capability_id, parent.id);
+        assert_eq!(chain[0].delegation_depth, 0);
+        assert_eq!(chain[1].capability_id, child.id);
+        assert_eq!(
+            chain[1].parent_capability_id.as_deref(),
+            Some(parent.id.as_str())
+        );
+        assert_eq!(chain[1].delegation_depth, 1);
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -6904,6 +7693,15 @@ mod tests {
         reported_cost: Option<ToolInvocationCost>,
     }
 
+    struct FailingMonetaryServer {
+        id: String,
+    }
+
+    struct CountingMonetaryServer {
+        id: String,
+        invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
     impl MonetaryCostServer {
         fn new(id: &str, cost_units: u64, currency: &str) -> Self {
             Self {
@@ -6930,7 +7728,11 @@ mod tests {
         }
 
         fn tool_names(&self) -> Vec<String> {
-            vec!["compute".to_string()]
+            vec![
+                "compute".to_string(),
+                "compute-a".to_string(),
+                "compute-b".to_string(),
+            ]
         }
 
         fn invoke(
@@ -6950,6 +7752,66 @@ mod tests {
         ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
             let value = self.invoke(tool_name, arguments, bridge)?;
             Ok((value, self.reported_cost.clone()))
+        }
+    }
+
+    impl ToolServerConnection for FailingMonetaryServer {
+        fn server_id(&self) -> &str {
+            &self.id
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["compute".to_string()]
+        }
+
+        fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            Err(KernelError::Internal("tool server failure".to_string()))
+        }
+
+        fn invoke_with_cost(
+            &self,
+            tool_name: &str,
+            arguments: serde_json::Value,
+            bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+            let _ = (tool_name, arguments, bridge);
+            Err(KernelError::Internal("tool server failure".to_string()))
+        }
+    }
+
+    impl ToolServerConnection for CountingMonetaryServer {
+        fn server_id(&self) -> &str {
+            &self.id
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["compute".to_string()]
+        }
+
+        fn invoke(
+            &self,
+            _tool_name: &str,
+            _arguments: serde_json::Value,
+            _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            self.invocations
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(serde_json::json!({"result": "ok"}))
+        }
+
+        fn invoke_with_cost(
+            &self,
+            tool_name: &str,
+            arguments: serde_json::Value,
+            bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+            let value = self.invoke(tool_name, arguments, bridge)?;
+            Ok((value, None))
         }
     }
 
@@ -7097,6 +7959,182 @@ mod tests {
         assert_eq!(financial["settlement_status"], "not_applicable");
         assert!(financial["attempted_cost"].as_u64().is_some());
         assert_eq!(financial["currency"], "USD");
+        let attribution = metadata
+            .get("attribution")
+            .expect("should have 'attribution' key");
+        assert_eq!(attribution["grant_index"].as_u64(), Some(0));
+        assert!(attribution["subject_key"].as_str().is_some());
+    }
+
+    #[test]
+    fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
+        use std::sync::{Arc, Mutex};
+
+        struct DenyOnceGuard {
+            denied: Arc<Mutex<bool>>,
+        }
+
+        impl Guard for DenyOnceGuard {
+            fn name(&self) -> &str {
+                "deny-once"
+            }
+
+            fn evaluate(&self, _ctx: &GuardContext) -> Result<Verdict, KernelError> {
+                let mut denied = self.denied.lock().unwrap();
+                if !*denied {
+                    *denied = true;
+                    Ok(Verdict::Deny)
+                } else {
+                    Ok(Verdict::Allow)
+                }
+            }
+        }
+
+        let mut kernel = PactKernel::new(make_monetary_config());
+        kernel.add_guard(Box::new(DenyOnceGuard {
+            denied: Arc::new(Mutex::new(false)),
+        }));
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let agent_kp = Keypair::generate();
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 100, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let request = |request_id: &str| ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+        };
+
+        let denied_response = kernel.evaluate_tool_call(&request("req-deny")).unwrap();
+        assert_eq!(denied_response.verdict, Verdict::Deny);
+        let denied_metadata = denied_response
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let denied_financial = denied_metadata
+            .get("financial")
+            .expect("should have financial metadata");
+        assert_eq!(denied_financial["cost_charged"].as_u64(), Some(0));
+        assert_eq!(denied_financial["attempted_cost"].as_u64(), Some(100));
+        assert_eq!(denied_financial["budget_remaining"].as_u64(), Some(100));
+        assert_eq!(denied_financial["settlement_status"], "not_applicable");
+
+        let allowed_response = kernel.evaluate_tool_call(&request("req-allow")).unwrap();
+        assert_eq!(allowed_response.verdict, Verdict::Allow);
+        let allowed_metadata = allowed_response
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let allowed_financial = allowed_metadata
+            .get("financial")
+            .expect("should have financial metadata");
+        assert_eq!(allowed_financial["cost_charged"].as_u64(), Some(100));
+        assert_eq!(allowed_financial["budget_remaining"].as_u64(), Some(0));
+    }
+
+    #[test]
+    fn kernel_accepts_optional_payment_adapter_installation() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        assert!(kernel.payment_adapter.is_none());
+
+        kernel.set_payment_adapter(Box::new(StubPaymentAdapter));
+
+        assert!(kernel.payment_adapter.is_some());
+    }
+
+    #[test]
+    fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocation() {
+        let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut kernel = PactKernel::new(make_monetary_config());
+        kernel.set_payment_adapter(Box::new(DecliningPaymentAdapter));
+        kernel.register_tool_server(Box::new(CountingMonetaryServer {
+            id: "cost-srv".to_string(),
+            invocations: invocations.clone(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-payment-deny".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Deny);
+        assert_eq!(
+            invocations.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "tool should not run when payment authorization fails"
+        );
+        let financial = response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("financial"))
+            .expect("deny receipt should carry financial metadata");
+        assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
+        let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+        assert_eq!(usage.invocation_count, 0);
+        assert_eq!(usage.total_cost_charged, 0);
+    }
+
+    #[test]
+    fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        kernel.set_payment_adapter(Box::new(PrepaidSettledPaymentAdapter));
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let agent_kp = Keypair::generate();
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-prepaid".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Allow);
+        let financial = response
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get("financial"))
+            .expect("allow receipt should carry financial metadata");
+        assert_eq!(financial["payment_reference"], "x402_txn_paid");
+        assert_eq!(financial["settlement_status"], "settled");
+        assert_eq!(financial["cost_charged"].as_u64(), Some(100));
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
+        let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+        assert_eq!(usage.total_cost_charged, 100);
     }
 
     #[test]
@@ -7135,8 +8173,54 @@ mod tests {
             .expect("should have 'financial' key");
         // The actual reported cost (75) should be recorded.
         assert_eq!(financial["cost_charged"].as_u64().unwrap(), 75);
-        assert_eq!(financial["settlement_status"], "authorized");
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(925));
+        assert_eq!(financial["settlement_status"], "settled");
         assert_eq!(financial["currency"], "USD");
+        let attribution = metadata
+            .get("attribution")
+            .expect("should have 'attribution' key");
+        assert_eq!(attribution["grant_index"].as_u64(), Some(0));
+
+        let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+        assert_eq!(usage.invocation_count, 1);
+        assert_eq!(usage.total_cost_charged, 75);
+    }
+
+    #[test]
+    fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_charge() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 150, "USD")));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-overrun".to_string(),
+                capability: cap,
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Allow);
+        let metadata = response
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let financial = metadata
+            .get("financial")
+            .expect("should have 'financial' key");
+        assert_eq!(financial["cost_charged"].as_u64(), Some(150));
+        assert_eq!(financial["settlement_status"], "failed");
+        assert!(financial["payment_reference"].is_null());
     }
 
     #[test]
@@ -7174,6 +8258,37 @@ mod tests {
             .expect("should have 'financial' key");
         // Worst-case debit: max_cost_per_invocation = 100.
         assert_eq!(financial["cost_charged"].as_u64().unwrap(), 100);
+    }
+
+    #[test]
+    fn monetary_tool_server_error_releases_precharged_budget() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(FailingMonetaryServer {
+            id: "cost-srv".to_string(),
+        }));
+
+        let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-tool-error".to_string(),
+                capability: cap.clone(),
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Deny);
+        let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+        assert_eq!(usage.invocation_count, 0);
+        assert_eq!(usage.total_cost_charged, 0);
     }
 
     #[test]
@@ -7217,6 +8332,53 @@ mod tests {
         // Verify the denial receipt has financial metadata.
         let metadata = r3.receipt.metadata.as_ref().expect("should have metadata");
         assert!(metadata.get("financial").is_some());
+    }
+
+    #[test]
+    fn multi_grant_budget_remaining_uses_matched_grant_total() {
+        let mut kernel = PactKernel::new(make_monetary_config());
+        let agent_kp = Keypair::generate();
+        kernel.register_tool_server(Box::new(MonetaryCostServer::no_cost("cost-srv")));
+
+        let grant_a = make_monetary_grant("cost-srv", "compute-a", 100, 500, "USD");
+        let grant_b = make_monetary_grant("cost-srv", "compute-b", 40, 200, "USD");
+        let cap = kernel
+            .issue_capability(
+                &agent_kp.public_key(),
+                make_scope(vec![grant_a, grant_b]),
+                3600,
+            )
+            .unwrap();
+
+        let invoke = |request_id: &str, tool_name: &str| ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap.clone(),
+            tool_name: tool_name.to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+        };
+
+        let _ = kernel
+            .evaluate_tool_call(&invoke("req-a", "compute-a"))
+            .unwrap();
+        let response_b = kernel
+            .evaluate_tool_call(&invoke("req-b", "compute-b"))
+            .unwrap();
+
+        let metadata = response_b
+            .receipt
+            .metadata
+            .as_ref()
+            .expect("should have metadata");
+        let financial = metadata
+            .get("financial")
+            .expect("should have financial metadata");
+        assert_eq!(financial["grant_index"].as_u64(), Some(1));
+        assert_eq!(financial["cost_charged"].as_u64(), Some(40));
+        assert_eq!(financial["budget_total"].as_u64(), Some(200));
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(160));
     }
 
     #[test]

@@ -15,21 +15,41 @@ const INITIAL_FILTERS: Filters = {
 
 export default function App() {
   const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS)
+  const [token, setToken] = useState<string | null>(null)
 
-  // Read bearer token from URL param or sessionStorage on mount
   useEffect(() => {
-    getToken()
+    setToken(getToken())
   }, [])
+
+  const missingToken = token !== null && token.length === 0
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <h1>PACT Receipt Dashboard</h1>
       </header>
-      <div className="app-body">
-        <FilterSidebar filters={filters} onFiltersChange={setFilters} />
-        <ReceiptTable filters={filters} />
-      </div>
+      {token === null ? (
+        <div className="main-content">
+          <div className="state-loading">Checking dashboard access...</div>
+        </div>
+      ) : missingToken ? (
+        <div className="main-content">
+          <section className="auth-notice">
+            <h2>Bearer token required</h2>
+            <p>
+              Provide a trust-control bearer token via <code>?token=&lt;value&gt;</code> on the
+              first load, or set <code>sessionStorage.pact_token</code> before opening the
+              dashboard.
+            </p>
+            <pre className="detail-json">http://localhost:7391/?token=my-service-token</pre>
+          </section>
+        </div>
+      ) : (
+        <div className="app-body">
+          <FilterSidebar filters={filters} onFiltersChange={setFilters} />
+          <ReceiptTable filters={filters} />
+        </div>
+      )}
     </div>
   )
 }

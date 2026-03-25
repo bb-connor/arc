@@ -35,6 +35,13 @@ pub struct CapabilitySnapshot {
     pub parent_capability_id: Option<String>,
 }
 
+/// A capability snapshot with the source database sequence used for cluster sync.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredCapabilitySnapshot {
+    pub seq: u64,
+    pub snapshot: CapabilitySnapshot,
+}
+
 /// Errors from capability lineage operations.
 #[derive(Debug, thiserror::Error)]
 pub enum CapabilityLineageError {
@@ -124,6 +131,49 @@ impl SqliteReceiptStore {
             ],
         )?;
 
+        Ok(())
+    }
+
+    /// Upsert an already-materialized capability snapshot.
+    ///
+    /// This is used by cluster replication so followers can converge on the
+    /// leader's lineage table without reconstructing full signed tokens.
+    pub fn upsert_capability_snapshot(
+        &mut self,
+        snapshot: &CapabilitySnapshot,
+    ) -> Result<(), CapabilityLineageError> {
+        self.connection.execute(
+            r#"
+            INSERT INTO capability_lineage (
+                capability_id,
+                subject_key,
+                issuer_key,
+                issued_at,
+                expires_at,
+                grants_json,
+                delegation_depth,
+                parent_capability_id
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ON CONFLICT(capability_id) DO UPDATE SET
+                subject_key = excluded.subject_key,
+                issuer_key = excluded.issuer_key,
+                issued_at = excluded.issued_at,
+                expires_at = excluded.expires_at,
+                grants_json = excluded.grants_json,
+                delegation_depth = excluded.delegation_depth,
+                parent_capability_id = excluded.parent_capability_id
+            "#,
+            params![
+                snapshot.capability_id,
+                snapshot.subject_key,
+                snapshot.issuer_key,
+                snapshot.issued_at as i64,
+                snapshot.expires_at as i64,
+                snapshot.grants_json,
+                snapshot.delegation_depth as i64,
+                snapshot.parent_capability_id,
+            ],
+        )?;
         Ok(())
     }
 
@@ -243,6 +293,19 @@ impl SqliteReceiptStore {
         &self,
         subject_key: &str,
     ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
+        self.list_capability_snapshots(Some(subject_key), None)
+    }
+
+    /// List capability snapshots filtered by subject and/or issuer.
+    ///
+    /// If both filters are present they are combined with AND semantics.
+    /// Results are ordered deterministically oldest-first to keep reputation
+    /// corpus construction stable across runs.
+    pub fn list_capability_snapshots(
+        &self,
+        subject_key: Option<&str>,
+        issuer_key: Option<&str>,
+    ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
         let mut stmt = self.connection.prepare(
             r#"
             SELECT
@@ -255,12 +318,65 @@ impl SqliteReceiptStore {
                 delegation_depth,
                 parent_capability_id
             FROM capability_lineage
-            WHERE subject_key = ?1
-            ORDER BY issued_at DESC
+            WHERE (?1 IS NULL OR subject_key = ?1)
+              AND (?2 IS NULL OR issuer_key = ?2)
+            ORDER BY issued_at ASC, capability_id ASC
             "#,
         )?;
 
-        let rows = stmt.query_map(params![subject_key], snapshot_from_row)?;
+        let rows = stmt.query_map(params![subject_key, issuer_key], snapshot_from_row)?;
+
+        let mut snapshots = Vec::new();
+        for row in rows {
+            snapshots.push(row?);
+        }
+
+        Ok(snapshots)
+    }
+
+    /// Return capability lineage snapshots added after a given local sequence.
+    ///
+    /// The sequence is the SQLite `rowid`, which is monotonic for this
+    /// append-only table and therefore suitable as a replication cursor.
+    pub fn list_capability_snapshots_after_seq(
+        &self,
+        after_seq: u64,
+        limit: usize,
+    ) -> Result<Vec<StoredCapabilitySnapshot>, CapabilityLineageError> {
+        let mut stmt = self.connection.prepare(
+            r#"
+            SELECT
+                rowid,
+                capability_id,
+                subject_key,
+                issuer_key,
+                issued_at,
+                expires_at,
+                grants_json,
+                delegation_depth,
+                parent_capability_id
+            FROM capability_lineage
+            WHERE rowid > ?1
+            ORDER BY rowid ASC
+            LIMIT ?2
+            "#,
+        )?;
+
+        let rows = stmt.query_map(params![after_seq as i64, limit as i64], |row| {
+            Ok(StoredCapabilitySnapshot {
+                seq: row.get::<_, i64>(0)?.max(0) as u64,
+                snapshot: CapabilitySnapshot {
+                    capability_id: row.get::<_, String>(1)?,
+                    subject_key: row.get::<_, String>(2)?,
+                    issuer_key: row.get::<_, String>(3)?,
+                    issued_at: row.get::<_, i64>(4)?.max(0) as u64,
+                    expires_at: row.get::<_, i64>(5)?.max(0) as u64,
+                    grants_json: row.get::<_, String>(6)?,
+                    delegation_depth: row.get::<_, i64>(7)?.max(0) as u64,
+                    parent_capability_id: row.get::<_, Option<String>>(8)?,
+                },
+            })
+        })?;
 
         let mut snapshots = Vec::new();
         for row in rows {

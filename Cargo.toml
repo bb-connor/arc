@@ -2,8 +2,12 @@
 resolver = "2"
 members = [
     "crates/pact-bindings-core",
+    "crates/pact-a2a-adapter",
     "crates/pact-core",
+    "crates/pact-credentials",
+    "crates/pact-did",
     "crates/pact-kernel",
+    "crates/pact-reputation",
     "crates/pact-guards",
     "crates/pact-policy",
     "crates/pact-cli",
@@ -32,7 +36,9 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 tracing = "0.1"
 hex = "0.4"
+bs58 = "0.5"
 ryu = "1"
 sha2 = "0.10"
 rusqlite = { version = "0.37", features = ["bundled"] }
 uuid = "1"
+url = "2"

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import {
   createColumnHelper,
   flexRender,
@@ -6,11 +6,21 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { format } from 'date-fns'
-import { fetchReceipts, fetchAgentCostSeries } from '../api'
+import { fetchAgentCostSeries, fetchLineage, fetchReceipts } from '../api'
 import type { Filters, Receipt } from '../types'
-import { decisionKind, formatMinorUnits } from '../types'
-import { DelegationChain } from './DelegationChain'
-import { BudgetSparkline } from './BudgetSparkline'
+import { decisionKind, formatMinorUnits, receiptSubjectKey } from '../types'
+import { OperatorSummary } from './OperatorSummary'
+import { PortableReputationPanel } from './PortableReputationPanel'
+
+const DelegationChain = lazy(async () => {
+  const module = await import('./DelegationChain')
+  return { default: module.DelegationChain }
+})
+
+const BudgetSparkline = lazy(async () => {
+  const module = await import('./BudgetSparkline')
+  return { default: module.BudgetSparkline }
+})
 
 interface ReceiptTableProps {
   filters: Filters
@@ -34,14 +44,50 @@ function DetailPanel({ receipt, onClose }: DetailPanelProps) {
   const financial = receipt.metadata?.financial
   const kind = decisionKind(receipt.decision)
   const [sparkData, setSparkData] = useState<{ time: string; cost: number }[]>([])
+  const subjectKey = receiptSubjectKey(receipt)
 
   useEffect(() => {
-    // Load agent cost series for the sparkline when financial metadata is present
-    if (!financial) return
-    fetchAgentCostSeries(receipt.capability_id)
-      .then(setSparkData)
-      .catch(() => setSparkData([]))
-  }, [receipt.capability_id, financial])
+    let cancelled = false
+
+    if (!financial) {
+      setSparkData([])
+      return () => {
+        cancelled = true
+      }
+    }
+
+    async function loadSparkData() {
+      try {
+        let resolvedSubjectKey = subjectKey
+        if (!resolvedSubjectKey) {
+          const snapshot = await fetchLineage(receipt.capability_id)
+          resolvedSubjectKey = snapshot.subject_key
+        }
+
+        if (!resolvedSubjectKey) {
+          if (!cancelled) {
+            setSparkData([])
+          }
+          return
+        }
+
+        const data = await fetchAgentCostSeries(resolvedSubjectKey)
+        if (!cancelled) {
+          setSparkData(data)
+        }
+      } catch {
+        if (!cancelled) {
+          setSparkData([])
+        }
+      }
+    }
+
+    void loadSparkData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [receipt.capability_id, financial, subjectKey])
 
   return (
     <aside className="detail-panel">
@@ -79,6 +125,15 @@ function DetailPanel({ receipt, onClose }: DetailPanelProps) {
         </span>
       </div>
 
+      {subjectKey && (
+        <div className="detail-section">
+          <div className="detail-section-title">Agent Subject</div>
+          <span title={subjectKey} style={{ wordBreak: 'break-all', fontSize: 12 }}>
+            {subjectKey}
+          </span>
+        </div>
+      )}
+
       {financial && (
         <div className="detail-section">
           <div className="detail-section-title">Financial</div>
@@ -95,13 +150,17 @@ function DetailPanel({ receipt, onClose }: DetailPanelProps) {
       {financial && (
         <div className="detail-section">
           <div className="detail-section-title">Cost over Time</div>
-          <BudgetSparkline data={sparkData} />
+          <Suspense fallback={<div className="sparkline-placeholder">Loading chart...</div>}>
+            <BudgetSparkline data={sparkData} />
+          </Suspense>
         </div>
       )}
 
       <div className="detail-section">
         <div className="detail-section-title">Delegation Chain</div>
-        <DelegationChain capabilityId={receipt.capability_id} />
+        <Suspense fallback={<div className="state-loading">Loading chain...</div>}>
+          <DelegationChain capabilityId={receipt.capability_id} />
+        </Suspense>
       </div>
 
       <div className="detail-section">
@@ -270,6 +329,8 @@ export function ReceiptTable({ filters }: ReceiptTableProps) {
     <div className="main-content" style={{ flexDirection: 'row', overflow: 'hidden' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div className="receipt-table-container">
+          <OperatorSummary filters={filters} />
+          <PortableReputationPanel subjectKey={filters.agentSubject || undefined} />
           {receipts.length === 0 ? (
             <div className="state-empty">No receipts found</div>
           ) : (

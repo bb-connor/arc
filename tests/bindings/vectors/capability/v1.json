@@ -1,0 +1,222 @@
+{
+  "cases": [
+    {
+      "capability": {
+        "delegation_chain": [
+          {
+            "capability_id": "cap-bindings-valid",
+            "delegatee": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+            "delegator": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+            "signature": "a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc6202459c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b865be00",
+            "timestamp": 1710000250
+          }
+        ],
+        "expires_at": 1710000800,
+        "id": "cap-bindings-valid",
+        "issued_at": 1710000200,
+        "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "scope": {
+          "grants": [
+            {
+              "constraints": [
+                {
+                  "type": "path_prefix",
+                  "value": "/workspace/"
+                }
+              ],
+              "max_invocations": 3,
+              "operations": [
+                "invoke",
+                "read_result"
+              ],
+              "server_id": "srv-files",
+              "tool_name": "file_read"
+            }
+          ]
+        },
+        "signature": "4cf1158e8efc0a245172340d9df9b6ec60f5cf3b70f8d5d34411f2066885c8dbaf32eb54ee86397c46bca9f3640fd1dea316a0c7f81e640d0605af4ddef12804",
+        "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+      },
+      "capability_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-valid\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"a4c297402d3bef255c8a9648215d9bb9c7fcbfb0a2e4009cfc6202459c10b2e4066de4ef60d4118f612993b6ceb2197095483e94c8a2ccc658ad7ef5b865be00\",\"timestamp\":1710000250}],\"expires_at\":1710000800,\"id\":\"cap-bindings-valid\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+      "description": "Capability is signed correctly, valid at the verification time, and carries a valid delegation link.",
+      "expected": {
+        "delegation_chain_valid": true,
+        "signature_valid": true,
+        "time_status": "valid",
+        "time_valid": true
+      },
+      "id": "valid_delegated_capability",
+      "verify_at": 1710000400
+    },
+    {
+      "capability": {
+        "expires_at": 1710000100,
+        "id": "cap-bindings-expired",
+        "issued_at": 1710000000,
+        "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "scope": {
+          "grants": [
+            {
+              "constraints": [
+                {
+                  "type": "path_prefix",
+                  "value": "/workspace/"
+                }
+              ],
+              "max_invocations": 3,
+              "operations": [
+                "invoke",
+                "read_result"
+              ],
+              "server_id": "srv-files",
+              "tool_name": "file_read"
+            }
+          ]
+        },
+        "signature": "91f504e7e00c8663ca84cc7db9c5c7cab1910b1f42ea6a5c5e121719cc0f635cfb862e06f4af335b98cedc2a8a96cf9124a82d8f438bb3e1da129881e7e49504",
+        "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+      },
+      "capability_body_canonical_json": "{\"expires_at\":1710000100,\"id\":\"cap-bindings-expired\",\"issued_at\":1710000000,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+      "description": "Capability signature is valid, but the token is expired at verification time.",
+      "expected": {
+        "delegation_chain_valid": true,
+        "signature_valid": true,
+        "time_status": "expired",
+        "time_valid": false
+      },
+      "id": "expired_capability",
+      "verify_at": 1710000400
+    },
+    {
+      "capability": {
+        "expires_at": 1710001200,
+        "id": "cap-bindings-not-yet-valid",
+        "issued_at": 1710000600,
+        "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "scope": {
+          "grants": [
+            {
+              "constraints": [
+                {
+                  "type": "path_prefix",
+                  "value": "/workspace/"
+                }
+              ],
+              "max_invocations": 3,
+              "operations": [
+                "invoke",
+                "read_result"
+              ],
+              "server_id": "srv-files",
+              "tool_name": "file_read"
+            }
+          ]
+        },
+        "signature": "385f7c09883a953e462c6656f839edfe512e23800f8013ea17f4ae731f7e588bd0ea32be1d198237ed0db8db972389e1b6138073599cd7dd1dd82b4d93c7af09",
+        "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+      },
+      "capability_body_canonical_json": "{\"expires_at\":1710001200,\"id\":\"cap-bindings-not-yet-valid\",\"issued_at\":1710000600,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+      "description": "Capability signature is valid, but the token is not yet valid at verification time.",
+      "expected": {
+        "delegation_chain_valid": true,
+        "signature_valid": true,
+        "time_status": "not_yet_valid",
+        "time_valid": false
+      },
+      "id": "not_yet_valid_capability",
+      "verify_at": 1710000400
+    },
+    {
+      "capability": {
+        "expires_at": 1710000800,
+        "id": "cap-bindings-invalid-signature",
+        "issued_at": 1710000200,
+        "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "scope": {
+          "grants": [
+            {
+              "constraints": [
+                {
+                  "type": "path_prefix",
+                  "value": "/workspace/"
+                }
+              ],
+              "max_invocations": 3,
+              "operations": [
+                "invoke",
+                "read_result"
+              ],
+              "server_id": "srv-files",
+              "tool_name": "file_write"
+            }
+          ]
+        },
+        "signature": "1af1875c9609de12e0bd4a8b39dd58dad166ada5fe3fdbd5f76c48497f1d4898991db43c22241ceb331c5ccc4151472aa7360e2be32a368239018ad2479cff02",
+        "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+      },
+      "capability_body_canonical_json": "{\"expires_at\":1710000800,\"id\":\"cap-bindings-invalid-signature\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_write\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+      "description": "Capability payload was modified after signing, so signature verification fails.",
+      "expected": {
+        "delegation_chain_valid": true,
+        "signature_valid": false,
+        "time_status": "valid",
+        "time_valid": true
+      },
+      "id": "tampered_capability_signature",
+      "verify_at": 1710000400
+    },
+    {
+      "capability": {
+        "delegation_chain": [
+          {
+            "capability_id": "cap-bindings-broken-chain",
+            "delegatee": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+            "delegator": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+            "signature": "e5031fd5c95e1cb79201c9750831e6604ee65fa451202f0ef540e9e30f7bc8e73ca877424e7ca3121db39cbb57e97827878a8656b077a7c084f9bfeeb8466f0e",
+            "timestamp": 1710000301
+          }
+        ],
+        "expires_at": 1710000800,
+        "id": "cap-bindings-broken-chain",
+        "issued_at": 1710000200,
+        "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+        "scope": {
+          "grants": [
+            {
+              "constraints": [
+                {
+                  "type": "path_prefix",
+                  "value": "/workspace/"
+                }
+              ],
+              "max_invocations": 3,
+              "operations": [
+                "invoke",
+                "read_result"
+              ],
+              "server_id": "srv-files",
+              "tool_name": "file_read"
+            }
+          ]
+        },
+        "signature": "47c1958897e7384f7b3efb6576287a9b40dab1ecaba0fc1137183d5a322679586f848c087ede29e1e531dba82c3daac871c6af6fc1a35d2ba579de70749a3501",
+        "subject": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+      },
+      "capability_body_canonical_json": "{\"delegation_chain\":[{\"capability_id\":\"cap-bindings-broken-chain\",\"delegatee\":\"91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a\",\"delegator\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"signature\":\"e5031fd5c95e1cb79201c9750831e6604ee65fa451202f0ef540e9e30f7bc8e73ca877424e7ca3121db39cbb57e97827878a8656b077a7c084f9bfeeb8466f0e\",\"timestamp\":1710000301}],\"expires_at\":1710000800,\"id\":\"cap-bindings-broken-chain\",\"issued_at\":1710000200,\"issuer\":\"66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a\",\"scope\":{\"grants\":[{\"constraints\":[{\"type\":\"path_prefix\",\"value\":\"/workspace/\"}],\"max_invocations\":3,\"operations\":[\"invoke\",\"read_result\"],\"server_id\":\"srv-files\",\"tool_name\":\"file_read\"}]},\"subject\":\"0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d\"}",
+      "description": "Capability was signed after embedding a delegation link whose own signature no longer matches.",
+      "expected": {
+        "delegation_chain_valid": false,
+        "signature_valid": true,
+        "time_status": "valid",
+        "time_valid": true
+      },
+      "id": "broken_delegation_chain_signature",
+      "verify_at": 1710000400
+    }
+  ],
+  "delegatee_seed_hex": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+  "generated_by": "pact-bindings-core",
+  "issuer_seed_hex": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+  "subject_seed_hex": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+  "version": 1
+}

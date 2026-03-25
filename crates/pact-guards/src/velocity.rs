@@ -170,6 +170,7 @@ impl Guard for VelocityGuard {
         // Check spend rate limit.
         if let Some(max_spend) = self.config.max_spend_per_window {
             let capacity = ((max_spend as f64 * self.config.burst_factor).round() as u64).max(1);
+            let spend_units = planned_spend_units(ctx)?;
 
             let mut buckets = self.spend_buckets.lock().map_err(|_| {
                 KernelError::Internal("velocity guard spend lock poisoned".to_string())
@@ -177,14 +178,36 @@ impl Guard for VelocityGuard {
             let bucket = buckets
                 .entry(key)
                 .or_insert_with(|| TokenBucket::new(capacity, max_spend, window_secs));
-            // Consume 1 unit per invocation; Phase 8 integration will pass actual cost.
-            if !bucket.try_consume(1) {
+            if !bucket.try_consume(spend_units) {
                 return Ok(Verdict::Deny);
             }
         }
 
         Ok(Verdict::Allow)
     }
+}
+
+fn planned_spend_units(ctx: &GuardContext) -> Result<u64, KernelError> {
+    let grant_index = ctx.matched_grant_index.ok_or_else(|| {
+        KernelError::Internal(
+            "velocity guard spend limiting requires matched_grant_index".to_string(),
+        )
+    })?;
+    let grant = ctx.scope.grants.get(grant_index).ok_or_else(|| {
+        KernelError::Internal(format!(
+            "velocity guard could not resolve grant index {grant_index}"
+        ))
+    })?;
+    grant
+        .max_cost_per_invocation
+        .as_ref()
+        .map(|amount| amount.units)
+        .ok_or_else(|| {
+            KernelError::Internal(
+                "velocity guard spend limiting requires max_cost_per_invocation on the matched grant"
+                    .to_string(),
+            )
+        })
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +219,9 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use pact_core::capability::{CapabilityToken, CapabilityTokenBody, PactScope};
+    use pact_core::capability::{
+        CapabilityToken, CapabilityTokenBody, MonetaryAmount, Operation, PactScope, ToolGrant,
+    };
     use pact_core::crypto::Keypair;
 
     use super::*;
@@ -230,6 +255,25 @@ mod tests {
             delegation_chain: vec![],
         };
         CapabilityToken::sign(body, kp).expect("sign cap")
+    }
+
+    fn spend_scope(max_cost_per_invocation: u64) -> PactScope {
+        PactScope {
+            grants: vec![ToolGrant {
+                server_id: "srv".to_string(),
+                tool_name: "read_file".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![],
+                max_invocations: None,
+                max_cost_per_invocation: Some(MonetaryAmount {
+                    units: max_cost_per_invocation,
+                    currency: "USD".to_string(),
+                }),
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            ..PactScope::default()
+        }
     }
 
     fn guard_ctx<'a>(
@@ -499,20 +543,20 @@ mod tests {
     fn spend_velocity_allows_up_to_limit() {
         let guard = VelocityGuard::new(VelocityConfig {
             max_invocations_per_window: None,
-            max_spend_per_window: Some(3),
+            max_spend_per_window: Some(300),
             window_secs: 60,
             burst_factor: 1.0,
         });
 
         let kp = Keypair::generate();
         let cap = signed_cap(&kp, "cap-spend");
-        let scope = PactScope::default();
+        let scope = spend_scope(100);
         let agent = kp.public_key().to_hex();
         let server = "srv".to_string();
         let request = make_request(&cap, &agent, &server);
 
         for i in 0..3 {
-            let ctx = guard_ctx(&request, &scope, &agent, &server, None);
+            let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
             let result = guard.evaluate(&ctx).expect("should not error");
             assert_eq!(
                 result,
@@ -521,8 +565,71 @@ mod tests {
             );
         }
 
-        let ctx = guard_ctx(&request, &scope, &agent, &server, None);
+        let ctx = guard_ctx(&request, &scope, &agent, &server, Some(0));
         let result = guard.evaluate(&ctx).expect("should not error");
         assert_eq!(result, Verdict::Deny, "4th spend request should be denied");
+    }
+
+    #[test]
+    fn spend_velocity_consumes_planned_cost_units() {
+        let guard = VelocityGuard::new(VelocityConfig {
+            max_invocations_per_window: None,
+            max_spend_per_window: Some(250),
+            window_secs: 60,
+            burst_factor: 1.0,
+        });
+
+        let kp = Keypair::generate();
+        let cap = signed_cap(&kp, "cap-spend-costed");
+        let scope = spend_scope(125);
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let request = make_request(&cap, &agent, &server);
+
+        let first = guard.evaluate(&guard_ctx(&request, &scope, &agent, &server, Some(0)));
+        assert_eq!(first.expect("first spend request"), Verdict::Allow);
+
+        let second = guard.evaluate(&guard_ctx(&request, &scope, &agent, &server, Some(0)));
+        assert_eq!(second.expect("second spend request"), Verdict::Allow);
+
+        let third = guard.evaluate(&guard_ctx(&request, &scope, &agent, &server, Some(0)));
+        assert_eq!(third.expect("third spend request"), Verdict::Deny);
+    }
+
+    #[test]
+    fn spend_velocity_requires_cost_metadata_on_matched_grant() {
+        let guard = VelocityGuard::new(VelocityConfig {
+            max_invocations_per_window: None,
+            max_spend_per_window: Some(10),
+            window_secs: 60,
+            burst_factor: 1.0,
+        });
+
+        let kp = Keypair::generate();
+        let cap = signed_cap(&kp, "cap-spend-missing-cost");
+        let scope = PactScope {
+            grants: vec![ToolGrant {
+                server_id: "srv".to_string(),
+                tool_name: "read_file".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![],
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            ..PactScope::default()
+        };
+        let agent = kp.public_key().to_hex();
+        let server = "srv".to_string();
+        let request = make_request(&cap, &agent, &server);
+
+        let error = guard
+            .evaluate(&guard_ctx(&request, &scope, &agent, &server, Some(0)))
+            .expect_err("missing cost metadata should fail closed");
+        assert!(
+            error.to_string().contains("max_cost_per_invocation"),
+            "unexpected error: {error}"
+        );
     }
 }

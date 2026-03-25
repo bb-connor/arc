@@ -1,0 +1,9 @@
+hushspec: "0.1.0"
+name: extended
+extends: "hushspec-base.yaml"
+
+rules:
+  tool_access:
+    allow:
+      - read_file
+      - list_directory

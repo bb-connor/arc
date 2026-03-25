@@ -13,6 +13,13 @@ export interface FinancialMetadata {
   settlement_status: string
 }
 
+export interface AttributionMetadata {
+  subject_key: string
+  issuer_key: string
+  delegation_depth: number
+  grant_index?: number | null
+}
+
 export interface ReceiptAction {
   parameters: Record<string, unknown>
   parameter_hash: string
@@ -26,6 +33,7 @@ export type ReceiptDecision =
 
 export interface ReceiptMetadata {
   financial?: FinancialMetadata
+  attribution?: AttributionMetadata
 }
 
 export interface Receipt {
@@ -43,6 +51,307 @@ export interface ReceiptQueryResponse {
   totalCount: number
   nextCursor: number | null
   receipts: Receipt[]
+}
+
+export type AnalyticsTimeBucket = 'hour' | 'day'
+
+export interface ReceiptAnalyticsMetrics {
+  totalReceipts: number
+  allowCount: number
+  denyCount: number
+  cancelledCount: number
+  incompleteCount: number
+  totalCostCharged: number
+  totalAttemptedCost: number
+  reliabilityScore?: number
+  complianceRate?: number
+  budgetUtilizationRate?: number
+}
+
+export interface AgentAnalyticsRow {
+  subjectKey: string
+  metrics: ReceiptAnalyticsMetrics
+}
+
+export interface ToolAnalyticsRow {
+  toolServer: string
+  toolName: string
+  metrics: ReceiptAnalyticsMetrics
+}
+
+export interface TimeAnalyticsRow {
+  bucketStart: number
+  bucketEnd: number
+  metrics: ReceiptAnalyticsMetrics
+}
+
+export interface ReceiptAnalyticsResponse {
+  summary: ReceiptAnalyticsMetrics
+  byAgent: AgentAnalyticsRow[]
+  byTool: ToolAnalyticsRow[]
+  byTime: TimeAnalyticsRow[]
+}
+
+export interface CostAttributionSummary {
+  matchingReceipts: number
+  returnedReceipts: number
+  totalCostCharged: number
+  totalAttemptedCost: number
+  maxDelegationDepth: number
+  distinctRootSubjects: number
+  distinctLeafSubjects: number
+  lineageGapCount: number
+  truncated: boolean
+}
+
+export interface RootCostAttributionRow {
+  rootSubjectKey: string
+  receiptCount: number
+  totalCostCharged: number
+  totalAttemptedCost: number
+  distinctLeafSubjects: number
+  maxDelegationDepth: number
+}
+
+export interface LeafCostAttributionRow {
+  rootSubjectKey: string
+  leafSubjectKey: string
+  receiptCount: number
+  totalCostCharged: number
+  totalAttemptedCost: number
+  maxDelegationDepth: number
+}
+
+export interface CostAttributionReceiptRow {
+  seq: number
+  receiptId: string
+  timestamp: number
+  capabilityId: string
+  toolServer: string
+  toolName: string
+  decisionKind: string
+  rootSubjectKey?: string
+  leafSubjectKey?: string
+  grantIndex?: number
+  delegationDepth: number
+  costCharged: number
+  attemptedCost?: number
+  currency: string
+  budgetTotal?: number
+  budgetRemaining?: number
+  settlementStatus?: string
+  paymentReference?: string
+  lineageComplete: boolean
+  chain: Array<{
+    capabilityId: string
+    subjectKey: string
+    issuerKey: string
+    delegationDepth: number
+    parentCapabilityId?: string
+  }>
+}
+
+export interface CostAttributionReport {
+  summary: CostAttributionSummary
+  byRoot: RootCostAttributionRow[]
+  byLeaf: LeafCostAttributionRow[]
+  receipts: CostAttributionReceiptRow[]
+}
+
+export interface BudgetUtilizationSummary {
+  matchingGrants: number
+  returnedGrants: number
+  distinctCapabilities: number
+  distinctSubjects: number
+  totalInvocations: number
+  totalCostCharged: number
+  nearLimitCount: number
+  exhaustedCount: number
+  rowsMissingScope: number
+  rowsMissingLineage: number
+  truncated: boolean
+}
+
+export interface BudgetUtilizationRow {
+  capabilityId: string
+  grantIndex: number
+  subjectKey?: string
+  toolServer?: string
+  toolName?: string
+  invocationCount: number
+  maxInvocations?: number
+  totalCostCharged: number
+  currency?: string
+  maxTotalCostUnits?: number
+  remainingCostUnits?: number
+  invocationUtilizationRate?: number
+  costUtilizationRate?: number
+  nearLimit: boolean
+  exhausted: boolean
+  updatedAt: number
+  scopeResolved: boolean
+  scopeResolutionError?: string
+}
+
+export interface BudgetUtilizationReport {
+  summary: BudgetUtilizationSummary
+  rows: BudgetUtilizationRow[]
+}
+
+export type EvidenceChildReceiptScope =
+  | 'full_query_window'
+  | 'time_window_context_only'
+  | 'omitted_no_join_path'
+
+export interface ComplianceReport {
+  matchingReceipts: number
+  evidenceReadyReceipts: number
+  uncheckpointedReceipts: number
+  checkpointCoverageRate?: number
+  lineageCoveredReceipts: number
+  lineageGapReceipts: number
+  lineageCoverageRate?: number
+  pendingSettlementReceipts: number
+  failedSettlementReceipts: number
+  directEvidenceExportSupported: boolean
+  childReceiptScope: EvidenceChildReceiptScope
+  proofsComplete: boolean
+  exportQuery: {
+    capabilityId?: string
+    agentSubject?: string
+    since?: number
+    until?: number
+  }
+  exportScopeNote?: string
+}
+
+export interface OperatorReport {
+  generatedAt: number
+  filters: {
+    capabilityId?: string
+    agentSubject?: string
+    toolServer?: string
+    toolName?: string
+    since?: number
+    until?: number
+    groupLimit?: number
+    timeBucket?: AnalyticsTimeBucket
+    attributionLimit?: number
+    budgetLimit?: number
+  }
+  activity: ReceiptAnalyticsResponse
+  costAttribution: CostAttributionReport
+  budgetUtilization: BudgetUtilizationReport
+  compliance: ComplianceReport
+  sharedEvidence: SharedEvidenceReferenceReport
+}
+
+export interface PassportVerification {
+  subject: string
+  issuer?: string | null
+  issuers: string[]
+  issuerCount: number
+  credentialCount: number
+  merkleRootCount: number
+  verifiedAt: number
+  validUntil: string
+}
+
+export interface PassportPolicyEvaluation {
+  accepted: boolean
+  matchedCredentialIndexes: number[]
+  matchedIssuers?: string[]
+}
+
+export interface SharedEvidenceShareSummary {
+  shareId: string
+  manifestHash: string
+  importedAt: number
+  exportedAt: number
+  issuer: string
+  partner: string
+  signerPublicKey: string
+  requireProofs: boolean
+  toolReceipts: number
+  capabilityLineage: number
+}
+
+export interface SharedEvidenceReferenceSummary {
+  matchingShares: number
+  matchingReferences: number
+  matchingLocalReceipts: number
+  remoteToolReceipts: number
+  remoteLineageRecords: number
+  distinctRemoteSubjects: number
+  proofRequiredShares: number
+  truncated: boolean
+}
+
+export interface SharedEvidenceReferenceRow {
+  share: SharedEvidenceShareSummary
+  capabilityId: string
+  subjectKey: string
+  issuerKey: string
+  delegationDepth: number
+  parentCapabilityId?: string | null
+  localAnchorCapabilityId?: string | null
+  matchedLocalReceipts: number
+  allowCount: number
+  denyCount: number
+  cancelledCount: number
+  incompleteCount: number
+  firstSeen?: number
+  lastSeen?: number
+}
+
+export interface SharedEvidenceReferenceReport {
+  summary: SharedEvidenceReferenceSummary
+  references: SharedEvidenceReferenceRow[]
+}
+
+export interface LocalReputationInspectionSummary {
+  subjectKey: string
+  effectiveScore: number
+  probationary: boolean
+  scoringSource: string
+  resolvedTier?: {
+    name: string
+  } | null
+}
+
+export interface ReputationMetricComparison {
+  portable?: number
+  local?: number
+  localMinusPortable?: number
+}
+
+export interface PortableCredentialDrift {
+  index: number
+  issuer: string
+  issuanceDate: string
+  expirationDate: string
+  attestationUntil: number
+  receiptCount: number
+  lineageRecords: number
+  policyAccepted?: boolean
+  metrics: {
+    compositeScore: ReputationMetricComparison
+    reliability: ReputationMetricComparison
+    delegationHygiene: ReputationMetricComparison
+    resourceStewardship: ReputationMetricComparison
+  }
+}
+
+export interface PortableReputationComparison {
+  subjectKey: string
+  passportSubject: string
+  subjectMatches: boolean
+  comparedAt: number
+  local: LocalReputationInspectionSummary
+  passportVerification: PassportVerification
+  passportEvaluation?: PassportPolicyEvaluation | null
+  credentialDrifts: PortableCredentialDrift[]
+  sharedEvidence: SharedEvidenceReferenceReport
 }
 
 export interface CapabilitySnapshot {
@@ -65,6 +374,17 @@ export interface Filters {
   until?: number
 }
 
+export interface ReceiptAnalyticsFilters {
+  capabilityId?: string
+  agentSubject?: string
+  toolServer?: string
+  toolName?: string
+  since?: number
+  until?: number
+  groupLimit?: number
+  timeBucket?: AnalyticsTimeBucket
+}
+
 /**
  * Extract a DecisionKind label from a raw receipt decision value.
  */
@@ -85,4 +405,8 @@ export function formatMinorUnits(amount: number, currency: string): string {
   const minorStr = minor.toString().padStart(2, '0')
   const prefix = currency === 'USD' ? '$' : `${currency} `
   return `${prefix}${major}.${minorStr}`
+}
+
+export function receiptSubjectKey(receipt: Receipt): string | null {
+  return receipt.metadata?.attribution?.subject_key ?? null
 }

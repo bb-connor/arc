@@ -6,16 +6,21 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use pact_reputation::{
+    ReputationConfig as LocalReputationConfig, ReputationWeights as LocalReputationWeights,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use pact_core::capability::{Operation, PactScope, PromptGrant, ResourceGrant, ToolGrant};
+use pact_core::capability::{
+    MonetaryAmount, Operation, PactScope, PromptGrant, ResourceGrant, ToolGrant,
+};
 use pact_guards::{
     EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline, McpToolGuard, PatchIntegrityGuard,
     PathAllowlistGuard, SecretLeakGuard, ShellCommandGuard,
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefaultCapability {
     pub scope: PactScope,
     pub ttl: u64,
@@ -42,6 +47,33 @@ pub struct PolicyIdentity {
     pub runtime_hash: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReputationIssuancePolicy {
+    pub scoring: LocalReputationConfig,
+    pub probationary_receipt_count: u64,
+    pub probationary_min_days: u64,
+    pub probationary_score_ceiling: f64,
+    pub tiers: Vec<ReputationTierPolicy>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReputationTierPolicy {
+    pub name: String,
+    pub score_range: [f64; 2],
+    pub max_scope: TierScopeCeiling,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TierScopeCeiling {
+    pub operations: Vec<Operation>,
+    pub max_invocations: Option<u32>,
+    pub max_cost_per_invocation: Option<MonetaryAmount>,
+    pub max_total_cost: Option<MonetaryAmount>,
+    pub max_delegation_depth: Option<u32>,
+    pub ttl_seconds: u64,
+    pub constraints_required: bool,
+}
+
 /// Runtime-ready policy materialization used by the CLI and kernel setup.
 pub struct LoadedPolicy {
     pub format: PolicyFormat,
@@ -49,6 +81,7 @@ pub struct LoadedPolicy {
     pub kernel: KernelPolicyConfig,
     pub default_capabilities: Vec<DefaultCapability>,
     pub guard_pipeline: GuardPipeline,
+    pub issuance_policy: Option<ReputationIssuancePolicy>,
 }
 
 impl LoadedPolicy {
@@ -493,6 +526,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         kernel: policy.kernel.clone(),
         default_capabilities,
         guard_pipeline: build_guard_pipeline(&policy.guards),
+        issuance_policy: None,
     })
 }
 
@@ -512,6 +546,7 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
     let kernel = KernelPolicyConfig::default();
     let default_capabilities =
         build_default_capabilities_from_scope(&compiled.default_scope, kernel.max_capability_ttl);
+    let issuance_policy = materialize_reputation_issuance_policy(&spec)?;
     let runtime_hash = runtime_hash_for_hushspec(&kernel, &default_capabilities, &spec)?;
 
     Ok(LoadedPolicy {
@@ -523,7 +558,107 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         kernel,
         default_capabilities,
         guard_pipeline: compiled.guards,
+        issuance_policy,
     })
+}
+
+fn materialize_reputation_issuance_policy(
+    spec: &pact_policy::HushSpec,
+) -> Result<Option<ReputationIssuancePolicy>, PolicyError> {
+    let Some(reputation) = spec
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.reputation.as_ref())
+    else {
+        return Ok(None);
+    };
+
+    let mut scoring = LocalReputationConfig::default();
+    let mut probationary_receipt_count = 1_000;
+    let mut probationary_min_days = 30;
+    let mut probationary_score_ceiling = 0.60;
+
+    if let Some(config) = &reputation.scoring {
+        if let Some(weights) = &config.weights {
+            scoring.weights = LocalReputationWeights {
+                boundary_pressure: weights
+                    .boundary_pressure
+                    .unwrap_or(scoring.weights.boundary_pressure),
+                resource_stewardship: weights
+                    .resource_stewardship
+                    .unwrap_or(scoring.weights.resource_stewardship),
+                least_privilege: weights
+                    .least_privilege
+                    .unwrap_or(scoring.weights.least_privilege),
+                history_depth: weights
+                    .history_depth
+                    .unwrap_or(scoring.weights.history_depth),
+                tool_diversity: weights
+                    .tool_diversity
+                    .unwrap_or(scoring.weights.tool_diversity),
+                delegation_hygiene: weights
+                    .delegation_hygiene
+                    .unwrap_or(scoring.weights.delegation_hygiene),
+                reliability: weights.reliability.unwrap_or(scoring.weights.reliability),
+                incident_correlation: weights
+                    .incident_correlation
+                    .unwrap_or(scoring.weights.incident_correlation),
+            };
+        }
+        scoring.temporal_decay_half_life_days = config
+            .temporal_decay_half_life_days
+            .unwrap_or(scoring.temporal_decay_half_life_days);
+        probationary_receipt_count = config
+            .probationary_receipt_count
+            .unwrap_or(probationary_receipt_count);
+        probationary_min_days = config
+            .probationary_min_days
+            .unwrap_or(probationary_min_days);
+        probationary_score_ceiling = config
+            .probationary_score_ceiling
+            .unwrap_or(probationary_score_ceiling);
+        scoring.history_receipt_target = probationary_receipt_count;
+        scoring.history_day_target = probationary_min_days;
+    }
+
+    let mut tiers = reputation
+        .tiers
+        .iter()
+        .map(|(name, tier)| {
+            Ok(ReputationTierPolicy {
+                name: name.clone(),
+                score_range: tier.score_range,
+                max_scope: TierScopeCeiling {
+                    operations: parse_operations(&tier.max_scope.operations)?,
+                    max_invocations: tier.max_scope.max_invocations,
+                    max_cost_per_invocation: tier.max_scope.max_cost_per_invocation.clone(),
+                    max_total_cost: tier.max_scope.max_total_cost.clone(),
+                    max_delegation_depth: tier.max_scope.max_delegation_depth,
+                    ttl_seconds: tier.max_scope.ttl_seconds,
+                    constraints_required: tier.max_scope.constraints_required.unwrap_or(false),
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, PolicyError>>()?;
+    tiers.sort_by(|left, right| {
+        left.score_range[0]
+            .partial_cmp(&right.score_range[0])
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                left.score_range[1]
+                    .partial_cmp(&right.score_range[1])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .then_with(|| left.name.cmp(&right.name))
+    });
+
+    Ok(Some(ReputationIssuancePolicy {
+        scoring,
+        probationary_receipt_count,
+        probationary_min_days,
+        probationary_score_ceiling,
+        tiers,
+    }))
 }
 
 /// Parse a policy from a YAML string (for testing).
@@ -869,6 +1004,7 @@ fn runtime_hash_for_hushspec(
     spec: &pact_policy::HushSpec,
 ) -> Result<String, PolicyError> {
     let rules = spec.rules.as_ref();
+    let extensions = spec.extensions.as_ref();
     let fingerprint = serde_json::json!({
         "format": PolicyFormat::HushSpec.as_str(),
         "kernel": kernel,
@@ -881,7 +1017,8 @@ fn runtime_hash_for_hushspec(
             "patch_integrity": rules.and_then(|entry| entry.patch_integrity.as_ref()),
             "shell_commands": rules.and_then(|entry| entry.shell_commands.as_ref()),
             "tool_access": rules.and_then(|entry| entry.tool_access.as_ref()),
-        }
+        },
+        "reputation": extensions.and_then(|entry| entry.reputation.as_ref()),
     });
     hash_json_value(&fingerprint)
 }
@@ -1412,6 +1549,43 @@ capabilities:
         assert_eq!(
             loaded.default_capabilities[0].scope.grants[1].tool_name,
             "list_directory"
+        );
+    }
+
+    #[test]
+    fn load_hushspec_materializes_reputation_issuance_policy() {
+        let loaded = load_policy(&fixture_path("hushspec-reputation.yaml")).unwrap();
+
+        let issuance_policy = loaded
+            .issuance_policy
+            .expect("reputation issuance policy should materialize");
+        assert_eq!(issuance_policy.probationary_receipt_count, 1000);
+        assert_eq!(issuance_policy.probationary_min_days, 30);
+        assert_eq!(issuance_policy.probationary_score_ceiling, 0.60);
+        assert_eq!(issuance_policy.tiers.len(), 4);
+        assert_eq!(issuance_policy.tiers[0].name, "probationary");
+        assert_eq!(
+            issuance_policy.tiers[0].max_scope.max_total_cost,
+            Some(MonetaryAmount {
+                units: 1_000,
+                currency: "USD".to_string(),
+            })
+        );
+        assert_eq!(
+            issuance_policy
+                .tiers
+                .last()
+                .expect("elevated tier")
+                .max_scope
+                .operations,
+            vec![
+                Operation::Read,
+                Operation::Get,
+                Operation::Invoke,
+                Operation::ReadResult,
+                Operation::Delegate,
+                Operation::Subscribe,
+            ]
         );
     }
 }

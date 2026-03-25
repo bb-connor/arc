@@ -1,0 +1,311 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  fetchAgentCostSeries,
+  fetchOperatorReport,
+  fetchReputationComparison,
+  fetchReceiptAnalytics,
+  getToken,
+} from './api'
+import { receiptSubjectKey, type Receipt } from './types'
+
+describe('dashboard api helpers', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    vi.restoreAllMocks()
+    window.history.replaceState({}, '', '/')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('stores token from the URL and removes it from the visible location', () => {
+    window.history.replaceState({}, '', '/?token=secret-token')
+
+    expect(getToken()).toBe('secret-token')
+    expect(sessionStorage.getItem('pact_token')).toBe('secret-token')
+    expect(window.location.pathname).toBe('/')
+    expect(window.location.search).toBe('')
+  })
+
+  it('calls the backend analytics endpoint with auth headers', async () => {
+    sessionStorage.setItem('pact_token', 'bearer-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        summary: {
+          totalReceipts: 1,
+          allowCount: 1,
+          denyCount: 0,
+          cancelledCount: 0,
+          incompleteCount: 0,
+          totalCostCharged: 250,
+          totalAttemptedCost: 250,
+        },
+        byAgent: [],
+        byTool: [],
+        byTime: [],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchReceiptAnalytics({
+      agentSubject: 'agent-a',
+      groupLimit: 10,
+      timeBucket: 'day',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/receipts/analytics?agentSubject=agent-a&groupLimit=10&timeBucket=day',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer bearer-token',
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
+  it('maps backend analytics buckets into sparkline points', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          summary: {
+            totalReceipts: 2,
+            allowCount: 2,
+            denyCount: 0,
+            cancelledCount: 0,
+            incompleteCount: 0,
+            totalCostCharged: 750,
+            totalAttemptedCost: 750,
+          },
+          byAgent: [],
+          byTool: [],
+          byTime: [
+            {
+              bucketStart: 1_728_864_000,
+              bucketEnd: 1_728_950_400,
+              metrics: {
+                totalReceipts: 1,
+                allowCount: 1,
+                denyCount: 0,
+                cancelledCount: 0,
+                incompleteCount: 0,
+                totalCostCharged: 500,
+                totalAttemptedCost: 500,
+              },
+            },
+            {
+              bucketStart: 1_728_950_400,
+              bucketEnd: 1_729_036_800,
+              metrics: {
+                totalReceipts: 1,
+                allowCount: 1,
+                denyCount: 0,
+                cancelledCount: 0,
+                incompleteCount: 0,
+                totalCostCharged: 250,
+                totalAttemptedCost: 250,
+              },
+            },
+          ],
+        }),
+      }),
+    )
+
+    await expect(fetchAgentCostSeries('agent-a')).resolves.toEqual([
+      { time: '2024-10-14', cost: 500 },
+      { time: '2024-10-15', cost: 250 },
+    ])
+  })
+
+  it('calls the backend operator report endpoint with dashboard defaults', async () => {
+    sessionStorage.setItem('pact_token', 'bearer-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        generatedAt: 1_700_000_000,
+        filters: {},
+        activity: {
+          summary: {
+            totalReceipts: 0,
+            allowCount: 0,
+            denyCount: 0,
+            cancelledCount: 0,
+            incompleteCount: 0,
+            totalCostCharged: 0,
+            totalAttemptedCost: 0,
+          },
+          byAgent: [],
+          byTool: [],
+          byTime: [],
+        },
+        costAttribution: {
+          summary: {
+            matchingReceipts: 0,
+            returnedReceipts: 0,
+            totalCostCharged: 0,
+            totalAttemptedCost: 0,
+            maxDelegationDepth: 0,
+            distinctRootSubjects: 0,
+            distinctLeafSubjects: 0,
+            lineageGapCount: 0,
+            truncated: false,
+          },
+          byRoot: [],
+          byLeaf: [],
+          receipts: [],
+        },
+        budgetUtilization: {
+          summary: {
+            matchingGrants: 0,
+            returnedGrants: 0,
+            distinctCapabilities: 0,
+            distinctSubjects: 0,
+            totalInvocations: 0,
+            totalCostCharged: 0,
+            nearLimitCount: 0,
+            exhaustedCount: 0,
+            rowsMissingScope: 0,
+            rowsMissingLineage: 0,
+            truncated: false,
+          },
+          rows: [],
+        },
+        compliance: {
+          matchingReceipts: 0,
+          evidenceReadyReceipts: 0,
+          uncheckpointedReceipts: 0,
+          lineageCoveredReceipts: 0,
+          lineageGapReceipts: 0,
+          pendingSettlementReceipts: 0,
+          failedSettlementReceipts: 0,
+          directEvidenceExportSupported: true,
+          childReceiptScope: 'full_query_window',
+          proofsComplete: true,
+          exportQuery: {},
+        },
+        sharedEvidence: {
+          summary: {
+            matchingShares: 0,
+            matchingReferences: 0,
+            matchingLocalReceipts: 0,
+            remoteToolReceipts: 0,
+            remoteLineageRecords: 0,
+            distinctRemoteSubjects: 0,
+            proofRequiredShares: 0,
+            truncated: false,
+          },
+          references: [],
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchOperatorReport({
+      agentSubject: 'agent-a',
+      toolServer: 'shell',
+      toolName: 'bash',
+      since: 123,
+      until: 456,
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/reports/operator?agentSubject=agent-a&toolServer=shell&toolName=bash&since=123&until=456&groupLimit=10&timeBucket=day&attributionLimit=10&budgetLimit=10',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer bearer-token',
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
+  it('posts portable reputation comparison requests with bearer auth', async () => {
+    sessionStorage.setItem('pact_token', 'bearer-token')
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        subjectKey: 'agent-a',
+        passportSubject: 'did:pact:agent-a',
+        subjectMatches: true,
+        comparedAt: 1_700_000_000,
+        local: {
+          subjectKey: 'agent-a',
+          effectiveScore: 0.82,
+          probationary: false,
+          scoringSource: 'issuance_policy',
+        },
+        passportVerification: {
+          subject: 'did:pact:agent-a',
+          issuer: 'did:pact:issuer-a',
+          issuers: ['did:pact:issuer-a'],
+          issuerCount: 1,
+          credentialCount: 1,
+          merkleRootCount: 1,
+          verifiedAt: 1_700_000_000,
+          validUntil: '2026-03-30T00:00:00Z',
+        },
+        credentialDrifts: [],
+        sharedEvidence: {
+          summary: {
+            matchingShares: 0,
+            matchingReferences: 0,
+            matchingLocalReceipts: 0,
+            remoteToolReceipts: 0,
+            remoteLineageRecords: 0,
+            distinctRemoteSubjects: 0,
+            proofRequiredShares: 0,
+            truncated: false,
+          },
+          references: [],
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchReputationComparison('agent-a', { schema: 'pact.agent-passport.v1' })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/reputation/compare/agent-a',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          passport: { schema: 'pact.agent-passport.v1' },
+        }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer bearer-token',
+          'Content-Type': 'application/json',
+        }),
+      }),
+    )
+  })
+
+  it('extracts the analytics subject from receipt attribution metadata', () => {
+    const receipt = {
+      id: 'r-1',
+      timestamp: 1,
+      capability_id: 'cap-123',
+      tool_server: 'shell',
+      tool_name: 'bash',
+      action: {
+        parameters: {},
+        parameter_hash: 'hash',
+      },
+      decision: 'allow',
+      metadata: {
+        attribution: {
+          subject_key: 'agent-subject',
+          issuer_key: 'issuer-subject',
+          delegation_depth: 1,
+          grant_index: 0,
+        },
+      },
+    } satisfies Receipt
+
+    expect(receiptSubjectKey(receipt)).toBe('agent-subject')
+  })
+})

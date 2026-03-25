@@ -7,6 +7,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use pact_core::capability::{CapabilityToken, CapabilityTokenBody, PactScope};
 use pact_core::crypto::Keypair;
 use pact_core::receipt::{
     ChildRequestReceipt, ChildRequestReceiptBody, Decision, PactReceipt, PactReceiptBody,
@@ -173,6 +174,11 @@ fn node_diagnostics(client: &Client, base_url: &str, token: &str, capability_id:
             &format!("{base_url}/v1/internal/cluster/status"),
             token,
         ),
+        "lineage": try_get_json(
+            client,
+            &format!("{base_url}/v1/lineage/{capability_id}/chain"),
+            token,
+        ),
         "budgets": try_get_json(
             client,
             &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
@@ -290,6 +296,22 @@ fn sample_child_receipt(id: &str, request_suffix: &str) -> ChildRequestReceipt {
     .expect("sign child receipt")
 }
 
+fn sample_capability(id: &str, subject_kp: &Keypair, issuer_kp: &Keypair) -> CapabilityToken {
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer_kp.public_key(),
+            subject: subject_kp.public_key(),
+            scope: PactScope::default(),
+            issued_at: 1_000,
+            expires_at: 9_000,
+            delegation_chain: vec![],
+        },
+        issuer_kp,
+    )
+    .expect("sign capability")
+}
+
 fn assert_write_visibility_metadata<'a>(response: &'a Value) -> &'a str {
     assert_eq!(response["visibleAtLeader"].as_bool(), Some(true));
     let leader_url = response["leaderUrl"].as_str().expect("leaderUrl metadata");
@@ -382,6 +404,20 @@ fn assert_budget_invocation_count(
         .find(|usage| usage["grantIndex"].as_u64() == Some(grant_index))
         .expect("matching budget usage");
     assert_eq!(usage["invocationCount"].as_u64(), Some(expected));
+}
+
+fn assert_lineage_visible(client: &Client, base_url: &str, token: &str, capability_id: &str) {
+    let lineage = get_json(
+        client,
+        &format!("{base_url}/v1/lineage/{capability_id}"),
+        token,
+    );
+    assert_eq!(
+        lineage["capabilityId"]
+            .as_str()
+            .or_else(|| lineage["capability_id"].as_str()),
+        Some(capability_id)
+    );
 }
 
 fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize) {
@@ -577,6 +613,66 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         .and_then(|value| value["count"].as_u64())
             == Some(2)
     });
+
+    let issuer_kp = Keypair::generate();
+    let root_kp = Keypair::generate();
+    let child_kp = Keypair::generate();
+    let root_capability = sample_capability("cluster-lineage-root", &root_kp, &issuer_kp);
+    let child_capability = sample_capability("cluster-lineage-child", &child_kp, &issuer_kp);
+
+    let stored_root_lineage = post_json(
+        &client,
+        &format!("{leader_url}/v1/lineage"),
+        service_token,
+        &json!({
+            "capability": root_capability,
+        }),
+    );
+    assert_eq!(stored_root_lineage["stored"].as_bool(), Some(true));
+    assert_expected_write_visibility_metadata(&stored_root_lineage, &leader_url);
+    assert_lineage_visible(&client, &leader_url, service_token, "cluster-lineage-root");
+
+    let stored_child_lineage = post_json(
+        &client,
+        &format!("{follower_url}/v1/lineage"),
+        service_token,
+        &json!({
+            "capability": child_capability,
+            "parentCapabilityId": "cluster-lineage-root",
+        }),
+    );
+    assert_eq!(stored_child_lineage["stored"].as_bool(), Some(true));
+    assert_expected_write_visibility_metadata(&stored_child_lineage, &leader_url);
+    assert_lineage_visible(&client, &leader_url, service_token, "cluster-lineage-child");
+
+    wait_until_with_diagnostics(
+        "lineage replication",
+        Duration::from_secs(90),
+        || {
+            let Some(lineage) = try_get_json(
+                &client,
+                &format!("{follower_url}/v1/lineage/cluster-lineage-child/chain"),
+                service_token,
+            ) else {
+                return false;
+            };
+            let Some(chain) = lineage.as_array() else {
+                return false;
+            };
+            chain.len() == 2
+                && chain[0]["capability_id"].as_str() == Some("cluster-lineage-root")
+                && chain[1]["capability_id"].as_str() == Some("cluster-lineage-child")
+        },
+        || {
+            cluster_timeout_diagnostics(
+                &client,
+                &leader_url,
+                &follower_url,
+                service_token,
+                "cluster-lineage-child",
+            )
+        },
+    );
 
     let revoked_leader = post_json(
         &client,

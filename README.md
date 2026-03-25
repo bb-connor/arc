@@ -91,7 +91,7 @@ In this workspace, those pieces are implemented as Rust crates rather than a ful
 - `pact-cli`: `pact check`, `pact run`, `pact mcp serve`, and `pact mcp serve-http` for exposing MCP-compatible edges backed by the kernel
 - `pact-manifest`: tool manifest types plus signing and verification
 - `pact-mcp-adapter`: MCP wrapping, transport, and edge support for tool flows plus first-class resource and prompt session handling in the in-process edge
-- `examples/hello-tool`: maintained native-service example using `NativePactServiceBuilder` for a tool, resource, prompt, and manifest signing flow
+- `examples/hello-tool`: maintained native-service example using `NativePactServiceBuilder` for a tool, resource, prompt, manifest signing flow, and manifest pricing metadata
 - `formal/diff-tests`: differential tests for scope semantics
 
 ## What Is Not Finished Yet
@@ -125,6 +125,7 @@ For new policy authoring, use HushSpec.
 Both inputs compile into the same runtime policy materialization inside `pact-cli`; the difference is product guidance, not a split execution path.
 
 For wrapped-MCP-to-native migration and the first higher-level native service surface, see [docs/NATIVE_ADOPTION_GUIDE.md](docs/NATIVE_ADOPTION_GUIDE.md).
+For advertised tool pricing and pre-invocation budget planning, see [docs/TOOL_PRICING_GUIDE.md](docs/TOOL_PRICING_GUIDE.md).
 
 ## Release Qualification
 

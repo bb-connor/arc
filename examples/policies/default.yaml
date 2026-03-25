@@ -1,0 +1,34 @@
+# PACT default policy
+#
+# Enables core guards and issues a wildcard capability with a 5-minute TTL.
+# Intended for development and testing.
+
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+
+guards:
+  forbidden_path:
+    enabled: true
+    additional_patterns:
+      - "/custom/secret/*"
+  shell_command:
+    enabled: true
+  egress_allowlist:
+    enabled: true
+    allowed_domains:
+      - "*.github.com"
+      - "*.openai.com"
+      - "api.anthropic.com"
+      - "*.npmjs.org"
+      - "registry.npmjs.org"
+      - "pypi.org"
+      - "crates.io"
+
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300

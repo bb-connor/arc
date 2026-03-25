@@ -16,8 +16,16 @@
 #![allow(clippy::large_enum_variant, clippy::too_many_arguments)]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
+mod certify;
+mod did;
+mod enterprise_federation;
+mod evidence_export;
+mod issuance;
+mod passport;
+mod passport_verifier;
 mod policy;
 mod remote_mcp;
+mod reputation;
 mod trust_control;
 
 use std::fs;
@@ -43,6 +51,7 @@ use pact_kernel::{
 };
 use pact_mcp_adapter::{AdaptedMcpServer, McpAdapterConfig, McpEdgeConfig, PactMcpEdge};
 
+use crate::enterprise_federation::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
 use crate::policy::{load_policy, DefaultCapability, LoadedPolicy};
 
 /// PACT -- Provable Agent Capability Transport.
@@ -141,6 +150,36 @@ enum Commands {
         #[command(subcommand)]
         command: ReceiptCommands,
     },
+
+    /// Export an offline evidence package from the local receipt database.
+    Evidence {
+        #[command(subcommand)]
+        command: EvidenceCommands,
+    },
+
+    /// Evaluate a conformance corpus and emit a signed certification artifact.
+    Certify {
+        #[command(subcommand)]
+        command: CertifyCommands,
+    },
+
+    /// Resolve self-certifying did:pact identifiers into DID Documents.
+    Did {
+        #[command(subcommand)]
+        command: DidCommands,
+    },
+
+    /// Create, verify, and present Agent Passport bundles.
+    Passport {
+        #[command(subcommand)]
+        command: PassportCommands,
+    },
+
+    /// Inspect local reputation scorecards from persisted receipts and lineage state.
+    Reputation {
+        #[command(subcommand)]
+        command: ReputationCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -222,19 +261,47 @@ enum McpCommands {
         #[arg(long)]
         auth_token: Option<String>,
 
-        /// Ed25519 public key used to verify OAuth-style JWT bearer tokens.
+        /// Public key used to verify externally issued JWT bearer tokens.
         #[arg(long)]
         auth_jwt_public_key: Option<String>,
+
+        /// OIDC discovery URL used to resolve issuer metadata and JWT JWKS keys.
+        #[arg(long)]
+        auth_jwt_discovery_url: Option<String>,
+
+        /// OAuth2 token introspection endpoint used to validate opaque bearer tokens.
+        #[arg(long)]
+        auth_introspection_url: Option<String>,
+
+        /// Client ID used when calling the token introspection endpoint.
+        #[arg(long)]
+        auth_introspection_client_id: Option<String>,
+
+        /// Client secret used when calling the token introspection endpoint.
+        #[arg(long)]
+        auth_introspection_client_secret: Option<String>,
+
+        /// Optional provider profile used for principal mapping and default OIDC discovery behavior.
+        #[arg(long, value_enum)]
+        auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
 
         /// Local auth-server signing seed file. When set, `serve-http` can issue JWTs itself.
         #[arg(long)]
         auth_server_seed_file: Option<PathBuf>,
 
-        /// Expected JWT issuer for remote MCP session admission.
+        /// Persistent seed file used to derive stable PACT subjects from authenticated OAuth bearer principals.
+        #[arg(long)]
+        identity_federation_seed_file: Option<PathBuf>,
+
+        /// Optional file-backed enterprise provider registry shared with trust-control.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+
+        /// Expected bearer-token issuer for remote MCP session admission.
         #[arg(long)]
         auth_jwt_issuer: Option<String>,
 
-        /// Expected JWT audience for remote MCP session admission.
+        /// Expected bearer-token audience for remote MCP session admission.
         #[arg(long)]
         auth_jwt_audience: Option<String>,
 
@@ -311,6 +378,38 @@ enum TrustCommands {
         /// Background cluster sync interval in milliseconds.
         #[arg(long, default_value_t = 500)]
         cluster_sync_interval_ms: u64,
+
+        /// Optional policy file whose reputation issuance extension is enforced by the service.
+        #[arg(long)]
+        policy: Option<PathBuf>,
+
+        /// Optional file-backed enterprise provider registry shared with remote MCP edges.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+
+        /// Optional file-backed signed verifier policy registry for remote verifier flows.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+
+        /// Optional SQLite verifier challenge-state database for replay-safe remote verifier flows.
+        #[arg(long)]
+        verifier_challenge_db: Option<PathBuf>,
+
+        /// Optional file-backed certification registry for publish/resolve/revoke flows.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+
+    /// Manage enterprise federation provider-admin records.
+    Provider {
+        #[command(subcommand)]
+        command: TrustProviderCommands,
+    },
+
+    /// Inspect shared remote evidence references used by local delegated activity.
+    EvidenceShare {
+        #[command(subcommand)]
+        command: TrustEvidenceShareCommands,
     },
 
     /// Persist a capability revocation into the configured revocation database.
@@ -320,11 +419,154 @@ enum TrustCommands {
         capability_id: String,
     },
 
+    /// Issue one local capability after verifying a challenge-bound portable presentation.
+    FederatedIssue {
+        /// Signed passport presentation response from the external agent.
+        #[arg(long)]
+        presentation_response: PathBuf,
+
+        /// Exact expected challenge JSON used to bind the presentation to this verifier.
+        #[arg(long)]
+        challenge: PathBuf,
+
+        /// Policy file whose default capability definition is the single capability to issue.
+        #[arg(long)]
+        capability_policy: PathBuf,
+
+        /// Optional enterprise identity context JSON used for provider-admin-gated admission.
+        #[arg(long)]
+        enterprise_identity: Option<PathBuf>,
+
+        /// Optional signed federated delegation policy that sets the parent scope/TTL ceiling.
+        #[arg(long)]
+        delegation_policy: Option<PathBuf>,
+
+        /// Optional imported upstream capability ID used as the parent for multi-hop federated delegation.
+        #[arg(long)]
+        upstream_capability_id: Option<String>,
+    },
+
+    /// Create a signed federated delegation policy from a single default capability.
+    FederatedDelegationPolicyCreate {
+        /// Output path for the signed policy JSON.
+        #[arg(long)]
+        output: PathBuf,
+
+        /// Persistent seed file used to sign the federated delegation policy.
+        #[arg(long)]
+        signing_seed_file: PathBuf,
+
+        /// Local issuer name or organization identifier.
+        #[arg(long)]
+        issuer: String,
+
+        /// External partner name or organization identifier.
+        #[arg(long)]
+        partner: String,
+
+        /// Trust-control verifier URL this policy is bound to.
+        #[arg(long)]
+        verifier: String,
+
+        /// Capability policy whose single default capability becomes the delegation ceiling.
+        #[arg(long)]
+        capability_policy: PathBuf,
+
+        /// Policy expiration as Unix seconds.
+        #[arg(long)]
+        expires_at: u64,
+
+        /// Optional reason or purpose string embedded in the policy document.
+        #[arg(long)]
+        purpose: Option<String>,
+
+        /// Optional upstream capability ID that this delegation policy is allowed to continue from.
+        #[arg(long)]
+        parent_capability_id: Option<String>,
+    },
+
     /// Query whether a capability ID is currently revoked.
     Status {
         /// Capability ID to check.
         #[arg(long)]
         capability_id: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrustProviderCommands {
+    /// List enterprise provider records from the shared registry.
+    List {
+        /// Local registry file to inspect when not using --control-url.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+    },
+
+    /// Read one enterprise provider record.
+    Get {
+        /// Provider ID to fetch.
+        #[arg(long)]
+        provider_id: String,
+
+        /// Local registry file to inspect when not using --control-url.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+    },
+
+    /// Create or update one enterprise provider record from JSON.
+    Upsert {
+        /// Input JSON file containing an EnterpriseProviderRecord.
+        #[arg(long)]
+        input: PathBuf,
+
+        /// Local registry file to update when not using --control-url.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+    },
+
+    /// Delete one enterprise provider record.
+    Delete {
+        /// Provider ID to delete.
+        #[arg(long)]
+        provider_id: String,
+
+        /// Local registry file to update when not using --control-url.
+        #[arg(long)]
+        enterprise_providers_file: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrustEvidenceShareCommands {
+    /// List shared-evidence references visible from local activity or the remote trust service.
+    List {
+        /// Filter by local capability ID.
+        #[arg(long)]
+        capability: Option<String>,
+        /// Filter by local agent subject public key.
+        #[arg(long)]
+        agent_subject: Option<String>,
+        /// Filter by local tool server.
+        #[arg(long)]
+        tool_server: Option<String>,
+        /// Filter by local tool name.
+        #[arg(long)]
+        tool_name: Option<String>,
+        /// Filter: receipts with timestamp >= this Unix seconds value.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Filter: receipts with timestamp <= this Unix seconds value.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Filter by remote share issuer.
+        #[arg(long)]
+        issuer: Option<String>,
+        /// Filter by remote share partner.
+        #[arg(long)]
+        partner: Option<String>,
+        /// Maximum number of shared-evidence references to return.
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
     },
 }
 
@@ -362,6 +604,480 @@ enum ReceiptCommands {
         /// Cursor for pagination (seq value to start after).
         #[arg(long)]
         cursor: Option<u64>,
+    },
+}
+
+#[derive(Subcommand)]
+enum EvidenceCommands {
+    /// Export a verifiable local evidence package into a directory.
+    Export {
+        /// Output directory for the evidence package. Must not already contain files.
+        #[arg(long)]
+        output: PathBuf,
+        /// Filter tool receipts by capability ID.
+        #[arg(long)]
+        capability: Option<String>,
+        /// Filter tool receipts by agent subject public key.
+        #[arg(long)]
+        agent_subject: Option<String>,
+        /// Include tool receipts with timestamp >= this Unix seconds value.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Include tool receipts with timestamp <= this Unix seconds value.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Optional policy file to attach to the export package.
+        #[arg(long)]
+        policy_file: Option<PathBuf>,
+        /// Optional signed bilateral federation policy that constrains the export scope.
+        #[arg(long)]
+        federation_policy: Option<PathBuf>,
+        /// Fail the export if any selected tool receipt lacks checkpoint coverage.
+        #[arg(long, default_value_t = false)]
+        require_proofs: bool,
+    },
+    /// Verify an exported evidence package offline.
+    Verify {
+        /// Input directory containing a previously exported evidence package.
+        #[arg(long)]
+        input: PathBuf,
+    },
+    /// Import a verified bilateral evidence package for later federated delegation.
+    Import {
+        /// Input directory containing a previously exported evidence package.
+        #[arg(long)]
+        input: PathBuf,
+    },
+    /// Create a signed bilateral receipt-sharing policy document.
+    FederationPolicy {
+        #[command(subcommand)]
+        command: EvidenceFederationPolicyCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum EvidenceFederationPolicyCommands {
+    /// Create a signed bilateral federation policy for receipt sharing.
+    Create {
+        /// Output JSON file for the signed policy document.
+        #[arg(long)]
+        output: PathBuf,
+        /// Persistent seed file used to sign the policy document.
+        #[arg(long)]
+        signing_seed_file: PathBuf,
+        /// Human-readable identifier for the issuing organization.
+        #[arg(long)]
+        issuer: String,
+        /// Human-readable identifier for the receiving organization.
+        #[arg(long)]
+        partner: String,
+        /// Optional capability scope for the shared export.
+        #[arg(long)]
+        capability: Option<String>,
+        /// Optional agent subject scope for the shared export.
+        #[arg(long)]
+        agent_subject: Option<String>,
+        /// Optional lower timestamp bound for the allowed export window.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Optional upper timestamp bound for the allowed export window.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Expiration time for the policy document, in Unix seconds.
+        #[arg(long)]
+        expires_at: u64,
+        /// Require full checkpoint coverage for any export performed under this policy.
+        #[arg(long, default_value_t = false)]
+        require_proofs: bool,
+        /// Optional reason or purpose string embedded in the policy document.
+        #[arg(long)]
+        purpose: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum CertifyCommands {
+    /// Evaluate conformance evidence and emit a signed pass/fail certification artifact.
+    Check {
+        /// Directory containing conformance scenario descriptor JSON files.
+        #[arg(long)]
+        scenarios_dir: PathBuf,
+        /// Directory containing conformance result JSON files.
+        #[arg(long)]
+        results_dir: PathBuf,
+        /// Output path for the signed certification artifact JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Stable identifier for the tool server being checked.
+        #[arg(long)]
+        tool_server_id: String,
+        /// Optional human-readable name for the tool server being checked.
+        #[arg(long)]
+        tool_server_name: Option<String>,
+        /// Optional path to write a generated markdown report for the evaluated corpus.
+        #[arg(long)]
+        report_output: Option<PathBuf>,
+        /// Certification criteria profile to apply.
+        #[arg(long, default_value = "conformance-all-pass-v1")]
+        criteria_profile: String,
+        /// Persistent seed file used to sign certification artifacts.
+        #[arg(long)]
+        signing_seed_file: PathBuf,
+    },
+
+    /// Verify a signed certification artifact.
+    Verify {
+        /// Input path for the signed certification artifact JSON.
+        #[arg(long)]
+        input: PathBuf,
+    },
+
+    /// Publish, resolve, and revoke certification artifacts in a registry.
+    Registry {
+        #[command(subcommand)]
+        command: CertifyRegistryCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum CertifyRegistryCommands {
+    /// Publish one signed certification artifact into a local or remote registry.
+    Publish {
+        /// Input path for the signed certification artifact JSON.
+        #[arg(long)]
+        input: PathBuf,
+        /// Local registry file to update when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+
+    /// List certification artifacts from a local or remote registry.
+    List {
+        /// Local registry file to inspect when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+
+    /// Read one certification artifact from a local or remote registry.
+    Get {
+        /// Certification artifact ID to fetch.
+        #[arg(long)]
+        artifact_id: String,
+        /// Local registry file to inspect when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+
+    /// Resolve the current certification status for one tool server.
+    Resolve {
+        /// Stable tool-server identifier whose current certification should be resolved.
+        #[arg(long)]
+        tool_server_id: String,
+        /// Local registry file to inspect when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+
+    /// Revoke one certification artifact in a local or remote registry.
+    Revoke {
+        /// Certification artifact ID to revoke.
+        #[arg(long)]
+        artifact_id: String,
+        /// Optional human-readable revocation reason.
+        #[arg(long)]
+        reason: Option<String>,
+        /// Optional revocation timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        revoked_at: Option<u64>,
+        /// Local registry file to update when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum DidCommands {
+    /// Resolve a did:pact identifier or Ed25519 public key into a DID Document.
+    Resolve {
+        /// Fully-qualified did:pact identifier to resolve.
+        #[arg(long, conflicts_with = "public_key")]
+        did: Option<String>,
+        /// Hex-encoded Ed25519 public key to resolve as did:pact.
+        #[arg(long, conflicts_with = "did")]
+        public_key: Option<String>,
+        /// Optional receipt log service endpoint to include in the resolved document.
+        #[arg(long = "receipt-log-url")]
+        receipt_log_urls: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum PassportCommands {
+    /// Create a single-issuer Agent Passport from local receipt and lineage data.
+    Create {
+        /// Subject Ed25519 public key in hex.
+        #[arg(long)]
+        subject_public_key: String,
+        /// Output path for the passport JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Persistent seed file used to sign the embedded reputation credential.
+        #[arg(long)]
+        signing_seed_file: PathBuf,
+        /// Passport validity period in days.
+        #[arg(long, default_value_t = 30)]
+        validity_days: u32,
+        /// Optional lower bound for the attested receipt window, in Unix seconds.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Optional upper bound for the attested receipt window, in Unix seconds.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Optional receipt log service endpoint(s) to embed in attestation evidence.
+        #[arg(long = "receipt-log-url")]
+        receipt_log_urls: Vec<String>,
+        /// Fail if any selected receipt lacks checkpoint coverage.
+        #[arg(long, default_value_t = false)]
+        require_checkpoints: bool,
+    },
+
+    /// Verify a passport and every embedded credential without external glue code.
+    Verify {
+        /// Passport JSON file to verify.
+        #[arg(long)]
+        input: PathBuf,
+        /// Verification timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        at: Option<u64>,
+    },
+
+    /// Evaluate a passport against a relying-party verifier policy.
+    Evaluate {
+        /// Passport JSON file to evaluate.
+        #[arg(long)]
+        input: PathBuf,
+        /// YAML or JSON verifier policy file.
+        #[arg(long)]
+        policy: PathBuf,
+        /// Verification timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        at: Option<u64>,
+    },
+
+    /// Produce a filtered presentation from an existing passport.
+    Present {
+        /// Input passport JSON file.
+        #[arg(long)]
+        input: PathBuf,
+        /// Output path for the presented passport JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Optional issuer DID allowlist. Repeat to allow multiple issuers.
+        #[arg(long = "issuer")]
+        issuers: Vec<String>,
+        /// Maximum number of credentials to include in the presentation.
+        #[arg(long)]
+        max_credentials: Option<usize>,
+    },
+
+    /// Create, verify, and manage signed verifier-policy artifacts.
+    Policy {
+        #[command(subcommand)]
+        command: PassportPolicyCommands,
+    },
+
+    /// Create and verify challenge-bound passport presentations.
+    Challenge {
+        #[command(subcommand)]
+        command: PassportChallengeCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum PassportChallengeCommands {
+    /// Create a presentation challenge for a relying party.
+    Create {
+        /// Output path for the challenge JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Relying-party identifier or audience string.
+        #[arg(long)]
+        verifier: String,
+        /// Challenge lifetime in seconds.
+        #[arg(long, default_value_t = 300)]
+        ttl_secs: u64,
+        /// Optional issuer DID allowlist for selective disclosure. Repeat to allow multiple issuers.
+        #[arg(long = "issuer")]
+        issuers: Vec<String>,
+        /// Maximum number of credentials a holder may disclose.
+        #[arg(long)]
+        max_credentials: Option<usize>,
+        /// Optional verifier policy to embed in the challenge.
+        #[arg(long)]
+        policy: Option<PathBuf>,
+        /// Optional stored verifier policy ID to reference instead of embedding raw policy.
+        #[arg(long)]
+        policy_id: Option<String>,
+        /// Optional verifier policy registry file used when resolving --policy-id locally.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+        /// Optional SQLite challenge-state database used for replay-safe local verification.
+        #[arg(long)]
+        verifier_challenge_db: Option<PathBuf>,
+    },
+
+    /// Respond to a presentation challenge using the passport subject key.
+    Respond {
+        /// Input passport JSON file.
+        #[arg(long)]
+        input: PathBuf,
+        /// Input challenge JSON file.
+        #[arg(long)]
+        challenge: PathBuf,
+        /// Existing seed file for the passport subject key.
+        #[arg(long)]
+        holder_seed_file: PathBuf,
+        /// Output path for the signed response JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Response timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        at: Option<u64>,
+    },
+
+    /// Verify a challenge-bound passport presentation response.
+    Verify {
+        /// Input response JSON file.
+        #[arg(long)]
+        input: PathBuf,
+        /// Optional expected challenge JSON file for exact-match verification.
+        #[arg(long)]
+        challenge: Option<PathBuf>,
+        /// Optional verifier policy registry file used to resolve policy references locally.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+        /// Optional SQLite challenge-state database used for replay-safe local verification.
+        #[arg(long)]
+        verifier_challenge_db: Option<PathBuf>,
+        /// Verification timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        at: Option<u64>,
+    },
+}
+
+#[derive(Subcommand)]
+enum PassportPolicyCommands {
+    /// Create a signed verifier-policy artifact from a raw policy file.
+    Create {
+        /// Output path for the signed verifier-policy document JSON.
+        #[arg(long)]
+        output: PathBuf,
+        /// Stable verifier policy ID.
+        #[arg(long)]
+        policy_id: String,
+        /// Relying-party identifier or audience string that owns this policy.
+        #[arg(long)]
+        verifier: String,
+        /// Persistent seed file used to sign the verifier policy.
+        #[arg(long)]
+        signing_seed_file: PathBuf,
+        /// YAML or JSON file containing the raw verifier policy body.
+        #[arg(long)]
+        policy: PathBuf,
+        /// Policy expiration as Unix seconds.
+        #[arg(long)]
+        expires_at: u64,
+        /// Optional local verifier policy registry to update after creation.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+    },
+
+    /// Verify a signed verifier-policy artifact.
+    Verify {
+        /// Signed verifier-policy document JSON file.
+        #[arg(long)]
+        input: PathBuf,
+        /// Verification timestamp override in Unix seconds. Defaults to now.
+        #[arg(long)]
+        at: Option<u64>,
+    },
+
+    /// List verifier-policy artifacts from a local registry or remote service.
+    List {
+        /// Local verifier policy registry file to inspect when not using --control-url.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+    },
+
+    /// Read one verifier-policy artifact.
+    Get {
+        /// Verifier policy ID to fetch.
+        #[arg(long)]
+        policy_id: String,
+        /// Local verifier policy registry file to inspect when not using --control-url.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+    },
+
+    /// Create or update one verifier-policy artifact in a local registry or remote service.
+    Upsert {
+        /// Input JSON file containing a signed verifier-policy document.
+        #[arg(long)]
+        input: PathBuf,
+        /// Local verifier policy registry file to update when not using --control-url.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+    },
+
+    /// Delete one verifier-policy artifact from a local registry or remote service.
+    Delete {
+        /// Verifier policy ID to delete.
+        #[arg(long)]
+        policy_id: String,
+        /// Local verifier policy registry file to update when not using --control-url.
+        #[arg(long)]
+        verifier_policies_file: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ReputationCommands {
+    /// Compute the local reputation scorecard for one subject.
+    Local {
+        /// Subject Ed25519 public key in hex.
+        #[arg(long)]
+        subject_public_key: String,
+        /// Optional lower bound for the evaluated receipt window, in Unix seconds.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Optional upper bound for the evaluated receipt window, in Unix seconds.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Optional policy file whose reputation scoring config should be applied for local evaluation.
+        #[arg(long)]
+        policy: Option<PathBuf>,
+    },
+
+    /// Compare the live local reputation corpus against a portable passport artifact.
+    Compare {
+        /// Subject Ed25519 public key in hex.
+        #[arg(long)]
+        subject_public_key: String,
+        /// Passport JSON file to compare against live local state.
+        #[arg(long)]
+        passport: PathBuf,
+        /// Optional lower bound for the evaluated local receipt window, in Unix seconds.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Optional upper bound for the evaluated local receipt window, in Unix seconds.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Optional HushSpec policy file whose local reputation scoring config should be applied.
+        #[arg(long)]
+        local_policy: Option<PathBuf>,
+        /// Optional YAML or JSON verifier policy used to evaluate the passport during comparison.
+        #[arg(long)]
+        verifier_policy: Option<PathBuf>,
     },
 }
 
@@ -458,7 +1174,14 @@ fn main() {
                 listen,
                 auth_token,
                 auth_jwt_public_key,
+                auth_jwt_discovery_url,
+                auth_introspection_url,
+                auth_introspection_client_id,
+                auth_introspection_client_secret,
+                auth_jwt_provider_profile,
                 auth_server_seed_file,
+                identity_federation_seed_file,
+                enterprise_providers_file,
                 auth_jwt_issuer,
                 auth_jwt_audience,
                 admin_token,
@@ -485,7 +1208,14 @@ fn main() {
                 listen,
                 auth_token.as_deref(),
                 auth_jwt_public_key.as_deref(),
+                auth_jwt_discovery_url.as_deref(),
+                auth_introspection_url.as_deref(),
+                auth_introspection_client_id.as_deref(),
+                auth_introspection_client_secret.as_deref(),
+                auth_jwt_provider_profile,
                 auth_server_seed_file.as_deref(),
+                identity_federation_seed_file.as_deref(),
+                enterprise_providers_file.as_deref(),
                 auth_jwt_issuer.as_deref(),
                 auth_jwt_audience.as_deref(),
                 admin_token.as_deref(),
@@ -517,9 +1247,19 @@ fn main() {
                 advertise_url,
                 peer_urls,
                 cluster_sync_interval_ms,
+                policy,
+                enterprise_providers_file,
+                verifier_policies_file,
+                verifier_challenge_db,
+                certification_registry_file,
             } => cmd_trust_serve(
                 listen,
                 &service_token,
+                policy.as_deref(),
+                enterprise_providers_file.as_deref(),
+                verifier_policies_file.as_deref(),
+                verifier_challenge_db.as_deref(),
+                certification_registry_file.as_deref(),
                 receipt_db.as_deref(),
                 revocation_db.as_deref(),
                 authority_seed_file.as_deref(),
@@ -530,12 +1270,119 @@ fn main() {
                 &peer_urls,
                 cluster_sync_interval_ms,
             ),
+            TrustCommands::Provider { command } => match command {
+                TrustProviderCommands::List {
+                    enterprise_providers_file,
+                } => cmd_trust_provider_list(
+                    cli.json,
+                    enterprise_providers_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                TrustProviderCommands::Get {
+                    provider_id,
+                    enterprise_providers_file,
+                } => cmd_trust_provider_get(
+                    &provider_id,
+                    cli.json,
+                    enterprise_providers_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                TrustProviderCommands::Upsert {
+                    input,
+                    enterprise_providers_file,
+                } => cmd_trust_provider_upsert(
+                    &input,
+                    cli.json,
+                    enterprise_providers_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                TrustProviderCommands::Delete {
+                    provider_id,
+                    enterprise_providers_file,
+                } => cmd_trust_provider_delete(
+                    &provider_id,
+                    cli.json,
+                    enterprise_providers_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+            TrustCommands::EvidenceShare { command } => match command {
+                TrustEvidenceShareCommands::List {
+                    capability,
+                    agent_subject,
+                    tool_server,
+                    tool_name,
+                    since,
+                    until,
+                    issuer,
+                    partner,
+                    limit,
+                } => cmd_trust_evidence_share_list(
+                    capability.as_deref(),
+                    agent_subject.as_deref(),
+                    tool_server.as_deref(),
+                    tool_name.as_deref(),
+                    since,
+                    until,
+                    issuer.as_deref(),
+                    partner.as_deref(),
+                    limit,
+                    cli.json,
+                    receipt_db.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
             TrustCommands::Revoke { capability_id } => cmd_trust_revoke(
                 &capability_id,
                 cli.json,
                 revocation_db.as_deref(),
                 control_url.as_deref(),
                 control_token.as_deref(),
+            ),
+            TrustCommands::FederatedIssue {
+                presentation_response,
+                challenge,
+                capability_policy,
+                enterprise_identity,
+                delegation_policy,
+                upstream_capability_id,
+            } => cmd_trust_federated_issue(
+                &presentation_response,
+                &challenge,
+                &capability_policy,
+                enterprise_identity.as_deref(),
+                delegation_policy.as_deref(),
+                upstream_capability_id.as_deref(),
+                cli.json,
+                control_url.as_deref(),
+                control_token.as_deref(),
+            ),
+            TrustCommands::FederatedDelegationPolicyCreate {
+                output,
+                signing_seed_file,
+                issuer,
+                partner,
+                verifier,
+                capability_policy,
+                expires_at,
+                purpose,
+                parent_capability_id,
+            } => cmd_trust_federated_delegation_policy_create(
+                &output,
+                &signing_seed_file,
+                &issuer,
+                &partner,
+                &verifier,
+                &capability_policy,
+                expires_at,
+                purpose.as_deref(),
+                parent_capability_id.as_deref(),
+                cli.json,
             ),
             TrustCommands::Status { capability_id } => cmd_trust_status(
                 &capability_id,
@@ -573,6 +1420,352 @@ fn main() {
                 control_token.as_deref(),
             ),
         },
+        Commands::Evidence { command } => match command {
+            EvidenceCommands::Export {
+                output,
+                capability,
+                agent_subject,
+                since,
+                until,
+                policy_file,
+                federation_policy,
+                require_proofs,
+            } => evidence_export::cmd_evidence_export(
+                &output,
+                capability.as_deref(),
+                agent_subject.as_deref(),
+                since,
+                until,
+                policy_file.as_deref(),
+                federation_policy.as_deref(),
+                require_proofs,
+                receipt_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+            ),
+            EvidenceCommands::Verify { input } => {
+                evidence_export::cmd_evidence_verify(&input, cli.json)
+            }
+            EvidenceCommands::Import { input } => evidence_export::cmd_evidence_import(
+                &input,
+                receipt_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+                cli.json,
+            ),
+            EvidenceCommands::FederationPolicy { command } => match command {
+                EvidenceFederationPolicyCommands::Create {
+                    output,
+                    signing_seed_file,
+                    issuer,
+                    partner,
+                    capability,
+                    agent_subject,
+                    since,
+                    until,
+                    expires_at,
+                    require_proofs,
+                    purpose,
+                } => evidence_export::cmd_evidence_federation_policy_create(
+                    &output,
+                    &signing_seed_file,
+                    &issuer,
+                    &partner,
+                    capability.as_deref(),
+                    agent_subject.as_deref(),
+                    since,
+                    until,
+                    expires_at,
+                    require_proofs,
+                    purpose.as_deref(),
+                    cli.json,
+                ),
+            },
+        },
+        Commands::Certify { command } => match command {
+            CertifyCommands::Check {
+                scenarios_dir,
+                results_dir,
+                output,
+                tool_server_id,
+                tool_server_name,
+                report_output,
+                criteria_profile,
+                signing_seed_file,
+            } => certify::cmd_certify_check(
+                &scenarios_dir,
+                &results_dir,
+                &output,
+                &tool_server_id,
+                tool_server_name.as_deref(),
+                report_output.as_deref(),
+                &criteria_profile,
+                &signing_seed_file,
+                cli.json,
+            ),
+            CertifyCommands::Verify { input } => certify::cmd_certify_verify(&input, cli.json),
+            CertifyCommands::Registry { command } => match command {
+                CertifyRegistryCommands::Publish {
+                    input,
+                    certification_registry_file,
+                } => cmd_certify_registry_publish(
+                    &input,
+                    certification_registry_file.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                CertifyRegistryCommands::List {
+                    certification_registry_file,
+                } => cmd_certify_registry_list(
+                    certification_registry_file.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                CertifyRegistryCommands::Get {
+                    artifact_id,
+                    certification_registry_file,
+                } => cmd_certify_registry_get(
+                    &artifact_id,
+                    certification_registry_file.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                CertifyRegistryCommands::Resolve {
+                    tool_server_id,
+                    certification_registry_file,
+                } => cmd_certify_registry_resolve(
+                    &tool_server_id,
+                    certification_registry_file.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                CertifyRegistryCommands::Revoke {
+                    artifact_id,
+                    reason,
+                    revoked_at,
+                    certification_registry_file,
+                } => cmd_certify_registry_revoke(
+                    &artifact_id,
+                    certification_registry_file.as_deref(),
+                    reason.as_deref(),
+                    revoked_at,
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+        },
+        Commands::Did { command } => match command {
+            DidCommands::Resolve {
+                did,
+                public_key,
+                receipt_log_urls,
+            } => did::cmd_did_resolve(
+                did.as_deref(),
+                public_key.as_deref(),
+                &receipt_log_urls,
+                cli.json,
+            ),
+        },
+        Commands::Passport { command } => match command {
+            PassportCommands::Create {
+                subject_public_key,
+                output,
+                signing_seed_file,
+                validity_days,
+                since,
+                until,
+                receipt_log_urls,
+                require_checkpoints,
+            } => passport::cmd_passport_create(
+                &subject_public_key,
+                &output,
+                &signing_seed_file,
+                validity_days,
+                since,
+                until,
+                &receipt_log_urls,
+                require_checkpoints,
+                receipt_db.as_deref(),
+                budget_db.as_deref(),
+                cli.json,
+            ),
+            PassportCommands::Verify { input, at } => {
+                passport::cmd_passport_verify(&input, at, cli.json)
+            }
+            PassportCommands::Evaluate { input, policy, at } => {
+                passport::cmd_passport_evaluate(&input, &policy, at, cli.json)
+            }
+            PassportCommands::Present {
+                input,
+                output,
+                issuers,
+                max_credentials,
+            } => {
+                passport::cmd_passport_present(&input, &output, &issuers, max_credentials, cli.json)
+            }
+            PassportCommands::Policy { command } => match command {
+                PassportPolicyCommands::Create {
+                    output,
+                    policy_id,
+                    verifier,
+                    signing_seed_file,
+                    policy,
+                    expires_at,
+                    verifier_policies_file,
+                } => passport::cmd_passport_policy_create(
+                    &output,
+                    &policy_id,
+                    &verifier,
+                    &signing_seed_file,
+                    &policy,
+                    expires_at,
+                    verifier_policies_file.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                PassportPolicyCommands::Verify { input, at } => {
+                    passport::cmd_passport_policy_verify(&input, at, cli.json)
+                }
+                PassportPolicyCommands::List {
+                    verifier_policies_file,
+                } => passport::cmd_passport_policy_list(
+                    cli.json,
+                    verifier_policies_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                PassportPolicyCommands::Get {
+                    policy_id,
+                    verifier_policies_file,
+                } => passport::cmd_passport_policy_get(
+                    &policy_id,
+                    cli.json,
+                    verifier_policies_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                PassportPolicyCommands::Upsert {
+                    input,
+                    verifier_policies_file,
+                } => passport::cmd_passport_policy_upsert(
+                    &input,
+                    cli.json,
+                    verifier_policies_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                PassportPolicyCommands::Delete {
+                    policy_id,
+                    verifier_policies_file,
+                } => passport::cmd_passport_policy_delete(
+                    &policy_id,
+                    cli.json,
+                    verifier_policies_file.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+            PassportCommands::Challenge { command } => match command {
+                PassportChallengeCommands::Create {
+                    output,
+                    verifier,
+                    ttl_secs,
+                    issuers,
+                    max_credentials,
+                    policy,
+                    policy_id,
+                    verifier_policies_file,
+                    verifier_challenge_db,
+                } => passport::cmd_passport_challenge_create(
+                    &output,
+                    &verifier,
+                    ttl_secs,
+                    &issuers,
+                    max_credentials,
+                    policy.as_deref(),
+                    policy_id.as_deref(),
+                    verifier_policies_file.as_deref(),
+                    verifier_challenge_db.as_deref(),
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                PassportChallengeCommands::Respond {
+                    input,
+                    challenge,
+                    holder_seed_file,
+                    output,
+                    at,
+                } => passport::cmd_passport_challenge_respond(
+                    &input,
+                    &challenge,
+                    &holder_seed_file,
+                    &output,
+                    at,
+                    cli.json,
+                ),
+                PassportChallengeCommands::Verify {
+                    input,
+                    challenge,
+                    verifier_policies_file,
+                    verifier_challenge_db,
+                    at,
+                } => passport::cmd_passport_challenge_verify(
+                    &input,
+                    challenge.as_deref(),
+                    verifier_policies_file.as_deref(),
+                    verifier_challenge_db.as_deref(),
+                    at,
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+        },
+        Commands::Reputation { command } => match command {
+            ReputationCommands::Local {
+                subject_public_key,
+                since,
+                until,
+                policy,
+            } => reputation::cmd_reputation_local(
+                &subject_public_key,
+                since,
+                until,
+                policy.as_deref(),
+                cli.json,
+                receipt_db.as_deref(),
+                budget_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+            ),
+            ReputationCommands::Compare {
+                subject_public_key,
+                passport,
+                since,
+                until,
+                local_policy,
+                verifier_policy,
+            } => reputation::cmd_reputation_compare(
+                &subject_public_key,
+                &passport,
+                since,
+                until,
+                local_policy.as_deref(),
+                verifier_policy.as_deref(),
+                cli.json,
+                receipt_db.as_deref(),
+                budget_db.as_deref(),
+                control_url.as_deref(),
+                control_token.as_deref(),
+            ),
+        },
     };
 
     if let Err(e) = result {
@@ -600,8 +1793,20 @@ enum CliError {
     #[error("kernel error: {0}")]
     Kernel(#[from] pact_kernel::KernelError),
 
+    #[error("checkpoint error: {0}")]
+    Checkpoint(#[from] pact_kernel::CheckpointError),
+
+    #[error("evidence export error: {0}")]
+    EvidenceExport(#[from] pact_kernel::EvidenceExportError),
+
+    #[error("credential error: {0}")]
+    Credential(#[from] pact_credentials::CredentialError),
+
     #[error("receipt store error: {0}")]
     ReceiptStore(#[from] pact_kernel::ReceiptStoreError),
+
+    #[error("conformance load error: {0}")]
+    ConformanceLoad(#[from] pact_conformance::LoadError),
 
     #[error("revocation store error: {0}")]
     RevocationStore(#[from] pact_kernel::RevocationStoreError),
@@ -623,6 +1828,9 @@ enum CliError {
 
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+
+    #[error("yaml error: {0}")]
+    Yaml(#[from] serde_yaml::Error),
 
     #[error("http error: {0}")]
     Reqwest(#[from] reqwest::Error),
@@ -647,6 +1855,7 @@ fn cmd_run(
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let issuance_policy = loaded_policy.issuance_policy.clone();
 
     info!(
         policy_path = %policy_path.display(),
@@ -662,10 +1871,14 @@ fn cmd_run(
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
+        &kernel_kp,
         authority_seed_path,
         authority_db_path,
+        receipt_db_path,
+        budget_db_path,
         control_url,
         control_token,
+        issuance_policy,
     )?;
     configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
 
@@ -784,6 +1997,7 @@ fn cmd_check(
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let issuance_policy = loaded_policy.issuance_policy.clone();
 
     let kernel_kp = Keypair::generate();
     let mut kernel = build_kernel(loaded_policy, &kernel_kp);
@@ -791,10 +2005,14 @@ fn cmd_check(
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
+        &kernel_kp,
         authority_seed_path,
         authority_db_path,
+        receipt_db_path,
+        budget_db_path,
         control_url,
         control_token,
+        issuance_policy,
     )?;
     configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
 
@@ -913,6 +2131,7 @@ fn cmd_mcp_serve(
     let loaded_policy = load_policy(policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
+    let issuance_policy = loaded_policy.issuance_policy.clone();
 
     info!(
         policy_path = %policy_path.display(),
@@ -929,10 +2148,14 @@ fn cmd_mcp_serve(
     configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
     configure_capability_authority(
         &mut kernel,
+        &kernel_kp,
         authority_seed_path,
         authority_db_path,
+        receipt_db_path,
+        budget_db_path,
         control_url,
         control_token,
+        issuance_policy,
     )?;
     configure_budget_store(&mut kernel, budget_db_path, control_url, control_token)?;
 
@@ -1016,7 +2239,14 @@ fn cmd_mcp_serve_http(
     listen: SocketAddr,
     auth_token: Option<&str>,
     auth_jwt_public_key: Option<&str>,
+    auth_jwt_discovery_url: Option<&str>,
+    auth_introspection_url: Option<&str>,
+    auth_introspection_client_id: Option<&str>,
+    auth_introspection_client_secret: Option<&str>,
+    auth_jwt_provider_profile: Option<remote_mcp::JwtProviderProfile>,
     auth_server_seed_file: Option<&Path>,
+    identity_federation_seed_file: Option<&Path>,
+    enterprise_providers_file: Option<&Path>,
     auth_jwt_issuer: Option<&str>,
     auth_jwt_audience: Option<&str>,
     admin_token: Option<&str>,
@@ -1059,7 +2289,14 @@ fn cmd_mcp_serve_http(
         listen,
         auth_token: auth_token.map(ToOwned::to_owned),
         auth_jwt_public_key: auth_jwt_public_key.map(ToOwned::to_owned),
+        auth_jwt_discovery_url: auth_jwt_discovery_url.map(ToOwned::to_owned),
+        auth_introspection_url: auth_introspection_url.map(ToOwned::to_owned),
+        auth_introspection_client_id: auth_introspection_client_id.map(ToOwned::to_owned),
+        auth_introspection_client_secret: auth_introspection_client_secret.map(ToOwned::to_owned),
+        auth_jwt_provider_profile,
         auth_server_seed_path: auth_server_seed_file.map(Path::to_path_buf),
+        identity_federation_seed_path: identity_federation_seed_file.map(Path::to_path_buf),
+        enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
         auth_jwt_issuer: auth_jwt_issuer.map(ToOwned::to_owned),
         auth_jwt_audience: auth_jwt_audience.map(ToOwned::to_owned),
         admin_token: admin_token.map(ToOwned::to_owned),
@@ -1183,10 +2420,14 @@ pub(crate) fn configure_revocation_store(
 
 pub(crate) fn configure_capability_authority(
     kernel: &mut PactKernel,
+    default_authority_keypair: &Keypair,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
     control_url: Option<&str>,
     control_token: Option<&str>,
+    issuance_policy: Option<policy::ReputationIssuancePolicy>,
 ) -> Result<(), CliError> {
     if control_url.is_some() && (authority_seed_path.is_some() || authority_db_path.is_some()) {
         return Err(CliError::Other(
@@ -1194,6 +2435,11 @@ pub(crate) fn configure_capability_authority(
         ));
     }
     if let Some(url) = control_url {
+        if issuance_policy.is_some() {
+            return Err(CliError::Other(
+                "reputation-gated issuance must be enforced by the trust-control service itself; start `pact trust serve --policy <path>` instead of relying on client-side --control-url issuance".to_string(),
+            ));
+        }
         let token = require_control_token(control_token)?;
         kernel.set_capability_authority(trust_control::build_remote_capability_authority(
             url, token,
@@ -1209,16 +2455,33 @@ pub(crate) fn configure_capability_authority(
         }
         (Some(path), None) => {
             let keypair = load_or_create_authority_keypair(path)?;
-            kernel.set_capability_authority(Box::new(pact_kernel::LocalCapabilityAuthority::new(
-                keypair,
-            )));
-        }
-        (None, Some(path)) => {
-            kernel.set_capability_authority(Box::new(
-                pact_kernel::SqliteCapabilityAuthority::open(path)?,
+            kernel.set_capability_authority(issuance::wrap_capability_authority(
+                Box::new(pact_kernel::LocalCapabilityAuthority::new(keypair)),
+                issuance_policy,
+                receipt_db_path,
+                budget_db_path,
             ));
         }
-        (None, None) => {}
+        (None, Some(path)) => {
+            kernel.set_capability_authority(issuance::wrap_capability_authority(
+                Box::new(pact_kernel::SqliteCapabilityAuthority::open(path)?),
+                issuance_policy,
+                receipt_db_path,
+                budget_db_path,
+            ));
+        }
+        (None, None) => {
+            if issuance_policy.is_some() || receipt_db_path.is_some() {
+                kernel.set_capability_authority(issuance::wrap_capability_authority(
+                    Box::new(pact_kernel::LocalCapabilityAuthority::new(
+                        default_authority_keypair.clone(),
+                    )),
+                    issuance_policy,
+                    receipt_db_path,
+                    budget_db_path,
+                ));
+            }
+        }
     }
     Ok(())
 }
@@ -1318,9 +2581,23 @@ fn require_revocation_db_path(revocation_db_path: Option<&Path>) -> Result<&Path
     })
 }
 
+fn require_receipt_db_path(receipt_db_path: Option<&Path>) -> Result<&Path, CliError> {
+    receipt_db_path.ok_or_else(|| {
+        CliError::Other(
+            "shared evidence commands require --receipt-db <path> when --control-url is not set"
+                .to_string(),
+        )
+    })
+}
+
 fn cmd_trust_serve(
     listen: SocketAddr,
     service_token: &str,
+    policy_path: Option<&Path>,
+    enterprise_providers_file: Option<&Path>,
+    verifier_policies_file: Option<&Path>,
+    verifier_challenge_db: Option<&Path>,
+    certification_registry_file: Option<&Path>,
     receipt_db_path: Option<&Path>,
     revocation_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -1331,6 +2608,10 @@ fn cmd_trust_serve(
     peer_urls: &[String],
     cluster_sync_interval_ms: u64,
 ) -> Result<(), CliError> {
+    let issuance_policy = policy_path
+        .map(load_policy)
+        .transpose()?
+        .and_then(|loaded| loaded.issuance_policy);
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
         service_token: service_token.to_string(),
@@ -1339,6 +2620,11 @@ fn cmd_trust_serve(
         authority_seed_path: authority_seed_path.map(Path::to_path_buf),
         authority_db_path: authority_db_path.map(Path::to_path_buf),
         budget_db_path: budget_db_path.map(Path::to_path_buf),
+        enterprise_providers_file: enterprise_providers_file.map(Path::to_path_buf),
+        verifier_policies_file: verifier_policies_file.map(Path::to_path_buf),
+        verifier_challenge_db_path: verifier_challenge_db.map(Path::to_path_buf),
+        certification_registry_file: certification_registry_file.map(Path::to_path_buf),
+        issuance_policy,
         advertise_url: advertise_url.map(ToOwned::to_owned),
         peer_urls: peer_urls.to_vec(),
         cluster_sync_interval: std::time::Duration::from_millis(cluster_sync_interval_ms.max(50)),
@@ -1422,6 +2708,584 @@ fn cmd_trust_status(
     }
 
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_trust_evidence_share_list(
+    capability_id: Option<&str>,
+    agent_subject: Option<&str>,
+    tool_server: Option<&str>,
+    tool_name: Option<&str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    issuer: Option<&str>,
+    partner: Option<&str>,
+    limit: usize,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let query = pact_kernel::SharedEvidenceQuery {
+        capability_id: capability_id.map(ToOwned::to_owned),
+        agent_subject: agent_subject.map(ToOwned::to_owned),
+        tool_server: tool_server.map(ToOwned::to_owned),
+        tool_name: tool_name.map(ToOwned::to_owned),
+        since,
+        until,
+        issuer: issuer.map(ToOwned::to_owned),
+        partner: partner.map(ToOwned::to_owned),
+        limit: Some(limit),
+    };
+
+    let report = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.shared_evidence_report(&query)?
+    } else {
+        let path = require_receipt_db_path(receipt_db_path)?;
+        let store = pact_kernel::SqliteReceiptStore::open(path)?;
+        store.query_shared_evidence_report(&query)?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!(
+            "matching_shares:         {}",
+            report.summary.matching_shares
+        );
+        println!(
+            "matching_references:     {}",
+            report.summary.matching_references
+        );
+        println!(
+            "matching_local_receipts: {}",
+            report.summary.matching_local_receipts
+        );
+        println!(
+            "remote_tool_receipts:    {}",
+            report.summary.remote_tool_receipts
+        );
+        println!(
+            "remote_lineage_records:  {}",
+            report.summary.remote_lineage_records
+        );
+        for reference in report.references {
+            println!(
+                "- {} partner={} remote_capability={} local_anchor={} receipts={}",
+                reference.share.share_id,
+                reference.share.partner,
+                reference.capability_id,
+                reference
+                    .local_anchor_capability_id
+                    .as_deref()
+                    .unwrap_or("n/a"),
+                reference.matched_local_receipts
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn require_enterprise_providers_file(path: Option<&Path>) -> Result<&Path, CliError> {
+    path.ok_or_else(|| {
+        CliError::Other(
+            "provider admin requires --enterprise-providers-file when --control-url is not set"
+                .to_string(),
+        )
+    })
+}
+
+fn require_certification_registry_file(path: Option<&Path>) -> Result<&Path, CliError> {
+    path.ok_or_else(|| {
+        CliError::Other(
+            "certification registry commands require --certification-registry-file when --control-url is not set"
+                .to_string(),
+        )
+    })
+}
+
+fn load_enterprise_provider_registry_local(
+    path: &Path,
+) -> Result<EnterpriseProviderRegistry, CliError> {
+    if path.exists() {
+        EnterpriseProviderRegistry::load(path)
+    } else {
+        Ok(EnterpriseProviderRegistry::default())
+    }
+}
+
+fn load_admission_policy(path: &Path) -> Result<Option<pact_policy::HushSpec>, CliError> {
+    let contents = fs::read_to_string(path)?;
+    if pact_policy::is_hushspec_format(&contents) {
+        return pact_policy::resolve_from_path(path)
+            .map(Some)
+            .map_err(|error| CliError::Other(error.to_string()));
+    }
+    Ok(None)
+}
+
+fn cmd_trust_provider_list(
+    json_output: bool,
+    enterprise_providers_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.list_enterprise_providers()?
+    } else {
+        let path = require_enterprise_providers_file(enterprise_providers_file)?;
+        let registry = load_enterprise_provider_registry_local(path)?;
+        trust_control::EnterpriseProviderListResponse {
+            configured: true,
+            count: registry.providers.len(),
+            providers: registry.providers.into_values().collect(),
+        }
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("providers: {}", response.count);
+        for provider in response.providers {
+            println!(
+                "- {} [{}] enabled={} valid={}",
+                provider.provider_id,
+                serde_json::to_string(&provider.kind).unwrap_or_default(),
+                provider.enabled,
+                provider.validation_errors.is_empty()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_provider_get(
+    provider_id: &str,
+    json_output: bool,
+    enterprise_providers_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let provider = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.get_enterprise_provider(provider_id)?
+    } else {
+        let path = require_enterprise_providers_file(enterprise_providers_file)?;
+        let registry = load_enterprise_provider_registry_local(path)?;
+        registry
+            .providers
+            .get(provider_id)
+            .cloned()
+            .ok_or_else(|| {
+                CliError::Other(format!("enterprise provider `{provider_id}` was not found"))
+            })?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&provider)?);
+    } else {
+        println!("provider_id: {}", provider.provider_id);
+        println!(
+            "kind:        {}",
+            serde_json::to_string(&provider.kind).unwrap_or_default()
+        );
+        println!("enabled:     {}", provider.enabled);
+        println!(
+            "validated:   {}",
+            if provider.validation_errors.is_empty() {
+                "true"
+            } else {
+                "false"
+            }
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_provider_upsert(
+    input_path: &Path,
+    json_output: bool,
+    enterprise_providers_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let provider: EnterpriseProviderRecord = serde_json::from_slice(&fs::read(input_path)?)?;
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?
+            .upsert_enterprise_provider(&provider.provider_id, &provider)?
+    } else {
+        let path = require_enterprise_providers_file(enterprise_providers_file)?;
+        let mut registry = load_enterprise_provider_registry_local(path)?;
+        registry.upsert(provider.clone());
+        registry.save(path)?;
+        registry
+            .providers
+            .get(&provider.provider_id)
+            .cloned()
+            .ok_or_else(|| {
+                CliError::Other("provider upsert did not persist the requested record".to_string())
+            })?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("provider upserted: {}", response.provider_id);
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_provider_delete(
+    provider_id: &str,
+    json_output: bool,
+    enterprise_providers_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.delete_enterprise_provider(provider_id)?
+    } else {
+        let path = require_enterprise_providers_file(enterprise_providers_file)?;
+        let mut registry = load_enterprise_provider_registry_local(path)?;
+        let deleted = registry.remove(provider_id);
+        registry.save(path)?;
+        trust_control::EnterpriseProviderDeleteResponse {
+            provider_id: provider_id.to_string(),
+            deleted,
+        }
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("provider_deleted: {}", response.deleted);
+        println!("provider_id:      {}", response.provider_id);
+    }
+
+    Ok(())
+}
+
+fn cmd_certify_registry_publish(
+    input_path: &Path,
+    certification_registry_file: Option<&Path>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let artifact: certify::SignedCertificationCheck =
+            serde_json::from_slice(&fs::read(input_path)?)?;
+        let entry = trust_control::build_client(url, token)?.publish_certification(&artifact)?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&entry)?);
+        } else {
+            println!("published certification artifact");
+            println!("artifact_id:     {}", entry.artifact_id);
+            println!("tool_server_id:  {}", entry.tool_server_id);
+            println!("verdict:         {}", entry.verdict.label());
+            println!("status:          {}", entry.status.label());
+        }
+        Ok(())
+    } else {
+        let path = require_certification_registry_file(certification_registry_file)?;
+        certify::cmd_certify_registry_publish_local(input_path, path, json_output)
+    }
+}
+
+fn cmd_certify_registry_list(
+    certification_registry_file: Option<&Path>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let response = trust_control::build_client(url, token)?.list_certifications()?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&response)?);
+        } else {
+            println!("certifications: {}", response.count);
+            for artifact in response.artifacts {
+                println!(
+                    "- {} server={} verdict={} status={}",
+                    artifact.artifact_id,
+                    artifact.tool_server_id,
+                    artifact.verdict.label(),
+                    artifact.status.label()
+                );
+            }
+        }
+        Ok(())
+    } else {
+        let path = require_certification_registry_file(certification_registry_file)?;
+        certify::cmd_certify_registry_list_local(path, json_output)
+    }
+}
+
+fn cmd_certify_registry_get(
+    artifact_id: &str,
+    certification_registry_file: Option<&Path>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let entry = trust_control::build_client(url, token)?.get_certification(artifact_id)?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&entry)?);
+        } else {
+            println!("certification artifact");
+            println!("artifact_id:     {}", entry.artifact_id);
+            println!("tool_server_id:  {}", entry.tool_server_id);
+            println!("verdict:         {}", entry.verdict.label());
+            println!("status:          {}", entry.status.label());
+        }
+        Ok(())
+    } else {
+        let path = require_certification_registry_file(certification_registry_file)?;
+        certify::cmd_certify_registry_get_local(artifact_id, path, json_output)
+    }
+}
+
+fn cmd_certify_registry_resolve(
+    tool_server_id: &str,
+    certification_registry_file: Option<&Path>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let response = trust_control::build_client(url, token)?
+            .resolve_certification(tool_server_id)?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&response)?);
+        } else {
+            println!("tool_server_id: {}", response.tool_server_id);
+            let state = match response.state {
+                certify::CertificationResolutionState::Active => "active",
+                certify::CertificationResolutionState::Superseded => "superseded",
+                certify::CertificationResolutionState::Revoked => "revoked",
+                certify::CertificationResolutionState::NotFound => "not-found",
+            };
+            println!("state:          {state}");
+            println!("total_entries:  {}", response.total_entries);
+            if let Some(current) = response.current {
+                println!("artifact_id:    {}", current.artifact_id);
+                println!("verdict:        {}", current.verdict.label());
+                println!("status:         {}", current.status.label());
+            }
+        }
+        Ok(())
+    } else {
+        let path = require_certification_registry_file(certification_registry_file)?;
+        certify::cmd_certify_registry_resolve_local(tool_server_id, path, json_output)
+    }
+}
+
+fn cmd_certify_registry_revoke(
+    artifact_id: &str,
+    certification_registry_file: Option<&Path>,
+    reason: Option<&str>,
+    revoked_at: Option<u64>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        let entry = trust_control::build_client(url, token)?.revoke_certification(
+            artifact_id,
+            &certify::CertificationRevocationRequest {
+                reason: reason.map(str::to_string),
+                revoked_at,
+            },
+        )?;
+        if json_output {
+            println!("{}", serde_json::to_string_pretty(&entry)?);
+        } else {
+            println!("revoked certification artifact");
+            println!("artifact_id:     {}", entry.artifact_id);
+            println!("tool_server_id:  {}", entry.tool_server_id);
+            println!("status:          {}", entry.status.label());
+            if let Some(revoked_at) = entry.revoked_at {
+                println!("revoked_at:      {revoked_at}");
+            }
+        }
+        Ok(())
+    } else {
+        let path = require_certification_registry_file(certification_registry_file)?;
+        certify::cmd_certify_registry_revoke_local(
+            artifact_id,
+            path,
+            reason,
+            revoked_at,
+            json_output,
+        )
+    }
+}
+
+fn cmd_trust_federated_issue(
+    presentation_response_path: &Path,
+    challenge_path: &Path,
+    capability_policy_path: &Path,
+    enterprise_identity_path: Option<&Path>,
+    delegation_policy_path: Option<&Path>,
+    upstream_capability_id: Option<&str>,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let control_url = control_url.ok_or_else(|| {
+        CliError::Other(
+            "federated issuance requires --control-url so the trust-control service enforces verifier and issuance policy centrally"
+                .to_string(),
+        )
+    })?;
+    let token = require_control_token(control_token)?;
+    let presentation: pact_credentials::PassportPresentationResponse =
+        serde_json::from_slice(&fs::read(presentation_response_path)?)?;
+    let expected_challenge: pact_credentials::PassportPresentationChallenge =
+        serde_json::from_slice(&fs::read(challenge_path)?)?;
+    let capability = load_single_default_capability(capability_policy_path)?;
+    let admission_policy = load_admission_policy(capability_policy_path)?;
+    let enterprise_identity = enterprise_identity_path
+        .map(|path| {
+            serde_json::from_slice::<pact_core::EnterpriseIdentityContext>(&fs::read(path)?)
+                .map_err(CliError::from)
+        })
+        .transpose()?;
+    let delegation_policy = delegation_policy_path
+        .map(|path| {
+            serde_json::from_slice::<trust_control::FederatedDelegationPolicyDocument>(&fs::read(
+                path,
+            )?)
+            .map_err(CliError::from)
+        })
+        .transpose()?;
+
+    let response = trust_control::build_client(control_url, token)?.federated_issue(
+        &trust_control::FederatedIssueRequest {
+            presentation,
+            expected_challenge,
+            capability,
+            admission_policy,
+            enterprise_identity,
+            delegation_policy,
+            upstream_capability_id: upstream_capability_id.map(str::to_string),
+        },
+    )?;
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("federated capability issued");
+        println!("subject:             {}", response.subject);
+        println!("subject_public_key:  {}", response.subject_public_key);
+        println!("verifier:            {}", response.verification.verifier);
+        println!("nonce:               {}", response.verification.nonce);
+        println!("presentation_accepted: {}", response.verification.accepted);
+        println!("capability_id:       {}", response.capability.id);
+        println!(
+            "issuer:              {}",
+            response.capability.issuer.to_hex()
+        );
+        println!("expires_at:          {}", response.capability.expires_at);
+        if let Some(audit) = response.enterprise_audit.as_ref() {
+            println!("enterprise_provider: {}", audit.provider_id);
+            if let Some(profile) = audit.matched_origin_profile.as_deref() {
+                println!("origin_profile:      {profile}");
+            }
+        }
+        if let Some(anchor_id) = response.delegation_anchor_capability_id.as_deref() {
+            println!("delegation_anchor:   {anchor_id}");
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_federated_delegation_policy_create(
+    output_path: &Path,
+    signing_seed_file: &Path,
+    issuer: &str,
+    partner: &str,
+    verifier: &str,
+    capability_policy_path: &Path,
+    expires_at: u64,
+    purpose: Option<&str>,
+    parent_capability_id: Option<&str>,
+    json_output: bool,
+) -> Result<(), CliError> {
+    let capability = load_single_default_capability(capability_policy_path)?;
+    let keypair = load_or_create_authority_keypair(signing_seed_file)?;
+    let created_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0);
+    let body = trust_control::FederatedDelegationPolicyBody {
+        schema: "pact.federated-delegation-policy.v1".to_string(),
+        issuer: issuer.to_string(),
+        partner: partner.to_string(),
+        verifier: verifier.to_string(),
+        signer_public_key: keypair.public_key(),
+        created_at,
+        expires_at,
+        ttl_seconds: capability.ttl,
+        scope: capability.scope,
+        purpose: purpose.map(str::to_string),
+        parent_capability_id: parent_capability_id.map(str::to_string),
+    };
+    let (signature, _) = keypair.sign_canonical(&body)?;
+    let policy = trust_control::FederatedDelegationPolicyDocument { body, signature };
+    trust_control::verify_federated_delegation_policy(&policy)?;
+    fs::write(output_path, serde_json::to_vec_pretty(&policy)?)?;
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&policy)?);
+    } else {
+        println!("federated delegation policy created");
+        println!("output:              {}", output_path.display());
+        println!("issuer:              {}", policy.body.issuer);
+        println!("partner:             {}", policy.body.partner);
+        println!("verifier:            {}", policy.body.verifier);
+        println!(
+            "signer_public_key:   {}",
+            policy.body.signer_public_key.to_hex()
+        );
+        println!("ttl_seconds:         {}", policy.body.ttl_seconds);
+        println!("expires_at:          {}", policy.body.expires_at);
+        if let Some(parent_capability_id) = policy.body.parent_capability_id.as_deref() {
+            println!("parent_capability_id: {parent_capability_id}");
+        }
+    }
+
+    Ok(())
+}
+
+fn load_single_default_capability(path: &Path) -> Result<DefaultCapability, CliError> {
+    let loaded = load_policy(path)?;
+    match loaded.default_capabilities.as_slice() {
+        [capability] => Ok(capability.clone()),
+        [] => Err(CliError::Other(
+            "federated issuance requires a capability policy with exactly one default capability"
+                .to_string(),
+        )),
+        _ => Err(CliError::Other(
+            "federated issuance currently supports exactly one default capability per request"
+                .to_string(),
+        )),
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1939,6 +3803,7 @@ mod tests {
             kernel: policy.kernel.clone(),
             default_capabilities,
             guard_pipeline: policy::build_guard_pipeline(&policy.guards),
+            issuance_policy: None,
         }
     }
 
@@ -2113,7 +3978,18 @@ capabilities:
         .unwrap();
         let kp = Keypair::generate();
         let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
-        configure_capability_authority(&mut kernel, Some(&seed_path), None, None, None).unwrap();
+        configure_capability_authority(
+            &mut kernel,
+            &kp,
+            Some(&seed_path),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .unwrap();
 
         let agent_kp = Keypair::generate();
         let capability =
@@ -2151,12 +4027,16 @@ capabilities:
             policy.kernel.max_capability_ttl,
         )
         .unwrap();
-        let mut first_kernel =
-            build_kernel(load_test_policy_runtime(&policy), &Keypair::generate());
+        let first_kp = Keypair::generate();
+        let mut first_kernel = build_kernel(load_test_policy_runtime(&policy), &first_kp);
         configure_capability_authority(
             &mut first_kernel,
+            &first_kp,
             None,
             Some(&authority_db_path),
+            None,
+            None,
+            None,
             None,
             None,
         )
@@ -2176,12 +4056,16 @@ capabilities:
         let authority = pact_kernel::SqliteCapabilityAuthority::open(&authority_db_path).unwrap();
         let rotated = authority.rotate().unwrap();
 
-        let mut second_kernel =
-            build_kernel(load_test_policy_runtime(&policy), &Keypair::generate());
+        let second_kp = Keypair::generate();
+        let mut second_kernel = build_kernel(load_test_policy_runtime(&policy), &second_kp);
         configure_capability_authority(
             &mut second_kernel,
+            &second_kp,
             None,
             Some(&authority_db_path),
+            None,
+            None,
+            None,
             None,
             None,
         )

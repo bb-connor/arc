@@ -3,7 +3,8 @@
 
 use pact_core::crypto::Keypair;
 use pact_core::receipt::{
-    Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, ToolCallAction,
+    Decision, FinancialReceiptMetadata, PactReceipt, PactReceiptBody, SettlementStatus,
+    ToolCallAction,
 };
 use pact_siem::event::SiemEvent;
 use pact_siem::exporter::ExportError;
@@ -50,7 +51,7 @@ fn sample_receipt_with_financial(id: &str) -> PactReceipt {
         delegation_depth: 1,
         root_budget_holder: "org-root".to_string(),
         payment_reference: None,
-        settlement_status: "pending".to_string(),
+        settlement_status: SettlementStatus::Pending,
         cost_breakdown: None,
         attempted_cost: None,
     };

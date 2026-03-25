@@ -1,0 +1,211 @@
+{
+  "schema_version": 1,
+  "status_values": [
+    "planned",
+    "peer_only",
+    "in_progress",
+    "package_backed",
+    "conformance_green"
+  ],
+  "languages": {
+    "ts": {
+      "label": "TypeScript"
+    },
+    "py": {
+      "label": "Python"
+    },
+    "go": {
+      "label": "Go"
+    }
+  },
+  "features": [
+    {
+      "id": "invariants",
+      "label": "Invariant helpers",
+      "languages": {
+        "ts": {
+          "status": "package_backed",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "./scripts/check-bindings-parity.sh"
+          ]
+        },
+        "py": {
+          "status": "package_backed",
+          "evidence": [
+            "./scripts/check-pact-py.sh"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave1_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "initialize_session",
+      "label": "Initialize and session lifecycle",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave1_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave1_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave1_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tools_resources_prompts",
+      "label": "Tools, resources, and prompts",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave1_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave1_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave1_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "notifications_subscriptions",
+      "label": "Notifications and subscriptions",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave4_notifications_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave4_notifications_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave4_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "tasks",
+      "label": "Tasks, progress, and cancellation",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave2_tasks_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave2_tasks_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave2_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "auth",
+      "label": "Auth discovery and hosted OAuth flows",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave3_auth_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave3_auth_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave3_go_live -- --nocapture"
+          ]
+        }
+      }
+    },
+    {
+      "id": "nested_callbacks",
+      "label": "Nested sampling, elicitation, and roots callbacks",
+      "languages": {
+        "ts": {
+          "status": "conformance_green",
+          "evidence": [
+            "npm --prefix packages/sdk/pact-ts test",
+            "cargo test -p pact-conformance --test wave5_nested_flows_live -- --nocapture"
+          ]
+        },
+        "py": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-py.sh",
+            "cargo test -p pact-conformance --test wave5_nested_flows_live -- --nocapture"
+          ]
+        },
+        "go": {
+          "status": "conformance_green",
+          "evidence": [
+            "./scripts/check-pact-go.sh",
+            "cargo test -p pact-conformance --test wave5_go_live -- --nocapture"
+          ]
+        }
+      }
+    }
+  ]
+}

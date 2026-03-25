@@ -1,0 +1,572 @@
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
+
+use serde::{Deserialize, Serialize};
+
+use crate::remote_mcp::JwtProviderProfile;
+use crate::CliError;
+
+pub const ENTERPRISE_PROVIDER_REGISTRY_VERSION: &str = "pact.enterprise-providers.v1";
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnterpriseProviderKind {
+    #[serde(rename = "oidc_jwks")]
+    OidcJwks,
+    #[serde(rename = "oauth_introspection")]
+    OauthIntrospection,
+    #[serde(rename = "scim")]
+    Scim,
+    #[serde(rename = "saml")]
+    Saml,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnterpriseProviderProvenance {
+    #[serde(default)]
+    pub configured_from: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust_material_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_mapping_source: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnterpriseTrustBoundary {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_issuers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_audiences: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_tenants: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_organizations: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnterpriseSubjectMapping {
+    pub principal_source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_id_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization_id_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub groups_field: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub roles_field: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnterpriseProviderRecord {
+    pub provider_id: String,
+    pub kind: EnterpriseProviderKind,
+    pub enabled: bool,
+    #[serde(default)]
+    pub provenance: EnterpriseProviderProvenance,
+    #[serde(default)]
+    pub trust_boundary: EnterpriseTrustBoundary,
+    #[serde(default, with = "jwt_provider_profile_serde")]
+    pub provider_profile: Option<JwtProviderProfile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jwks_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub introspection_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scim_base_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saml_entity_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saml_metadata_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization_id: Option<String>,
+    pub subject_mapping: EnterpriseSubjectMapping,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validation_errors: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnterpriseProviderRegistry {
+    pub version: String,
+    pub providers: BTreeMap<String, EnterpriseProviderRecord>,
+}
+
+impl Default for EnterpriseProviderRegistry {
+    fn default() -> Self {
+        Self {
+            version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
+            providers: BTreeMap::new(),
+        }
+    }
+}
+
+impl EnterpriseProviderRecord {
+    pub fn validate(&self) -> Vec<String> {
+        let mut errors = Vec::new();
+
+        require_non_empty(&self.provider_id, "provider_id", &mut errors);
+        require_non_empty(
+            &self.provenance.configured_from,
+            "provenance.configured_from",
+            &mut errors,
+        );
+        require_non_empty(
+            self.provenance
+                .trust_material_ref
+                .as_deref()
+                .unwrap_or_default(),
+            "provenance.trust_material_ref",
+            &mut errors,
+        );
+        require_non_empty(
+            &self.subject_mapping.principal_source,
+            "subject_mapping.principal_source",
+            &mut errors,
+        );
+
+        match self.kind {
+            EnterpriseProviderKind::OidcJwks => {
+                require_non_empty(
+                    self.issuer.as_deref().unwrap_or_default(),
+                    "issuer",
+                    &mut errors,
+                );
+                if is_blank(self.discovery_url.as_deref()) && is_blank(self.jwks_url.as_deref()) {
+                    errors
+                        .push("oidc_jwks provider requires discovery_url or jwks_url".to_string());
+                }
+            }
+            EnterpriseProviderKind::OauthIntrospection => {
+                require_non_empty(
+                    self.issuer.as_deref().unwrap_or_default(),
+                    "issuer",
+                    &mut errors,
+                );
+                require_non_empty(
+                    self.introspection_url.as_deref().unwrap_or_default(),
+                    "introspection_url",
+                    &mut errors,
+                );
+            }
+            EnterpriseProviderKind::Scim => {
+                require_non_empty(
+                    self.scim_base_url.as_deref().unwrap_or_default(),
+                    "scim_base_url",
+                    &mut errors,
+                );
+            }
+            EnterpriseProviderKind::Saml => {
+                require_non_empty(
+                    self.saml_entity_id.as_deref().unwrap_or_default(),
+                    "saml_entity_id",
+                    &mut errors,
+                );
+                require_non_empty(
+                    self.saml_metadata_url.as_deref().unwrap_or_default(),
+                    "saml_metadata_url",
+                    &mut errors,
+                );
+            }
+        }
+
+        if let Some(issuer) = self.issuer.as_deref() {
+            if !allowlist_matches(&self.trust_boundary.allowed_issuers, issuer) {
+                errors.push(format!(
+                    "issuer `{issuer}` falls outside trust_boundary.allowed_issuers"
+                ));
+            }
+        }
+        if let Some(tenant_id) = self.tenant_id.as_deref() {
+            if !allowlist_matches(&self.trust_boundary.allowed_tenants, tenant_id) {
+                errors.push(format!(
+                    "tenant_id `{tenant_id}` falls outside trust_boundary.allowed_tenants"
+                ));
+            }
+        }
+        if let Some(organization_id) = self.organization_id.as_deref() {
+            if !allowlist_matches(&self.trust_boundary.allowed_organizations, organization_id) {
+                errors.push(format!(
+                    "organization_id `{organization_id}` falls outside trust_boundary.allowed_organizations"
+                ));
+            }
+        }
+
+        errors
+    }
+
+    pub fn is_validated_enabled(&self) -> bool {
+        self.enabled && self.validation_errors.is_empty()
+    }
+}
+
+impl EnterpriseProviderRegistry {
+    pub fn load(path: &Path) -> Result<Self, CliError> {
+        let bytes = fs::read(path).map_err(|error| {
+            CliError::Other(format!(
+                "failed to read enterprise provider registry {}: {error}",
+                path.display()
+            ))
+        })?;
+        let registry = serde_json::from_slice::<Self>(&bytes).map_err(|error| {
+            CliError::Other(format!(
+                "failed to parse enterprise provider registry {}: {error}",
+                path.display()
+            ))
+        })?;
+        registry.with_revalidated_records()
+    }
+
+    pub fn save(&self, path: &Path) -> Result<(), CliError> {
+        let registry = self.clone().with_revalidated_records()?;
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    CliError::Other(format!(
+                        "failed to create enterprise provider registry directory {}: {error}",
+                        parent.display()
+                    ))
+                })?;
+            }
+        }
+        let serialized = serde_json::to_vec_pretty(&registry).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize enterprise provider registry {}: {error}",
+                path.display()
+            ))
+        })?;
+        fs::write(path, serialized).map_err(|error| {
+            CliError::Other(format!(
+                "failed to write enterprise provider registry {}: {error}",
+                path.display()
+            ))
+        })
+    }
+
+    pub fn validated_provider(&self, provider_id: &str) -> Option<&EnterpriseProviderRecord> {
+        self.providers
+            .get(provider_id)
+            .filter(|record| record.is_validated_enabled())
+    }
+
+    pub fn upsert(&mut self, mut record: EnterpriseProviderRecord) {
+        record.validation_errors = record.validate();
+        self.version = ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string();
+        self.providers.insert(record.provider_id.clone(), record);
+    }
+
+    pub fn remove(&mut self, provider_id: &str) -> bool {
+        self.providers.remove(provider_id).is_some()
+    }
+
+    fn with_revalidated_records(mut self) -> Result<Self, CliError> {
+        if self.version != ENTERPRISE_PROVIDER_REGISTRY_VERSION {
+            return Err(CliError::Other(format!(
+                "unsupported enterprise provider registry version `{}`",
+                self.version
+            )));
+        }
+
+        let mut normalized = BTreeMap::new();
+        for (_, mut record) in self.providers {
+            record.validation_errors = record.validate();
+            normalized.insert(record.provider_id.clone(), record);
+        }
+        self.providers = normalized;
+        Ok(self)
+    }
+}
+
+fn require_non_empty(value: &str, field: &str, errors: &mut Vec<String>) {
+    if is_blank(Some(value)) {
+        errors.push(format!("{field} is required"));
+    }
+}
+
+fn allowlist_matches(allowlist: &[String], value: &str) -> bool {
+    if allowlist.is_empty() {
+        return true;
+    }
+    let value = value.trim();
+    allowlist
+        .iter()
+        .map(|candidate| candidate.trim())
+        .any(|candidate| !candidate.is_empty() && candidate == value)
+}
+
+fn is_blank(value: Option<&str>) -> bool {
+    value.is_none_or(|value| value.trim().is_empty())
+}
+
+mod jwt_provider_profile_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use crate::remote_mcp::JwtProviderProfile;
+
+    pub fn serialize<S>(
+        value: &Option<JwtProviderProfile>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serialize_option(value).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<JwtProviderProfile>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Option::<String>::deserialize(deserializer)?;
+        value
+            .map(parse_profile)
+            .transpose()
+            .map_err(serde::de::Error::custom)
+    }
+
+    fn serialize_option(value: &Option<JwtProviderProfile>) -> Option<&'static str> {
+        value.map(|profile| match profile {
+            JwtProviderProfile::Generic => "generic",
+            JwtProviderProfile::Auth0 => "auth0",
+            JwtProviderProfile::Okta => "okta",
+            JwtProviderProfile::AzureAd => "azure-ad",
+        })
+    }
+
+    fn parse_profile(value: String) -> Result<JwtProviderProfile, String> {
+        match value.as_str() {
+            "generic" => Ok(JwtProviderProfile::Generic),
+            "auth0" => Ok(JwtProviderProfile::Auth0),
+            "okta" => Ok(JwtProviderProfile::Okta),
+            "azure-ad" => Ok(JwtProviderProfile::AzureAd),
+            other => Err(format!("unsupported jwt provider profile `{other}`")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use crate::remote_mcp::JwtProviderProfile;
+
+    use super::{
+        EnterpriseProviderKind, EnterpriseProviderProvenance, EnterpriseProviderRecord,
+        EnterpriseProviderRegistry, EnterpriseSubjectMapping, EnterpriseTrustBoundary,
+        ENTERPRISE_PROVIDER_REGISTRY_VERSION,
+    };
+
+    fn subject_mapping() -> EnterpriseSubjectMapping {
+        EnterpriseSubjectMapping {
+            principal_source: "sub".to_string(),
+            client_id_field: None,
+            object_id_field: None,
+            tenant_id_field: None,
+            organization_id_field: None,
+            groups_field: None,
+            roles_field: None,
+        }
+    }
+
+    fn provenance() -> EnterpriseProviderProvenance {
+        EnterpriseProviderProvenance {
+            configured_from: "manual".to_string(),
+            source_ref: Some("operator".to_string()),
+            trust_material_ref: Some("jwks:primary".to_string()),
+            subject_mapping_source: Some("manual".to_string()),
+        }
+    }
+
+    fn trust_boundary() -> EnterpriseTrustBoundary {
+        EnterpriseTrustBoundary {
+            allowed_issuers: vec!["https://issuer.example".to_string()],
+            allowed_audiences: vec!["pact-mcp".to_string()],
+            allowed_tenants: vec!["tenant-123".to_string()],
+            allowed_organizations: vec!["org-456".to_string()],
+        }
+    }
+
+    fn provider_record(
+        provider_id: &str,
+        kind: EnterpriseProviderKind,
+    ) -> EnterpriseProviderRecord {
+        EnterpriseProviderRecord {
+            provider_id: provider_id.to_string(),
+            kind,
+            enabled: true,
+            provenance: provenance(),
+            trust_boundary: trust_boundary(),
+            provider_profile: Some(JwtProviderProfile::Generic),
+            issuer: Some("https://issuer.example".to_string()),
+            discovery_url: Some(
+                "https://issuer.example/.well-known/openid-configuration".to_string(),
+            ),
+            jwks_url: Some("https://issuer.example/jwks".to_string()),
+            introspection_url: Some("https://issuer.example/introspect".to_string()),
+            scim_base_url: Some("https://issuer.example/scim".to_string()),
+            saml_entity_id: Some("urn:example:saml".to_string()),
+            saml_metadata_url: Some("https://issuer.example/metadata".to_string()),
+            tenant_id: Some("tenant-123".to_string()),
+            organization_id: Some("org-456".to_string()),
+            subject_mapping: subject_mapping(),
+            validation_errors: Vec::new(),
+        }
+    }
+
+    fn temp_registry_path() -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("pact-enterprise-provider-registry-{nonce}.json"))
+    }
+
+    #[test]
+    fn enterprise_provider_oidc_missing_issuer_is_invalid() {
+        let mut record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
+        record.issuer = None;
+
+        let errors = record.validate();
+
+        assert!(
+            errors.iter().any(|error| error.contains("issuer")),
+            "expected issuer validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_introspection_missing_url_is_invalid() {
+        let mut record =
+            provider_record("introspection", EnterpriseProviderKind::OauthIntrospection);
+        record.introspection_url = None;
+
+        let errors = record.validate();
+
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("introspection_url")),
+            "expected introspection_url validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_scim_missing_base_url_is_invalid() {
+        let mut record = provider_record("scim", EnterpriseProviderKind::Scim);
+        record.scim_base_url = None;
+
+        let errors = record.validate();
+
+        assert!(
+            errors.iter().any(|error| error.contains("scim_base_url")),
+            "expected scim_base_url validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_saml_missing_metadata_url_is_invalid() {
+        let mut record = provider_record("saml", EnterpriseProviderKind::Saml);
+        record.saml_metadata_url = None;
+
+        let errors = record.validate();
+
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("saml_metadata_url")),
+            "expected saml_metadata_url validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_missing_trust_material_reference_is_invalid() {
+        let mut record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
+        record.provenance.trust_material_ref = None;
+
+        let errors = record.validate();
+
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("provenance.trust_material_ref")),
+            "expected trust_material_ref validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_out_of_boundary_issuer_is_invalid() {
+        let mut record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
+        record.issuer = Some("https://rogue.example".to_string());
+
+        let errors = record.validate();
+
+        assert!(
+            errors.iter().any(|error| error.contains("allowed_issuers")),
+            "expected allowed_issuers validation error, got {errors:?}"
+        );
+    }
+
+    #[test]
+    fn enterprise_provider_registry_round_trips_validation_state() {
+        let path = temp_registry_path();
+        let mut registry = EnterpriseProviderRegistry {
+            version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
+            providers: BTreeMap::new(),
+        };
+        let mut invalid_record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
+        invalid_record.issuer = None;
+        registry.upsert(invalid_record.clone());
+
+        registry.save(&path).expect("save registry");
+        let loaded = EnterpriseProviderRegistry::load(&path).expect("load registry");
+
+        assert_eq!(loaded.version, ENTERPRISE_PROVIDER_REGISTRY_VERSION);
+        assert_eq!(
+            loaded
+                .providers
+                .get("oidc")
+                .expect("provider present")
+                .validation_errors,
+            invalid_record.validate()
+        );
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn enterprise_provider_invalid_enabled_record_is_excluded_by_validated_provider() {
+        let mut registry = EnterpriseProviderRegistry {
+            version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
+            providers: BTreeMap::new(),
+        };
+        let mut invalid_record = provider_record("oidc", EnterpriseProviderKind::OidcJwks);
+        invalid_record.issuer = None;
+        registry.upsert(invalid_record);
+
+        assert!(registry.validated_provider("oidc").is_none());
+    }
+
+    #[test]
+    fn enterprise_provider_registry_remove_deletes_record() {
+        let mut registry = EnterpriseProviderRegistry {
+            version: ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string(),
+            providers: BTreeMap::new(),
+        };
+        registry.upsert(provider_record("oidc", EnterpriseProviderKind::OidcJwks));
+
+        assert!(registry.remove("oidc"));
+        assert!(!registry.providers.contains_key("oidc"));
+    }
+}

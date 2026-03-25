@@ -1,0 +1,22 @@
+[package]
+name = "pact-bindings-core"
+description = "Bindings-friendly invariant helpers for PACT SDKs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+pact-core = { path = "../pact-core" }
+pact-manifest = { path = "../pact-manifest" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

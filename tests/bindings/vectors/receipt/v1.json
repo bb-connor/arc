@@ -1,0 +1,197 @@
+{
+  "cases": [
+    {
+      "description": "Valid allow receipt with matching signature and parameter hash.",
+      "expected": {
+        "decision": "allow",
+        "parameter_hash_valid": true,
+        "signature_valid": true
+      },
+      "id": "allow_receipt",
+      "receipt": {
+        "action": {
+          "parameter_hash": "035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/roadmap.md"
+          }
+        },
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "rcpt-bindings-allow",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v1",
+        "signature": "c1420914fa6a85a668ba2bf79d8a3fcc6b0f467c6fe5f419a1efb64e81b3b2bd56de534c8c56f758eaaa72565889278288e4fa3c0a97a03f42acca86d915c30c",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_server": "srv-files"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-allow\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+    },
+    {
+      "description": "Valid deny receipt with matching signature and parameter hash.",
+      "expected": {
+        "decision": "deny",
+        "parameter_hash_valid": true,
+        "signature_valid": true
+      },
+      "id": "deny_receipt",
+      "receipt": {
+        "action": {
+          "parameter_hash": "d6f55d803ff027795f4a4c43fd8f6d3119051f82b7e3e1a13b1713fd37ea7b09",
+          "parameters": {
+            "mode": "read",
+            "path": "/etc/shadow"
+          }
+        },
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "guard": "ForbiddenPathGuard",
+          "reason": "path is forbidden",
+          "verdict": "deny"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "rcpt-bindings-deny",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v1",
+        "signature": "d272e21ab1030d25e28daa50065ecea47e60fa07a1f446b587e64b5cc8616048627afd2cdf547a2ab8abbeaa3b661afd8dfb423c6b2bdad4b1955189e755b30a",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_server": "srv-files"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"d6f55d803ff027795f4a4c43fd8f6d3119051f82b7e3e1a13b1713fd37ea7b09\",\"parameters\":{\"mode\":\"read\",\"path\":\"/etc/shadow\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"guard\":\"ForbiddenPathGuard\",\"reason\":\"path is forbidden\",\"verdict\":\"deny\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-deny\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+    },
+    {
+      "description": "Receipt is signed correctly but carries a bad action parameter hash.",
+      "expected": {
+        "decision": "allow",
+        "parameter_hash_valid": false,
+        "signature_valid": true
+      },
+      "id": "signed_receipt_with_invalid_parameter_hash",
+      "receipt": {
+        "action": {
+          "parameter_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/private.md"
+          }
+        },
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "rcpt-bindings-invalid-hash",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v1",
+        "signature": "c043ad36f6cc2965a61f692691ac551067d3d0e8da7ff3280379e6eb1e84dcdc709358462b59d3b8801a5e78904286b2321f68dd195a8d00b6d926b2bc1b8903",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_server": "srv-files"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/private.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-invalid-hash\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+    },
+    {
+      "description": "Receipt payload was modified after signing, so signature verification fails.",
+      "expected": {
+        "decision": "allow",
+        "parameter_hash_valid": true,
+        "signature_valid": false
+      },
+      "id": "tampered_receipt_signature",
+      "receipt": {
+        "action": {
+          "parameter_hash": "035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/roadmap.md"
+          }
+        },
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "rcpt-bindings-invalid-signature",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v2",
+        "signature": "403a76d11a30eef531374cb83f9fd9618d44c40892cc909928e3cf784e1255572bff3267fec538507c4d82a5616d64ab65eff79452aa989c414f7141bb71c70e",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_server": "srv-files"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"rcpt-bindings-invalid-signature\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v2\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_server\":\"srv-files\"}"
+    }
+  ],
+  "generated_by": "pact-bindings-core",
+  "signing_key_seed_hex": "0707070707070707070707070707070707070707070707070707070707070707",
+  "version": 1
+}

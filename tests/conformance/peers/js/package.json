@@ -1,0 +1,10 @@
+{
+  "name": "pact-conformance-js-peer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node client.mjs --help",
+    "client": "node client.mjs",
+    "server": "node server.mjs"
+  }
+}

@@ -13,10 +13,14 @@ path = "src/main.rs"
 
 [dependencies]
 pact-core = { path = "../pact-core" }
+pact-credentials = { path = "../pact-credentials" }
+pact-did = { path = "../pact-did" }
 pact-kernel = { path = "../pact-kernel" }
 pact-guards = { path = "../pact-guards" }
 pact-policy = { path = "../pact-policy" }
 pact-mcp-adapter = { path = "../pact-mcp-adapter" }
+pact-conformance = { path = "../pact-conformance" }
+pact-reputation = { path = "../pact-reputation" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = "0.9"
@@ -37,6 +41,10 @@ serde_urlencoded = "0.7"
 rusqlite = { workspace = true }
 pact-siem = { path = "../pact-siem", optional = true }
 tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+rsa = { version = "0.9", features = ["sha2"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+p384 = { version = "0.13", features = ["ecdsa"] }
 
 [features]
 siem = ["pact-siem"]

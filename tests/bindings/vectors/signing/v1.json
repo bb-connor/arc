@@ -1,0 +1,43 @@
+{
+  "generated_by": "pact-bindings-core",
+  "json_cases": [
+    {
+      "canonical_json": "{\"a\":2,\"z\":1}",
+      "description": "Signing raw JSON first canonicalizes it, then signs the canonical bytes.",
+      "expected_verify": true,
+      "id": "valid_canonical_json_message",
+      "input_json": "{\"z\":1,\"a\":2}",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+      "signature_hex": "0b656434a9cf4f1d2f5cd0a2e008d69789251ecde8373781ee24d22f36abe53abf9fd51ee04df5c090143a5d49e14324a2d52f628472f02719bd405d2567590e"
+    },
+    {
+      "canonical_json": "{\"a\":2,\"z\":2}",
+      "description": "Verification fails if the JSON payload changes after signing.",
+      "expected_verify": false,
+      "id": "tampered_canonical_json_message",
+      "input_json": "{\"z\":2,\"a\":2}",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+      "signature_hex": "0b656434a9cf4f1d2f5cd0a2e008d69789251ecde8373781ee24d22f36abe53abf9fd51ee04df5c090143a5d49e14324a2d52f628472f02719bd405d2567590e"
+    }
+  ],
+  "signing_key_seed_hex": "0909090909090909090909090909090909090909090909090909090909090909",
+  "utf8_cases": [
+    {
+      "description": "A UTF-8 message signs and verifies with a deterministic Ed25519 seed.",
+      "expected_verify": true,
+      "id": "valid_utf8_message",
+      "input_utf8": "hello pact",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+      "signature_hex": "2af253f96bf126896350e434d6aae3fa1cb67109624e0fb3ea3381b677ec7464a1a831f51a5c99f9ec070039f65721677f3116e82f300839b9eb22999f4f8a03"
+    },
+    {
+      "description": "The same signature fails if the UTF-8 message bytes change.",
+      "expected_verify": false,
+      "id": "tampered_utf8_message",
+      "input_utf8": "hello pact!",
+      "public_key_hex": "fd1724385aa0c75b64fb78cd602fa1d991fdebf76b13c58ed702eac835e9f618",
+      "signature_hex": "2af253f96bf126896350e434d6aae3fa1cb67109624e0fb3ea3381b677ec7464a1a831f51a5c99f9ec070039f65721677f3116e82f300839b9eb22999f4f8a03"
+    }
+  ],
+  "version": 1
+}

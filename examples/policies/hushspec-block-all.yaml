@@ -1,0 +1,8 @@
+hushspec: "0.1.0"
+name: block-all
+description: Deny every tool by default.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block

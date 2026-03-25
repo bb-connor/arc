@@ -1,0 +1,23 @@
+[package]
+name = "pact-mcp-adapter"
+description = "Adapter that wraps MCP servers as PACT tool servers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+pact-core = { path = "../pact-core" }
+pact-kernel = { path = "../pact-kernel" }
+pact-manifest = { path = "../pact-manifest" }
+chrono = { version = "0.4", features = ["clock"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

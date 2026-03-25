@@ -9,14 +9,22 @@ mod retention {
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use pact_core::capability::{
+        CapabilityToken, CapabilityTokenBody, Operation, PactScope, ToolGrant,
+    };
     use pact_core::crypto::Keypair;
     use pact_core::merkle::MerkleTree;
-    use pact_core::receipt::{Decision, PactReceipt, PactReceiptBody, ToolCallAction};
+    use pact_core::receipt::{
+        ChildRequestReceipt, ChildRequestReceiptBody, Decision, PactReceipt, PactReceiptBody,
+        ToolCallAction,
+    };
+    use pact_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 
     use pact_kernel::build_checkpoint;
     use pact_kernel::build_inclusion_proof;
     use pact_kernel::receipt_store::{RetentionConfig, SqliteReceiptStore};
     use pact_kernel::verify_checkpoint_signature;
+    use pact_kernel::ReceiptStore;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
         let nonce = SystemTime::now()
@@ -26,13 +34,17 @@ mod retention {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
     }
 
-    fn receipt_with_ts(id: &str, timestamp: u64) -> PactReceipt {
+    fn receipt_with_capability_and_ts(
+        id: &str,
+        capability_id: &str,
+        timestamp: u64,
+    ) -> PactReceipt {
         let keypair = Keypair::generate();
         PactReceipt::sign(
             PactReceiptBody {
                 id: id.to_string(),
                 timestamp,
-                capability_id: "cap-1".to_string(),
+                capability_id: capability_id.to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
                 action: ToolCallAction {
@@ -49,6 +61,59 @@ mod retention {
             &keypair,
         )
         .expect("sign receipt")
+    }
+
+    fn receipt_with_ts(id: &str, timestamp: u64) -> PactReceipt {
+        receipt_with_capability_and_ts(id, "cap-1", timestamp)
+    }
+
+    fn child_receipt_with_ts(id: &str, timestamp: u64) -> ChildRequestReceipt {
+        let keypair = Keypair::generate();
+        ChildRequestReceipt::sign(
+            ChildRequestReceiptBody {
+                id: id.to_string(),
+                timestamp,
+                session_id: SessionId::new("sess-retention"),
+                parent_request_id: RequestId::new("parent-retention"),
+                request_id: RequestId::new(format!("request-{id}")),
+                operation_kind: OperationKind::CreateMessage,
+                terminal_state: OperationTerminalState::Completed,
+                outcome_hash: format!("outcome-{id}"),
+                policy_hash: "policy-retention".to_string(),
+                metadata: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign child receipt")
+    }
+
+    fn capability_with_id(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: PactScope {
+                    grants: vec![ToolGrant {
+                        server_id: "shell".to_string(),
+                        tool_name: "bash".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..PactScope::default()
+                },
+                issued_at: 100,
+                expires_at: 10_000,
+                delegation_chain: vec![],
+            },
+            issuer,
+        )
+        .expect("sign capability")
     }
 
     /// Time-based rotation: receipts before the cutoff are archived, receipts
@@ -339,6 +404,74 @@ mod retention {
             archive_store.load_checkpoint_by_seq(1).unwrap().is_none(),
             "archive DB should have no checkpoints"
         );
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn archive_copies_and_deletes_child_receipts() {
+        let live_path = unique_db_path("retention-child-live");
+        let archive_path = unique_db_path("retention-child-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        store
+            .append_pact_receipt(&receipt_with_ts("rcpt-parent", 100))
+            .unwrap();
+        store
+            .append_child_receipt(&child_receipt_with_ts("child-parent", 100))
+            .unwrap();
+
+        let archived = store
+            .archive_receipts_before(500, archive_path.to_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            archived, 1,
+            "tool receipt archival count should remain stable"
+        );
+        assert_eq!(store.child_receipt_count().unwrap(), 0);
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        assert_eq!(archive_store.child_receipt_count().unwrap(), 1);
+
+        let _ = fs::remove_file(&live_path);
+        let _ = fs::remove_file(&archive_path);
+    }
+
+    #[test]
+    fn archive_copies_capability_lineage_for_archived_receipts() {
+        let live_path = unique_db_path("retention-lineage-live");
+        let archive_path = unique_db_path("retention-lineage-archive");
+
+        let mut store = SqliteReceiptStore::open(&live_path).unwrap();
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = capability_with_id("cap-retention-lineage", &subject, &issuer);
+        store.record_capability_snapshot(&capability, None).unwrap();
+        store
+            .append_pact_receipt(&receipt_with_capability_and_ts(
+                "rcpt-lineage",
+                &capability.id,
+                100,
+            ))
+            .unwrap();
+
+        store
+            .archive_receipts_before(500, archive_path.to_str().unwrap())
+            .unwrap();
+
+        let archive_store = SqliteReceiptStore::open(&archive_path).unwrap();
+        let archived_lineage = archive_store
+            .get_lineage("cap-retention-lineage")
+            .unwrap()
+            .expect("archived lineage snapshot");
+        assert_eq!(archived_lineage.subject_key, subject.public_key().to_hex());
+
+        let live_lineage = store
+            .get_lineage("cap-retention-lineage")
+            .unwrap()
+            .expect("live lineage snapshot should remain");
+        assert_eq!(live_lineage.issuer_key, issuer.public_key().to_hex());
 
         let _ = fs::remove_file(&live_path);
         let _ = fs::remove_file(&archive_path);

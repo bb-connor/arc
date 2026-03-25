@@ -1,0 +1,18 @@
+{
+  "id": "deny-receipt-emitted",
+  "title": "Denied actions emit signed deny receipts",
+  "area": "trust_extensions",
+  "category": "pact-extension",
+  "specVersions": ["2026-03-19"],
+  "transport": ["stdio"],
+  "peerRoles": ["client_to_pact_server"],
+  "deploymentModes": ["wrapped_stdio"],
+  "requiredCapabilities": {
+    "server": [],
+    "client": []
+  },
+  "tags": ["wave4", "trust"],
+  "expected": "pass",
+  "timeoutMs": 5000,
+  "notes": "PACT-specific trust assertion. This should never be counted as MCP-core compatibility."
+}

@@ -90,6 +90,7 @@ fn make_manifest_body(kp: &Keypair) -> ToolManifestBody {
                 "required": ["path"]
             }),
             output_schema: None,
+            pricing: None,
             annotations: ToolAnnotations {
                 read_only: true,
                 destructive: false,

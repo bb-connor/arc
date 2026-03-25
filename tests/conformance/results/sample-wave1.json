@@ -1,0 +1,93 @@
+[
+  {
+    "scenarioId": "initialize",
+    "peer": "js",
+    "peerRole": "client_to_pact_server",
+    "deploymentMode": "wrapped_stdio",
+    "transport": "stdio",
+    "specVersion": "2025-11-25",
+    "category": "mcp-core",
+    "status": "pass",
+    "durationMs": 91,
+    "assertions": [
+      { "name": "initialize_succeeds", "status": "pass" }
+    ],
+    "artifacts": {
+      "transcript": "artifacts/transcripts/initialize-js-wrapped-stdio.jsonl"
+    }
+  },
+  {
+    "scenarioId": "tools-list",
+    "peer": "js",
+    "peerRole": "client_to_pact_server",
+    "deploymentMode": "wrapped_stdio",
+    "transport": "stdio",
+    "specVersion": "2025-11-25",
+    "category": "mcp-core",
+    "status": "pass",
+    "durationMs": 55,
+    "assertions": [
+      { "name": "tools_list_returns_array", "status": "pass" }
+    ]
+  },
+  {
+    "scenarioId": "tools-call-simple-text",
+    "peer": "python",
+    "peerRole": "client_to_pact_server",
+    "deploymentMode": "remote_http",
+    "transport": "streamable-http",
+    "specVersion": "2025-11-25",
+    "category": "mcp-core",
+    "status": "pass",
+    "durationMs": 183,
+    "assertions": [
+      { "name": "tool_result_is_text", "status": "pass" }
+    ]
+  },
+  {
+    "scenarioId": "resources-list",
+    "peer": "python",
+    "peerRole": "client_to_pact_server",
+    "deploymentMode": "remote_http",
+    "transport": "streamable-http",
+    "specVersion": "2025-11-25",
+    "category": "mcp-core",
+    "status": "unsupported",
+    "durationMs": 12,
+    "assertions": []
+  },
+  {
+    "scenarioId": "prompts-list",
+    "peer": "js",
+    "peerRole": "pact_client_to_server",
+    "deploymentMode": "wrapped_stdio",
+    "transport": "stdio",
+    "specVersion": "2025-11-25",
+    "category": "mcp-core",
+    "status": "fail",
+    "durationMs": 67,
+    "assertions": [
+      {
+        "name": "prompt_list_shape",
+        "status": "fail",
+        "message": "server returned prompt records without stable names"
+      }
+    ],
+    "failureKind": "shape-mismatch",
+    "failureMessage": "server returned prompt records without stable names"
+  },
+  {
+    "scenarioId": "deny-receipt-emitted",
+    "peer": "pact-self",
+    "peerRole": "client_to_pact_server",
+    "deploymentMode": "wrapped_stdio",
+    "transport": "stdio",
+    "specVersion": "2026-03-19",
+    "category": "pact-extension",
+    "status": "pass",
+    "durationMs": 18,
+    "assertions": [
+      { "name": "deny_receipt_written", "status": "pass" }
+    ]
+  }
+]

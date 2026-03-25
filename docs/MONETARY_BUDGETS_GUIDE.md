@@ -2,6 +2,11 @@
 
 Monetary budgets let operators cap how much an agent can spend when invoking cost-bearing tools. Budgets are enforced by the PACT kernel before each tool invocation using an atomic read-check-increment transaction. An invocation is denied at the kernel boundary if it would exceed either the per-call cap or the lifetime total.
 
+If you need the planning step that happens before budget issuance, see
+[TOOL_PRICING_GUIDE.md](TOOL_PRICING_GUIDE.md). That guide covers how
+advertised tool-manifest pricing informs the `max_cost_per_invocation` and
+`max_total_cost` values you choose to issue.
+
 ## MonetaryAmount Type
 
 ```rust
@@ -86,13 +91,20 @@ pub struct FinancialReceiptMetadata {
     pub delegation_depth: u32,
     pub root_budget_holder: String,
     pub payment_reference: Option<String>,
-    pub settlement_status: String,
+    pub settlement_status: SettlementStatus,
     pub cost_breakdown: Option<serde_json::Value>,
     pub attempted_cost: Option<u64>,  // populated on denial receipts
 }
 ```
 
 `cost_charged` and `budget_remaining` are in the same minor-unit denomination as `MonetaryAmount.units`. A denial receipt due to budget exhaustion sets `cost_charged` to 0 and populates `attempted_cost` with the cost that would have been charged.
+
+`settlement_status` uses the canonical receipt-side enum:
+
+- `not_applicable` for pre-execution denials where no settlement applies
+- `pending` for an initiated but not yet final external settlement
+- `settled` for a final recorded charge
+- `failed` when execution completed but settlement became invalid
 
 ## Delegation and Attenuation
 

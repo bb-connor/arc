@@ -1,0 +1,141 @@
+//! Egress allowlist guard -- controls network egress by domain.
+//!
+//! Adapted from ClawdStrike's `guards/egress_allowlist.rs`.  The domain
+//! matching logic is reimplemented here without the `hush_proxy::DomainPolicy`
+//! dependency, using simple glob matching instead.
+
+use glob::Pattern;
+
+use pact_kernel::{GuardContext, KernelError, Verdict};
+
+use crate::action::{extract_action, ToolAction};
+
+fn default_allow_patterns() -> Vec<String> {
+    vec![
+        // Common AI/ML APIs
+        "*.openai.com".to_string(),
+        "*.anthropic.com".to_string(),
+        "api.github.com".to_string(),
+        // Package registries
+        "*.npmjs.org".to_string(),
+        "registry.npmjs.org".to_string(),
+        "pypi.org".to_string(),
+        "files.pythonhosted.org".to_string(),
+        "crates.io".to_string(),
+        "static.crates.io".to_string(),
+    ]
+}
+
+/// Guard that controls network egress via domain allowlist.
+///
+/// By default, only well-known AI API and package registry domains are
+/// allowed. All other egress is denied (fail-closed).
+pub struct EgressAllowlistGuard {
+    allow_patterns: Vec<Pattern>,
+    block_patterns: Vec<Pattern>,
+}
+
+impl EgressAllowlistGuard {
+    pub fn new() -> Self {
+        Self::with_lists(default_allow_patterns(), vec![])
+    }
+
+    pub fn with_lists(allow: Vec<String>, block: Vec<String>) -> Self {
+        let allow_patterns = allow.iter().filter_map(|p| Pattern::new(p).ok()).collect();
+        let block_patterns = block.iter().filter_map(|p| Pattern::new(p).ok()).collect();
+        Self {
+            allow_patterns,
+            block_patterns,
+        }
+    }
+
+    pub fn is_allowed(&self, domain: &str) -> bool {
+        let domain = domain.to_lowercase();
+
+        // Block list takes precedence.
+        for pattern in &self.block_patterns {
+            if pattern.matches(&domain) {
+                return false;
+            }
+        }
+
+        // Check allow list.
+        for pattern in &self.allow_patterns {
+            if pattern.matches(&domain) {
+                return true;
+            }
+        }
+
+        // Default: deny (fail-closed).
+        false
+    }
+}
+
+impl Default for EgressAllowlistGuard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl pact_kernel::Guard for EgressAllowlistGuard {
+    fn name(&self) -> &str {
+        "egress-allowlist"
+    }
+
+    fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
+        let action = extract_action(&ctx.request.tool_name, &ctx.request.arguments);
+
+        let host = match &action {
+            ToolAction::NetworkEgress(h, _) => h.as_str(),
+            _ => return Ok(Verdict::Allow),
+        };
+
+        if self.is_allowed(host) {
+            Ok(Verdict::Allow)
+        } else {
+            Ok(Verdict::Deny)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allows_default_domains() {
+        let guard = EgressAllowlistGuard::new();
+        assert!(guard.is_allowed("api.openai.com"));
+        assert!(guard.is_allowed("api.anthropic.com"));
+        assert!(guard.is_allowed("api.github.com"));
+        assert!(guard.is_allowed("registry.npmjs.org"));
+    }
+
+    #[test]
+    fn blocks_unknown_domains() {
+        let guard = EgressAllowlistGuard::new();
+        assert!(!guard.is_allowed("evil.com"));
+        assert!(!guard.is_allowed("random-site.org"));
+        assert!(!guard.is_allowed("malware.bad"));
+    }
+
+    #[test]
+    fn block_list_takes_precedence() {
+        let guard = EgressAllowlistGuard::with_lists(
+            vec!["*.mycompany.com".to_string()],
+            vec!["blocked.mycompany.com".to_string()],
+        );
+        assert!(guard.is_allowed("api.mycompany.com"));
+        assert!(!guard.is_allowed("blocked.mycompany.com"));
+        assert!(!guard.is_allowed("other.com"));
+    }
+
+    #[test]
+    fn wildcard_subdomain_matching() {
+        let guard = EgressAllowlistGuard::with_lists(vec!["*.example.com".to_string()], vec![]);
+        assert!(guard.is_allowed("api.example.com"));
+        assert!(guard.is_allowed("www.example.com"));
+        // Bare domain does not match *.example.com with glob
+        assert!(!guard.is_allowed("example.com"));
+    }
+}

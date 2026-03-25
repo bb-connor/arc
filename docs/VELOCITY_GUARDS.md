@@ -6,7 +6,7 @@ The `VelocityGuard` in `crates/pact-guards/src/velocity.rs` limits how fast an a
 
 Each `(capability_id, grant_index)` pair gets its own independent token bucket. Buckets for different grants within the same capability token are isolated; exhausting one grant's bucket does not affect another. Buckets for different capability tokens are also isolated.
 
-On each invocation the guard calls `bucket.try_consume(1.0)`. The bucket refills continuously at a rate of `max_invocations_per_window / window_secs` tokens per second. If the bucket has at least 1 token available the invocation is allowed and one token is consumed. If the bucket is empty the guard returns `Verdict::Deny` (not an error).
+On each invocation the invocation bucket calls `bucket.try_consume(1.0)`. The bucket refills continuously at a rate of `max_invocations_per_window / window_secs` tokens per second. If the bucket has at least 1 token available the invocation is allowed and one token is consumed. If the bucket is empty the guard returns `Verdict::Deny` (not an error).
 
 ## VelocityConfig
 
@@ -21,7 +21,7 @@ pub struct VelocityConfig {
 
 **`max_invocations_per_window`**: Maximum number of invocations allowed within the window. `None` means unlimited invocations. When set, the bucket capacity is `max_invocations_per_window * burst_factor` and the refill rate is `max_invocations_per_window / window_secs`.
 
-**`max_spend_per_window`**: Maximum monetary spend (in the same minor-unit denomination as `MonetaryAmount`) within the window. `None` means unlimited spend. This uses a separate bucket from the invocation bucket.
+**`max_spend_per_window`**: Maximum monetary spend (in the same minor-unit denomination as `MonetaryAmount`) within the window. `None` means unlimited spend. This uses a separate bucket from the invocation bucket and consumes the matched grant's planned per-invocation cost.
 
 **`window_secs`**: Window duration in seconds. Default: 60. A window of 60 with `max_invocations_per_window = 10` allows 10 invocations per minute at a steady rate.
 
@@ -59,7 +59,7 @@ let guard = VelocityGuard::new(VelocityConfig {
 
 Velocity guards and monetary budgets are independent enforcement layers. The `VelocityGuard` runs in the guard pipeline before the budget store is charged. A request denied by the velocity guard never reaches `try_charge_cost`, so it does not consume any monetary budget.
 
-The `max_spend_per_window` field in `VelocityConfig` currently consumes 1 spend unit per invocation regardless of actual tool cost. Phase 8 integration will wire actual cost values into the spend bucket. Until then, `max_spend_per_window` can be used as a secondary invocation rate limit expressed in cost units.
+When `max_spend_per_window` is enabled, the spend bucket consumes the matched grant's `max_cost_per_invocation.units`. This means two tools with different planned costs drain the spend window at different rates. If a spend window is configured but the matched grant does not carry `max_cost_per_invocation`, the guard fails closed with a kernel error rather than silently treating spend as call-count rate limiting.
 
 When both `max_invocations_per_window` and `max_spend_per_window` are set, both buckets must have available capacity for an invocation to proceed. The invocation bucket is checked first; if it denies, the spend bucket is not checked.
 

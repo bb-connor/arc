@@ -24,7 +24,7 @@ All parameters are optional. Omitting a parameter disables that filter.
 | `until` | u64 | Include only receipts with `timestamp <= until` (Unix seconds, inclusive) |
 | `minCost` | u64 | Include only receipts with `cost_charged >= minCost` (minor units). Receipts without financial metadata are excluded when this filter is set. |
 | `maxCost` | u64 | Include only receipts with `cost_charged <= maxCost` (minor units). Receipts without financial metadata are excluded when this filter is set. |
-| `agentSubject` | string | Filter by agent subject public key (hex-encoded Ed25519). Resolved through the capability lineage table. |
+| `agentSubject` | string | Filter by agent subject public key (hex-encoded Ed25519). Resolved from receipt attribution metadata when present and otherwise through the capability lineage table. |
 | `cursor` | u64 | Pagination cursor: return only receipts with `seq > cursor` (exclusive). |
 | `limit` | usize | Maximum results per page. Capped server-side at `MAX_QUERY_LIMIT` (200). Default: 50. |
 
@@ -94,6 +94,12 @@ Authorization: Bearer my-service-token
       "tool_name": "exec",
       "decision": { "deny": { "reason": "budget exhausted", "guard": "monetary_budget" } },
       "metadata": {
+        "attribution": {
+          "subject_key": "ed25519-subject-hex",
+          "issuer_key": "ed25519-issuer-hex",
+          "delegation_depth": 0,
+          "grant_index": 0
+        },
         "financial": {
           "grant_index": 0,
           "cost_charged": 0,
@@ -102,7 +108,7 @@ Authorization: Bearer my-service-token
           "budget_total": 10000,
           "delegation_depth": 0,
           "root_budget_holder": "agent-root",
-          "settlement_status": "denied",
+          "settlement_status": "not_applicable",
           "attempted_cost": 500
         }
       },
@@ -124,6 +130,139 @@ GET /v1/agents/{subject_key}/receipts?limit=50&cursor=0
 ```
 
 This is equivalent to calling `/v1/receipts/query?agentSubject={subject_key}`. It accepts only `limit` and `cursor` query parameters.
+
+## Receipt Analytics Endpoint
+
+The trust-control service also exposes aggregate analytics over the same receipt corpus:
+
+```
+GET /v1/receipts/analytics
+```
+
+It uses the same authentication model as `/v1/receipts/query` and accepts these optional query parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `capabilityId` | string | Restrict analytics to one capability ID |
+| `agentSubject` | string | Restrict analytics to one agent subject key |
+| `toolServer` | string | Restrict analytics to one tool server |
+| `toolName` | string | Restrict analytics to one tool |
+| `since` | u64 | Include only receipts with `timestamp >= since` |
+| `until` | u64 | Include only receipts with `timestamp <= until` |
+| `groupLimit` | usize | Maximum rows returned for each grouped dimension. Default: 50, capped server-side at 200. |
+| `timeBucket` | string | Time aggregation width: `hour` or `day`. Default: `day`. |
+
+Response shape:
+
+```json
+{
+  "summary": {
+    "totalReceipts": 12,
+    "allowCount": 9,
+    "denyCount": 1,
+    "cancelledCount": 1,
+    "incompleteCount": 1,
+    "totalCostCharged": 750,
+    "totalAttemptedCost": 500,
+    "reliabilityScore": 0.8181818182,
+    "complianceRate": 0.9166666667,
+    "budgetUtilizationRate": 0.6
+  },
+  "byAgent": [
+    {
+      "subjectKey": "ed25519-subject-hex",
+      "metrics": { "...": "same metric object as summary" }
+    }
+  ],
+  "byTool": [
+    {
+      "toolServer": "shell",
+      "toolName": "bash",
+      "metrics": { "...": "same metric object as summary" }
+    }
+  ],
+  "byTime": [
+    {
+      "bucketStart": 1700000000,
+      "bucketEnd": 1700086400,
+      "metrics": { "...": "same metric object as summary" }
+    }
+  ]
+}
+```
+
+The analytics API is backend-side aggregation. It complements, but is distinct from, any client-side dashboard summaries.
+
+## Operator Report Endpoint
+
+The trust-control service also exposes a composed operator report:
+
+```
+GET /v1/reports/operator
+```
+
+It uses the same Bearer authentication model as the other receipt endpoints and accepts the same corpus filters as the analytics API, plus:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `attributionLimit` | usize | Maximum detailed rows returned in the nested cost-attribution slice. Default: 100. |
+| `budgetLimit` | usize | Maximum budget-utilization rows returned. Default: 50, capped server-side at 200. |
+
+Response shape:
+
+```json
+{
+  "generatedAt": 1700000000,
+  "filters": {
+    "agentSubject": "ed25519-subject-hex",
+    "toolServer": "shell",
+    "toolName": "bash"
+  },
+  "activity": { "...": "same shape as /v1/receipts/analytics" },
+  "costAttribution": { "...": "same shape as /v1/reports/cost-attribution" },
+  "budgetUtilization": {
+    "summary": {
+      "matchingGrants": 3,
+      "nearLimitCount": 1,
+      "exhaustedCount": 0
+    },
+    "rows": [
+      {
+        "capabilityId": "cap-123",
+        "grantIndex": 0,
+        "subjectKey": "ed25519-subject-hex",
+        "toolServer": "shell",
+        "toolName": "bash",
+        "invocationCount": 12,
+        "maxInvocations": 20,
+        "totalCostCharged": 850,
+        "maxTotalCostUnits": 1000,
+        "remainingCostUnits": 150,
+        "nearLimit": true,
+        "exhausted": false,
+        "scopeResolved": true
+      }
+    ]
+  },
+  "compliance": {
+    "matchingReceipts": 12,
+    "evidenceReadyReceipts": 11,
+    "uncheckpointedReceipts": 1,
+    "checkpointCoverageRate": 0.9166666667,
+    "lineageCoveredReceipts": 12,
+    "lineageGapReceipts": 0,
+    "directEvidenceExportSupported": false,
+    "childReceiptScope": "omitted_no_join_path",
+    "proofsComplete": false,
+    "exportQuery": {
+      "agentSubject": "ed25519-subject-hex"
+    },
+    "exportScopeNote": "tool filters narrow the operator report only; direct evidence export can scope by capability, agent, and time window."
+  }
+}
+```
+
+This endpoint is the stable operator workflow surface. It packages the existing analytics, cost-attribution, and evidence-export substrate into one response so dashboards and back-office tooling do not need to reconstruct the report client-side.
 
 ## CLI Usage: pact receipt list
 

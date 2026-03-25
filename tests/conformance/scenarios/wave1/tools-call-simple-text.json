@@ -1,0 +1,17 @@
+{
+  "id": "tools-call-simple-text",
+  "title": "Call a tool that returns a simple text result",
+  "area": "tools",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["stdio", "streamable-http"],
+  "peerRoles": ["client_to_pact_server", "pact_client_to_server"],
+  "deploymentModes": ["wrapped_stdio", "remote_http"],
+  "requiredCapabilities": {
+    "server": ["tools"],
+    "client": []
+  },
+  "tags": ["wave1", "tools"],
+  "expected": "pass",
+  "timeoutMs": 5000
+}

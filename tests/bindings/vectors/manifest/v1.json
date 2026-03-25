@@ -1,0 +1,378 @@
+{
+  "alternate_seed_hex": "1616161616161616161616161616161616161616161616161616161616161616",
+  "cases": [
+    {
+      "description": "Signed manifest is structurally valid, signature-valid, and its embedded public key matches the signer.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "valid_signed_manifest",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "PACT_ENV"
+            ],
+            "network_hosts": [
+              "api.example.com"
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "pact.manifest.v1",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "af32a81f57f258c0aec92de0972296cddc8a7b47db1148d5cd53b85223dbf869835903e6d09a80a6635371c78081dc6061eb53f574458335048a05c7ec0df00b",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest payload was modified after signing, so signature verification fails while structure remains valid.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": false,
+        "structure_valid": true
+      },
+      "id": "tampered_manifest_signature",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.1\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "PACT_ENV"
+            ],
+            "network_hosts": [
+              "api.example.com"
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "pact.manifest.v1",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.1"
+        },
+        "signature": "af32a81f57f258c0aec92de0972296cddc8a7b47db1148d5cd53b85223dbf869835903e6d09a80a6635371c78081dc6061eb53f574458335048a05c7ec0df00b",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest is signed correctly, but the manifest.public_key field does not match the signer key carried alongside the signature.",
+      "expected": {
+        "embedded_public_key_matches_signer": false,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "mismatched_embedded_public_key",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
+          "required_permissions": {
+            "environment_variables": [
+              "PACT_ENV"
+            ],
+            "network_hosts": [
+              "api.example.com"
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "pact.manifest.v1",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "23aa191579af6d0bcf537fbc938ad682f1cdbbc631e7c241f3062c2b1a2d085ba7e5d79150d0f5150e6cb1236ddd31552a2b443a1928b01da12409309c77640b",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest signature is valid, but validation fails because tool names are not unique.",
+      "expected": {
+        "embedded_public_key_matches_signer": true,
+        "embedded_public_key_valid": true,
+        "signature_valid": true,
+        "structure_valid": false
+      },
+      "id": "duplicate_tool_name_manifest",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
+          "required_permissions": {
+            "environment_variables": [
+              "PACT_ENV"
+            ],
+            "network_hosts": [
+              "api.example.com"
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "pact.manifest.v1",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "42fe333cf43dca48741da14a2d287e6ba07b1efe680b9a965a5be40d829e2bd700a87b43a1c4f352b7b181b383df01638550770a9baabf5588fc66820ebc1a08",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    },
+    {
+      "description": "Manifest signature is valid, but the embedded public_key field is not a parseable Ed25519 key.",
+      "expected": {
+        "embedded_public_key_matches_signer": false,
+        "embedded_public_key_valid": false,
+        "signature_valid": true,
+        "structure_valid": true
+      },
+      "id": "invalid_embedded_public_key",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_write\",\"has_side_effects\":true,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "signed_manifest": {
+        "manifest": {
+          "description": "Manifest vector for bindings-core SDK fixtures",
+          "name": "Bindings Demo",
+          "public_key": "not-a-public-key",
+          "required_permissions": {
+            "environment_variables": [
+              "PACT_ENV"
+            ],
+            "network_hosts": [
+              "api.example.com"
+            ],
+            "read_paths": [
+              "/workspace"
+            ],
+            "write_paths": [
+              "/workspace/output"
+            ]
+          },
+          "schema": "pact.manifest.v1",
+          "server_id": "srv-bindings-demo",
+          "tools": [
+            {
+              "description": "Tool definition for file_read",
+              "has_side_effects": false,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "fast",
+              "name": "file_read",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            {
+              "description": "Tool definition for file_write",
+              "has_side_effects": true,
+              "input_schema": {
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              },
+              "latency_hint": "moderate",
+              "name": "file_write",
+              "output_schema": {
+                "properties": {
+                  "ok": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          ],
+          "version": "1.0.0"
+        },
+        "signature": "66438735e8c0a31823afe6aa4c469807f1601e533ae23b53ba48b8ac2c118d99931cd30bc7330cd5d1000a616ce22760970290942ccbdd485d2a68f381acc40f",
+        "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
+      }
+    }
+  ],
+  "generated_by": "pact-bindings-core",
+  "server_seed_hex": "1515151515151515151515151515151515151515151515151515151515151515",
+  "version": 1
+}

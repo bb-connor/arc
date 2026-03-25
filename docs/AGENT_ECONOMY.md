@@ -52,7 +52,8 @@ pub struct BudgetUsageRecord {
 
 ### 2.2 BudgetStore Trait
 
-The `BudgetStore` trait (`crates/pact-kernel/src/budget_store.rs`) has two methods:
+The `BudgetStore` trait (`crates/pact-kernel/src/budget_store.rs`) now covers
+both invocation-count and monetary accounting:
 
 ```rust
 pub trait BudgetStore: Send {
@@ -62,6 +63,22 @@ pub trait BudgetStore: Send {
         grant_index: usize,
         max_invocations: Option<u32>,
     ) -> Result<bool, BudgetStoreError>;
+
+    fn try_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError>;
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError>;
 
     fn list_usages(
         &self,
@@ -119,24 +136,21 @@ pub metadata: Option<serde_json::Value>,
 
 This field is signed as part of the receipt body and is available for structured financial data without schema changes to the receipt envelope.
 
-### 2.7 Analytics Join Gap
+### 2.7 Analytics Substrate (Shipped in v2.0)
 
-The current persisted receipt shape is sufficient for an audit trail, but not
-yet ideal for agent-level economics or reputation analytics. `PactReceipt`
-stores `capability_id`, `tool_server`, and `tool_name`, but it does not record
-the matched `grant_index` or the capability subject directly. That creates two
-practical gaps:
+The local analytics join gap is now closed in the v2.0 runtime:
 
-1. Agent-centric queries need a local capability lineage index keyed by
-   `capability_id` so receipts can be joined to `CapabilityToken.subject`,
-   issuer, and delegation metadata without replaying issuance logs.
-2. Per-grant metrics need a deterministic join path from receipt to the grant
-   that was charged, either by persisting the matched `grant_index` on the
-   receipt or by storing an equivalent local attribution record.
+1. The receipt store persists a capability lineage index keyed by
+   `capability_id`, so receipts can be joined to issuer, subject, grants, and
+   delegation metadata without replaying issuance logs.
+2. Receipts carry deterministic attribution metadata under
+   `metadata.attribution`, including `subject_key`, `issuer_key`,
+   `delegation_depth`, and `grant_index` when a specific grant matched.
+3. The SQLite receipt store indexes `subject_key`, `issuer_key`, and
+   `grant_index` for efficient agent-scoped and per-grant analytics queries.
 
-This is a storage/indexing gap, not a protocol-model gap. The roadmap should
-land this analytics substrate before relying on receipt data for billing
-dashboards, budget-discipline scoring, or agent reputation.
+This means billing dashboards, reputation scoring, and receipt analytics can
+rely on persisted local state rather than ad hoc inference.
 
 ---
 
@@ -435,10 +449,8 @@ pub struct FinancialReceiptMetadata {
     /// Payment or authorization reference on the external rail, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_reference: Option<String>,
-    /// Settlement state as observed by the kernel when the receipt was signed.
-    /// Typical values: "not_applicable", "authorized", "captured",
-    /// "settled", "pending", "failed".
-    pub settlement_status: String,
+    /// Canonical receipt-side settlement state.
+    pub settlement_status: SettlementStatus,
     /// Optional cost breakdown from the tool server.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_breakdown: Option<serde_json::Value>,
@@ -458,13 +470,20 @@ This struct is serialized into `receipt.metadata` as a nested object under the k
     "delegation_depth": 1,
     "root_budget_holder": "a1b2c3...",
     "payment_reference": "pi_123",
-    "settlement_status": "captured"
+    "settlement_status": "settled"
   }
 }
 ```
 
 The kernel populates this after the budget charge is accepted and the payment
-rail reaches a known local state (`captured`, `pending`, `failed`, etc.).
+rail reaches a canonical local state. The receipt contract is intentionally
+smaller than any given payment rail's internal state machine:
+
+- `not_applicable` for pre-execution denials where no settlement applies
+- `pending` for initiated but not yet final settlement
+- `settled` for a final recorded charge
+- `failed` when execution completed but settlement became invalid
+
 Denied invocations may still include structured financial metadata when denial
 occurred before execution due to budget exhaustion or payment pre-authorization
 failure.
@@ -507,14 +526,15 @@ pub struct PaymentAuthorization {
 pub struct PaymentResult {
     /// Payment rail's transaction identifier, if a capture or settlement occurred.
     pub transaction_id: String,
-    /// Local settlement state known to the kernel at the time of receipt signing.
-    pub settlement_status: SettlementStatus,
+    /// Richer payment-rail settlement state, mapped onto the receipt-side
+    /// canonical enum when the kernel signs the receipt.
+    pub settlement_status: RailSettlementStatus,
     /// Rail-specific metadata (idempotency keys, network confirmations, etc.).
     pub metadata: serde_json::Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SettlementStatus {
+pub enum RailSettlementStatus {
     Authorized,
     Captured,
     Settled,
@@ -584,6 +604,24 @@ pub enum PaymentError {
 }
 ```
 
+Implemented on 2026-03-23: `pact-kernel` now ships this payment bridge module
+with the adapter trait, rail-side settlement enum, and canonical
+receipt-side settlement mapping helper.
+
+Also implemented on 2026-03-23: `pact-kernel` now ships a concrete
+`X402PaymentAdapter` reference bridge. It performs a thin prepaid HTTP
+authorization hop before execution, records receipt-linked payment references
+on successful calls, and denies truthfully when authorization fails.
+
+Also implemented on 2026-03-23: pre-execution monetary denials now release any
+provisional internal budget debit before the kernel signs the deny receipt, so
+guard-side denials do not leak budget state.
+
+Also implemented on 2026-03-23: aborted monetary invocations now unwind
+provisional budget debits before returning deny/cancel/incomplete outcomes, and
+successful invocations reconcile the internal debit down to actual reported
+cost when the configured payment rail is not prepaid.
+
 #### 3.6.2 Planned Implementations
 
 | Adapter | Rail | Settlement | Notes |
@@ -594,16 +632,24 @@ pub enum PaymentError {
 
 #### 3.6.3 Integration Point
 
-The `PaymentAdapter` is an optional dependency of `PactKernel`. When configured,
-the kernel follows this rule set:
+The `PaymentAdapter` is an optional dependency of `PactKernel`. The currently
+implemented `X402PaymentAdapter` uses the prepaid branch below; future hold /
+capture rails will use the non-prepaid branch.
+
+When configured, the kernel follows this rule set:
 
 1. If the rail requires or supports pre-authorization, the kernel calls
    `authorize(...)` before invoking the tool. Authorization failure produces a
    truthful `Decision::Deny` receipt because the tool never executed.
 2. The tool executes and reports the actual cost.
-3. The kernel captures the actual amount, releases any unused hold, or records
-   `pending` settlement state for async rails.
-4. If settlement work fails after the tool already ran, the kernel still signs
+3. For prepaid rails, the receipt records the prepaid payment reference and
+   preserves the prepaid amount as the charged cost. For non-prepaid rails, the
+   kernel captures the actual amount and reconciles any provisional debit down
+   to the actual reported cost.
+4. If execution aborts before a result is produced, the kernel unwinds the
+   provisional internal budget debit and releases or refunds the external rail
+   authorization before returning the non-success outcome.
+5. If settlement work fails after the tool already ran, the kernel still signs
    `Decision::Allow` and records the failed settlement state plus a recovery
    reference in `FinancialReceiptMetadata`. Reconciliation happens out-of-band.
 
@@ -646,6 +692,8 @@ Tool provider billing infrastructure.
 Cross-organization delegation chain settlement.
 
 - When Org A delegates to Org B which delegates to Org C, the receipt chain records cost at each level.
+- `GET /v1/reports/cost-attribution` materializes that chain into operator-facing summary, `byRoot`, `byLeaf`, and per-receipt detail rows for a filtered receipt corpus.
+- Trust-control cluster replication includes capability-lineage snapshots, so attribution chains and lineage queries converge on followers rather than only on the leader.
 - Settlement is a batch process that walks delegation chains in receipts, nets out cost attribution per org, and triggers capture, transfer, refund, or reconciliation actions against the connected payment rail.
 - Dispute resolution: any party can verify any receipt's signature and delegation chain independently using only the kernel's public key.
 
@@ -654,6 +702,7 @@ Cross-organization delegation chain settlement.
 Spending analytics and anomaly detection.
 
 - Real-time streaming of `FinancialReceiptMetadata` from the receipt log.
+- `GET /v1/reports/operator` composes receipt analytics, cost attribution, budget utilization, and evidence-export readiness into one operator-facing workflow surface.
 - Anomaly detection: spending velocity exceeding historical baselines, unusual tool-server cost reports, delegation depth anomalies, or growing `pending`/`failed` settlement backlogs.
 - Webhook integration: notify when budget utilization exceeds configurable thresholds (50%, 80%, 95%).
 - Dashboard queries against the indexed receipt store.
@@ -694,19 +743,21 @@ Spending analytics and anomaly detection.
 
 **Data flow for a monetized tool call:**
 
-*Steps 1-3 reflect current kernel behavior. Steps 4-11 are proposed extensions.*
+*Steps 1-3 reflect current kernel behavior. Steps 4-10 are now partially
+implemented in the kernel for monetary grants; Step 11 is current receipt-store
+behavior and Step 12 remains the planned reconciliation extension.*
 
 1. Agent presents `CapabilityToken` with `ToolGrant`. *(current)*
 2. Kernel validates signature, time bounds, revocation, scope. *(current)*
 3. Kernel calls `budget_store.try_increment(...)` to enforce invocation-count budgets, then evaluates guards. *(current)*
-4. **[proposed]** Kernel evaluates `VelocityGuard` against velocity constraints.
-5. **[proposed]** If needed, kernel obtains budget and payment pre-authorization using `max_cost_per_invocation` or a quoted amount.
+4. **[current]** Kernel evaluates `VelocityGuard` against velocity constraints.
+5. **[current]** If needed, kernel obtains budget and payment pre-authorization using `max_cost_per_invocation` or a quoted amount.
 6. Kernel forwards request to tool server. *(current, unchanged)*
-7. **[proposed]** Tool server returns result + `ToolInvocationCost`.
-8. **[proposed]** Kernel verifies reported cost against the per-invocation cap and finalizes the budget charge.
-9. **[proposed]** If `PaymentAdapter` is configured, the kernel captures the actual amount, releases unused hold value, or records `pending` settlement state.
-10. **[proposed]** Kernel signs `PactReceipt` with `FinancialReceiptMetadata`, including settlement status and payment reference.
-11. Receipt is appended to `SqliteReceiptStore` and replicated. *(current for plain receipts; proposed financial metadata is new)*
+7. **[current]** Tool server returns result + `ToolInvocationCost`.
+8. **[current]** Kernel verifies reported cost against the per-invocation cap, unwinds aborted invocations, and finalizes the budget charge.
+9. **[current]** If `PaymentAdapter` is configured, the kernel either records prepaid settlement metadata or captures/releases the post-execution amount depending on rail mode.
+10. **[current]** Kernel signs `PactReceipt` with `FinancialReceiptMetadata`, including settlement status and payment reference.
+11. Receipt is appended to `SqliteReceiptStore` and replicated. *(current)*
 12. **[proposed]** Failed or pending settlement follow-up is handled by a reconciliation queue, not by rewriting the receipt verdict.
 
 ---

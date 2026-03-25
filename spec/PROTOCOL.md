@@ -1576,7 +1576,7 @@ FinancialReceiptMetadata {
     delegation_depth:    u32,              // Depth of delegation chain at time of invocation
     root_budget_holder:  String,           // Agent ID of the root budget holder
     payment_reference:   Option<String>,   // Opaque reference for external settlement systems
-    settlement_status:   String,           // "pending", "settled", or "failed"
+    settlement_status:   SettlementStatus, // "not_applicable", "pending", "settled", or "failed"
     cost_breakdown:      Option<Value>,    // Optional itemized breakdown for audit
     attempted_cost:      Option<u64>,      // Populated only on denial receipts (budget exhausted)
 }
@@ -1594,7 +1594,7 @@ The struct is serialized as the value under the `"financial"` key:
     "budget_total": 1000,
     "delegation_depth": 1,
     "root_budget_holder": "agent-root-001",
-    "settlement_status": "pending"
+    "settlement_status": "settled"
   }
 }
 ```
@@ -1615,6 +1615,8 @@ propagates. Consumers must treat `budget_remaining` as advisory, not as a
 strict balance guarantee.
 
 **`settlement_status`.** Tracks external settlement state. Valid values are:
+- `"not_applicable"` -- no external settlement applies to this receipt
+  (for example, a pre-execution denial).
 - `"pending"` -- charge recorded; external settlement has not yet confirmed.
 - `"settled"` -- external settlement system confirmed the charge.
 - `"failed"` -- settlement system reported a failure; charge may be reversed.
@@ -1641,6 +1643,24 @@ Financial metadata is absent when:
   financial metadata directly; costs are tracked at the parent tool-call level).
 - The invocation was denied before reaching the budget-check step (e.g., due
   to a signature failure or revocation check).
+
+### D.4 Receipt Attribution Metadata
+
+To support deterministic local analytics joins, the Kernel may also attach an
+`"attribution"` object inside `PactReceipt::metadata`:
+
+```
+ReceiptAttributionMetadata {
+    subject_key:      String,        // Capability subject public key (hex)
+    issuer_key:       String,        // Capability issuer public key (hex)
+    delegation_depth: u32,           // Delegation depth for the capability
+    grant_index:      Option<u32>,   // Matched grant index when one was resolved
+}
+```
+
+This metadata provides a direct receipt-side join path to the acting agent and
+the matched grant. It complements, but does not replace, the full capability
+lineage snapshot used for richer historical and delegation analysis.
 
 ---
 

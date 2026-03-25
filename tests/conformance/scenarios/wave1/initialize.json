@@ -1,0 +1,17 @@
+{
+  "id": "initialize",
+  "title": "Initialize a client/server session",
+  "area": "lifecycle",
+  "category": "mcp-core",
+  "specVersions": ["2025-11-25"],
+  "transport": ["stdio", "streamable-http"],
+  "peerRoles": ["client_to_pact_server", "pact_client_to_server"],
+  "deploymentModes": ["wrapped_stdio", "remote_http"],
+  "requiredCapabilities": {
+    "server": [],
+    "client": []
+  },
+  "tags": ["wave1", "lifecycle"],
+  "expected": "pass",
+  "timeoutMs": 5000
+}

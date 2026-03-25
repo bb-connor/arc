@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::capability::MonetaryAmount;
 use crate::crypto::{Keypair, PublicKey, Signature};
 use crate::error::Result;
 
@@ -78,8 +79,32 @@ pub struct ToolDefinition {
     /// JSON Schema for the tool's output (optional).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_schema: Option<serde_json::Value>,
+    /// Optional advertised pricing metadata for operator and agent planning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing: Option<ToolPricing>,
     /// Behavioral annotations for policy and scheduling decisions.
     pub annotations: ToolAnnotations,
+}
+
+/// Optional advertised pricing metadata for a tool manifest entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolPricing {
+    pub pricing_model: PricingModel,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_price: Option<MonetaryAmount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unit_price: Option<MonetaryAmount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub billing_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PricingModel {
+    Flat,
+    PerInvocation,
+    PerUnit,
+    Hybrid,
 }
 
 /// Behavioral annotations that help the Kernel make policy and scheduling
@@ -126,6 +151,15 @@ mod tests {
                     "content": { "type": "string" }
                 }
             })),
+            pricing: Some(ToolPricing {
+                pricing_model: PricingModel::PerInvocation,
+                base_price: None,
+                unit_price: Some(MonetaryAmount {
+                    units: 25,
+                    currency: "USD".to_string(),
+                }),
+                billing_unit: Some("invocation".to_string()),
+            }),
             annotations: ToolAnnotations {
                 read_only: true,
                 destructive: false,
@@ -191,6 +225,15 @@ mod tests {
         let restored: ToolDefinition = serde_json::from_str(&json).unwrap();
         assert_eq!(tool.name, restored.name);
         assert_eq!(tool.description, restored.description);
+        assert_eq!(
+            tool.pricing
+                .as_ref()
+                .map(|pricing| pricing.pricing_model.clone()),
+            restored
+                .pricing
+                .as_ref()
+                .map(|pricing| pricing.pricing_model.clone())
+        );
         assert_eq!(tool.annotations.read_only, restored.annotations.read_only);
         assert_eq!(
             tool.annotations.estimated_duration_ms,

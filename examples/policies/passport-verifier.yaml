@@ -1,0 +1,12 @@
+issuerAllowlist: []
+minCompositeScore: 0.70
+minReliability: 0.85
+minLeastPrivilege: 0.60
+minDelegationHygiene: 0.70
+maxBoundaryPressure: 0.20
+minReceiptCount: 100
+minLineageRecords: 1
+minHistoryDays: 7
+maxAttestationAgeDays: 30
+requireCheckpointCoverage: true
+requireReceiptLogUrls: true

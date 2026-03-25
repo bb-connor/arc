@@ -1,0 +1,30 @@
+[package]
+name = "pact-policy"
+description = "HushSpec policy format for the PACT runtime -- parse, validate, merge, evaluate, and compile to PACT guards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+pact-core = { path = "../pact-core" }
+pact-guards = { path = "../pact-guards" }
+pact-kernel = { path = "../pact-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+regex = "1"
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

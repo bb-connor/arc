@@ -1,0 +1,50 @@
+name: Release Qualification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  qualify:
+    name: Release qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install MSRV toolchain
+        run: rustup toolchain install 1.93.0 --profile minimal
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: SDK parity contract lane
+        run: ./scripts/check-sdk-parity.sh
+
+      - name: Release qualification
+        run: ./scripts/qualify-release.sh
+
+      - name: MSRV workspace lane
+        run: cargo +1.93.0 build --workspace && cargo +1.93.0 test --workspace
+
+      - name: Upload qualification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-qualification
+          path: target/release-qualification

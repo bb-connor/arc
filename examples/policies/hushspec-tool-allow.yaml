@@ -1,0 +1,11 @@
+hushspec: "0.1.0"
+name: tool-allow
+description: Allow a narrow read-only tool surface.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+      - list_directory

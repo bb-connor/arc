@@ -1,0 +1,51 @@
+//! HushSpec policy format for the PACT runtime.
+//!
+//! This crate provides a portable, standards-based policy format for AI agent
+//! security rules. It is ported from the HushSpec reference implementation and
+//! adapted to integrate with PACT's guard pipeline and capability system.
+//!
+//! # Key modules
+//!
+//! - [`models`] -- HushSpec YAML schema types
+//! - [`evaluate`] -- Policy evaluation producing allow/warn/deny decisions
+//! - [`merge`] -- Policy inheritance via `extends`
+//! - [`validate`] -- Schema and semantic validation
+//! - [`resolve`] -- `extends` chain resolution from filesystem
+//! - [`compiler`] -- **Bridge**: compile HushSpec policies into PACT guards
+//! - [`conditions`] -- Conditional rule activation
+//! - [`detection`] -- Regex-based content detectors
+//! - [`receipt`] -- Decision receipts with timing and hashing
+
+pub mod compiler;
+pub mod conditions;
+pub mod detection;
+pub mod evaluate;
+pub mod merge;
+pub mod models;
+pub mod receipt;
+pub mod resolve;
+pub mod validate;
+pub mod version;
+
+// Re-exports for convenience
+pub use compiler::{compile_policy, CompileError, CompiledPolicy};
+pub use conditions::{evaluate_condition, Condition, RuntimeContext};
+pub use evaluate::{
+    activate_panic, deactivate_panic, evaluate, evaluate_with_context, is_panic_active,
+    selected_origin_profile_id, Decision, EvaluationAction, EvaluationResult, OriginContext,
+    PostureContext, PostureResult,
+};
+pub use merge::merge;
+pub use models::{HushSpec, OriginMatch};
+pub use receipt::{evaluate_audited, AuditConfig, DecisionReceipt};
+pub use resolve::{resolve_from_path, resolve_with_loader, LoadedSpec, ResolveError};
+pub use validate::{validate, ValidationError, ValidationResult};
+pub use version::HUSHSPEC_VERSION;
+
+/// Detect whether a YAML string is a HushSpec document by checking for the
+/// `hushspec` top-level key. This enables auto-detection when loading policies.
+pub fn is_hushspec_format(yaml: &str) -> bool {
+    // Quick check without full parse: look for "hushspec:" at the start of a line
+    yaml.lines()
+        .any(|line| line.starts_with("hushspec:") || line.starts_with("\"hushspec\""))
+}

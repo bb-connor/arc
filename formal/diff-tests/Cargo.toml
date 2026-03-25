@@ -1,0 +1,13 @@
+[package]
+name = "pact-formal-diff-tests"
+description = "Differential testing: random inputs compared against reference spec and production implementation"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+pact-core = { path = "../../crates/pact-core" }
+proptest = "1.10"
+serde_json = { workspace = true }

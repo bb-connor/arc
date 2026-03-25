@@ -38,12 +38,12 @@ pub use receipt::{
 pub use session::{
     CompleteOperation, CompletionArgument, CompletionReference, CompletionResult,
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
-    CreateMessageResult, ElicitationAction, GetPromptOperation, OperationContext, OperationKind,
-    OperationTerminalState, ProgressToken, PromptArgument, PromptDefinition, PromptMessage,
-    PromptResult, ReadResourceOperation, RequestId, ResourceContent, ResourceDefinition,
-    ResourceTemplateDefinition, RootDefinition, SamplingMessage, SamplingTool, SamplingToolChoice,
-    SessionAuthContext, SessionAuthMethod, SessionId, SessionOperation, SessionTransport,
-    ToolCallOperation,
+    CreateMessageResult, ElicitationAction, EnterpriseFederationMethod, EnterpriseIdentityContext,
+    GetPromptOperation, OperationContext, OperationKind, OperationTerminalState, ProgressToken,
+    PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
+    RequestId, ResourceContent, ResourceDefinition, ResourceTemplateDefinition, RootDefinition,
+    SamplingMessage, SamplingTool, SamplingToolChoice, SessionAuthContext, SessionAuthMethod,
+    SessionId, SessionOperation, SessionTransport, ToolCallOperation,
 };
 
 pub use capability::{validate_attenuation, validate_delegation_chain};

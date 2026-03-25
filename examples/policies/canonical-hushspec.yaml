@@ -1,0 +1,22 @@
+hushspec: "0.1.0"
+name: canonical-hushspec
+description: Recommended starting point for supported policy authoring in PACT.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - greet
+  forbidden_paths:
+    enabled: true
+    patterns:
+      - "**/.ssh/**"
+  path_allowlist:
+    enabled: true
+    read:
+      - "/workspace/**"
+    write:
+      - "/workspace/**"
+    patch:
+      - "/workspace/**"

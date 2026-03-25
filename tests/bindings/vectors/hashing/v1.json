@@ -1,0 +1,24 @@
+{
+  "cases": [
+    {
+      "description": "SHA-256 of the empty UTF-8 string.",
+      "id": "empty_utf8",
+      "input_utf8": "",
+      "sha256_hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "description": "SHA-256 of a simple ASCII string.",
+      "id": "hello_utf8",
+      "input_utf8": "hello",
+      "sha256_hex": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    },
+    {
+      "description": "SHA-256 operates on UTF-8 bytes for non-ASCII strings too.",
+      "id": "unicode_utf8",
+      "input_utf8": "pact 🔐",
+      "sha256_hex": "a2c80884f0e01e16154a4c8083e595f669cc33af7ac75e6c5e86997ec2cceb83"
+    }
+  ],
+  "generated_by": "pact-bindings-core",
+  "version": 1
+}

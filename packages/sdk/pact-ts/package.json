@@ -3,16 +3,33 @@
   "version": "1.0.0",
   "type": "module",
   "description": "TypeScript SDK for the PACT (Provable Agent Capability Transport) protocol",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./invariants": "./src/invariants/index.ts",
-    "./transport": "./src/transport/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./invariants": {
+      "types": "./dist/invariants/index.d.ts",
+      "import": "./dist/invariants/index.js"
+    },
+    "./transport": {
+      "types": "./dist/transport/index.d.ts",
+      "import": "./dist/transport/index.js"
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node ./scripts/fix-dist-imports.mjs",
+    "prepack": "npm run build",
     "test": "node --experimental-strip-types --test ./test/*.test.ts"
   }
 }

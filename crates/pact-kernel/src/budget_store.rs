@@ -15,6 +15,9 @@ pub enum BudgetStoreError {
 
     #[error("budget arithmetic overflow: {0}")]
     Overflow(String),
+
+    #[error("budget state invariant violated: {0}")]
+    Invariant(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,11 +65,36 @@ pub trait BudgetStore: Send {
         max_total_cost_units: Option<u64>,
     ) -> Result<bool, BudgetStoreError>;
 
+    /// Reverse a previously applied monetary charge for a pre-execution denial path.
+    fn reverse_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError>;
+
+    /// Reduce a previously charged monetary amount without changing invocation count.
+    ///
+    /// This is used when the kernel pre-debits `max_cost_per_invocation` before
+    /// execution and later reconciles the charge down to the actual reported cost.
+    fn reduce_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError>;
+
     fn list_usages(
         &self,
         limit: usize,
         capability_id: Option<&str>,
     ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError>;
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError>;
 }
 
 #[derive(Default)]
@@ -172,6 +200,64 @@ impl BudgetStore for InMemoryBudgetStore {
         Ok(true)
     }
 
+    fn reverse_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        let key = (capability_id.to_string(), grant_index);
+        let entry = self
+            .counts
+            .get_mut(&key)
+            .ok_or_else(|| BudgetStoreError::Invariant("missing charged budget row".to_string()))?;
+
+        if entry.invocation_count == 0 {
+            return Err(BudgetStoreError::Invariant(
+                "cannot reverse charge with zero invocation_count".to_string(),
+            ));
+        }
+        if entry.total_cost_charged < cost_units {
+            return Err(BudgetStoreError::Invariant(
+                "cannot reverse charge larger than total_cost_charged".to_string(),
+            ));
+        }
+
+        let next_seq = self.next_seq.saturating_add(1);
+        self.next_seq = next_seq;
+        entry.invocation_count -= 1;
+        entry.total_cost_charged -= cost_units;
+        entry.updated_at = unix_now();
+        entry.seq = next_seq;
+        Ok(())
+    }
+
+    fn reduce_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        let key = (capability_id.to_string(), grant_index);
+        let entry = self
+            .counts
+            .get_mut(&key)
+            .ok_or_else(|| BudgetStoreError::Invariant("missing charged budget row".to_string()))?;
+
+        if entry.total_cost_charged < cost_units {
+            return Err(BudgetStoreError::Invariant(
+                "cannot reduce charge larger than total_cost_charged".to_string(),
+            ));
+        }
+
+        let next_seq = self.next_seq.saturating_add(1);
+        self.next_seq = next_seq;
+        entry.total_cost_charged -= cost_units;
+        entry.updated_at = unix_now();
+        entry.seq = next_seq;
+        Ok(())
+    }
+
     fn list_usages(
         &self,
         limit: usize,
@@ -192,6 +278,17 @@ impl BudgetStore for InMemoryBudgetStore {
         });
         records.truncate(limit);
         Ok(records)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        Ok(self
+            .counts
+            .get(&(capability_id.to_string(), grant_index))
+            .cloned())
     }
 }
 
@@ -321,6 +418,27 @@ impl SqliteBudgetStore {
                 })
             },
         )?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    pub fn list_all_usages(&self) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        let mut statement = self.connection.prepare(
+            r#"
+            SELECT capability_id, grant_index, invocation_count, updated_at, seq, total_cost_charged
+            FROM capability_grant_budgets
+            ORDER BY updated_at DESC, capability_id ASC, grant_index ASC
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(BudgetUsageRecord {
+                capability_id: row.get(0)?,
+                grant_index: row.get::<_, i64>(1)?.max(0) as u32,
+                invocation_count: row.get::<_, i64>(2)?.max(0) as u32,
+                updated_at: row.get(3)?,
+                seq: row.get::<_, i64>(4)?.max(0) as u64,
+                total_cost_charged: row.get::<_, i64>(5)?.max(0) as u64,
+            })
+        })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 }
@@ -479,6 +597,134 @@ impl BudgetStore for SqliteBudgetStore {
         Ok(true)
     }
 
+    fn reverse_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let current = transaction
+            .query_row(
+                r#"
+                SELECT invocation_count, total_cost_charged
+                FROM capability_grant_budgets
+                WHERE capability_id = ?1 AND grant_index = ?2
+                "#,
+                params![capability_id, grant_index as i64],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?.max(0) as u64)),
+            )
+            .optional()?;
+
+        let Some((invocation_count, total_cost_charged)) = current else {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "missing charged budget row".to_string(),
+            ));
+        };
+
+        if invocation_count <= 0 {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot reverse charge with zero invocation_count".to_string(),
+            ));
+        }
+        if total_cost_charged < cost_units {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot reverse charge larger than total_cost_charged".to_string(),
+            ));
+        }
+
+        let seq = allocate_budget_replication_seq(&transaction)?;
+        transaction.execute(
+            r#"
+            UPDATE capability_grant_budgets
+            SET invocation_count = ?3,
+                updated_at = ?4,
+                seq = ?5,
+                total_cost_charged = ?6
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![
+                capability_id,
+                grant_index as i64,
+                invocation_count - 1,
+                unix_now(),
+                seq as i64,
+                (total_cost_charged - cost_units) as i64,
+            ],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
+    fn reduce_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let current = transaction
+            .query_row(
+                r#"
+                SELECT invocation_count, total_cost_charged
+                FROM capability_grant_budgets
+                WHERE capability_id = ?1 AND grant_index = ?2
+                "#,
+                params![capability_id, grant_index as i64],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?.max(0) as u64)),
+            )
+            .optional()?;
+
+        let Some((invocation_count, total_cost_charged)) = current else {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "missing charged budget row".to_string(),
+            ));
+        };
+
+        if invocation_count <= 0 {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot reduce charge with zero invocation_count".to_string(),
+            ));
+        }
+        if total_cost_charged < cost_units {
+            transaction.rollback()?;
+            return Err(BudgetStoreError::Invariant(
+                "cannot reduce charge larger than total_cost_charged".to_string(),
+            ));
+        }
+
+        let seq = allocate_budget_replication_seq(&transaction)?;
+        transaction.execute(
+            r#"
+            UPDATE capability_grant_budgets
+            SET updated_at = ?3,
+                seq = ?4,
+                total_cost_charged = ?5
+            WHERE capability_id = ?1 AND grant_index = ?2
+            "#,
+            params![
+                capability_id,
+                grant_index as i64,
+                unix_now(),
+                seq as i64,
+                (total_cost_charged - cost_units) as i64,
+            ],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
     fn list_usages(
         &self,
         limit: usize,
@@ -504,6 +750,34 @@ impl BudgetStore for SqliteBudgetStore {
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.connection
+            .query_row(
+                r#"
+                SELECT capability_id, grant_index, invocation_count, updated_at, seq, total_cost_charged
+                FROM capability_grant_budgets
+                WHERE capability_id = ?1 AND grant_index = ?2
+                "#,
+                params![capability_id, grant_index as i64],
+                |row| {
+                    Ok(BudgetUsageRecord {
+                        capability_id: row.get(0)?,
+                        grant_index: row.get::<_, i64>(1)?.max(0) as u32,
+                        invocation_count: row.get::<_, i64>(2)?.max(0) as u32,
+                        updated_at: row.get(3)?,
+                        seq: row.get::<_, i64>(4)?.max(0) as u64,
+                        total_cost_charged: row.get::<_, i64>(5)?.max(0) as u64,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
     }
 }
 
@@ -860,6 +1134,68 @@ mod tests {
             .unwrap());
         let records = store.list_usages(10, Some("cap-1")).unwrap();
         assert_eq!(records[0].total_cost_charged, 42);
+    }
+
+    #[test]
+    fn budget_store_reverse_charge_cost_restores_prior_state_inmemory() {
+        let mut store = InMemoryBudgetStore::new();
+        assert!(store
+            .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
+            .unwrap());
+
+        store.reverse_charge_cost("cap-1", 0, 100).unwrap();
+
+        let record = store.get_usage("cap-1", 0).unwrap().unwrap();
+        assert_eq!(record.invocation_count, 0);
+        assert_eq!(record.total_cost_charged, 0);
+    }
+
+    #[test]
+    fn budget_store_reverse_charge_cost_restores_prior_state_sqlite() {
+        let path = unique_db_path("pact-reverse-charge");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        assert!(store
+            .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
+            .unwrap());
+
+        store.reverse_charge_cost("cap-1", 0, 100).unwrap();
+
+        let record = store.get_usage("cap-1", 0).unwrap().unwrap();
+        assert_eq!(record.invocation_count, 0);
+        assert_eq!(record.total_cost_charged, 0);
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn budget_store_reduce_charge_cost_preserves_invocation_count_inmemory() {
+        let mut store = InMemoryBudgetStore::new();
+        assert!(store
+            .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
+            .unwrap());
+
+        store.reduce_charge_cost("cap-1", 0, 25).unwrap();
+
+        let record = store.get_usage("cap-1", 0).unwrap().unwrap();
+        assert_eq!(record.invocation_count, 1);
+        assert_eq!(record.total_cost_charged, 75);
+    }
+
+    #[test]
+    fn budget_store_reduce_charge_cost_preserves_invocation_count_sqlite() {
+        let path = unique_db_path("pact-reduce-charge");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        assert!(store
+            .try_charge_cost("cap-1", 0, Some(10), 100, Some(200), Some(1000))
+            .unwrap());
+
+        store.reduce_charge_cost("cap-1", 0, 25).unwrap();
+
+        let record = store.get_usage("cap-1", 0).unwrap().unwrap();
+        assert_eq!(record.invocation_count, 1);
+        assert_eq!(record.total_cost_charged, 75);
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]

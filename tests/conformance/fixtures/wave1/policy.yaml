@@ -1,0 +1,21 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+  allow_sampling: true
+  allow_elicitation: true
+
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 300
+    resources:
+      - uri: "*"
+        operations: [read, subscribe]
+        ttl: 300
+    prompts:
+      - prompt: "*"
+        operations: [get]
+        ttl: 300

@@ -4,6 +4,7 @@
 //! JSON-RPC, stdio frames, or another protocol into `SessionOperation`, and the
 //! kernel can evaluate those operations without knowing how they arrived.
 
+use std::collections::BTreeMap;
 use std::fmt;
 
 use percent_encoding::percent_decode_str;
@@ -168,6 +169,7 @@ impl TaskOwnershipSnapshot {
 /// This is intentionally separate from PACT capability authorization. A session
 /// may be transport-authenticated and still be denied by capability or guard
 /// checks later during operation evaluation.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionAuthMethod {
@@ -187,9 +189,89 @@ pub enum SessionAuthMethod {
         audience: Option<String>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         scopes: Vec<String>,
+        #[serde(
+            default,
+            skip_serializing_if = "OAuthBearerFederatedClaims::is_empty",
+            rename = "federatedClaims"
+        )]
+        federated_claims: OAuthBearerFederatedClaims,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            rename = "enterpriseIdentity"
+        )]
+        enterprise_identity: Option<EnterpriseIdentityContext>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         token_fingerprint: Option<String>,
     },
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthBearerFederatedClaims {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<String>,
+}
+
+impl OAuthBearerFederatedClaims {
+    pub fn is_empty(&self) -> bool {
+        self.client_id.is_none()
+            && self.object_id.is_none()
+            && self.tenant_id.is_none()
+            && self.organization_id.is_none()
+            && self.groups.is_empty()
+            && self.roles.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EnterpriseFederationMethod {
+    #[default]
+    Jwt,
+    Introspection,
+    Scim,
+    Saml,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EnterpriseIdentityContext {
+    pub provider_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_record_id: Option<String>,
+    pub provider_kind: String,
+    pub federation_method: EnterpriseFederationMethod,
+    pub principal: String,
+    pub subject_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub client_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organization_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_subject: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub attribute_sources: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust_material_ref: Option<String>,
 }
 
 /// Normalized transport-authentication context bound to a logical session.
@@ -243,6 +325,31 @@ impl SessionAuthContext {
         token_fingerprint: Option<String>,
         origin: Option<String>,
     ) -> Self {
+        Self::streamable_http_oauth_bearer_with_claims(
+            principal,
+            issuer,
+            subject,
+            audience,
+            scopes,
+            OAuthBearerFederatedClaims::default(),
+            None,
+            token_fingerprint,
+            origin,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn streamable_http_oauth_bearer_with_claims(
+        principal: Option<String>,
+        issuer: Option<String>,
+        subject: Option<String>,
+        audience: Option<String>,
+        scopes: Vec<String>,
+        federated_claims: OAuthBearerFederatedClaims,
+        enterprise_identity: Option<EnterpriseIdentityContext>,
+        token_fingerprint: Option<String>,
+        origin: Option<String>,
+    ) -> Self {
         Self {
             transport: SessionTransport::StreamableHttp,
             method: SessionAuthMethod::OAuthBearer {
@@ -251,6 +358,8 @@ impl SessionAuthContext {
                 subject,
                 audience,
                 scopes,
+                federated_claims,
+                enterprise_identity,
                 token_fingerprint,
             },
             origin,
@@ -924,6 +1033,8 @@ impl SessionOperation {
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use super::*;
     use crate::capability::{CapabilityTokenBody, Operation, PactScope, ToolGrant};
     use crate::crypto::Keypair;
@@ -1300,6 +1411,57 @@ mod tests {
         let auth = SessionAuthContext::stdio_anonymous();
         assert!(!auth.is_authenticated());
         assert_eq!(auth.principal(), None);
+    }
+
+    #[test]
+    fn oauth_session_auth_context_roundtrips_with_federated_claims() {
+        let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
+            Some("oidc:https://issuer.example#sub:user-123".to_string()),
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("pact-mcp".to_string()),
+            vec!["mcp:invoke".to_string()],
+            OAuthBearerFederatedClaims {
+                client_id: Some("client-abc".to_string()),
+                object_id: Some("object-123".to_string()),
+                tenant_id: Some("tenant-123".to_string()),
+                organization_id: Some("org-789".to_string()),
+                groups: vec!["eng".to_string(), "ops".to_string()],
+                roles: vec!["operator".to_string()],
+            },
+            Some(EnterpriseIdentityContext {
+                provider_id: "provider-1".to_string(),
+                provider_record_id: Some("provider-1".to_string()),
+                provider_kind: "oidc_jwks".to_string(),
+                federation_method: EnterpriseFederationMethod::Jwt,
+                principal: "oidc:https://issuer.example#sub:user-123".to_string(),
+                subject_key: "subject-key-123".to_string(),
+                client_id: Some("client-abc".to_string()),
+                object_id: Some("object-123".to_string()),
+                tenant_id: Some("tenant-123".to_string()),
+                organization_id: Some("org-789".to_string()),
+                groups: vec!["eng".to_string(), "ops".to_string()],
+                roles: vec!["operator".to_string()],
+                source_subject: Some("user-123".to_string()),
+                attribute_sources: BTreeMap::from([
+                    ("principal".to_string(), "sub".to_string()),
+                    ("groups".to_string(), "groups".to_string()),
+                ]),
+                trust_material_ref: Some("jwks:primary".to_string()),
+            }),
+            Some("cafebabe".to_string()),
+            Some("http://localhost:3000".to_string()),
+        );
+
+        assert!(auth.is_authenticated());
+        assert_eq!(
+            auth.principal(),
+            Some("oidc:https://issuer.example#sub:user-123")
+        );
+
+        let encoded = serde_json::to_string(&auth).unwrap();
+        let decoded: SessionAuthContext = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, auth);
     }
 
     #[test]

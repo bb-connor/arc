@@ -63,7 +63,10 @@ export class ReceiptQueryClient {
   async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<PactReceipt[]> {
     let cursor: number | undefined = params.cursor;
     while (true) {
-      const response = await this.query({ ...params, cursor });
+      const response =
+        cursor === undefined
+          ? await this.query(params)
+          : await this.query({ ...params, cursor });
       if (response.receipts.length > 0) {
         yield response.receipts;
       }

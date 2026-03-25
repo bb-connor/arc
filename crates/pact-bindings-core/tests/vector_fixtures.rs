@@ -649,6 +649,7 @@ fn sample_signed_manifest(public_key: String, tool_names: &[&str]) -> SignedTool
                         "ok": { "type": "boolean" }
                     }
                 })),
+                pricing: None,
                 has_side_effects: *tool_name == "file_write",
                 latency_hint: Some(if *tool_name == "file_read" {
                     LatencyHint::Fast

@@ -3,242 +3,116 @@
 ## Milestones
 
 - [x] **v1.0 Closing Cycle** - Phases 1-6 (shipped 2026-03-20)
-- [ ] **v2.0 Agent Economy Foundation** - Phases 7-12 (in progress)
+- [x] **v2.0 Agent Economy Foundation** - Phases 7-12 (shipped 2026-03-24)
+- [x] **v2.1 Federation and Verifier Completion** - Phases 13-16 (shipped 2026-03-24)
+- [x] **v2.2 A2A and Ecosystem Hardening** - Phases 17-20 (completed 2026-03-25)
+- [ ] **v2.3 Production and Standards** - planned
+- [ ] **v2.4 Commercial Trust Primitives** - planned
 
-## Phases
+## Archived Milestone
 
-<details>
-<summary>v1.0 Closing Cycle (Phases 1-6) - SHIPPED 2026-03-20</summary>
+- `v2.1` roadmap: `.planning/milestones/v2.1-ROADMAP.md`
+- `v2.1` requirements: `.planning/milestones/v2.1-REQUIREMENTS.md`
+- `v2.1` audit: `.planning/milestones/v2.1-MILESTONE-AUDIT.md`
+- `v2.2` roadmap: `.planning/milestones/v2.2-ROADMAP.md`
+- `v2.2` requirements: `.planning/milestones/v2.2-REQUIREMENTS.md`
+- `v2.2` audit: `.planning/milestones/v2.2-MILESTONE-AUDIT.md`
 
-### Phase 1: E9 HA Trust-Control Reliability
-**Goal**: Make clustered trust-control deterministic enough that workspace and CI runs stop failing on leader/follower visibility races.
-**Depends on**: Nothing (current closing-cycle entry phase)
-**Requirements**: [HA-01, HA-02, HA-03, HA-04]
-**Success Criteria** (what must be TRUE):
-  1. Repeated workspace and targeted trust-cluster runs no longer flake on leader-side budget visibility.
-  2. Forwarded writes return success only after the documented visibility guarantee is actually satisfied.
-  3. Authority, revocation, receipt, and budget state remain correct across leader failover.
-  4. Cluster status surfaces enough state to localize routing, cursor, and convergence failures quickly.
-**Plans**: 4 plans
+## Current Milestone: v2.2 A2A and Ecosystem Hardening
 
-Plans:
-- [x] 01-01: Reproduce the current trust-cluster flake and add observability for leader, follower, and cursor state.
-- [x] 01-02: Freeze and implement the control-plane write visibility contract for forwarded writes.
-- [x] 01-03: Harden replication ordering and cursor semantics across budget, authority, receipt, and revocation state.
-- [x] 01-04: Add failover, convergence, and repeat-run coverage that proves the cluster is stable under load.
-
-### Phase 2: E12 Security Boundary Completion
-**Goal**: Turn negotiated roots into enforced runtime boundaries for filesystem-shaped tools and filesystem-backed resources.
-**Depends on**: Phase 1
-**Requirements**: [SEC-01, SEC-02, SEC-03, SEC-04]
-**Success Criteria** (what must be TRUE):
-  1. Filesystem-shaped tool calls outside allowed roots are denied with signed evidence.
-  2. Filesystem-backed resource reads outside allowed roots are denied with signed evidence.
-  3. Root normalization rules are explicit and consistent across the supported transports.
-  4. Missing or stale roots never silently expand access.
-**Plans**: 4 plans
-
-Plans:
-- [x] 02-01: Freeze the root normalization model and threat boundaries for filesystem-shaped access.
-- [x] 02-02: Enforce roots for tool calls with path-bearing arguments and fail-closed receipts.
-- [x] 02-03: Enforce roots for filesystem-backed resources while preserving non-filesystem resource behavior.
-- [x] 02-04: Add cross-transport tests and docs that make the enforced boundary explicit.
-
-### Phase 3: E10 Remote Runtime Hardening
-**Goal**: Make the hosted remote MCP runtime reconnect-safe, resumable where intended, and scalable beyond the current subprocess ownership shape.
-**Depends on**: Phase 2
-**Requirements**: [REM-01, REM-02, REM-03, REM-04]
-**Success Criteria** (what must be TRUE):
-  1. Remote sessions follow one documented reconnect and resume contract.
-  2. GET-based SSE coverage exists and works against the compatibility surface.
-  3. Stale-session cleanup, drain, and shutdown behavior are deterministic and test-covered.
-  4. Hosted runtime ownership no longer depends on one subprocess per session in all serious deployments.
-**Plans**: 4 plans
-
-Plans:
-- [x] 03-01: Specify resumability, reconnect rules, and terminal states for remote sessions.
-- [x] 03-02: Implement GET/SSE stream support and align POST/GET stream ownership behavior.
-- [x] 03-03: Expand the hosted ownership model for wrapped and native providers.
-- [x] 03-04: Add lifecycle diagnostics, cleanup behavior, and operational docs for hosted runtime use.
-
-### Phase 4: E11 Cross-Transport Concurrency Semantics
-**Goal**: Make task ownership, stream ownership, cancellation, and late async completion behave the same way across direct, wrapped, stdio, and remote paths.
-**Depends on**: Phase 3
-**Requirements**: [CON-01, CON-02, CON-03, CON-04]
-**Success Criteria** (what must be TRUE):
-  1. One ownership model describes active work, stream emission, and terminal state across transports.
-  2. `tasks-cancel` no longer remains `xfail` in the remote story.
-  3. Late async completion no longer depends on request-local bridges surviving accidentally.
-  4. Cancellation races produce deterministic receipts and terminal outcomes across all supported paths.
-**Plans**: 4 plans
-
-Plans:
-- [x] 04-01: Freeze the transport-neutral ownership state machine for work, streams, and terminal state.
-- [x] 04-02: Remove transport-specific task lifecycle edge cases, including the remote `tasks-cancel` gap.
-- [x] 04-03: Normalize cancellation race semantics and nested parent/child linkage.
-- [x] 04-04: Add durable async completion sources and late-event coverage for native and wrapped paths.
-
-### Phase 5: E13 Policy and Adoption Unification
-**Goal**: Give operators and adopters one clear policy story and one higher-level path into native PACT services.
-**Depends on**: Phase 4
-**Requirements**: [POL-01, POL-02, POL-03, POL-04]
-**Success Criteria** (what must be TRUE):
-  1. One policy authoring path is clearly documented as canonical.
-  2. All shipped guards are reachable through the supported configuration surface.
-  3. Wrapped-MCP-to-native migration guidance and examples are maintained and evidence-backed.
-  4. At least one higher-level native authoring surface exists and is test-covered.
-**Plans**: 4 plans
-
-Plans:
-- [x] 05-01: Freeze the supported policy contract and align README, CLI messaging, and docs around it.
-- [x] 05-02: Expose the full shipped guard surface through the supported path with regression coverage.
-- [x] 05-03: Ship migration guides and examples for wrapped-to-native adoption.
-- [x] 05-04: Add a higher-level native authoring surface that covers the core PACT primitives coherently.
-
-### Phase 6: E14 Hardening and Release Candidate
-**Goal**: Turn the closing-cycle epics into a release candidate with explicit guarantees, limits, and go/no-go evidence.
-**Depends on**: Phase 5
-**Requirements**: [REL-01, REL-02, REL-03, REL-04]
-**Success Criteria** (what must be TRUE):
-  1. Workspace build, lint, and test gates are repeatable in CI and local qualification runs.
-  2. Failure-mode, limits, and guarantee docs accurately describe the supported surface.
-  3. Examples, conformance coverage, and release docs tell one coherent story.
-  4. No remaining post-review finding is deferred into an undefined hardening bucket.
-**Plans**: 4 plans
-
-Plans:
-- [x] 06-01: Build the release qualification matrix covering gates, limits, and unresolved findings.
-- [x] 06-02: Add failure-mode, regression, and qualification coverage for the final supported surface.
-- [x] 06-03: Publish release docs covering guarantees, non-goals, migration path, and extension policy.
-- [x] 06-04: Run the final milestone audit and capture the release-candidate go/no-go decision.
-
-</details>
-
----
-
-## v2.0 Agent Economy Foundation
-
-**Milestone Goal:** Transform PACT from a security protocol into economic infrastructure for autonomous agent systems. Ship Merkle-committed receipts, monetary budgets, compliance-ready tooling, and the data substrate for agent reputation. Hit Colorado (June 2026) and EU AI Act (August 2026) regulatory deadlines.
+**Milestone Goal:** Turn the shipped A2A adapter and certification skeleton into partner-hardened, operator-usable surfaces by closing the remaining auth/lifecycle gaps, adding certification registry distribution, and shipping the conformance/docs needed for real onboarding.
+**Status:** Complete on 2026-03-25. Archived snapshots now exist under
+`.planning/milestones/`; the next milestone definition has not been created yet.
 
 **Phase Numbering:**
-- Integer phases (7-12): Planned v2.0 milestone work
-- Decimal phases (7.1, 7.2): Urgent insertions (marked with INSERTED)
+- Integer phases 17-20: planned v2.2 milestone work
+- Future milestones continue from phase 21 onward
 
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 7: Schema Compatibility and Monetary Foundation** - Remove deny_unknown_fields from all 18 pact-core types and add monetary budget types to ToolGrant. (completed 2026-03-22)
-- [x] **Phase 8: Core Enforcement** - Wire monetary budget enforcement, Merkle checkpoint batching, and velocity guard into the kernel execution path. (completed 2026-03-22)
-- [ ] **Phase 9: Compliance and DPoP** - Ship Colorado and EU AI Act compliance documents against verified code, add receipt retention, and add DPoP proof-of-possession.
-- [x] **Phase 10: Receipt Query API and TypeScript SDK 1.0** - Make receipts queryable via API and publish the TypeScript SDK at stable 1.0. (completed 2026-03-23)
-- [x] **Phase 11: SIEM Integration** - Ship pact-siem crate with at least 2 exporters for enterprise security stack integration. (completed 2026-03-23)
-- [x] **Phase 12: Capability Lineage Index and Receipt Dashboard** - Build the agent-centric lineage index and the compliance officer receipt dashboard on top of it. (completed 2026-03-23)
+- [x] **Phase 17: A2A Auth Matrix and Partner Admission Hardening** - Close the remaining auth-matrix gaps, including provider-specific and non-header credential delivery, while keeping partner admission fail closed and operator-visible.
+- [x] **Phase 18: Durable A2A Task Lifecycle and Federation Hardening** - Complete long-running task recovery, follow-up correlation, and per-partner federation/request-shaping isolation for mediated A2A work.
+- [x] **Phase 19: Certification Registry and Trust Distribution** - Turn signed certification checks into registry-backed artifact publication, lookup, verification, supersession, and revocation surfaces.
+- [x] **Phase 20: Ecosystem Conformance and Operator Onboarding** - Harden the new A2A and certification lanes with conformance coverage, docs, examples, and operator/admin onboarding surfaces.
 
 ## Phase Details
 
-### Phase 7: Schema Compatibility and Monetary Foundation
-**Goal**: pact-core types tolerate unknown fields and carry monetary budget primitives, unblocking all subsequent v2.0 wire-format additions.
-**Depends on**: Phase 6 (v1.0 complete)
-**Requirements**: SCHEMA-01, SCHEMA-02, SCHEMA-03
+### Phase 17: A2A Auth Matrix and Partner Admission Hardening
+**Goal**: Operators can mediate the remaining A2A peer auth schemes without bespoke glue while keeping negotiation, partner admission, and diagnostics fail closed.
+**Depends on**: Phase 16 and shipped A2A alpha
+**Requirements**: A2A-01, A2A-02
 **Success Criteria** (what must be TRUE):
-  1. A capability token produced by a v1.0 kernel is accepted by a v2.0 kernel without deserialization errors.
-  2. A v2.0 kernel token containing new fields is accepted by a v1.0 kernel without deserialization errors.
-  3. ToolGrant fields max_cost_per_invocation and max_total_cost are present and round-trip correctly via canonical JSON.
-  4. Attenuation enum variants ReduceCostPerInvocation and ReduceTotalCost serialize and deserialize correctly.
-  5. A cross-version round-trip test passes in CI covering pre-existing SQLite databases.
-**Plans**: 2 plans
+  1. An operator can configure provider-specific or non-header A2A credentials through explicit adapter or admin surfaces rather than patching per-call request code.
+  2. The adapter negotiates partner auth requirements fail closed across the remaining supported scheme matrix and never silently downgrades auth.
+  3. Rejected partner auth setups explain which security requirement, credential binding, or tenant context caused denial.
+  4. Integration coverage proves the new auth lanes through mediated A2A calls and truthful receipt generation.
+**Plans**: 3 plans completed
 
 Plans:
-- [x] 07-01: Remove deny_unknown_fields from all 18 serialized types in pact-core and add forward-compatibility test fixtures.
-- [x] 07-02: Add MonetaryAmount type, monetary budget fields to ToolGrant, and cost-reduction Attenuation variants with is_subset_of enforcement.
+- [x] 17-01: Define the remaining A2A auth-scheme model, config surfaces, and partner-admission contract.
+- [x] 17-02: Implement provider-specific and non-header credential delivery plus fail-closed negotiation and diagnostics.
+- [x] 17-03: Add fixtures, docs, and mediated integration tests for the completed auth matrix.
 
-### Phase 8: Core Enforcement
-**Goal**: Monetary budget limits, Merkle-committed receipt batches, and velocity throttling are all enforced at kernel evaluation time.
-**Depends on**: Phase 7
-**Requirements**: SCHEMA-04, SCHEMA-05, SCHEMA-06, SEC-01, SEC-02, SEC-05
+### Phase 18: Durable A2A Task Lifecycle and Federation Hardening
+**Goal**: Long-running A2A work remains truthful and recoverable across reconnects, delayed completions, and per-partner federation boundaries.
+**Depends on**: Phase 17
+**Requirements**: A2A-03, A2A-04, A2A-05
 **Success Criteria** (what must be TRUE):
-  1. An invocation that would exceed max_cost_per_invocation or max_total_cost is denied with a signed receipt recording the denial reason.
-  2. Tool servers can report invocation cost and that cost is recorded in FinancialReceiptMetadata on the signed receipt.
-  3. A batch of 100 receipts produces a Merkle root and signed kernel checkpoint statement; a single receipt's inclusion proof verifies against it.
-  4. An agent that exceeds a configured invocation or spend window is denied by the velocity guard without kernel panics or executor nesting.
-  5. The monetary HA overrun bound under split-brain is explicitly documented and covered by a named concurrent-charge test.
-**Plans**: 4 plans
+  1. Long-running A2A tasks preserve the original capability binding and receipt semantics across reconnect, retry, and delayed follow-up paths.
+  2. Push-notification and follow-up flows can be correlated back to the originating task and rejected when lifecycle state is inconsistent.
+  3. Partner-specific federation/request-shaping policy can isolate tenant and org routing without widening trust across peers.
+  4. Operator-facing evidence is sufficient to debug lifecycle or federation failures without replaying raw partner traffic by hand.
+**Plans**: 3 plans completed
 
 Plans:
-- [ ] 08-01-PLAN.md -- Monetary budget enforcement: FinancialReceiptMetadata, try_charge_cost in BudgetStore, ToolInvocationCost
-- [ ] 08-02-PLAN.md -- Merkle checkpoint: KernelCheckpoint, batch signing, inclusion proofs, kernel_checkpoints table
-- [ ] 08-03-PLAN.md -- Velocity guard: VelocityGuard with synchronous token bucket in pact-guards
-- [ ] 08-04-PLAN.md -- Integration wiring: monetary enforcement, Merkle checkpointing, and velocity guard into kernel pipeline
+- [x] 18-01: Define durable task-state recovery and lifecycle-correlation semantics for long-running A2A work.
+- [x] 18-02: Implement reconnect, resume, and delayed-completion handling with fail-closed lifecycle validation.
+- [x] 18-03: Add per-partner federation/request-shaping policy, diagnostics, and end-to-end lifecycle tests.
 
-### Phase 9: Compliance and DPoP
-**Goal**: Colorado and EU AI Act compliance documents are filed against tested and shipped code, receipt retention is configurable, and DPoP proof-of-possession closes the stolen-token replay story.
-**Depends on**: Phase 8
-**Requirements**: COMP-01, COMP-02, COMP-03, COMP-04, SEC-03, SEC-04
+### Phase 19: Certification Registry and Trust Distribution
+**Goal**: Signed certification artifacts become publishable and resolvable trust objects rather than local files only.
+**Depends on**: Phase 18
+**Requirements**: CERT-01, CERT-02
 **Success Criteria** (what must be TRUE):
-  1. The Colorado SB 24-205 compliance document is published and references passing test artifacts for each claim (must ship before June 30, 2026).
-  2. The EU AI Act Article 19 compliance document is published and references passing test artifacts for each claim (must ship before August 2, 2026).
-  3. Receipt retention policy is configurable with both time-based and size-based rotation; archived receipts verify against stored Merkle checkpoint roots.
-  4. A DPoP proof for invocation A is rejected when replayed for invocation B (cross-invocation replay test passes).
-  5. A reused DPoP nonce within the configured TTL window is rejected by the nonce replay store.
-**Plans**: 3 plans
+  1. Operators can publish and retrieve certification artifacts through a registry surface with stable identifiers and immutable artifact verification.
+  2. The system can resolve the current certification status for a tool server, including active, superseded, and revoked states.
+  3. CLI and service surfaces can verify registry-backed certification artifacts without bespoke glue code or manual file coordination.
+  4. Certification registry flows remain fail closed when artifact signatures, digests, or trust metadata do not match.
+**Plans**: 3 plans completed
 
 Plans:
-- [ ] 09-01-PLAN.md -- Receipt retention and rotation policy (time-based and size-based) with archived receipt Merkle verification.
-- [ ] 09-02-PLAN.md -- DPoP proof-of-possession (PACT-native Ed25519 proof with LRU nonce replay store) and dpop_required on ToolGrant.
-- [ ] 09-03-PLAN.md -- Colorado SB 24-205 and EU AI Act Article 19 compliance mapping documents against Phase 8 and 9 acceptance tests.
+- [x] 19-01: Define certification registry artifact IDs, metadata, storage semantics, and status model.
+- [x] 19-02: Implement publish/query/resolve/revoke flows across CLI and trust-control surfaces.
+- [x] 19-03: Add verification, supersession/revocation handling, and integration coverage for registry-backed certification.
 
-### Phase 10: Receipt Query API and TypeScript SDK 1.0
-**Goal**: Receipts are queryable through a stable API and the TypeScript SDK is published at 1.0 with DPoP proof generation helpers.
-**Depends on**: Phase 8 (receipt query requires signed receipts and financial metadata); Phase 9 for DPoP SDK helpers (DPoP kernel verifier must exist before client helpers are written)
-**Requirements**: PROD-01, PROD-06
+### Phase 20: Ecosystem Conformance and Operator Onboarding
+**Goal**: The new A2A and certification surfaces are supportable and adoptable by operators and design partners.
+**Depends on**: Phase 19
+**Requirements**: ECO-01, ECO-02
 **Success Criteria** (what must be TRUE):
-  1. An operator can filter receipts by capability, tool, time range, outcome, and budget impact via the receipt query API.
-  2. The TypeScript SDK is published to npm at a stable 1.0 version with semantic versioning and documented error handling.
-  3. TypeScript SDK DPoP proof generation helpers produce proofs that the Phase 9 kernel verifier accepts.
-  4. The pact receipt list CLI subcommand returns paginated results using the same underlying query API.
-**Plans**: 3 plans
+  1. Conformance and CI lanes prove the newly shipped A2A auth, lifecycle, and certification-registry flows across supported operator surfaces.
+  2. Operators can onboard an A2A partner and a certified tool server by following docs and examples rather than inspecting source code.
+  3. Admin, reporting, and example surfaces expose enough context to support partner onboarding and troubleshooting.
+  4. The v2.2 milestone exits with docs, fixtures, and regression coverage aligned to the shipped behavior.
+**Plans**: 3 plans completed
 
 Plans:
-- [ ] 10-01-PLAN.md -- Implement receipt_query.rs in pact-kernel with ReceiptQuery struct, cursor-based pagination, and 7-filter SQL query.
-- [ ] 10-02-PLAN.md -- Expose receipt query via GET /v1/receipts/query HTTP endpoint and pact receipt list CLI subcommand with JSON Lines output.
-- [ ] 10-03-PLAN.md -- Harden TypeScript SDK to @pact-protocol/sdk 1.0.0: typed PactError hierarchy, DPoP proof generation, ReceiptQueryClient, build pipeline.
+- [x] 20-01: Extend conformance fixtures and CI coverage for the new A2A auth, lifecycle, and certification-registry lanes.
+- [x] 20-02: Add operator/admin docs, examples, and onboarding guides for A2A partners and certified tool servers.
+- [x] 20-03: Harden partner-facing reporting and regression coverage for milestone closeout.
 
-### Phase 11: SIEM Integration
-**Goal**: Enterprise security teams can receive PACT receipt events in their existing SIEM via at least 2 tested exporters.
-**Depends on**: Phase 10 (SIEM cursor-pull requires the receipt query API)
-**Requirements**: COMP-05
-**Success Criteria** (what must be TRUE):
-  1. At least 2 SIEM exporters (Splunk HEC and Elasticsearch bulk) are functional, tested, and ship behind a feature flag in the pact-siem crate.
-  2. The pact-kernel TCB has no HTTP client dependencies; all SIEM I/O is isolated in the pact-siem crate.
-  3. Exporter failure does not block kernel execution; a bounded dead-letter queue absorbs export failures without unbounded memory growth.
-  4. Receipt events delivered to a SIEM include FinancialReceiptMetadata when the source receipt carries monetary grants.
-**Plans**: 3 plans
+## Future Milestone Outline
 
-Plans:
-- [ ] 11-01-PLAN.md -- pact-siem crate foundation: Exporter trait, SiemEvent, DeadLetterQueue, ExporterManager cursor-pull loop, workspace and feature flag integration.
-- [ ] 11-02-PLAN.md -- Splunk HEC and Elasticsearch bulk exporters implementing Exporter trait with protocol-specific serialization.
-- [ ] 11-03-PLAN.md -- Integration tests for both exporters, FinancialReceiptMetadata enrichment, DLQ bounded growth, and ExporterManager failure isolation.
-
-### Phase 12: Capability Lineage Index and Receipt Dashboard
-**Goal**: Operators and compliance officers can answer "what did agent X do?" through a web dashboard backed by a persistent capability lineage index.
-**Depends on**: Phase 10 (dashboard reads receipt query API; lineage index requires stable receipt schema from Phase 8+)
-**Requirements**: PROD-02, PROD-03, PROD-04, PROD-05
-**Success Criteria** (what must be TRUE):
-  1. Capability snapshots are persisted at issuance time and keyed by capability_id with subject, issuer, grants, and delegation metadata.
-  2. Agent-centric receipt queries resolve through the lineage index without replaying issuance logs.
-  3. A non-engineer stakeholder can open the receipt dashboard and filter by agent, tool, outcome, and time without CLI access.
-  4. The dashboard shows delegation chain inspection and budget views for receipts with monetary grants.
-**Plans**: 4 plans
-
-Plans:
-- [ ] 12-01-PLAN.md -- Capability lineage SQLite table and CapabilityLineageStore with snapshot persistence, delegation chain via WITH RECURSIVE CTE.
-- [ ] 12-02-PLAN.md -- Agent-centric receipt query via LEFT JOIN capability_lineage; lineage HTTP endpoints for snapshots and delegation chains.
-- [ ] 12-03-PLAN.md -- Receipt dashboard SPA (React 18 / Vite 6 / TanStack Table 8 / Recharts 2) with filter sidebar, receipt table, delegation chain, and budget sparkline.
-- [ ] 12-04-PLAN.md -- Wire dashboard SPA into axum via tower_http::ServeDir; integration tests for lineage endpoints and end-to-end dashboard verification.
+- **v2.2 A2A and Ecosystem Hardening**
+  Remaining A2A auth matrix and provider-specific hardening, deeper long-running lifecycle coverage, certification registry/storage, and operator onboarding.
+- **v2.3 Production and Standards**
+  Protocol specification v2 alignment, deployment/runbook/launch hardening, and standards submission.
+- **v2.4 Commercial Trust Primitives**
+  Insurer-facing data feed, marketplace trust primitives, and reputation federation.
 
 ## Progress
 
 **Execution Order:**
-v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 -> 12
+v1.0, v2.0, v2.1, and v2.2 are complete. The next milestone definition will
+start v2.3 at Phase 21.
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -248,9 +122,17 @@ v1.0 phases complete. v2.0 executes in numeric order: 7 -> 8 -> 9 -> 10 -> 11 ->
 | 4. E11 Cross-Transport Concurrency Semantics | v1.0 | 4/4 | Complete | 2026-03-20 |
 | 5. E13 Policy and Adoption Unification | v1.0 | 4/4 | Complete | 2026-03-19 |
 | 6. E14 Hardening and Release Candidate | v1.0 | 4/4 | Complete | 2026-03-20 |
-| 7. Schema Compatibility and Monetary Foundation | 2/2 | Complete   | 2026-03-22 | - |
-| 8. Core Enforcement | 4/4 | Complete   | 2026-03-22 | - |
-| 9. Compliance and DPoP | 2/3 | In Progress|  | - |
-| 10. Receipt Query API and TypeScript SDK 1.0 | 3/3 | Complete    | 2026-03-23 | - |
-| 11. SIEM Integration | 3/3 | Complete    | 2026-03-23 | - |
-| 12. Capability Lineage Index and Receipt Dashboard | 4/4 | Complete    | 2026-03-23 | - |
+| 7. Schema Compatibility and Monetary Foundation | v2.0 | 2/2 | Complete | 2026-03-22 |
+| 8. Core Enforcement | v2.0 | 4/4 | Complete | 2026-03-22 |
+| 9. Compliance and DPoP | v2.0 | 3/3 | Complete | 2026-03-24 |
+| 10. Receipt Query API and TypeScript SDK 1.0 | v2.0 | 3/3 | Complete | 2026-03-23 |
+| 11. SIEM Integration | v2.0 | 3/3 | Complete | 2026-03-23 |
+| 12. Capability Lineage Index and Receipt Dashboard | v2.0 | 4/4 | Complete | 2026-03-23 |
+| 13. Enterprise Federation Administration | v2.1 | 4/4 | Complete | 2026-03-24 |
+| 14. Portable Verifier Distribution and Replay Safety | v2.1 | 4/4 | Complete | 2026-03-24 |
+| 15. Multi-Issuer Passport Composition | v2.1 | 3/3 | Complete | 2026-03-24 |
+| 16. Cross-Org Shared Evidence Analytics | v2.1 | 4/4 | Complete | 2026-03-24 |
+| 17. A2A Auth Matrix and Partner Admission Hardening | v2.2 | 3/3 | Complete | 2026-03-25 |
+| 18. Durable A2A Task Lifecycle and Federation Hardening | v2.2 | 3/3 | Complete | 2026-03-25 |
+| 19. Certification Registry and Trust Distribution | v2.2 | 3/3 | Complete | 2026-03-25 |
+| 20. Ecosystem Conformance and Operator Onboarding | v2.2 | 3/3 | Complete | 2026-03-25 |
