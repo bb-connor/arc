@@ -6,25 +6,25 @@
 
 ## Context
 
-The repository already contains `pact-mcp-adapter`, which wraps MCP servers for use under PACT.
+The repository already contains `arc-mcp-adapter`, which wraps MCP servers for use under ARC.
 
-As PACT grows an MCP-compatible public edge, there are two choices:
+As ARC grows an MCP-compatible public edge, there are two choices:
 
-1. keep extending `pact-mcp-adapter` until it becomes the MCP edge runtime
-2. keep `pact-mcp-adapter` focused on migration and create a separate MCP edge runtime
+1. keep extending `arc-mcp-adapter` until it becomes the MCP edge runtime
+2. keep `arc-mcp-adapter` focused on migration and create a separate MCP edge runtime
 
 ## Decision
 
-PACT will keep `pact-mcp-adapter` focused on migration and adaptation of upstream MCP servers.
+ARC will keep `arc-mcp-adapter` focused on migration and adaptation of upstream MCP servers.
 
-PACT will add a separate MCP edge runtime module or crate for first-class MCP-compatible hosting.
+ARC will add a separate MCP edge runtime module or crate for first-class MCP-compatible hosting.
 
 ## Rationale
 
 These are different responsibilities:
 
 - the adapter translates and wraps foreign MCP servers
-- the edge runtime hosts PACT itself as an MCP-compatible endpoint
+- the edge runtime hosts ARC itself as an MCP-compatible endpoint
 
 Merging them would blur concerns and make both paths harder to reason about.
 
@@ -49,6 +49,6 @@ Merging them would blur concerns and make both paths harder to reason about.
 
 ## Guideline
 
-If a change primarily helps PACT host itself as an MCP-compatible endpoint, it belongs in the edge runtime.
+If a change primarily helps ARC host itself as an MCP-compatible endpoint, it belongs in the edge runtime.
 
-If a change primarily helps wrap an existing MCP server under PACT, it belongs in the adapter.
+If a change primarily helps wrap an existing MCP server under ARC, it belongs in the adapter.

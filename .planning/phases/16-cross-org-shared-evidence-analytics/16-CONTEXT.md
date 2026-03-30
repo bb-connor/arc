@@ -21,7 +21,7 @@ comparison, and the dashboard.
 ### Shared-Evidence Model
 - Imported evidence packages remain isolated in their own federated-share
   tables.
-- Phase 16 does not merge foreign receipts into `pact_tool_receipts`.
+- Phase 16 does not merge foreign receipts into `arc_tool_receipts`.
 - The operator-facing contract is a reference report over imported share
   metadata plus locally observed downstream receipt usage.
 
@@ -29,7 +29,7 @@ comparison, and the dashboard.
 - Trust-control now exposes a dedicated shared-evidence query endpoint.
 - Operator report embeds a `sharedEvidence` section rather than requiring the
   dashboard to reconstruct provenance client-side.
-- CLI gains `pact trust evidence-share list` for direct operator inspection of
+- CLI gains `arc trust evidence-share list` for direct operator inspection of
   shared references.
 
 ### Reporting Semantics
@@ -51,12 +51,12 @@ comparison, and the dashboard.
 
 - `.planning/ROADMAP.md` -- Phase 16 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `FED-03`, `XORG-01`, `XORG-02`
-- `crates/pact-kernel/src/receipt_store.rs` -- federated-share persistence and
+- `crates/arc-kernel/src/receipt_store.rs` -- federated-share persistence and
   combined lineage substrate
-- `crates/pact-kernel/src/operator_report.rs` -- operator-facing report types
-- `crates/pact-cli/src/trust_control.rs` -- HTTP surfaces
-- `crates/pact-cli/src/reputation.rs` -- comparison reporting
-- `crates/pact-cli/dashboard/src/` -- operator UI surfaces
+- `crates/arc-kernel/src/operator_report.rs` -- operator-facing report types
+- `crates/arc-cli/src/trust_control.rs` -- HTTP surfaces
+- `crates/arc-cli/src/reputation.rs` -- comparison reporting
+- `crates/arc-cli/dashboard/src/` -- operator UI surfaces
 
 </canonical_refs>
 

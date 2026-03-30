@@ -12,7 +12,7 @@ surfaces, fail-closed partner admission, and operator-visible auth diagnostics.
 
 ## Automated Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
 
 ## Result
 

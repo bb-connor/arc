@@ -21,10 +21,10 @@ Phase 13 turns the shipped bearer-authenticated identity-federation alpha into a
 
 ### Enterprise Identity Normalization
 - JWT, introspection, SCIM, and SAML inputs must normalize into one canonical enterprise-origin envelope that preserves provider, tenant, organization, object/client identifiers, roles, groups, and raw subject identifiers.
-- Stable PACT subject derivation must be keyed from provider-scoped canonical principal identifiers, not mutable display attributes such as email or display name.
+- Stable ARC subject derivation must be keyed from provider-scoped canonical principal identifiers, not mutable display attributes such as email or display name.
 - Groups and roles are preserved as normalized lists plus provider-native provenance so policy/debugging can explain exactly which source attribute produced each value.
 - Enterprise identity and downstream audit outputs must preserve source-attribute provenance for canonical principal, tenant, organization, groups, roles, and the trust material reference that authorized the provider record.
-- Ambiguous or partial mappings deny admission; PACT must not silently drop unresolved tenant/org/role/group context and continue with widened trust.
+- Ambiguous or partial mappings deny admission; ARC must not silently drop unresolved tenant/org/role/group context and continue with widened trust.
 
 ### Policy Admission Semantics
 - Trust-control policy rules for enterprise federation are allow-by-explicit-match and only narrow admission; missing provider, tenant, organization, role, or group constraints never widen an otherwise stricter decision.
@@ -42,7 +42,7 @@ Phase 13 turns the shipped bearer-authenticated identity-federation alpha into a
 
 ### Claude's Discretion
 - Exact storage shape for provider records and sync metadata as long as it preserves auditable provenance and fail-closed validation.
-- Exact CLI command names and HTTP route naming for the admin surface as long as they stay consistent with existing `pact trust` and `pact mcp serve-http` conventions.
+- Exact CLI command names and HTTP route naming for the admin surface as long as they stay consistent with existing `arc trust` and `arc mcp serve-http` conventions.
 - Whether the first operator surface lands primarily in CLI, trust-control HTTP admin APIs, or both in the first wave, provided docs and tests cover the shipped path.
 
 </decisions>
@@ -72,23 +72,23 @@ Phase 13 turns the shipped bearer-authenticated identity-federation alpha into a
 ## Existing Code Insights
 
 ### Reusable Assets
-- `crates/pact-cli/src/remote_mcp.rs` — Current JWT/OIDC/introspection admission, federated-claim normalization, and stable subject derivation helpers that Phase 13 should extend rather than replace.
-- `crates/pact-core/src/session.rs` — `OAuthBearerFederatedClaims` and session auth-context types already carry provider, tenant, organization, group, and role data into admin surfaces.
-- `crates/pact-policy/src/models.rs` and `crates/pact-policy/src/evaluate.rs` — Origin policy structs already have provider/tenant/role-style fields and are the natural home for enterprise admission constraints.
-- `crates/pact-cli/src/trust_control.rs` — Federated issuance endpoint plus operator HTTP/reporting surfaces where provider-admin and provenance-aware admission/debugging must land.
-- `crates/pact-cli/src/main.rs` — Existing `pact mcp serve-http` auth flags and `pact trust` command organization define the operator-facing entrypoint conventions.
+- `crates/arc-cli/src/remote_mcp.rs` — Current JWT/OIDC/introspection admission, federated-claim normalization, and stable subject derivation helpers that Phase 13 should extend rather than replace.
+- `crates/arc-core/src/session.rs` — `OAuthBearerFederatedClaims` and session auth-context types already carry provider, tenant, organization, group, and role data into admin surfaces.
+- `crates/arc-policy/src/models.rs` and `crates/arc-policy/src/evaluate.rs` — Origin policy structs already have provider/tenant/role-style fields and are the natural home for enterprise admission constraints.
+- `crates/arc-cli/src/trust_control.rs` — Federated issuance endpoint plus operator HTTP/reporting surfaces where provider-admin and provenance-aware admission/debugging must land.
+- `crates/arc-cli/src/main.rs` — Existing `arc mcp serve-http` auth flags and `arc trust` command organization define the operator-facing entrypoint conventions.
 
 ### Established Patterns
 - Security-sensitive inputs fail closed on ambiguous issuer metadata, incompatible keys, inactive tokens, or malformed claims; enterprise federation should extend that posture to SCIM/SAML inputs and provider-admin configuration.
-- Operator surfaces in PACT usually ship with both CLI and HTTP trust-control coverage backed by the same underlying Rust types and integration tests.
+- Operator surfaces in ARC usually ship with both CLI and HTTP trust-control coverage backed by the same underlying Rust types and integration tests.
 - Existing identity federation logic keeps provider-specific mapping explicit (`JwtProviderProfile`) and preserves normalized enterprise claims in auth context instead of re-parsing raw tokens later.
 - New functionality typically lands with guide/changelog updates plus crate integration tests rather than hidden wiring.
 
 ### Integration Points
-- Remote bearer admission and provider metadata bootstrap live in `crates/pact-cli/src/remote_mcp.rs`; provider-admin config likely feeds this boundary.
-- Portable-trust issuance and operator debugging live in `crates/pact-cli/src/trust_control.rs`, which is where admission outcomes and provenance need to stay visible.
-- Policy schema/evaluator extensions in `crates/pact-policy` must line up with how normalized federation context is captured in `crates/pact-core/src/session.rs`.
-- CLI flag and command changes need to remain compatible with existing `pact mcp serve-http`, `pact trust federated-issue`, and admin API conventions.
+- Remote bearer admission and provider metadata bootstrap live in `crates/arc-cli/src/remote_mcp.rs`; provider-admin config likely feeds this boundary.
+- Portable-trust issuance and operator debugging live in `crates/arc-cli/src/trust_control.rs`, which is where admission outcomes and provenance need to stay visible.
+- Policy schema/evaluator extensions in `crates/arc-policy` must line up with how normalized federation context is captured in `crates/arc-core/src/session.rs`.
+- CLI flag and command changes need to remain compatible with existing `arc mcp serve-http`, `arc trust federated-issue`, and admin API conventions.
 
 </code_context>
 

@@ -1,7 +1,7 @@
 ---
 phase: 07-schema-compatibility-and-monetary-foundation
 plan: "01"
-subsystem: pact-core
+subsystem: arc-core
 tags:
   - schema-compatibility
   - forward-compatibility
@@ -11,23 +11,23 @@ tags:
 dependency_graph:
   requires: []
   provides:
-    - "Forward-compatible pact-core wire types (CapabilityToken, PactReceipt, ToolManifest)"
+    - "Forward-compatible arc-core wire types (CapabilityToken, ArcReceipt, ToolManifest)"
     - "Cross-version round-trip tests proving unknown fields tolerated"
   affects:
-    - crates/pact-kernel
-    - crates/pact-mcp-adapter
-    - crates/pact-manifest
+    - crates/arc-kernel
+    - crates/arc-mcp-adapter
+    - crates/arc-manifest
 tech_stack:
   added: []
   patterns:
     - "serde_json::Value injection pattern for forward-compatibility testing"
 key_files:
   created:
-    - crates/pact-core/tests/forward_compat.rs
+    - crates/arc-core/tests/forward_compat.rs
   modified:
-    - crates/pact-core/src/capability.rs
-    - crates/pact-core/src/receipt.rs
-    - crates/pact-core/src/manifest.rs
+    - crates/arc-core/src/capability.rs
+    - crates/arc-core/src/receipt.rs
+    - crates/arc-core/src/manifest.rs
 decisions:
   - "Removed all 18 deny_unknown_fields annotations without replacement -- serde default behavior (silently ignore) is the correct v2.0 wire protocol posture"
   - "Tests use serde_json::Value mutation strategy rather than raw string manipulation -- cleaner and less brittle"
@@ -41,7 +41,7 @@ metrics:
 
 # Phase 7 Plan 01: Schema Forward Compatibility Summary
 
-Removed all 18 `deny_unknown_fields` serde annotations from pact-core serialized types and added a 7-test integration suite proving cross-version deserialization and signature verification work correctly.
+Removed all 18 `deny_unknown_fields` serde annotations from arc-core serialized types and added a 7-test integration suite proving cross-version deserialization and signature verification work correctly.
 
 ## What Was Built
 
@@ -49,21 +49,21 @@ Removed all 18 `deny_unknown_fields` serde annotations from pact-core serialized
 
 Removed `#[serde(deny_unknown_fields)]` from exactly 18 struct definitions across three files:
 
-- `crates/pact-core/src/capability.rs` -- 8 structs: CapabilityToken, CapabilityTokenBody, PactScope, ToolGrant, ResourceGrant, PromptGrant, DelegationLink, DelegationLinkBody
-- `crates/pact-core/src/receipt.rs` -- 6 structs: PactReceipt, PactReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, ToolCallAction, GuardEvidence
-- `crates/pact-core/src/manifest.rs` -- 4 structs: ToolManifest, ToolManifestBody, ToolDefinition, ToolAnnotations
+- `crates/arc-core/src/capability.rs` -- 8 structs: CapabilityToken, CapabilityTokenBody, ArcScope, ToolGrant, ResourceGrant, PromptGrant, DelegationLink, DelegationLinkBody
+- `crates/arc-core/src/receipt.rs` -- 6 structs: ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, ToolCallAction, GuardEvidence
+- `crates/arc-core/src/manifest.rs` -- 4 structs: ToolManifest, ToolManifestBody, ToolDefinition, ToolAnnotations
 
-All 123 pre-existing pact-core unit tests continue to pass.
+All 123 pre-existing arc-core unit tests continue to pass.
 
 **Task 2: Forward-compatibility tests (test commit f8b4576)**
 
-Created `crates/pact-core/tests/forward_compat.rs` with 7 integration tests:
+Created `crates/arc-core/tests/forward_compat.rs` with 7 integration tests:
 
 | Test | Type Family | Unknown Fields Injected | Sig Verified |
 |------|------------|------------------------|--------------|
 | v1_token_accepted_by_v2 | CapabilityToken | None (baseline) | Yes |
 | v2_token_with_unknown_fields_accepted | CapabilityToken + ToolGrant | Top-level + nested | Yes |
-| v2_receipt_with_unknown_fields_accepted | PactReceipt + GuardEvidence + ToolCallAction | Top-level + nested | Yes |
+| v2_receipt_with_unknown_fields_accepted | ArcReceipt + GuardEvidence + ToolCallAction | Top-level + nested | Yes |
 | v2_manifest_with_unknown_fields_accepted | ToolManifest + ToolDefinition + ToolAnnotations | All three levels | Yes |
 | unknown_fields_not_preserved_on_reserialize | CapabilityToken | "ghost_field" | N/A |
 | delegation_link_with_unknown_fields | DelegationLink | Top-level | Yes |
@@ -74,9 +74,9 @@ Test strategy: serialize struct to `serde_json::Value`, inject `future_field`, `
 ## Verification Results
 
 ```
-grep -r "deny_unknown_fields" crates/pact-core/src/  ->  zero matches (PASS)
-cargo test -p pact-core                              ->  123 passed (PASS)
-cargo test -p pact-core --test forward_compat        ->  7 passed (PASS)
+grep -r "deny_unknown_fields" crates/arc-core/src/  ->  zero matches (PASS)
+cargo test -p arc-core                              ->  123 passed (PASS)
+cargo test -p arc-core --test forward_compat        ->  7 passed (PASS)
 cargo test --workspace                               ->  0 failed across all crates (PASS)
 cargo clippy --workspace -- -D warnings              ->  0 warnings (PASS)
 ```
@@ -95,9 +95,9 @@ None - plan executed exactly as written.
 
 ## Self-Check: PASSED
 
-- crates/pact-core/tests/forward_compat.rs: FOUND
-- crates/pact-core/src/capability.rs: FOUND
-- crates/pact-core/src/receipt.rs: FOUND
-- crates/pact-core/src/manifest.rs: FOUND
+- crates/arc-core/tests/forward_compat.rs: FOUND
+- crates/arc-core/src/capability.rs: FOUND
+- crates/arc-core/src/receipt.rs: FOUND
+- crates/arc-core/src/manifest.rs: FOUND
 - Commit e36ee02 (feat - annotation removal): FOUND
 - Commit f8b4576 (test - forward compat tests): FOUND

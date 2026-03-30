@@ -15,7 +15,7 @@ key-files:
   created:
     - .planning/phases/14-portable-verifier-distribution-and-replay-safety/14-02-SUMMARY.md
   modified:
-    - crates/pact-cli/src/passport_verifier.rs
+    - crates/arc-cli/src/passport_verifier.rs
 requirements-completed:
   - VER-02
 completed: 2026-03-24
@@ -35,4 +35,4 @@ Verifier challenge replay protection is now durable instead of process-local.
 
 ## Verification
 
-- `cargo test -p pact-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`

@@ -1,11 +1,11 @@
 # GSD Milestone Program
 
-This document maps the remaining PACT roadmap into GSD milestone cycles.
+This document maps the remaining ARC roadmap into GSD milestone cycles.
 
 ## Operating Rules
 
 - `.planning/` is the execution source of truth for the active milestone.
-- [STRATEGIC_ROADMAP.md](/Users/connor/Medica/backbay/standalone/pact/docs/STRATEGIC_ROADMAP.md), [FULL_VISION_EXECUTION_PROGRAM.md](/Users/connor/Medica/backbay/standalone/pact/docs/release/FULL_VISION_EXECUTION_PROGRAM.md), and [V2_EXECUTION_BACKLOG.md](/Users/connor/Medica/backbay/standalone/pact/docs/release/V2_EXECUTION_BACKLOG.md) remain the strategic reference set.
+- [STRATEGIC_ROADMAP.md](/Users/connor/Medica/backbay/standalone/arc/docs/STRATEGIC_ROADMAP.md), [FULL_VISION_EXECUTION_PROGRAM.md](/Users/connor/Medica/backbay/standalone/arc/docs/release/FULL_VISION_EXECUTION_PROGRAM.md), and [V2_EXECUTION_BACKLOG.md](/Users/connor/Medica/backbay/standalone/arc/docs/release/V2_EXECUTION_BACKLOG.md) remain the strategic reference set.
 - Every phase exit must keep `cargo test --workspace` green.
 - Every milestone exit must run audit before completion.
 - Do not open the next milestone until the current milestone has either shipped or been explicitly re-scoped.

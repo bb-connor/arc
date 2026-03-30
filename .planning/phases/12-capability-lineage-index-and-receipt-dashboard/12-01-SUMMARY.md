@@ -2,7 +2,7 @@
 phase: 12-capability-lineage-index-and-receipt-dashboard
 plan: 01
 subsystem: database
-tags: [sqlite, rusqlite, capability-tokens, delegation-chain, recursive-cte, pact-kernel]
+tags: [sqlite, rusqlite, capability-tokens, delegation-chain, recursive-cte, arc-kernel]
 
 requires:
   - phase: 08-core-enforcement
@@ -11,7 +11,7 @@ requires:
     provides: CapabilityToken struct with id, issuer, subject, scope, issued_at, expires_at
 
 provides:
-  - capability_lineage SQLite table co-located with pact_tool_receipts for efficient JOINs
+  - capability_lineage SQLite table co-located with arc_tool_receipts for efficient JOINs
   - CapabilitySnapshot struct (serializable, cloneable capability point-in-time record)
   - record_capability_snapshot -- idempotent INSERT OR IGNORE with depth computation
   - get_lineage -- O(1) lookup by capability_id primary key
@@ -32,10 +32,10 @@ tech-stack:
 
 key-files:
   created:
-    - crates/pact-kernel/src/capability_lineage.rs
+    - crates/arc-kernel/src/capability_lineage.rs
   modified:
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-kernel/src/lib.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-kernel/src/lib.rs
 
 key-decisions:
   - "pub(crate) on SqliteReceiptStore.connection field allows capability_lineage.rs to implement methods without a separate accessor; same pattern used by budget_store and checkpoint"
@@ -55,7 +55,7 @@ completed: 2026-03-22
 
 # Phase 12 Plan 01: Capability Lineage Table and Store Summary
 
-**SQLite capability_lineage table with WITH RECURSIVE delegation chain walk, idempotent snapshot recording, and subject_key index -- co-located with pact_tool_receipts for efficient JOINs**
+**SQLite capability_lineage table with WITH RECURSIVE delegation chain walk, idempotent snapshot recording, and subject_key index -- co-located with arc_tool_receipts for efficient JOINs**
 
 ## Performance
 
@@ -79,9 +79,9 @@ completed: 2026-03-22
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/capability_lineage.rs` - CapabilitySnapshot struct, CapabilityLineageError, and impl SqliteReceiptStore methods for record/get/chain/list operations with 9 unit tests
-- `crates/pact-kernel/src/receipt_store.rs` - capability_lineage table DDL and indexes added to execute_batch in SqliteReceiptStore::open; connection field promoted to pub(crate)
-- `crates/pact-kernel/src/lib.rs` - pub mod capability_lineage declaration, re-exports of CapabilitySnapshot and CapabilityLineageError
+- `crates/arc-kernel/src/capability_lineage.rs` - CapabilitySnapshot struct, CapabilityLineageError, and impl SqliteReceiptStore methods for record/get/chain/list operations with 9 unit tests
+- `crates/arc-kernel/src/receipt_store.rs` - capability_lineage table DDL and indexes added to execute_batch in SqliteReceiptStore::open; connection field promoted to pub(crate)
+- `crates/arc-kernel/src/lib.rs` - pub mod capability_lineage declaration, re-exports of CapabilitySnapshot and CapabilityLineageError
 
 ## Decisions Made
 
@@ -98,15 +98,15 @@ completed: 2026-03-22
 - **Found during:** Task 1 (after clippy run)
 - **Issue:** Used `///` (item doc comment) at the top of the module file with a blank line after it, triggering `empty_line_after_doc_comments`
 - **Fix:** Changed `///` to `//!` (inner doc comment) for the module preamble
-- **Files modified:** crates/pact-kernel/src/capability_lineage.rs
-- **Verification:** `cargo clippy -p pact-kernel -- -D warnings` passes
+- **Files modified:** crates/arc-kernel/src/capability_lineage.rs
+- **Verification:** `cargo clippy -p arc-kernel -- -D warnings` passes
 - **Committed in:** 7432195 (Task 1 commit)
 
 **2. [Rule 3 - Blocking] Fixed type inference errors in rusqlite row closures**
 - **Found during:** Task 1 (first compile attempt)
 - **Issue:** Rust could not infer types for tuple destructuring patterns from rusqlite query_map closures when using complex tuple return types
 - **Fix:** Extracted `snapshot_from_row` helper function with explicit `&Row<'_>` parameter type, replacing all inline closure tuple patterns
-- **Files modified:** crates/pact-kernel/src/capability_lineage.rs
+- **Files modified:** crates/arc-kernel/src/capability_lineage.rs
 - **Verification:** All 9 tests compile and pass
 - **Committed in:** 7432195 (Task 1 commit)
 
@@ -114,7 +114,7 @@ completed: 2026-03-22
 - **Found during:** Task 1 (first compile attempt)
 - **Issue:** Test helper used `Operation::Execute` which does not exist in the enum (correct variant is `Operation::Invoke`)
 - **Fix:** Changed to `Operation::Invoke`
-- **Files modified:** crates/pact-kernel/src/capability_lineage.rs (test module)
+- **Files modified:** crates/arc-kernel/src/capability_lineage.rs (test module)
 - **Verification:** Compiles and tests pass
 - **Committed in:** 7432195 (Task 1 commit)
 
@@ -135,13 +135,13 @@ None - no external service configuration required.
 
 - capability_lineage table is ready for JOIN queries from the receipt dashboard (Phase 12 Plan 02)
 - record_capability_snapshot can be called from the kernel at token issuance time in future integration work
-- All 148 pact-kernel tests pass, no regressions
+- All 148 arc-kernel tests pass, no regressions
 
 ## Self-Check: PASSED
 
-- FOUND: crates/pact-kernel/src/capability_lineage.rs
-- FOUND: crates/pact-kernel/src/receipt_store.rs (modified)
-- FOUND: crates/pact-kernel/src/lib.rs (modified)
+- FOUND: crates/arc-kernel/src/capability_lineage.rs
+- FOUND: crates/arc-kernel/src/receipt_store.rs (modified)
+- FOUND: crates/arc-kernel/src/lib.rs (modified)
 - FOUND: .planning/phases/12-capability-lineage-index-and-receipt-dashboard/12-01-SUMMARY.md
 - FOUND commit 7432195: feat(12-01): add capability_lineage table and CapabilityLineageStore
 

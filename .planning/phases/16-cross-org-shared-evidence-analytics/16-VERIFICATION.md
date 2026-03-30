@@ -12,10 +12,10 @@ operator analytics, downstream provenance, and dashboard/reporting surfaces.
 
 ## Automated Verification
 
-- `cargo test -p pact-cli --test receipt_query -- --nocapture`
-- `cargo test -p pact-cli --test local_reputation -- --nocapture`
-- `npm --prefix crates/pact-cli/dashboard test -- --run`
-- `npm --prefix crates/pact-cli/dashboard run build`
+- `cargo test -p arc-cli --test receipt_query -- --nocapture`
+- `cargo test -p arc-cli --test local_reputation -- --nocapture`
+- `npm --prefix crates/arc-cli/dashboard test -- --run`
+- `npm --prefix crates/arc-cli/dashboard run build`
 
 ## Result
 

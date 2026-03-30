@@ -21,7 +21,7 @@ Add a session abstraction that owns:
 Suggested module split:
 
 ```text
-crates/pact-kernel/src/session/
+crates/arc-kernel/src/session/
   mod.rs
   lifecycle.rs
   inflight.rs
@@ -98,7 +98,7 @@ This becomes the common substrate for tools, resources, prompts, and nested flow
 
 ## 3. Capability model evolution
 
-The current `PactScope` is centered on tool grants.
+The current `ArcScope` is centered on tool grants.
 
 That is acceptable for the prototype, but it becomes awkward once resources and prompts arrive.
 
@@ -114,7 +114,7 @@ Keep `ToolGrant`, but add constraints that are actually enforced:
 - regex match
 - max length
 
-This already exists structurally in [capability.rs](../../crates/pact-core/src/capability.rs), but most of the runtime path does not yet turn it into pervasive enforcement behavior.
+This already exists structurally in [capability.rs](../../crates/arc-core/src/capability.rs), but most of the runtime path does not yet turn it into pervasive enforcement behavior.
 
 ### Step 2
 
@@ -130,7 +130,7 @@ Add new grant types:
 Replace:
 
 ```rust
-pub struct PactScope {
+pub struct ArcScope {
     pub grants: Vec<ToolGrant>,
 }
 ```
@@ -138,7 +138,7 @@ pub struct PactScope {
 with something closer to:
 
 ```rust
-pub struct PactScope {
+pub struct ArcScope {
     pub grants: Vec<Grant>,
 }
 ```
@@ -157,7 +157,7 @@ Replace the current split logic with a single loaded policy object:
 
 ```rust
 enum LoadedPolicy {
-    PactYaml(PactPolicy),
+    ArcYaml(ArcPolicy),
     HushSpec {
         spec: HushSpec,
         compiled: CompiledPolicy,
@@ -183,7 +183,7 @@ Benefits:
 
 ## Metadata parity
 
-Current `ToolDefinition` in `pact-manifest` is missing some MCP-facing fields that matter for compatibility:
+Current `ToolDefinition` in `arc-manifest` is missing some MCP-facing fields that matter for compatibility:
 
 - title
 - icons
@@ -219,7 +219,7 @@ It should expand to support:
 - embedded resources
 - structured content
 
-This is especially important if PACT wants to host rich MCP-compatible tools rather than flatten everything into text.
+This is especially important if ARC wants to host rich MCP-compatible tools rather than flatten everything into text.
 
 ## 6. Resource implementation plan
 
@@ -278,7 +278,7 @@ Prompt retrieval should support policy gates such as:
 - argument schema and size checks
 - optional prompt-injection scanning on prompt bodies and embedded resources
 
-That aligns well with the project's security thesis and with `pact-policy` detection work.
+That aligns well with the project's security thesis and with `arc-policy` detection work.
 
 ## 8. Sampling and elicitation design
 
@@ -411,11 +411,11 @@ Later backends:
 
 Questions:
 
-- does PACT answer the expected JSON-RPC methods?
+- does ARC answer the expected JSON-RPC methods?
 - does it preserve important tool/resource/prompt metadata?
 - does it obey lifecycle, pagination, and notification semantics?
 
-## PACT security suite
+## ARC security suite
 
 Questions:
 
@@ -440,13 +440,13 @@ The current CLI is too small for the eventual system.
 
 Likely future command groups:
 
-- `pact serve`
-- `pact proxy mcp`
-- `pact policy`
-- `pact receipts`
-- `pact capabilities`
-- `pact ca`
-- `pact doctor`
+- `arc serve`
+- `arc proxy mcp`
+- `arc policy`
+- `arc receipts`
+- `arc capabilities`
+- `arc ca`
+- `arc doctor`
 
 That should not all ship at once, but the eventual operator story should be reflected in the docs early so the architecture does not stay CLI-hostile.
 

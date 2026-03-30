@@ -1,24 +1,24 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/pact-bindings-core",
-    "crates/pact-a2a-adapter",
-    "crates/pact-control-plane",
-    "crates/pact-core",
-    "crates/pact-credentials",
-    "crates/pact-did",
-    "crates/pact-hosted-mcp",
-    "crates/pact-kernel",
-    "crates/pact-store-sqlite",
-    "crates/pact-reputation",
-    "crates/pact-guards",
-    "crates/pact-policy",
-    "crates/pact-cli",
-    "crates/pact-conformance",
-    "crates/pact-manifest",
-    "crates/pact-mcp-edge",
-    "crates/pact-mcp-adapter",
-    "crates/pact-siem",
+    "crates/arc-bindings-core",
+    "crates/arc-a2a-adapter",
+    "crates/arc-control-plane",
+    "crates/arc-core",
+    "crates/arc-credentials",
+    "crates/arc-did",
+    "crates/arc-hosted-mcp",
+    "crates/arc-kernel",
+    "crates/arc-store-sqlite",
+    "crates/arc-reputation",
+    "crates/arc-guards",
+    "crates/arc-policy",
+    "crates/arc-cli",
+    "crates/arc-conformance",
+    "crates/arc-manifest",
+    "crates/arc-mcp-edge",
+    "crates/arc-mcp-adapter",
+    "crates/arc-siem",
     "examples/hello-tool",
     "formal/diff-tests",
     "tests/e2e",
@@ -29,7 +29,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.93"
 license = "Apache-2.0"
-repository = "https://github.com/backbay-labs/pact"
+repository = "https://github.com/backbay-labs/arc"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -40,8 +40,8 @@ Make clustered trust-control deterministic enough that workspace and CI runs sto
 ## Specific Ideas
 
 - Keep the HA model pragmatic: deterministic leader plus repair sync, not consensus.
-- Preserve the existing crate seams: `pact-cli` owns control-plane HTTP behavior, `pact-kernel` owns budget/authority/receipt/revocation storage primitives.
-- Treat `crates/pact-cli/tests/trust_cluster.rs` as the first proving ground, because it already demonstrates the failing scenario.
+- Preserve the existing crate seams: `arc-cli` owns control-plane HTTP behavior, `arc-kernel` owns budget/authority/receipt/revocation storage primitives.
+- Treat `crates/arc-cli/tests/trust_cluster.rs` as the first proving ground, because it already demonstrates the failing scenario.
 
 </specifics>
 
@@ -59,15 +59,15 @@ Make clustered trust-control deterministic enough that workspace and CI runs sto
 - `docs/HA_CONTROL_AUTH_PLAN.md` — Existing HA control, leader selection, replication, and shared-budget design constraints.
 
 ### Runtime and storage code
-- `crates/pact-cli/src/trust_control.rs` — Leader selection, forwarding, cluster sync, internal status, and budget increment handlers.
-- `crates/pact-kernel/src/budget_store.rs` — Budget persistence, list-after cursor logic, and upsert/try-increment semantics.
-- `crates/pact-kernel/src/authority.rs` — Authority snapshot replication semantics.
-- `crates/pact-kernel/src/receipt_store.rs` — Receipt append and delta sequencing semantics.
-- `crates/pact-kernel/src/revocation_store.rs` — Revocation cursor and upsert semantics.
+- `crates/arc-cli/src/trust_control.rs` — Leader selection, forwarding, cluster sync, internal status, and budget increment handlers.
+- `crates/arc-kernel/src/budget_store.rs` — Budget persistence, list-after cursor logic, and upsert/try-increment semantics.
+- `crates/arc-kernel/src/authority.rs` — Authority snapshot replication semantics.
+- `crates/arc-kernel/src/receipt_store.rs` — Receipt append and delta sequencing semantics.
+- `crates/arc-kernel/src/revocation_store.rs` — Revocation cursor and upsert semantics.
 
 ### Proving tests
-- `crates/pact-cli/tests/trust_cluster.rs` — Two-node HA replication and leader failover coverage, including the visible flake site.
-- `crates/pact-cli/tests/trust_revocation.rs` — Related trust-control persistence behavior.
+- `crates/arc-cli/tests/trust_cluster.rs` — Two-node HA replication and leader failover coverage, including the visible flake site.
+- `crates/arc-cli/tests/trust_revocation.rs` — Related trust-control persistence behavior.
 - `.github/workflows/ci.yml` — The real workspace gate this phase must stabilize.
 
 </canonical_refs>
@@ -76,9 +76,9 @@ Make clustered trust-control deterministic enough that workspace and CI runs sto
 ## Existing Code Insights
 
 ### Reusable Assets
-- `handle_internal_cluster_status` in `crates/pact-cli/src/trust_control.rs`: already exposes leader and peer health, making it the right place to add richer cursor/replication diagnostics.
-- `wait_until` and HTTP helpers in `crates/pact-cli/tests/trust_cluster.rs`: already centralize timeout behavior and can carry structured diagnostics on failure.
-- `SqliteBudgetStore::list_usages_after` and `upsert_usage` in `crates/pact-kernel/src/budget_store.rs`: the main budget replication seam and the likely place to harden monotonic ordering.
+- `handle_internal_cluster_status` in `crates/arc-cli/src/trust_control.rs`: already exposes leader and peer health, making it the right place to add richer cursor/replication diagnostics.
+- `wait_until` and HTTP helpers in `crates/arc-cli/tests/trust_cluster.rs`: already centralize timeout behavior and can carry structured diagnostics on failure.
+- `SqliteBudgetStore::list_usages_after` and `upsert_usage` in `crates/arc-kernel/src/budget_store.rs`: the main budget replication seam and the likely place to harden monotonic ordering.
 
 ### Established Patterns
 - Trust-control endpoints use internal JSON views plus shared bearer auth.
@@ -86,9 +86,9 @@ Make clustered trust-control deterministic enough that workspace and CI runs sto
 - Storage crates prefer SQLite with WAL + FULL sync and small helper methods rather than a generic persistence abstraction.
 
 ### Integration Points
-- Any write-visibility change must flow through `forward_post_to_leader` and the individual mutating handlers in `crates/pact-cli/src/trust_control.rs`.
+- Any write-visibility change must flow through `forward_post_to_leader` and the individual mutating handlers in `crates/arc-cli/src/trust_control.rs`.
 - Any replication-order hardening must keep follower repair sync compatible with the current authority, revocation, receipt, and budget stores.
-- Any new diagnostics should be consumable by `crates/pact-cli/tests/trust_cluster.rs` without requiring external tooling.
+- Any new diagnostics should be consumable by `crates/arc-cli/tests/trust_cluster.rs` without requiring external tooling.
 
 </code_context>
 

@@ -15,8 +15,8 @@ key-files:
   created:
     - .planning/phases/19-certification-registry-and-trust-distribution/19-03-SUMMARY.md
   modified:
-    - crates/pact-cli/tests/certify.rs
-    - docs/PACT_CERTIFY_GUIDE.md
+    - crates/arc-cli/tests/certify.rs
+    - docs/ARC_CERTIFY_GUIDE.md
 requirements-completed: []
 completed: 2026-03-25
 ---
@@ -30,9 +30,9 @@ for operators.
 
 - added local and remote certification registry regression coverage
 - documented artifact verification, registry status, and trust-control usage in
-  `PACT_CERTIFY_GUIDE.md`
+  `ARC_CERTIFY_GUIDE.md`
 - proved supersession and revocation behavior through integration tests
 
 ## Verification
 
-- `cargo test -p pact-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`

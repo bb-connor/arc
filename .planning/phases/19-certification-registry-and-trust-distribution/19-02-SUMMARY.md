@@ -14,9 +14,9 @@ key-files:
   created:
     - .planning/phases/19-certification-registry-and-trust-distribution/19-02-SUMMARY.md
   modified:
-    - crates/pact-cli/src/certify.rs
-    - crates/pact-cli/src/main.rs
-    - crates/pact-cli/src/trust_control.rs
+    - crates/arc-cli/src/certify.rs
+    - crates/arc-cli/src/main.rs
+    - crates/arc-cli/src/trust_control.rs
 requirements-completed:
   - CERT-02
 completed: 2026-03-25
@@ -29,11 +29,11 @@ surfaces.
 
 ## Accomplishments
 
-- added `pact certify verify` and registry subcommands for local and remote use
+- added `arc certify verify` and registry subcommands for local and remote use
 - wired trust-control endpoints and client helpers for certification registry
   admin flows
 - kept publish, resolve, and revoke semantics aligned across both paths
 
 ## Verification
 
-- `cargo test -p pact-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`

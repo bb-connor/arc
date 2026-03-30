@@ -13,11 +13,11 @@ contract.
 
 ## Automated Verification
 
-- `./scripts/check-pact-ts-release.sh`
-- `./scripts/check-pact-py-release.sh`
-- `./scripts/check-pact-go-release.sh`
-- `rg -n 'production candidate|@pact-protocol/sdk|v2.3' README.md docs/release/RELEASE_CANDIDATE.md packages/sdk/pact-ts/README.md packages/sdk/pact-py/README.md packages/sdk/pact-go/README.md`
-- `rg -n 'Scope|Compatibility Rules|Non-Goals' docs/standards/PACT_RECEIPTS_PROFILE.md docs/standards/PACT_PORTABLE_TRUST_PROFILE.md`
+- `./scripts/check-arc-ts-release.sh`
+- `./scripts/check-arc-py-release.sh`
+- `./scripts/check-arc-go-release.sh`
+- `rg -n 'production candidate|@arc-protocol/sdk|v2.3' README.md docs/release/RELEASE_CANDIDATE.md packages/sdk/arc-ts/README.md packages/sdk/arc-py/README.md packages/sdk/arc-go/README.md`
+- `rg -n 'Scope|Compatibility Rules|Non-Goals' docs/standards/ARC_RECEIPTS_PROFILE.md docs/standards/ARC_PORTABLE_TRUST_PROFILE.md`
 - `rg -n 'Conditional go|GA Checklist|Risk Register|hosted `CI`|hosted `Release Qualification`' docs/release/RELEASE_AUDIT.md docs/release/GA_CHECKLIST.md docs/release/RISK_REGISTER.md`
 
 ## Result

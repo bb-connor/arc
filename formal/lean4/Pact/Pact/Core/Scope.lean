@@ -1,15 +1,15 @@
 /-
-  Scope subsumption logic: ToolGrant.isSubsetOf, PactScope.isSubsetOf.
-  Mirrors: pact-core/src/capability.rs (ToolGrant::is_subset_of, PactScope::is_subset_of)
+  Scope subsumption logic: ToolGrant.isSubsetOf, ArcScope.isSubsetOf.
+  Mirrors: arc-core/src/capability.rs (ToolGrant::is_subset_of, ArcScope::is_subset_of)
 
-  This is the core of PACT's capability monotonicity guarantee.
+  This is the core of ARC's capability monotonicity guarantee.
 -/
 
-import Pact.Core.Capability
+import Arc.Core.Capability
 
 set_option autoImplicit false
 
-namespace Pact.Core
+namespace Arc.Core
 
 /-- Check if every element of `child` appears in `parent`. -/
 def List.isSubsetOf [BEq α] (child parent : List α) : Bool :=
@@ -40,20 +40,20 @@ def ToolGrant.isSubsetOf (child parent : ToolGrant) : Bool :=
   -- Constraints: parent's constraints must all appear in child
   && parent.constraints.isSubsetOf child.constraints
 
-/-- Mirrors: PactScope::is_subset_of in capability.rs.
+/-- Mirrors: ArcScope::is_subset_of in capability.rs.
 
     Returns true if every grant in `child` is covered by some grant in `parent`. -/
-def PactScope.isSubsetOf (child parent : PactScope) : Bool :=
+def ArcScope.isSubsetOf (child parent : ArcScope) : Bool :=
   child.grants.all (fun cg =>
     parent.grants.any (fun pg => cg.isSubsetOf pg))
 
 /-- The empty scope: no grants at all. -/
-def PactScope.empty : PactScope := { grants := [] }
+def ArcScope.empty : ArcScope := { grants := [] }
 
 /-- Empty scope is a subset of any scope. -/
-theorem PactScope.empty_isSubsetOf (parent : PactScope) :
-    PactScope.isSubsetOf PactScope.empty parent = true := by
-  unfold PactScope.isSubsetOf PactScope.empty
+theorem ArcScope.empty_isSubsetOf (parent : ArcScope) :
+    ArcScope.isSubsetOf ArcScope.empty parent = true := by
+  unfold ArcScope.isSubsetOf ArcScope.empty
   simp [List.all]
 
 /-- Reflexivity: a scope is a subset of itself. -/
@@ -91,4 +91,4 @@ private theorem List.any_of_mem {α : Type} [BEq α]
     | head => left; rw [← h_beq]; congr
     | tail _ h_tail => right; exact ih h_tail
 
-end Pact.Core
+end Arc.Core

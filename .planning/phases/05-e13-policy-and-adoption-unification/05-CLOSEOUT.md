@@ -8,14 +8,14 @@ The E13 closeout landed as a compact operator/adoption slice rather than a long 
 - kept legacy PACT YAML documented as a supported compatibility input
 - added a maintained canonical HushSpec example at `examples/policies/canonical-hushspec.yaml`
 - added `docs/NATIVE_ADOPTION_GUIDE.md` plus `examples/hello-tool/README.md` for wrapped-MCP-to-native migration guidance
-- introduced `NativePactServiceBuilder` and related helper types in `pact-mcp-adapter`
+- introduced `NativeArcServiceBuilder` and related helper types in `arc-mcp-adapter`
 - refactored `examples/hello-tool` to use the new native authoring surface
 - added adapter tests proving the native service builder covers tools, resources, prompts, and late events
 
 ## Verification
 
 ```bash
-cargo test -p pact-mcp-adapter
+cargo test -p arc-mcp-adapter
 cargo test -p hello-tool
 cargo test --workspace
 ```

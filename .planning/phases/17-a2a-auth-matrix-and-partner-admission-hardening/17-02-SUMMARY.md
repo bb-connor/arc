@@ -14,7 +14,7 @@ key-files:
   created:
     - .planning/phases/17-a2a-auth-matrix-and-partner-admission-hardening/17-02-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
 requirements-completed:
   - A2A-02
 completed: 2026-03-25
@@ -35,4 +35,4 @@ Partner admission is now explicit, narrow, and fail closed at discovery time.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`

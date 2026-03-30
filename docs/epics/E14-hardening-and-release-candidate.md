@@ -6,11 +6,11 @@ Implemented locally. The repo now has release qualification and release-audit ar
 
 ## Suggested issue title
 
-`E14: qualify PACT for release with explicit guarantees, limits, and failure-mode coverage`
+`E14: qualify ARC for release with explicit guarantees, limits, and failure-mode coverage`
 
 ## Problem
 
-By the time E9 through E13 land, PACT should have closed the major semantic gaps identified in the post-review plan.
+By the time E9 through E13 land, ARC should have closed the major semantic gaps identified in the post-review plan.
 
 That still does not automatically make it release-ready.
 
@@ -18,7 +18,7 @@ The repo needs one explicit close-out epic that proves:
 
 - the supported surface is stable under the real workspace and CI gates
 - failure modes are tested and documented
-- operator and adopter docs describe what PACT actually guarantees
+- operator and adopter docs describe what ARC actually guarantees
 - the final release story is driven by evidence rather than by leftover optimism
 
 Without that, "hardening" becomes a vague catch-all bucket and the closing cycle never really ends.
@@ -56,8 +56,8 @@ Out of scope:
 - `docs/EXECUTION_PLAN.md`
 - `docs/ROADMAP_V1.md`
 - `docs/epics/`
-- `crates/pact-cli/tests/`
-- `crates/pact-conformance/tests/`
+- `crates/arc-cli/tests/`
+- `crates/arc-conformance/tests/`
 - `tests/e2e/`
 - release-facing examples and policy fixtures
 

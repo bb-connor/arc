@@ -24,11 +24,11 @@ requirements:
 ## Commands Run
 
 - `cargo fmt --all -- --check`
-- `cargo test -p pact-core ownership_snapshots_roundtrip_with_expected_defaults -- --nocapture`
-- `cargo test -p pact-mcp-adapter -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
-- `cargo test -p pact-cli --test trust_cluster trust_control_cluster_replicates_state_and_survives_leader_failover -- --nocapture`
+- `cargo test -p arc-core ownership_snapshots_roundtrip_with_expected_defaults -- --nocapture`
+- `cargo test -p arc-mcp-adapter -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-cli --test trust_cluster trust_control_cluster_replicates_state_and_survives_leader_failover -- --nocapture`
 - `cargo test --workspace`
 
 ## Notes

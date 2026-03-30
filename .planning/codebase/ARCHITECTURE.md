@@ -16,37 +16,37 @@
 
 **Core Model Layer:**
 - Purpose: Define canonical types, signing, hashing, manifests, receipts, session messages, and capability structures
-- Contains: `pact-core`, `pact-manifest`
+- Contains: `arc-core`, `arc-manifest`
 - Depends on: Serialization and crypto dependencies
 - Used by: Every other crate
 
 **Policy and Guard Layer:**
 - Purpose: Compile policy inputs and evaluate request-time guard logic
-- Contains: `pact-policy`, `pact-guards`
+- Contains: `arc-policy`, `arc-guards`
 - Depends on: Core model types
 - Used by: Kernel construction and CLI policy loading
 
 **Runtime Kernel Layer:**
 - Purpose: Validate capabilities, evaluate guards, manage session operations, and persist trust state
-- Contains: `pact-kernel`
+- Contains: `arc-kernel`
 - Depends on: Core model, SQLite, tracing
 - Used by: CLI entrypoints and MCP adapter surfaces
 
 **Edge and Adapter Layer:**
 - Purpose: Translate between MCP-compatible transports and the kernel's session/runtime abstractions
-- Contains: `pact-mcp-adapter`
+- Contains: `arc-mcp-adapter`
 - Depends on: Core model, kernel, manifest support
-- Used by: `pact-cli` stdio and HTTP serving paths
+- Used by: `arc-cli` stdio and HTTP serving paths
 
 **CLI and Hosted Service Layer:**
 - Purpose: Provide operator-facing commands, HTTP serving, and trust-control admin/control endpoints
-- Contains: `pact-cli`
+- Contains: `arc-cli`
 - Depends on: All core runtime crates plus Axum/HTTP tooling
 - Used by: Humans, harnesses, wrapped MCP clients, and remote deployments
 
 **Verification Layer:**
 - Purpose: Prove behavior across unit, integration, conformance, e2e, and formal-diff suites
-- Contains: `pact-conformance`, `tests/e2e`, `formal/diff-tests`, crate integration tests
+- Contains: `arc-conformance`, `tests/e2e`, `formal/diff-tests`, crate integration tests
 - Depends on: Runtime and edge behavior being externally observable
 - Used by: CI and release qualification
 
@@ -54,14 +54,14 @@
 
 **CLI Policy Check:**
 
-1. Operator invokes `pact check`
+1. Operator invokes `arc check`
 2. CLI loads policy input and default capability context
 3. Kernel validates capability and evaluates guards
 4. Receipt is signed and returned with allow/deny outcome
 
 **Wrapped MCP Session:**
 
-1. Operator invokes `pact mcp serve` or `pact mcp serve-http`
+1. Operator invokes `arc mcp serve` or `arc mcp serve-http`
 2. CLI spawns or connects to an upstream MCP server
 3. Adapter exposes an MCP-compatible edge backed by kernel session state
 4. Incoming tool/resource/prompt/sampling/elicitation flows are normalized into kernel operations
@@ -83,12 +83,12 @@
 
 **Capability / Scope:**
 - Purpose: Represent what an agent may do and under what bounds
-- Examples: `PactScope`, capability tokens, grants
+- Examples: `ArcScope`, capability tokens, grants
 - Pattern: Signed, serializable security contract
 
 **Receipt:**
 - Purpose: Produce auditable evidence for allow, deny, cancel, and incomplete outcomes
-- Examples: `PactReceipt`, receipt stores, receipt signing
+- Examples: `ArcReceipt`, receipt stores, receipt signing
 - Pattern: Immutable signed record
 
 **Session Operation:**
@@ -104,17 +104,17 @@
 ## Entry Points
 
 **CLI Entry:**
-- Location: `crates/pact-cli/src/main.rs`
-- Triggers: `pact check`, `pact run`, `pact mcp serve`, `pact mcp serve-http`, `pact trust ...`
+- Location: `crates/arc-cli/src/main.rs`
+- Triggers: `arc check`, `arc run`, `arc mcp serve`, `arc mcp serve-http`, `arc trust ...`
 - Responsibilities: Parse flags, load policy/runtime state, host transports, route operator commands
 
 **MCP Edge Entry:**
-- Location: `crates/pact-mcp-adapter/src/edge.rs`
+- Location: `crates/arc-mcp-adapter/src/edge.rs`
 - Triggers: Wrapped stdio and remote HTTP MCP traffic
 - Responsibilities: Translate protocol traffic into kernel/session operations
 
 **Kernel Entry:**
-- Location: `crates/pact-kernel/src/lib.rs`, `crates/pact-kernel/src/session.rs`
+- Location: `crates/arc-kernel/src/lib.rs`, `crates/arc-kernel/src/session.rs`
 - Triggers: CLI and edge calls
 - Responsibilities: Enforce capability and policy semantics, track session state, create receipts
 

@@ -26,9 +26,9 @@ key-files:
   created:
     - .planning/phases/01-e9-ha-trust-control-reliability/01-03-SUMMARY.md
   modified:
-    - crates/pact-kernel/src/budget_store.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/tests/trust_cluster.rs
+    - crates/arc-kernel/src/budget_store.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/tests/trust_cluster.rs
 key-decisions:
   - "Budget replication must use a durable monotonic seq so repeated same-key updates cannot collapse behind coarse updated_at ordering"
   - "Imported replicated budget seq values must raise the local allocation floor so failover writes continue monotonically"
@@ -69,9 +69,9 @@ No task commits were created in this session because the repository currently ha
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/budget_store.rs` - added durable budget seq allocation, persisted replication metadata, and seq-based delta listing/import semantics
-- `crates/pact-cli/src/trust_control.rs` - moved budget sync cursors and internal delta payloads to `after_seq` replication
-- `crates/pact-cli/tests/trust_cluster.rs` - added rapid same-key budget increments before follower convergence and preserved failover correctness assertions
+- `crates/arc-kernel/src/budget_store.rs` - added durable budget seq allocation, persisted replication metadata, and seq-based delta listing/import semantics
+- `crates/arc-cli/src/trust_control.rs` - moved budget sync cursors and internal delta payloads to `after_seq` replication
+- `crates/arc-cli/tests/trust_cluster.rs` - added rapid same-key budget increments before follower convergence and preserved failover correctness assertions
 
 ## Decisions Made
 
@@ -87,8 +87,8 @@ No task commits were created in this session because the repository currently ha
 - **Found during:** Task 3 (Add regression coverage for rapid same-key updates and post-failover correctness)
 - **Issue:** Generic sync errors were feeding peer routing health too aggressively, allowing a follower to elect itself locally and increment stale budget state before failover
 - **Fix:** Limited routing-health downgrades to actual peer reachability failures and tightened the HA test to fail immediately if a pre-failover write is not handled by the expected leader
-- **Files modified:** `crates/pact-cli/src/trust_control.rs`, `crates/pact-cli/tests/trust_cluster.rs`
-- **Verification:** `cargo test -p pact-cli --test trust_cluster` passes after the fix
+- **Files modified:** `crates/arc-cli/src/trust_control.rs`, `crates/arc-cli/tests/trust_cluster.rs`
+- **Verification:** `cargo test -p arc-cli --test trust_cluster` passes after the fix
 - **Committed in:** working tree only
 
 ---
@@ -99,8 +99,8 @@ No task commits were created in this session because the repository currently ha
 ## Verification
 
 - `cargo fmt --all` - passed
-- `cargo test -p pact-kernel budget_store` - passed
-- `cargo test -p pact-cli --test trust_cluster` - passed
+- `cargo test -p arc-kernel budget_store` - passed
+- `cargo test -p arc-cli --test trust_cluster` - passed
 - `cargo fmt --all -- --check` - passed
 
 ## Issues Encountered

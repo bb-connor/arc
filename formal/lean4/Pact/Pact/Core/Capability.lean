@@ -1,12 +1,12 @@
 /-
-  Core type definitions: CapabilityToken, PactScope, ToolGrant, Operation,
+  Core type definitions: CapabilityToken, ArcScope, ToolGrant, Operation,
   Constraint, DelegationLink, Attenuation.
-  Mirrors: pact-core/src/capability.rs
+  Mirrors: arc-core/src/capability.rs
 -/
 
 set_option autoImplicit false
 
-namespace Pact.Core
+namespace Arc.Core
 
 abbrev ServerId := String
 abbrev ToolName := String
@@ -41,8 +41,8 @@ structure ToolGrant where
   maxInvocations : Option Nat
   deriving Repr, BEq
 
-/-- Mirrors: PactScope in capability.rs -/
-structure PactScope where
+/-- Mirrors: ArcScope in capability.rs -/
+structure ArcScope where
   grants : List ToolGrant
   deriving Repr, BEq
 
@@ -69,7 +69,7 @@ structure CapabilityToken where
   id : CapabilityId
   issuer : PublicKeyHex
   subject : PublicKeyHex
-  scope : PactScope
+  scope : ArcScope
   issuedAt : Timestamp
   expiresAt : Timestamp
   delegationChain : List DelegationLink
@@ -86,4 +86,4 @@ def CapabilityToken.isExpiredAt (cap : CapabilityToken) (now : Timestamp) : Bool
 /-- Mirrors: KernelConfig.max_delegation_depth (default). -/
 def maxDelegationDepth : Nat := 32
 
-end Pact.Core
+end Arc.Core

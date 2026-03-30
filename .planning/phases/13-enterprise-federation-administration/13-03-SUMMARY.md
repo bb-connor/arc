@@ -18,12 +18,12 @@ key-files:
   created:
     - .planning/phases/13-enterprise-federation-administration/13-03-SUMMARY.md
   modified:
-    - crates/pact-policy/src/models.rs
-    - crates/pact-policy/src/evaluate.rs
-    - crates/pact-policy/src/lib.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/src/main.rs
-    - crates/pact-cli/tests/federated_issue.rs
+    - crates/arc-policy/src/models.rs
+    - crates/arc-policy/src/evaluate.rs
+    - crates/arc-policy/src/lib.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/src/main.rs
+    - crates/arc-cli/tests/federated_issue.rs
 requirements-completed:
   - FED-02
 completed: 2026-03-24
@@ -31,7 +31,7 @@ completed: 2026-03-24
 
 # Phase 13 Plan 03 Summary
 
-Enterprise origin matching is now first-class in `pact-policy`, and
+Enterprise origin matching is now first-class in `arc-policy`, and
 trust-control uses that richer origin context when a request enters the
 enterprise-provider lane.
 
@@ -52,8 +52,8 @@ enterprise-provider lane.
 
 ## Verification
 
-- `cargo test -p pact-policy enterprise_origin -- --nocapture`
-- `cargo test -p pact-cli --test federated_issue -- --nocapture`
+- `cargo test -p arc-policy enterprise_origin -- --nocapture`
+- `cargo test -p arc-cli --test federated_issue -- --nocapture`
 
 ## Notes
 

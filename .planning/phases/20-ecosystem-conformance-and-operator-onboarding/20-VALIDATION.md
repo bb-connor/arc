@@ -14,7 +14,7 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test`, roadmap analysis |
-| **Quick run command** | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
 | **Docs and planning verification** | `node /Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs roadmap analyze` |
 
@@ -22,8 +22,8 @@ created: 2026-03-25
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 20-01 | ECO-01 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` and `cargo test -p pact-cli --test certify -- --nocapture` |
-| 20-02 | ECO-02 | `cargo test -p pact-cli --test provider_admin -- --nocapture` |
+| 20-01 | ECO-01 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` and `cargo test -p arc-cli --test certify -- --nocapture` |
+| 20-02 | ECO-02 | `cargo test -p arc-cli --test provider_admin -- --nocapture` |
 | 20-03 | ECO-01, ECO-02 | `node /Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs roadmap analyze` |
 
 ## Coverage Notes

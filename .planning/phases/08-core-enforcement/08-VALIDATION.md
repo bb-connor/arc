@@ -38,15 +38,15 @@ created: 2026-03-22
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 08-01-01 | 01 | 1 | SCHEMA-04 | unit | `cargo test -p pact-kernel budget_store` | ❌ W0 | ⬜ pending |
-| 08-01-02 | 01 | 1 | SCHEMA-05 | unit | `cargo test -p pact-core capability` | ❌ W0 | ⬜ pending |
-| 08-01-03 | 01 | 1 | SCHEMA-06 | unit | `cargo test -p pact-core receipt` | ❌ W0 | ⬜ pending |
-| 08-02-01 | 02 | 1 | SEC-01 | unit | `cargo test -p pact-kernel checkpoint` | ❌ W0 | ⬜ pending |
-| 08-02-02 | 02 | 1 | SEC-02 | unit | `cargo test -p pact-kernel checkpoint` | ❌ W0 | ⬜ pending |
-| 08-03-01 | 03 | 1 | SEC-05 | unit | `cargo test -p pact-guards velocity` | ❌ W0 | ⬜ pending |
-| 08-04-01 | 04 | 2 | SCHEMA-04,SEC-05 | integration | `cargo test -p pact-kernel integration` | ❌ W0 | ⬜ pending |
-| 08-04-02 | 04 | 2 | SEC-01,SEC-02 | integration | `cargo test -p pact-kernel checkpoint_integration` | ❌ W0 | ⬜ pending |
-| 08-04-03 | 04 | 2 | SCHEMA-06 | integration | `cargo test -p pact-kernel financial_receipt` | ❌ W0 | ⬜ pending |
+| 08-01-01 | 01 | 1 | SCHEMA-04 | unit | `cargo test -p arc-kernel budget_store` | ❌ W0 | ⬜ pending |
+| 08-01-02 | 01 | 1 | SCHEMA-05 | unit | `cargo test -p arc-core capability` | ❌ W0 | ⬜ pending |
+| 08-01-03 | 01 | 1 | SCHEMA-06 | unit | `cargo test -p arc-core receipt` | ❌ W0 | ⬜ pending |
+| 08-02-01 | 02 | 1 | SEC-01 | unit | `cargo test -p arc-kernel checkpoint` | ❌ W0 | ⬜ pending |
+| 08-02-02 | 02 | 1 | SEC-02 | unit | `cargo test -p arc-kernel checkpoint` | ❌ W0 | ⬜ pending |
+| 08-03-01 | 03 | 1 | SEC-05 | unit | `cargo test -p arc-guards velocity` | ❌ W0 | ⬜ pending |
+| 08-04-01 | 04 | 2 | SCHEMA-04,SEC-05 | integration | `cargo test -p arc-kernel integration` | ❌ W0 | ⬜ pending |
+| 08-04-02 | 04 | 2 | SEC-01,SEC-02 | integration | `cargo test -p arc-kernel checkpoint_integration` | ❌ W0 | ⬜ pending |
+| 08-04-03 | 04 | 2 | SCHEMA-06 | integration | `cargo test -p arc-kernel financial_receipt` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -54,10 +54,10 @@ created: 2026-03-22
 
 ## Wave 0 Requirements
 
-- [ ] Budget store monetary tests in `crates/pact-kernel/src/budget_store.rs`
-- [ ] Checkpoint unit tests in `crates/pact-kernel/src/checkpoint.rs`
-- [ ] Velocity guard tests in `crates/pact-guards/src/velocity.rs`
-- [ ] FinancialReceiptMetadata serde tests in `crates/pact-core/src/receipt.rs`
+- [ ] Budget store monetary tests in `crates/arc-kernel/src/budget_store.rs`
+- [ ] Checkpoint unit tests in `crates/arc-kernel/src/checkpoint.rs`
+- [ ] Velocity guard tests in `crates/arc-guards/src/velocity.rs`
+- [ ] FinancialReceiptMetadata serde tests in `crates/arc-core/src/receipt.rs`
 
 *Existing test infrastructure (cargo test) covers all framework needs.*
 

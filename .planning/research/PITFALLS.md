@@ -11,7 +11,7 @@
 ### Pitfall 1: deny_unknown_fields Removal Not Sequenced Before New Fields Ship
 
 **What goes wrong:**
-`CapabilityToken`, `CapabilityTokenBody`, `PactScope`, `ToolGrant`, `ResourceGrant`, `PromptGrant`, `DelegationLink`, `DelegationLinkBody`, `ToolCallAction`, `GuardEvidence`, `PactReceipt`, `PactReceiptBody`, `ChildRequestReceipt`, `ChildRequestReceiptBody`, and additional types all carry `#[serde(deny_unknown_fields)]`. When `MonetaryAmount`, `max_cost_per_invocation`, `max_total_cost`, or any other new field is added to a type that still has `deny_unknown_fields`, any old kernel that receives a token or receipt containing the new field will panic with a deserialization error rather than ignoring it. This is a silent wire-level compatibility break: the new kernel issues tokens that the old kernel rejects, but the old kernel produces no useful diagnostic about why.
+`CapabilityToken`, `CapabilityTokenBody`, `ArcScope`, `ToolGrant`, `ResourceGrant`, `PromptGrant`, `DelegationLink`, `DelegationLinkBody`, `ToolCallAction`, `GuardEvidence`, `ArcReceipt`, `ArcReceiptBody`, `ChildRequestReceipt`, `ChildRequestReceiptBody`, and additional types all carry `#[serde(deny_unknown_fields)]`. When `MonetaryAmount`, `max_cost_per_invocation`, `max_total_cost`, or any other new field is added to a type that still has `deny_unknown_fields`, any old kernel that receives a token or receipt containing the new field will panic with a deserialization error rather than ignoring it. This is a silent wire-level compatibility break: the new kernel issues tokens that the old kernel rejects, but the old kernel produces no useful diagnostic about why.
 
 **Why it happens:**
 Developers add the new fields behind `#[serde(default, skip_serializing_if = "Option::is_none")]`, which makes them optional for serialization, but forget that `deny_unknown_fields` applies during deserialization. The `default` attribute only helps when the field is absent from the JSON; it has no effect when the field is present but unknown to an older deserializer. Because both old and new kernels compile and pass their own tests independently, the breakage only appears during cross-version token exchange.
@@ -20,7 +20,7 @@ Developers add the new fields behind `#[serde(default, skip_serializing_if = "Op
 Remove `deny_unknown_fields` from all 18 affected types in a dedicated release before any new fields are added to wire-serialized structs. This removal must ship and be deployed before the monetary budget fields appear in any token or receipt payload. The removal itself is non-breaking: it only widens what existing deployments will accept. Use a migration test that round-trips a token built with new optional fields through the old deserialization path to confirm tolerance.
 
 **Warning signs:**
-- A plan phase proposes adding `MonetaryAmount` or any new field to `ToolGrant` or `PactReceipt` without a preceding phase that removes `deny_unknown_fields`.
+- A plan phase proposes adding `MonetaryAmount` or any new field to `ToolGrant` or `ArcReceipt` without a preceding phase that removes `deny_unknown_fields`.
 - Test coverage for deserialization of tokens with unknown fields does not exist.
 - The migration sequence in planning does not call out schema-tolerance as a prerequisite gate.
 
@@ -29,19 +29,19 @@ Schema compatibility phase -- must be the first substantive v2.0 phase, before a
 
 ---
 
-### Pitfall 2: DPoP Proof Binding Copied From HTTP Shape Rather Than PACT Invocation Shape
+### Pitfall 2: DPoP Proof Binding Copied From HTTP Shape Rather Than ARC Invocation Shape
 
 **What goes wrong:**
-ClawdStrike's DPoP implementation binds proofs to HTTP requests using fields `method`, `url`, and `body_sha256`. If the PACT port replicates this shape, proofs become meaningless at the PACT layer: a proof bound to an HTTP POST to `/invoke` is not bound to which capability, which tool, or which argument content was authorized. An attacker who can observe the transport layer can replay the same HTTP request (same method + url + body) against a different capability context. The proof-of-possession property -- that the agent holding the keypair authorized this specific invocation -- is not provided.
+ClawdStrike's DPoP implementation binds proofs to HTTP requests using fields `method`, `url`, and `body_sha256`. If the ARC port replicates this shape, proofs become meaningless at the ARC layer: a proof bound to an HTTP POST to `/invoke` is not bound to which capability, which tool, or which argument content was authorized. An attacker who can observe the transport layer can replay the same HTTP request (same method + url + body) against a different capability context. The proof-of-possession property -- that the agent holding the keypair authorized this specific invocation -- is not provided.
 
 **Why it happens:**
 The ClawdStrike source is a working, tested implementation. Porting developers default to copying it. HTTP-specific fields look generic enough that they appear to provide meaningful binding. The type shapes are similar; the semantic gap is invisible until threat-modeled.
 
 **How to avoid:**
-The PACT DPoP proof message must bind to `capability_id`, `tool_server`, `tool_name`, canonical hash of the invocation arguments, and `issued_at` + nonce. This is documented explicitly in `CLAWDSTRIKE_INTEGRATION.md` section 3.1. The port must also add replay protection via a nonce store (ClawdStrike's source does not have one). Treat the ClawdStrike code as a reference for the signature verification flow only, not as the proof message schema.
+The ARC DPoP proof message must bind to `capability_id`, `tool_server`, `tool_name`, canonical hash of the invocation arguments, and `issued_at` + nonce. This is documented explicitly in `CLAWDSTRIKE_INTEGRATION.md` section 3.1. The port must also add replay protection via a nonce store (ClawdStrike's source does not have one). Treat the ClawdStrike code as a reference for the signature verification flow only, not as the proof message schema.
 
 **Warning signs:**
-- The PACT DPoP proof message struct contains `method` or `url` fields.
+- The ARC DPoP proof message struct contains `method` or `url` fields.
 - No nonce replay store is present in the implementation.
 - DPoP tests only cover freshness/signature checks, not argument-content binding.
 - The DPoP PR description says "port from ClawdStrike" without calling out the proof message rewrite.
@@ -54,7 +54,7 @@ DPoP implementation phase. Verification gate: a proof generated for invocation A
 ### Pitfall 3: Velocity Guard Implemented With async/await
 
 **What goes wrong:**
-ClawdStrike's `TokenBucket` uses `tokio::Mutex` and `async` acquire semantics. `pact_kernel::Guard::evaluate()` is a synchronous trait method. If the velocity guard wraps the async bucket without wrapping it in `std::sync::Mutex` and a synchronous try-acquire, the compiler will refuse to compile. A developer who works around this by making the guard async-first, or by calling `block_on()` inside `evaluate()`, introduces executor-within-executor panics in async runtime contexts and violates the kernel's guard contract.
+ClawdStrike's `TokenBucket` uses `tokio::Mutex` and `async` acquire semantics. `arc_kernel::Guard::evaluate()` is a synchronous trait method. If the velocity guard wraps the async bucket without wrapping it in `std::sync::Mutex` and a synchronous try-acquire, the compiler will refuse to compile. A developer who works around this by making the guard async-first, or by calling `block_on()` inside `evaluate()`, introduces executor-within-executor panics in async runtime contexts and violates the kernel's guard contract.
 
 **Why it happens:**
 The source is async. The target is sync. The mechanical impedance mismatch is obvious in the type system but not obvious in intent. Developers unfamiliar with the kernel internals may assume guards can be async.
@@ -100,13 +100,13 @@ Monetary budget phase. Verification gate: HA budget replication test with concur
 If the checkpoint is signed on every receipt append, the kernel's hot path incurs SHA-256 over all accumulated receipt leaf hashes on every invocation. At 1,000 receipts, each checkpoint recomputes a 1,000-leaf Merkle tree. At 100,000 receipts the cost becomes measurable. More importantly, `MerkleTree::from_leaves` requires materializing all leaf hashes at once, meaning the SQLite checkpoint step reads all receipt rows in each batch.
 
 **Why it happens:**
-The natural implementation wires the checkpoint into `append_pact_receipt` as the simplest integration. The test suite runs with small receipt counts where per-receipt checkpoints are imperceptible.
+The natural implementation wires the checkpoint into `append_arc_receipt` as the simplest integration. The test suite runs with small receipt counts where per-receipt checkpoints are imperceptible.
 
 **How to avoid:**
 Checkpoint every N receipts (configurable, default suggested in `CLAWDSTRIKE_INTEGRATION.md` as the design intent). Store the batch leaf hashes in a staging buffer, not by re-reading historical rows. The checkpoint references `prev_checkpoint_hash` for chain continuity. This is how Certificate Transparency logs work: they batch entries, not one-per-entry.
 
 **Warning signs:**
-- `append_pact_receipt` calls a Merkle build function on every call.
+- `append_arc_receipt` calls a Merkle build function on every call.
 - No `batch_size` or `checkpoint_interval` config parameter exists.
 - The checkpoint implementation reads all receipts from the database to build the tree.
 - Performance benchmarks are not part of the checkpoint acceptance criteria.
@@ -119,13 +119,13 @@ Merkle checkpoint wiring phase. Verification gate: receipt append latency does n
 ### Pitfall 6: Receipt Query API Inherits ClawdStrike's Tenant/Policy Chain Model
 
 **What goes wrong:**
-ClawdStrike's receipt query API is indexed by `(tenant_id, policy_name)` chain keys. PACT's receipt model does not have tenants or policy names as first-class identifiers. If the PACT receipt query layer is built with these as primary index keys, queries for "all receipts for agent X" require a workaround join, and the receipt dashboard cannot answer agent-centric questions. This also creates a false dependency: PACT queries start requiring tenant context that is not part of the PACT protocol.
+ClawdStrike's receipt query API is indexed by `(tenant_id, policy_name)` chain keys. ARC's receipt model does not have tenants or policy names as first-class identifiers. If the ARC receipt query layer is built with these as primary index keys, queries for "all receipts for agent X" require a workaround join, and the receipt dashboard cannot answer agent-centric questions. This also creates a false dependency: ARC queries start requiring tenant context that is not part of the ARC protocol.
 
 **Why it happens:**
-The ClawdStrike query API is production-tested and the path of least resistance. The structural mismatch between ClawdStrike's multi-tenant broker model and PACT's capability-centric model is easy to miss when porting at the module level.
+The ClawdStrike query API is production-tested and the path of least resistance. The structural mismatch between ClawdStrike's multi-tenant broker model and ARC's capability-centric model is easy to miss when porting at the module level.
 
 **How to avoid:**
-PACT receipt queries must be keyed by `capability_id`, `tool_server`, `tool_name`, `decision`, and timestamp. Child-request queries are keyed by `session_id` and `parent_request_id`. Capability lineage joins (agent-centric queries) require the capability lineage index built in a later phase -- do not attempt to synthesize them from the receipt table alone before the index exists. This is documented explicitly in `CLAWDSTRIKE_INTEGRATION.md` section 3.2.
+ARC receipt queries must be keyed by `capability_id`, `tool_server`, `tool_name`, `decision`, and timestamp. Child-request queries are keyed by `session_id` and `parent_request_id`. Capability lineage joins (agent-centric queries) require the capability lineage index built in a later phase -- do not attempt to synthesize them from the receipt table alone before the index exists. This is documented explicitly in `CLAWDSTRIKE_INTEGRATION.md` section 3.2.
 
 **Warning signs:**
 - The `ReceiptQueryStore` trait has `tenant_id` or `policy_name` parameters.
@@ -140,7 +140,7 @@ Receipt query API phase. Verification gate: `receipt list --capability-id X` and
 ### Pitfall 7: Schema Evolution Without a Migration Test for Old Receipts
 
 **What goes wrong:**
-When new columns are added to `capability_grant_budgets` or `pact_tool_receipts` via `ALTER TABLE ... ADD COLUMN ... DEFAULT`, existing rows get `NULL` (or the specified default) for the new column. If the application code assumes the new column is always non-null (for example, treating `cost_units_charged = NULL` as zero), aggregate queries like `SUM(cost_units_charged)` silently return `NULL` in SQLite rather than the sum. This produces a nil budget-remaining value, which depending on error handling could either block all invocations (fail-closed: safe) or bypass budget enforcement (fail-open: dangerous).
+When new columns are added to `capability_grant_budgets` or `arc_tool_receipts` via `ALTER TABLE ... ADD COLUMN ... DEFAULT`, existing rows get `NULL` (or the specified default) for the new column. If the application code assumes the new column is always non-null (for example, treating `cost_units_charged = NULL` as zero), aggregate queries like `SUM(cost_units_charged)` silently return `NULL` in SQLite rather than the sum. This produces a nil budget-remaining value, which depending on error handling could either block all invocations (fail-closed: safe) or bypass budget enforcement (fail-open: dangerous).
 
 **Why it happens:**
 SQLite `ALTER TABLE ADD COLUMN` is convenient but produces a mixed-schema database. Developers test with freshly created databases where all rows have the new column from the start. The migration path for existing databases with historical rows is not tested.
@@ -228,7 +228,7 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 | Copy DPoP verifier without rewriting proof message schema | Faster port, working tests | Proof binding is HTTP-shaped, not invocation-shaped -- replay protection is incomplete | Never |
 | Leave `deny_unknown_fields` removal for "later cleanup" | Saves one PR | Any new field ships as a wire-breaking change until removal lands | Never |
 | Per-receipt Merkle checkpoint with no batching | Simpler initial implementation | Quadratic read cost at receipt volume; checkpoint becomes a bottleneck | Only if a `batch_size` config knob gates the behavior for quick iteration, with a TODO tracking the fix |
-| Use ClawdStrike's `(tenant_id, policy_name)` index in PACT receipt API | Faster port, reuse query logic | Agent-centric queries require structural workarounds; lineage index design is constrained | Never |
+| Use ClawdStrike's `(tenant_id, policy_name)` index in ARC receipt API | Faster port, reuse query logic | Agent-centric queries require structural workarounds; lineage index design is constrained | Never |
 | Monetary budget enforcement without HA overrun documentation | Simpler mental model | Auditors and security reviewers will find the gap; surprise overrun window in production | Never -- document the model explicitly |
 | SIEM DLQ without size cap | One fewer config knob | Unbounded disk growth under sustained SIEM unavailability | Only in a feature-flagged dev build, never in a production release |
 | Compliance documents drafted before features ship | Meet deadlines on paper | Regulatory risk if the document describes non-shipping code at audit time | Never for regulatory filings |
@@ -241,8 +241,8 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 |-------------|----------------|------------------|
 | ClawdStrike DPoP port | Copy `validate_dpop_binding()` including HTTP proof message fields | Rewrite proof message to bind `capability_id + tool_server + tool_name + arg_hash + issued_at + nonce`; add nonce replay store |
 | ClawdStrike velocity guard port | Use `tokio::Mutex` and `async acquire()` from the source | Use `std::sync::Mutex` with synchronous `try_acquire()` returning `Verdict::Deny` immediately |
-| ClawdStrike checkpoint pattern | Copy domain-separation tag `"AegisNetCheckpointHashV1"` | Replace with `"PactCheckpointHashV1"` and schema ID `"pact.checkpoint_statement.v1"` |
-| ClawdStrike SIEM `SecurityEvent` | Use the ClawdStrike event type directly | Define a PACT-native `ReceiptEvent` wrapping `PactReceipt`; map schema formats (ECS, CEF, OCSF, Native) at export time |
+| ClawdStrike checkpoint pattern | Copy domain-separation tag `"AegisNetCheckpointHashV1"` | Replace with `"ArcCheckpointHashV1"` and schema ID `"arc.checkpoint_statement.v1"` |
+| ClawdStrike SIEM `SecurityEvent` | Use the ClawdStrike event type directly | Define a ARC-native `ReceiptEvent` wrapping `ArcReceipt`; map schema formats (ECS, CEF, OCSF, Native) at export time |
 | SQLite budget schema migration | Run `ALTER TABLE ADD COLUMN` and test only on fresh databases | Include a migration test that populates a pre-migration database and verifies correct behavior after migration |
 | Receipt query API from ClawdStrike | Carry over `tenant_id` and `policy_name` index keys | Rekey on `capability_id`, `tool_server`, `tool_name`, `decision`, and timestamp |
 | HA budget replication for monetary charges | Assume invocation-count consistency model applies to money | Explicitly document the overrun window; add HA concurrent-charge test |
@@ -254,7 +254,7 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
 | Per-receipt Merkle checkpoint | Receipt append latency climbs linearly with receipt count; checkpoint step reads all historical rows | Batch every N receipts (configurable); stage leaf hashes in memory | At ~10,000 receipts the per-receipt read cost becomes measurable; at 100,000 it is a bottleneck |
-| SIEM exporter blocking the receipt append path | Receipt signing latency spikes when SIEM endpoint is slow | Run SIEM export in a background channel with a fixed-depth queue; never block `append_pact_receipt` on export | First SIEM endpoint with >100ms latency; any transient network hiccup |
+| SIEM exporter blocking the receipt append path | Receipt signing latency spikes when SIEM endpoint is slow | Run SIEM export in a background channel with a fixed-depth queue; never block `append_arc_receipt` on export | First SIEM endpoint with >100ms latency; any transient network hiccup |
 | Velocity guard with in-memory window state and unbounded key space | Memory grows linearly with unique `(capability_id, grant_index)` pairs | Cap the window map size; evict expired windows on access | At high grant-cardinality deployments (thousands of active capabilities) |
 | SQLite WAL checkpoint accumulation under high receipt volume | Write latency spikes during automatic checkpoints | Tune `wal_autocheckpoint` pragma; use explicit checkpoint calls at known-quiet moments | Above ~10,000 receipts/minute on a typical laptop-grade disk |
 | Full-JSON scan for cost queries before indexed columns exist | Billing aggregate queries scan every receipt row | Add `cost_charged` and `cost_currency` columns at receipt insert time, not as a later migration | At ~100,000 receipts, a full-scan aggregate query takes seconds |
@@ -269,7 +269,7 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 | Monetary budget enforcement on only the issuing kernel, not the receiving kernel | An agent with two kernels in play can exceed the budget by issuing to the second kernel after the first exhausted | Budget state must be replicated across all HA nodes before any charge is approved; document the overrun window explicitly |
 | Receipt dashboard served without kernel-key verification | Dashboard displays unsigned or tamper-modified receipt data | The dashboard must verify each receipt's Ed25519 signature against the embedded `kernel_key` before displaying it |
 | Compliance document claims tamper-evident receipts before Merkle wiring ships | If the log is audited before Merkle is wired, individual receipts can be silently omitted | Gate compliance documents on Merkle wiring acceptance test |
-| ClawdStrike checkpoint domain tag carried over | Checkpoints from PACT and ClawdStrike produce identical-looking proofs, enabling cross-system confusion | Replace domain tag with `"PactCheckpointHashV1"` in all checkpoint hash inputs |
+| ClawdStrike checkpoint domain tag carried over | Checkpoints from ARC and ClawdStrike produce identical-looking proofs, enabling cross-system confusion | Replace domain tag with `"ArcCheckpointHashV1"` in all checkpoint hash inputs |
 
 ---
 
@@ -289,7 +289,7 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 - [ ] **deny_unknown_fields removal:** Verify that the removal PR covers all 18 affected types. Check `capability.rs`, `receipt.rs`, and `manifest.rs` individually with `grep deny_unknown_fields`. Count must be zero before any new fields ship.
 - [ ] **DPoP proof binding:** Verify the proof message schema contains `capability_id`, `tool_server`, `tool_name`, and argument hash -- not `method` or `url`. Check with a test that generates a proof for tool invocation A and attempts to use it for tool invocation B.
 - [ ] **Velocity guard sync boundary:** Verify `Guard::evaluate()` in `velocity.rs` has no `async` keyword and no `tokio` imports. Run the guard from a `#[test]` (not `#[tokio::test]`) harness.
-- [ ] **Merkle checkpoint batching:** Verify `append_pact_receipt` does not call `MerkleTree::from_leaves` on every call. Look for a `checkpoint_interval` or `batch_size` config. Confirm the checkpoint test appends 1,000 receipts and measures latency.
+- [ ] **Merkle checkpoint batching:** Verify `append_arc_receipt` does not call `MerkleTree::from_leaves` on every call. Look for a `checkpoint_interval` or `batch_size` config. Confirm the checkpoint test appends 1,000 receipts and measures latency.
 - [ ] **Budget migration test:** Verify a test creates a pre-migration database, inserts invocation-count rows, runs the migration, then exercises `try_charge_cost`. This test must exist before merging the monetary budget phase.
 - [ ] **SIEM DLQ size cap:** Verify `DeadLetterQueue` has a `max_entries` field and a test that confirms the depth cap is enforced.
 - [ ] **Compliance document claims:** Verify each document claim has a passing test or verification artifact cited. Check the traceability matrix before filing.
@@ -315,12 +315,12 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| deny_unknown_fields removal not sequenced first | Schema compatibility phase (Phase 1 of v2) | `grep -r deny_unknown_fields crates/pact-core/src/capability.rs crates/pact-core/src/receipt.rs` returns no results before monetary field PRs open |
+| deny_unknown_fields removal not sequenced first | Schema compatibility phase (Phase 1 of v2) | `grep -r deny_unknown_fields crates/arc-core/src/capability.rs crates/arc-core/src/receipt.rs` returns no results before monetary field PRs open |
 | DPoP proof binding HTTP-shaped | DPoP implementation phase | Cross-invocation proof replay test: proof from invocation A is rejected for invocation B |
 | Velocity guard uses async | Velocity guard implementation phase | Guard passes `#[test]` (non-async) harness without `block_on` |
 | Monetary budget HA overrun undocumented | Monetary budget phase | HA concurrent-charge test documents overrun bound in test name and assertion message |
 | Merkle checkpoint per-receipt | Merkle wiring phase | Benchmark test: 1,000-receipt append does not regress append latency beyond 2x baseline |
-| Receipt query inherits tenant model | Receipt query API phase | `ReceiptQueryStore` trait has no `tenant_id` parameter; query tests use PACT-native keys |
+| Receipt query inherits tenant model | Receipt query API phase | `ReceiptQueryStore` trait has no `tenant_id` parameter; query tests use ARC-native keys |
 | SQLite migration missing pre-migration test | Monetary budget phase | Migration test exists and runs against pre-populated database |
 | SIEM DLQ unbounded | SIEM exporter phase | DLQ depth cap test passes; `ExporterHealth` reports `dlq_depth` |
 | Compliance claims lead code | Compliance documentation phase | Traceability matrix links each claim to a passing test artifact |
@@ -330,13 +330,13 @@ Receipt query API phase (define stub) and capability lineage index phase (implem
 
 ## Sources
 
-- `crates/pact-core/src/capability.rs` -- 18 `deny_unknown_fields` annotations confirmed by direct code inspection
-- `crates/pact-core/src/receipt.rs` -- `deny_unknown_fields` on `PactReceipt`, `PactReceiptBody`, `ChildRequestReceipt`, `ChildRequestReceiptBody`, `ToolCallAction`, `GuardEvidence`
+- `crates/arc-core/src/capability.rs` -- 18 `deny_unknown_fields` annotations confirmed by direct code inspection
+- `crates/arc-core/src/receipt.rs` -- `deny_unknown_fields` on `ArcReceipt`, `ArcReceiptBody`, `ChildRequestReceipt`, `ChildRequestReceiptBody`, `ToolCallAction`, `GuardEvidence`
 - `docs/CLAWDSTRIKE_INTEGRATION.md` -- Section 3.1 (DPoP proof message rewrite), Section 3.3 (sync guard requirement), Section 3.2 (receipt query key model), Section 8 (risk register)
 - `docs/AGENT_ECONOMY.md` -- Section 3.1.1 (deny_unknown_fields migration requirement explicitly called out), Section 2.3 (HA replication conflict resolution for monetary charges)
 - `docs/STRATEGIC_ROADMAP.md` -- Perspective A (Merkle commitment must back compliance claims), debate resolution sequencing
-- `crates/pact-kernel/src/lib.rs` -- `Guard::evaluate()` synchronous trait confirmation
-- `crates/pact-core/src/merkle.rs` -- `MerkleTree::from_leaves` build semantics (full batch required)
+- `crates/arc-kernel/src/lib.rs` -- `Guard::evaluate()` synchronous trait confirmation
+- `crates/arc-core/src/merkle.rs` -- `MerkleTree::from_leaves` build semantics (full batch required)
 - `.planning/PROJECT.md` -- v2.0 feature list, regulatory deadlines, known risks
 
 ---

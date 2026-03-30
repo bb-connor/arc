@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/../packages/sdk/arc-go"
+
+if ! command -v go >/dev/null 2>&1; then
+  echo "arc-go checks require go on PATH" >&2
+  exit 1
+fi
+
+CGO_ENABLED=0 go test ./...

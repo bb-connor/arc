@@ -6,7 +6,7 @@ Core shipped.
 
 Slice A is now partially shipped:
 
-- `pact mcp serve-http` exposes a first authenticated remote MCP edge over Streamable HTTP
+- `arc mcp serve-http` exposes a first authenticated remote MCP edge over Streamable HTTP
 - remote sessions are isolated per `MCP-Session-Id`
 - multiple remote sessions can coexist concurrently
 - remote `tools/list`, `tools/call`, tasks, and nested sampling flows now work through the HTTP edge
@@ -16,17 +16,17 @@ Slice A is now partially shipped:
 
 Slice C is now partially shipped too:
 
-- `pact-kernel` has a SQLite receipt backend for signed tool and child-request receipts
+- `arc-kernel` has a SQLite receipt backend for signed tool and child-request receipts
 - the CLI now exposes that through `--receipt-db`
 - the CLI/runtime paths now also expose durable revocation through `--revocation-db`
-- `pact-kernel` also has a SQLite revocation backend and a pluggable capability-authority interface with a local implementation
-- the CLI now has a first local operator-facing trust control surface via `pact trust revoke` and `pact trust status`
+- `arc-kernel` also has a SQLite revocation backend and a pluggable capability-authority interface with a local implementation
+- the CLI now has a first local operator-facing trust control surface via `arc trust revoke` and `arc trust status`
 - the hosted HTTP runtime now has remote trust-admin surfaces for receipt queries, arbitrary capability revocation, per-session trust revocation, and authority status/rotation
 - restart-proof kernel tests now validate durable revocation enforcement and durable receipt persistence
 
 The distributed-control rewrite is now shipped as the next E7 slice:
 
-- `pact trust serve` now exposes a shared authenticated trust-control service over HTTP
+- `arc trust serve` now exposes a shared authenticated trust-control service over HTTP
 - the service centralizes capability issuance, authority status/rotation, revocation query/control, and durable tool/child receipt ingestion and query
 - `run`, `check`, `mcp serve`, and `mcp serve-http` can all now use that service through `--control-url` and `--control-token`
 - hosted HTTP admin APIs now proxy to the control service when configured instead of reading only local SQLite files
@@ -58,11 +58,11 @@ What is still missing:
 
 ## Problem
 
-PACT can now look convincing as a local or wrapped stdio MCP replacement, but it is not yet credible as a remote deployment target.
+ARC can now look convincing as a local or wrapped stdio MCP replacement, but it is not yet credible as a remote deployment target.
 
 That blocks:
 
-- hosted MCP-compatible PACT servers
+- hosted MCP-compatible ARC servers
 - authenticated remote sessions
 - durable audit and revocation guarantees
 - production adoption beyond local subprocess mediation
@@ -71,7 +71,7 @@ That blocks:
 
 By the end of E7:
 
-- PACT can host an authenticated remote MCP edge
+- ARC can host an authenticated remote MCP edge
 - session authentication and action authorization are cleanly separated
 - revocation and receipt durability survive process restarts
 - remote sessions preserve the same kernel enforcement guarantees as local ones
@@ -96,9 +96,9 @@ Out of scope:
 ## Primary files and areas
 
 - new remote edge crate or modules
-- `crates/pact-mcp-adapter`
-- `crates/pact-kernel`
-- `crates/pact-core`
+- `crates/arc-mcp-adapter`
+- `crates/arc-kernel`
+- `crates/arc-core`
 - trust-service crates if added
 - `docs`
 
@@ -166,15 +166,15 @@ Responsibilities:
 
 Current status:
 
-- SQLite receipt persistence is shipped in `pact-kernel`
+- SQLite receipt persistence is shipped in `arc-kernel`
 - receipt durability is validated through kernel and CLI tests
 - SQLite revocation persistence plus local and shared-SQLite pluggable capability authorities are now shipped in the kernel
 - deployment wiring for those local stores now reaches `run`, `check`, `mcp serve`, and `mcp serve-http`
-- the CLI now exposes the first local trust administration surface via `pact trust`
+- the CLI now exposes the first local trust administration surface via `arc trust`
 - `--authority-seed-file` now pins issuance identity across runtime restarts and hosted sessions
 - `--authority-db` now allows future-session authority rotation to propagate across hosted nodes that share the same SQLite backend
 - the hosted HTTP runtime now exposes remote trust administration for receipt queries, arbitrary revocation query/control, per-session trust revocation, and authority status/rotation
-- `pact trust serve` now exposes a shared HTTP trust-control service that centralizes capability issuance, authority status/rotation, revocation query/control, and durable receipt ingestion/query
+- `arc trust serve` now exposes a shared HTTP trust-control service that centralizes capability issuance, authority status/rotation, revocation query/control, and durable receipt ingestion/query
 - all CLI/runtime paths can now use that service through `--control-url` and `--control-token`
 - hosted admin APIs now proxy to that service when configured
 - authority rotation is currently scoped to future sessions only, but trusted key history is now preserved so already-issued capabilities remain valid after rotation
@@ -214,7 +214,7 @@ Useful references to study, not copy blindly:
 - RMCP transport-hardening tests for stale sessions and reserved headers
 - MCP authorization model for protected HTTP transports
 
-PACT should copy the shape of the solution where it helps, but keep its own kernel-mediated authority and receipt model.
+ARC should copy the shape of the solution where it helps, but keep its own kernel-mediated authority and receipt model.
 
 ## Dependencies
 
@@ -237,7 +237,7 @@ PACT should copy the shape of the solution where it helps, but keep its own kern
 
 ## Acceptance criteria
 
-- a remote MCP client can initialize, call tools, use nested flows, and retrieve task results through PACT
+- a remote MCP client can initialize, call tools, use nested flows, and retrieve task results through ARC
 - multiple sessions can coexist without corrupting in-flight ownership
 - authenticated remote sessions preserve capability checks and receipt issuance
 - revocation and receipts survive process restart

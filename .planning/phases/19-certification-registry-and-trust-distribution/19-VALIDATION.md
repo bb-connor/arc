@@ -14,17 +14,17 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test` |
-| **Quick run command** | `cargo test -p pact-cli --test certify -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-cli --test certify -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
-| **Admin regression** | `cargo test -p pact-cli --test provider_admin -- --nocapture` |
+| **Admin regression** | `cargo test -p arc-cli --test provider_admin -- --nocapture` |
 
 ## Per-Plan Verification Map
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 19-01 | CERT-01 | `cargo test -p pact-cli --test certify -- --nocapture` |
-| 19-02 | CERT-01, CERT-02 | `cargo test -p pact-cli --test certify -- --nocapture` |
-| 19-03 | CERT-01, CERT-02 | `cargo test -p pact-cli --test certify -- --nocapture` |
+| 19-01 | CERT-01 | `cargo test -p arc-cli --test certify -- --nocapture` |
+| 19-02 | CERT-01, CERT-02 | `cargo test -p arc-cli --test certify -- --nocapture` |
+| 19-03 | CERT-01, CERT-02 | `cargo test -p arc-cli --test certify -- --nocapture` |
 
 ## Coverage Notes
 

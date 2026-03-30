@@ -24,7 +24,7 @@ shared remote evidence analytics.
   inline blob. The signed body binds `policy_id`, `verifier`, validity window,
   signer public key, and the underlying `PassportVerifierPolicy`.
 - Stored verifier policies live in a versioned JSON registry
-  (`pact.passport-verifier-policies.v1`) so local CLI and trust-control can use
+  (`arc.passport-verifier-policies.v1`) so local CLI and trust-control can use
   the same durable source of truth.
 - A challenge may carry either an embedded policy or a `policyRef`, but never
   both at once.
@@ -69,7 +69,7 @@ shared remote evidence analytics.
 - Exact SQLite schema for replay-safe challenge state as long as it binds the
   stored row to the exact challenge payload and enforces one-time consumption.
 - Exact CLI route naming as long as it stays consistent with the existing
-  `pact passport` and `pact trust serve` surfaces.
+  `arc passport` and `arc trust serve` surfaces.
 
 </decisions>
 
@@ -90,24 +90,24 @@ shared remote evidence analytics.
 ## Existing Code Insights
 
 ### Reusable Assets
-- `crates/pact-credentials/src/lib.rs` -- canonical passport, challenge,
+- `crates/arc-credentials/src/lib.rs` -- canonical passport, challenge,
   evaluation, and signed-artifact types
-- `crates/pact-cli/src/passport_verifier.rs` -- registry and replay-store
+- `crates/arc-cli/src/passport_verifier.rs` -- registry and replay-store
   helpers added for this phase
-- `crates/pact-cli/src/passport.rs` -- local/remote CLI flows for policy and
+- `crates/arc-cli/src/passport.rs` -- local/remote CLI flows for policy and
   challenge handling
-- `crates/pact-cli/src/trust_control.rs` -- trust-control verifier policy CRUD,
+- `crates/arc-cli/src/trust_control.rs` -- trust-control verifier policy CRUD,
   challenge create/verify, and federated-issue integration
-- `crates/pact-cli/tests/passport.rs` -- local replay-safe policy-reference
+- `crates/arc-cli/tests/passport.rs` -- local replay-safe policy-reference
   coverage
-- `crates/pact-cli/tests/federated_issue.rs` -- remote replay-safe verifier
+- `crates/arc-cli/tests/federated_issue.rs` -- remote replay-safe verifier
   challenge coverage
-- `crates/pact-cli/tests/provider_admin.rs` -- remote verifier policy admin CRUD
+- `crates/arc-cli/tests/provider_admin.rs` -- remote verifier policy admin CRUD
 
 ### Established Patterns
-- Signed artifacts in PACT bind schema, signer key, validity window, and the
+- Signed artifacts in ARC bind schema, signer key, validity window, and the
   protected body under canonical JSON verification.
-- Local and remote operator surfaces in `pact-cli` usually share Rust types,
+- Local and remote operator surfaces in `arc-cli` usually share Rust types,
   JSON shape, and integration coverage.
 - Security-sensitive verifier behavior fails closed when required storage or
   bound verifier identity is missing.

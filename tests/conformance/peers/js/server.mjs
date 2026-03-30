@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 if (process.argv.includes("--help")) {
-  console.log("PACT JS conformance server scaffold");
+  console.log("ARC JS conformance server scaffold");
   process.exit(0);
 }
 

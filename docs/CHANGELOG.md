@@ -1,4 +1,4 @@
-# PACT Changelog
+# ARC Changelog
 
 ---
 
@@ -6,10 +6,10 @@
 
 ### Production And Standards
 
-- **Release hygiene and structure** (`pact-cli`, packaging, scripts): generated
+- **Release hygiene and structure** (`arc-cli`, packaging, scripts): generated
   Python cache/build artifacts are now excluded from tracked release inputs,
   release-input guard scripts fail fast when they reappear, and oversized CLI
-  admin handling has been split into `crates/pact-cli/src/admin.rs`.
+  admin handling has been split into `crates/arc-cli/src/admin.rs`.
 
 - **Qualification and operator runbooks** (`scripts`, workflows, docs): the
   release lane now explicitly qualifies dashboard, TypeScript package, Python
@@ -38,26 +38,26 @@
 
 ### Federation and Verifier Completion
 
-- **Enterprise federation administration** (`pact-cli`, `pact-core`,
-  `pact-policy`): `pact mcp serve-http` and `pact trust serve` now share an
+- **Enterprise federation administration** (`arc-cli`, `arc-core`,
+  `arc-policy`): `arc mcp serve-http` and `arc trust serve` now share an
   explicit `--enterprise-providers-file` registry for provider-admin records.
   Provider records support `oidc_jwks`, `oauth_introspection`, `scim`, and
   `saml` kinds, preserve provenance and trust-boundary metadata, and stay
   operator-visible with `validation_errors` when incomplete or invalid.
 
-- **Provider-admin CLI and HTTP surfaces** (`pact-cli`, trust-control): Added
-  `pact trust provider list|get|upsert|delete` plus
+- **Provider-admin CLI and HTTP surfaces** (`arc-cli`, trust-control): Added
+  `arc trust provider list|get|upsert|delete` plus
   `GET/PUT/DELETE /v1/federation/providers...` on the trust-control service.
   Operators can now inspect or manage enterprise provider records without
   editing ad hoc bearer settings directly.
 
-- **Enterprise identity audit context** (`pact-core`, `remote_mcp`):
+- **Enterprise identity audit context** (`arc-core`, `remote_mcp`):
   bearer-backed session auth now exposes `enterpriseIdentity` with provider
   id, provider record id, provider kind, federation method, canonical
   principal, stable subject key, tenant, organization, groups, roles,
   `attributeSources`, and `trustMaterialRef`.
 
-- **Enterprise portable-trust admission gating** (`pact-cli`, `pact-policy`):
+- **Enterprise portable-trust admission gating** (`arc-cli`, `arc-policy`):
   federated issue can now evaluate HushSpec origin profiles against enterprise
   provider, tenant, organization, groups, and roles. The enterprise-provider
   lane is explicit: bearer-only observability does not activate it, but once a
@@ -66,37 +66,37 @@
   `enterprise_audit` / `enterpriseAudit` with matched origin profile and
   decision context.
 
-- **Signed verifier policy artifacts** (`pact-credentials`, `pact-cli`):
+- **Signed verifier policy artifacts** (`arc-credentials`, `arc-cli`):
   verifier policy is now a signed reusable document with schema
-  `pact.passport-verifier-policy.v1`, explicit `policy_id`, verifier binding,
+  `arc.passport-verifier-policy.v1`, explicit `policy_id`, verifier binding,
   validity window, and signer public key. Operators can manage these artifacts
-  locally or remotely with `pact passport policy create|verify|list|get|upsert|delete`
+  locally or remotely with `arc passport policy create|verify|list|get|upsert|delete`
   and trust-control verifier policy CRUD endpoints.
 
-- **Replay-safe verifier challenge state** (`pact-cli`, trust-control):
+- **Replay-safe verifier challenge state** (`arc-cli`, trust-control):
   verifier challenges can now be persisted in a SQLite-backed durable store via
   `--verifier-challenge-db`. Stored rows bind `challengeId` to the full
   canonical challenge payload, track `issued` / `consumed` / `expired` state,
   and reject replay after local or remote verifier-side consumption.
 
-- **Local and remote verifier parity** (`pact-cli`, trust-control): local
+- **Local and remote verifier parity** (`arc-cli`, trust-control): local
   `passport challenge create|verify`, remote trust-control challenge create and
   verify, and `trust federated-issue` now all understand stored verifier policy
   references plus shared output fields including `challengeId`, `policyId`,
   `policySource`, `policyEvaluated`, and `replayState`.
 
-- **Multi-issuer passport composition** (`pact-credentials`, `pact-cli`):
+- **Multi-issuer passport composition** (`arc-credentials`, `arc-cli`):
   passport verification, evaluation, presentation, and reputation comparison no
   longer reject same-subject bundles signed by more than one issuer. Verification
   now exposes `issuerCount` and `issuers`, while policy evaluation stays
   per-credential, adds issuer identity to each credential result, and reports
   `matchedIssuers` without inventing any cross-issuer aggregate score.
 
-- **Cross-org shared evidence analytics** (`pact-kernel`, `pact-cli`,
+- **Cross-org shared evidence analytics** (`arc-kernel`, `arc-cli`,
   dashboard): imported federated evidence shares now surface through a shared
   `sharedEvidence` report contract used by `GET /v1/federation/evidence-shares`,
   `GET /v1/reports/operator`, `POST /v1/reputation/compare/{subject_key}`, the
-  new `pact trust evidence-share list` CLI, and dashboard operator/comparison
+  new `arc trust evidence-share list` CLI, and dashboard operator/comparison
   panels. Downstream local receipts now preserve upstream provenance through
   remote share metadata plus `localAnchorCapabilityId`.
 
@@ -108,46 +108,46 @@
 
 ### Enforcement
 
-- **Monetary budget enforcement** (`pact-core`, `pact-kernel`): `ToolGrant`
+- **Monetary budget enforcement** (`arc-core`, `arc-kernel`): `ToolGrant`
   gains `max_cost_per_invocation: Option<MonetaryAmount>` and
   `max_total_cost: Option<MonetaryAmount>`. The Kernel enforces both limits
   atomically via `BudgetStore::try_charge_cost`. All monetary values use u64
   minor units with an ISO 4217 currency code. Overflow is detected with
   `checked_add` and fails closed.
 
-- **DPoP proof-of-possession** (`pact-kernel`): Added `DpopProof`,
+- **DPoP proof-of-possession** (`arc-kernel`): Added `DpopProof`,
   `DpopProofBody`, `DpopNonceStore`, and `verify_dpop_proof`. The 8-field
-  PACT-native DPoP format (`pact.dpop_proof.v1`) binds each invocation to the
+  ARC-native DPoP format (`arc.dpop_proof.v1`) binds each invocation to the
   agent's Ed25519 private key. Enabled per-grant via
   `ToolGrant::dpop_required: Option<bool>`. Default TTL 300s, clock skew
   tolerance 30s, LRU nonce cache capacity 8192.
 
-- **Receipt Merkle checkpointing** (`pact-kernel`): Added `build_checkpoint`,
+- **Receipt Merkle checkpointing** (`arc-kernel`): Added `build_checkpoint`,
   `build_inclusion_proof`, `verify_checkpoint_signature`,
   `KernelCheckpoint`, `KernelCheckpointBody`, and `ReceiptInclusionProof`.
   Checkpoints are triggered every `checkpoint_batch_size` receipts (default
   100, configurable). Each checkpoint commits a batch of canonical receipt
   bytes to a binary Merkle tree and signs the root with the Kernel's keypair.
-  Schema: `pact.checkpoint_statement.v1`.
+  Schema: `arc.checkpoint_statement.v1`.
 
 ### Compliance and Audit
 
-- **Financial receipt metadata** (`pact-core`): Added
+- **Financial receipt metadata** (`arc-core`): Added
   `FinancialReceiptMetadata` struct with 11 fields: `grant_index`,
   `cost_charged`, `currency`, `budget_remaining`, `budget_total`,
   `delegation_depth`, `root_budget_holder`, `payment_reference`,
   `settlement_status`, `cost_breakdown`, and `attempted_cost`. Attached under
-  the `"financial"` key in `PactReceipt::metadata` for all monetary
+  the `"financial"` key in `ArcReceipt::metadata` for all monetary
   invocations. Denial receipts carry `attempted_cost` instead of
   `cost_charged`.
 
-- **Receipt attribution metadata** (`pact-core`, `pact-kernel`): Added
+- **Receipt attribution metadata** (`arc-core`, `arc-kernel`): Added
   canonical `ReceiptAttributionMetadata` under the `"attribution"` metadata
   key. Receipts now persist `subject_key`, `issuer_key`, `delegation_depth`,
   and `grant_index` when available, giving analytics and reputation systems a
   deterministic local join path.
 
-- **Nested flow receipts** (`pact-core`): Added `ChildRequestReceipt` and
+- **Nested flow receipts** (`arc-core`): Added `ChildRequestReceipt` and
   `ChildRequestReceiptBody`. Signed records for sub-operations spawned within
   a parent tool call (sampling, resource reads, elicitation). Fields:
   `session_id`, `parent_request_id`, `request_id`, `operation_kind`,
@@ -156,58 +156,58 @@
 
 ### APIs
 
-- **Receipt query API** (`pact-cli`): New `GET /v1/receipts/query` endpoint
+- **Receipt query API** (`arc-cli`): New `GET /v1/receipts/query` endpoint
   with 9 filter dimensions: `capabilityId`, `toolServer`, `toolName`,
   `outcome`, `since`, `until`, `minCost`, `maxCost`, `agentSubject`. Supports
   cursor-based pagination (`cursor` + `limit`). Maximum page size: 200
   receipts. Response includes `totalCount` (full filtered set), `nextCursor`,
   and `receipts` ordered by `seq` ascending.
 
-- **Agent receipts endpoint** (`pact-cli`): New
+- **Agent receipts endpoint** (`arc-cli`): New
   `GET /v1/agents/{subject_key}/receipts` endpoint for per-agent receipt
   history lookup via hex-encoded Ed25519 public key.
 
-- **Receipt analytics API** (`pact-cli`, `pact-kernel`): New
+- **Receipt analytics API** (`arc-cli`, `arc-kernel`): New
   `GET /v1/receipts/analytics` endpoint providing backend-side aggregates by
   agent, tool, and time window, including reliability, compliance, and budget
   utilization metrics.
 
-- **Operator report API** (`pact-cli`, `pact-kernel`, dashboard): New
+- **Operator report API** (`arc-cli`, `arc-kernel`, dashboard): New
   `GET /v1/reports/operator` endpoint composing activity, cost attribution,
   budget utilization, and compliance/export readiness into one stable operator
   workflow surface. The receipt dashboard now renders these report cards above
   the receipt table.
 
-- **Capability lineage endpoints** (`pact-cli`): New
+- **Capability lineage endpoints** (`arc-cli`): New
   `GET /v1/lineage/{capability_id}` and
   `GET /v1/lineage/{capability_id}/chain` for querying delegation chain
   snapshots.
 
-- **`PACT Certify` alpha CLI** (`pact-cli`, `pact-conformance`): New
-  `pact certify check` command evaluates a conformance scenario/result corpus
+- **`ARC Certify` alpha CLI** (`arc-cli`, `arc-conformance`): New
+  `arc certify check` command evaluates a conformance scenario/result corpus
   against the fail-closed `conformance-all-pass-v1` profile and emits a signed
-  `pact.certify.check.v1` pass/fail artifact. Optional markdown report output
+  `arc.certify.check.v1` pass/fail artifact. Optional markdown report output
   uses the same compatibility report generator as release qualification.
 
 ### SDK
 
-- **`MonetaryAmount` type** (`pact-core`): New struct with `units: u64` and
+- **`MonetaryAmount` type** (`arc-core`): New struct with `units: u64` and
   `currency: String`. Used in `ToolGrant::max_cost_per_invocation` and
   `ToolGrant::max_total_cost`. Forward-compatible with v1.0 tokens via
   `#[serde(default, skip_serializing_if = "Option::is_none")]`.
 
-- **`ToolGrant` attenuation** (`pact-core`): `ToolGrant::is_subset_of` updated
+- **`ToolGrant` attenuation** (`arc-core`): `ToolGrant::is_subset_of` updated
   to respect monetary fields. A child grant is a valid attenuation only if its
   `max_cost_per_invocation` and `max_total_cost` are no greater than the
   parent's corresponding limits.
 
-- **`CapabilityLineage` snapshot** (`pact-kernel`): New
+- **`CapabilityLineage` snapshot** (`arc-kernel`): New
   `CapabilitySnapshot` and `CapabilityLineageError` types. `record_capability_snapshot`
   on `SqliteReceiptStore` captures issuer, subject, and delegation chain at
   token issuance time for the `agentSubject` filter.
 
-- **Manifest pricing authoring and examples** (`pact-mcp-adapter`,
-  `examples/hello-tool`, `pact-ts`): `NativeTool` now exposes pricing helpers
+- **Manifest pricing authoring and examples** (`arc-mcp-adapter`,
+  `examples/hello-tool`, `arc-ts`): `NativeTool` now exposes pricing helpers
   for flat, per-invocation, per-unit, and hybrid quotes. The maintained
   `hello-tool` example publishes manifest pricing, TypeScript manifest types
   preserve the `pricing` field, and `docs/TOOL_PRICING_GUIDE.md` documents how
@@ -216,34 +216,34 @@
 
 ### Trust and Reputation
 
-- **`pact-reputation` crate**: Added a new pure local-scoring workspace crate
+- **`arc-reputation` crate**: Added a new pure local-scoring workspace crate
   that computes deterministic Phase 1 reputation scorecards from normalized
   receipts, capability-lineage records, budget-usage records, and optional
   incident inputs. It ships boundary-pressure, stewardship, least-privilege,
   history-depth, specialization, delegation-hygiene, reliability, and incident
   metrics, preserves `unknown` for unavailable metrics, and renormalizes the
   composite score across the available weights only. The crate does not depend
-  on `pact-kernel`, keeping later issuance-hook integration cycle-free.
+  on `arc-kernel`, keeping later issuance-hook integration cycle-free.
 
-- **Reputation-gated issuance** (`pact-cli`, `pact-policy`): HushSpec
+- **Reputation-gated issuance** (`arc-cli`, `arc-policy`): HushSpec
   `extensions.reputation` now materializes into a runtime issuance policy that
   is enforced by a shared capability-authority wrapper. The wrapper computes a
   subject's local scorecard from persisted receipts, capability-lineage
   snapshots, and budget usage before signing capabilities, enforces TTL,
   operation, invocation, required-constraint, and monetary grant ceilings, and
   persists successful issuance into the lineage index at the same boundary.
-  `pact trust serve --policy ...` now applies the same gate over HTTP.
+  `arc trust serve --policy ...` now applies the same gate over HTTP.
 
-- **Local reputation operator surfaces** (`pact-cli`, `trust-control`): Added
-  `pact reputation local --subject-public-key ...` for direct CLI inspection of
+- **Local reputation operator surfaces** (`arc-cli`, `trust-control`): Added
+  `arc reputation local --subject-public-key ...` for direct CLI inspection of
   local scorecards, plus `GET /v1/reputation/local/:subject_key` on the
   trust-control service. Both surfaces reuse the exact same persisted corpus,
   probationary evaluation, and tier resolution path already used for
   reputation-gated issuance, so operator debugging and issuance enforcement
   stay contractually aligned.
 
-- **OIDC discovery-backed identity federation** (`pact-cli`, `remote_mcp`):
-  `pact mcp serve-http` now supports startup-time OIDC discovery, discovery-backed
+- **OIDC discovery-backed identity federation** (`arc-cli`, `remote_mcp`):
+  `arc mcp serve-http` now supports startup-time OIDC discovery, discovery-backed
   JWKS verification for `EdDSA`, RSA (`RS*`, `PS*`), and EC (`ES256`,
   `ES384`) JWTs, and provider-aware principal mapping for
   Generic/Auth0/Okta/Azure AD claim shapes. JWT admission can now bootstrap
@@ -253,8 +253,8 @@
   user principals from `oid` instead of opaque `sub` values, and trusted JWKS
   key selection is fail-closed on `kid` plus algorithm compatibility.
 
-- **Opaque bearer federation via token introspection** (`pact-cli`,
-  `remote_mcp`): `pact mcp serve-http` now also supports OAuth2 token
+- **Opaque bearer federation via token introspection** (`arc-cli`,
+  `remote_mcp`): `arc mcp serve-http` now also supports OAuth2 token
   introspection for opaque bearer tokens through `--auth-introspection-url`,
   with optional confidential-client auth to the introspection endpoint.
   Introspected tokens feed the same stable principal-to-subject derivation path
@@ -262,42 +262,42 @@
   fail closed on inactive tokens, unsupported token types, or insecure remote
   introspection endpoints.
 
-- **`did:pact` method + resolver** (`pact-did`, `pact-cli`): Added the new
-  `pact-did` workspace crate with self-certifying `did:pact` parsing,
-  canonicalization, and DID Document resolution for any PACT Ed25519 public
+- **`did:arc` method + resolver** (`arc-did`, `arc-cli`): Added the new
+  `arc-did` workspace crate with self-certifying `did:arc` parsing,
+  canonicalization, and DID Document resolution for any ARC Ed25519 public
   key. The resolved document emits a stable `Ed25519VerificationKey2020`
   method, canonical `publicKeyMultibase`, and optional validated
-  `PactReceiptLogService` endpoints. The CLI now exposes this via
-  `pact did resolve --did ...` and `pact did resolve --public-key ...`.
+  `ArcReceiptLogService` endpoints. The CLI now exposes this via
+  `arc did resolve --did ...` and `arc did resolve --public-key ...`.
 
-- **Agent Passport alpha** (`pact-credentials`, `pact-cli`): Added the new
-  `pact-credentials` workspace crate with signed reputation credentials,
+- **Agent Passport alpha** (`arc-credentials`, `arc-cli`): Added the new
+  `arc-credentials` workspace crate with signed reputation credentials,
   single-issuer Agent Passport bundling, offline verification, and filtered
-  presentation helpers. The CLI now exposes `pact passport create`,
-  `pact passport verify`, and `pact passport present`. Passport creation is
+  presentation helpers. The CLI now exposes `arc passport create`,
+  `arc passport verify`, and `arc passport present`. Passport creation is
   grounded in the local reputation corpus plus receipt/checkpoint evidence and
   can fail closed when `--require-checkpoints` is set.
 
-- **Portable verifier policy lane** (`pact-credentials`, `pact-cli`): Added
+- **Portable verifier policy lane** (`arc-credentials`, `arc-cli`): Added
   `PassportVerifierPolicy` plus per-credential policy evaluation in
-  `pact-credentials`, and exposed it through `pact passport evaluate`. A
+  `arc-credentials`, and exposed it through `arc passport evaluate`. A
   relying party can now evaluate a passport against issuer allowlists, metric
   thresholds, checkpoint coverage, receipt-log URL requirements, and
   attestation freshness without custom glue code, while keeping the current
   alpha semantics honest by evaluating credentials independently instead of
   inventing multi-credential aggregation.
 
-- **Challenge-bound passport presentation** (`pact-credentials`, `pact-cli`):
+- **Challenge-bound passport presentation** (`arc-credentials`, `arc-cli`):
   Added portable presentation challenge documents plus holder-signed passport
-  presentation responses. The CLI now exposes `pact passport challenge create`,
-  `pact passport challenge respond`, and `pact passport challenge verify`.
+  presentation responses. The CLI now exposes `arc passport challenge create`,
+  `arc passport challenge respond`, and `arc passport challenge verify`.
   Challenges carry verifier identity, nonce, TTL, selective-disclosure hints,
   and optional embedded verifier policy; responses bind the selected passport
   view to the passport subject DID and support exact expected-challenge
   matching during verification.
 
-- **Local-versus-portable reputation comparison** (`pact-cli`): Added
-  `pact reputation compare --subject-public-key ... --passport ...` as the
+- **Local-versus-portable reputation comparison** (`arc-cli`): Added
+  `arc reputation compare --subject-public-key ... --passport ...` as the
   first operator-facing drift surface between live local reputation and
   portable passport artifacts. The command reuses the exact local inspection
   path plus the exact passport verification/evaluation path, then emits
@@ -305,25 +305,25 @@
   scoring semantics. It also supports trust-service-backed local inspection
   through `--control-url`.
 
-- **A2A adapter skeleton** (`pact-a2a-adapter`): Added the new
-  `pact-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery,
+- **A2A adapter skeleton** (`arc-a2a-adapter`): Added the new
+  `arc-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery,
   preferred-interface selection, and blocking `SendMessage` mediation for both
-  `JSONRPC` and `HTTP+JSON`. The adapter exposes one PACT tool per advertised
+  `JSONRPC` and `HTTP+JSON`. The adapter exposes one ARC tool per advertised
   A2A skill, routes skill intent through the explicit
-  `metadata.pact.targetSkillId` convention, requires HTTPS except for
+  `metadata.arc.targetSkillId` convention, requires HTTPS except for
   localhost test targets, and is verified by direct adapter tests plus an
   end-to-end kernel receipt test.
 
-- **A2A task follow-up support** (`pact-a2a-adapter`): Extended the A2A
-  adapter with adapter-local `get_task` follow-up mode so the same PACT
+- **A2A task follow-up support** (`arc-a2a-adapter`): Extended the A2A
+  adapter with adapter-local `get_task` follow-up mode so the same ARC
   skill-scoped tool can poll A2A `GetTask` over both `JSONRPC` and
-  `HTTP+JSON` after a non-terminal `SendMessage` response. The public PACT
+  `HTTP+JSON` after a non-terminal `SendMessage` response. The public ARC
   tool contract now truthfully exposes snake_case follow-up fields while still
   accepting camelCase aliases for compatibility, rejects mixed send/follow-up
   inputs fail-closed, and is verified by direct transport tests plus a kernel
   end-to-end receipt test for the follow-up path.
 
-- **A2A streaming support** (`pact-a2a-adapter`): Extended the A2A adapter
+- **A2A streaming support** (`arc-a2a-adapter`): Extended the A2A adapter
   with adapter-local `stream: true` opt-in that issues A2A
   `SendStreamingMessage` over both `JSONRPC` and `HTTP+JSON`. The kernel now
   captures each upstream A2A `StreamResponse` as one streamed tool chunk,
@@ -331,7 +331,7 @@
   upstream streams fail closed as incomplete receipts while preserving partial
   stream output for auditability.
 
-- **A2A auth negotiation hardening** (`pact-a2a-adapter`): Extended the A2A
+- **A2A auth negotiation hardening** (`arc-a2a-adapter`): Extended the A2A
   adapter with fail-closed request auth negotiation from Agent Card
   `securitySchemes` / `securityRequirements`. The adapter now satisfies
   declared bearer-style and header API-key requirements from configured
@@ -339,15 +339,15 @@
   or when unsupported schemes such as mTLS are required, and propagates
   interface tenant metadata into `SendMessage` and HTTP `GetTask` requests.
 
-- **A2A subscribe-task support** (`pact-a2a-adapter`): Extended the A2A
-  adapter with adapter-local `subscribe_task` follow-up mode so the same PACT
+- **A2A subscribe-task support** (`arc-a2a-adapter`): Extended the A2A
+  adapter with adapter-local `subscribe_task` follow-up mode so the same ARC
   tool can reattach to live task updates through A2A `SubscribeToTask` over
   both `JSONRPC` and `HTTP+JSON`. The HTTP transport now follows the current
   A2A proto's tenant path semantics instead of a query-string shim, and
   incomplete subscribe streams fail closed as incomplete receipts while
   preserving partial output.
 
-- **A2A task-management hardening** (`pact-a2a-adapter`): Extended the A2A
+- **A2A task-management hardening** (`arc-a2a-adapter`): Extended the A2A
   adapter with adapter-local `cancel_task` plus task push-notification config
   create/get/list/delete over both `JSONRPC` and `HTTP+JSON`. These follow-up
   operations stay inside the normal capability and receipt pipeline, remote
@@ -355,7 +355,7 @@
   `http`, and the shipped coverage now includes direct roundtrip tests plus a
   kernel end-to-end allow-receipt test for `CancelTask`.
 
-- **A2A OAuth/OpenID acquisition** (`pact-a2a-adapter`): Extended the A2A
+- **A2A OAuth/OpenID acquisition** (`arc-a2a-adapter`): Extended the A2A
   adapter so required `oauth2SecurityScheme` and
   `openIdConnectSecurityScheme` bearer flows can be satisfied with configured
   client credentials instead of only a preseeded static bearer token. The
@@ -364,7 +364,7 @@
   when credentials are missing, token endpoints are unsafe, or token types are
   not bearer-compatible.
 
-- **A2A mTLS transport support** (`pact-a2a-adapter`): Extended the A2A
+- **A2A mTLS transport support** (`arc-a2a-adapter`): Extended the A2A
   adapter so required `mtlsSecurityScheme` flows can be satisfied with a
   configured client certificate plus trusted root CA bundle. The adapter now
   performs real client-certificate authentication for Agent Card discovery and
@@ -373,7 +373,7 @@
   other auth flows only receive the credentials their declared requirement set
   actually needs.
 
-- **A2A query/cookie API-key support** (`pact-a2a-adapter`): Extended the A2A
+- **A2A query/cookie API-key support** (`arc-a2a-adapter`): Extended the A2A
   adapter so declared `apiKeySecurityScheme` requirements can now be satisfied
   for `location: query` and `location: cookie`, not just `location: header`.
   The request-auth model now carries headers, query parameters, cookies, and
@@ -382,15 +382,15 @@
   shipped tests now cover both adapter-level negotiation paths plus a kernel
   end-to-end allow-receipt path for query-authenticated invocation.
 
-- **A2A state-transition-history enforcement** (`pact-a2a-adapter`): Hardened
+- **A2A state-transition-history enforcement** (`arc-a2a-adapter`): Hardened
   the A2A lifecycle surface so `historyLength` is only sent on `SendMessage`
   and `GetTask` when the Agent Card explicitly advertises
   `capabilities.stateTransitionHistory = true`. This closes a protocol-truth
-  gap where PACT previously parsed the capability but did not enforce it. The
+  gap where ARC previously parsed the capability but did not enforce it. The
   shipped tests now cover both supported history paths and fail-closed local
   denial when the capability is absent.
 
-- **A2A lifecycle payload validation** (`pact-a2a-adapter`): Hardened the A2A
+- **A2A lifecycle payload validation** (`arc-a2a-adapter`): Hardened the A2A
   adapter so task lifecycle payloads are validated fail-closed instead of only
   being shape-counted. `SendMessage` task responses and `GetTask` results now
   require non-empty `id` plus `status.state`, streamed `statusUpdate` events
@@ -398,23 +398,23 @@
   require `taskId` plus object `artifact`. The shipped tests now cover these
   malformed-payload denial paths directly.
 
-- **Offline evidence verification** (`pact-cli`, `pact-kernel`): Added
-  `pact evidence verify --input <dir>` so exported evidence bundles can be
+- **Offline evidence verification** (`arc-cli`, `arc-kernel`): Added
+  `arc evidence verify --input <dir>` so exported evidence bundles can be
   verified without a running trust-control service. The verifier checks the
   manifest, file hashes, query scope, receipt signatures, checkpoint
   signatures, lineage shape, inclusion proofs, and optional policy attachment.
   The workspace HTTP control-plane harness was also hardened with bind-collision
   retry logic so the full verification/test signal is repeatable again.
 
-- **Identity federation alpha** (`pact-cli`): JWT-authenticated
-  `pact mcp serve-http` sessions can now derive a stable PACT subject from the
+- **Identity federation alpha** (`arc-cli`): JWT-authenticated
+  `arc mcp serve-http` sessions can now derive a stable ARC subject from the
   authenticated enterprise principal when `--identity-federation-seed-file` is
   configured. Principals are canonicalized as `oidc:<issuer>#sub:<sub>` or
   `oidc:<issuer>#client:<client_id>`, the edge derives a deterministic subject
   key from that principal, and the admin session APIs now expose both
   `authContext` and `subjectPublicKey` so the mapping is directly auditable.
 
-- **Identity federation claim propagation** (`pact-cli`, `pact-core`): The
+- **Identity federation claim propagation** (`arc-cli`, `arc-core`): The
   bearer-authenticated federation lane now preserves normalized enterprise
   identity metadata in `authContext.method.federatedClaims` instead of
   discarding it after principal derivation. Verified JWT and introspection
@@ -423,7 +423,7 @@
   provider-aware client/object claim capture for the shipped Generic/Auth0/
   Okta/Azure AD profiles.
 
-- **A2A HTTP Basic auth** (`pact-a2a-adapter`): The adapter now supports
+- **A2A HTTP Basic auth** (`arc-a2a-adapter`): The adapter now supports
   `httpAuthSecurityScheme` with `scheme: basic` in the Agent Card
   `securitySchemes` / `securityRequirements` surface. Operators can configure
   Basic credentials directly, missing required Basic auth fails closed before
@@ -433,32 +433,32 @@
 
 ### Infrastructure
 
-- **`pact-siem` crate**: New crate providing an independent SIEM exporter
+- **`arc-siem` crate**: New crate providing an independent SIEM exporter
   pipeline. `ExporterManager` runs a cursor-pull loop reading from the
-  Kernel's receipt SQLite database (read-only, no `pact-kernel` dependency).
+  Kernel's receipt SQLite database (read-only, no `arc-kernel` dependency).
   Ships with `SplunkExporter` (Splunk HEC) and `ElasticExporter`
   (Elasticsearch `_bulk` API). Includes `DeadLetterQueue` with configurable
   capacity (default 1000) and exponential backoff retry (default 3 attempts,
   base 500ms). Configurable via `SiemConfig`: `poll_interval`,
   `batch_size`, `max_retries`, `base_backoff_ms`, `dlq_capacity`.
 
-- **SQLite budget store** (`pact-kernel`): `SqliteBudgetStore` gains
+- **SQLite budget store** (`arc-kernel`): `SqliteBudgetStore` gains
   `total_cost_charged` column (added via `ALTER TABLE` migration for existing
   databases). LWW merge strategy uses seq-based conflict resolution.
 
-- **Checkpoint persistence** (`pact-kernel`): `SqliteReceiptStore` gains
+- **Checkpoint persistence** (`arc-kernel`): `SqliteReceiptStore` gains
   `store_checkpoint`, `load_checkpoint_by_seq`, and
   `receipts_canonical_bytes_range` methods for checkpoint storage and
   inclusion proof construction.
 
-- **Retention coverage expansion** (`pact-kernel`): archival rotation now
-  copies `pact_child_receipts` and the relevant capability-lineage snapshots,
+- **Retention coverage expansion** (`arc-kernel`): archival rotation now
+  copies `arc_child_receipts` and the relevant capability-lineage snapshots,
   preserving nested-flow and agent-centric auditability in archive files.
 
-- **Federation evidence policies** (`pact-cli`): Added
-  `pact evidence federation-policy create` plus signed bilateral
-  receipt-sharing policy documents. `pact evidence export` can now be
-  constrained by `--federation-policy`, and `pact evidence verify` now checks
+- **Federation evidence policies** (`arc-cli`): Added
+  `arc evidence federation-policy create` plus signed bilateral
+  receipt-sharing policy documents. `arc evidence export` can now be
+  constrained by `--federation-policy`, and `arc evidence verify` now checks
   the signed policy's signature, validity window, proof requirements, and
   query containment rather than treating the policy as a passive attachment.
 
@@ -469,38 +469,38 @@
   uploads a passport JSON file and renders subject match, local score, policy
   acceptance, and per-credential drift.
 
-- **Remote evidence export** (`trust-control`, `pact-cli`): Added
+- **Remote evidence export** (`trust-control`, `arc-cli`): Added
   `POST /v1/evidence/export` so signed bilateral evidence packages can be
   generated live from a trust-control deployment instead of only from a local
-  SQLite checkout. `pact evidence export --control-url ...` now reuses the
+  SQLite checkout. `arc evidence export --control-url ...` now reuses the
   same prepared-query, federation-policy, and proof-requirement contract as
   local export.
 
-- **Federated portable-trust issuance** (`trust-control`, `pact-cli`): Added
-  `POST /v1/federation/capabilities/issue` plus `pact trust federated-issue`
+- **Federated portable-trust issuance** (`trust-control`, `arc-cli`): Added
+  `POST /v1/federation/capabilities/issue` plus `arc trust federated-issue`
   for the first live cross-org portable-trust issuance path. Trust-control now
   consumes an exact expected challenge, requires an embedded verifier policy,
   verifies a challenge-bound passport presentation response, derives the
-  subject key from the presented `did:pact`, and issues one locally signed
+  subject key from the presented `did:arc`, and issues one locally signed
   capability from a supplied capability policy.
 
-- **Federated delegation-policy attenuation** (`trust-control`, `pact-cli`):
-  Added `pact trust federated-delegation-policy-create` plus optional
-  `--delegation-policy` support on `pact trust federated-issue` and
+- **Federated delegation-policy attenuation** (`trust-control`, `arc-cli`):
+  Added `arc trust federated-delegation-policy-create` plus optional
+  `--delegation-policy` support on `arc trust federated-issue` and
   `POST /v1/federation/capabilities/issue`. Trust-control now verifies a
   signed scope/TTL ceiling, requires a locally trusted signer, and persists a
   delegation anchor into capability lineage so the issued capability no longer
   appears as a fresh local root when this path is used.
 
-- **Federated evidence import** (`trust-control`, `pact-cli`, `pact-kernel`):
-  Added `pact evidence import` plus `POST /v1/evidence/import` for consuming
+- **Federated evidence import** (`trust-control`, `arc-cli`, `arc-kernel`):
+  Added `arc evidence import` plus `POST /v1/evidence/import` for consuming
   bilateral evidence packages into a trust-control deployment. Imported
   packages are fully re-verified before persistence, then indexed as
   federated shares for later upstream capability lookup without polluting the
   native local receipt tables.
 
-- **Multi-hop cross-org delegation** (`trust-control`, `pact-cli`,
-  `pact-kernel`): Extended `pact trust federated-issue` and
+- **Multi-hop cross-org delegation** (`trust-control`, `arc-cli`,
+  `arc-kernel`): Extended `arc trust federated-issue` and
   `POST /v1/federation/capabilities/issue` with parent-bound
   `--upstream-capability-id` continuation. A new local delegation anchor can
   now bridge to an imported upstream capability under an exact signed ceiling,

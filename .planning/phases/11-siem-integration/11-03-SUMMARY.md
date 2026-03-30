@@ -1,21 +1,21 @@
 ---
 phase: 11-siem-integration
 plan: "03"
-subsystem: pact-siem
+subsystem: arc-siem
 tags: [siem, exporter, splunk-hec, elasticsearch-bulk, dlq, manager, wiremock, rusqlite, integration-tests]
 dependency_graph:
-  requires: [pact-siem (11-01, 11-02), SplunkHecExporter, ElasticsearchExporter, DeadLetterQueue, ExporterManager]
+  requires: [arc-siem (11-01, 11-02), SplunkHecExporter, ElasticsearchExporter, DeadLetterQueue, ExporterManager]
   provides: [integration test suite for COMP-05 acceptance, splunk_export.rs, elastic_export.rs, dlq_bounded.rs, manager_integration.rs]
   affects: []
 tech_stack:
   added: []
-  patterns: [wiremock MockServer for HTTP mocking, raw rusqlite schema duplication in tests (no pact-kernel import), CountingExporter/FailingExporter test doubles, tokio::sync::watch cancel channel for ExporterManager run loop control]
+  patterns: [wiremock MockServer for HTTP mocking, raw rusqlite schema duplication in tests (no arc-kernel import), CountingExporter/FailingExporter test doubles, tokio::sync::watch cancel channel for ExporterManager run loop control]
 key_files:
   created:
-    - crates/pact-siem/tests/splunk_export.rs
-    - crates/pact-siem/tests/elastic_export.rs
-    - crates/pact-siem/tests/dlq_bounded.rs
-    - crates/pact-siem/tests/manager_integration.rs
+    - crates/arc-siem/tests/splunk_export.rs
+    - crates/arc-siem/tests/elastic_export.rs
+    - crates/arc-siem/tests/dlq_bounded.rs
+    - crates/arc-siem/tests/manager_integration.rs
   modified: []
 decisions:
   - ToggleExporter removed in favor of two-instance test pattern: Arc<ToggleExporter> cannot implement Exporter without an impl-on-Arc pattern; two sequential ExporterManager instances proves the same invariant more clearly
@@ -42,11 +42,11 @@ metrics:
 
 ## Verification Results
 
-1. `cargo test -p pact-siem` -- PASS (11 tests: 3 DLQ + 3 manager + 2 Splunk + 3 Elasticsearch)
+1. `cargo test -p arc-siem` -- PASS (11 tests: 3 DLQ + 3 manager + 2 Splunk + 3 Elasticsearch)
 2. `cargo test --workspace` -- PASS (mcp_serve_http flaky test is pre-existing timing issue, passes in isolation)
 3. `cargo clippy --workspace -- -D warnings` -- PASS (no warnings)
-4. `cargo tree -p pact-kernel | grep reqwest` -- PASS (empty -- kernel isolation verified)
-5. `cargo build -p pact-cli --features siem` -- PASS
+4. `cargo tree -p arc-kernel | grep reqwest` -- PASS (empty -- kernel isolation verified)
+5. `cargo build -p arc-cli --features siem` -- PASS
 
 ## Test Coverage
 
@@ -85,10 +85,10 @@ None -- plan executed exactly as written, except for the ToggleExporter simplifi
 ## Self-Check: PASSED
 
 Files exist on disk:
-- `crates/pact-siem/tests/splunk_export.rs` -- EXISTS
-- `crates/pact-siem/tests/elastic_export.rs` -- EXISTS
-- `crates/pact-siem/tests/dlq_bounded.rs` -- EXISTS
-- `crates/pact-siem/tests/manager_integration.rs` -- EXISTS
+- `crates/arc-siem/tests/splunk_export.rs` -- EXISTS
+- `crates/arc-siem/tests/elastic_export.rs` -- EXISTS
+- `crates/arc-siem/tests/dlq_bounded.rs` -- EXISTS
+- `crates/arc-siem/tests/manager_integration.rs` -- EXISTS
 
 Commits verified in git log:
 - Task 1 commit 6ae08f9 -- VERIFIED

@@ -31,6 +31,6 @@ completed: 2026-03-25
 
 ## Verification
 
-- `cargo test -p pact-mcp-edge -- --nocapture`
-- `cargo test -p pact-a2a-adapter -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture --test-threads=1`
+- `cargo test -p arc-mcp-edge -- --nocapture`
+- `cargo test -p arc-a2a-adapter -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture --test-threads=1`

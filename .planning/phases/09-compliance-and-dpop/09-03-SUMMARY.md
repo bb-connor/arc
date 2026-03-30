@@ -30,7 +30,7 @@ metrics:
 
 # Phase 09 Plan 03: Compliance Document Authoring Summary
 
-Two regulatory compliance mapping documents published in `docs/compliance/`: Colorado SB 24-205 (16 clauses, June 30, 2026 deadline) and EU AI Act Article 19 (19 clauses, August 2, 2026 deadline), both mapping regulatory obligations to PACT test artifacts confirmed passing under `cargo test --workspace`.
+Two regulatory compliance mapping documents published in `docs/compliance/`: Colorado SB 24-205 (16 clauses, June 30, 2026 deadline) and EU AI Act Article 19 (19 clauses, August 2, 2026 deadline), both mapping regulatory obligations to ARC test artifacts confirmed passing under `cargo test --workspace`.
 
 ## Tasks Completed
 
@@ -66,7 +66,7 @@ Two regulatory compliance mapping documents published in `docs/compliance/`: Col
 
 ## Deviations from Plan
 
-None -- plan executed exactly as written. Both documents follow the specified structure (metadata, executive summary, clause mapping table with Test File and Test Function columns, verification section). All referenced tests were confirmed passing via `cargo test -p pact-kernel` before authoring the documents.
+None -- plan executed exactly as written. Both documents follow the specified structure (metadata, executive summary, clause mapping table with Test File and Test Function columns, verification section). All referenced tests were confirmed passing via `cargo test -p arc-kernel` before authoring the documents.
 
 ## Tests Referenced
 
@@ -74,46 +74,46 @@ None -- plan executed exactly as written. Both documents follow the specified st
 
 | Test Function | Test File | Clause |
 |---------------|-----------|--------|
-| `sign_and_verify_manifest` | `crates/pact-manifest/src/lib.rs` | §6-1-1703(1)(a) -- material limitations disclosure |
-| `all_calls_produce_verified_receipts` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(1)(b) -- AI output records |
-| `retention_rotates_at_time_boundary` | `crates/pact-kernel/tests/retention.rs` | §6-1-1703(2)(a) -- configurable retention |
-| `retention_rotates_at_size_boundary` | `crates/pact-kernel/tests/retention.rs` | §6-1-1703(2)(a) -- size-based rotation |
-| `archived_receipt_verifies_against_checkpoint` | `crates/pact-kernel/tests/retention.rs` | §6-1-1703(2)(b) -- records verifiable after retention |
-| `archive_preserves_checkpoint_rows` | `crates/pact-kernel/tests/retention.rs` | §6-1-1703(2)(b) -- archive integrity |
-| `all_calls_produce_verified_receipts` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(3) -- decision audit trail |
-| `monetary_denial_receipt_contains_financial_metadata` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(3) -- deny records |
-| `build_checkpoint_signature_verifies` | `crates/pact-kernel/src/checkpoint.rs` | §6-1-1703(4) -- tamper-evident storage |
-| `inclusion_proof_verifies_for_leaf_n` | `crates/pact-kernel/src/checkpoint.rs` | §6-1-1703(4) -- individual receipt inclusion |
-| `dpop_valid_proof_accepted` | `crates/pact-kernel/tests/dpop.rs` | §6-1-1703(5) -- proof of possession |
-| `dpop_wrong_action_hash_rejected` | `crates/pact-kernel/tests/dpop.rs` | §6-1-1703(5) -- cross-invocation replay prevention |
-| `dpop_wrong_agent_key_rejected` | `crates/pact-kernel/tests/dpop.rs` | §6-1-1703(5) -- agent identity binding |
-| `monetary_full_pipeline_three_invocations_third_denied` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(6) -- budget accountability |
-| `monetary_allow_receipt_contains_financial_metadata` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(6) -- monetary allow evidence |
-| `checkpoint_triggers_at_100_receipts` | `crates/pact-kernel/src/lib.rs` | §6-1-1703(7) -- checkpoint cadence |
+| `sign_and_verify_manifest` | `crates/arc-manifest/src/lib.rs` | §6-1-1703(1)(a) -- material limitations disclosure |
+| `all_calls_produce_verified_receipts` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(1)(b) -- AI output records |
+| `retention_rotates_at_time_boundary` | `crates/arc-kernel/tests/retention.rs` | §6-1-1703(2)(a) -- configurable retention |
+| `retention_rotates_at_size_boundary` | `crates/arc-kernel/tests/retention.rs` | §6-1-1703(2)(a) -- size-based rotation |
+| `archived_receipt_verifies_against_checkpoint` | `crates/arc-kernel/tests/retention.rs` | §6-1-1703(2)(b) -- records verifiable after retention |
+| `archive_preserves_checkpoint_rows` | `crates/arc-kernel/tests/retention.rs` | §6-1-1703(2)(b) -- archive integrity |
+| `all_calls_produce_verified_receipts` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(3) -- decision audit trail |
+| `monetary_denial_receipt_contains_financial_metadata` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(3) -- deny records |
+| `build_checkpoint_signature_verifies` | `crates/arc-kernel/src/checkpoint.rs` | §6-1-1703(4) -- tamper-evident storage |
+| `inclusion_proof_verifies_for_leaf_n` | `crates/arc-kernel/src/checkpoint.rs` | §6-1-1703(4) -- individual receipt inclusion |
+| `dpop_valid_proof_accepted` | `crates/arc-kernel/tests/dpop.rs` | §6-1-1703(5) -- proof of possession |
+| `dpop_wrong_action_hash_rejected` | `crates/arc-kernel/tests/dpop.rs` | §6-1-1703(5) -- cross-invocation replay prevention |
+| `dpop_wrong_agent_key_rejected` | `crates/arc-kernel/tests/dpop.rs` | §6-1-1703(5) -- agent identity binding |
+| `monetary_full_pipeline_three_invocations_third_denied` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(6) -- budget accountability |
+| `monetary_allow_receipt_contains_financial_metadata` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(6) -- monetary allow evidence |
+| `checkpoint_triggers_at_100_receipts` | `crates/arc-kernel/src/lib.rs` | §6-1-1703(7) -- checkpoint cadence |
 
 ### EU AI Act Article 19 (19 clause mappings)
 
 | Test Function | Test File | Article/Annex |
 |---------------|-----------|---------------|
-| `all_calls_produce_verified_receipts` | `crates/pact-kernel/src/lib.rs` | Article 19(1) -- automatic logging |
-| `kernel_persists_tool_receipts_to_sqlite_store` | `crates/pact-kernel/src/lib.rs` | Article 19(1) -- traceability |
-| `monetary_denial_receipt_contains_financial_metadata` | `crates/pact-kernel/src/lib.rs` | Article 19(1) -- denial traceability |
-| `sign_and_verify_manifest` | `crates/pact-manifest/src/lib.rs` | Article 19(2) -- logging capability description |
-| `retention_rotates_at_time_boundary` | `crates/pact-kernel/tests/retention.rs` | Annex IV Section 2(g) -- record retention |
-| `retention_rotates_at_size_boundary` | `crates/pact-kernel/tests/retention.rs` | Annex IV Section 2(g) -- size-based rotation |
-| `archived_receipt_verifies_against_checkpoint` | `crates/pact-kernel/tests/retention.rs` | Annex IV Section 2(g) -- verifiable after archival |
-| `archive_preserves_checkpoint_rows` | `crates/pact-kernel/tests/retention.rs` | Annex IV Section 2(g) -- checkpoint integrity |
-| `build_checkpoint_signature_verifies` | `crates/pact-kernel/src/checkpoint.rs` | Annex IV Section 7 -- tamper-evident audit |
-| `inclusion_proof_verifies_for_leaf_n` | `crates/pact-kernel/src/checkpoint.rs` | Annex IV Section 7 -- individual inclusion proof |
-| `checkpoint_triggers_at_100_receipts` | `crates/pact-kernel/src/lib.rs` | Annex IV Section 7 -- checkpoint cadence |
-| `inclusion_proof_verifies_against_stored_checkpoint` | `crates/pact-kernel/src/lib.rs` | Annex IV Section 7 -- persisted inclusion proof |
-| `all_calls_produce_verified_receipts` | `crates/pact-kernel/src/lib.rs` | Article 14 -- human oversight: attributable decisions |
-| `dpop_valid_proof_accepted` | `crates/pact-kernel/tests/dpop.rs` | Article 14 -- proof of possession |
-| `dpop_nonce_replay_within_ttl_rejected` | `crates/pact-kernel/tests/dpop.rs` | Article 14 -- replay prevention |
-| `dpop_wrong_agent_key_rejected` | `crates/pact-kernel/tests/dpop.rs` | Article 14 -- agent identity binding |
-| `dpop_expired_proof_rejected` | `crates/pact-kernel/tests/dpop.rs` | Article 14 -- freshness of evidence |
-| `monetary_full_pipeline_three_invocations_third_denied` | `crates/pact-kernel/src/lib.rs` | Article 9 -- monetary risk management |
-| `monetary_allow_receipt_contains_financial_metadata` | `crates/pact-kernel/src/lib.rs` | Article 9 -- monetary allow evidence |
+| `all_calls_produce_verified_receipts` | `crates/arc-kernel/src/lib.rs` | Article 19(1) -- automatic logging |
+| `kernel_persists_tool_receipts_to_sqlite_store` | `crates/arc-kernel/src/lib.rs` | Article 19(1) -- traceability |
+| `monetary_denial_receipt_contains_financial_metadata` | `crates/arc-kernel/src/lib.rs` | Article 19(1) -- denial traceability |
+| `sign_and_verify_manifest` | `crates/arc-manifest/src/lib.rs` | Article 19(2) -- logging capability description |
+| `retention_rotates_at_time_boundary` | `crates/arc-kernel/tests/retention.rs` | Annex IV Section 2(g) -- record retention |
+| `retention_rotates_at_size_boundary` | `crates/arc-kernel/tests/retention.rs` | Annex IV Section 2(g) -- size-based rotation |
+| `archived_receipt_verifies_against_checkpoint` | `crates/arc-kernel/tests/retention.rs` | Annex IV Section 2(g) -- verifiable after archival |
+| `archive_preserves_checkpoint_rows` | `crates/arc-kernel/tests/retention.rs` | Annex IV Section 2(g) -- checkpoint integrity |
+| `build_checkpoint_signature_verifies` | `crates/arc-kernel/src/checkpoint.rs` | Annex IV Section 7 -- tamper-evident audit |
+| `inclusion_proof_verifies_for_leaf_n` | `crates/arc-kernel/src/checkpoint.rs` | Annex IV Section 7 -- individual inclusion proof |
+| `checkpoint_triggers_at_100_receipts` | `crates/arc-kernel/src/lib.rs` | Annex IV Section 7 -- checkpoint cadence |
+| `inclusion_proof_verifies_against_stored_checkpoint` | `crates/arc-kernel/src/lib.rs` | Annex IV Section 7 -- persisted inclusion proof |
+| `all_calls_produce_verified_receipts` | `crates/arc-kernel/src/lib.rs` | Article 14 -- human oversight: attributable decisions |
+| `dpop_valid_proof_accepted` | `crates/arc-kernel/tests/dpop.rs` | Article 14 -- proof of possession |
+| `dpop_nonce_replay_within_ttl_rejected` | `crates/arc-kernel/tests/dpop.rs` | Article 14 -- replay prevention |
+| `dpop_wrong_agent_key_rejected` | `crates/arc-kernel/tests/dpop.rs` | Article 14 -- agent identity binding |
+| `dpop_expired_proof_rejected` | `crates/arc-kernel/tests/dpop.rs` | Article 14 -- freshness of evidence |
+| `monetary_full_pipeline_three_invocations_third_denied` | `crates/arc-kernel/src/lib.rs` | Article 9 -- monetary risk management |
+| `monetary_allow_receipt_contains_financial_metadata` | `crates/arc-kernel/src/lib.rs` | Article 9 -- monetary allow evidence |
 
 ## Compliance Coverage
 
@@ -124,8 +124,8 @@ None -- plan executed exactly as written. Both documents follow the specified st
 ## Self-Check: PASSED
 
 **Files exist:**
-- `/Users/connor/Medica/backbay/standalone/pact/docs/compliance/colorado-sb-24-205.md` -- 16 clause entries, Clause Mapping table, Verification section
-- `/Users/connor/Medica/backbay/standalone/pact/docs/compliance/eu-ai-act-article-19.md` -- 19 clause entries, Clause Mapping table, Verification section
+- `/Users/connor/Medica/backbay/standalone/arc/docs/compliance/colorado-sb-24-205.md` -- 16 clause entries, Clause Mapping table, Verification section
+- `/Users/connor/Medica/backbay/standalone/arc/docs/compliance/eu-ai-act-article-19.md` -- 19 clause entries, Clause Mapping table, Verification section
 
 **Commits exist:**
 - `3859e2a` -- Colorado SB 24-205 compliance document (verified in git log)
@@ -133,5 +133,5 @@ None -- plan executed exactly as written. Both documents follow the specified st
 
 **Tests pass:**
 - `cargo test --workspace` -- all suites passed, 0 failures
-- `cargo test -p pact-kernel -- retention` -- 4 passed
-- `cargo test -p pact-kernel -- dpop` -- 7 passed
+- `cargo test -p arc-kernel -- retention` -- 4 passed
+- `cargo test -p arc-kernel -- dpop` -- 7 passed

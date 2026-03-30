@@ -6,7 +6,7 @@
 
 ## Context
 
-PACT capability tokens needed a way to express monetary spending limits for
+ARC capability tokens needed a way to express monetary spending limits for
 tool invocations. Requirements were:
 
 1. Avoid floating-point precision issues in financial arithmetic.
@@ -89,7 +89,7 @@ setting tight total budgets must account for this bound when choosing
 credit operation. If a tool call succeeds but the downstream settlement fails,
 the Kernel does not automatically reverse the charge. Settlement status is
 tracked as an advisory field in `FinancialReceiptMetadata::settlement_status`
-for external systems, but the PACT kernel enforces budgets based on committed
+for external systems, but the ARC kernel enforces budgets based on committed
 charges only.
 
 ## Consequences

@@ -10,7 +10,7 @@
         "structure_valid": true
       },
       "id": "valid_signed_manifest",
-      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"ARC_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"arc.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
       "signed_manifest": {
         "manifest": {
           "description": "Manifest vector for bindings-core SDK fixtures",
@@ -18,7 +18,7 @@
           "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
           "required_permissions": {
             "environment_variables": [
-              "PACT_ENV"
+              "ARC_ENV"
             ],
             "network_hosts": [
               "api.example.com"
@@ -30,7 +30,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "pact.manifest.v1",
+          "schema": "arc.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -61,7 +61,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "af32a81f57f258c0aec92de0972296cddc8a7b47db1148d5cd53b85223dbf869835903e6d09a80a6635371c78081dc6061eb53f574458335048a05c7ec0df00b",
+        "signature": "964193623d9a3bd727ffc992c16c5c9ba4db93030f3f0e59883010f59356f8c6a7494df369c6e85a605d0a6095e0fdeeb895ee855bb2a74a89b8c6e81154df03",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -74,7 +74,7 @@
         "structure_valid": true
       },
       "id": "tampered_manifest_signature",
-      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.1\"}",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"ARC_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"arc.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.1\"}",
       "signed_manifest": {
         "manifest": {
           "description": "Manifest vector for bindings-core SDK fixtures",
@@ -82,7 +82,7 @@
           "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
           "required_permissions": {
             "environment_variables": [
-              "PACT_ENV"
+              "ARC_ENV"
             ],
             "network_hosts": [
               "api.example.com"
@@ -94,7 +94,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "pact.manifest.v1",
+          "schema": "arc.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -125,7 +125,7 @@
           ],
           "version": "1.0.1"
         },
-        "signature": "af32a81f57f258c0aec92de0972296cddc8a7b47db1148d5cd53b85223dbf869835903e6d09a80a6635371c78081dc6061eb53f574458335048a05c7ec0df00b",
+        "signature": "964193623d9a3bd727ffc992c16c5c9ba4db93030f3f0e59883010f59356f8c6a7494df369c6e85a605d0a6095e0fdeeb895ee855bb2a74a89b8c6e81154df03",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -138,7 +138,7 @@
         "structure_valid": true
       },
       "id": "mismatched_embedded_public_key",
-      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a\",\"required_permissions\":{\"environment_variables\":[\"ARC_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"arc.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
       "signed_manifest": {
         "manifest": {
           "description": "Manifest vector for bindings-core SDK fixtures",
@@ -146,7 +146,7 @@
           "public_key": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
           "required_permissions": {
             "environment_variables": [
-              "PACT_ENV"
+              "ARC_ENV"
             ],
             "network_hosts": [
               "api.example.com"
@@ -158,7 +158,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "pact.manifest.v1",
+          "schema": "arc.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -189,7 +189,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "23aa191579af6d0bcf537fbc938ad682f1cdbbc631e7c241f3062c2b1a2d085ba7e5d79150d0f5150e6cb1236ddd31552a2b443a1928b01da12409309c77640b",
+        "signature": "1574eb6bb237c709e88be2eec2014782ad28264f74950260c5734dd887a6a640c68da13e95b6d211faa4719d86f546dabb685ed355107aed7367a42d5fa61509",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -202,7 +202,7 @@
         "structure_valid": false
       },
       "id": "duplicate_tool_name_manifest",
-      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da\",\"required_permissions\":{\"environment_variables\":[\"ARC_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"arc.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
       "signed_manifest": {
         "manifest": {
           "description": "Manifest vector for bindings-core SDK fixtures",
@@ -210,7 +210,7 @@
           "public_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
           "required_permissions": {
             "environment_variables": [
-              "PACT_ENV"
+              "ARC_ENV"
             ],
             "network_hosts": [
               "api.example.com"
@@ -222,7 +222,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "pact.manifest.v1",
+          "schema": "arc.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -278,7 +278,7 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "42fe333cf43dca48741da14a2d287e6ba07b1efe680b9a965a5be40d829e2bd700a87b43a1c4f352b7b181b383df01638550770a9baabf5588fc66820ebc1a08",
+        "signature": "9a0063fc738f5667bfd3d5d8638752885727a458e78870cd88cc437b747448a5ad971d751a90d702bbc34523972a8402bf7b98db7e37c6ad09ab9de046337d06",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     },
@@ -291,7 +291,7 @@
         "structure_valid": true
       },
       "id": "invalid_embedded_public_key",
-      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"PACT_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"pact.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_write\",\"has_side_effects\":true,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
+      "manifest_body_canonical_json": "{\"description\":\"Manifest vector for bindings-core SDK fixtures\",\"name\":\"Bindings Demo\",\"public_key\":\"not-a-public-key\",\"required_permissions\":{\"environment_variables\":[\"ARC_ENV\"],\"network_hosts\":[\"api.example.com\"],\"read_paths\":[\"/workspace\"],\"write_paths\":[\"/workspace/output\"]},\"schema\":\"arc.manifest.v1\",\"server_id\":\"srv-bindings-demo\",\"tools\":[{\"description\":\"Tool definition for file_read\",\"has_side_effects\":false,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"fast\",\"name\":\"file_read\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}},{\"description\":\"Tool definition for file_write\",\"has_side_effects\":true,\"input_schema\":{\"properties\":{\"path\":{\"type\":\"string\"}},\"required\":[\"path\"],\"type\":\"object\"},\"latency_hint\":\"moderate\",\"name\":\"file_write\",\"output_schema\":{\"properties\":{\"ok\":{\"type\":\"boolean\"}},\"type\":\"object\"}}],\"version\":\"1.0.0\"}",
       "signed_manifest": {
         "manifest": {
           "description": "Manifest vector for bindings-core SDK fixtures",
@@ -299,7 +299,7 @@
           "public_key": "not-a-public-key",
           "required_permissions": {
             "environment_variables": [
-              "PACT_ENV"
+              "ARC_ENV"
             ],
             "network_hosts": [
               "api.example.com"
@@ -311,7 +311,7 @@
               "/workspace/output"
             ]
           },
-          "schema": "pact.manifest.v1",
+          "schema": "arc.manifest.v1",
           "server_id": "srv-bindings-demo",
           "tools": [
             {
@@ -367,12 +367,12 @@
           ],
           "version": "1.0.0"
         },
-        "signature": "66438735e8c0a31823afe6aa4c469807f1601e533ae23b53ba48b8ac2c118d99931cd30bc7330cd5d1000a616ce22760970290942ccbdd485d2a68f381acc40f",
+        "signature": "7769bb549022661719a58c0dcf239f60cbcc3ae3726fea5bcd9d7d7847a02c5069ac7cbe9c4cde6b4d0cc8c4d137c6454d47d060a0d75ca0786e90bc5cabf504",
         "signer_key": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da"
       }
     }
   ],
-  "generated_by": "pact-bindings-core",
+  "generated_by": "arc-bindings-core",
   "server_seed_hex": "1515151515151515151515151515151515151515151515151515151515151515",
   "version": 1
 }

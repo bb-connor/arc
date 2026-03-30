@@ -8,7 +8,7 @@ Make the hosted remote MCP runtime reconnect-safe, resumable where intended, and
 
 ### Remote HTTP admission and request handling already exist
 
-- `crates/pact-cli/src/remote_mcp.rs` exposes `/mcp` as `POST`, `GET`, and `DELETE`, but only `POST` currently handles MCP traffic; `GET` returns `405 Method Not Allowed` with `Allow: POST, DELETE`.
+- `crates/arc-cli/src/remote_mcp.rs` exposes `/mcp` as `POST`, `GET`, and `DELETE`, but only `POST` currently handles MCP traffic; `GET` returns `405 Method Not Allowed` with `Allow: POST, DELETE`.
 - `handle_post()` authenticates the request, requires `Accept` to contain both `application/json` and `text/event-stream`, requires `Content-Type: application/json`, and parses exactly one JSON-RPC message per request.
 - `initialize` is special-cased: `handle_initialize_post()` spawns a new session, buffers the initialization event stream until the terminal response, and only then inserts the session into the in-memory map and returns `MCP-Session-Id`.
 - Post-initialize requests require `MCP-Session-Id`, matching auth context, and matching negotiated protocol version before they are routed into the session worker.
@@ -22,13 +22,13 @@ Make the hosted remote MCP runtime reconnect-safe, resumable where intended, and
 
 ### Session ownership is per-session and process-heavy
 
-- `RemoteSessionFactory::spawn_session()` creates a fresh `AdaptedMcpServer::from_command(...)`, a fresh kernel, a fresh `PactMcpEdge`, fresh capability issuance, and a dedicated thread running `edge.serve_message_channels(...)` for every remote session.
+- `RemoteSessionFactory::spawn_session()` creates a fresh `AdaptedMcpServer::from_command(...)`, a fresh kernel, a fresh `ArcMcpEdge`, fresh capability issuance, and a dedicated thread running `edge.serve_message_channels(...)` for every remote session.
 - Session state is stored in `RemoteAppState.sessions: HashMap<String, Arc<RemoteSession>>`.
 - Deleting a session only removes it from that map. There is no explicit drain handshake, worker shutdown signal, lease expiry, or stale-session sweep in the remote runtime.
 
 ### Test coverage is good for the current transport, not for the missing hardening work
 
-- `crates/pact-cli/tests/mcp_serve_http.rs` already covers initialize/session issuance, auth enforcement, session reuse, delete semantics, multi-session isolation, nested sampling over HTTP SSE, control-service integration, roots negotiation, and authority rotation behavior.
+- `crates/arc-cli/tests/mcp_serve_http.rs` already covers initialize/session issuance, auth enforcement, session reuse, delete semantics, multi-session isolation, nested sampling over HTTP SSE, control-service integration, roots negotiation, and authority rotation behavior.
 - There is no coverage for standalone GET-based SSE streams, replay/resume cursors, stale-session expiry, drain windows, or hosted ownership broader than one wrapped subprocess per session.
 
 ## Concrete Gaps
@@ -67,15 +67,15 @@ That is simple and isolates well, but it is expensive and constrains hosted scal
 
 ### Remote runtime / transport
 
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
 
 ### Session / lifecycle substrate
 
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-core/src/session.rs`
 
 ### Scope / plan docs
 

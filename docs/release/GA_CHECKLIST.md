@@ -1,7 +1,7 @@
 # GA Checklist
 
 Use this checklist before claiming general-availability readiness for the
-current production candidate.
+current `v2.8 Risk, Attestation, and Launch Closure` launch candidate.
 
 - [x] `./scripts/ci-workspace.sh` passes
 - [x] `./scripts/check-sdk-parity.sh` passes
@@ -13,6 +13,8 @@ current production candidate.
 - [x] Go module release qualification is green
 - [x] trust-control deployment, backup/restore, upgrade, and rollback are documented
 - [x] hosted edge admin and health diagnostics are documented
+- [x] formal/spec launch evidence boundary is explicit in protocol and release docs
+- [x] partner-proof materials are updated to the current ARC surface
 - [x] `spec/PROTOCOL.md` reflects the shipped repository profile
 - [x] standards-submission drafts exist for receipts and portable trust
 - [x] README and SDK docs align to the current production-candidate contract

@@ -9,19 +9,19 @@ Build the first real E8 Slice A execution plan:
 - spec-fixture coverage
 - generated compatibility reporting
 
-The purpose is not to prove that PACT passes its own tests.
+The purpose is not to prove that ARC passes its own tests.
 
 The purpose is to prove that:
 
-- stock external MCP peers can interoperate with PACT
-- PACT stays aligned with the MCP spec as it evolves
+- stock external MCP peers can interoperate with ARC
+- ARC stays aligned with the MCP spec as it evolves
 - compatibility claims are generated from artifacts instead of prose
 
 ## Why this comes next
 
-PACT's remaining blockers are now adoption and proof, not missing core runtime primitives.
+ARC's remaining blockers are now adoption and proof, not missing core runtime primitives.
 
-The repo already has strong local integration coverage in `crates/pact-cli/tests`, especially:
+The repo already has strong local integration coverage in `crates/arc-cli/tests`, especially:
 
 - `mcp_serve.rs`
 - `mcp_serve_http.rs`
@@ -51,34 +51,34 @@ That includes expected gaps.
 
 If a scenario is intentionally tracked as an expected failure for a specific deployment shape, the generated matrix should surface it as `xfail`, not hide it in prose or flatten it into an undifferentiated failure.
 
-### 2. Separate peer interoperability from PACT self-tests
+### 2. Separate peer interoperability from ARC self-tests
 
 Keep three layers distinct:
 
-- local PACT integration tests
+- local ARC integration tests
 - external peer interoperability tests
 - versioned spec-scenario conformance tests
 
 That separation prevents an external-peer failure from being misread as a core runtime regression.
 
-### 3. Test both PACT deployment shapes
+### 3. Test both ARC deployment shapes
 
 The harness must cover:
 
 - wrapped MCP mode
-- native PACT-backed MCP edge mode
+- native ARC-backed MCP edge mode
 - remote HTTP hosting where relevant
 
 If a scenario only works on one path, the report should say that explicitly.
 
 ### 4. Preserve security semantics in the report
 
-PACT is not only an MCP shim.
+ARC is not only an MCP shim.
 
 The harness should record both:
 
 - MCP compatibility outcome
-- PACT-specific trust outcome when relevant
+- ARC-specific trust outcome when relevant
 
 Examples:
 
@@ -90,7 +90,7 @@ Examples:
 
 Scenarios should carry spec-version metadata.
 
-That lets PACT track:
+That lets ARC track:
 
 - current latest MCP behavior
 - older compatibility requirements where still relevant
@@ -109,7 +109,7 @@ That lets PACT track:
 
 ## Out of scope
 
-- native PACT authoring SDK
+- native ARC authoring SDK
 - migration examples
 - transport redesign
 - multi-region conformance infrastructure
@@ -144,7 +144,7 @@ tests/
       .gitkeep
 
 crates/
-  pact-conformance/
+  arc-conformance/
     src/
       lib.rs
       scenario.rs
@@ -156,15 +156,15 @@ crates/
 
 Notes:
 
-- `pact-conformance` should own scenario loading, report generation, and peer process orchestration.
-- The existing `pact-cli/tests` suite should remain intact and continue to act as the implementation-focused integration suite.
-- External peer assets should live under `tests/conformance/peers`, not inside `crates/pact-cli/tests`.
+- `arc-conformance` should own scenario loading, report generation, and peer process orchestration.
+- The existing `arc-cli/tests` suite should remain intact and continue to act as the implementation-focused integration suite.
+- External peer assets should live under `tests/conformance/peers`, not inside `crates/arc-cli/tests`.
 
 ## Test Layers
 
 ### Layer 1: local contract tests
 
-Keep the current PACT-controlled integration tests as the fast correctness layer.
+Keep the current ARC-controlled integration tests as the fast correctness layer.
 
 Primary purpose:
 
@@ -173,23 +173,23 @@ Primary purpose:
 
 Existing assets to reuse:
 
-- `crates/pact-cli/tests/mcp_serve.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-cli/tests/mcp_auth_server.rs`
-- `crates/pact-cli/tests/trust_cluster.rs`
+- `crates/arc-cli/tests/mcp_serve.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-cli/tests/mcp_auth_server.rs`
+- `crates/arc-cli/tests/trust_cluster.rs`
 
 ### Layer 2: peer interoperability tests
 
-Run real JS and Python peers against PACT.
+Run real JS and Python peers against ARC.
 
 Initial target permutations:
 
-- JS client -> PACT stdio-wrapped server
-- JS client -> PACT remote HTTP edge
-- Python client -> PACT stdio-wrapped server
-- Python client -> PACT remote HTTP edge
-- PACT client/wrapper -> JS server
-- PACT client/wrapper -> Python server
+- JS client -> ARC stdio-wrapped server
+- JS client -> ARC remote HTTP edge
+- Python client -> ARC stdio-wrapped server
+- Python client -> ARC remote HTTP edge
+- ARC client/wrapper -> JS server
+- ARC client/wrapper -> Python server
 
 This layer proves that wire behavior and lifecycle behavior are not only self-consistent, but interoperable.
 
@@ -257,7 +257,7 @@ Recommended top-level areas:
 - `remote`
 - `trust_extensions`
 
-`trust_extensions` should be clearly separated from core MCP pass/fail so the matrix does not blur standard compliance with PACT-native guarantees.
+`trust_extensions` should be clearly separated from core MCP pass/fail so the matrix does not blur standard compliance with ARC-native guarantees.
 
 ## Initial Scenario Waves
 
@@ -310,7 +310,7 @@ Scenarios:
 - wrong audience rejection
 - session reuse / stale session behavior
 
-## Wave 4: PACT-specific trust verification
+## Wave 4: ARC-specific trust verification
 
 Scenarios:
 
@@ -344,8 +344,8 @@ Suggested status values:
 
 Suggested dimensions:
 
-- peer: `js`, `python`, `rust-reference`, `pact-self`
-- role: `client_to_pact_server`, `pact_client_to_server`
+- peer: `js`, `python`, `rust-reference`, `arc-self`
+- role: `client_to_arc_server`, `arc_client_to_server`
 - mode: `wrapped_stdio`, `native_stdio`, `remote_http`
 
 ## CI Structure
@@ -385,7 +385,7 @@ Use a staged CI model.
 - the repo contains a fixture format, not only ad hoc tests
 - at least one JS peer and one Python peer run in CI
 - the first generated matrix is committed as an artifact or report output
-- the report distinguishes MCP-core scenarios from PACT-extension scenarios
+- the report distinguishes MCP-core scenarios from ARC-extension scenarios
 - failures are localized by area and peer, not buried inside one large integration test
 
 ## Risks
@@ -410,7 +410,7 @@ Mitigation:
 
 Mitigation:
 
-- separate MCP-core from PACT-specific assertions
+- separate MCP-core from ARC-specific assertions
 - record exact scenario IDs and versions in artifacts
 - use machine-readable statuses and only derive Markdown from them
 
@@ -420,7 +420,7 @@ Mitigation:
 2. `tests/conformance/scenarios/` with Wave 1 scenarios
 3. `tests/conformance/peers/js/`
 4. `tests/conformance/peers/python/`
-5. `crates/pact-conformance` runner
+5. `crates/arc-conformance` runner
 6. generated `docs/reports/compatibility-matrix.md`
 
 ## Bottom Line
@@ -429,7 +429,7 @@ The first E8 slice should not start by polishing SDK ergonomics.
 
 It should start by building a harness that can answer, continuously and with artifacts:
 
-- which MCP scenarios PACT passes
+- which MCP scenarios ARC passes
 - with which peers
 - over which transports
 - in which deployment modes

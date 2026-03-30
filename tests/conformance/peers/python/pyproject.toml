@@ -1,7 +1,7 @@
 [project]
-name = "pact-conformance-python-peer"
+name = "arc-conformance-python-peer"
 version = "0.1.0"
-description = "Python peer scaffold for the PACT conformance harness"
+description = "Python peer scaffold for the ARC conformance harness"
 requires-python = ">=3.11"
 dependencies = ["httpx>=0.28,<1"]
 

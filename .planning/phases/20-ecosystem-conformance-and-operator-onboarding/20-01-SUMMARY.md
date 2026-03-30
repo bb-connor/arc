@@ -13,8 +13,8 @@ key-files:
   created:
     - .planning/phases/20-ecosystem-conformance-and-operator-onboarding/20-01-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
-    - crates/pact-cli/tests/certify.rs
+    - crates/arc-a2a-adapter/src/lib.rs
+    - crates/arc-cli/tests/certify.rs
 requirements-completed:
   - ECO-01
 completed: 2026-03-25
@@ -35,5 +35,5 @@ confidence.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
-- `cargo test -p pact-cli --test certify -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`

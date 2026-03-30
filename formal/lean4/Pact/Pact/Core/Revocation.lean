@@ -1,13 +1,13 @@
 /-
   Revocation store model and delegation chain validation.
-  Mirrors: pact-kernel/src/lib.rs (check_revocation, validate_delegation_chain)
+  Mirrors: arc-kernel/src/lib.rs (check_revocation, validate_delegation_chain)
 -/
 
-import Pact.Core.Capability
+import Arc.Core.Capability
 
 set_option autoImplicit false
 
-namespace Pact.Core
+namespace Arc.Core
 
 /-- Abstract revocation store: a set of revoked capability IDs. -/
 abbrev RevocationStore := List CapabilityId
@@ -18,7 +18,7 @@ def RevocationStore.isRevoked (store : RevocationStore) (capId : CapabilityId) :
 def RevocationStore.revoke (store : RevocationStore) (capId : CapabilityId) : RevocationStore :=
   if store.isRevoked capId then store else capId :: store
 
-/-- Mirrors: Verdict in pact-kernel. -/
+/-- Mirrors: Verdict in arc-kernel. -/
 inductive Decision where
   | allow
   | deny (reason : String)
@@ -38,7 +38,7 @@ def checkTimeBounds (cap : CapabilityToken) (now : Timestamp) : Except String Un
     .ok ()
 
 /-- Check revocation of the token and its entire delegation chain.
-    Mirrors: PactKernel::check_revocation in lib.rs. -/
+    Mirrors: ArcKernel::check_revocation in lib.rs. -/
 def checkRevocation (store : RevocationStore) (cap : CapabilityToken) : Except String Unit :=
   if store.isRevoked cap.id then
     .error s!"capability {cap.id} is revoked"
@@ -95,7 +95,7 @@ def validateDelegationChain (chain : List DelegationLink) (maxDepth : Option Nat
 
 /-- Simplified kernel evaluation pipeline.
     Every path returns a Decision. Errors map to deny.
-    Mirrors: PactKernel::evaluate_tool_call in lib.rs. -/
+    Mirrors: ArcKernel::evaluate_tool_call in lib.rs. -/
 def evalToolCall
     (trustedKeys : List PublicKeyHex)
     (store : RevocationStore)
@@ -124,4 +124,4 @@ def evalToolCall
   else
     .allow
 
-end Pact.Core
+end Arc.Core

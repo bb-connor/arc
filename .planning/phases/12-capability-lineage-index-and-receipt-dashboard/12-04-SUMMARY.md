@@ -8,7 +8,7 @@ requires:
   - phase: 12-02
     provides: lineage HTTP handlers (handle_get_lineage, handle_get_delegation_chain, handle_agent_receipts) and router with all API routes
   - phase: 12-03
-    provides: React SPA built to crates/pact-cli/dashboard/dist/ with index.html entry point
+    provides: React SPA built to crates/arc-cli/dashboard/dist/ with index.html entry point
 
 provides:
   - tower_http::ServeDir nest_service wiring that serves dashboard dist/ as SPA catch-all after all API routes
@@ -17,7 +17,7 @@ provides:
 
 affects:
   - Stakeholders using the dashboard URL (PROD-05 completed -- non-engineer can open http://host:port/?token=X)
-  - CI pipelines that run pact-cli tests (tests now cover all lineage and agent endpoints)
+  - CI pipelines that run arc-cli tests (tests now cover all lineage and agent endpoints)
 
 tech-stack:
   added: []
@@ -29,8 +29,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/tests/receipt_query.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/tests/receipt_query.rs
 
 key-decisions:
   - "Conditional nest_service: only wire SPA if dashboard/dist/index.html exists -- CI and API-only deployments start without requiring a frontend build"
@@ -73,8 +73,8 @@ completed: "2026-03-23"
 
 ## Files Created/Modified
 
-- `crates/pact-cli/src/trust_control.rs` - Added ServeDir/ServeFile import, DASHBOARD_DIST_DIR constant, conditional nest_service wiring, axum 0.8 route syntax fix
-- `crates/pact-cli/tests/receipt_query.rs` - Added CapabilityToken imports, make_capability_token and prepopulate_lineage helpers, 8 new integration test functions
+- `crates/arc-cli/src/trust_control.rs` - Added ServeDir/ServeFile import, DASHBOARD_DIST_DIR constant, conditional nest_service wiring, axum 0.8 route syntax fix
+- `crates/arc-cli/tests/receipt_query.rs` - Added CapabilityToken imports, make_capability_token and prepopulate_lineage helpers, 8 new integration test functions
 
 ## Decisions Made
 
@@ -90,7 +90,7 @@ completed: "2026-03-23"
 - **Found during:** Task 1 (integration test execution -- binary panicked at startup)
 - **Issue:** Routes used `:capability_id` / `:subject_key` syntax from axum 0.7. axum 0.8 requires `{capture}` syntax. The binary panicked with "Path segments must not start with ':'. For capture groups, use '{capture}'." -- all integration tests failed because the service never became ready.
 - **Fix:** Changed all three route constants to use `{param}` syntax: `/v1/lineage/{capability_id}`, `/v1/lineage/{capability_id}/chain`, `/v1/agents/{subject_key}/receipts`
-- **Files modified:** crates/pact-cli/src/trust_control.rs
+- **Files modified:** crates/arc-cli/src/trust_control.rs
 - **Verification:** Binary starts cleanly, health endpoint responds, all 12 integration tests pass
 - **Committed in:** e0c8027 (Task 1 commit)
 
@@ -109,15 +109,15 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- `cargo build -p pact-cli` produces a binary that serves the SPA at root when `dashboard/dist/index.html` exists
+- `cargo build -p arc-cli` produces a binary that serves the SPA at root when `dashboard/dist/index.html` exists
 - API routes continue to function correctly alongside SPA serving
 - Task 2 (human-verify checkpoint) requires: build dashboard with `npm run build`, start trust service, open browser to verify dashboard renders and filters work
 - All 12 receipt_query integration tests pass; no regressions
 
 ## Self-Check: PASSED
 
-- FOUND: crates/pact-cli/src/trust_control.rs (ServeDir import, DASHBOARD_DIST_DIR, conditional nest_service)
-- FOUND: crates/pact-cli/tests/receipt_query.rs (8 new test functions)
+- FOUND: crates/arc-cli/src/trust_control.rs (ServeDir import, DASHBOARD_DIST_DIR, conditional nest_service)
+- FOUND: crates/arc-cli/tests/receipt_query.rs (8 new test functions)
 - FOUND commit e0c8027: feat(12-04): wire ServeDir SPA into axum router and add lineage integration tests
 
 ---

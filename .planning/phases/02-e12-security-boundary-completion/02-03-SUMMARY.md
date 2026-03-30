@@ -27,9 +27,9 @@ key-files:
   created:
     - .planning/phases/02-e12-security-boundary-completion/02-03-SUMMARY.md
   modified:
-    - crates/pact-core/src/session.rs
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-mcp-adapter/src/edge.rs
+    - crates/arc-core/src/session.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-mcp-adapter/src/edge.rs
 key-decisions:
   - "Only local absolute `file://` resource URIs are classified as filesystem-backed for root enforcement; provider-owned schemes like `repo://` remain outside the filesystem boundary"
   - "Filesystem-backed resource reads must fail closed when the URI is unenforceable or the session cannot prove in-root membership"
@@ -58,8 +58,8 @@ completed: 2026-03-19
 
 ## Accomplishments
 
-- Added a shared `ResourceUriClassification` boundary in `pact-core` so the runtime can explicitly decide when a resource URI is filesystem-backed
-- Enforced session roots for filesystem-backed resource reads in `pact-kernel` before any provider returns content, including fail-closed behavior when roots are missing or the file URI is unenforceable
+- Added a shared `ResourceUriClassification` boundary in `arc-core` so the runtime can explicitly decide when a resource URI is filesystem-backed
+- Enforced session roots for filesystem-backed resource reads in `arc-kernel` before any provider returns content, including fail-closed behavior when roots are missing or the file URI is unenforceable
 - Updated the MCP edge to return clear `resources/read` denial errors for root-boundary failures while preserving the existing non-filesystem `repo://` resource flow
 - Added kernel and edge coverage for in-root allow, out-of-root deny, missing-roots fail-closed, and preserved non-filesystem reads
 
@@ -72,9 +72,9 @@ No task commits were created in this session because the owned source files are 
 
 ## Files Created/Modified
 
-- `crates/pact-core/src/session.rs` - added `ResourceUriClassification`, shared local-file URI normalization reuse, and classification tests
-- `crates/pact-kernel/src/lib.rs` - enforced session-root checks for filesystem-backed resource reads and added kernel tests for in-root, out-of-root, and missing-root behavior
-- `crates/pact-mcp-adapter/src/edge.rs` - surfaced root-boundary resource denials as explicit `resources/read` errors and added edge tests for preserved non-filesystem and filesystem-backed cases
+- `crates/arc-core/src/session.rs` - added `ResourceUriClassification`, shared local-file URI normalization reuse, and classification tests
+- `crates/arc-kernel/src/lib.rs` - enforced session-root checks for filesystem-backed resource reads and added kernel tests for in-root, out-of-root, and missing-root behavior
+- `crates/arc-mcp-adapter/src/edge.rs` - surfaced root-boundary resource denials as explicit `resources/read` errors and added edge tests for preserved non-filesystem and filesystem-backed cases
 - `.planning/phases/02-e12-security-boundary-completion/02-03-SUMMARY.md` - recorded the slice outcome and verification
 
 ## Decisions Made
@@ -103,10 +103,10 @@ None - no external services or local configuration changes required.
 
 ## Verification
 
-- `cargo test -p pact-kernel read_resource` - passed
-- `cargo test -p pact-mcp-adapter resources_read` - passed
+- `cargo test -p arc-kernel read_resource` - passed
+- `cargo test -p arc-mcp-adapter resources_read` - passed
 - `cargo fmt --all -- --check` - passed
-- `cargo test -p pact-core resource_uri` - passed (extra targeted check for the new shared classification tests)
+- `cargo test -p arc-core resource_uri` - passed (extra targeted check for the new shared classification tests)
 
 ## Self-Check
 

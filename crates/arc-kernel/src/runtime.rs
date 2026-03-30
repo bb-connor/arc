@@ -1,0 +1,270 @@
+use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
+use arc_core::receipt::ArcReceipt;
+use arc_core::session::{
+    CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
+    CreateMessageResult, OperationContext, OperationTerminalState, RequestId, RootDefinition,
+};
+
+use crate::dpop;
+use crate::{AgentId, KernelError, ServerId};
+
+/// Verdict of a guard or capability evaluation.
+///
+/// This is the kernel's own verdict type, distinct from `arc_core::Decision`.
+/// The kernel uses this internally; it maps to `arc_core::Decision` when
+/// building receipts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Verdict {
+    /// The action is allowed.
+    Allow,
+    /// The action is denied.
+    Deny,
+}
+
+/// A tool call request as seen by the kernel.
+#[derive(Debug)]
+pub struct ToolCallRequest {
+    /// Unique request identifier.
+    pub request_id: String,
+    /// The signed capability token authorizing this call.
+    pub capability: CapabilityToken,
+    /// The tool to invoke.
+    pub tool_name: String,
+    /// The server hosting the tool.
+    pub server_id: ServerId,
+    /// The calling agent's identifier (hex-encoded public key).
+    pub agent_id: AgentId,
+    /// Tool arguments.
+    pub arguments: serde_json::Value,
+    /// Optional DPoP proof. Required when the matched grant has `dpop_required == Some(true)`.
+    pub dpop_proof: Option<dpop::DpopProof>,
+    /// Optional governed transaction intent bound to this invocation.
+    pub governed_intent: Option<GovernedTransactionIntent>,
+    /// Optional approval token authorizing this governed invocation.
+    pub approval_token: Option<GovernedApprovalToken>,
+}
+
+/// The kernel's response to a tool call request.
+#[derive(Debug)]
+pub struct ToolCallResponse {
+    /// Correlation identifier (matches the request).
+    pub request_id: String,
+    /// The kernel's verdict.
+    pub verdict: Verdict,
+    /// The tool's output payload, which may be a direct value or a stream.
+    pub output: Option<ToolCallOutput>,
+    /// Denial reason (populated when verdict is Deny).
+    pub reason: Option<String>,
+    /// Explicit terminal lifecycle state for this request.
+    pub terminal_state: OperationTerminalState,
+    /// Signed receipt attesting to this decision.
+    pub receipt: ArcReceipt,
+}
+
+/// Streamed tool output emitted before the final tool response frame.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolCallChunk {
+    pub data: serde_json::Value,
+}
+
+/// Complete streamed output captured by the kernel.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolCallStream {
+    pub chunks: Vec<ToolCallChunk>,
+}
+
+impl ToolCallStream {
+    pub fn chunk_count(&self) -> u64 {
+        self.chunks.len() as u64
+    }
+}
+
+/// Output produced by a tool invocation.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolCallOutput {
+    Value(serde_json::Value),
+    Stream(ToolCallStream),
+}
+
+/// Stream-capable tool-server result.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolServerStreamResult {
+    Complete(ToolCallStream),
+    Incomplete {
+        stream: ToolCallStream,
+        reason: String,
+    },
+}
+
+/// Tool-server output produced after validation and guard checks.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolServerOutput {
+    Value(serde_json::Value),
+    Stream(ToolServerStreamResult),
+}
+
+/// Bridge exposed to tool-server implementations while a parent request is in flight.
+///
+/// Wrapped servers can use this to trigger negotiated server-to-client requests such as
+/// `roots/list` and `sampling/createMessage`, or to surface wrapped MCP notifications,
+/// without escaping kernel mediation.
+pub trait NestedFlowBridge {
+    fn parent_request_id(&self) -> &RequestId;
+
+    fn poll_parent_cancellation(&mut self) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    fn list_roots(&mut self) -> Result<Vec<RootDefinition>, KernelError>;
+
+    fn create_message(
+        &mut self,
+        operation: CreateMessageOperation,
+    ) -> Result<CreateMessageResult, KernelError>;
+
+    fn create_elicitation(
+        &mut self,
+        operation: CreateElicitationOperation,
+    ) -> Result<CreateElicitationResult, KernelError>;
+
+    fn notify_elicitation_completed(&mut self, elicitation_id: &str) -> Result<(), KernelError>;
+
+    fn notify_resource_updated(&mut self, uri: &str) -> Result<(), KernelError>;
+
+    fn notify_resources_list_changed(&mut self) -> Result<(), KernelError>;
+}
+
+/// Raw client transport used by the kernel to service nested flows on behalf of a parent request.
+///
+/// The kernel owns lineage, policy, and in-flight bookkeeping. Implementors only move the nested
+/// request or notification across the client transport and return the decoded response.
+pub trait NestedFlowClient {
+    fn poll_parent_cancellation(
+        &mut self,
+        _parent_context: &OperationContext,
+    ) -> Result<(), KernelError> {
+        Ok(())
+    }
+
+    fn list_roots(
+        &mut self,
+        parent_context: &OperationContext,
+        child_context: &OperationContext,
+    ) -> Result<Vec<RootDefinition>, KernelError>;
+
+    fn create_message(
+        &mut self,
+        parent_context: &OperationContext,
+        child_context: &OperationContext,
+        operation: &CreateMessageOperation,
+    ) -> Result<CreateMessageResult, KernelError>;
+
+    fn create_elicitation(
+        &mut self,
+        parent_context: &OperationContext,
+        child_context: &OperationContext,
+        operation: &CreateElicitationOperation,
+    ) -> Result<CreateElicitationResult, KernelError>;
+
+    fn notify_elicitation_completed(
+        &mut self,
+        parent_context: &OperationContext,
+        elicitation_id: &str,
+    ) -> Result<(), KernelError>;
+
+    fn notify_resource_updated(
+        &mut self,
+        parent_context: &OperationContext,
+        uri: &str,
+    ) -> Result<(), KernelError>;
+
+    fn notify_resources_list_changed(
+        &mut self,
+        parent_context: &OperationContext,
+    ) -> Result<(), KernelError>;
+}
+
+/// Cost reported by a tool server after invocation.
+///
+/// Tool servers that track monetary costs override `invoke_with_cost` and
+/// return this struct. Servers that do not override return `None` via the
+/// default implementation, and the kernel charges `max_cost_per_invocation`
+/// as a worst-case debit.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ToolInvocationCost {
+    /// Cost in the currency's smallest unit (e.g. cents for USD).
+    pub units: u64,
+    /// ISO 4217 currency code.
+    pub currency: String,
+    /// Optional cost breakdown for audit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub breakdown: Option<serde_json::Value>,
+}
+
+/// Trait representing a connection to a tool server.
+///
+/// The kernel holds one `ToolServerConnection` per registered server. In
+/// production this is an mTLS connection over UDS or TCP. For testing,
+/// an in-process implementation can be used.
+pub trait ToolServerConnection: Send + Sync {
+    /// The server's unique identifier.
+    fn server_id(&self) -> &str;
+
+    /// List the tool names available on this server.
+    fn tool_names(&self) -> Vec<String>;
+
+    /// Invoke a tool on this server. The kernel has already validated the
+    /// capability and run guards before calling this.
+    fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError>;
+
+    /// Invoke a tool and optionally report the actual cost of the invocation.
+    ///
+    /// Tool servers that track monetary costs should override this method.
+    /// The default implementation delegates to `invoke` and returns `None`
+    /// cost, meaning the kernel will charge `max_cost_per_invocation` as
+    /// the worst-case debit.
+    fn invoke_with_cost(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
+        let value = self.invoke(tool_name, arguments, nested_flow_bridge)?;
+        Ok((value, None))
+    }
+
+    /// Invoke a tool that can emit multiple streamed chunks before its final terminal state.
+    ///
+    /// Servers that do not support streaming can ignore this and rely on `invoke`.
+    fn invoke_stream(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Option<ToolServerStreamResult>, KernelError> {
+        let _ = (tool_name, arguments, nested_flow_bridge);
+        Ok(None)
+    }
+
+    /// Drain asynchronous events emitted after a tool invocation has already returned.
+    ///
+    /// Native tool servers can use this to surface late URL-elicitation completions and
+    /// catalog/resource notifications without depending on a still-live request-local bridge.
+    fn drain_events(&self) -> Result<Vec<ToolServerEvent>, KernelError> {
+        Ok(vec![])
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolServerEvent {
+    ElicitationCompleted { elicitation_id: String },
+    ResourceUpdated { uri: String },
+    ResourcesListChanged,
+    ToolsListChanged,
+    PromptsListChanged,
+}

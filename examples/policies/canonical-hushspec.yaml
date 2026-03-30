@@ -1,6 +1,6 @@
 hushspec: "0.1.0"
 name: canonical-hushspec
-description: Recommended starting point for supported policy authoring in PACT.
+description: Recommended starting point for supported policy authoring in ARC.
 
 rules:
   tool_access:

@@ -35,7 +35,7 @@ public-registry ideas clearly out of scope.
 ### Documentation
 - update `A2A_ADAPTER_GUIDE.md` for request shaping, partner admission, and
   durable task correlation
-- update `PACT_CERTIFY_GUIDE.md` for verify and registry-backed flows
+- update `ARC_CERTIFY_GUIDE.md` for verify and registry-backed flows
 - record milestone-visible deltas in `CHANGELOG.md`
 
 ### Closeout
@@ -45,9 +45,9 @@ public-registry ideas clearly out of scope.
 
 ## Validation Strategy
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
-- `cargo test -p pact-cli --test certify -- --nocapture`
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
 - `node /Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs roadmap analyze`
 
 ## Conclusion

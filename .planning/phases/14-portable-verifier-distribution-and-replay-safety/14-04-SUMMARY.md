@@ -18,8 +18,8 @@ key-files:
   created:
     - .planning/phases/14-portable-verifier-distribution-and-replay-safety/14-04-SUMMARY.md
   modified:
-    - crates/pact-cli/tests/provider_admin.rs
-    - crates/pact-cli/tests/federated_issue.rs
+    - crates/arc-cli/tests/provider_admin.rs
+    - crates/arc-cli/tests/federated_issue.rs
     - docs/AGENT_PASSPORT_GUIDE.md
     - docs/CHANGELOG.md
 requirements-completed:
@@ -45,6 +45,6 @@ coverage instead of only internal verifier wiring.
 
 ## Verification
 
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
-- `cargo test -p pact-cli --test federated_issue -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-cli --test federated_issue -- --nocapture`
 - `rg -n "passport policy|verifier-policies-file|verifier-challenge-db|policyId|policySource|replayState" docs/AGENT_PASSPORT_GUIDE.md docs/CHANGELOG.md`

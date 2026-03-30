@@ -1,0 +1,53 @@
+[package]
+name = "arc-control-plane"
+description = "Trust-control service, client, and shared runtime support for ARC"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_control_plane"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
+arc-did = { package = "arc-did", path = "../arc-did" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-guards = { package = "arc-guards", path = "../arc-guards" }
+arc-policy = { package = "arc-policy", path = "../arc-policy" }
+arc-reputation = { package = "arc-reputation", path = "../arc-reputation" }
+arc-conformance = { package = "arc-conformance", path = "../arc-conformance" }
+arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../arc-mcp-adapter" }
+arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = { workspace = true }
+tokio = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+axum = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+ureq = { version = "2.10", features = ["json"] }
+serde_urlencoded = "0.7"
+percent-encoding = "2"
+rusqlite = { workspace = true }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+base64 = "0.22"
+ciborium = "0.2"
+rsa = { version = "0.9", features = ["sha2"] }
+p384 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+x509-cert = "0.2"
+url = "2"
+
+[dev-dependencies]
+rcgen = "0.13"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

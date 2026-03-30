@@ -12,7 +12,7 @@ follow-up recovery, and partner-bound lifecycle validation.
 
 ## Automated Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
 
 ## Result
 

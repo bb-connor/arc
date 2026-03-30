@@ -53,7 +53,7 @@
 
 ## Fragile Areas
 
-**`crates/pact-cli/src/trust_control.rs`:**
+**`crates/arc-cli/src/trust_control.rs`:**
 - Why fragile: Leader forwarding, replication, repair sync, and failover behavior interact with persistent state and timing
 - Common failures: Flaky visibility, convergence ambiguity, hard-to-localize cluster issues
 - Safe modification: Freeze the external write/visibility contract first, then adjust internals with targeted stress coverage

@@ -16,9 +16,9 @@ fi
 # ci-workspace runs the workspace layering guardrail before the wider release lane.
 ./scripts/ci-workspace.sh
 ./scripts/check-dashboard-release.sh
-./scripts/check-pact-ts-release.sh
-./scripts/check-pact-py-release.sh
-./scripts/check-pact-go-release.sh
+./scripts/check-arc-ts-release.sh
+./scripts/check-arc-py-release.sh
+./scripts/check-arc-go-release.sh
 
 output_root="target/release-qualification"
 conformance_root="${output_root}/conformance"
@@ -31,7 +31,7 @@ run_wave() {
   shift
   local wave_dir="${conformance_root}/${wave}"
   mkdir -p "${wave_dir}/results"
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
     "$@" \
     --results-dir "${wave_dir}/results" \
     --report-output "${wave_dir}/report.md"
@@ -43,5 +43,5 @@ run_wave wave3 --auth-mode oauth-local --scenarios-dir tests/conformance/scenari
 run_wave wave4 --scenarios-dir tests/conformance/scenarios/wave4
 run_wave wave5 --scenarios-dir tests/conformance/scenarios/wave5
 
-cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
+cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"

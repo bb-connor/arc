@@ -12,11 +12,11 @@ origin policy gating, and remote edge observability.
 
 ## Automated Verification
 
-- `cargo test -p pact-policy enterprise_origin -- --nocapture`
-- `cargo clippy -p pact-policy -- -D warnings`
-- `cargo test -p pact-cli --test federated_issue -- --nocapture`
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-policy enterprise_origin -- --nocapture`
+- `cargo clippy -p arc-policy -- -D warnings`
+- `cargo test -p arc-cli --test federated_issue -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
 - `rg -n "enterprise-providers-file|SCIM|SAML|enterprise_audit|enterpriseAudit|provider-admin|federation/providers|enterprise-provider lane|attributeSources|trust_material_ref|trustMaterialRef" docs/IDENTITY_FEDERATION_GUIDE.md docs/AGENT_PASSPORT_GUIDE.md docs/CHANGELOG.md`
 
 ## Result

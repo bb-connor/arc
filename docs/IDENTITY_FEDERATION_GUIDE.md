@@ -1,7 +1,7 @@
 # Identity Federation Guide
 
-PACT now ships the next identity-federation alpha for bearer-authenticated
-`pact mcp serve-http` deployments, including both JWT verification and opaque
+ARC now ships the next identity-federation alpha for bearer-authenticated
+`arc mcp serve-http` deployments, including both JWT verification and opaque
 bearer admission via token introspection.
 
 ## What It Does
@@ -13,7 +13,7 @@ bearer admission via token introspection.
   - `oidc:<issuer>#oid:<oid>` for user principals when `--auth-jwt-provider-profile azure-ad`
     is configured
   - falls back to `azp` / `appid` / `client_id` for client principals on that profile
-- Derives a stable PACT subject key from that federated principal when
+- Derives a stable ARC subject key from that federated principal when
   `--identity-federation-seed-file` is configured.
 - Issues default session capabilities against that stable subject instead of a
   random per-session subject.
@@ -34,21 +34,21 @@ bearer admission via token introspection.
   confidential-client authentication to the introspection endpoint.
 
 This means repeated sessions for the same enterprise principal converge on the
-same PACT subject and therefore the same receipt attribution path.
+same ARC subject and therefore the same receipt attribution path.
 
 ## CLI
 
-Use `pact mcp serve-http` with explicit JWT admission:
+Use `arc mcp serve-http` with explicit JWT admission:
 
 ```bash
-pact mcp serve-http \
+arc mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-jwt-public-key <ed25519-public-key-hex> \
   --auth-jwt-issuer https://issuer.example \
-  --auth-jwt-audience pact-mcp \
+  --auth-jwt-audience arc-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -57,14 +57,14 @@ pact mcp serve-http \
 Or use OIDC discovery plus provider-aware mapping:
 
 ```bash
-pact mcp serve-http \
+arc mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-jwt-discovery-url https://id.example.com/tenant/v2.0/.well-known/openid-configuration \
   --auth-jwt-provider-profile azure-ad \
-  --auth-jwt-audience pact-mcp \
+  --auth-jwt-audience arc-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -73,16 +73,16 @@ pact mcp serve-http \
 Or use OAuth2 token introspection for opaque bearer tokens:
 
 ```bash
-pact mcp serve-http \
+arc mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --server-name "Wrapped HTTP Mock" \
   --listen 127.0.0.1:8931 \
   --auth-introspection-url https://id.example.com/oauth2/introspect \
-  --auth-introspection-client-id pact-edge \
-  --auth-introspection-client-secret "$PACT_EDGE_SECRET" \
+  --auth-introspection-client-id arc-edge \
+  --auth-introspection-client-secret "$ARC_EDGE_SECRET" \
   --auth-jwt-issuer https://id.example.com/oauth2/default \
-  --auth-jwt-audience pact-mcp \
+  --auth-jwt-audience arc-mcp \
   --identity-federation-seed-file ./identity-federation.seed \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
@@ -91,7 +91,7 @@ pact mcp serve-http \
 To share an explicit provider-admin registry with the edge and trust-control:
 
 ```bash
-pact mcp serve-http \
+arc mcp serve-http \
   --policy ./policy.yaml \
   --server-id wrapped-http-mock \
   --listen 127.0.0.1:8931 \
@@ -101,15 +101,87 @@ pact mcp serve-http \
   --admin-token <admin-token> \
   -- python3 ./mock_server.py
 
-pact trust serve \
+arc trust serve \
   --listen 127.0.0.1:8940 \
   --service-token <service-token> \
   --enterprise-providers-file ./enterprise-providers.json
 ```
 
+The same trust-control process can also host portable-trust discovery surfaces
+that depend on explicit operator identity:
+
+```bash
+arc trust serve \
+  --listen 127.0.0.1:8940 \
+  --service-token <service-token> \
+  --enterprise-providers-file ./enterprise-providers.json \
+  --passport-statuses-file ./passport-statuses.json \
+  --certification-registry-file ./certifications.json \
+  --certification-discovery-file ./certification-network.json
+```
+
+That keeps enterprise provider identity, passport lifecycle, and certification
+discovery on one operator-owned service boundary without pretending those
+registries become global trust roots.
+
+## Conservative Cross-Org Reputation Distribution
+
+ARC now also exposes imported reputation as a conservative operator-visible
+signal instead of folding remote evidence into local receipt truth.
+
+The supported flow is:
+
+1. one operator exports a bilateral evidence package with an attached
+   federation policy
+2. the receiving operator imports that package with `arc evidence import`
+3. local inspection and comparison surfaces report imported trust separately
+   from native local reputation
+
+That separation is deliberate. Imported evidence does not rewrite the local
+receipt log, local budget history, or the native `scorecard` that ARC uses for
+local truth.
+
+Use the local CLI surfaces to inspect imported trust:
+
+```bash
+arc --receipt-db receipts.sqlite3 evidence import --input ./upstream-package
+
+arc --json --receipt-db receipts.sqlite3 reputation local \
+  --subject-public-key <agent-ed25519-hex>
+
+arc --json --receipt-db receipts.sqlite3 reputation compare \
+  --subject-public-key <agent-ed25519-hex> \
+  --passport passport.json
+```
+
+The same reporting is available through trust-control:
+
+```text
+GET  /v1/reputation/local/{subject_key}
+POST /v1/reputation/compare/{subject_key}
+```
+
+Responses now include `importedTrust` with:
+
+- per-share provenance (`shareId`, issuer, partner, signer key, import/export
+  timestamps)
+- the explicit imported-trust policy that was applied
+- `accepted` / rejection reasons for each imported signal
+- an `attenuatedCompositeScore` only when the imported share passes the local
+  guardrails
+
+The default guardrails are intentionally conservative:
+
+- proofless imported shares are rejected
+- stale imported signals expire out of consideration
+- imported scores are attenuated instead of treated as native confidence
+
+This means ARC can surface cross-org reputation without implying a universal
+portable score or a hidden trust merge.
+
 ## Provider-Admin Registry
 
-PACT now ships a file-backed provider-admin registry for enterprise federation.
+ARC now ships a file-backed provider-admin registry for enterprise federation.
 Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 `scim`, or `saml` source with:
 
@@ -122,10 +194,10 @@ Each provider record is an explicit `oidc_jwks`, `oauth_introspection`,
 CLI surface:
 
 ```text
-pact trust provider list
-pact trust provider get --provider-id <id>
-pact trust provider upsert --input provider.json
-pact trust provider delete --provider-id <id>
+arc trust provider list
+arc trust provider get --provider-id <id>
+arc trust provider upsert --input provider.json
+arc trust provider delete --provider-id <id>
 ```
 
 HTTP surface on trust-control:
@@ -143,8 +215,8 @@ configs without guessing from logs.
 
 ## Operational Behavior
 
-- Same federated principal + same seed file => same derived PACT subject key.
-- Different federated principal + same seed file => different derived PACT
+- Same federated principal + same seed file => same derived ARC subject key.
+- Different federated principal + same seed file => different derived ARC
   subject key.
 - OIDC discovery and discovered `jwks_uri` must use `https`, or localhost-only
   `http` during local testing.
@@ -176,7 +248,7 @@ Portable-trust admission now distinguishes two paths:
 
 - Legacy bearer-only path: bearer admission can still surface
   `enterpriseIdentity` for observability, but if no validated
-  provider-admin record is selected, `pact trust federated-issue` preserves
+  provider-admin record is selected, `arc trust federated-issue` preserves
   the legacy bearer admission behavior.
 - Enterprise-provider lane: this is active only when
   `enterpriseIdentity.providerRecordId` resolves to a validated provider-admin
@@ -194,6 +266,14 @@ When the enterprise-provider lane is active, allow responses expose
 - source-attribute provenance (`attributeSources`)
 - `trust_material_ref` / `trustMaterialRef`
 - matched origin profile and decision reason
+
+Portable-trust issuance can now also project verified enterprise identity into
+passport artifacts. `arc passport create --enterprise-identity <file>` embeds
+typed `enterpriseIdentityProvenance` into the signed credential plus the
+passport bundle, `arc passport verify` / `evaluate` / `challenge verify`
+surface the same provenance back out, and `arc trust federated-issue`
+includes a typed `enterpriseIdentityProvenance` object alongside the
+enterprise audit when enterprise context participates in admission.
 
 When admission denies in the enterprise-provider lane, trust-control returns a
 structured error body that still includes the enterprise audit context so the
@@ -219,9 +299,12 @@ operator can see which provider, organization, group, or role inputs failed.
   fail-closed identity normalization and policy gating, but it does not yet
   implement automatic SCIM provisioning lifecycle or reusable IdP-specific
   management workflows beyond the shared provider-admin registry.
-- It does not yet propagate enterprise identity into portable credentials or
-  cross-org federation artifacts beyond the session/admin trust surface,
-  federated-issue `enterprise_audit`, and stable subject mapping exposed by
-  the remote edge and receipts.
+- It now propagates enterprise identity into portable passport credentials,
+  passport verification/presentation outputs, and the federated-issue response
+  surface, but enterprise identity still does not silently widen local
+  authority without an explicit verifier or admission policy requirement.
+- It now exposes imported cross-org reputation signals through local and
+  trust-control reputation views, but those signals remain evidence-backed,
+  issuer-scoped, attenuated, and separate from native local score history.
 - This phase does not ship reusable verifier artifact distribution or
   multi-issuer passport composition; those land in later phases.

@@ -1,18 +1,18 @@
 /-
   Proofs for capability monotonicity (P1) and related properties.
-  Mirrors: pact-core/src/capability.rs (is_subset_of)
+  Mirrors: arc-core/src/capability.rs (is_subset_of)
 -/
 
-import Pact.Core.Capability
-import Pact.Core.Scope
-import Pact.Core.Revocation
-import Pact.Spec.Properties
+import Arc.Core.Capability
+import Arc.Core.Scope
+import Arc.Core.Revocation
+import Arc.Spec.Properties
 
 set_option autoImplicit false
 
-namespace Pact.Proofs
+namespace Arc.Proofs
 
-open Pact.Core
+open Arc.Core
 
 -- P1: Capability Monotonicity -- standalone proofs
 
@@ -36,12 +36,12 @@ theorem list_isSubsetOf_trans {α : Type} [BEq α] [DecidableEq α] [LawfulBEq �
   exact ⟨z, h_z_mem, sorry⟩  -- BEq transitivity needs LawfulBEq instance
 
 /-- If child.grants is a sublist of parent.grants (in the subset sense),
-    then PactScope.isSubsetOf holds. This is the key structural lemma. -/
-theorem scope_subset_of_grants_subset (child parent : PactScope)
+    then ArcScope.isSubsetOf holds. This is the key structural lemma. -/
+theorem scope_subset_of_grants_subset (child parent : ArcScope)
     (h : ∀ g, g ∈ child.grants →
       ∃ pg, pg ∈ parent.grants ∧ g.isSubsetOf pg = true) :
     child.isSubsetOf parent = true := by
-  unfold PactScope.isSubsetOf
+  unfold ArcScope.isSubsetOf
   apply List.all_eq_true.mpr
   intro g h_mem
   have ⟨pg, h_pg_mem, h_sub⟩ := h g h_mem
@@ -122,7 +122,7 @@ theorem added_constraint_is_subset
     narrowing scopes. This is a corollary of P1 applied at each delegation
     step. -/
 theorem delegation_chain_monotone
-    (scopes : List PactScope)
+    (scopes : List ArcScope)
     (h_chain : ∀ (i : Nat), i + 1 < scopes.length →
       (scopes.get ⟨i + 1, by omega⟩).isSubsetOf
         (scopes.get ⟨i, by omega⟩) = true)
@@ -133,4 +133,4 @@ theorem delegation_chain_monotone
     True := by  -- Full proof requires induction over i..j; stated for completeness
   trivial
 
-end Pact.Proofs
+end Arc.Proofs

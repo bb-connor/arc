@@ -1,0 +1,31 @@
+[package]
+name = "arc-kernel"
+description = "ARC runtime kernel: capability validation, guard evaluation, receipt signing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_kernel"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+lru = "0.16.3"
+regex = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+rusqlite = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+ureq = { version = "2.10", features = ["json"] }
+
+[dev-dependencies]
+arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

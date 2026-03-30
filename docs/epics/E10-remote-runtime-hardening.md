@@ -11,7 +11,7 @@ The hosted runtime now has:
 - an opt-in shared wrapped-host owner via `--shared-hosted-owner`
 - deterministic session lifecycle cleanup with idle expiry, drain grace, and tombstone retention
 - admin diagnostics at `/admin/sessions` plus per-session trust details for active and terminal sessions
-- tunable lifecycle controls via `PACT_MCP_SESSION_IDLE_EXPIRY_MILLIS`, `PACT_MCP_SESSION_DRAIN_GRACE_MILLIS`, and `PACT_MCP_SESSION_REAPER_INTERVAL_MILLIS`
+- tunable lifecycle controls via `ARC_MCP_SESSION_IDLE_EXPIRY_MILLIS`, `ARC_MCP_SESSION_DRAIN_GRACE_MILLIS`, and `ARC_MCP_SESSION_REAPER_INTERVAL_MILLIS`
 
 The conservative deployment default is still one wrapped subprocess per session, but the hosted runtime now also has an opt-in shared owner path. The remaining work in adjacent epics is broader async/concurrency normalization rather than an open E10 lifecycle gap.
 
@@ -21,7 +21,7 @@ The conservative deployment default is still one wrapped subprocess per session,
 
 ## Problem
 
-PACT now ships a credible remote MCP edge over authenticated Streamable HTTP.
+ARC now ships a credible remote MCP edge over authenticated Streamable HTTP.
 
 That is a major milestone, but it is not yet deployment-hard.
 
@@ -32,7 +32,7 @@ The remaining gaps are:
 - reconnect, stale-session cleanup, and shutdown ownership rules
 - broader hosted-runtime ownership than one wrapped subprocess per remote session
 
-Without those, PACT remains convincing for controlled demos and harnesses but still weaker than a production-grade hosted runtime should be.
+Without those, ARC remains convincing for controlled demos and harnesses but still weaker than a production-grade hosted runtime should be.
 
 The first hardening slice should freeze one explicit reconnect contract before adding new stream surfaces:
 
@@ -70,13 +70,13 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-core/src/session.rs`
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-conformance/tests/`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-conformance/tests/`
 - `docs/HA_CONTROL_AUTH_PLAN.md`
 
 ## Proposed implementation slices

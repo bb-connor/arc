@@ -1,0 +1,25 @@
+[package]
+name = "arc-bindings-core"
+description = "Bindings-friendly invariant helpers for ARC SDKs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_bindings_core"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

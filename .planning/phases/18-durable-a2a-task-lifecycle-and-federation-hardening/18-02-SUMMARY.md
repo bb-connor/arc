@@ -14,7 +14,7 @@ key-files:
   created:
     - .planning/phases/18-durable-a2a-task-lifecycle-and-federation-hardening/18-02-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
 requirements-completed:
   - A2A-04
 completed: 2026-03-25
@@ -35,4 +35,4 @@ contract before the adapter talks to the peer again.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`

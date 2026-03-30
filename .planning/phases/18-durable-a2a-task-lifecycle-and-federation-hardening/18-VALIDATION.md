@@ -14,7 +14,7 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test` |
-| **Quick run command** | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
 | **Docs verification** | `rg -n "task registry|follow-up|durable task correlation" docs/A2A_ADAPTER_GUIDE.md` |
 
@@ -22,9 +22,9 @@ created: 2026-03-25
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 18-01 | A2A-03 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
-| 18-02 | A2A-03, A2A-04 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
-| 18-03 | A2A-04, A2A-05 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
+| 18-01 | A2A-03 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
+| 18-02 | A2A-03, A2A-04 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
+| 18-03 | A2A-04, A2A-05 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
 
 ## Coverage Notes
 

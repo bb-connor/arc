@@ -1,12 +1,13 @@
 //! Differential tests: scope subsumption logic.
 //!
 //! Compares the reference specification's `is_subset_of` against the production
-//! `pact_core::capability::PactScope::is_subset_of` on randomly generated scopes.
+//! `arc_core::capability::ArcScope::is_subset_of` on randomly generated scopes.
 
-use pact_formal_diff_tests::generators::{
-    arb_paired_grant, arb_paired_scope_pair, arb_spec_scope, arb_spec_tool_grant,
+use arc_formal_diff_tests::generators::{
+    arb_paired_grant, arb_paired_prompt_grant, arb_paired_resource_grant, arb_paired_scope_pair,
+    arb_spec_scope, arb_spec_tool_grant,
 };
-use pact_formal_diff_tests::spec::{SpecOperation, SpecPactScope, SpecToolGrant};
+use arc_formal_diff_tests::spec::{SpecArcScope, SpecOperation, SpecToolGrant};
 
 use proptest::prelude::*;
 use proptest::test_runner::Config as ProptestConfig;
@@ -60,6 +61,38 @@ proptest! {
             spec_result, impl_result, spec_child, spec_parent
         );
     }
+
+    /// Resource grant subset differential test.
+    #[test]
+    fn resource_grant_subset_spec_matches_impl(
+        (spec_parent, impl_parent) in arb_paired_resource_grant(),
+        (spec_child, impl_child) in arb_paired_resource_grant(),
+    ) {
+        let spec_result = spec_child.is_subset_of(&spec_parent);
+        let impl_result = impl_child.is_subset_of(&impl_parent);
+
+        prop_assert_eq!(
+            spec_result, impl_result,
+            "Resource grant subset mismatch!\n  spec: {}\n  impl: {}\n  child: {:?}\n  parent: {:?}",
+            spec_result, impl_result, spec_child, spec_parent
+        );
+    }
+
+    /// Prompt grant subset differential test.
+    #[test]
+    fn prompt_grant_subset_spec_matches_impl(
+        (spec_parent, impl_parent) in arb_paired_prompt_grant(),
+        (spec_child, impl_child) in arb_paired_prompt_grant(),
+    ) {
+        let spec_result = spec_child.is_subset_of(&spec_parent);
+        let impl_result = impl_child.is_subset_of(&impl_parent);
+
+        prop_assert_eq!(
+            spec_result, impl_result,
+            "Prompt grant subset mismatch!\n  spec: {}\n  impl: {}\n  child: {:?}\n  parent: {:?}",
+            spec_result, impl_result, spec_child, spec_parent
+        );
+    }
 }
 
 proptest! {
@@ -68,7 +101,11 @@ proptest! {
     /// P1: Empty scope is a subset of any scope.
     #[test]
     fn empty_scope_is_subset(scope in arb_spec_scope()) {
-        let empty = SpecPactScope { grants: vec![] };
+        let empty = SpecArcScope {
+            grants: vec![],
+            resource_grants: vec![],
+            prompt_grants: vec![],
+        };
         prop_assert!(
             empty.is_subset_of(&scope),
             "Empty scope must be a subset of any scope"
@@ -96,7 +133,11 @@ proptest! {
         let remove_idx = idx % scope.grants.len();
         let mut child_grants = scope.grants.clone();
         child_grants.remove(remove_idx);
-        let child = SpecPactScope { grants: child_grants };
+        let child = SpecArcScope {
+            grants: child_grants,
+            resource_grants: scope.resource_grants.clone(),
+            prompt_grants: scope.prompt_grants.clone(),
+        };
 
         prop_assert!(
             child.is_subset_of(&scope),
@@ -167,6 +208,9 @@ proptest! {
             operations: vec![SpecOperation::Invoke],
             constraints: vec![],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
         };
         let child = SpecToolGrant {
             server_id: server,
@@ -174,6 +218,9 @@ proptest! {
             operations: vec![SpecOperation::Invoke],
             constraints: vec![],
             max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
         };
 
         prop_assert!(
@@ -209,14 +256,18 @@ proptest! {
 
         // Parent: keep first half of grants
         let half = scope.grants.len() / 2;
-        let parent = SpecPactScope {
+        let parent = SpecArcScope {
             grants: scope.grants[..half].to_vec(),
+            resource_grants: scope.resource_grants.clone(),
+            prompt_grants: scope.prompt_grants.clone(),
         };
 
         // Child: keep first quarter of grants
         let quarter = half / 2;
-        let child = SpecPactScope {
+        let child = SpecArcScope {
             grants: scope.grants[..quarter].to_vec(),
+            resource_grants: scope.resource_grants.clone(),
+            prompt_grants: scope.prompt_grants.clone(),
         };
 
         if parent.is_subset_of(&grandparent) && child.is_subset_of(&parent) {

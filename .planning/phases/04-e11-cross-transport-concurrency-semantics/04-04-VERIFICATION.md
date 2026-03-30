@@ -24,9 +24,9 @@ requirements:
 ## Commands Run
 
 - `cargo fmt --all -- --check`
-- `cargo test -p pact-mcp-adapter -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-mcp-adapter -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
 - `cargo test --workspace`
 
 ## Notes

@@ -22,24 +22,24 @@ tech-stack:
   patterns:
     - session-backed root enforcement rides the existing guard pipeline instead of a kernel-only side path
     - root containment is evaluated with the same lexical and filesystem-aware normalization helpers already used for allowlist checks
-    - PACT YAML now maps `path_allowlist` into the same runtime guard that HushSpec already used
+    - ARC YAML now maps `path_allowlist` into the same runtime guard that HushSpec already used
 key-files:
   created:
     - .planning/phases/02-e12-security-boundary-completion/02-02-SUMMARY.md
   modified:
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-guards/src/path_allowlist.rs
-    - crates/pact-guards/src/action.rs
-    - crates/pact-guards/src/pipeline.rs
-    - crates/pact-guards/src/mcp_tool.rs
-    - crates/pact-guards/src/patch_integrity.rs
-    - crates/pact-guards/src/secret_leak.rs
-    - crates/pact-guards/tests/integration.rs
-    - crates/pact-cli/src/policy.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-guards/src/path_allowlist.rs
+    - crates/arc-guards/src/action.rs
+    - crates/arc-guards/src/pipeline.rs
+    - crates/arc-guards/src/mcp_tool.rs
+    - crates/arc-guards/src/patch_integrity.rs
+    - crates/arc-guards/src/secret_leak.rs
+    - crates/arc-guards/tests/integration.rs
+    - crates/arc-cli/src/policy.rs
 key-decisions:
   - "Root-aware tool enforcement should apply through the session-backed guard path because direct ToolCallRequest evaluation does not carry session identity"
   - "PathAllowlistGuard should enforce session root containment before optional allowlist matching so missing roots fail closed instead of widening access"
-  - "The supported PACT YAML surface should expose `path_allowlist` directly rather than leaving root-aware tool enforcement reachable only through HushSpec"
+  - "The supported ARC YAML surface should expose `path_allowlist` directly rather than leaving root-aware tool enforcement reachable only through HushSpec"
 patterns-established:
   - "Filesystem-shaped tool actions should expose a target path through ToolAction helpers so future runtime checks do not re-derive that classification"
   - "GuardContext can carry session-scoped runtime facts when enforcement depends on negotiated session state"
@@ -78,15 +78,15 @@ No task commits were created in this session because the repository is still bei
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/lib.rs` - passed session root paths into the guard path for session-backed tool evaluation
-- `crates/pact-guards/src/path_allowlist.rs` - enforced session-root containment for filesystem-shaped actions and added fail-closed/root-aware tests
-- `crates/pact-guards/src/action.rs` - exposed a shared filesystem-path helper on `ToolAction`
-- `crates/pact-guards/src/pipeline.rs` - updated guard test contexts for the new session-root field
-- `crates/pact-guards/src/mcp_tool.rs` - updated guard test contexts for the new session-root field
-- `crates/pact-guards/src/patch_integrity.rs` - updated guard test contexts for the new session-root field
-- `crates/pact-guards/src/secret_leak.rs` - updated guard test contexts for the new session-root field
-- `crates/pact-guards/tests/integration.rs` - added session-backed filesystem tool integration tests covering allow, deny, and missing-root fail-closed behavior
-- `crates/pact-cli/src/policy.rs` - added `path_allowlist` support to the PACT YAML guard loader and policy tests
+- `crates/arc-kernel/src/lib.rs` - passed session root paths into the guard path for session-backed tool evaluation
+- `crates/arc-guards/src/path_allowlist.rs` - enforced session-root containment for filesystem-shaped actions and added fail-closed/root-aware tests
+- `crates/arc-guards/src/action.rs` - exposed a shared filesystem-path helper on `ToolAction`
+- `crates/arc-guards/src/pipeline.rs` - updated guard test contexts for the new session-root field
+- `crates/arc-guards/src/mcp_tool.rs` - updated guard test contexts for the new session-root field
+- `crates/arc-guards/src/patch_integrity.rs` - updated guard test contexts for the new session-root field
+- `crates/arc-guards/src/secret_leak.rs` - updated guard test contexts for the new session-root field
+- `crates/arc-guards/tests/integration.rs` - added session-backed filesystem tool integration tests covering allow, deny, and missing-root fail-closed behavior
+- `crates/arc-cli/src/policy.rs` - added `path_allowlist` support to the ARC YAML guard loader and policy tests
 - `.planning/phases/02-e12-security-boundary-completion/02-02-SUMMARY.md` - recorded slice results and verification
 
 ## Decisions Made
@@ -103,8 +103,8 @@ No task commits were created in this session because the repository is still bei
 - **Found during:** final slice verification
 - **Issue:** adding session-root data to `GuardContext` required updating several guard test contexts and formatting a few multiline call sites before the final gate would go green
 - **Fix:** propagated the new `session_filesystem_roots` field through the affected test fixtures and ran `cargo fmt --all`
-- **Files modified:** `crates/pact-guards/src/pipeline.rs`, `crates/pact-guards/src/mcp_tool.rs`, `crates/pact-guards/src/patch_integrity.rs`, `crates/pact-guards/src/secret_leak.rs`, plus formatting in touched files
-- **Verification:** `cargo test -p pact-guards filesystem_tool`, `cargo test -p pact-cli policy`, and `cargo fmt --all -- --check` all pass
+- **Files modified:** `crates/arc-guards/src/pipeline.rs`, `crates/arc-guards/src/mcp_tool.rs`, `crates/arc-guards/src/patch_integrity.rs`, `crates/arc-guards/src/secret_leak.rs`, plus formatting in touched files
+- **Verification:** `cargo test -p arc-guards filesystem_tool`, `cargo test -p arc-cli policy`, and `cargo fmt --all -- --check` all pass
 - **Committed in:** working tree only
 
 ---
@@ -114,8 +114,8 @@ No task commits were created in this session because the repository is still bei
 
 ## Verification
 
-- `cargo test -p pact-guards filesystem_tool` - passed
-- `cargo test -p pact-cli policy` - passed
+- `cargo test -p arc-guards filesystem_tool` - passed
+- `cargo test -p arc-cli policy` - passed
 - `cargo fmt --all -- --check` - passed
 
 ## Issues Encountered

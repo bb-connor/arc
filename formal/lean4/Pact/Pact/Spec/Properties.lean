@@ -1,6 +1,6 @@
 /-
-  PACT formal properties P1-P5.
-  Mirrors: spec/PROTOCOL.md Section 7.2.
+  ARC formal properties P1-P5.
+  Mirrors the launch safety-property inventory documented in spec/PROTOCOL.md.
 
   P1: Capability monotonicity (delegation can only attenuate)
   P2: Revocation completeness (revoking ancestor invalidates descendants)
@@ -9,15 +9,15 @@
   P5: Delegation graph acyclicity
 -/
 
-import Pact.Core.Capability
-import Pact.Core.Scope
-import Pact.Core.Revocation
+import Arc.Core.Capability
+import Arc.Core.Scope
+import Arc.Core.Revocation
 
 set_option autoImplicit false
 
-namespace Pact.Spec
+namespace Arc.Spec
 
-open Pact.Core
+open Arc.Core
 
 -- P1: Capability Monotonicity
 
@@ -25,29 +25,29 @@ open Pact.Core
     scope, then every grant in the child is covered by some grant in the
     parent.
 
-    This is the core PACT safety property: delegation can only attenuate,
+    This is the core ARC safety property: delegation can only attenuate,
     never amplify. -/
-theorem capability_monotonicity (parent child : PactScope)
+theorem capability_monotonicity (parent child : ArcScope)
     (h : child.isSubsetOf parent = true) :
     ∀ g, g ∈ child.grants →
       ∃ pg, pg ∈ parent.grants ∧ g.isSubsetOf pg = true := by
   intro g h_mem
-  unfold PactScope.isSubsetOf at h
+  unfold ArcScope.isSubsetOf at h
   have h_all := List.all_eq_true.mp h g h_mem
   simp [List.any] at h_all
   exact h_all
 
 /-- P1a: Empty scope is always a valid attenuation. -/
-theorem empty_scope_monotonicity (parent : PactScope) :
-    PactScope.isSubsetOf PactScope.empty parent = true :=
-  PactScope.empty_isSubsetOf parent
+theorem empty_scope_monotonicity (parent : ArcScope) :
+    ArcScope.isSubsetOf ArcScope.empty parent = true :=
+  ArcScope.empty_isSubsetOf parent
 
 /-- P1b: Removing a grant from a scope produces a subset. -/
-theorem remove_grant_is_attenuation (scope : PactScope) (g : ToolGrant) :
-    PactScope.isSubsetOf
+theorem remove_grant_is_attenuation (scope : ArcScope) (g : ToolGrant) :
+    ArcScope.isSubsetOf
       { grants := scope.grants.filter (fun x => !(x == g)) }
       scope = true := by
-  unfold PactScope.isSubsetOf
+  unfold ArcScope.isSubsetOf
   apply List.all_eq_true.mpr
   intro x h_mem
   have h_in_original := List.mem_of_mem_filter h_mem
@@ -212,7 +212,7 @@ axiom receipt_sign_verify_roundtrip (sk : SecretKey) (msg : ReceiptByteArray) :
     receiptVerify (receiptPublicKey sk) msg (receiptSign sk msg) = true
 
 /-- Simplified receipt structure. -/
-structure PactReceipt where
+structure ArcReceipt where
   id : String
   timestamp : Timestamp
   capabilityId : CapabilityId
@@ -224,12 +224,12 @@ structure PactReceipt where
 
 /-- Signed receipt. -/
 structure SignedReceipt where
-  receipt : PactReceipt
+  receipt : ArcReceipt
   signature : ReceiptSignature
   kernelKey : ReceiptPublicKey
 
 /-- Sign a receipt with the kernel's key. -/
-noncomputable def SignedReceipt.sign (sk : SecretKey) (r : PactReceipt) : SignedReceipt :=
+noncomputable def SignedReceipt.sign (sk : SecretKey) (r : ArcReceipt) : SignedReceipt :=
   let canonical := receiptCanonicalize (toString r)
   { receipt := r
   , signature := receiptSign sk canonical
@@ -241,20 +241,20 @@ noncomputable def SignedReceipt.verify (sr : SignedReceipt) : Bool :=
   receiptVerify sr.kernelKey canonical sr.signature
 
 /-- P4: Sign-then-verify roundtrip for receipts. -/
-theorem receipt_sign_then_verify (sk : SecretKey) (r : PactReceipt) :
+theorem receipt_sign_then_verify (sk : SecretKey) (r : ArcReceipt) :
     (SignedReceipt.sign sk r).verify = true := by
   unfold SignedReceipt.sign SignedReceipt.verify
   simp only []
   exact receipt_sign_verify_roundtrip sk (receiptCanonicalize (toString r))
 
 /-- P4a: Signing preserves the receipt content. -/
-theorem receipt_sign_preserves_content (sk : SecretKey) (r : PactReceipt) :
+theorem receipt_sign_preserves_content (sk : SecretKey) (r : ArcReceipt) :
     (SignedReceipt.sign sk r).receipt = r := by
   unfold SignedReceipt.sign
   rfl
 
 /-- P4b: Signing binds the kernel's public key. -/
-theorem receipt_sign_binds_key (sk : SecretKey) (r : PactReceipt) :
+theorem receipt_sign_binds_key (sk : SecretKey) (r : ArcReceipt) :
     (SignedReceipt.sign sk r).kernelKey = receiptPublicKey sk := by
   unfold SignedReceipt.sign
   rfl
@@ -335,4 +335,4 @@ theorem allow_requires_all_checks (trustedKeys : List PublicKeyHex)
             · simp [h_scope] at h_allow
   · simp [h_sig] at h_allow
 
-end Pact.Spec
+end Arc.Spec

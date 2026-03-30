@@ -1,15 +1,15 @@
 ---
 status: investigating
-trigger: "Debug the current blocker in /Users/connor/Medica/backbay/standalone/pact for Phase 1 Plan 01-02.
+trigger: "Debug the current blocker in /Users/connor/Medica/backbay/standalone/arc for Phase 1 Plan 01-02.
 
 Observed gate failure from independent verifier:
-- command: cargo test -p pact-cli --test trust_cluster
-- failing location: crates/pact-cli/tests/trust_cluster.rs:653
+- command: cargo test -p arc-cli --test trust_cluster
+- failing location: crates/arc-cli/tests/trust_cluster.rs:653
 - symptom: follower-originated POST /v1/budgets/increment returned invocationCount = 1, but test expected 2
 
 Context:
 - This is inside the HA trust-cluster test asserting the leader-visible write contract.
-- Recent changes added leader-local post-write verification and response metadata in crates/pact-cli/src/trust_control.rs.
+- Recent changes added leader-local post-write verification and response metadata in crates/arc-cli/src/trust_control.rs.
 - The failure indicates the follower-forwarded budget increment may be returning before the leader-visible count reflects both increments, or the returned count is using the wrong local view.
 
 Your task:
@@ -19,8 +19,8 @@ Your task:
 4. Include the exact files/lines you think are responsible.
 
 Focus files:
-- crates/pact-cli/src/trust_control.rs
-- crates/pact-cli/tests/trust_cluster.rs
+- crates/arc-cli/src/trust_control.rs
+- crates/arc-cli/tests/trust_cluster.rs
 - any budget-store file you need
 
 Return a concise debugger report with hypothesis, evidence, and recommended fix."
@@ -39,9 +39,9 @@ next_action: finalize diagnosis from the current_leader_url and forward_post_to_
 
 expected: follower-originated POST /v1/budgets/increment should return invocationCount = 2 in the HA trust-cluster test
 actual: follower-originated POST /v1/budgets/increment returned invocationCount = 1
-errors: test assertion failure at crates/pact-cli/tests/trust_cluster.rs:653
-reproduction: run cargo test -p pact-cli --test trust_cluster and inspect the follower-originated budget increment assertion
-started: after recent changes adding leader-local post-write verification and response metadata in crates/pact-cli/src/trust_control.rs
+errors: test assertion failure at crates/arc-cli/tests/trust_cluster.rs:653
+reproduction: run cargo test -p arc-cli --test trust_cluster and inspect the follower-originated budget increment assertion
+started: after recent changes adding leader-local post-write verification and response metadata in crates/arc-cli/src/trust_control.rs
 
 ## Eliminated
 
@@ -53,22 +53,22 @@ started: after recent changes adding leader-local post-write verification and re
   implication: this failure needs first-principles investigation
 
 - timestamp: 2026-03-19T00:09:00-04:00
-  checked: crates/pact-cli/tests/trust_cluster.rs
+  checked: crates/arc-cli/tests/trust_cluster.rs
   found: the failing assertion expects the follower-originated increment response itself to report invocationCount = 2 immediately after a leader-originated increment returned 1
   implication: the contract is response-time leader visibility, not eventual follower replication
 
 - timestamp: 2026-03-19T00:10:00-04:00
-  checked: crates/pact-cli/src/trust_control.rs handle_try_increment_budget and forward_post_to_leader
+  checked: crates/arc-cli/src/trust_control.rs handle_try_increment_budget and forward_post_to_leader
   found: handle_try_increment_budget would return the leader store's post-commit count if forwarding occurs, but forward_post_to_leader skips forwarding whenever current_leader_url(state) resolves to self
   implication: a returned count of 1 strongly suggests the follower executed the write locally rather than forwarding to the leader
 
 - timestamp: 2026-03-19T00:17:00-04:00
-  checked: cargo test -p pact-cli --test trust_cluster -- --nocapture
+  checked: cargo test -p arc-cli --test trust_cluster -- --nocapture
   found: the test passed locally in 62.71s on this checkout
   implication: the reported gate failure is likely timing-dependent rather than a deterministic logic error in the happy path
 
 - timestamp: 2026-03-19T00:18:00-04:00
-  checked: crates/pact-cli/src/trust_control.rs current_leader_url, PeerHealth::is_candidate, and forward_post_to_leader
+  checked: crates/arc-cli/src/trust_control.rs current_leader_url, PeerHealth::is_candidate, and forward_post_to_leader
   found: a peer marked Unhealthy is excluded from leader election for 3 seconds, and forward_post_to_leader falls back to local handling whenever current_leader_url(state) equals self
   implication: any transient sync/transport failure can cause a follower to stop forwarding writes and return its own local budget count, which matches the observed invocationCount = 1 symptom
 

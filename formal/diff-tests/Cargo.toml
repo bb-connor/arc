@@ -1,5 +1,5 @@
 [package]
-name = "pact-formal-diff-tests"
+name = "arc-formal-diff-tests"
 description = "Differential testing: random inputs compared against reference spec and production implementation"
 publish = false
 version.workspace = true
@@ -8,6 +8,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-pact-core = { path = "../../crates/pact-core" }
+arc-core = { package = "arc-core", path = "../../crates/arc-core" }
 proptest = "1.10"
 serde_json = { workspace = true }

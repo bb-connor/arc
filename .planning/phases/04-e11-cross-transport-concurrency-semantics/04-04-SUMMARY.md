@@ -22,7 +22,7 @@ completed: 2026-03-20T03:29:52Z
 
 # Phase 4 Plan 04-04: E11 Durable Async Completion Summary
 
-**PACT late async behavior is now session-owned enough to close Phase 4: kernel sessions own pending URL completions and late event queues, the direct edge drains those session queues explicitly, and remote HTTP proves wrapped notifications can still arrive after the originating POST turn is already over**
+**ARC late async behavior is now session-owned enough to close Phase 4: kernel sessions own pending URL completions and late event queues, the direct edge drains those session queues explicitly, and remote HTTP proves wrapped notifications can still arrive after the originating POST turn is already over**
 
 ## Accomplishments
 
@@ -35,10 +35,10 @@ completed: 2026-03-20T03:29:52Z
 
 ## Key Files
 
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-kernel/src/lib.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-kernel/src/lib.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
 - `.planning/ROADMAP.md`
 - `.planning/REQUIREMENTS.md`
 - `.planning/STATE.md`
@@ -53,9 +53,9 @@ completed: 2026-03-20T03:29:52Z
 ## Verification
 
 - `cargo fmt --all -- --check`
-- `cargo test -p pact-mcp-adapter -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-mcp-adapter -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
 - `cargo test --workspace`
 
 ## Next Phase Readiness

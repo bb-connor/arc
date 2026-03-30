@@ -7,7 +7,7 @@
 ## Phase Boundary
 
 Phase 15 removes the alpha-era single-issuer restriction from passport
-verification, evaluation, and presentation. PACT now accepts same-subject
+verification, evaluation, and presentation. ARC now accepts same-subject
 passport bundles containing independently signed credentials from multiple
 issuers, reports issuer identity explicitly, and keeps acceptance rules per
 credential instead of inventing any cross-issuer aggregate truth. This phase
@@ -59,9 +59,9 @@ special local compose command.
 - `.planning/REQUIREMENTS.md` -- `PASS-01`, `PASS-02`
 - `.planning/STATE.md` -- current milestone position after Phase 14
 - `docs/AGENT_PASSPORT_GUIDE.md` -- shipped passport/verifier contract
-- `crates/pact-credentials/src/lib.rs` -- core composition, verification, and
+- `crates/arc-credentials/src/lib.rs` -- core composition, verification, and
   evaluation semantics
-- `crates/pact-cli/src/passport.rs` and `crates/pact-cli/src/reputation.rs` --
+- `crates/arc-cli/src/passport.rs` and `crates/arc-cli/src/reputation.rs` --
   user-facing reporting surfaces
 
 </canonical_refs>

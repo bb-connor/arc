@@ -25,7 +25,7 @@ completed: 2026-03-25
 
 ## Accomplishments
 
-- requalified `pact-credentials`, `pact-reputation`, and `pact-policy` with
+- requalified `arc-credentials`, `arc-reputation`, and `arc-policy` with
   targeted crate test runs after the source-file splits
 - proved the workspace layering guardrail passes against the current manifests
 - closed the milestone with both refactor evidence and a codified dependency
@@ -34,6 +34,6 @@ completed: 2026-03-25
 ## Verification
 
 - `./scripts/check-workspace-layering.sh`
-- `cargo test -p pact-credentials -- --nocapture`
-- `cargo test -p pact-reputation -- --nocapture`
-- `cargo test -p pact-policy -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`
+- `cargo test -p arc-reputation -- --nocapture`
+- `cargo test -p arc-policy -- --nocapture`

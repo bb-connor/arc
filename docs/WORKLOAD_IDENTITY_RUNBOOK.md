@@ -1,0 +1,150 @@
+# Workload Identity and Attestation Runbook
+
+This runbook defines the supported operator boundary for ARC workload identity
+and attestation trust.
+
+## Supported Surface
+
+- SPIFFE-derived workload identity mapping through
+  `runtimeAttestation.workloadIdentity` or a SPIFFE `runtimeIdentity`
+- Azure Attestation JWT normalization into ARC `runtimeAttestation`
+- AWS Nitro attestation document verification into ARC `runtimeAttestation`
+- Google Confidential VM JWT normalization into ARC `runtimeAttestation`
+- canonical runtime-attestation appraisal artifacts that separate evidence
+  identity, normalized assertions, and vendor-scoped claims
+- signed runtime-attestation appraisal reports through
+  `arc trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
+- HushSpec runtime-assurance ceilings through
+  `extensions.runtime_assurance.tiers`
+- Explicit verifier trust and rebinding through
+  `extensions.runtime_assurance.trusted_verifiers`
+
+## Appraisal Boundary
+
+ARC now treats verifier output as two related but distinct surfaces:
+
+- `runtimeAttestation`: the bounded evidence ARC carries with governed and
+  issuance requests
+- `runtime-attestation appraisal`: the canonical adapter-facing contract ARC
+  uses to describe verifier family, evidence descriptor, normalized
+  assertions, vendor claims, and reason codes
+
+The appraisal contract is intentionally conservative. Vendor-specific claims
+remain vendor-scoped, and ARC only normalizes the small set of assertions it
+can defend across verifier families.
+
+Operators can export one signed appraisal report over that contract either
+locally with:
+
+- `arc trust appraisal export --input <runtime-attestation.json> --policy-file <policy.yaml>`
+
+or remotely through:
+
+- `POST /v1/reports/runtime-attestation-appraisal`
+
+The signed report captures the canonical appraisal plus the policy-visible
+accept or reject outcome ARC derived at export time. It is an operator-facing
+evidence artifact, not a claim of generic attestation-result interoperability.
+
+Today ARC ships three concrete verifier families against that boundary:
+
+- Azure MAA JWT evidence with optional SPIFFE workload-identity projection
+- AWS Nitro `COSE_Sign1` attestation documents with anchored certificate
+  trust, `SHA384` PCR comparison, freshness validation, optional nonce
+  matching, and debug-mode denial by default
+- Google Confidential VM JWT evidence with OpenID metadata and `JWKS`
+  resolution, `RS256` signature verification, audience pinning, hardware-model
+  allowlists, secure-boot enforcement, and conservative normalization of the
+  resulting verifier output
+
+## Trust Policy Shape
+
+```yaml
+extensions:
+  runtime_assurance:
+    tiers:
+      baseline:
+        minimum_attestation_tier: none
+        max_scope:
+          operations: ["invoke"]
+          ttl_seconds: 60
+      verified:
+        minimum_attestation_tier: verified
+        max_scope:
+          operations: ["invoke"]
+          ttl_seconds: 300
+    trusted_verifiers:
+      azure_contoso:
+        schema: arc.runtime-attestation.azure-maa.jwt.v1
+        verifier: https://maa.contoso.test
+        verifier_family: azure_maa
+        effective_tier: verified
+        max_evidence_age_seconds: 120
+        allowed_attestation_types: [sgx]
+      google_cvm_prod:
+        schema: arc.runtime-attestation.google-confidential-vm.jwt.v1
+        verifier: https://confidentialcomputing.googleapis.com
+        verifier_family: google_attestation
+        effective_tier: verified
+        max_evidence_age_seconds: 120
+        allowed_attestation_types: [confidential_vm]
+        required_assertions:
+          hardwareModel: GCP_AMD_SEV
+          secureBoot: enabled
+```
+
+## Fail-Closed Conditions
+
+- explicit `workloadIdentity` conflicts with raw `runtimeIdentity`
+- attestation evidence is expired or older than the configured verifier rule
+- attestation schema or verifier does not match any configured trusted verifier
+- attestation claims are missing a required attestation type, carry a
+  disallowed type, or fail a configured `required_assertions` match
+- Nitro evidence is malformed, uses an unsupported digest or algorithm, fails
+  certificate-chain anchoring, carries mismatched PCRs, or mismatches the
+  configured nonce
+- Google Confidential VM evidence is malformed, signed by an unexpected key,
+  carries a mismatched audience, fails secure-boot requirements, or presents
+  an unapproved hardware model
+
+## Recovery Guidance
+
+- Verifier mismatch:
+  normalize the configured verifier URL exactly to the upstream issuer or
+  relying-party string ARC records in `runtimeAttestation.verifier`.
+- Stale evidence:
+  refresh the upstream attestation and resend the governed or issuance request;
+  do not extend `max_evidence_age_seconds` just to bypass freshness checks.
+- Verifier outage:
+  remove or omit `runtimeAttestation` only for flows that are intentionally
+  allowed to fall back to a weaker issuance tier. Requests that require
+  stronger runtime assurance should stay denied until verifier service
+  recovers.
+- Attestation-type mismatch:
+  either update the verifier rule to the supported attestation class or fix the
+  upstream workload so it emits the intended trusted evidence.
+- Nitro measurement mismatch:
+  refresh the enclave image or update the configured expected PCRs only after
+  confirming the new measurement is an intentional release.
+- Nitro chain or nonce mismatch:
+  treat it as a trust failure, not a transient transport failure. Reissue the
+  attestation document from the enclave and confirm the trusted root and nonce
+  configuration are exact.
+- Google audience or hardware mismatch:
+  confirm the workload is requesting a token for the configured relying party
+  and that the verifier rule's `required_assertions` reflect the intended
+  production hardware and boot posture exactly.
+
+## Qualification Commands
+
+- `cargo test -p arc-core appraisal -- --nocapture`
+- `cargo test -p arc-core runtime_attestation_trust_policy -- --nocapture`
+- `cargo test -p arc-policy runtime_assurance_validation -- --nocapture`
+- `cargo test -p arc-control-plane azure_maa -- --nocapture`
+- `cargo test -p arc-control-plane aws_nitro -- --nocapture`
+- `cargo test -p arc-control-plane google_confidential_vm -- --nocapture`
+- `cargo test -p arc-control-plane runtime_assurance_policy -- --nocapture`
+- `cargo test -p arc-kernel governed_request_denies_untrusted_attestation_when_trust_policy_is_configured -- --nocapture`
+- `cargo test -p arc-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
+- `cargo test -p arc-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`

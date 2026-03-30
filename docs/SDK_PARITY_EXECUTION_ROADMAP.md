@@ -1,4 +1,4 @@
-# PACT SDK Parity Execution Roadmap
+# ARC SDK Parity Execution Roadmap
 
 ## Purpose
 
@@ -6,7 +6,7 @@ Turn the current bindings and SDK planning into a short-horizon execution roadma
 
 This roadmap is intentionally narrower than the full repo roadmap. It optimizes for one outcome:
 
-- make SDK parity real enough that PACT has a credible multi-language adoption surface
+- make SDK parity real enough that ARC has a credible multi-language adoption surface
 
 It does not replace the broader release-closeout work tracked in [POST_REVIEW_EXECUTION_PLAN.md](POST_REVIEW_EXECUTION_PLAN.md). It is the interop and adoption lane that should feed into that closeout.
 
@@ -14,9 +14,9 @@ It does not replace the broader release-closeout work tracked in [POST_REVIEW_EX
 
 As of 2026-03-20, the roadmap has materially advanced beyond the original starting point:
 
-- `pact-ts` is package-backed across the current live conformance surface
-- `pact-py` exists as a pure Python package and backs the current live conformance peer
-- `pact-go` exists as a pure Go module with live Wave 1 through Wave 5 conformance coverage and no mandatory CGO
+- `arc-ts` is package-backed across the current live conformance surface
+- `arc-py` exists as a pure Python package and backs the current live conformance peer
+- `arc-go` exists as a pure Go module with live Wave 1 through Wave 5 conformance coverage and no mandatory CGO
 - the SDK feature matrix and repo parity script now provide checked-in parity evidence across TS, Python, and Go
 
 The remaining work after this execution pass is mostly hardening and adoption work:
@@ -30,22 +30,22 @@ The remaining work after this execution pass is mostly hardening and adoption wo
 
 At the start of this roadmap, the repo already has:
 
-- `crates/pact-bindings-core` with canonical JSON, hashing, signing, receipt, capability, and manifest helpers
+- `crates/arc-bindings-core` with canonical JSON, hashing, signing, receipt, capability, and manifest helpers
 - checked-in shared vectors under `tests/bindings/vectors/`
-- `packages/sdk/pact-ts` invariant helpers plus a low-level transport/session layer
-- the JS conformance peer importing shared transport code from `pact-ts`
+- `packages/sdk/arc-ts` invariant helpers plus a low-level transport/session layer
+- the JS conformance peer importing shared transport code from `arc-ts`
 - live Wave 1 through Wave 5 JS and Python conformance green against the remote edge
 
 The repo does not yet have:
 
-- a first-class `pact-ts` client/session API
-- a `packages/sdk/pact-py` package
-- a `packages/sdk/pact-go` package
+- a first-class `arc-ts` client/session API
+- a `packages/sdk/arc-py` package
+- a `packages/sdk/arc-go` package
 - a checked-in SDK feature matrix with release gates
 
 ## North Star
 
-By the end of this roadmap, PACT should be able to say all of the following with checked-in evidence:
+By the end of this roadmap, ARC should be able to say all of the following with checked-in evidence:
 
 - TypeScript has a package-backed remote-edge SDK that replaces the bespoke JS peer logic for current conformance waves.
 - Python has a package-backed remote-edge SDK that replaces the bespoke Python peer logic for current conformance waves.
@@ -56,7 +56,7 @@ By the end of this roadmap, PACT should be able to say all of the following with
 
 These constraints hold for the full roadmap:
 
-- `pact-bindings-core` stays invariant-only
+- `arc-bindings-core` stays invariant-only
 - no session runtime, auth flows, callback routers, or trust-control clients move into Rust bindings
 - WASM, PyO3, CGO, and C ABI work are explicitly deferred unless a milestone says otherwise
 - pure remote-edge usability beats native acceleration in this window
@@ -65,9 +65,9 @@ These constraints hold for the full roadmap:
 
 The roadmap is successful if all of the following are true:
 
-1. `pact-ts` exposes a real `Client` and `Session` API and the JS peer becomes mostly scenario code.
-2. `pact-py` exists as a pure Python package and the Python peer routes through it.
-3. `pact-go` exists as a pure Go module and proves at least the first meaningful remote-edge slice with `CGO_ENABLED=0`.
+1. `arc-ts` exposes a real `Client` and `Session` API and the JS peer becomes mostly scenario code.
+2. `arc-py` exists as a pure Python package and the Python peer routes through it.
+3. `arc-go` exists as a pure Go module and proves at least the first meaningful remote-edge slice with `CGO_ENABLED=0`.
 4. vectors and conformance gates are the evidence source for parity claims.
 5. native acceleration remains optional and does not define package boundaries.
 
@@ -75,9 +75,9 @@ The roadmap is successful if all of the following are true:
 
 Do not spend this 4 to 6 week window on:
 
-- `crates/pact-bindings-ffi`
-- `crates/pact-bindings-wasm`
-- `packages/sdk/pact-py/pact-native`
+- `crates/arc-bindings-ffi`
+- `crates/arc-bindings-wasm`
+- `packages/sdk/arc-py/arc-native`
 - Go CGO bridge work
 - browser-first packaging work
 - moving full SDK runtime logic behind Rust FFI
@@ -98,14 +98,14 @@ Objective:
 
 Deliverables:
 
-- `docs/BINDINGS_API.md` or equivalent short API contract for `pact-bindings-core`
+- `docs/BINDINGS_API.md` or equivalent short API contract for `arc-bindings-core`
 - checked-in SDK feature matrix under `tests/bindings/matrix/`
 - one script or CI lane that names the required parity checks by language
 - explicit alpha support table for TS, Python, and Go
 
 Tasks:
 
-- freeze the current `pact-bindings-core` public surface and stable error taxonomy
+- freeze the current `arc-bindings-core` public surface and stable error taxonomy
 - define the SDK feature rows:
   - invariants
   - initialize/session
@@ -132,15 +132,15 @@ Timebox:
 
 Objective:
 
-- turn `pact-ts` from low-level helpers into the first real package-backed SDK
+- turn `arc-ts` from low-level helpers into the first real package-backed SDK
 
 Deliverables:
 
-- `packages/sdk/pact-ts/src/client/`
-- `packages/sdk/pact-ts/src/session/`
-- `packages/sdk/pact-ts/src/auth/`
-- `packages/sdk/pact-ts/src/tasks/`
-- `packages/sdk/pact-ts/src/nested/`
+- `packages/sdk/arc-ts/src/client/`
+- `packages/sdk/arc-ts/src/session/`
+- `packages/sdk/arc-ts/src/auth/`
+- `packages/sdk/arc-ts/src/tasks/`
+- `packages/sdk/arc-ts/src/nested/`
 - public `Client` and `Session` API exported from the package root
 - updated README with alpha scope, examples, and unsupported surfaces
 
@@ -153,10 +153,10 @@ Tasks:
 
 Acceptance bar:
 
-- `pact-ts` root exports more than invariants and transport
+- `arc-ts` root exports more than invariants and transport
 - the JS peer uses package modules for all remote-edge behavior in current waves
-- `npm --prefix packages/sdk/pact-ts test` is green
-- Wave 1 through Wave 5 live conformance is green with the JS peer backed by `pact-ts`
+- `npm --prefix packages/sdk/arc-ts test` is green
+- Wave 1 through Wave 5 live conformance is green with the JS peer backed by `arc-ts`
 - the README clearly marks the package as alpha and lists unsupported surfaces explicitly
 
 ## Milestone 3: Python Foundation
@@ -171,8 +171,8 @@ Objective:
 
 Deliverables:
 
-- `packages/sdk/pact-py/pyproject.toml`
-- `packages/sdk/pact-py/src/pact/`
+- `packages/sdk/arc-py/pyproject.toml`
+- `packages/sdk/arc-py/src/arc/`
 - Python errors, models, invariants, transport, and session modules
 - vector tests for Python invariant helpers
 
@@ -186,7 +186,7 @@ Tasks:
 
 Acceptance bar:
 
-- `pip install -e packages/sdk/pact-py` works without a Rust toolchain
+- `pip install -e packages/sdk/arc-py` works without a Rust toolchain
 - Python vector tests are green against the checked-in shared fixtures
 - the package can initialize a remote session and perform low-level request execution in tests
 - no PyO3 or maturin dependency is required for the package to function
@@ -211,17 +211,17 @@ Deliverables:
 
 Tasks:
 
-- move the current peer transport and callback logic into `packages/sdk/pact-py`
+- move the current peer transport and callback logic into `packages/sdk/arc-py`
 - keep transcript/debug hooks available to the peer
 - route the existing Python peer through the package for all current scenarios
 - document the alpha surface and explicit non-goals
 
 Acceptance bar:
 
-- Wave 1 through Wave 5 live conformance is green with the Python peer backed by `pact-py`
+- Wave 1 through Wave 5 live conformance is green with the Python peer backed by `arc-py`
 - Python vector tests remain green
 - the package is still pure Python
-- `pact-native` remains deferred and is not required for any current parity claim
+- `arc-native` remains deferred and is not required for any current parity claim
 
 ## Milestone 5: Go Alpha Foundation
 
@@ -235,12 +235,12 @@ Objective:
 
 Deliverables:
 
-- `packages/sdk/pact-go/go.mod`
-- `packages/sdk/pact-go/client/`
-- `packages/sdk/pact-go/transport/`
-- `packages/sdk/pact-go/session/`
-- `packages/sdk/pact-go/auth/`
-- `packages/sdk/pact-go/invariants/`
+- `packages/sdk/arc-go/go.mod`
+- `packages/sdk/arc-go/client/`
+- `packages/sdk/arc-go/transport/`
+- `packages/sdk/arc-go/session/`
+- `packages/sdk/arc-go/auth/`
+- `packages/sdk/arc-go/invariants/`
 - first Go vector tests
 
 Tasks:
@@ -304,23 +304,23 @@ Acceptance bar:
 ### Week 2
 
 - finish TS alpha API
-- route JS peer fully through `pact-ts`
+- route JS peer fully through `arc-ts`
 - keep all live waves green
 
 ### Week 3
 
-- scaffold `pact-py`
+- scaffold `arc-py`
 - land Python vectors and transport/session foundation
 
 ### Week 4
 
 - finish Python alpha API
-- route Python peer through `pact-py`
+- route Python peer through `arc-py`
 - keep all live waves green
 
 ### Week 5
 
-- scaffold `pact-go`
+- scaffold `arc-go`
 - land Go invariants, transport, and first peer coverage
 
 ### Week 6
@@ -342,7 +342,7 @@ The main execution risks should be reduced in this order:
 
 Use these rules to keep the roadmap on track:
 
-- if a feature is needed only for byte-sensitive invariant equivalence, prefer `pact-bindings-core`
+- if a feature is needed only for byte-sensitive invariant equivalence, prefer `arc-bindings-core`
 - if a feature is about transport, callbacks, auth, tasks, or ergonomics, keep it native to the language SDK
 - if a native bridge would delay package-backed remote-edge parity, defer it
 - if Go support would force CGO before remote-edge shape is proven, defer that portion
@@ -352,10 +352,10 @@ Use these rules to keep the roadmap on track:
 
 At the end of this roadmap, the desired project state is:
 
-- `pact-bindings-core` is stable and still small
-- `pact-ts` is the real JS/TS remote-edge package for current conformance behavior
-- `pact-py` is the real Python remote-edge package for current conformance behavior
-- `pact-go` exists as a real pure Go SDK foundation
+- `arc-bindings-core` is stable and still small
+- `arc-ts` is the real JS/TS remote-edge package for current conformance behavior
+- `arc-py` is the real Python remote-edge package for current conformance behavior
+- `arc-go` exists as a real pure Go SDK foundation
 - parity status is visible in the repo and backed by repeatable checks
 
 That is the point where optional acceleration work becomes justified:

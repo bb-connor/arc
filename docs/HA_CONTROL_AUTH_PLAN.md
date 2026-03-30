@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move PACT from:
+Move ARC from:
 
 - one shared trust-control service with optional local OAuth metadata
 
@@ -16,7 +16,7 @@ to:
 
 As shipped before this rewrite:
 
-- `pact trust serve` centralized authority, revocations, and receipts behind one HTTP service
+- `arc trust serve` centralized authority, revocations, and receipts behind one HTTP service
 - hosted MCP edges could use that service through `--control-url` and `--control-token`
 - hosted MCP edges could advertise protected-resource and auth-server metadata
 - hosted MCP edges could verify JWT bearer tokens
@@ -30,9 +30,9 @@ As shipped before this rewrite:
 The code already has the right seams:
 
 - kernel extension points for `CapabilityAuthority`, `ReceiptStore`, `RevocationStore`, and now `BudgetStore`
-- CLI/runtime construction concentrated in `crates/pact-cli/src/main.rs`
-- hosted HTTP auth and admin behavior concentrated in `crates/pact-cli/src/remote_mcp.rs`
-- control-plane HTTP client and server behavior concentrated in `crates/pact-cli/src/trust_control.rs`
+- CLI/runtime construction concentrated in `crates/arc-cli/src/main.rs`
+- hosted HTTP auth and admin behavior concentrated in `crates/arc-cli/src/remote_mcp.rs`
+- control-plane HTTP client and server behavior concentrated in `crates/arc-cli/src/trust_control.rs`
 
 The rewrite should preserve those seams instead of inventing a second trust model.
 
@@ -40,7 +40,7 @@ The rewrite should preserve those seams instead of inventing a second trust mode
 
 ### 1. Control cluster model
 
-PACT will use a pragmatic replicated control cluster:
+ARC will use a pragmatic replicated control cluster:
 
 - every trust-control node owns local durable SQLite state
 - every node knows its own `advertise_url` and a list of `peer_urls`
@@ -88,7 +88,7 @@ Rules:
 
 ### 5. Hosted auth-server behavior
 
-`pact mcp serve-http` gains a hosted OAuth authorization server when configured with a local auth signing seed.
+`arc mcp serve-http` gains a hosted OAuth authorization server when configured with a local auth signing seed.
 
 Supported flows:
 
@@ -184,7 +184,7 @@ Deliverables:
 
 Acceptance:
 
-- `pact check` and hosted MCP nodes enforce one shared budget across nodes
+- `arc check` and hosted MCP nodes enforce one shared budget across nodes
 - the same CLI invocation can survive a dead first control URL
 
 ### D. Hosted authorization server
@@ -224,7 +224,7 @@ Acceptance:
 
 Recommended deployment shape:
 
-- two or more `pact trust serve` nodes
+- two or more `arc trust serve` nodes
 - one local SQLite dataset per control node
 - short peer replication interval
 - hosted MCP nodes configured with a cluster `--control-url` list

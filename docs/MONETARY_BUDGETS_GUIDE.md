@@ -1,6 +1,6 @@
 # Monetary Budgets Guide
 
-Monetary budgets let operators cap how much an agent can spend when invoking cost-bearing tools. Budgets are enforced by the PACT kernel before each tool invocation using an atomic read-check-increment transaction. An invocation is denied at the kernel boundary if it would exceed either the per-call cap or the lifetime total.
+Monetary budgets let operators cap how much an agent can spend when invoking cost-bearing tools. Budgets are enforced by the ARC kernel before each tool invocation using an atomic read-check-increment transaction. An invocation is denied at the kernel boundary if it would exceed either the per-call cap or the lifetime total.
 
 If you need the planning step that happens before budget issuance, see
 [TOOL_PRICING_GUIDE.md](TOOL_PRICING_GUIDE.md). That guide covers how
@@ -79,7 +79,7 @@ When designing budgets for sensitive tools, size `max_total_cost` conservatively
 
 ## FinancialReceiptMetadata on Receipts
 
-Every allowed invocation under a monetary grant produces a `PactReceipt` with a `"financial"` key in its `metadata` field. The value is a `FinancialReceiptMetadata` object:
+Every allowed invocation under a monetary grant produces a `ArcReceipt` with a `"financial"` key in its `metadata` field. The value is a `FinancialReceiptMetadata` object:
 
 ```rust
 pub struct FinancialReceiptMetadata {

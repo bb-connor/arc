@@ -50,7 +50,7 @@ The established libraries/tools for this domain:
 ### Core
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| `axum` | 0.8 | Trust-control HTTP serving | Already owns the control-plane endpoint layer in `pact-cli` |
+| `axum` | 0.8 | Trust-control HTTP serving | Already owns the control-plane endpoint layer in `arc-cli` |
 | `rusqlite` | 0.37 | Durable authority, receipt, revocation, and budget state | Existing store layer already depends on it and uses WAL/FULL sync |
 | `tokio` | 1.x | Cluster sync loop and async server runtime | Existing async control-plane execution model |
 | `tracing` | 0.1 | Runtime diagnostics | Existing logging and warning surface |
@@ -80,9 +80,9 @@ The established libraries/tools for this domain:
 
 ### Recommended Project Structure
 ```text
-crates/pact-cli/src/trust_control.rs     # routing, forwarding, sync orchestration, debug views
-crates/pact-kernel/src/budget_store.rs   # monotonic budget persistence/cursor semantics
-crates/pact-cli/tests/trust_cluster.rs   # HA proving ground and timeout diagnostics
+crates/arc-cli/src/trust_control.rs     # routing, forwarding, sync orchestration, debug views
+crates/arc-kernel/src/budget_store.rs   # monotonic budget persistence/cursor semantics
+crates/arc-cli/tests/trust_cluster.rs   # HA proving ground and timeout diagnostics
 ```
 
 ### Pattern 1: Internal status views for cluster debugging
@@ -183,7 +183,7 @@ fn current_leader_url(state: &TrustServiceState) -> Option<String> {
     candidates.into_iter().next()
 }
 ```
-Source: `crates/pact-cli/src/trust_control.rs`
+Source: `crates/arc-cli/src/trust_control.rs`
 
 ### Budget delta cursor today
 ```rust
@@ -197,7 +197,7 @@ pub fn list_usages_after(
     // ordered by updated_at ASC, capability_id ASC, grant_index ASC
 }
 ```
-Source: `crates/pact-kernel/src/budget_store.rs`
+Source: `crates/arc-kernel/src/budget_store.rs`
 
 ### Trust-cluster timeout proving point
 ```rust
@@ -213,7 +213,7 @@ wait_until("leader budget visibility", Duration::from_secs(90), || {
         && budgets["usages"][0]["invocationCount"].as_u64() == Some(1)
 });
 ```
-Source: `crates/pact-cli/tests/trust_cluster.rs`
+Source: `crates/arc-cli/tests/trust_cluster.rs`
 </code_examples>
 
 <sota_updates>
@@ -252,14 +252,14 @@ Source: `crates/pact-cli/tests/trust_cluster.rs`
 ### Primary (HIGH confidence)
 - `docs/epics/E9-ha-trust-control-reliability.md` - E9 outcome, slices, and acceptance criteria
 - `docs/HA_CONTROL_AUTH_PLAN.md` - HA control-plane design and non-goals
-- `crates/pact-cli/src/trust_control.rs` - Current forwarding, leader selection, sync, and status code
-- `crates/pact-kernel/src/budget_store.rs` - Current budget storage and delta cursor logic
-- `crates/pact-cli/tests/trust_cluster.rs` - Failing/critical proving scenario
+- `crates/arc-cli/src/trust_control.rs` - Current forwarding, leader selection, sync, and status code
+- `crates/arc-kernel/src/budget_store.rs` - Current budget storage and delta cursor logic
+- `crates/arc-cli/tests/trust_cluster.rs` - Failing/critical proving scenario
 
 ### Secondary (MEDIUM confidence)
-- `crates/pact-kernel/src/authority.rs` - Authority snapshot convergence model
-- `crates/pact-kernel/src/receipt_store.rs` - Receipt sequencing model
-- `crates/pact-kernel/src/revocation_store.rs` - Revocation cursor model
+- `crates/arc-kernel/src/authority.rs` - Authority snapshot convergence model
+- `crates/arc-kernel/src/receipt_store.rs` - Receipt sequencing model
+- `crates/arc-kernel/src/revocation_store.rs` - Revocation cursor model
 </sources>
 
 <metadata>

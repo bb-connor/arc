@@ -1,13 +1,13 @@
-# PACT v2.0 Migration Guide
+# ARC v2.0 Migration Guide
 
-This guide covers what changed between PACT v1.0 and v2.0 and how to update
+This guide covers what changed between ARC v1.0 and v2.0 and how to update
 your deployment and code.
 
 ---
 
 ## What Changed
 
-PACT v2.0 adds enforcement, compliance, and observability features on top of
+ARC v2.0 adds enforcement, compliance, and observability features on top of
 the v1.0 protocol. The core capability model, receipt format, and wire
 protocol are backward-compatible. New fields are optional in all structures.
 No existing API endpoints were removed.
@@ -16,14 +16,14 @@ No existing API endpoints were removed.
 
 | Feature | Crate | Summary |
 |---------|-------|---------|
-| Monetary budgets | `pact-core`, `pact-kernel` | `ToolGrant` gains `max_cost_per_invocation` and `max_total_cost` |
-| DPoP proof binding | `pact-kernel` | Per-invocation Ed25519 proof-of-possession |
-| Receipt Merkle checkpointing | `pact-kernel` | Count-triggered signed tree heads with inclusion proofs |
-| Receipt query API | `pact-cli` | `GET /v1/receipts/query` with 9 filter dimensions and cursor pagination |
-| Agent-subject receipt filter | `pact-cli` | Filter receipts by agent's Ed25519 public key |
-| Nested flow receipts | `pact-core`, `pact-kernel` | `ChildRequestReceipt` for sub-operations |
-| SIEM exporter pipeline | `pact-siem` | Cursor-pull loop exporting to Splunk HEC and Elasticsearch |
-| Financial receipt metadata | `pact-core` | `FinancialReceiptMetadata` attached to monetary receipts |
+| Monetary budgets | `arc-core`, `arc-kernel` | `ToolGrant` gains `max_cost_per_invocation` and `max_total_cost` |
+| DPoP proof binding | `arc-kernel` | Per-invocation Ed25519 proof-of-possession |
+| Receipt Merkle checkpointing | `arc-kernel` | Count-triggered signed tree heads with inclusion proofs |
+| Receipt query API | `arc-cli` | `GET /v1/receipts/query` with 9 filter dimensions and cursor pagination |
+| Agent-subject receipt filter | `arc-cli` | Filter receipts by agent's Ed25519 public key |
+| Nested flow receipts | `arc-core`, `arc-kernel` | `ChildRequestReceipt` for sub-operations |
+| SIEM exporter pipeline | `arc-siem` | Cursor-pull loop exporting to Splunk HEC and Elasticsearch |
+| Financial receipt metadata | `arc-core` | `FinancialReceiptMetadata` attached to monetary receipts |
 
 ---
 
@@ -73,7 +73,7 @@ v2.0 `ToolGrant` type. The new fields are tagged with
 **1. Issue a capability token with monetary limits.**
 
 ```rust
-use pact_core::capability::{MonetaryAmount, ToolGrant};
+use arc_core::capability::{MonetaryAmount, ToolGrant};
 
 let grant = ToolGrant {
     server_id: "payments-server".to_string(),
@@ -103,7 +103,7 @@ or push `total_cost_charged` beyond `max_total_cost`.
 
 **3. Read financial metadata from receipts.**
 
-Allowed invocations produce a `PactReceipt` with financial metadata under the
+Allowed invocations produce a `ArcReceipt` with financial metadata under the
 `"financial"` key in `metadata`:
 
 ```rust
@@ -135,9 +135,9 @@ let grant = ToolGrant {
 **2. Build a DPoP proof in the agent before each invocation.**
 
 ```rust
-use pact_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
-use pact_core::crypto::sha256_hex;
-use pact_core::canonical::canonical_json_bytes;
+use arc_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+use arc_core::crypto::sha256_hex;
+use arc_core::canonical::canonical_json_bytes;
 
 let action_hash = sha256_hex(&canonical_json_bytes(&arguments)?);
 
@@ -171,25 +171,25 @@ within the TTL window. Use a random string of at least 16 bytes for the nonce.
 
 ## How to Set Up SIEM
 
-The `pact-siem` crate provides a cursor-pull loop that reads signed receipts
+The `arc-siem` crate provides a cursor-pull loop that reads signed receipts
 from the Kernel's SQLite database and forwards them to Splunk HEC or
 Elasticsearch.
 
-**1. Add `pact-siem` to your binary.**
+**1. Add `arc-siem` to your binary.**
 
 ```toml
 [dependencies]
-pact-siem = { path = "../crates/pact-siem" }
+arc-siem = { path = "../crates/arc-siem" }
 ```
 
 **2. Configure and run the ExporterManager.**
 
 ```rust
-use pact_siem::manager::{ExporterManager, SiemConfig};
-use pact_siem::exporters::splunk::SplunkExporter;
+use arc_siem::manager::{ExporterManager, SiemConfig};
+use arc_siem::exporters::splunk::SplunkExporter;
 
 let config = SiemConfig {
-    db_path: "/var/lib/pact/receipts.sqlite3".into(),
+    db_path: "/var/lib/arc/receipts.sqlite3".into(),
     poll_interval: Duration::from_secs(5),
     batch_size: 100,
     max_retries: 3,
@@ -207,7 +207,7 @@ let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
 manager.run(cancel_rx).await;
 ```
 
-`pact-siem` opens the receipt database read-only. The Kernel does not need to
+`arc-siem` opens the receipt database read-only. The Kernel does not need to
 be stopped during SIEM export. On restart, the manager re-exports from seq=0;
 ensure your SIEM backend is configured for idempotent ingest.
 
@@ -215,7 +215,7 @@ ensure your SIEM backend is configured for idempotent ingest.
 
 ## How to Access the Receipt Query API
 
-The `GET /v1/receipts/query` endpoint is served by the `pact-cli` trust
+The `GET /v1/receipts/query` endpoint is served by the `arc-cli` trust
 control server.
 
 **Basic query:**
@@ -248,12 +248,12 @@ GET /v1/receipts/query?agentSubject=<hex-encoded-ed25519-pubkey>&limit=50
 ```
 
 All filter parameters are optional and combinable. Filters are applied with
-AND semantics. See `ReceiptQueryHttpQuery` in `pact-cli/src/trust_control.rs`
+AND semantics. See `ReceiptQueryHttpQuery` in `arc-cli/src/trust_control.rs`
 for the full parameter list.
 
 The response includes `totalCount` (full filtered set, not just this page),
 `nextCursor` (present when more pages exist), and `receipts` (array of
-`PactReceipt` objects, ordered by `seq` ascending).
+`ArcReceipt` objects, ordered by `seq` ascending).
 
 ---
 

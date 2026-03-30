@@ -1,9 +1,9 @@
 # A2A Adapter Guide
 
-`pact-a2a-adapter` is the first PACT bridge for the A2A v1.0.0 protocol. It is
+`arc-a2a-adapter` is the first ARC bridge for the A2A v1.0.0 protocol. It is
 intentionally thin: discover an Agent Card, select a supported interface, map
-advertised A2A skills into PACT tools, and execute blocking or streaming A2A
-message operations through the normal PACT kernel guard and receipt pipeline.
+advertised A2A skills into ARC tools, and execute blocking or streaming A2A
+message operations through the normal ARC kernel guard and receipt pipeline.
 
 ## Current Scope
 
@@ -23,7 +23,7 @@ message operations through the normal PACT kernel guard and receipt pipeline.
   `httpAuthSecurityScheme` with `scheme: basic`
 - supports mutual TLS when the Agent Card declares `mtlsSecurityScheme` and
   the adapter is configured with a client certificate plus trusted root CA
-- exposes one PACT tool per advertised A2A skill
+- exposes one ARC tool per advertised A2A skill
 - supports explicit adapter-level request headers, query params, and cookies
   for provider-specific partner integration without per-call glue
 - negotiates required bearer, HTTP Basic, and API key
@@ -33,7 +33,7 @@ message operations through the normal PACT kernel guard and receipt pipeline.
   skills, required security schemes, and allowed interface origins
 - supports an optional durable task registry for follow-up correlation across
   adapter restarts
-- fails closed when the Agent Card requires auth schemes PACT still does not
+- fails closed when the Agent Card requires auth schemes ARC still does not
   implement
 - propagates interface tenant metadata into `SendMessage` and HTTP task
   lifecycle requests
@@ -49,14 +49,14 @@ metadata:
 
 ```json
 {
-  "pact": {
+  "arc": {
     "targetSkillId": "research",
     "targetSkillName": "Research"
   }
 }
 ```
 
-That keeps the protocol boundary explicit while still giving PACT stable
+That keeps the protocol boundary explicit while still giving ARC stable
 per-skill tool names and capability scoping.
 
 Auth negotiation is equally explicit. The adapter will only send credentials
@@ -75,16 +75,16 @@ that satisfy a declared A2A requirement set. Today that means:
 - named API keys when the Agent Card declares an `apiKeySecurityScheme` with
   `location: header`, `location: query`, or `location: cookie`
 
-If the card requires a scheme PACT does not implement yet, the adapter denies
+If the card requires a scheme ARC does not implement yet, the adapter denies
 the invocation before sending the tool call upstream.
 
-Task-history semantics are also fail-closed. PACT will only send
+Task-history semantics are also fail-closed. ARC will only send
 `historyLength` on `SendMessage` or `GetTask` when the Agent Card advertises
 `capabilities.stateTransitionHistory = true`.
 
 Lifecycle payload validation is fail-closed too. `SendMessage` task responses,
 `GetTask` results, streamed `task` objects, `statusUpdate` events, and
-`artifactUpdate` events must contain the required lifecycle fields PACT relies
+`artifactUpdate` events must contain the required lifecycle fields ARC relies
 on (`id`, `status.state`, `taskId`, and `artifact` where applicable).
 
 HTTP auth is fail-closed too. If the Agent Card requires HTTP Basic auth and
@@ -95,12 +95,19 @@ Partner admission is explicit too. If you configure a partner policy, discovery
 fails closed unless the selected interface, tenant, skills, and required
 security scheme names match the contract you expect for that partner.
 
+When an A2A call is executed through ARC governed-transaction policy, upstream
+task lineage should be bound into `governed_intent.call_chain`, not attached as
+freeform operator notes. ARC preserves that delegated provenance in the signed
+receipt and projects it later through `/v1/reports/authorization-context` or
+`arc trust authorization-context list`, alongside derived authorization-detail
+scope for commerce and metered-billing context.
+
 ## Rust Example
 
 ```rust
-use pact_a2a_adapter::{A2aAdapter, A2aAdapterConfig, A2aPartnerPolicy};
-use pact_core::crypto::Keypair;
-use pact_kernel::PactKernel;
+use arc_a2a_adapter::{A2aAdapter, A2aAdapterConfig, A2aPartnerPolicy};
+use arc_core::crypto::Keypair;
+use arc_kernel::ArcKernel;
 
 let manifest_key = Keypair::generate();
 let adapter = A2aAdapter::discover(
@@ -123,16 +130,16 @@ let adapter = A2aAdapter::discover(
             .require_security_scheme("oauthAuth")
             .allow_interface_origin("https://agent.example.com"),
     )
-    .with_task_registry_file(".pact/a2a-task-registry.json")
+    .with_task_registry_file(".arc/a2a-task-registry.json")
 )?;
 
-let mut kernel = PactKernel::new(/* ... */);
+let mut kernel = ArcKernel::new(/* ... */);
 kernel.register_tool_server(Box::new(adapter));
 ```
 
 ## Tool Contract
 
-Each generated PACT tool accepts:
+Each generated ARC tool accepts:
 
 - `message`: plain-text content sent as an A2A text part
 - `data`: structured JSON sent as an A2A data part
@@ -172,7 +179,7 @@ Each generated PACT tool accepts:
 
 These follow-up and task-management modes are mutually exclusive with the
 `SendMessage` fields above. When `get_task` is present, the adapter issues A2A
-`GetTask` and returns the resulting `Task` under the normal PACT tool response
+`GetTask` and returns the resulting `Task` under the normal ARC tool response
 shape. `get_task.history_length` also requires the Agent Card to advertise
 `capabilities.stateTransitionHistory`:
 
@@ -189,7 +196,7 @@ shape. `get_task.history_length` also requires the Agent Card to advertise
 
 Without `get_task`, at least one of `message` or `data` is required.
 
-When `stream: true`, the adapter issues A2A `SendStreamingMessage` and the PACT
+When `stream: true`, the adapter issues A2A `SendStreamingMessage` and the ARC
 kernel surfaces each upstream A2A `StreamResponse` as one stream chunk. The
 chunk payload is the raw A2A object, for example:
 
@@ -214,7 +221,7 @@ chunk payload is the raw A2A object, for example:
 ```
 
 If the A2A server returns a task instead of a terminal message, poll it later
-through the same PACT tool:
+through the same ARC tool:
 
 ```json
 {
@@ -236,7 +243,7 @@ state, use `subscribe_task`:
 }
 ```
 
-The adapter issues A2A `SubscribeToTask` and the PACT kernel surfaces each
+The adapter issues A2A `SubscribeToTask` and the ARC kernel surfaces each
 upstream `StreamResponse` as one stream chunk using the same chunk semantics as
 `SendStreamingMessage`.
 
@@ -261,7 +268,7 @@ task notification config management through the same tool surface:
 {
   "create_push_notification_config": {
     "task_id": "task-1",
-    "url": "https://callbacks.example.com/pact",
+    "url": "https://callbacks.example.com/arc",
     "token": "notify-token",
     "authentication": {
       "scheme": "bearer",
@@ -298,7 +305,7 @@ to survive adapter recreation or process restart.
 
 The registry persists one fail-closed binding per observed task id:
 
-- PACT tool name
+- ARC tool name
 - selected interface URL
 - protocol binding
 - tenant
@@ -344,7 +351,7 @@ The current adapter is verified by:
   through a local HTTPS A2A server that requires a client certificate
 - direct tenant-shaping tests for `SendMessage` and HTTP `GetTask` requests
 - a kernel end-to-end test that proves a mediated A2A call produces an allow
-  receipt with the expected PACT server/tool scoping
+  receipt with the expected ARC server/tool scoping
 - a kernel end-to-end streaming test that proves `SendStreamingMessage`
   produces streamed output plus a truthful allow receipt
 - a kernel end-to-end incomplete-stream test that proves prematurely closed

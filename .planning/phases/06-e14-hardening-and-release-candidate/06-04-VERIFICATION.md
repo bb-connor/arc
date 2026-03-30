@@ -23,6 +23,6 @@ requirements:
 
 - `cargo fmt --all -- --check`
 - `cargo clippy --workspace -- -D warnings`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
-- `cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture`
 - `./scripts/qualify-release.sh`

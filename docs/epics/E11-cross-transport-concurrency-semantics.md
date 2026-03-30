@@ -12,7 +12,7 @@ The remote `tasks-cancel` conformance gap is closed and regression-covered. `CON
 
 ## Problem
 
-PACT now supports tasks, streaming, cancellation, nested flows, and late events across multiple paths:
+ARC now supports tasks, streaming, cancellation, nested flows, and late events across multiple paths:
 
 - direct stdio edge
 - wrapped stdio edge
@@ -54,16 +54,16 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-core/src/session.rs`
-- `crates/pact-core/src/message.rs`
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-kernel/src/lib.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-cli/tests/mcp_serve.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-conformance/tests/`
+- `crates/arc-core/src/session.rs`
+- `crates/arc-core/src/message.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-kernel/src/lib.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-cli/tests/mcp_serve.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-conformance/tests/`
 
 ## Proposed implementation slices
 

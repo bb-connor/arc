@@ -1,25 +1,25 @@
-//! End-to-end integration tests for the PACT runtime stack.
+//! End-to-end integration tests for the ARC runtime stack.
 //!
 //! Each test exercises the full pipeline: kernel + guards + capability
 //! validation + receipt signing, all in-process with no I/O.
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
-use pact_core::capability::{
-    CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation, PactScope,
+use arc_core::capability::{
+    ArcScope, CapabilityToken, CapabilityTokenBody, DelegationLink, DelegationLinkBody, Operation,
     ToolGrant,
 };
-use pact_core::crypto::Keypair;
-use pact_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
-use pact_kernel::{
-    Guard, GuardContext, KernelConfig, KernelError, PactKernel, ToolCallOutput, ToolCallRequest,
+use arc_core::crypto::Keypair;
+use arc_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
+use arc_kernel::{
+    ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallOutput, ToolCallRequest,
     ToolServerConnection, Verdict,
 };
 
 // Test helpers
 /// Create a kernel with the default guard pipeline (forbidden_path +
 /// shell_command + egress_allowlist) and an echo tool server on "srv".
-fn make_kernel_with_guards() -> (PactKernel, Keypair) {
+fn make_kernel_with_guards() -> (ArcKernel, Keypair) {
     let kp = Keypair::generate();
     let config = KernelConfig {
         keypair: kp.clone(),
@@ -29,19 +29,19 @@ fn make_kernel_with_guards() -> (PactKernel, Keypair) {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = PactKernel::new(config);
+    let mut kernel = ArcKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     kernel.add_guard(Box::new(GuardPipeline::default_pipeline()));
     (kernel, kp)
 }
 
 /// Create a bare kernel (no guards) with an echo tool server on "srv".
-fn make_kernel_bare() -> (PactKernel, Keypair) {
+fn make_kernel_bare() -> (ArcKernel, Keypair) {
     let kp = Keypair::generate();
     let config = KernelConfig {
         keypair: kp.clone(),
@@ -51,22 +51,22 @@ fn make_kernel_bare() -> (PactKernel, Keypair) {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = PactKernel::new(config);
+    let mut kernel = ArcKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     (kernel, kp)
 }
 
 /// Issue a capability from the kernel granting wildcard access on "srv".
-fn issue_wildcard_cap(kernel: &PactKernel, agent_pk: &pact_core::PublicKey) -> CapabilityToken {
+fn issue_wildcard_cap(kernel: &ArcKernel, agent_pk: &arc_core::PublicKey) -> CapabilityToken {
     kernel
         .issue_capability(
             agent_pk,
-            PactScope {
+            ArcScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: "*".to_string(),
@@ -77,7 +77,7 @@ fn issue_wildcard_cap(kernel: &PactKernel, agent_pk: &pact_core::PublicKey) -> C
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..PactScope::default()
+                ..ArcScope::default()
             },
             300,
         )
@@ -86,15 +86,15 @@ fn issue_wildcard_cap(kernel: &PactKernel, agent_pk: &pact_core::PublicKey) -> C
 
 /// Issue a capability scoped to a single tool on "srv".
 fn issue_tool_cap(
-    kernel: &PactKernel,
-    agent_pk: &pact_core::PublicKey,
+    kernel: &ArcKernel,
+    agent_pk: &arc_core::PublicKey,
     tool: &str,
     ttl: u64,
 ) -> CapabilityToken {
     kernel
         .issue_capability(
             agent_pk,
-            PactScope {
+            ArcScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: tool.to_string(),
@@ -105,7 +105,7 @@ fn issue_tool_cap(
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..PactScope::default()
+                ..ArcScope::default()
             },
             ttl,
         )
@@ -127,6 +127,8 @@ fn make_request(
         agent_id: cap.subject.to_hex(),
         arguments: args,
         dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
     }
 }
 
@@ -145,7 +147,7 @@ impl ToolServerConnection for EchoServer {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
-        _nested_flow_bridge: Option<&mut dyn pact_kernel::NestedFlowBridge>,
+        _nested_flow_bridge: Option<&mut dyn arc_kernel::NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
         Ok(serde_json::json!({
             "tool": tool_name,
@@ -165,7 +167,7 @@ fn full_flow_allowed_tool_call() {
         "req-happy",
         &cap,
         "echo",
-        serde_json::json!({"message": "hello pact"}),
+        serde_json::json!({"message": "hello arc"}),
     );
 
     let resp = kernel.evaluate_tool_call(&req).unwrap();
@@ -179,7 +181,7 @@ fn full_flow_allowed_tool_call() {
     match resp.output.unwrap() {
         ToolCallOutput::Value(result) => {
             assert_eq!(result["tool"], "echo");
-            assert_eq!(result["echo"]["message"], "hello pact");
+            assert_eq!(result["echo"]["message"], "hello arc");
         }
         other => panic!("unexpected tool output: {other:?}"),
     }
@@ -341,7 +343,7 @@ fn full_flow_revocation_cascade() {
         id: format!("cap-delegated-{now}"),
         issuer: ca_kp.public_key(),
         subject: agent_b_kp.public_key(),
-        scope: PactScope {
+        scope: ArcScope {
             grants: vec![ToolGrant {
                 server_id: "srv".to_string(),
                 tool_name: "*".to_string(),
@@ -352,7 +354,7 @@ fn full_flow_revocation_cascade() {
                 max_total_cost: None,
                 dpop_required: None,
             }],
-            ..PactScope::default()
+            ..ArcScope::default()
         },
         issued_at: now,
         expires_at: now + 300,
@@ -369,6 +371,8 @@ fn full_flow_revocation_cascade() {
         agent_id: agent_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "before revocation"}),
         dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
     };
     let resp_ok = kernel.evaluate_tool_call(&req_ok).unwrap();
     assert_eq!(
@@ -389,6 +393,8 @@ fn full_flow_revocation_cascade() {
         agent_id: agent_b_kp.public_key().to_hex(),
         arguments: serde_json::json!({"msg": "after revocation"}),
         dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
     };
     let resp_revoked = kernel.evaluate_tool_call(&req_revoked).unwrap();
 
@@ -505,12 +511,12 @@ fn full_flow_guard_pipeline_mixed_verdicts() {
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
-        max_stream_duration_secs: pact_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
-        max_stream_total_bytes: pact_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+        max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
-    let mut kernel = PactKernel::new(config);
+    let mut kernel = ArcKernel::new(config);
     kernel.register_tool_server(Box::new(EchoServer("srv")));
 
     // Add only the forbidden-path and shell-command guards.
@@ -573,7 +579,7 @@ fn full_flow_budget_exhaustion() {
     let cap = kernel
         .issue_capability(
             &agent_kp.public_key(),
-            PactScope {
+            ArcScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),
                     tool_name: "echo".to_string(),
@@ -584,7 +590,7 @@ fn full_flow_budget_exhaustion() {
                     max_total_cost: None,
                     dpop_required: None,
                 }],
-                ..PactScope::default()
+                ..ArcScope::default()
             },
             300,
         )
@@ -670,7 +676,7 @@ fn full_flow_untrusted_issuer() {
         id: "cap-rogue".to_string(),
         issuer: rogue_kp.public_key(),
         subject: agent_kp.public_key(),
-        scope: PactScope {
+        scope: ArcScope {
             grants: vec![ToolGrant {
                 server_id: "srv".to_string(),
                 tool_name: "*".to_string(),
@@ -681,7 +687,7 @@ fn full_flow_untrusted_issuer() {
                 max_total_cost: None,
                 dpop_required: None,
             }],
-            ..PactScope::default()
+            ..ArcScope::default()
         },
         issued_at: now,
         expires_at: now + 300,
@@ -697,6 +703,8 @@ fn full_flow_untrusted_issuer() {
         agent_id: agent_kp.public_key().to_hex(),
         arguments: serde_json::json!({}),
         dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
     };
 
     let resp = kernel.evaluate_tool_call(&req).unwrap();

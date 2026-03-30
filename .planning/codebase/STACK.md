@@ -25,7 +25,7 @@
 
 **Core:**
 - Tokio 1.x - Async runtime for kernel/session/transport work
-- Axum 0.8 - HTTP serving in `pact-cli` for the remote MCP and trust-control surfaces
+- Axum 0.8 - HTTP serving in `arc-cli` for the remote MCP and trust-control surfaces
 
 **Testing:**
 - Built-in Rust test runner (`cargo test`)
@@ -43,7 +43,7 @@
 - `axum` - Remote HTTP serving in the CLI
 - `rusqlite` - Durable receipt, revocation, authority, and budget storage
 - `ed25519-dalek` - Capability and receipt signing primitives
-- `clap` - CLI command structure for `pact`
+- `clap` - CLI command structure for `arc`
 
 **Infrastructure:**
 - `tracing` / `tracing-subscriber` - Logging and diagnostics
@@ -54,7 +54,7 @@
 
 **Environment:**
 - Most local workflows are CLI-flag driven rather than env-var driven
-- Optional auth, DB, and seed inputs are passed as file paths or flags to `pact`
+- Optional auth, DB, and seed inputs are passed as file paths or flags to `arc`
 
 **Build:**
 - `Cargo.toml` at the workspace root defines members, shared versions, and shared dependencies

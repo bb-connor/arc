@@ -2,11 +2,11 @@
 
 ## The Core Decision
 
-There are three realistic ways PACT can evolve from here.
+There are three realistic ways ARC can evolve from here.
 
 ## Option A: Clean-slate replacement
 
-PACT defines its own native wire protocol and asks the ecosystem to move to it.
+ARC defines its own native wire protocol and asks the ecosystem to move to it.
 
 ### Pros
 
@@ -27,9 +27,9 @@ Do not choose this as the primary strategy.
 
 It may remain the long-term native protocol form, but it is a bad go-to-market plan.
 
-## Option B: MCP-compatible edge, PACT-native core
+## Option B: MCP-compatible edge, ARC-native core
 
-PACT presents an MCP-compatible session surface externally, while internally enforcing:
+ARC presents an MCP-compatible session surface externally, while internally enforcing:
 
 - capabilities
 - guard pipelines
@@ -42,23 +42,23 @@ PACT presents an MCP-compatible session surface externally, while internally enf
 - best migration path
 - easiest way to prove value quickly
 - lets existing MCP tools keep working
-- makes PACT an additive security and governance layer, not a total rewrite demand
+- makes ARC an additive security and governance layer, not a total rewrite demand
 
 ### Cons
 
 - protocol translation complexity
-- some MCP concepts map awkwardly onto PACT's stronger trust model
+- some MCP concepts map awkwardly onto ARC's stronger trust model
 - may require a larger compatibility matrix and conformance suite
 
 ### Verdict
 
 This is the strongest primary strategy.
 
-It lets PACT replace MCP operationally before it replaces it culturally.
+It lets ARC replace MCP operationally before it replaces it culturally.
 
 ## Option C: Security runtime beneath MCP, without trying to own the whole protocol
 
-PACT becomes mainly:
+ARC becomes mainly:
 
 - a secure execution kernel
 - a guard engine
@@ -74,9 +74,9 @@ The outer session contract stays MCP indefinitely.
 
 ### Cons
 
-- PACT never really becomes the replacement standard
+- ARC never really becomes the replacement standard
 - the project stays dependent on MCP's evolution
-- PACT-native ideas may always be constrained by another protocol's shape
+- ARC-native ideas may always be constrained by another protocol's shape
 
 ### Verdict
 
@@ -87,14 +87,14 @@ This is viable as an interim phase, but too small as the final ambition if the g
 Choose Option B:
 
 - MCP-compatible edge
-- PACT-native security core
-- optional PACT-native extensions where MCP has no equivalent
+- ARC-native security core
+- optional ARC-native extensions where MCP has no equivalent
 
 This gives the project a staged path:
 
 1. Replace MCP deployments operationally.
 2. Prove stronger security and governance.
-3. Introduce PACT-native capabilities that clients adopt because they are better, not because they are mandatory.
+3. Introduce ARC-native capabilities that clients adopt because they are better, not because they are mandatory.
 
 ## What This Means in Practice
 
@@ -116,7 +116,7 @@ Enforce:
 - server manifests
 - policy guards
 
-### PACT-native extensions
+### ARC-native extensions
 
 Add:
 

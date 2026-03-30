@@ -17,11 +17,11 @@ provides:
 
 affects:
   - 12-03-receipt-dashboard (dashboard can use agentSubject param and lineage endpoints)
-  - pact receipt list CLI (agent_subject: None preserves existing behavior)
+  - arc receipt list CLI (agent_subject: None preserves existing behavior)
 
 tech-stack:
   added:
-    - tower-http 0.6 (features = ["fs"]) added to pact-cli Cargo.toml (needed for Plan 12-04 SPA serving)
+    - tower-http 0.6 (features = ["fs"]) added to arc-cli Cargo.toml (needed for Plan 12-04 SPA serving)
   patterns:
     - "LEFT JOIN capability_lineage ON capability_id in query_receipts_impl -- agent filter without log replay"
     - "?9 IS NULL OR cl.subject_key = ?9 guard -- NULL-safe filter that is no-op when agent_subject is None"
@@ -31,11 +31,11 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - crates/pact-kernel/src/receipt_query.rs
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/src/main.rs
-    - crates/pact-cli/Cargo.toml
+    - crates/arc-kernel/src/receipt_query.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/src/main.rs
+    - crates/arc-cli/Cargo.toml
 
 key-decisions:
   - "agent_subject placed as ?9 parameter; cursor moved to ?10 and limit to ?11 -- keeps parameter numbering sequential and readable"
@@ -72,7 +72,7 @@ completed: 2026-03-23
 - Implemented `handle_agent_receipts` (GET /v1/agents/:subject_key/receipts) as a convenience wrapper delegating to query_receipts
 - Added `AgentReceiptsHttpQuery` struct for path-based agent receipt queries
 - Registered all three new routes in serve_async router before `.with_state(state)`
-- Added `tower-http = { version = "0.6", features = ["fs"] }` to pact-cli Cargo.toml for Plan 12-04
+- Added `tower-http = { version = "0.6", features = ["fs"] }` to arc-cli Cargo.toml for Plan 12-04
 - All 23 receipt_query tests pass (18 existing + 5 new); cargo build and clippy pass
 
 ## Task Commits
@@ -83,11 +83,11 @@ completed: 2026-03-23
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/receipt_query.rs` - Added `agent_subject: Option<String>` field to ReceiptQuery; 5 new test functions added
-- `crates/pact-kernel/src/receipt_store.rs` - query_receipts_impl updated with LEFT JOIN capability_lineage and agent_subject filter; parameters renumbered (?9 agent_sub, ?10 cursor, ?11 limit)
-- `crates/pact-cli/src/trust_control.rs` - AxumPath import, 3 new route constants, agentSubject field on ReceiptQueryHttpQuery, AgentReceiptsHttpQuery struct, 3 new handler functions, routes registered in serve_async
-- `crates/pact-cli/src/main.rs` - agent_subject: None added to both ReceiptQueryHttpQuery and ReceiptQuery struct initializers in receipt list command
-- `crates/pact-cli/Cargo.toml` - tower-http 0.6 with fs feature added
+- `crates/arc-kernel/src/receipt_query.rs` - Added `agent_subject: Option<String>` field to ReceiptQuery; 5 new test functions added
+- `crates/arc-kernel/src/receipt_store.rs` - query_receipts_impl updated with LEFT JOIN capability_lineage and agent_subject filter; parameters renumbered (?9 agent_sub, ?10 cursor, ?11 limit)
+- `crates/arc-cli/src/trust_control.rs` - AxumPath import, 3 new route constants, agentSubject field on ReceiptQueryHttpQuery, AgentReceiptsHttpQuery struct, 3 new handler functions, routes registered in serve_async
+- `crates/arc-cli/src/main.rs` - agent_subject: None added to both ReceiptQueryHttpQuery and ReceiptQuery struct initializers in receipt list command
+- `crates/arc-cli/Cargo.toml` - tower-http 0.6 with fs feature added
 
 ## Decisions Made
 
@@ -104,15 +104,15 @@ completed: 2026-03-23
 - **Found during:** Task 2 (first cargo build)
 - **Issue:** Adding `agent_subject` to `ReceiptQuery` and `ReceiptQueryHttpQuery` made two non-exhaustive struct initializers in main.rs fail to compile
 - **Fix:** Added `agent_subject: None` to both struct initializers in the receipt list CLI command path
-- **Files modified:** crates/pact-cli/src/main.rs
+- **Files modified:** crates/arc-cli/src/main.rs
 - **Verification:** cargo build passes
 - **Committed in:** 3778e7b (Task 2 commit)
 
 **2. [Rule 1 - Bug] Removed unused CapabilityLineageError and CapabilitySnapshot imports**
 - **Found during:** Task 2 (first cargo build warning)
 - **Issue:** Imported `CapabilityLineageError` and `CapabilitySnapshot` explicitly but Rust infers both via type context; `unused_imports` warning triggered
-- **Fix:** Removed both explicit imports from the pact_kernel use statement in trust_control.rs
-- **Files modified:** crates/pact-cli/src/trust_control.rs
+- **Fix:** Removed both explicit imports from the arc_kernel use statement in trust_control.rs
+- **Files modified:** crates/arc-cli/src/trust_control.rs
 - **Verification:** cargo clippy -D warnings passes
 - **Committed in:** 3778e7b (Task 2 commit)
 
@@ -139,9 +139,9 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-- FOUND: crates/pact-kernel/src/receipt_query.rs (agent_subject field + 5 new tests)
-- FOUND: crates/pact-kernel/src/receipt_store.rs (LEFT JOIN capability_lineage)
-- FOUND: crates/pact-cli/src/trust_control.rs (handle_get_lineage, handle_get_delegation_chain, handle_agent_receipts)
+- FOUND: crates/arc-kernel/src/receipt_query.rs (agent_subject field + 5 new tests)
+- FOUND: crates/arc-kernel/src/receipt_store.rs (LEFT JOIN capability_lineage)
+- FOUND: crates/arc-cli/src/trust_control.rs (handle_get_lineage, handle_get_delegation_chain, handle_agent_receipts)
 - FOUND commit bc372b1: test(12-02): add failing tests for agent_subject filter
 - FOUND commit c44fe94: feat(12-02): add agent_subject filter to ReceiptQuery with LEFT JOIN capability_lineage
 - FOUND commit 3778e7b: feat(12-02): add lineage HTTP endpoints and agentSubject query param to trust-control

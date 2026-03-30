@@ -1,12 +1,12 @@
 ---
 phase: 09-compliance-and-dpop
 plan: "01"
-subsystem: pact-kernel
+subsystem: arc-kernel
 tags: [compliance, retention, archival, sqlite, merkle]
 dependency_graph:
   requires: [08-04]
   provides: [COMP-03, COMP-04]
-  affects: [pact-kernel, pact-cli, pact-mcp-adapter, pact-guards, tests/e2e]
+  affects: [arc-kernel, arc-cli, arc-mcp-adapter, arc-guards, tests/e2e]
 tech_stack:
   added:
     - RetentionConfig struct with 90-day and 10GB defaults
@@ -19,19 +19,19 @@ tech_stack:
     - Partial-batch exclusion: only archive checkpoint rows with batch_end_seq <= max_archived_seq
 key_files:
   created:
-    - crates/pact-kernel/tests/retention.rs
+    - crates/arc-kernel/tests/retention.rs
   modified:
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-cli/src/main.rs
-    - crates/pact-mcp-adapter/src/edge.rs
-    - crates/pact-guards/tests/integration.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-cli/src/main.rs
+    - crates/arc-mcp-adapter/src/edge.rs
+    - crates/arc-guards/tests/integration.rs
     - tests/e2e/tests/full_flow.rs
-    - crates/pact-bindings-core/tests/vector_fixtures.rs
-    - crates/pact-bindings-core/src/capability.rs
-    - crates/pact-policy/src/compiler.rs
-    - crates/pact-core/tests/monetary_types.rs
-    - crates/pact-core/tests/forward_compat.rs
+    - crates/arc-bindings-core/tests/vector_fixtures.rs
+    - crates/arc-bindings-core/src/capability.rs
+    - crates/arc-policy/src/compiler.rs
+    - crates/arc-core/tests/monetary_types.rs
+    - crates/arc-core/tests/forward_compat.rs
 decisions:
   - "SQLite ATTACH DATABASE used for archive writes -- avoids filesystem copy, preserves WAL atomicity"
   - "Partial batch exclusion: never archive a checkpoint whose batch_end_seq exceeds max archived seq (avoids broken inclusion proofs)"
@@ -60,7 +60,7 @@ Receipt retention with time-based and size-based rotation: archives aged receipt
 
 - `RetentionConfig` struct with `retention_days: u64` (default 90), `max_size_bytes: u64` (default 10 GB), `archive_path: String`
 - `db_size_bytes()` using `PRAGMA page_count` and `PRAGMA page_size` (WAL-safe)
-- `oldest_receipt_timestamp()` using `SELECT MIN(timestamp) FROM pact_tool_receipts`
+- `oldest_receipt_timestamp()` using `SELECT MIN(timestamp) FROM arc_tool_receipts`
 - `archive_receipts_before(cutoff, archive_path)`: ATTACHes archive DB, creates tables, copies receipts and checkpoint rows (partial-batch exclusion), deletes archived receipts, DETACHes, WAL checkpoint
 - `rotate_if_needed(config)`: checks time cutoff (now - retention_days * 86400), then size threshold; uses median timestamp for size-triggered archival
 - `retention_config: Option<RetentionConfig>` field on `KernelConfig` (default None)
@@ -77,14 +77,14 @@ Receipt retention with time-based and size-based rotation: archives aged receipt
 **1. [Rule 3 - Blocking] Fixed missing `dpop_required` field in ToolGrant initializers workspace-wide**
 
 - **Found during:** Task 1, RED phase (compilation errors)
-- **Issue:** Phase 09-02 added `dpop_required: Option<bool>` to the `ToolGrant` struct in pact-core, but many existing struct initializers throughout the workspace did not include this field, causing compilation failures
+- **Issue:** Phase 09-02 added `dpop_required: Option<bool>` to the `ToolGrant` struct in arc-core, but many existing struct initializers throughout the workspace did not include this field, causing compilation failures
 - **Fix:** Added `dpop_required: None` to all affected ToolGrant initializer sites across authority.rs, transport.rs, lib.rs (kernel), edge.rs (mcp-adapter), full_flow.rs (e2e), integration.rs (guards), vector_fixtures.rs, capability.rs (bindings-core), compiler.rs (policy), monetary_types.rs, forward_compat.rs
 - **Files modified:** 11 files (many already partially fixed by the 09-02 agent in an earlier run)
 - **Commit:** `f4d9377` (RED phase commit)
 
 ## Tests
 
-Four new retention tests in `crates/pact-kernel/tests/retention.rs`:
+Four new retention tests in `crates/arc-kernel/tests/retention.rs`:
 
 | Test | What it verifies |
 |------|-----------------|
@@ -101,14 +101,14 @@ Four new retention tests in `crates/pact-kernel/tests/retention.rs`:
 ## Self-Check: PASSED
 
 **Files exist:**
-- `/Users/connor/Medica/backbay/standalone/pact/crates/pact-kernel/src/receipt_store.rs` -- contains RetentionConfig, db_size_bytes, archive_receipts_before, rotate_if_needed
-- `/Users/connor/Medica/backbay/standalone/pact/crates/pact-kernel/tests/retention.rs` -- 4 retention tests
+- `/Users/connor/Medica/backbay/standalone/arc/crates/arc-kernel/src/receipt_store.rs` -- contains RetentionConfig, db_size_bytes, archive_receipts_before, rotate_if_needed
+- `/Users/connor/Medica/backbay/standalone/arc/crates/arc-kernel/tests/retention.rs` -- 4 retention tests
 
 **Commits exist:**
 - `f4d9377` -- RED phase tests (verified in git log)
 - `82c5848` -- GREEN phase implementation (verified in git log)
 
 **Tests pass:**
-- `cargo test -p pact-kernel -- retention` -- 4 passed, 0 failed
+- `cargo test -p arc-kernel -- retention` -- 4 passed, 0 failed
 - `cargo test --workspace` -- all test suites passed (no regressions)
 - `cargo clippy --workspace -- -D warnings` -- clean

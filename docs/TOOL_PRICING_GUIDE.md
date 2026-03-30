@@ -1,6 +1,6 @@
 # Tool Pricing Guide
 
-PACT tool manifests can advertise pricing metadata so operators and authorities
+ARC tool manifests can advertise pricing metadata so operators and authorities
 can plan budgets before any tool call is attempted.
 
 Pricing metadata is advisory discovery data. The hard stop still comes from the
@@ -43,7 +43,7 @@ Supported pricing models:
 The maintained native example in [`examples/hello-tool`](../examples/hello-tool) now publishes pricing directly from `NativeTool`:
 
 ```rust
-use pact_mcp_adapter::NativeTool;
+use arc_mcp_adapter::NativeTool;
 
 let greet_tool = NativeTool::new(
     "greet",
@@ -93,7 +93,7 @@ per_call_cap   = 25
 The corresponding `ToolGrant` is:
 
 ```rust
-use pact_core::capability::{MonetaryAmount, Operation, ToolGrant};
+use arc_core::capability::{MonetaryAmount, Operation, ToolGrant};
 
 let grant = ToolGrant {
     server_id: "srv-hello".to_string(),
@@ -119,6 +119,43 @@ This does two different jobs:
 - the grant budget tells the kernel what to enforce
 
 Do not collapse those concepts. A quoted price is not the enforcement boundary.
+
+## Governed Metered Billing Quotes
+
+Manifest pricing remains advisory discovery data. When an operator wants to
+bind a concrete pre-execution quote into a governed request, ARC now supports a
+typed `governed_intent.metered_billing` contract for payment-rail-neutral
+metered tools.
+
+That block carries:
+
+- `settlement_mode`: `must_prepay`, `hold_capture`, or `allow_then_settle`
+- `quote.quote_id`: stable quote identifier from the metering or billing system
+- `quote.provider`: billing authority that issued the quote
+- `quote.billing_unit`: unit such as `invocation` or `1k_tokens`
+- `quote.quoted_units`: estimated billable units
+- `quote.quoted_cost`: estimated monetary amount
+- `quote.issued_at` and optional `quote.expires_at`
+- optional `max_billed_units`: explicit upper bound on billable units for the
+  governed request
+
+This gives ARC a truthful two-source contract:
+
+1. pre-execution quote and settlement posture live in
+   `governed_intent.metered_billing`
+2. kernel-side charged or attempted money still lives in `metadata.financial`
+3. later post-execution usage evidence is reconciled through a mutable
+   trust-control sidecar keyed by `receipt_id`, with report/export views that
+   sit next to the signed receipt rather than rewriting it
+
+That is intentionally different from saying the quote itself is the enforced
+budget. The enforced budget is still the issued capability plus any explicit
+governed `max_amount` bound.
+
+The operational rule is strict: adapter evidence is auditable and queryable,
+but signed receipt truth is immutable. ARC reports quote, kernel-observed
+financial truth, and external metered evidence side by side instead of
+flattening them into one mutable field.
 
 ## Planning Rules By Pricing Model
 

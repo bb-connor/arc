@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-source_dir="${repo_root}/crates/pact-cli/dashboard"
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/pact-dashboard-release.XXXXXX")"
+source_dir="${repo_root}/crates/arc-cli/dashboard"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-dashboard-release.XXXXXX")"
 dashboard_dir="${work_dir}/dashboard"
 
 cleanup() {

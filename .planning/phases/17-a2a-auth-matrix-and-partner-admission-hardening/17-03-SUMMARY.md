@@ -15,7 +15,7 @@ key-files:
   created:
     - .planning/phases/17-a2a-auth-matrix-and-partner-admission-hardening/17-03-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
     - docs/A2A_ADAPTER_GUIDE.md
 requirements-completed: []
 completed: 2026-03-25
@@ -35,4 +35,4 @@ by regression tests.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`

@@ -1,6 +1,6 @@
 hushspec: "0.1.0"
 name: "reputation-gated-policy"
-description: "Capability issuance ceilings backed by local PACT reputation"
+description: "Capability issuance ceilings backed by local ARC reputation"
 
 rules:
   tool_access:

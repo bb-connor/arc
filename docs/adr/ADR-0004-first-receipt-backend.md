@@ -6,7 +6,7 @@
 
 ## Context
 
-PACT currently stores receipts in memory.
+ARC currently stores receipts in memory.
 
 `v1` requires durable receipts, but there are several ways to get there:
 
@@ -16,7 +16,7 @@ PACT currently stores receipts in memory.
 
 ## Decision
 
-PACT will use SQLite as the first durable receipt backend.
+ARC will use SQLite as the first durable receipt backend.
 
 The receipt persistence interface should be abstract enough to support later backends such as:
 

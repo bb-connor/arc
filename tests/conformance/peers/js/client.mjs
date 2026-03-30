@@ -4,13 +4,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  PactClient,
-  PactSession,
+  ArcClient,
+  ArcSession,
   terminalMessage
-} from "../../../../packages/sdk/pact-ts/src/index.ts";
+} from "../../../../packages/sdk/arc-ts/src/index.ts";
 
 if (process.argv.includes("--help")) {
-  console.log("PACT JS conformance client");
+  console.log("ARC JS conformance client");
   process.exit(0);
 }
 
@@ -197,11 +197,11 @@ async function resolveAuth(args, transcript) {
 async function initializeSession(baseUrl, authToken, transcript, stepPrefix = "") {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
-      const client = PactClient.withStaticBearer(baseUrl, authToken);
+      const client = ArcClient.withStaticBearer(baseUrl, authToken);
       const session = await client.initialize({
         capabilities: CONFORMANCE_CLIENT_CAPABILITIES,
         clientInfo: {
-          name: "pact-conformance-js",
+          name: "arc-conformance-js",
           version: "0.1.0"
         },
         onMessage: async (message, session) => {
@@ -252,7 +252,7 @@ async function postRpc(
   body,
   onMessage = async () => {}
 ) {
-  const session = new PactSession({
+  const session = new ArcSession({
     baseUrl,
     authToken,
     sessionId,
@@ -269,7 +269,7 @@ async function postNotification(
   body,
   onMessage = async () => {}
 ) {
-  const session = new PactSession({
+  const session = new ArcSession({
     baseUrl,
     authToken,
     sessionId,
@@ -622,7 +622,7 @@ async function runScenario(scenario, args, authContext, session, transcript) {
             params: {
               protocolVersion: "2025-11-25",
               capabilities: {},
-              clientInfo: { name: "pact-conformance-js-unauthorized", version: "0.1.0" }
+              clientInfo: { name: "arc-conformance-js-unauthorized", version: "0.1.0" }
             }
           })
         });
@@ -1117,7 +1117,7 @@ async function handleNestedClientRequest(
               type: "text",
               text: CONFORMANCE_SAMPLE_TEXT
             },
-            model: "pact-conformance-js-model",
+            model: "arc-conformance-js-model",
             stopReason: "end_turn"
           }
         }
@@ -1202,10 +1202,10 @@ async function fetchJson(url) {
 }
 
 async function performAuthorizationCodeFlow(baseUrl, authScope, authorizationServerMetadata, transcript) {
-  const codeVerifier = "pact-conformance-js-verifier";
+  const codeVerifier = "arc-conformance-js-verifier";
   const redirectUri = "http://localhost:7777/callback";
   const resource = `${baseUrl}/mcp`;
-  const state = "pact-js-state";
+  const state = "arc-js-state";
   const authorizationEndpoint =
     authorizationServerMetadata.authorization_endpoint ?? `${baseUrl}/oauth/authorize`;
   const tokenEndpoint = authorizationServerMetadata.token_endpoint ?? `${baseUrl}/oauth/token`;
@@ -1374,7 +1374,7 @@ function scenarioResult(scenario, durationMs, status, assertions) {
   return {
     scenarioId: scenario.id,
     peer: "js",
-    peerRole: "client_to_pact_server",
+    peerRole: "client_to_arc_server",
     deploymentMode: "remote_http",
     transport: "streamable-http",
     specVersion: scenario.specVersions?.[0] ?? "2025-11-25",

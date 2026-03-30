@@ -2,11 +2,11 @@
 
 ## Suggested issue title
 
-`E3: add MCP-compatible tool edge on top of the PACT kernel`
+`E3: add MCP-compatible tool edge on top of the ARC kernel`
 
 ## Problem
 
-PACT can currently wrap MCP servers outbound through `pact-mcp-adapter`, but it does not yet expose a first-class MCP-compatible server edge of its own.
+ARC can currently wrap MCP servers outbound through `arc-mcp-adapter`, but it does not yet expose a first-class MCP-compatible server edge of its own.
 
 That blocks:
 
@@ -19,7 +19,7 @@ That blocks:
 
 By the end of E3:
 
-- PACT exposes an MCP-compatible tool server edge
+- ARC exposes an MCP-compatible tool server edge
 - the edge uses the session-aware kernel path introduced in E1
 - policy- and capability-mediated tool calls are available to MCP clients
 
@@ -43,10 +43,10 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-mcp-adapter/src/lib.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
-- `crates/pact-cli/src/main.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/lib.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
+- `crates/arc-cli/src/main.rs`
 
 ## Proposed implementation slices
 
@@ -54,7 +54,7 @@ Out of scope:
 
 Candidate types:
 
-- `PactMcpEdge`
+- `ArcMcpEdge`
 - `McpEdgeConfig`
 - `McpExposedTool`
 
@@ -115,7 +115,7 @@ Requirements:
 
 ### `T3.5` Add a user-facing MCP serve path
 
-- add `pact mcp serve`
+- add `arc mcp serve`
 - wrap an MCP server subprocess through the adapter and kernel
 - add an integration test that initializes, lists tools, and calls tools through the binary
 
@@ -142,7 +142,7 @@ Requirements:
 - `tools/list` returns paginated tool descriptors
 - `tools/call` flows through the kernel session path
 - denied tool calls return MCP tool errors instead of transport failures
-- a stock client can use `pact mcp serve` as a secured MCP proxy
+- a stock client can use `arc mcp serve` as a secured MCP proxy
 
 ## Definition of done
 

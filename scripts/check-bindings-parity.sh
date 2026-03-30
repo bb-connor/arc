@@ -8,5 +8,5 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-cargo test -p pact-bindings-core
-npm --prefix packages/sdk/pact-ts test
+cargo test -p arc-bindings-core
+npm --prefix packages/sdk/arc-ts test

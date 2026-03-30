@@ -21,9 +21,9 @@ It should not optimize first for:
 
 Local evidence:
 
-- there is no Go peer yet in the PACT repo
+- there is no Go peer yet in the ARC repo
 - the current interop harness exercises JS and Python peers only: [docs/epics/E8-migration-conformance-and-sdks.md](../epics/E8-migration-conformance-and-sdks.md)
-- `pact-core` is intentionally free of runtime dependencies and already documents itself as suitable for embedded and WASM-style environments: [crates/pact-core/src/lib.rs](../../crates/pact-core/src/lib.rs)
+- `arc-core` is intentionally free of runtime dependencies and already documents itself as suitable for embedded and WASM-style environments: [crates/arc-core/src/lib.rs](../../crates/arc-core/src/lib.rs)
 
 Implication:
 
@@ -32,7 +32,7 @@ Implication:
 
 ## Recommended Product Model
 
-### `pact-go`
+### `arc-go`
 
 Purpose:
 
@@ -54,7 +54,7 @@ Should include:
 
 Purpose:
 
-- optional CGO-backed narrow bridge to `pact-bindings-ffi`
+- optional CGO-backed narrow bridge to `arc-bindings-ffi`
 - only for deterministic helper functions
 
 Should include:
@@ -92,7 +92,7 @@ So the default Go package should remain pure Go.
 ## Recommended Repository Layout
 
 ```text
-packages/sdk/pact-go/
+packages/sdk/arc-go/
   go.mod
   client/
   transport/
@@ -112,7 +112,7 @@ packages/sdk/pact-go/
 
 If the native bridge ships later:
 
-- generated headers should come from `crates/pact-bindings-ffi`
+- generated headers should come from `crates/arc-bindings-ffi`
 - the Go package should consume them behind build tags
 
 ## Package API Recommendation
@@ -138,7 +138,7 @@ Examples:
 
 ### First release target
 
-Target the remote HTTP PACT edge first.
+Target the remote HTTP ARC edge first.
 
 The Go SDK should support:
 
@@ -177,11 +177,11 @@ Recommended API model:
 Example shape:
 
 ```go
-session, err := client.Initialize(ctx, pact.InitializeOptions{
-    OnSample: func(ctx context.Context, req pact.SampleRequest) (pact.SampleResponse, error) {
+session, err := client.Initialize(ctx, arc.InitializeOptions{
+    OnSample: func(ctx context.Context, req arc.SampleRequest) (arc.SampleResponse, error) {
         ...
     },
-    OnRootsList: func(ctx context.Context) (pact.RootsResponse, error) {
+    OnRootsList: func(ctx context.Context) (arc.RootsResponse, error) {
         ...
     },
 })
@@ -235,7 +235,7 @@ Why:
 Only after the pure Go client is stable should the repo consider:
 
 - `native` subpackage
-- `pact-bindings-ffi`
+- `arc-bindings-ffi`
 - CGO-backed helper acceleration
 
 Even then:
@@ -332,8 +332,8 @@ Go should get its own interop coverage before any parity claim is made.
 
 Recommended path:
 
-1. add `packages/sdk/pact-go`
-2. write Go integration tests against a local PACT edge
+1. add `packages/sdk/arc-go`
+2. write Go integration tests against a local ARC edge
 3. once stable, add a Go peer to the conformance harness
 
 ## Release Strategy
@@ -405,9 +405,9 @@ Mitigation:
 
 ## Recommended First Implementation Slice
 
-1. Create `packages/sdk/pact-go` as a pure Go module.
+1. Create `packages/sdk/arc-go` as a pure Go module.
 2. Implement the remote HTTP client, session lifecycle, and nested callback routing in pure Go.
-3. Add integration tests against a local PACT edge.
+3. Add integration tests against a local ARC edge.
 4. Add pure Go invariant helpers and vector tests.
 5. Revisit CGO only after the package proves useful without it.
 
@@ -417,7 +417,7 @@ Local:
 
 - [../BINDINGS_CORE_PLAN.md](../BINDINGS_CORE_PLAN.md)
 - [../epics/E8-migration-conformance-and-sdks.md](../epics/E8-migration-conformance-and-sdks.md)
-- [crates/pact-core/src/lib.rs](../../crates/pact-core/src/lib.rs)
+- [crates/arc-core/src/lib.rs](../../crates/arc-core/src/lib.rs)
 
 External:
 

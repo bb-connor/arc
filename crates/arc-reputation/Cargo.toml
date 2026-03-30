@@ -1,0 +1,21 @@
+[package]
+name = "arc-reputation"
+description = "Deterministic local reputation scoring for ARC agents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_reputation"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

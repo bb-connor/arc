@@ -45,18 +45,18 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `crates/pact-kernel/src/receipt_store.rs` | RetentionConfig, db_size_bytes, archive_receipts_before, rotate_if_needed | VERIFIED | All 4 symbols present at lines 19, 449, 478, 569 |
-| `crates/pact-kernel/src/lib.rs` | retention_config field on KernelConfig | VERIFIED | `pub retention_config: Option<crate::receipt_store::RetentionConfig>` at line 707 |
-| `crates/pact-kernel/tests/retention.rs` | 4 retention tests | VERIFIED | All 4 test functions present at lines 57, 103, 146, 217 |
+| `crates/arc-kernel/src/receipt_store.rs` | RetentionConfig, db_size_bytes, archive_receipts_before, rotate_if_needed | VERIFIED | All 4 symbols present at lines 19, 449, 478, 569 |
+| `crates/arc-kernel/src/lib.rs` | retention_config field on KernelConfig | VERIFIED | `pub retention_config: Option<crate::receipt_store::RetentionConfig>` at line 707 |
+| `crates/arc-kernel/tests/retention.rs` | 4 retention tests | VERIFIED | All 4 test functions present at lines 57, 103, 146, 217 |
 
 ### Plan 09-02 Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `crates/pact-kernel/src/dpop.rs` | DpopProofBody, DpopProof, DpopConfig, DpopNonceStore, verify_dpop_proof | VERIFIED | All 5 symbols present; DPOP_SCHEMA = "pact.dpop_proof.v1" at line 39 |
-| `crates/pact-core/src/capability.rs` | dpop_required field on ToolGrant | VERIFIED | `pub dpop_required: Option<bool>` at line 193 with serde(default, skip_serializing_if) |
-| `crates/pact-kernel/tests/dpop.rs` | 7 DPoP tests | VERIFIED | All 7 test functions present at lines 71, 98, 132, 181, 224, 300, 369 |
-| `crates/pact-kernel/Cargo.toml` | lru dependency | VERIFIED | `lru = "0.16.3"` at line 12 |
+| `crates/arc-kernel/src/dpop.rs` | DpopProofBody, DpopProof, DpopConfig, DpopNonceStore, verify_dpop_proof | VERIFIED | All 5 symbols present; DPOP_SCHEMA = "arc.dpop_proof.v1" at line 39 |
+| `crates/arc-core/src/capability.rs` | dpop_required field on ToolGrant | VERIFIED | `pub dpop_required: Option<bool>` at line 193 with serde(default, skip_serializing_if) |
+| `crates/arc-kernel/tests/dpop.rs` | 7 DPoP tests | VERIFIED | All 7 test functions present at lines 71, 98, 132, 181, 224, 300, 369 |
+| `crates/arc-kernel/Cargo.toml` | lru dependency | VERIFIED | `lru = "0.16.3"` at line 12 |
 
 ### Plan 09-03 Artifacts
 
@@ -80,16 +80,16 @@ re_verification: false
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `dpop.rs` | `pact_core::canonical` | `canonical_json_bytes for proof body signing` | VERIFIED | `use pact_core::canonical::canonical_json_bytes` at line 31; used at lines 90, 256 |
-| `dpop.rs` | `pact_core::capability::CapabilityToken` | `proof.body.agent_key == capability.subject` | VERIFIED | Sender constraint check at line 216 |
+| `dpop.rs` | `arc_core::canonical` | `canonical_json_bytes for proof body signing` | VERIFIED | `use arc_core::canonical::canonical_json_bytes` at line 31; used at lines 90, 256 |
+| `dpop.rs` | `arc_core::capability::CapabilityToken` | `proof.body.agent_key == capability.subject` | VERIFIED | Sender constraint check at line 216 |
 | `dpop.rs` | `DpopNonceStore` | `check_and_insert in verify_dpop_proof` | VERIFIED | `nonce_store.check_and_insert` at line 266 |
 
 ### Plan 09-03 Key Links
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `colorado-sb-24-205.md` | `crates/pact-kernel/tests/retention.rs` | clause-to-test table entries | VERIFIED | `retention_rotates_at_time_boundary` and `archived_receipt_verifies_against_checkpoint` referenced in table |
-| `eu-ai-act-article-19.md` | `crates/pact-kernel/src/checkpoint.rs` | clause-to-test table entries | VERIFIED | `build_checkpoint_signature_verifies` and `inclusion_proof_verifies_for_leaf_n` referenced in table |
+| `colorado-sb-24-205.md` | `crates/arc-kernel/tests/retention.rs` | clause-to-test table entries | VERIFIED | `retention_rotates_at_time_boundary` and `archived_receipt_verifies_against_checkpoint` referenced in table |
+| `eu-ai-act-article-19.md` | `crates/arc-kernel/src/checkpoint.rs` | clause-to-test table entries | VERIFIED | `build_checkpoint_signature_verifies` and `inclusion_proof_verifies_for_leaf_n` referenced in table |
 
 ---
 
@@ -99,8 +99,8 @@ Phase 09 plans claim requirements: COMP-01, COMP-02, COMP-03, COMP-04, SEC-03, S
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |-------------|------------|-------------|--------|----------|
-| COMP-01 | 09-03 | Published document maps PACT receipts to Colorado SB 24-205 requirements | SATISFIED | `docs/compliance/colorado-sb-24-205.md` exists; 16 clause mappings; Clause Mapping table; Verification section; all referenced tests pass under `cargo test --workspace` |
-| COMP-02 | 09-03 | Published document maps PACT to EU AI Act Article 19 traceability requirements | SATISFIED | `docs/compliance/eu-ai-act-article-19.md` exists; 19 clause mappings; Clause Mapping table; Verification section; all referenced tests pass |
+| COMP-01 | 09-03 | Published document maps ARC receipts to Colorado SB 24-205 requirements | SATISFIED | `docs/compliance/colorado-sb-24-205.md` exists; 16 clause mappings; Clause Mapping table; Verification section; all referenced tests pass under `cargo test --workspace` |
+| COMP-02 | 09-03 | Published document maps ARC to EU AI Act Article 19 traceability requirements | SATISFIED | `docs/compliance/eu-ai-act-article-19.md` exists; 19 clause mappings; Clause Mapping table; Verification section; all referenced tests pass |
 | COMP-03 | 09-01 | Receipt retention policies are configurable (time-based and size-based rotation) | SATISFIED | `RetentionConfig` struct with `retention_days` and `max_size_bytes`; `rotate_if_needed` archives receipts exceeding either threshold; 4 retention tests pass |
 | COMP-04 | 09-01 | Archived receipts remain verifiable via stored Merkle checkpoint roots | SATISFIED | `archive_receipts_before` copies checkpoint rows into archive DB; `archived_receipt_verifies_against_checkpoint` test confirms cryptographic verifiability after archival |
 | SEC-03 | 09-02 | DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce | SATISFIED | `verify_dpop_proof` in dpop.rs validates all 5 binding fields; `dpop_valid_proof_accepted` and `dpop_wrong_action_hash_rejected` tests pass |
@@ -114,7 +114,7 @@ Phase 09 plans claim requirements: COMP-01, COMP-02, COMP-03, COMP-04, SEC-03, S
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `crates/pact-kernel/src/receipt_store.rs` | 722, 749, 770, 777-785 | `expect` / `unwrap` calls | Info | All instances are inside `#[cfg(test)]` module (module boundary at line 703); production code is clean; clippy passes with -D warnings |
+| `crates/arc-kernel/src/receipt_store.rs` | 722, 749, 770, 777-785 | `expect` / `unwrap` calls | Info | All instances are inside `#[cfg(test)]` module (module boundary at line 703); production code is clean; clippy passes with -D warnings |
 
 No blockers or warnings found. The `expect`/`unwrap` instances in receipt_store.rs are entirely within the test module and are exempt by convention (CLAUDE.md: "Test code is exempt").
 
@@ -124,8 +124,8 @@ No blockers or warnings found. The `expect`/`unwrap` instances in receipt_store.
 
 | Test Suite | Command | Result |
 |------------|---------|--------|
-| Retention tests | `cargo test -p pact-kernel -- retention` | 4 passed, 0 failed |
-| DPoP tests | `cargo test -p pact-kernel -- dpop` | 7 passed, 0 failed |
+| Retention tests | `cargo test -p arc-kernel -- retention` | 4 passed, 0 failed |
+| DPoP tests | `cargo test -p arc-kernel -- dpop` | 7 passed, 0 failed |
 | Full workspace | `cargo test --workspace` | All suites ok, 0 failures (30 test result lines, all "ok") |
 | Clippy | `cargo clippy --workspace -- -D warnings` | Clean (no errors) |
 
@@ -138,7 +138,7 @@ The compliance documents are Markdown files containing clause-to-test mappings. 
 ### 1. Legal Accuracy of Clause Interpretations
 
 **Test:** Review the "Requirement Summary" column in each compliance document against the actual enrolled bill text (Colorado SB 24-205) and the EU AI Act Official Journal text (Regulation 2024/1689).
-**Expected:** The clause summaries should accurately paraphrase the regulatory obligations; PACT mechanisms should genuinely satisfy those obligations.
+**Expected:** The clause summaries should accurately paraphrase the regulatory obligations; ARC mechanisms should genuinely satisfy those obligations.
 **Why human:** Automated verification confirms that referenced test functions exist and pass, but cannot assess whether the clause-to-mechanism mapping is legally sufficient.
 
 ### 2. Compliance Document Filing Readiness

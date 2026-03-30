@@ -15,8 +15,8 @@
 **Run Commands:**
 ```bash
 cargo test --workspace                         # Run the full workspace suite
-cargo test -p pact-cli --test trust_cluster    # Run targeted HA trust-control integration coverage
-cargo test -p pact-conformance                 # Run conformance harness tests
+cargo test -p arc-cli --test trust_cluster    # Run targeted HA trust-control integration coverage
+cargo test -p arc-conformance                 # Run conformance harness tests
 cargo fmt --all -- --check                     # Format gate
 cargo clippy --workspace -- -D warnings        # Lint gate
 ```
@@ -34,7 +34,7 @@ cargo clippy --workspace -- -D warnings        # Lint gate
 
 **Structure:**
 ```text
-crates/pact-cli/tests/
+crates/arc-cli/tests/
   mcp_auth_server.rs
   mcp_serve.rs
   mcp_serve_http.rs
@@ -42,7 +42,7 @@ crates/pact-cli/tests/
   trust_cluster.rs
   trust_revocation.rs
 
-crates/pact-conformance/tests/
+crates/arc-conformance/tests/
   wave1_live.rs
   wave2_tasks_live.rs
   wave3_auth_live.rs
@@ -73,7 +73,7 @@ fn trust_control_cluster_replicates_state_and_survives_leader_failover() {
 - Minimal mocking culture; many tests prefer real subprocesses, temporary files, and local HTTP calls
 
 **Patterns:**
-- Build or spawn the actual `pact` binary where practical
+- Build or spawn the actual `arc` binary where practical
 - Use temporary directories, random local ports, and local SQLite files for isolation
 - Skip live conformance tests gracefully when required external runtimes are unavailable
 
@@ -109,14 +109,14 @@ fn trust_control_cluster_replicates_state_and_survives_leader_failover() {
 - Use direct assertions and lightweight helpers
 
 **Integration Tests:**
-- Heavy use in `pact-cli/tests/` and related crates
+- Heavy use in `arc-cli/tests/` and related crates
 - Exercise subprocesses, HTTP endpoints, SQLite state, and protocol flows
 
 **E2E Tests:**
 - `tests/e2e/tests/full_flow.rs` covers end-to-end user/system flows
 
 **Conformance Tests:**
-- `pact-conformance/tests/` runs live wave suites against JS and Python peers when runtimes are available
+- `arc-conformance/tests/` runs live wave suites against JS and Python peers when runtimes are available
 
 ## Common Patterns
 
@@ -132,8 +132,8 @@ where
 
 **Error testing:**
 ```rust
-let status = Command::new("cargo").arg("build").status().expect("build pact-cli");
-assert!(status.success(), "cargo build -p pact-cli must succeed");
+let status = Command::new("cargo").arg("build").status().expect("build arc-cli");
+assert!(status.success(), "cargo build -p arc-cli must succeed");
 ```
 
 **Snapshot Testing:**

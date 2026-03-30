@@ -18,7 +18,7 @@ Implemented in the second slice:
 - explicit child-request helpers in the kernel for nested flows
 - negotiated sampling capability capture during MCP initialization
 - policy-gated nested sampling flags in the runtime policy and kernel config
-- normalized `sampling/createMessage` request and result types in `pact-core`
+- normalized `sampling/createMessage` request and result types in `arc-core`
 - edge-owned `sampling/createMessage` child-request plumbing with fail-closed validation
 
 Implemented in the third slice:
@@ -26,7 +26,7 @@ Implemented in the third slice:
 - kernel-owned nested-flow bridge for wrapped tool calls
 - wrapped-server propagation of `roots/list` and `sampling/createMessage` through the adapted MCP transport
 - proxy client capability advertisement to wrapped MCP servers during adapter initialization
-- end-to-end `pact mcp serve` coverage for wrapped sampling and roots roundtrips
+- end-to-end `arc mcp serve` coverage for wrapped sampling and roots roundtrips
 
 Still pending:
 
@@ -40,9 +40,9 @@ Still pending:
 
 ## Problem
 
-PACT now has strong coverage for tools, resources, prompts, completion, and logging, but it still lacks the client-feature flows that make MCP servers agentic.
+ARC now has strong coverage for tools, resources, prompts, completion, and logging, but it still lacks the client-feature flows that make MCP servers agentic.
 
-Without E5, PACT can mediate actions and context, but it cannot safely support:
+Without E5, ARC can mediate actions and context, but it cannot safely support:
 
 - client workspace roots as a negotiated security boundary
 - server-initiated model execution through the client
@@ -75,17 +75,17 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-core/src/session.rs`
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-kernel/src/lib.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-cli/src/policy.rs`
+- `crates/arc-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-kernel/src/lib.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-cli/src/policy.rs`
 
 ## Implementation slices
 
 ### Slice A: roots substrate
 
-- add root types to `pact-core`
+- add root types to `arc-core`
 - track negotiated roots capability in session state
 - refresh root snapshots from the MCP client after initialization and on list-changed notifications
 - expose root snapshots through the kernel session model
@@ -126,7 +126,7 @@ Out of scope:
 Status:
 
 - implemented through session lineage fields and kernel child-request helpers
-- implemented for the wrapped transport path used by `pact mcp serve`
+- implemented for the wrapped transport path used by `arc mcp serve`
 - follow-on still needed for elicitation and receipt lineage
 
 ### `T5.3` Sampling

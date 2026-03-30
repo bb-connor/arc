@@ -14,18 +14,18 @@ created: 2026-03-24
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test`, `vitest`, `vite build` |
-| **Quick run command** | `cargo test -p pact-cli --test receipt_query -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-cli --test receipt_query -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
-| **UI verification** | `npm --prefix crates/pact-cli/dashboard test -- --run` and `npm --prefix crates/pact-cli/dashboard run build` |
+| **UI verification** | `npm --prefix crates/arc-cli/dashboard test -- --run` and `npm --prefix crates/arc-cli/dashboard run build` |
 
 ## Per-Plan Verification Map
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 16-01 | XORG-01 | `cargo test -p pact-cli --test receipt_query -- --nocapture` |
-| 16-02 | FED-03, XORG-02 | `cargo test -p pact-cli --test receipt_query -- --nocapture` |
-| 16-03 | XORG-01, XORG-02 | `npm --prefix crates/pact-cli/dashboard test -- --run` |
-| 16-04 | FED-03, XORG-01, XORG-02 | `cargo test -p pact-cli --test local_reputation -- --nocapture` and `npm --prefix crates/pact-cli/dashboard run build` |
+| 16-01 | XORG-01 | `cargo test -p arc-cli --test receipt_query -- --nocapture` |
+| 16-02 | FED-03, XORG-02 | `cargo test -p arc-cli --test receipt_query -- --nocapture` |
+| 16-03 | XORG-01, XORG-02 | `npm --prefix crates/arc-cli/dashboard test -- --run` |
+| 16-04 | FED-03, XORG-01, XORG-02 | `cargo test -p arc-cli --test local_reputation -- --nocapture` and `npm --prefix crates/arc-cli/dashboard run build` |
 
 ## Coverage Notes
 

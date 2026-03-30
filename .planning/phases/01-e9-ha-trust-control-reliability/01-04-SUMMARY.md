@@ -27,7 +27,7 @@ key-files:
   created:
     - .planning/phases/01-e9-ha-trust-control-reliability/01-04-SUMMARY.md
   modified:
-    - crates/pact-cli/tests/trust_cluster.rs
+    - crates/arc-cli/tests/trust_cluster.rs
     - docs/POST_REVIEW_EXECUTION_PLAN.md
     - .planning/ROADMAP.md
     - .planning/STATE.md
@@ -74,7 +74,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `crates/pact-cli/tests/trust_cluster.rs` - extracted the main failover scenario into a helper and added the five-run ignored qualification test
+- `crates/arc-cli/tests/trust_cluster.rs` - extracted the main failover scenario into a helper and added the five-run ignored qualification test
 - `docs/POST_REVIEW_EXECUTION_PLAN.md` - documented the exact E9 qualification command and rewrote Gate G1 around the actual CI and qualification lanes
 - `.planning/ROADMAP.md` - marked `01-04` and Phase 1 complete
 - `.planning/STATE.md` - advanced the project state to Phase 2 and corrected overall milestone progress
@@ -105,14 +105,14 @@ Each task was committed atomically:
 
 ## Verification
 
-- `cargo test -p pact-cli --test trust_cluster` - passed
-- `cargo test -p pact-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` - passed
+- `cargo test -p arc-cli --test trust_cluster` - passed
+- `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` - passed
 - `cargo fmt --all -- --check` - passed
 - `rg -n "Gate G1|trust-cluster|workspace stability|flake|trust_control_cluster_repeat_run_qualification|cargo test --workspace" .github/workflows/ci.yml docs/POST_REVIEW_EXECUTION_PLAN.md` - passed
 
 ## Issues Encountered
 
-- `cargo test -p pact-cli --test trust_cluster` and the ignored qualification command contend on Cargo's lock if launched in parallel, so verification should run them sequentially
+- `cargo test -p arc-cli --test trust_cluster` and the ignored qualification command contend on Cargo's lock if launched in parallel, so verification should run them sequentially
 - `state advance-plan` could not parse the existing `STATE.md` format, so the final Phase 1 bookkeeping was applied manually after the gsd helper updates that did succeed
 
 ## User Setup Required

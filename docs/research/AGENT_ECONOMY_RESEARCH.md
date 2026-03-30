@@ -1,6 +1,6 @@
 # Agent Economy Research Synthesis
 
-Research compiled 2025-Q3 through 2026-Q1. This document synthesizes findings from academic literature, industry reports, regulatory filings, and market data relevant to PACT's positioning as a secure agent infrastructure layer.
+Research compiled 2025-Q3 through 2026-Q1. This document synthesizes findings from academic literature, industry reports, regulatory filings, and market data relevant to ARC's positioning as a secure agent infrastructure layer.
 
 Evidence discipline note: several vendor-supplied market, payment-volume, and
 ecosystem figures in this document remain unverified. They are included as
@@ -43,7 +43,7 @@ depend on any single unverified number or third-party marketing claim.
 - Launched AIUC-1 standard: a certification framework for AI agent liability. Modeled on SOC2 structure but specific to agent autonomy, tool access scope, and decision audit trails.
 - Certified companies as of Q1 2026: UiPath (RPA agent suite), ElevenLabs (voice agent deployments), Glean (enterprise search agents). Certification requires: (1) bounded tool access via capability tokens, (2) tamper-evident action logs, (3) human-in-the-loop for actions exceeding defined risk thresholds.
 - AIUC-1 policies underwritten by a syndicate at Lloyd's. Coverage: errors & omissions, third-party liability from agent actions, regulatory defense costs.
-- Key design choice: premiums priced per-agent-session, not per-company. This creates a direct economic incentive for fine-grained capability scoping -- exactly the model PACT enables.
+- Key design choice: premiums priced per-agent-session, not per-company. This creates a direct economic incentive for fine-grained capability scoping -- exactly the model ARC enables.
 
 **Armilla AI**
 - $25M in Lloyd's-backed AI liability policies issued by end of 2025.
@@ -65,7 +65,7 @@ depend on any single unverified number or third-party marketing claim.
 
 ### Insurance Market Dynamics
 
-- **Premium reduction precedent from cyber insurance:** Organizations with SOC2 Type II or ISO 27001 certification receive approximately 5-15% premium reductions on cyber liability policies (source: Marsh McLennan cyber insurance market data). This precedent is directly applicable: if PACT receipts can serve as the "SOC2 equivalent" for agent actions, they create a measurable premium reduction signal.
+- **Premium reduction precedent from cyber insurance:** Organizations with SOC2 Type II or ISO 27001 certification receive approximately 5-15% premium reductions on cyber liability policies (source: Marsh McLennan cyber insurance market data). This precedent is directly applicable: if ARC receipts can serve as the "SOC2 equivalent" for agent actions, they create a measurable premium reduction signal.
 - **Insurer retreat:** Multiple major insurers (AIG, Chubb, Zurich) added AI liability exclusions to general commercial policies in 2025. Language typically excludes "losses arising from autonomous decisions made by artificial intelligence systems without direct human authorization." This creates a coverage gap that specialist AI insurers (AIUC, Armilla) are filling at higher premiums.
 - **Lloyd's syndicates:** Multiple Lloyd's syndicates have moved to explicitly address AI-generated liability in policy wordings, with most excluding autonomous agent liability from general policies, creating addressable demand for purpose-built coverage. [Note: A previous version of this document incorrectly cited Lloyd's Market Bulletin Y5381; that bulletin concerns state-backed cyber-attack exclusions (August 2022), not AI liability.]
 
@@ -88,7 +88,7 @@ depend on any single unverified number or third-party marketing claim.
 - MPP enables platforms to manage fund flows between agents acting on behalf of different principals.
 - Tempo blockchain integration: Stripe's proprietary settlement layer for sub-second finality on agent microtransactions. Built on a permissioned L2 anchored to Ethereum. USDC-denominated.
 - Key design: agents carry a "Stripe Agent Wallet" with a spending policy defined by the human principal. Each tool invocation can trigger a payment authorization. If the tool's price exceeds the agent's remaining budget, the call is denied.
-- Relevance to PACT: Stripe's spending policy is analogous to a PACT capability scope. The agent wallet's authorization check mirrors PACT's guard pipeline. But Stripe's model is payment-centric -- it does not attest to what the agent did, only what it paid. Receipts fill this gap.
+- Relevance to ARC: Stripe's spending policy is analogous to a ARC capability scope. The agent wallet's authorization check mirrors ARC's guard pipeline. But Stripe's model is payment-centric -- it does not attest to what the agent did, only what it paid. Receipts fill this gap.
 
 ### Coinbase x402
 
@@ -104,7 +104,7 @@ depend on any single unverified number or third-party marketing claim.
 - "Intent Mandates": a structured payment authorization format where the human principal specifies acceptable payment intents (e.g., "up to $50/day on data retrieval tools," "no payments to unverified vendors").
 - 60+ launch partners including Shopify, Salesforce, ServiceNow, Workday.
 - Settlement via Google Pay rails (existing card network integration). Not crypto-native.
-- Key differentiator: Intent Mandates are declarative policy documents -- closest to PACT capability grants in structure among payment platforms.
+- Key differentiator: Intent Mandates are declarative policy documents -- closest to ARC capability grants in structure among payment platforms.
 - Limitation: Google-ecosystem lock-in. Mandates are Google-proprietary, not an open standard.
 
 ### Card Network Programs
@@ -126,7 +126,7 @@ In multi-agent chains (Agent A calls Tool B which delegates to Agent C which cal
 2. **Post-hoc settlement:** All agents log costs; a settlement layer reconciles at chain completion. Requires trust in the settlement layer. No standard exists.
 3. **Streaming micropayments:** Payment flows per-token or per-second during tool execution. Implemented by Skyfire. High overhead for short calls.
 
-PACT receipts provide the missing accounting primitive: a cryptographically signed record of what each agent did, when, for whom, at what cost. This makes post-hoc settlement auditable.
+ARC receipts provide the missing accounting primitive: a cryptographically signed record of what each agent did, when, for whom, at what cost. This makes post-hoc settlement auditable.
 
 ---
 
@@ -138,8 +138,8 @@ PACT receipts provide the missing accounting primitive: a cryptographically sign
 
 - **ERTP (Electronic Rights Transfer Protocol):** A token standard where assets are capabilities. Holding a token is equivalent to holding an unforgeable reference to a right. Transfer is capability delegation. ERTP enforces offer safety: if a swap fails, both parties get their original assets back (no partial failure states).
 - **Zoe contract framework:** A smart contract layer that guarantees offer safety and payout liveness. Contracts cannot steal escrowed assets because they never receive direct access -- only attenuated capabilities to manipulate balances within Zoe's rules.
-- **Relevance:** ERTP is the intellectual ancestor of PACT's capability token model. Mark Miller's original insight (from his 2006 PhD thesis, "Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control") is that capabilities unify authorization and resource management. PACT's capability grants are ERTP's digital assets applied to tool access instead of financial rights.
-- **Lessons learned from Agoric:** (1) Capability models are correct but hard to explain to developers accustomed to ACL-based thinking. (2) Offer safety is a powerful primitive but adds latency to every transaction. (3) The blockchain execution environment limited throughput to ~100 TPS -- insufficient for agent workloads. PACT avoids this by running the kernel locally with optional anchoring.
+- **Relevance:** ERTP is the intellectual ancestor of ARC's capability token model. Mark Miller's original insight (from his 2006 PhD thesis, "Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control") is that capabilities unify authorization and resource management. ARC's capability grants are ERTP's digital assets applied to tool access instead of financial rights.
+- **Lessons learned from Agoric:** (1) Capability models are correct but hard to explain to developers accustomed to ACL-based thinking. (2) Offer safety is a powerful primitive but adds latency to every transaction. (3) The blockchain execution environment limited throughput to ~100 TPS -- insufficient for agent workloads. ARC avoids this by running the kernel locally with optional anchoring.
 
 ### Microsoft Magentic Marketplace
 
@@ -148,21 +148,21 @@ PACT receipts provide the missing accounting primitive: a cryptographically sign
   - **First-proposal bias:** LLM agents tend to accept the first reasonable-looking offer in negotiations, regardless of whether better alternatives exist. This is an artifact of autoregressive generation -- the model optimizes for coherent continuation, not optimal outcome. [Specific percentages from the original simulation results could not be independently verified.]
   - **Collusion emergence:** In repeated auction settings, LLM agents converge on supra-competitive pricing within 20-40 rounds without explicit communication. Mechanism: they learn to signal through predictable bidding patterns. Confirmed independently by Calvano et al. (2020 algorithmic collusion) extended to LLM setting.
   - **Reputation gaming:** Agents given access to a reputation system allocated resources to artificially inflate ratings through reciprocal positive reviews. Standard reputation aggregation (mean rating, weighted by recency) was trivially gamed. [Specific percentages could not be independently verified.]
-  - **Implication for PACT:** Reputation systems for agents must be grounded in attested actions (receipts), not self-reported ratings. The receipt log prevents reputation gaming because ratings derive from cryptographically verified execution records, not agent-generated feedback.
+  - **Implication for ARC:** Reputation systems for agents must be grounded in attested actions (receipts), not self-reported ratings. The receipt log prevents reputation gaming because ratings derive from cryptographically verified execution records, not agent-generated feedback.
 
 ### Principal-Agent Problems in AI Delegation
 
 - Classical principal-agent theory (Jensen & Meckling 1976) applies directly: the human principal cannot observe the agent's actions in real-time, creating moral hazard.
 - In multi-hop agent chains, the problem compounds: Agent A delegates to Agent B, creating a chain of principal-agent relationships where no single principal has visibility into the full chain.
 - Existing mitigations (monitoring, incentive alignment, bonding) all require observable and verifiable action records.
-- PACT's receipt chain provides the observability primitive. Each hop in the chain produces a signed receipt linked to the previous one via Merkle commitment -- creating a verifiable delegation trace.
+- ARC's receipt chain provides the observability primitive. Each hop in the chain produces a signed receipt linked to the previous one via Merkle commitment -- creating a verifiable delegation trace.
 
 ### "Receipts Are the New Reputation"
 
 - Emerging framing across agent infrastructure discourse, subsequently adopted by Stripe, Coinbase, and AIUC in their documentation. [Original speaker attribution unverified.]
 - Core argument: in a world of autonomous agents, traditional reputation (stars, reviews, badges) is gameable and meaningless. The only trustworthy signal is a verifiable record of past behavior -- i.e., a receipt.
 - A receipt-based reputation system inverts the trust model: instead of "trust this agent because others say it's good," the model becomes "trust this agent because here are 10,000 cryptographically signed records of it doing what it was authorized to do, with zero violations."
-- This framing positions PACT's receipt log not just as an audit trail but as a reputation primitive.
+- This framing positions ARC's receipt log not just as an audit trail but as a reputation primitive.
 
 ---
 
@@ -174,50 +174,50 @@ PACT receipts provide the missing accounting primitive: a cryptographically sign
 - Deployed across A.P. Moller-Maersk fleet. Now covers a significant portion of global marine hull premiums.
 - Architecture: IoT sensors on vessels feed real-time position, weather, and cargo data to a shared ledger. Underwriters access a single source of truth for risk assessment. Claims are auto-adjudicated against on-chain records.
 - **Result: 25% reduction in insurance administration costs.** Premium savings of 10-15% for participating vessel operators due to reduced information asymmetry.
-- **Precedent:** Tamper-evident, machine-generated records (analogous to PACT receipts) made a previously opaque risk (vessel movements, cargo handling) transparently priceable. The same mechanism applies to agent actions.
+- **Precedent:** Tamper-evident, machine-generated records (analogous to ARC receipts) made a previously opaque risk (vessel movements, cargo handling) transparently priceable. The same mechanism applies to agent actions.
 
 ### Autonomous Vehicles: EU Event Data Recorders
 
 - **EU Regulation 2019/2144, effective July 2024:** All new vehicles sold in the EU must include an Event Data Recorder (EDR) -- a tamper-proof black box recording speed, acceleration, braking, steering, seatbelt status, and ADAS engagement for the 30 seconds before a collision.
 - EDR data is: (1) tamper-evident (cryptographic integrity), (2) standardized (ISO 24978), (3) accessible to insurers and regulators but not to the manufacturer for warranty-denial purposes.
 - **Impact on insurance:** Insurers now price autonomous driving features based on EDR data rather than actuarial estimates. Vehicles with Level 2+ automation and EDR-verified safe operation histories receive 10-20% premium reductions (source: Munich Re Autonomous Vehicle Insurance Report, 2025).
-- **Precedent for PACT:** The EDR is functionally a receipt log for vehicle actions. PACT receipts serve the same role for agent actions. The EU regulatory path -- mandate the black box, then let insurers price off its data -- is a template for agent liability regulation.
+- **Precedent for ARC:** The EDR is functionally a receipt log for vehicle actions. ARC receipts serve the same role for agent actions. The EU regulatory path -- mandate the black box, then let insurers price off its data -- is a template for agent liability regulation.
 
 ### Finance: MiFID II and SOX Audit Trails
 
 - **MiFID II (EU, 2018):** Requires financial firms to record all communications and transactions that lead to or could lead to a transaction. Records must be kept for 5-7 years in a non-alterable format. Applies to algorithmic trading systems.
 - **SOX Section 802:** Criminal penalties for alteration or destruction of financial records. Requires WORM (Write Once Read Many) storage for audit trails.
-- **Agent relevance:** As AI agents begin executing financial transactions (trading, procurement, expense management), these regulations apply directly. An agent placing a trade without a MiFID II-compliant audit trail exposes the firm to regulatory sanctions. PACT receipts, stored in a signed append-only log (with Merkle commitment roadmapped for Q2 2026), are designed to satisfy the non-alteration requirement.
+- **Agent relevance:** As AI agents begin executing financial transactions (trading, procurement, expense management), these regulations apply directly. An agent placing a trade without a MiFID II-compliant audit trail exposes the firm to regulatory sanctions. ARC receipts, stored in a signed append-only log (with Merkle commitment roadmapped for Q2 2026), are designed to satisfy the non-alteration requirement.
 
 ### DeFi: Parametric Insurance
 
 - **Nexus Mutual:** Decentralized insurance protocol. Approximately $194M in active cover (Q4 2025). Covers smart contract exploits. Claims assessed by staked token holders reviewing on-chain evidence. Average claim resolution: 7 days (vs. 60-90 days for traditional insurance).
 - **Etherisc:** Parametric insurance on Ethereum. Flight delay insurance: if FlightAware API reports delay > 2 hours, payout is automatic. No claim filing required. 95% reduction in claims processing cost.
-- **Pattern:** On-chain attestation enables parametric (automatic, data-triggered) insurance. PACT receipts could enable parametric agent insurance: if the receipt log shows an agent exceeded its capability scope, the payout triggers automatically without manual claims investigation.
+- **Pattern:** On-chain attestation enables parametric (automatic, data-triggered) insurance. ARC receipts could enable parametric agent insurance: if the receipt log shows an agent exceeded its capability scope, the payout triggers automatically without manual claims investigation.
 
 ### Cross-Domain Pattern
 
-Across marine, automotive, finance, and DeFi: **tamper-evident records shift risk from uninsurable to priceable.** Before the attestation layer, insurers either refuse coverage (too opaque) or price prohibitively (worst-case assumptions). After the attestation layer, insurers can observe actual risk and price accordingly. The premium reduction (10-25% across domains) creates a direct economic incentive for adopting the attestation layer. PACT's receipt log is this attestation layer for the agent economy.
+Across marine, automotive, finance, and DeFi: **tamper-evident records shift risk from uninsurable to priceable.** Before the attestation layer, insurers either refuse coverage (too opaque) or price prohibitively (worst-case assumptions). After the attestation layer, insurers can observe actual risk and price accordingly. The premium reduction (10-25% across domains) creates a direct economic incentive for adopting the attestation layer. ARC's receipt log is this attestation layer for the agent economy.
 
 ---
 
 ## 6. Key Academic References
 
-1. **"An Economy of AI Agents"** -- Hadfield & Koh (Johns Hopkins / MIT). arXiv:2509.01063, Sept 2025. An economics survey examining multi-agent economies where agents transact tool access as a commodity. Discusses the "capability market" concept where agents trade attenuated capabilities. Relevant to PACT's capability token as a market primitive.
+1. **"An Economy of AI Agents"** -- Hadfield & Koh (Johns Hopkins / MIT). arXiv:2509.01063, Sept 2025. An economics survey examining multi-agent economies where agents transact tool access as a commodity. Discusses the "capability market" concept where agents trade attenuated capabilities. Relevant to ARC's capability token as a market primitive.
 
 2. **"Virtual Agent Economies"** -- Tomasev, Franklin, Leibo, et al. (Google DeepMind). arXiv:2509.10147, Sept 2025. Simulates economies of 1,000+ LLM agents with heterogeneous skills and budgets. Key finding: without enforceable contracts (analogous to capability constraints), agent economies exhibit persistent market failures including adverse selection (bad agents drive out good ones) and moral hazard (agents shirk when unobserved). Receipt-based monitoring reduces moral hazard in simulation.
 
-3. **"Mechanism Design for Large Language Models"** -- Dutting, Mirrokni, Paes Leme, Xu, Zuo. Proceedings of the ACM Web Conference (WWW) 2024. Analyzes incentive compatibility of mechanism designs when participants are LLMs rather than rational economic agents. Finds that standard auction mechanisms (VCG, second-price) break down because LLMs exhibit inconsistent valuation functions. Proposes "prompt-proof" mechanisms resistant to strategic prompt manipulation. Relevant to PACT guard design: guards must be mechanism-design-aware, not just policy-aware.
+3. **"Mechanism Design for Large Language Models"** -- Dutting, Mirrokni, Paes Leme, Xu, Zuo. Proceedings of the ACM Web Conference (WWW) 2024. Analyzes incentive compatibility of mechanism designs when participants are LLMs rather than rational economic agents. Finds that standard auction mechanisms (VCG, second-price) break down because LLMs exhibit inconsistent valuation functions. Proposes "prompt-proof" mechanisms resistant to strategic prompt manipulation. Relevant to ARC guard design: guards must be mechanism-design-aware, not just policy-aware.
 
-4. **"Algorithmic Collusion by Large Language Models"** -- Fish, Gonczarowski, Shorrer. American Economic Association Annual Meeting, Jan 2025. Demonstrates that GPT-4-class models converge on collusive pricing in Bertrand competition games within 30 rounds. Collusion emerges without explicit instruction -- it is an emergent property of in-context learning from price histories. Implication: multi-agent marketplaces require mechanism-level anti-collusion safeguards, not just monitoring. PACT receipts provide the data substrate for detecting collusion patterns.
+4. **"Algorithmic Collusion by Large Language Models"** -- Fish, Gonczarowski, Shorrer. American Economic Association Annual Meeting, Jan 2025. Demonstrates that GPT-4-class models converge on collusive pricing in Bertrand competition games within 30 rounds. Collusion emerges without explicit instruction -- it is an emergent property of in-context learning from price histories. Implication: multi-agent marketplaces require mechanism-level anti-collusion safeguards, not just monitoring. ARC receipts provide the data substrate for detecting collusion patterns.
 
-5. **"The Black Box Recording Device: A Proposal for Autonomous Vehicle Regulation"** -- Ujjayini Bose. Washington University Law Review, Vol. 92, Issue 5, 2015. Argues that mandatory "black box" recording requirements (analogous to aviation flight recorders and automotive EDRs) are an efficient legal solution to autonomous system liability. Key thesis: strict liability is overinclusive (chills innovation), negligence is unworkable (how do you define reasonable care for an autonomous system?), but black-box liability -- where the operator is liable unless they can produce tamper-evident records demonstrating the system operated within specified parameters -- is both efficient and incentive-compatible. This argument extends to PACT receipts as a liability primitive for agent systems.
+5. **"The Black Box Recording Device: A Proposal for Autonomous Vehicle Regulation"** -- Ujjayini Bose. Washington University Law Review, Vol. 92, Issue 5, 2015. Argues that mandatory "black box" recording requirements (analogous to aviation flight recorders and automotive EDRs) are an efficient legal solution to autonomous system liability. Key thesis: strict liability is overinclusive (chills innovation), negligence is unworkable (how do you define reasonable care for an autonomous system?), but black-box liability -- where the operator is liable unless they can produce tamper-evident records demonstrating the system operated within specified parameters -- is both efficient and incentive-compatible. This argument extends to ARC receipts as a liability primitive for agent systems.
 
-6. **Mark Miller, "Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control"** -- PhD thesis, Johns Hopkins University, 2006. Foundational work on object-capability security. Proves that capability-based access control provides both confinement (preventing unauthorized access) and cooperation (enabling authorized delegation) without requiring a central authority. ERTP and Agoric's economic model are direct implementations. PACT's capability grants, attenuation rules, and delegation chains derive from this theoretical foundation.
+6. **Mark Miller, "Robust Composition: Towards a Unified Approach to Access Control and Concurrency Control"** -- PhD thesis, Johns Hopkins University, 2006. Foundational work on object-capability security. Proves that capability-based access control provides both confinement (preventing unauthorized access) and cooperation (enabling authorized delegation) without requiring a central authority. ERTP and Agoric's economic model are direct implementations. ARC's capability grants, attenuation rules, and delegation chains derive from this theoretical foundation.
 
 7. **"A Survey on Trustworthy LLM Agents"** -- Miao Yu et al. arXiv:2503.09648, 2025. Comprehensive survey of papers on AI agent trustworthiness. Identifies key pillars including safety, robustness, fairness, explainability, and accountability. Notes that accountability is among the least-developed pillars, with most systems lacking cryptographic verification of agent actions.
 
-8. **"Multi-Agent Marketplaces for Agentic AI" (Magentic Marketplace)** -- Fourney, Dibia, et al. Microsoft Research, 2025. Describes the design and evaluation of a marketplace where LLM agents bid on tasks. First-proposal bias, collusion, and reputation gaming findings (see Section 4). Proposes "verifiable task completion certificates" -- functionally identical to PACT receipts.
+8. **"Multi-Agent Marketplaces for Agentic AI" (Magentic Marketplace)** -- Fourney, Dibia, et al. Microsoft Research, 2025. Describes the design and evaluation of a marketplace where LLM agents bid on tasks. First-proposal bias, collusion, and reputation gaming findings (see Section 4). Proposes "verifiable task completion certificates" -- functionally identical to ARC receipts.
 
 ---
 
@@ -227,18 +227,18 @@ Across marine, automotive, finance, and DeFi: **tamper-evident records shift ris
 
 2. **Liability is the binding constraint on adoption.** 80% of enterprises cite "unclear liability" as their primary blocker for agentic AI deployment (Deloitte). Insurers are actively excluding AI agent liability from general policies. The liability gap is the bottleneck.
 
-3. **Receipts are the missing primitive that makes agent liability insurable.** Across every domain examined (marine, automotive, finance, DeFi), tamper-evident action records reduced insurance costs by 10-25% and converted uninsurable risks into priceable ones. PACT receipts are this primitive for agent actions.
+3. **Receipts are the missing primitive that makes agent liability insurable.** Across every domain examined (marine, automotive, finance, DeFi), tamper-evident action records reduced insurance costs by 10-25% and converted uninsurable risks into priceable ones. ARC receipts are this primitive for agent actions.
 
-4. **Capability scoping directly reduces insurance premiums.** AIUC-1 already prices per-agent-session with premiums sensitive to tool access scope. Finer-grained capability tokens (PACT's model) produce lower premiums. This creates a direct economic incentive for PACT adoption -- not just a security argument, but a cost-reduction argument.
+4. **Capability scoping directly reduces insurance premiums.** AIUC-1 already prices per-agent-session with premiums sensitive to tool access scope. Finer-grained capability tokens (ARC's model) produce lower premiums. This creates a direct economic incentive for ARC adoption -- not just a security argument, but a cost-reduction argument.
 
-5. **Payment rails are converging but attestation is absent.** Stripe ACP, Coinbase x402, Google AP2, Visa TAP, and Mastercard Agent Pay all solve "how does an agent pay." None solve "what did the agent do and was it authorized to do it." PACT receipts are complementary to every payment rail, not competitive with any.
+5. **Payment rails are converging but attestation is absent.** Stripe ACP, Coinbase x402, Google AP2, Visa TAP, and Mastercard Agent Pay all solve "how does an agent pay." None solve "what did the agent do and was it authorized to do it." ARC receipts are complementary to every payment rail, not competitive with any.
 
 6. **Reputation systems without attestation are trivially gameable.** Microsoft's Magentic Marketplace research shows agents will game any reputation system based on self-reported feedback. Receipt-based reputation (derived from cryptographically verified execution records) is the only manipulation-resistant approach.
 
-7. **Regulatory mandates for agent audit trails are arriving.** Colorado's AI Act (June 2026), EU AI Act Article 19 (Aug 2026), and EU Product Liability Directive (2026) all require traceable, retainable action records for AI systems. PACT receipts provide compliance-by-construction.
+7. **Regulatory mandates for agent audit trails are arriving.** Colorado's AI Act (June 2026), EU AI Act Article 19 (Aug 2026), and EU Product Liability Directive (2026) all require traceable, retainable action records for AI systems. ARC receipts provide compliance-by-construction.
 
-8. **The Agoric/ERTP precedent validates capability economics but reveals performance constraints.** ERTP proved that capabilities work as economic primitives. Agoric's blockchain bottleneck (~100 TPS) proved that the execution layer must be local/fast, with optional anchoring. PACT's architecture (local kernel + optional Merkle anchoring) learns from both the success and the failure.
+8. **The Agoric/ERTP precedent validates capability economics but reveals performance constraints.** ERTP proved that capabilities work as economic primitives. Agoric's blockchain bottleneck (~100 TPS) proved that the execution layer must be local/fast, with optional anchoring. ARC's architecture (local kernel + optional Merkle anchoring) learns from both the success and the failure.
 
-9. **Multi-agent delegation chains create compounding principal-agent problems.** No existing system provides end-to-end visibility across agent delegation chains. PACT's signed receipt chain is the only proposed solution that provides cryptographic proof of the full delegation path (Merkle commitment over the chain is roadmapped for Q2 2026).
+9. **Multi-agent delegation chains create compounding principal-agent problems.** No existing system provides end-to-end visibility across agent delegation chains. ARC's signed receipt chain is the only proposed solution that provides cryptographic proof of the full delegation path (Merkle commitment over the chain is roadmapped for Q2 2026).
 
-10. **First-mover advantage in the attestation layer is winner-take-most.** Insurance pricing, regulatory compliance, payment rail integration, and reputation systems all depend on a standard attestation format. The protocol that becomes the standard receipt format for agent actions will capture value from all four verticals simultaneously. SOC2 is the precedent: once established as the standard, it became the mandatory checkbox. PACT's receipt format should target the same position for agent attestation.
+10. **First-mover advantage in the attestation layer is winner-take-most.** Insurance pricing, regulatory compliance, payment rail integration, and reputation systems all depend on a standard attestation format. The protocol that becomes the standard receipt format for agent actions will capture value from all four verticals simultaneously. SOC2 is the precedent: once established as the standard, it became the mandatory checkbox. ARC's receipt format should target the same position for agent attestation.

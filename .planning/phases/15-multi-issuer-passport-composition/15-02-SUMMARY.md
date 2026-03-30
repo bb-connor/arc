@@ -15,9 +15,9 @@ key-files:
   created:
     - .planning/phases/15-multi-issuer-passport-composition/15-02-SUMMARY.md
   modified:
-    - crates/pact-credentials/src/lib.rs
-    - crates/pact-cli/src/passport.rs
-    - crates/pact-cli/src/reputation.rs
+    - crates/arc-credentials/src/lib.rs
+    - crates/arc-cli/src/passport.rs
+    - crates/arc-cli/src/reputation.rs
 requirements-completed:
   - PASS-02
 completed: 2026-03-24
@@ -36,5 +36,5 @@ Issuer-aware reporting now matches the shipped composition contract.
 
 ## Verification
 
-- `cargo test -p pact-credentials -- --nocapture`
-- `cargo test -p pact-cli --test local_reputation -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`
+- `cargo test -p arc-cli --test local_reputation -- --nocapture`

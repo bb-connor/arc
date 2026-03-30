@@ -12,7 +12,7 @@ provides:
   - ReceiptQuery struct with 8 filter dimensions (capability_id, tool_server, tool_name, outcome, since, until, min_cost, max_cost) + cursor + limit
   - ReceiptQueryResult struct with receipts, total_count, next_cursor
   - query_receipts method on SqliteReceiptStore with parameterized SQL and cursor pagination
-  - MAX_QUERY_LIMIT constant (200) exported from pact-kernel
+  - MAX_QUERY_LIMIT constant (200) exported from arc-kernel
 affects: [10-02, CLI receipt query command, HTTP receipt endpoint, SIEM/dashboard consumers]
 
 # Tech tracking
@@ -27,10 +27,10 @@ tech-stack:
 
 key-files:
   created:
-    - crates/pact-kernel/src/receipt_query.rs
+    - crates/arc-kernel/src/receipt_query.rs
   modified:
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-kernel/src/lib.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-kernel/src/lib.rs
 
 key-decisions:
   - "query_receipts_impl lives in receipt_store.rs (connection is private) while public API types and shell live in receipt_query.rs"
@@ -75,9 +75,9 @@ completed: 2026-03-23
 1. **Task 1: Implement receipt_query.rs with ReceiptQuery, ReceiptQueryResult, and query_receipts** - `4dbe3b5` (feat)
 
 ## Files Created/Modified
-- `crates/pact-kernel/src/receipt_query.rs` - Public types (ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT), public query_receipts shell, 18 unit tests
-- `crates/pact-kernel/src/receipt_store.rs` - query_receipts_impl method with SQL implementation, import of receipt_query types
-- `crates/pact-kernel/src/lib.rs` - Added `pub mod receipt_query` and re-exports
+- `crates/arc-kernel/src/receipt_query.rs` - Public types (ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT), public query_receipts shell, 18 unit tests
+- `crates/arc-kernel/src/receipt_store.rs` - query_receipts_impl method with SQL implementation, import of receipt_query types
+- `crates/arc-kernel/src/lib.rs` - Added `pub mod receipt_query` and re-exports
 
 ## Decisions Made
 - `query_receipts_impl` lives in `receipt_store.rs` because `connection` is a private field -- the public shell `query_receipts` in `receipt_query.rs` delegates to it. This keeps the module structure clean while respecting Rust privacy rules.
@@ -92,15 +92,15 @@ completed: 2026-03-23
 - **Found during:** Task 1 (clippy check)
 - **Issue:** `query.limit.min(MAX_QUERY_LIMIT).max(1)` triggers clippy::manual_clamp
 - **Fix:** Changed to `query.limit.clamp(1, MAX_QUERY_LIMIT)`
-- **Files modified:** crates/pact-kernel/src/receipt_store.rs
-- **Verification:** `cargo clippy -p pact-kernel -- -D warnings` passes clean
+- **Files modified:** crates/arc-kernel/src/receipt_store.rs
+- **Verification:** `cargo clippy -p arc-kernel -- -D warnings` passes clean
 - **Committed in:** 4dbe3b5 (Task 1 commit)
 
 **2. [Rule 1 - Bug] Moved query_receipts impl to receipt_store.rs**
 - **Found during:** Task 1 (compilation)
 - **Issue:** `connection` field is private to `receipt_store.rs`; `receipt_query.rs` cannot access it directly
 - **Fix:** Added `query_receipts_impl` as a `pub(crate)` method in receipt_store.rs; public `query_receipts` shell in receipt_query.rs delegates to it
-- **Files modified:** crates/pact-kernel/src/receipt_store.rs, crates/pact-kernel/src/receipt_query.rs
+- **Files modified:** crates/arc-kernel/src/receipt_store.rs, crates/arc-kernel/src/receipt_query.rs
 - **Verification:** All 18 tests pass, clippy clean
 - **Committed in:** 4dbe3b5 (Task 1 commit)
 
@@ -116,7 +116,7 @@ completed: 2026-03-23
 None - no external service configuration required.
 
 ## Next Phase Readiness
-- `ReceiptQuery`, `ReceiptQueryResult`, `MAX_QUERY_LIMIT` exported from `pact-kernel` crate
+- `ReceiptQuery`, `ReceiptQueryResult`, `MAX_QUERY_LIMIT` exported from `arc-kernel` crate
 - `SqliteReceiptStore::query_receipts` is ready for use by the CLI receipt command (plan 10-02) and HTTP endpoint
 - Financial metadata path `$.metadata.financial.cost_charged` confirmed working via test suite
 

@@ -20,7 +20,7 @@ milestone auditable.
 - Update release-facing docs from stale `v1` wording to the current `v2.3`
   production-candidate framing.
 - Fix the TypeScript SDK README to use the actual published package name
-  `@pact-protocol/sdk`.
+  `@arc-protocol/sdk`.
 - Keep Python and Go SDKs in documented beta posture, but align them to the
   current protocol and release docs.
 
@@ -43,15 +43,15 @@ milestone auditable.
 - `.planning/ROADMAP.md` -- Phase 24 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `PROD-13`, `PROD-14`
 - `README.md` -- repository entrypoint
-- `packages/sdk/pact-ts/README.md` -- TypeScript SDK release surface
-- `packages/sdk/pact-py/README.md` -- Python SDK release posture
-- `packages/sdk/pact-go/README.md` -- Go SDK release posture
+- `packages/sdk/arc-ts/README.md` -- TypeScript SDK release surface
+- `packages/sdk/arc-py/README.md` -- Python SDK release posture
+- `packages/sdk/arc-go/README.md` -- Go SDK release posture
 - `docs/release/RELEASE_CANDIDATE.md` -- supported candidate surface
 - `docs/release/RELEASE_AUDIT.md` -- go/no-go record
 - `docs/release/GA_CHECKLIST.md` -- launch checklist
 - `docs/release/RISK_REGISTER.md` -- known remaining risks
-- `docs/standards/PACT_RECEIPTS_PROFILE.md` -- receipts standards profile
-- `docs/standards/PACT_PORTABLE_TRUST_PROFILE.md` -- portable-trust standards profile
+- `docs/standards/ARC_RECEIPTS_PROFILE.md` -- receipts standards profile
+- `docs/standards/ARC_PORTABLE_TRUST_PROFILE.md` -- portable-trust standards profile
 
 </canonical_refs>
 
@@ -61,8 +61,8 @@ milestone auditable.
 - The production qualification lane for dashboard and SDK packages already
   existed after Phase 22; the remaining gap was doc and launch-surface
   alignment.
-- `packages/sdk/pact-ts/package.json` already declared the real package name
-  `@pact-protocol/sdk`, but the README still advertised `@pact/sdk`.
+- `packages/sdk/arc-ts/package.json` already declared the real package name
+  `@arc-protocol/sdk`, but the README still advertised `@arc/sdk`.
 - The main README and release-candidate docs were still written against the
   older scoped `v1` framing even though the repository now ships broader
   portable-trust, certification, and A2A surfaces.

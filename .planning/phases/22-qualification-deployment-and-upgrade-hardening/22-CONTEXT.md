@@ -52,16 +52,16 @@ runtime assumptions, and local tribal knowledge.
 - `scripts/qualify-release.sh` -- canonical production qualification lane
 - `scripts/ci-workspace.sh` -- baseline workspace gate
 - `scripts/check-dashboard-release.sh` -- dashboard clean-install proof
-- `scripts/check-pact-ts-release.sh` -- TypeScript SDK build/pack/smoke proof
-- `scripts/check-pact-py-release.sh` -- Python SDK wheel/sdist proof
-- `scripts/check-pact-go-release.sh` -- Go SDK module-release proof
+- `scripts/check-arc-ts-release.sh` -- TypeScript SDK build/pack/smoke proof
+- `scripts/check-arc-py-release.sh` -- Python SDK wheel/sdist proof
+- `scripts/check-arc-go-release.sh` -- Go SDK module-release proof
 - `docs/release/QUALIFICATION.md` -- qualification contract
 - `docs/release/OPERATIONS_RUNBOOK.md` -- deploy/backup/restore/upgrade contract
 - `.github/workflows/ci.yml` -- hosted CI runtime prerequisites
 - `.github/workflows/release-qualification.yml` -- hosted release lane
-- `packages/sdk/pact-ts/package.json` -- TypeScript SDK package metadata
-- `packages/sdk/pact-ts/package-lock.json` -- deterministic TS SDK install plan
-- `crates/pact-cli/tests/receipt_query.rs` -- release-lane startup reliability
+- `packages/sdk/arc-ts/package.json` -- TypeScript SDK package metadata
+- `packages/sdk/arc-ts/package-lock.json` -- deterministic TS SDK install plan
+- `crates/arc-cli/tests/receipt_query.rs` -- release-lane startup reliability
 
 </canonical_refs>
 
@@ -74,7 +74,7 @@ runtime assumptions, and local tribal knowledge.
   `@types/node`, which broke the clean package-release lane.
 - The hosted workflows assumed Python and Go availability instead of declaring
   them explicitly.
-- `pact trust serve` correctly tolerated missing dashboard assets at runtime,
+- `arc trust serve` correctly tolerated missing dashboard assets at runtime,
   but the `receipt_query` integration harness could still fail opaquely on
   transient startup issues during the full qualification run.
 

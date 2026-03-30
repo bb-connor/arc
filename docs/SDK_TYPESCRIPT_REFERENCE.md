@@ -1,13 +1,13 @@
 # TypeScript SDK Reference
 
-The `@pact-protocol/sdk` package provides TypeScript bindings for agent-side PACT operations: signing DPoP proofs, querying receipts, and working with PACT types.
+The `@arc-protocol/sdk` package provides TypeScript bindings for agent-side ARC operations: signing DPoP proofs, querying receipts, and working with ARC types.
 
 ## Installation
 
 ```bash
-npm install @pact-protocol/sdk
+npm install @arc-protocol/sdk
 # or
-yarn add @pact-protocol/sdk
+yarn add @arc-protocol/sdk
 ```
 
 **Requirements:** Node.js >= 22. The package uses ES module format (`"type": "module"` in `package.json`). All entry points export TypeScript source directly; compile with `tsc` before shipping to a consumer that requires `.js` output.
@@ -16,9 +16,9 @@ yarn add @pact-protocol/sdk
 
 | Export | Entry Point |
 |--------|-------------|
-| `@pact-protocol/sdk` | Main surface: errors, DPoP, receipt query client, types, transport, auth |
-| `@pact-protocol/sdk/invariants` | Low-level canonical JSON, hashing, signing invariants |
-| `@pact-protocol/sdk/transport` | Session and message transport types |
+| `@arc-protocol/sdk` | Main surface: errors, DPoP, receipt query client, types, transport, auth |
+| `@arc-protocol/sdk/invariants` | Low-level canonical JSON, hashing, signing invariants |
+| `@arc-protocol/sdk/transport` | Session and message transport types |
 
 ## API Stability
 
@@ -26,10 +26,10 @@ The package follows semantic versioning. The current version is `1.0.0`. All exp
 
 ## Error Hierarchy
 
-All SDK errors extend `PactError`:
+All SDK errors extend `ArcError`:
 
 ```typescript
-class PactError extends Error {
+class ArcError extends Error {
   readonly code: string;
   constructor(code: string, message: string, options?: ErrorOptions)
 }
@@ -38,32 +38,32 @@ class PactError extends Error {
 Concrete error classes:
 
 ```typescript
-class DpopSignError extends PactError {
+class DpopSignError extends ArcError {
   // code: "dpop_sign_error"
   // Thrown when agentSeedHex is invalid or Ed25519 signing fails.
 }
 
-class QueryError extends PactError {
+class QueryError extends ArcError {
   // code: "query_error"
   readonly status: number | undefined;
   constructor(message: string, status?: number, options?: ErrorOptions)
   // Thrown when the server returns a non-2xx HTTP status.
 }
 
-class TransportError extends PactError {
+class TransportError extends ArcError {
   // code: "transport_error"
   // Thrown when the fetch itself fails (network error, DNS failure, etc.).
 }
 ```
 
-`PactInvariantError` (exported from `./invariants`) is a separate lower-level error type and does NOT extend `PactError`. Catch it separately if you use the invariants layer directly.
+`ArcInvariantError` (exported from `./invariants`) is a separate lower-level error type and does NOT extend `ArcError`. Catch it separately if you use the invariants layer directly.
 
 ## signDpopProof
 
-Signs a DPoP proof for a single tool invocation. The proof body is serialized as RFC 8785 canonical JSON before signing, ensuring compatibility with `pact-kernel`'s `verify_dpop_proof`.
+Signs a DPoP proof for a single tool invocation. The proof body is serialized as RFC 8785 canonical JSON before signing, ensuring compatibility with `arc-kernel`'s `verify_dpop_proof`.
 
 ```typescript
-import { signDpopProof } from "@pact-protocol/sdk";
+import { signDpopProof } from "@arc-protocol/sdk";
 
 interface SignDpopProofParams {
   capabilityId: string;   // token ID of the capability being used
@@ -110,7 +110,7 @@ Throws `DpopSignError` if `agentSeedHex` is invalid or signing fails.
 Wraps `GET /v1/receipts/query` with TypeScript types and automatic `Bearer` token injection.
 
 ```typescript
-import { ReceiptQueryClient } from "@pact-protocol/sdk";
+import { ReceiptQueryClient } from "@arc-protocol/sdk";
 
 const client = new ReceiptQueryClient(
   "http://localhost:7391",  // trust-control base URL
@@ -139,7 +139,7 @@ interface ReceiptQueryParams {
 interface ReceiptQueryResponse {
   totalCount: number;
   nextCursor?: number;
-  receipts: PactReceipt[];
+  receipts: ArcReceipt[];
 }
 
 async query(params?: ReceiptQueryParams): Promise<ReceiptQueryResponse>
@@ -154,7 +154,7 @@ Throws `QueryError` (with `status` set to the HTTP status code) on non-2xx respo
 An async generator that iterates through all pages automatically:
 
 ```typescript
-async *paginate(params?: ReceiptQueryParams): AsyncGenerator<PactReceipt[]>
+async *paginate(params?: ReceiptQueryParams): AsyncGenerator<ArcReceipt[]>
 ```
 
 Each yielded value is one page of receipts. The generator stops when `nextCursor` is absent in the response.
@@ -172,7 +172,7 @@ for await (const page of client.paginate({ toolServer: "filesystem" })) {
 ```typescript
 const client = new ReceiptQueryClient("http://localhost:7391", token);
 
-const all: PactReceipt[] = [];
+const all: ArcReceipt[] = [];
 for await (const page of client.paginate({
   outcome: "deny",
   since: 1700000000,
@@ -186,7 +186,7 @@ console.log(`Found ${all.length} denied receipts`);
 ### Error Handling
 
 ```typescript
-import { QueryError, TransportError } from "@pact-protocol/sdk";
+import { QueryError, TransportError } from "@arc-protocol/sdk";
 
 try {
   const result = await client.query({ capabilityId: "cap-xyz" });

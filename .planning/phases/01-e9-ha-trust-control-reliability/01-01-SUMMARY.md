@@ -25,8 +25,8 @@ key-files:
   created:
     - .planning/phases/01-e9-ha-trust-control-reliability/01-01-SUMMARY.md
   modified:
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/tests/trust_cluster.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/tests/trust_cluster.rs
     - docs/HA_CONTROL_AUTH_PLAN.md
 key-decisions:
   - "Expose peer sequence and cursor state through internal cluster status instead of relying on logs only"
@@ -67,8 +67,8 @@ No task commits were created in this session because the repository currently ha
 3. **Task 3: Document the richer internal observability surface for HA debugging** - working tree only
 
 ## Files Created/Modified
-- `crates/pact-cli/src/trust_control.rs` - added peer replication-position fields to the internal cluster-status response
-- `crates/pact-cli/tests/trust_cluster.rs` - added timeout diagnostics that print cluster and budget state from both nodes
+- `crates/arc-cli/src/trust_control.rs` - added peer replication-position fields to the internal cluster-status response
+- `crates/arc-cli/tests/trust_cluster.rs` - added timeout diagnostics that print cluster and budget state from both nodes
 - `docs/HA_CONTROL_AUTH_PLAN.md` - documented the richer HA debug/status surface
 
 ## Decisions Made
@@ -90,7 +90,7 @@ None - no external service configuration required.
 ## Next Phase Readiness
 
 - Phase 1 now has actionable observability for the remaining E9 work
-- The next slice should freeze the forwarded-write visibility contract in `crates/pact-cli/src/trust_control.rs`
+- The next slice should freeze the forwarded-write visibility contract in `crates/arc-cli/src/trust_control.rs`
 - Root-cause elimination for the original flake is still pending; this summary only improves localization
 
 ---

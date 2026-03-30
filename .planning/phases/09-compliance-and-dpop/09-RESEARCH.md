@@ -1,7 +1,7 @@
 # Phase 9: Compliance and DPoP - Research
 
 **Researched:** 2026-03-22
-**Domain:** Receipt retention/rotation (SQLite archival), DPoP proof-of-possession (PACT-native Ed25519), regulatory compliance mapping (Colorado SB 24-205, EU AI Act Article 19)
+**Domain:** Receipt retention/rotation (SQLite archival), DPoP proof-of-possession (ARC-native Ed25519), regulatory compliance mapping (Colorado SB 24-205, EU AI Act Article 19)
 **Confidence:** HIGH
 
 <user_constraints>
@@ -17,7 +17,7 @@
 - Archived receipts must remain verifiable against stored Merkle checkpoint roots (COMP-04)
 
 **DPoP Proof Design:**
-- DPoP proof format: canonical JSON signed with Ed25519, consistent with all PACT signing (PACT-native, not HTTP-shaped)
+- DPoP proof format: canonical JSON signed with Ed25519, consistent with all ARC signing (ARC-native, not HTTP-shaped)
 - Proof message binds: capability_id + tool_server + tool_name + action_hash + nonce (per SEC-03)
 - Nonce replay store: in-memory LRU with configurable capacity -- DPoP nonces are ephemeral, no persistence across restarts
 - Default TTL window: 5 minutes (standard DPoP practice), configurable
@@ -49,11 +49,11 @@ None -- discussion stayed within phase scope
 
 | ID | Description | Research Support |
 |----|-------------|-----------------|
-| COMP-01 | Published document maps PACT receipts to Colorado SB 24-205 requirements for AI system output records | Colorado SB 24-205 clause structure, receipt field mapping table, test artifact reference pattern |
-| COMP-02 | Published document maps PACT to EU AI Act Article 19 traceability requirements for high-risk AI systems | EU AI Act Art. 19 record-keeping obligations, receipt + checkpoint field mapping, test artifact reference pattern |
+| COMP-01 | Published document maps ARC receipts to Colorado SB 24-205 requirements for AI system output records | Colorado SB 24-205 clause structure, receipt field mapping table, test artifact reference pattern |
+| COMP-02 | Published document maps ARC to EU AI Act Article 19 traceability requirements for high-risk AI systems | EU AI Act Art. 19 record-keeping obligations, receipt + checkpoint field mapping, test artifact reference pattern |
 | COMP-03 | Receipt retention policies are configurable (time-based and size-based rotation) | SQLite archive pattern, `ensure_*_column` migration helper, `page_count * page_size` size query |
 | COMP-04 | Archived receipts remain verifiable via stored Merkle checkpoint roots | `kernel_checkpoints` table already carries `merkle_root`; `verify_checkpoint_signature` already exists; archive DB must preserve checkpoint rows alongside receipt rows |
-| SEC-03 | DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce (PACT-native proof message) | `Keypair::sign_canonical`, `PublicKey::verify_canonical`, canonical JSON for proof body, `CapabilityToken.subject` as sender constraint |
+| SEC-03 | DPoP per-invocation proofs bind to capability_id + tool_server + tool_name + action_hash + nonce (ARC-native proof message) | `Keypair::sign_canonical`, `PublicKey::verify_canonical`, canonical JSON for proof body, `CapabilityToken.subject` as sender constraint |
 | SEC-04 | DPoP nonce replay store rejects reused nonces within configurable TTL window | `lru` crate 0.16.3 for `LruCache<(nonce, cap_id), Instant>`, TTL eviction check, cross-invocation replay via action_hash binding |
 </phase_requirements>
 
@@ -63,9 +63,9 @@ Phase 9 has three distinct work streams that share no mutual dependencies: recei
 
 The retention work extends `SqliteReceiptStore` with two new capabilities: a size check (`PRAGMA page_count * page_size`) and a time-boundary query (`WHERE timestamp < cutoff`), then archives matched rows to a separate SQLite file using `ATTACH DATABASE` + `INSERT INTO archive.table SELECT ... FROM main.table` before deleting from the live DB and running `PRAGMA wal_checkpoint(TRUNCATE)`. Checkpoint rows must be archived alongside their receipt ranges so that archived receipts remain verifiable (COMP-04).
 
-The DPoP work introduces a new `pact-kernel/src/dpop.rs` module containing `DpopProofBody` (canonical JSON struct), `DpopConfig` (TTL + LRU capacity), and `DpopNonceStore` (in-memory `LruCache` keyed by `(nonce, capability_id)` with timestamp). Verification reuses `pact_core::crypto::{PublicKey, Signature}` and `canonical_json_bytes` already present in the project. The agent's proof key must match `capability.subject` (sender constraint already encoded in `CapabilityToken`). `ToolGrant` gains one new `Option<bool>` field (`dpop_required`) following the existing `#[serde(default, skip_serializing_if = "Option::is_none")]` pattern.
+The DPoP work introduces a new `arc-kernel/src/dpop.rs` module containing `DpopProofBody` (canonical JSON struct), `DpopConfig` (TTL + LRU capacity), and `DpopNonceStore` (in-memory `LruCache` keyed by `(nonce, capability_id)` with timestamp). Verification reuses `arc_core::crypto::{PublicKey, Signature}` and `canonical_json_bytes` already present in the project. The agent's proof key must match `capability.subject` (sender constraint already encoded in `CapabilityToken`). `ToolGrant` gains one new `Option<bool>` field (`dpop_required`) following the existing `#[serde(default, skip_serializing_if = "Option::is_none")]` pattern.
 
-The compliance documents are Markdown files. Colorado SB 24-205 (effective Feb 1, 2026) primarily imposes developer transparency and impact assessment obligations on deployers of high-risk AI systems; PACT's receipts, signed kernel attestations, and configurable retention directly satisfy the record-keeping provisions. EU AI Act Article 19 requires technical documentation and logs for high-risk AI systems; the same artifacts (receipts, checkpoints, Merkle proofs) satisfy those requirements. Both documents map clauses to specific test functions using a clause-ID | behavior | test-file | test-function table structure.
+The compliance documents are Markdown files. Colorado SB 24-205 (effective Feb 1, 2026) primarily imposes developer transparency and impact assessment obligations on deployers of high-risk AI systems; ARC's receipts, signed kernel attestations, and configurable retention directly satisfy the record-keeping provisions. EU AI Act Article 19 requires technical documentation and logs for high-risk AI systems; the same artifacts (receipts, checkpoints, Merkle proofs) satisfy those requirements. Both documents map clauses to specific test functions using a clause-ID | behavior | test-file | test-function table structure.
 
 **Primary recommendation:** Implement plans 09-01 (retention) and 09-02 (DPoP) concurrently; 09-03 and 09-04 can begin as soon as Phase 8 tests are confirmed passing, since the compliance docs reference those test artifacts.
 
@@ -75,17 +75,17 @@ The compliance documents are Markdown files. Colorado SB 24-205 (effective Feb 1
 
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| `rusqlite` (workspace) | 0.37 (workspace pinned; 0.39.0 latest) | SQLite archive, retention queries, ATTACH DATABASE | Already in use throughout pact-kernel |
+| `rusqlite` (workspace) | 0.37 (workspace pinned; 0.39.0 latest) | SQLite archive, retention queries, ATTACH DATABASE | Already in use throughout arc-kernel |
 | `lru` | 0.16.3 | `LruCache` for DPoP nonce replay store | Standard Rust LRU implementation; 10M+ downloads; capacity-bounded, O(1) ops |
-| `pact_core::crypto` | workspace | Ed25519 sign/verify for DPoP proofs | Already the project's signing primitive |
-| `pact_core::canonical` | workspace | `canonical_json_bytes` for DPoP proof body | All PACT signed payloads use this |
+| `arc_core::crypto` | workspace | Ed25519 sign/verify for DPoP proofs | Already the project's signing primitive |
+| `arc_core::canonical` | workspace | `canonical_json_bytes` for DPoP proof body | All ARC signed payloads use this |
 
 ### Supporting
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
 | `std::time::{Instant, SystemTime}` | stdlib | TTL expiry tracking in nonce store | Prefer `Instant` for duration comparisons in `DpopNonceStore`; `SystemTime` for proof `issued_at` (wall-clock) |
-| `std::sync::Mutex` | stdlib | Guard `DpopNonceStore` interior mutability | Consistent with `VelocityGuard` pattern in `pact-guards/src/velocity.rs` |
+| `std::sync::Mutex` | stdlib | Guard `DpopNonceStore` interior mutability | Consistent with `VelocityGuard` pattern in `arc-guards/src/velocity.rs` |
 
 ### Alternatives Considered
 
@@ -97,7 +97,7 @@ The compliance documents are Markdown files. Colorado SB 24-205 (effective Feb 1
 
 **Installation:**
 ```bash
-# In crates/pact-kernel/Cargo.toml
+# In crates/arc-kernel/Cargo.toml
 # Add to [dependencies]:
 lru = "0.16.3"
 ```
@@ -111,11 +111,11 @@ lru = "0.16.3"
 ### Recommended Project Structure (new files this phase)
 
 ```
-crates/pact-kernel/src/
+crates/arc-kernel/src/
 ├── dpop.rs                  # NEW: DpopProofBody, DpopConfig, DpopNonceStore, verify_dpop_proof
 └── receipt_store.rs         # EXTEND: rotate_receipts(), archive_receipts_before(), db_size_bytes()
 
-crates/pact-core/src/
+crates/arc-core/src/
 └── capability.rs            # EXTEND: ToolGrant gets dpop_required: Option<bool>
 
 docs/compliance/             # NEW directory
@@ -125,25 +125,25 @@ docs/compliance/             # NEW directory
 
 ### Pattern 1: DPoP Proof Body (canonical JSON signed struct)
 
-**What:** A signed PACT-native proof message that binds a tool invocation to a specific agent keypair via Ed25519 over canonical JSON. Follows the exact same signing envelope as `PactReceipt`, `KernelCheckpoint`, and `CapabilityToken`.
+**What:** A signed ARC-native proof message that binds a tool invocation to a specific agent keypair via Ed25519 over canonical JSON. Follows the exact same signing envelope as `ArcReceipt`, `KernelCheckpoint`, and `CapabilityToken`.
 
 **When to use:** Called by the kernel before the guard pipeline when `ToolGrant.dpop_required == Some(true)`.
 
 **Example:**
 ```rust
-// Source: pact-core/src/crypto.rs (sign_canonical pattern)
-// New file: crates/pact-kernel/src/dpop.rs
+// Source: arc-core/src/crypto.rs (sign_canonical pattern)
+// New file: crates/arc-kernel/src/dpop.rs
 
-use pact_core::canonical::canonical_json_bytes;
-use pact_core::crypto::{PublicKey, Signature};
+use arc_core::canonical::canonical_json_bytes;
+use arc_core::crypto::{PublicKey, Signature};
 use serde::{Deserialize, Serialize};
 
-/// Schema for PACT-native DPoP proofs.
-pub const DPOP_SCHEMA: &str = "pact.dpop_proof.v1";
+/// Schema for ARC-native DPoP proofs.
+pub const DPOP_SCHEMA: &str = "arc.dpop_proof.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DpopProofBody {
-    /// Always "pact.dpop_proof.v1"
+    /// Always "arc.dpop_proof.v1"
     pub schema: String,
     /// The capability_id this proof is bound to.
     pub capability_id: String,
@@ -177,7 +177,7 @@ pub struct DpopProof {
 
 **Example:**
 ```rust
-// Source: established pattern from pact-guards/src/velocity.rs (Mutex + in-memory state)
+// Source: established pattern from arc-guards/src/velocity.rs (Mutex + in-memory state)
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use std::sync::Mutex;
@@ -224,7 +224,7 @@ impl DpopNonceStore {
 **Example:**
 ```rust
 // Source: rusqlite docs + existing SqliteReceiptStore patterns
-// Extends: crates/pact-kernel/src/receipt_store.rs
+// Extends: crates/arc-kernel/src/receipt_store.rs
 
 impl SqliteReceiptStore {
     /// Returns DB file size in bytes using SQLite page metadata.
@@ -237,7 +237,7 @@ impl SqliteReceiptStore {
         Ok((page_count * page_size).max(0) as u64)
     }
 
-    /// Archive all pact_tool_receipts with timestamp < cutoff_unix_secs
+    /// Archive all arc_tool_receipts with timestamp < cutoff_unix_secs
     /// to the given archive SQLite path, preserving relevant checkpoint rows.
     pub fn archive_receipts_before(
         &mut self,
@@ -251,7 +251,7 @@ impl SqliteReceiptStore {
         ))?;
         // Ensure archive tables exist (same schema as main)
         self.connection.execute_batch(r#"
-            CREATE TABLE IF NOT EXISTS archive.pact_tool_receipts (
+            CREATE TABLE IF NOT EXISTS archive.arc_tool_receipts (
                 seq INTEGER PRIMARY KEY,
                 receipt_id TEXT NOT NULL UNIQUE,
                 timestamp INTEGER NOT NULL,
@@ -278,8 +278,8 @@ impl SqliteReceiptStore {
         "#)?;
         // Copy receipts older than cutoff
         self.connection.execute(
-            r#"INSERT OR IGNORE INTO archive.pact_tool_receipts
-               SELECT * FROM main.pact_tool_receipts
+            r#"INSERT OR IGNORE INTO archive.arc_tool_receipts
+               SELECT * FROM main.arc_tool_receipts
                WHERE timestamp < ?1"#,
             rusqlite::params![cutoff_unix_secs as i64],
         )?;
@@ -288,13 +288,13 @@ impl SqliteReceiptStore {
             r#"INSERT OR IGNORE INTO archive.kernel_checkpoints
                SELECT * FROM main.kernel_checkpoints
                WHERE batch_end_seq IN (
-                   SELECT seq FROM main.pact_tool_receipts WHERE timestamp < ?1
+                   SELECT seq FROM main.arc_tool_receipts WHERE timestamp < ?1
                )"#,
             rusqlite::params![cutoff_unix_secs as i64],
         )?;
         // Delete archived receipts from main
         let deleted = self.connection.execute(
-            "DELETE FROM main.pact_tool_receipts WHERE timestamp < ?1",
+            "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1",
             rusqlite::params![cutoff_unix_secs as i64],
         )?;
         self.connection.execute_batch("DETACH DATABASE archive")?;
@@ -311,7 +311,7 @@ impl SqliteReceiptStore {
 
 **Example:**
 ```rust
-// Source: crates/pact-core/src/capability.rs (existing field pattern)
+// Source: crates/arc-core/src/capability.rs (existing field pattern)
 pub struct ToolGrant {
     // ... existing fields ...
     /// If Some(true), the kernel requires a valid DPoP proof for every invocation.
@@ -331,10 +331,10 @@ pub struct ToolGrant {
 ```markdown
 ## Clause Mapping
 
-| Clause | Requirement Summary | PACT Mechanism | Test File | Test Function |
+| Clause | Requirement Summary | ARC Mechanism | Test File | Test Function |
 |--------|---------------------|----------------|-----------|---------------|
-| SB 24-205 §6(1)(a) | AI system output records | Signed PactReceipt per invocation | crates/pact-kernel/src/lib.rs | test_receipt_signed_on_allow |
-| SB 24-205 §6(1)(b) | Record retention | Configurable retention_days, max_size_bytes | crates/pact-kernel/tests/... | retention_rotates_at_time_boundary |
+| SB 24-205 §6(1)(a) | AI system output records | Signed ArcReceipt per invocation | crates/arc-kernel/src/lib.rs | test_receipt_signed_on_allow |
+| SB 24-205 §6(1)(b) | Record retention | Configurable retention_days, max_size_bytes | crates/arc-kernel/tests/... | retention_rotates_at_time_boundary |
 ```
 
 ### Anti-Patterns to Avoid
@@ -351,11 +351,11 @@ pub struct ToolGrant {
 |---------|-------------|-------------|-----|
 | LRU eviction for nonce store | Custom doubly-linked list + HashMap | `lru::LruCache` | Correct O(1) implementation; edge cases around eviction ordering are subtle |
 | SQLite DB size measurement | File system stat | `PRAGMA page_count` * `page_size` | Reports the logical DB size including uncommitted pages; consistent with SQLite's own understanding of size |
-| Canonical JSON for DPoP proof body | Ad-hoc string concat | `pact_core::canonical::canonical_json_bytes` | RFC 8785 compliance already implemented; deterministic key ordering required for reproducible signatures |
-| Ed25519 proof signing/verification | Custom crypto | `pact_core::crypto::{Keypair, PublicKey, Signature}` | Already project standard; ed25519-dalek 2.x with ZeroizeOnDrop |
+| Canonical JSON for DPoP proof body | Ad-hoc string concat | `arc_core::canonical::canonical_json_bytes` | RFC 8785 compliance already implemented; deterministic key ordering required for reproducible signatures |
+| Ed25519 proof signing/verification | Custom crypto | `arc_core::crypto::{Keypair, PublicKey, Signature}` | Already project standard; ed25519-dalek 2.x with ZeroizeOnDrop |
 | Nonce TTL expiry | Time-based background sweep | TTL checked at lookup time in `check_and_insert` | Simpler; no background thread; capacity-bounded LRU handles memory; avoids timer thread ownership complexity |
 
-**Key insight:** The entire DPoP implementation reuses primitives that already exist in pact-core and pact-kernel. The only new dependency is `lru` for the nonce cache.
+**Key insight:** The entire DPoP implementation reuses primitives that already exist in arc-core and arc-kernel. The only new dependency is `lru` for the nonce cache.
 
 ## Common Pitfalls
 
@@ -367,7 +367,7 @@ pub struct ToolGrant {
 
 **How to avoid:** Archive all receipts for seqs covered by each checkpoint batch atomically. The correct approach: when archiving receipts before timestamp T, find the max receipt seq archived, then archive all checkpoints whose `batch_end_seq <= max_archived_seq`. Never archive a partial batch.
 
-**Warning signs:** Archive DB has `kernel_checkpoints` rows but the corresponding `pact_tool_receipts` rows are missing from the archive.
+**Warning signs:** Archive DB has `kernel_checkpoints` rows but the corresponding `arc_tool_receipts` rows are missing from the archive.
 
 ---
 
@@ -397,7 +397,7 @@ pub struct ToolGrant {
 
 ### Pitfall 4: unwrap() / expect() in DPoP or Nonce Store Code
 
-**What goes wrong:** Clippy `unwrap_used = "deny"` and `expect_used = "deny"` are enforced in pact-kernel. Any `unwrap()` or `expect()` in non-test code causes a CI failure.
+**What goes wrong:** Clippy `unwrap_used = "deny"` and `expect_used = "deny"` are enforced in arc-kernel. Any `unwrap()` or `expect()` in non-test code causes a CI failure.
 
 **Why it happens:** Forgetting the project convention when reaching for Mutex guards or LruCache non-zero capacity.
 
@@ -429,7 +429,7 @@ pub struct ToolGrant {
 
 ### Pitfall 7: Receipt Rotation at Append Time vs. Background Timer
 
-**What goes wrong:** Running rotation logic synchronously on every `append_pact_receipt_returning_seq` call adds O(query) latency to every receipt append, and may trigger archival mid-batch.
+**What goes wrong:** Running rotation logic synchronously on every `append_arc_receipt_returning_seq` call adds O(query) latency to every receipt append, and may trigger archival mid-batch.
 
 **Why it happens:** Simplest implementation runs the check inline.
 
@@ -440,11 +440,11 @@ pub struct ToolGrant {
 ### DPoP Proof Verification Function
 
 ```rust
-// Source: pattern from crates/pact-kernel/src/checkpoint.rs (verify_checkpoint_signature)
-// Target: crates/pact-kernel/src/dpop.rs
+// Source: pattern from crates/arc-kernel/src/checkpoint.rs (verify_checkpoint_signature)
+// Target: crates/arc-kernel/src/dpop.rs
 
 use std::time::{SystemTime, UNIX_EPOCH};
-use pact_core::canonical::canonical_json_bytes;
+use arc_core::canonical::canonical_json_bytes;
 
 #[derive(Debug, Clone)]
 pub struct DpopConfig {
@@ -468,7 +468,7 @@ impl Default for DpopConfig {
 
 pub fn verify_dpop_proof(
     proof: &DpopProof,
-    capability: &pact_core::CapabilityToken,
+    capability: &arc_core::CapabilityToken,
     expected_tool_server: &str,
     expected_tool_name: &str,
     expected_action_hash: &str,
@@ -540,25 +540,25 @@ pub fn verify_dpop_proof(
 
 **Regulation:** Colorado Senate Bill 24-205, "Consumer Protections for Artificial Intelligence"
 **Effective:** February 1, 2026
-**Version:** PACT v2.0 (Phase 9)
+**Version:** ARC v2.0 (Phase 9)
 
-| Clause | Summary | PACT Mechanism | Test File | Test Function |
+| Clause | Summary | ARC Mechanism | Test File | Test Function |
 |--------|---------|----------------|-----------|---------------|
-| §6-1-1703(1)(a) | Developer disclose material limitations | pact-manifest: ToolDefinition.description | crates/pact-manifest/... | manifest_includes_tool_description |
-| §6-1-1703(2)(b) | AI system output record retention | SqliteReceiptStore + configurable retention | crates/pact-kernel/tests/... | retention_rotates_at_time_boundary |
-| §6-1-1703(2)(c) | Records verifiable after retention | Archived receipts verify against checkpoint root | crates/pact-kernel/tests/... | archived_receipt_verifies_against_checkpoint |
+| §6-1-1703(1)(a) | Developer disclose material limitations | arc-manifest: ToolDefinition.description | crates/arc-manifest/... | manifest_includes_tool_description |
+| §6-1-1703(2)(b) | AI system output record retention | SqliteReceiptStore + configurable retention | crates/arc-kernel/tests/... | retention_rotates_at_time_boundary |
+| §6-1-1703(2)(c) | Records verifiable after retention | Archived receipts verify against checkpoint root | crates/arc-kernel/tests/... | archived_receipt_verifies_against_checkpoint |
 ```
 
 ## State of the Art
 
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
-| HTTP-shaped DPoP proofs (method + url + body_hash) | PACT-native proof message (capability_id + tool_server + tool_name + action_hash + nonce) | CONTEXT.md decision 2026-03-21 | Decouples proof binding from transport layer; proof verifies without HTTP context |
+| HTTP-shaped DPoP proofs (method + url + body_hash) | ARC-native proof message (capability_id + tool_server + tool_name + action_hash + nonce) | CONTEXT.md decision 2026-03-21 | Decouples proof binding from transport layer; proof verifies without HTTP context |
 | Compliance docs referencing planned tests | Compliance docs referencing only passing tests | STATE.md decision 2026-03-21 | Claims are verifiable by running cargo test |
 | No receipt retention -- DB grows unbounded | Configurable time and size rotation with archive SQLite | Phase 9 (this phase) | Meets regulatory retention obligations; prevents unbounded storage growth |
 
 **Deprecated/outdated:**
-- HTTP-shaped DPoP: The PACT proof message intentionally diverges from RFC 9449 (OAuth DPoP) to remove HTTP dependency. The existing ClawdStrike broker DPoP code (docs/CLAWDSTRIKE_INTEGRATION.md section 3.1) is reference material only; the HTTP fields (`method`, `url`, `body_sha256`) are replaced with PACT invocation fields.
+- HTTP-shaped DPoP: The ARC proof message intentionally diverges from RFC 9449 (OAuth DPoP) to remove HTTP dependency. The existing ClawdStrike broker DPoP code (docs/CLAWDSTRIKE_INTEGRATION.md section 3.1) is reference material only; the HTTP fields (`method`, `url`, `body_sha256`) are replaced with ARC invocation fields.
 
 ## Open Questions
 
@@ -574,8 +574,8 @@ pub fn verify_dpop_proof(
 
 3. **DpoP proof generation in test harness**
    - What we know: Verification is the primary deliverable; proof generation helper is in scope per CLAWDSTRIKE_INTEGRATION.md section 3.1 ("porting only the verifier is not enough")
-   - What's unclear: Whether to add proof generation to pact-core or only in test helpers
-   - Recommendation: Add a `DpopProof::sign(body: DpopProofBody, keypair: &Keypair) -> Result<DpopProof, Error>` constructor in pact-kernel (same pattern as `PactReceipt::sign` in pact-core). Tests and SDK callers both need this.
+   - What's unclear: Whether to add proof generation to arc-core or only in test helpers
+   - Recommendation: Add a `DpopProof::sign(body: DpopProofBody, keypair: &Keypair) -> Result<DpopProof, Error>` constructor in arc-kernel (same pattern as `ArcReceipt::sign` in arc-core). Tests and SDK callers both need this.
 
 ## Validation Architecture
 
@@ -592,43 +592,43 @@ pub fn verify_dpop_proof(
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| COMP-03 | Receipts older than retention_days are archived | unit | `cargo test -p pact-kernel -- retention_rotates_at_time_boundary` | Wave 0 |
-| COMP-03 | DB exceeding max_size_bytes triggers size rotation | unit | `cargo test -p pact-kernel -- retention_rotates_at_size_boundary` | Wave 0 |
-| COMP-04 | Archived receipt verifies against checkpoint root in archive DB | unit | `cargo test -p pact-kernel -- archived_receipt_verifies_against_checkpoint` | Wave 0 |
-| COMP-04 | Checkpoint rows are preserved in archive alongside receipt rows | unit | `cargo test -p pact-kernel -- archive_preserves_checkpoint_rows` | Wave 0 |
-| SEC-03 | DPoP proof with correct binding fields is accepted | unit | `cargo test -p pact-kernel -- dpop_valid_proof_accepted` | Wave 0 |
-| SEC-03 | DPoP proof with wrong action_hash is rejected (cross-invocation replay) | unit | `cargo test -p pact-kernel -- dpop_wrong_action_hash_rejected` | Wave 0 |
-| SEC-03 | DPoP proof with agent_key != capability.subject is rejected | unit | `cargo test -p pact-kernel -- dpop_wrong_agent_key_rejected` | Wave 0 |
-| SEC-03 | DPoP proof with expired issued_at is rejected | unit | `cargo test -p pact-kernel -- dpop_expired_proof_rejected` | Wave 0 |
-| SEC-04 | DPoP nonce reused within TTL window is rejected | unit | `cargo test -p pact-kernel -- dpop_nonce_replay_within_ttl_rejected` | Wave 0 |
-| SEC-04 | DPoP nonce reused after TTL window is accepted | unit | `cargo test -p pact-kernel -- dpop_nonce_replay_after_ttl_accepted` | Wave 0 |
-| COMP-01 | colorado-sb-24-205.md exists in docs/compliance/ | integration | `cargo test -p pact-kernel -- colorado_compliance_doc_test_references_pass` | Wave 0 |
-| COMP-02 | eu-ai-act-article-19.md exists in docs/compliance/ | integration | `cargo test -p pact-kernel -- eu_ai_act_compliance_doc_test_references_pass` | Wave 0 |
+| COMP-03 | Receipts older than retention_days are archived | unit | `cargo test -p arc-kernel -- retention_rotates_at_time_boundary` | Wave 0 |
+| COMP-03 | DB exceeding max_size_bytes triggers size rotation | unit | `cargo test -p arc-kernel -- retention_rotates_at_size_boundary` | Wave 0 |
+| COMP-04 | Archived receipt verifies against checkpoint root in archive DB | unit | `cargo test -p arc-kernel -- archived_receipt_verifies_against_checkpoint` | Wave 0 |
+| COMP-04 | Checkpoint rows are preserved in archive alongside receipt rows | unit | `cargo test -p arc-kernel -- archive_preserves_checkpoint_rows` | Wave 0 |
+| SEC-03 | DPoP proof with correct binding fields is accepted | unit | `cargo test -p arc-kernel -- dpop_valid_proof_accepted` | Wave 0 |
+| SEC-03 | DPoP proof with wrong action_hash is rejected (cross-invocation replay) | unit | `cargo test -p arc-kernel -- dpop_wrong_action_hash_rejected` | Wave 0 |
+| SEC-03 | DPoP proof with agent_key != capability.subject is rejected | unit | `cargo test -p arc-kernel -- dpop_wrong_agent_key_rejected` | Wave 0 |
+| SEC-03 | DPoP proof with expired issued_at is rejected | unit | `cargo test -p arc-kernel -- dpop_expired_proof_rejected` | Wave 0 |
+| SEC-04 | DPoP nonce reused within TTL window is rejected | unit | `cargo test -p arc-kernel -- dpop_nonce_replay_within_ttl_rejected` | Wave 0 |
+| SEC-04 | DPoP nonce reused after TTL window is accepted | unit | `cargo test -p arc-kernel -- dpop_nonce_replay_after_ttl_accepted` | Wave 0 |
+| COMP-01 | colorado-sb-24-205.md exists in docs/compliance/ | integration | `cargo test -p arc-kernel -- colorado_compliance_doc_test_references_pass` | Wave 0 |
+| COMP-02 | eu-ai-act-article-19.md exists in docs/compliance/ | integration | `cargo test -p arc-kernel -- eu_ai_act_compliance_doc_test_references_pass` | Wave 0 |
 
 ### Sampling Rate
 
-- **Per task commit:** `cargo test -p pact-kernel`
+- **Per task commit:** `cargo test -p arc-kernel`
 - **Per wave merge:** `cargo test --workspace`
 - **Phase gate:** Full suite green before `/gsd:verify-work`
 
 ### Wave 0 Gaps
 
-- [ ] `crates/pact-kernel/src/dpop.rs` -- DpopProofBody, DpopProof, DpopConfig, DpopNonceStore, verify_dpop_proof (covers SEC-03, SEC-04)
-- [ ] `crates/pact-kernel/tests/dpop.rs` -- test functions for SEC-03 and SEC-04 (all dpop_* tests above)
-- [ ] `crates/pact-kernel/tests/retention.rs` -- test functions for COMP-03 and COMP-04 (all retention_* and archive_* tests above)
+- [ ] `crates/arc-kernel/src/dpop.rs` -- DpopProofBody, DpopProof, DpopConfig, DpopNonceStore, verify_dpop_proof (covers SEC-03, SEC-04)
+- [ ] `crates/arc-kernel/tests/dpop.rs` -- test functions for SEC-03 and SEC-04 (all dpop_* tests above)
+- [ ] `crates/arc-kernel/tests/retention.rs` -- test functions for COMP-03 and COMP-04 (all retention_* and archive_* tests above)
 - [ ] `docs/compliance/colorado-sb-24-205.md` -- COMP-01 (depends on 09-01 and 09-02 passing)
 - [ ] `docs/compliance/eu-ai-act-article-19.md` -- COMP-02 (depends on 09-01, 09-02, and Phase 8 tests)
-- [ ] `crates/pact-kernel/Cargo.toml` -- add `lru = "0.16.3"` dependency
+- [ ] `crates/arc-kernel/Cargo.toml` -- add `lru = "0.16.3"` dependency
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `crates/pact-kernel/src/receipt_store.rs` -- exact schema of `pact_tool_receipts`, `kernel_checkpoints`, `SqliteReceiptStore` methods, WAL/SYNCHRONOUS/busy_timeout patterns verified by reading source
-- `crates/pact-kernel/src/budget_store.rs` -- `IMMEDIATE` transaction pattern, `ensure_*_column` migration helper, `allocate_budget_replication_seq` pattern, verified by reading source
-- `crates/pact-kernel/src/checkpoint.rs` -- `build_checkpoint`, `verify_checkpoint_signature`, `KernelCheckpointBody` schema, `build_inclusion_proof`, verified by reading source
-- `crates/pact-core/src/crypto.rs` -- `Keypair::sign_canonical`, `PublicKey::verify_canonical`, `canonical_json_bytes` verified by reading source
-- `crates/pact-core/src/capability.rs` -- `ToolGrant` field structure, optional-field serde pattern `#[serde(default, skip_serializing_if = "Option::is_none")]`, verified by reading source
-- `crates/pact-guards/src/velocity.rs` -- `Mutex`-based in-memory guard state pattern, `VelocityConfig` struct pattern, verified by reading source
+- `crates/arc-kernel/src/receipt_store.rs` -- exact schema of `arc_tool_receipts`, `kernel_checkpoints`, `SqliteReceiptStore` methods, WAL/SYNCHRONOUS/busy_timeout patterns verified by reading source
+- `crates/arc-kernel/src/budget_store.rs` -- `IMMEDIATE` transaction pattern, `ensure_*_column` migration helper, `allocate_budget_replication_seq` pattern, verified by reading source
+- `crates/arc-kernel/src/checkpoint.rs` -- `build_checkpoint`, `verify_checkpoint_signature`, `KernelCheckpointBody` schema, `build_inclusion_proof`, verified by reading source
+- `crates/arc-core/src/crypto.rs` -- `Keypair::sign_canonical`, `PublicKey::verify_canonical`, `canonical_json_bytes` verified by reading source
+- `crates/arc-core/src/capability.rs` -- `ToolGrant` field structure, optional-field serde pattern `#[serde(default, skip_serializing_if = "Option::is_none")]`, verified by reading source
+- `crates/arc-guards/src/velocity.rs` -- `Mutex`-based in-memory guard state pattern, `VelocityConfig` struct pattern, verified by reading source
 - `.planning/phases/09-compliance-and-dpop/09-CONTEXT.md` -- all locked decisions, verified by reading source
 - `docs/CLAWDSTRIKE_INTEGRATION.md` section 3.1 -- DPoP port strategy, `DpopConfig` field names reference, message field mapping, verified by reading source
 - crates.io API -- `lru` 0.16.3 confirmed latest stable (2026-01-07); `rusqlite` 0.39.0 latest but workspace pins 0.37

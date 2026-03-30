@@ -12,9 +12,9 @@ coverage, and milestone closeout integrity.
 
 ## Automated Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
-- `cargo test -p pact-cli --test certify -- --nocapture`
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
 - `node /Users/connor/.codex/get-shit-done/bin/gsd-tools.cjs roadmap analyze`
 
 ## Result

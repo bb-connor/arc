@@ -13,8 +13,8 @@ distribution.
 
 ## Automated Verification
 
-- `cargo test -p pact-cli --test certify -- --nocapture`
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
 
 ## Result
 

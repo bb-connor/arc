@@ -16,7 +16,7 @@ created: 2026-03-25
 3. `receipt_analytics.rs`, `operator_report.rs`, and `cost_attribution.rs`
    already behave like contract/data-model modules and do not need major
    extraction edits.
-4. `pact-kernel` currently depends on concrete store behavior through
+4. `arc-kernel` currently depends on concrete store behavior through
    `downcast_mut::<SqliteReceiptStore>()` during receipt persistence and
    checkpoint generation.
 5. A clean split is feasible if `ReceiptStore` grows small capability hooks for:
@@ -28,22 +28,22 @@ created: 2026-03-25
 
 Phase 26 will use this shape:
 
-- `pact-kernel`
+- `arc-kernel`
   - owns traits, errors, shared query/report/export types, in-memory stores,
     local capability authority, and the kernel core itself
   - uses trait hooks instead of concrete SQLite downcasts
-- `pact-store-sqlite`
+- `arc-store-sqlite`
   - owns `SqliteReceiptStore`, `SqliteBudgetStore`,
     `SqliteCapabilityAuthority`, `SqliteRevocationStore`
   - owns receipt-query, analytics, cost-attribution, shared-evidence,
     capability-lineage, and evidence-export impl blocks for the SQLite receipt
     store
-  - becomes a dev-dependency of `pact-kernel` so kernel tests can still cover
+  - becomes a dev-dependency of `arc-kernel` so kernel tests can still cover
     storage-backed flows without reintroducing a normal crate cycle
 
 ## Verification Inputs
 
-- `wc -l crates/pact-kernel/src/*.rs | sort -nr | head -n 20`
-- `rg -n "impl SqliteReceiptStore|impl SqliteBudgetStore|impl SqliteCapabilityAuthority|impl RevocationStore for SqliteRevocationStore" crates/pact-kernel/src/*.rs`
+- `wc -l crates/arc-kernel/src/*.rs | sort -nr | head -n 20`
+- `rg -n "impl SqliteReceiptStore|impl SqliteBudgetStore|impl SqliteCapabilityAuthority|impl RevocationStore for SqliteRevocationStore" crates/arc-kernel/src/*.rs`
 - local Cargo cycle check confirming normal dependency one way plus reverse
   dev-dependency works for tests

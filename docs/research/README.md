@@ -1,6 +1,6 @@
-# PACT Research Notes
+# ARC Research Notes
 
-This folder collects working research for turning PACT from a promising security kernel into a true MCP replacement.
+This folder collects working research for turning ARC from a promising security kernel into a true MCP replacement.
 
 Read in this order:
 
@@ -28,10 +28,10 @@ Read in this order:
 
 Short version:
 
-- PACT already has the right security center of gravity: capability tokens, mediation, guards, and signed receipts.
-- PACT does not yet own enough protocol surface to replace MCP.
+- ARC already has the right security center of gravity: capability tokens, mediation, guards, and signed receipts.
+- ARC does not yet own enough protocol surface to replace MCP.
 - The most viable path is not "ignore MCP and start over."
-- The most viable path is "become the secure session layer and trust plane underneath an MCP-compatible edge, then add PACT-native guarantees on top."
+- The most viable path is "become the secure session layer and trust plane underneath an MCP-compatible edge, then add ARC-native guarantees on top."
 
 Primary external references used in this research:
 
@@ -54,8 +54,8 @@ Primary external references used in this research:
 Primary local references used in this research:
 
 - [spec/PROTOCOL.md](../../spec/PROTOCOL.md)
-- [crates/pact-core/src/message.rs](../../crates/pact-core/src/message.rs)
-- [crates/pact-kernel/src/transport.rs](../../crates/pact-kernel/src/transport.rs)
-- [crates/pact-mcp-adapter/src/lib.rs](../../crates/pact-mcp-adapter/src/lib.rs)
-- [crates/pact-policy/src/compiler.rs](../../crates/pact-policy/src/compiler.rs)
-- [crates/pact-cli/src/policy.rs](../../crates/pact-cli/src/policy.rs)
+- [crates/arc-core/src/message.rs](../../crates/arc-core/src/message.rs)
+- [crates/arc-kernel/src/transport.rs](../../crates/arc-kernel/src/transport.rs)
+- [crates/arc-mcp-adapter/src/lib.rs](../../crates/arc-mcp-adapter/src/lib.rs)
+- [crates/arc-policy/src/compiler.rs](../../crates/arc-policy/src/compiler.rs)
+- [crates/arc-cli/src/policy.rs](../../crates/arc-cli/src/policy.rs)

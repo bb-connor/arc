@@ -14,7 +14,7 @@ created: 2026-03-24
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test` |
-| **Quick run command** | `cargo test -p pact-cli --test passport -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-cli --test passport -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
 | **Targeted feedback loop** | 10-30 seconds after build warmup |
 
@@ -22,16 +22,16 @@ created: 2026-03-24
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 15-01 | PASS-01 | `cargo test -p pact-credentials -- --nocapture` |
-| 15-02 | PASS-02 | `cargo test -p pact-cli --test passport -- --nocapture` |
-| 15-03 | PASS-01, PASS-02 | `cargo test -p pact-cli --test local_reputation -- --nocapture` and doc assertions |
+| 15-01 | PASS-01 | `cargo test -p arc-credentials -- --nocapture` |
+| 15-02 | PASS-02 | `cargo test -p arc-cli --test passport -- --nocapture` |
+| 15-03 | PASS-01, PASS-02 | `cargo test -p arc-cli --test local_reputation -- --nocapture` and doc assertions |
 
 ## Coverage Notes
 
-- Accepted multi-issuer bundle: covered in `pact-credentials`
-- Rejected multi-issuer bundle: covered in `pact-credentials`
+- Accepted multi-issuer bundle: covered in `arc-credentials`
+- Rejected multi-issuer bundle: covered in `arc-credentials`
 - Mixed multi-issuer bundle with one accepted and one rejected credential:
-  covered in `pact-credentials` and `pact-cli` passport CLI regression
+  covered in `arc-credentials` and `arc-cli` passport CLI regression
 - Reputation comparison remains truthful for multi-issuer bundles: covered in
   `local_reputation`
 

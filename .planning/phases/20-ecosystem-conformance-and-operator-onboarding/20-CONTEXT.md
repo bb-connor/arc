@@ -40,10 +40,10 @@ closeout artifacts rather than another protocol expansion.
 - `.planning/ROADMAP.md` -- Phase 20 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `ECO-01`, `ECO-02`
 - `docs/A2A_ADAPTER_GUIDE.md` -- A2A operator onboarding
-- `docs/PACT_CERTIFY_GUIDE.md` -- certification operator onboarding
+- `docs/ARC_CERTIFY_GUIDE.md` -- certification operator onboarding
 - `docs/CHANGELOG.md` -- operator-visible milestone delta
-- `crates/pact-cli/tests/certify.rs` -- certification conformance coverage
-- `crates/pact-cli/tests/provider_admin.rs` -- remote admin regression coverage
+- `crates/arc-cli/tests/certify.rs` -- certification conformance coverage
+- `crates/arc-cli/tests/provider_admin.rs` -- remote admin regression coverage
 
 </canonical_refs>
 

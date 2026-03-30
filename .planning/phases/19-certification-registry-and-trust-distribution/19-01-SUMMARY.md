@@ -13,7 +13,7 @@ key-files:
   created:
     - .planning/phases/19-certification-registry-and-trust-distribution/19-01-SUMMARY.md
   modified:
-    - crates/pact-cli/src/certify.rs
+    - crates/arc-cli/src/certify.rs
 requirements-completed:
   - CERT-01
 completed: 2026-03-25
@@ -32,4 +32,4 @@ storage contract.
 
 ## Verification
 
-- `cargo test -p pact-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`

@@ -7,7 +7,7 @@
 ## Phase Boundary
 
 Phase 25 is the first architectural extraction in `v2.4`. The intent is to
-stop treating `pact-cli` as both command shell and service runtime host, then
+stop treating `arc-cli` as both command shell and service runtime host, then
 move the trust-control and hosted-MCP surfaces into dedicated crates without
 changing their operator-visible behavior.
 
@@ -32,9 +32,9 @@ changing their operator-visible behavior.
 
 ### Extraction Order
 - First isolate the shared support pieces that both services currently pull from
-  `pact-cli`.
-- Then extract trust-control to `pact-control-plane`.
-- Then extract hosted MCP to `pact-hosted-mcp`, after the trust-control client
+  `arc-cli`.
+- Then extract trust-control to `arc-control-plane`.
+- Then extract hosted MCP to `arc-hosted-mcp`, after the trust-control client
   and common helpers are no longer anchored in the CLI crate.
 
 </decisions>
@@ -45,40 +45,40 @@ changing their operator-visible behavior.
 - `.planning/ROADMAP.md` -- Phase 25 goal, crate moves, and success criteria
 - `.planning/REQUIREMENTS.md` -- `ARCH-01`, `ARCH-02`, `ARCH-03`
 - `Cargo.toml` -- current workspace members
-- `crates/pact-cli/Cargo.toml` -- current CLI dependency surface
-- `crates/pact-cli/src/main.rs` -- current mixed command/runtime entrypoint and
+- `crates/arc-cli/Cargo.toml` -- current CLI dependency surface
+- `crates/arc-cli/src/main.rs` -- current mixed command/runtime entrypoint and
   shared helper functions
-- `crates/pact-cli/src/trust_control.rs` -- trust-control server and client
+- `crates/arc-cli/src/trust_control.rs` -- trust-control server and client
   implementation
-- `crates/pact-cli/src/remote_mcp.rs` -- hosted MCP runtime implementation
-- `crates/pact-cli/src/policy.rs` -- policy loading and runtime policy types
-- `crates/pact-cli/src/certify.rs` -- certification registry support
-- `crates/pact-cli/src/enterprise_federation.rs` -- enterprise provider registry
-- `crates/pact-cli/src/issuance.rs` -- issuance-policy wrappers for capability
+- `crates/arc-cli/src/remote_mcp.rs` -- hosted MCP runtime implementation
+- `crates/arc-cli/src/policy.rs` -- policy loading and runtime policy types
+- `crates/arc-cli/src/certify.rs` -- certification registry support
+- `crates/arc-cli/src/enterprise_federation.rs` -- enterprise provider registry
+- `crates/arc-cli/src/issuance.rs` -- issuance-policy wrappers for capability
   authority
-- `crates/pact-cli/src/passport_verifier.rs` -- verifier policy and challenge
+- `crates/arc-cli/src/passport_verifier.rs` -- verifier policy and challenge
   registry support
-- `crates/pact-cli/src/evidence_export.rs` -- export/import helper surface
-- `crates/pact-cli/src/reputation.rs` -- reputation-report helper surface
+- `crates/arc-cli/src/evidence_export.rs` -- export/import helper surface
+- `crates/arc-cli/src/reputation.rs` -- reputation-report helper surface
 
 </canonical_refs>
 
 <code_context>
 ## Existing Code Insights
 
-- `crates/pact-cli/src/trust_control.rs` imports CLI-local modules including
+- `crates/arc-cli/src/trust_control.rs` imports CLI-local modules including
   `certify`, `enterprise_federation`, `evidence_export`, `issuance`,
   `passport_verifier`, and `reputation`, plus authority helper functions and
   `CliError`.
-- `crates/pact-cli/src/remote_mcp.rs` imports `build_kernel`,
+- `crates/arc-cli/src/remote_mcp.rs` imports `build_kernel`,
   `configure_receipt_store`, `configure_revocation_store`,
   `configure_capability_authority`, `configure_budget_store`,
   `issue_default_capabilities`, authority keypair helpers, `policy::load_policy`,
   and `trust_control` query/client types.
-- `crates/pact-cli/src/main.rs` still centralizes kernel construction, local
+- `crates/arc-cli/src/main.rs` still centralizes kernel construction, local
   authority file management, local-vs-remote store wiring, and top-level command
   dispatch.
-- A direct file move from `pact-cli` into two new crates will not compile
+- A direct file move from `arc-cli` into two new crates will not compile
   cleanly without first creating a shared support boundary for the reused logic.
 
 </code_context>
@@ -87,7 +87,7 @@ changing their operator-visible behavior.
 ## Deferred Ideas
 
 - Decide the final name of the shared support crate during execution
-  (`pact-runtime-support` vs `pact-app-support`) once the dependency graph is
+  (`arc-runtime-support` vs `arc-app-support`) once the dependency graph is
   laid out concretely.
 - Fold deeper trust-control and hosted-MCP module splits into this phase only
   after the crate boundaries compile and tests are back to green.

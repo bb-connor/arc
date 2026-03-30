@@ -16,12 +16,12 @@ key-files:
   created:
     - .planning/phases/14-portable-verifier-distribution-and-replay-safety/14-03-SUMMARY.md
   modified:
-    - crates/pact-cli/src/main.rs
-    - crates/pact-cli/src/passport.rs
-    - crates/pact-cli/src/reputation.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/tests/passport.rs
-    - crates/pact-cli/tests/federated_issue.rs
+    - crates/arc-cli/src/main.rs
+    - crates/arc-cli/src/passport.rs
+    - crates/arc-cli/src/reputation.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/tests/passport.rs
+    - crates/arc-cli/tests/federated_issue.rs
 requirements-completed:
   - VER-03
 completed: 2026-03-24
@@ -34,7 +34,7 @@ the local CLI and trust-control surfaces.
 
 ## Accomplishments
 
-- Added `pact passport policy create|verify|list|get|upsert|delete`
+- Added `arc passport policy create|verify|list|get|upsert|delete`
 - Extended `passport challenge create|verify` with policy references,
   verifier-policy registries, and replay-safe challenge databases
 - Added trust-control verifier policy CRUD plus remote challenge create/verify
@@ -46,5 +46,5 @@ the local CLI and trust-control surfaces.
 
 ## Verification
 
-- `cargo test -p pact-cli --test passport -- --nocapture`
-- `cargo test -p pact-cli --test federated_issue -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test federated_issue -- --nocapture`

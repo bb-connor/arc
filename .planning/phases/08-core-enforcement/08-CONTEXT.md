@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Monetary budget limits, Merkle-committed receipt batches, and velocity throttling are all enforced at kernel evaluation time. This phase adds try_charge_cost to BudgetStore, FinancialReceiptMetadata to receipts, batch-N Merkle checkpoint signing, inclusion proof verification, and a synchronous VelocityGuard in pact-guards. No new APIs, CLI commands, or external integrations -- pure enforcement logic wired into the kernel pipeline.
+Monetary budget limits, Merkle-committed receipt batches, and velocity throttling are all enforced at kernel evaluation time. This phase adds try_charge_cost to BudgetStore, FinancialReceiptMetadata to receipts, batch-N Merkle checkpoint signing, inclusion proof verification, and a synchronous VelocityGuard in arc-guards. No new APIs, CLI commands, or external integrations -- pure enforcement logic wired into the kernel pipeline.
 
 </domain>
 
@@ -23,10 +23,10 @@ Monetary budget limits, Merkle-committed receipt batches, and velocity throttlin
 - Checkpoints trigger every N receipts (configurable, default 100) -- deterministic and testable per success criterion
 - Checkpoint is a separate KernelCheckpoint struct with Merkle root, batch range, and kernel signature -- not a special receipt type
 - Checkpoints stored in a separate kernel_checkpoints SQLite table (different access pattern from receipts)
-- Inclusion proofs are self-contained for offline verification (carry root + path + leaf hash), using existing MerkleProof from pact-core
+- Inclusion proofs are self-contained for offline verification (carry root + path + leaf hash), using existing MerkleProof from arc-core
 
 ### Velocity Guard Design
-- VelocityGuard lives in pact-guards alongside existing guards (forbidden_path, egress_allowlist, etc.) -- keeps kernel TCB minimal
+- VelocityGuard lives in arc-guards alongside existing guards (forbidden_path, egress_allowlist, etc.) -- keeps kernel TCB minimal
 - Uses synchronous token bucket with std::sync::Mutex (no async) per success criterion
 - Enforcement scope is per-grant with agent-level aggregation option (grants are the natural enforcement boundary)
 - Velocity denials use standard Decision::Deny with reason "velocity_limit_exceeded" -- no new Decision variant needed
@@ -43,12 +43,12 @@ Monetary budget limits, Merkle-committed receipt batches, and velocity throttlin
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-kernel/src/budget_store.rs` -- BudgetStore trait, InMemoryBudgetStore, SqliteBudgetStore with IMMEDIATE transactions and replication seq
-- `pact-kernel/src/receipt_store.rs` -- ReceiptStore trait, SqliteReceiptStore with append and filtered list methods
-- `pact-core/src/merkle.rs` -- RFC 6962-compatible MerkleTree and MerkleProof with from_leaves, inclusion_proof, and verify methods
-- `pact-core/src/capability.rs` -- MonetaryAmount (u64 minor-units), ToolGrant with max_cost_per_invocation/max_total_cost fields, Attenuation with ReduceCostPerInvocation/ReduceTotalCost
-- `pact-guards/src/pipeline.rs` -- Guard pipeline pattern for composable enforcement
-- `pact-core/src/crypto.rs` -- Keypair, signing, canonical JSON
+- `arc-kernel/src/budget_store.rs` -- BudgetStore trait, InMemoryBudgetStore, SqliteBudgetStore with IMMEDIATE transactions and replication seq
+- `arc-kernel/src/receipt_store.rs` -- ReceiptStore trait, SqliteReceiptStore with append and filtered list methods
+- `arc-core/src/merkle.rs` -- RFC 6962-compatible MerkleTree and MerkleProof with from_leaves, inclusion_proof, and verify methods
+- `arc-core/src/capability.rs` -- MonetaryAmount (u64 minor-units), ToolGrant with max_cost_per_invocation/max_total_cost fields, Attenuation with ReduceCostPerInvocation/ReduceTotalCost
+- `arc-guards/src/pipeline.rs` -- Guard pipeline pattern for composable enforcement
+- `arc-core/src/crypto.rs` -- Keypair, signing, canonical JSON
 
 ### Established Patterns
 - SQLite stores use WAL mode, SYNCHRONOUS=FULL, IMMEDIATE transactions for writes
@@ -59,9 +59,9 @@ Monetary budget limits, Merkle-committed receipt batches, and velocity throttlin
 
 ### Integration Points
 - BudgetStore.try_increment is called during kernel evaluation -- try_charge_cost follows the same call site pattern
-- ReceiptStore.append_pact_receipt is the hook for counting toward Merkle checkpoint trigger
-- Guard pipeline in pact-guards/src/pipeline.rs is where VelocityGuard plugs in
-- PactReceipt.metadata (Option<serde_json::Value>) is where FinancialReceiptMetadata attaches
+- ReceiptStore.append_arc_receipt is the hook for counting toward Merkle checkpoint trigger
+- Guard pipeline in arc-guards/src/pipeline.rs is where VelocityGuard plugs in
+- ArcReceipt.metadata (Option<serde_json::Value>) is where FinancialReceiptMetadata attaches
 
 </code_context>
 

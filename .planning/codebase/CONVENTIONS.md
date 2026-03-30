@@ -7,7 +7,7 @@
 **Files:**
 - Rust module files use `snake_case.rs`
 - Integration tests use descriptive `snake_case.rs` names under `tests/`
-- Crates use `pact-*` naming for product modules
+- Crates use `arc-*` naming for product modules
 
 **Functions:**
 - Rust functions and methods use `snake_case`
@@ -107,7 +107,7 @@
 
 **Barrel Files:**
 - Rust crate/module exports are used instead of JavaScript-style barrel files
-- Avoid circular dependencies by keeping shared domain types in `pact-core`
+- Avoid circular dependencies by keeping shared domain types in `arc-core`
 
 ---
 *Convention analysis: 2026-03-19*

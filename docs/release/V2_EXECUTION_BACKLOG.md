@@ -69,16 +69,16 @@ Completed:
   - added dashboard summary cards backed by the new report endpoint
   - verified with new kernel compliance tests, receipt-query HTTP tests, dashboard unit tests, dashboard production build, and full `cargo test --workspace`
 - `P2-05` completed on 2026-03-23
-  - added `pact certify check` as the first PACT Certify command surface
+  - added `arc certify check` as the first ARC Certify command surface
   - evaluates explicit fail-closed certification criteria over a conformance scenario/result corpus
   - emits a signed portable pass/fail JSON artifact plus an optional generated markdown report
-  - verified with end-to-end CLI integration tests, targeted `pact-cli` unit tests, and full `cargo test --workspace`
+  - verified with end-to-end CLI integration tests, targeted `arc-cli` unit tests, and full `cargo test --workspace`
 - `P2-06` completed on 2026-03-23
   - added priced native-tool authoring helpers so example servers can publish manifest pricing without dropping to raw struct edits
   - updated `examples/hello-tool` to publish a priced manifest and added a dedicated example test for that contract
   - added a pricing and budget-planning guide that explains how advertised manifest pricing informs capability monetary budgets before invocation, without overstating the current YAML policy surface
   - aligned TypeScript signed-manifest types with the shipped pricing metadata contract
-  - verified with `npm --prefix packages/sdk/pact-ts test` and full `cargo test --workspace`
+  - verified with `npm --prefix packages/sdk/arc-ts test` and full `cargo test --workspace`
 
 | ID | Task | Why it matters | Effort | Depends on | Acceptance |
 | --- | --- | --- | --- | --- | --- |
@@ -87,166 +87,166 @@ Completed:
 
 Completed:
 - `P3-01` completed on 2026-03-23
-  - added the new `crates/pact-reputation` workspace crate as a pure local scoring surface with no `pact-kernel` dependency
+  - added the new `crates/arc-reputation` workspace crate as a pure local scoring surface with no `arc-kernel` dependency
   - shipped deterministic Phase 1 local metric computation over receipts, capability-lineage records, budget-usage records, and optional incident inputs
   - implemented truthful `unknown` metric handling plus composite-score renormalization across available metrics
   - verified with dedicated crate fixture tests and full `cargo test --workspace`
 - `P3-02` completed on 2026-03-23
   - extended HushSpec/runtime policy loading with `extensions.reputation` issuance materialization, probation configuration, and tier scope ceilings including monetary caps
   - added a shared issuance authority wrapper that computes local reputation from persisted receipts, lineage snapshots, and budget usage before signing capabilities
-  - wired the same enforcement path into local CLI issuance and `pact trust serve --policy ...`, with successful issuance persisting capability snapshots at the authority boundary
-  - verified with policy unit tests, issuance unit tests, a trust-service HTTP integration test, `cargo test -p pact-cli`, and full `cargo test --workspace`
+  - wired the same enforcement path into local CLI issuance and `arc trust serve --policy ...`, with successful issuance persisting capability snapshots at the authority boundary
+  - verified with policy unit tests, issuance unit tests, a trust-service HTTP integration test, `cargo test -p arc-cli`, and full `cargo test --workspace`
 - `P3-03` completed on 2026-03-23
-  - added the new `crates/pact-did` workspace crate with self-certifying `did:pact` parsing, canonicalization, and DID Document resolution over PACT Ed25519 public keys
-  - shipped stable `Ed25519VerificationKey2020` documents with optional validated `PactReceiptLogService` endpoints
-  - exposed the resolver through `pact did resolve --did ...` and `pact did resolve --public-key ...`
-  - verified with crate unit tests, CLI integration tests, `cargo test -p pact-cli`, and full `cargo test --workspace`
+  - added the new `crates/arc-did` workspace crate with self-certifying `did:arc` parsing, canonicalization, and DID Document resolution over ARC Ed25519 public keys
+  - shipped stable `Ed25519VerificationKey2020` documents with optional validated `ArcReceiptLogService` endpoints
+  - exposed the resolver through `arc did resolve --did ...` and `arc did resolve --public-key ...`
+  - verified with crate unit tests, CLI integration tests, `cargo test -p arc-cli`, and full `cargo test --workspace`
 - `P3-04` completed on 2026-03-23
-  - added the new `crates/pact-credentials` workspace crate with signed reputation credentials, passport bundling, offline verification, and filtered presentation helpers
-  - shipped `pact passport create`, `pact passport verify`, and `pact passport present` on top of local reputation scoring and `did:pact`
+  - added the new `crates/arc-credentials` workspace crate with signed reputation credentials, passport bundling, offline verification, and filtered presentation helpers
+  - shipped `arc passport create`, `arc passport verify`, and `arc passport present` on top of local reputation scoring and `did:arc`
   - enforced truthful alpha boundaries: single issuer only, optional checkpoint-required issuance, and no fake multi-issuer aggregation
-  - verified with credential crate tests, CLI end-to-end passport tests, `cargo test -p pact-cli --test passport`, and full `cargo test --workspace`
+  - verified with credential crate tests, CLI end-to-end passport tests, `cargo test -p arc-cli --test passport`, and full `cargo test --workspace`
 - `P3-05` completed on 2026-03-23
-  - added the new `crates/pact-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery, preferred-interface selection, and blocking `SendMessage` mediation for both `JSONRPC` and `HTTP+JSON`
-  - exposed one PACT tool per advertised A2A skill and kept the protocol boundary honest by routing skill intent through the adapter-specific `metadata.pact.targetSkillId` convention rather than pretending A2A has a native `skillId` field
+  - added the new `crates/arc-a2a-adapter` workspace crate with A2A v1.0.0 Agent Card discovery, preferred-interface selection, and blocking `SendMessage` mediation for both `JSONRPC` and `HTTP+JSON`
+  - exposed one ARC tool per advertised A2A skill and kept the protocol boundary honest by routing skill intent through the adapter-specific `metadata.arc.targetSkillId` convention rather than pretending A2A has a native `skillId` field
   - enforced secure transport defaults: HTTPS required in production, localhost HTTP only for local testing, bounded request timeouts, and optional bearer-auth propagation
-  - verified with direct adapter tests, an end-to-end kernel receipt test, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with direct adapter tests, an end-to-end kernel receipt test, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-06` completed on 2026-03-23
-  - added `pact evidence verify --input <dir>` as an offline verifier for exported receipt/checkpoint/lineage packages
+  - added `arc evidence verify --input <dir>` as an offline verifier for exported receipt/checkpoint/lineage packages
   - verifies manifest hashes, query scope, receipt signatures, checkpoint signatures, lineage integrity, inclusion proofs, and policy attachment consistency without a running trust-control node
   - hardened the flaky `mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority` lane with bind-collision retry logic so full workspace runs are repeatable again
-  - verified with `cargo test -p pact-cli --test evidence_export`, the repaired HTTP integration lane, and full `cargo test --workspace`
+  - verified with `cargo test -p arc-cli --test evidence_export`, the repaired HTTP integration lane, and full `cargo test --workspace`
 - `P3-07` completed on 2026-03-23
-  - shipped the first identity-federation alpha for JWT-authenticated `pact mcp serve-http`
+  - shipped the first identity-federation alpha for JWT-authenticated `arc mcp serve-http`
   - canonicalizes federated principals as `oidc:<issuer>#sub:<sub>` or `oidc:<issuer>#client:<client_id>`
-  - adds `--identity-federation-seed-file` so the edge derives a stable PACT subject key from the authenticated enterprise principal instead of minting a random subject per session
+  - adds `--identity-federation-seed-file` so the edge derives a stable ARC subject key from the authenticated enterprise principal instead of minting a random subject per session
   - exposes `authContext` plus per-capability `subjectPublicKey` in the admin session APIs so operators can audit the mapping directly
-  - verified with new `remote_mcp` unit tests, a JWT HTTP integration test proving same-principal convergence and different-principal separation, `cargo test -p pact-cli`, `git diff --check`, and full `cargo test --workspace`
+  - verified with new `remote_mcp` unit tests, a JWT HTTP integration test proving same-principal convergence and different-principal separation, `cargo test -p arc-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-08` completed on 2026-03-24
-  - added `pact reputation local --subject-public-key ...` as the first operator-facing CLI for inspecting local scorecards from persisted receipts, lineage snapshots, and budget state
+  - added `arc reputation local --subject-public-key ...` as the first operator-facing CLI for inspecting local scorecards from persisted receipts, lineage snapshots, and budget state
   - added `GET /v1/reputation/local/:subject_key` to trust-control so operators can query the same scorecard over HTTP using the service's configured issuance-policy scoring context
   - kept the logic single-sourced by reusing the same local corpus assembly, probationary evaluation, and tier resolution path already used for reputation-gated issuance
-  - verified with dedicated CLI/HTTP integration tests, `cargo test -p pact-cli`, `git diff --check`, and full `cargo test --workspace`
+  - verified with dedicated CLI/HTTP integration tests, `cargo test -p arc-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-09` completed on 2026-03-24
   - added the first portable relying-party verifier lane on top of shipped single-issuer passports
-  - introduced `PassportVerifierPolicy` plus per-credential acceptance evaluation in `pact-credentials` for issuer allowlists, metric thresholds, checkpoint/log-url requirements, and attestation freshness
-  - exposed the verifier through `pact passport evaluate --input <passport> --policy <yaml-or-json>`
+  - introduced `PassportVerifierPolicy` plus per-credential acceptance evaluation in `arc-credentials` for issuer allowlists, metric thresholds, checkpoint/log-url requirements, and attestation freshness
+  - exposed the verifier through `arc passport evaluate --input <passport> --policy <yaml-or-json>`
   - kept the semantics honest by evaluating each credential independently and accepting the passport only when at least one credential satisfies policy, without inventing multi-credential aggregation
-  - verified with new credential crate policy tests, expanded CLI passport end-to-end coverage, `cargo test -p pact-credentials`, `cargo test -p pact-cli --test passport`, `cargo test -p pact-cli`, `git diff --check`, and full `cargo test --workspace`
+  - verified with new credential crate policy tests, expanded CLI passport end-to-end coverage, `cargo test -p arc-credentials`, `cargo test -p arc-cli --test passport`, `cargo test -p arc-cli`, `git diff --check`, and full `cargo test --workspace`
 - `P3-10` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with adapter-local `get_task` follow-up mode on top of the shipped A2A v1.0.0 `SendMessage` skeleton
-  - supports follow-up `GetTask` over both `JSONRPC` and `HTTP+JSON` while keeping one PACT tool per advertised A2A skill and reusing the normal capability/receipt pipeline
+  - extended `arc-a2a-adapter` with adapter-local `get_task` follow-up mode on top of the shipped A2A v1.0.0 `SendMessage` skeleton
+  - supports follow-up `GetTask` over both `JSONRPC` and `HTTP+JSON` while keeping one ARC tool per advertised A2A skill and reusing the normal capability/receipt pipeline
   - hardened the public tool contract so the published snake_case manifest surface is actually accepted, while camelCase aliases remain accepted for compatibility
   - rejects mixed send/follow-up invocations fail-closed instead of guessing caller intent
-  - verified with new direct transport tests, a kernel end-to-end receipt test for follow-up polling, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with new direct transport tests, a kernel end-to-end receipt test for follow-up polling, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-11` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with adapter-local `stream: true` opt-in that issues A2A `SendStreamingMessage` over both `JSONRPC` and `HTTP+JSON`
+  - extended `arc-a2a-adapter` with adapter-local `stream: true` opt-in that issues A2A `SendStreamingMessage` over both `JSONRPC` and `HTTP+JSON`
   - the kernel now captures each upstream A2A `StreamResponse` as one streamed tool chunk without inventing a second stream model
   - complete streams produce normal allow receipts, and prematurely closed upstream streams fail closed as incomplete receipts while preserving partial stream output
-  - verified with direct streaming tests over both bindings, direct incomplete-stream tests, kernel end-to-end allow/incomplete receipt tests, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with direct streaming tests over both bindings, direct incomplete-stream tests, kernel end-to-end allow/incomplete receipt tests, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-12` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with fail-closed auth negotiation from Agent Card `securitySchemes` / `securityRequirements`
+  - extended `arc-a2a-adapter` with fail-closed auth negotiation from Agent Card `securitySchemes` / `securityRequirements`
   - supports declared bearer-style auth, OAuth/OpenID bearer semantics backed by configured bearer material, and header-based API keys without guessing or silently over-sharing headers
-  - denies invocation locally when required credentials are missing or when the Agent Card requires an auth scheme PACT still does not implement
+  - denies invocation locally when required credentials are missing or when the Agent Card requires an auth scheme ARC still does not implement
   - propagates interface tenant metadata into `SendMessage` and HTTP `GetTask` follow-up requests and added direct regression coverage for that request shaping
-  - verified with direct auth-negotiation tests, tenant-shaping tests, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with direct auth-negotiation tests, tenant-shaping tests, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-13` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with adapter-local `subscribe_task` follow-up mode that issues A2A `SubscribeToTask` over both `JSONRPC` and `HTTP+JSON`
+  - extended `arc-a2a-adapter` with adapter-local `subscribe_task` follow-up mode that issues A2A `SubscribeToTask` over both `JSONRPC` and `HTTP+JSON`
   - corrected HTTP tenant propagation to match the official A2A proto by using tenant path segments for `message:send`, `message:stream`, `GetTask`, and `SubscribeToTask` instead of a query-string shim
   - keeps `SubscribeToTask` inside the normal capability/receipt pipeline: terminal streams allow, prematurely closed streams fail closed as incomplete while preserving partial output
-  - verified with new direct subscribe tests over both bindings, direct incomplete-subscribe tests, kernel end-to-end allow/incomplete receipt tests, `cargo test -p pact-a2a-adapter`, and full `cargo test --workspace`
+  - verified with new direct subscribe tests over both bindings, direct incomplete-subscribe tests, kernel end-to-end allow/incomplete receipt tests, `cargo test -p arc-a2a-adapter`, and full `cargo test --workspace`
 - `P3-14` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with adapter-local `cancel_task` plus push-notification config create/get/list/delete over both `JSONRPC` and `HTTP+JSON`
+  - extended `arc-a2a-adapter` with adapter-local `cancel_task` plus push-notification config create/get/list/delete over both `JSONRPC` and `HTTP+JSON`
   - kept these task-management operations inside the normal capability and receipt pipeline, including a kernel end-to-end allow-receipt test for `CancelTask`
   - added fail-closed callback URL validation so remote push-notification targets must use `https` and localhost-only `http` remains the only plaintext exception
-  - verified with new direct cancel tests, push-config CRUD roundtrip tests, URL-shaping tests, insecure-callback validation tests, kernel end-to-end receipt coverage, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with new direct cancel tests, push-config CRUD roundtrip tests, URL-shaping tests, insecure-callback validation tests, kernel end-to-end receipt coverage, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-15` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with real OAuth2 client-credentials token acquisition and OpenID Connect discovery-backed token acquisition when the Agent Card declares those schemes
+  - extended `arc-a2a-adapter` with real OAuth2 client-credentials token acquisition and OpenID Connect discovery-backed token acquisition when the Agent Card declares those schemes
   - added in-process bearer-token caching keyed by scheme, endpoint, and scope set so repeated mediated calls do not keep reissuing token requests during a valid token lifetime
   - kept the auth surface fail-closed: missing client credentials still deny locally, remote token/discovery endpoints must use `https` or localhost-only `http`, and unsupported non-bearer token types are rejected
-  - verified with direct OAuth2 acquisition/caching tests, direct OpenID discovery tests, a kernel end-to-end allow-receipt test for OAuth-backed invocation, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with direct OAuth2 acquisition/caching tests, direct OpenID discovery tests, a kernel end-to-end allow-receipt test for OAuth-backed invocation, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-16` completed on 2026-03-24
-  - extended `pact-a2a-adapter` with real `mtlsSecurityScheme` support using client-certificate auth plus custom trusted root CAs
+  - extended `arc-a2a-adapter` with real `mtlsSecurityScheme` support using client-certificate auth plus custom trusted root CAs
   - the adapter now uses configured client certificates for Agent Card discovery when needed, selects mTLS only for mediated request paths that actually require it, and keeps other auth flows on their declared transport semantics
   - kept the transport surface fail-closed: missing client identity still denies locally when the Agent Card requires mTLS, malformed PEM material is rejected at adapter construction, and local HTTPS handshake tests prove the real transport path instead of only config parsing
-  - verified with direct mTLS discovery/invocation tests, a kernel end-to-end allow-receipt test for mTLS-backed invocation, `cargo test -p pact-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
+  - verified with direct mTLS discovery/invocation tests, a kernel end-to-end allow-receipt test for mTLS-backed invocation, `cargo test -p arc-a2a-adapter`, `git diff --check`, and full `cargo test --workspace`
 - `P3-17` completed on 2026-03-24
-  - deepened `pact mcp serve-http` identity federation with startup-time OIDC discovery, Ed25519 JWKS bootstrap, and provider-aware principal mapping for Generic/Auth0/Okta/Azure AD claim shapes
+  - deepened `arc mcp serve-http` identity federation with startup-time OIDC discovery, Ed25519 JWKS bootstrap, and provider-aware principal mapping for Generic/Auth0/Okta/Azure AD claim shapes
   - added fail-closed enterprise bootstrap semantics: discovery and discovered `jwks_uri` must use `https` or localhost-only `http`, issuer mismatches are rejected, and discovery without a compatible Ed25519 signing key fails at startup instead of silently admitting tokens
-  - verified with direct unit coverage for Azure AD principal mapping and provider-profile discovery derivation, a full `mcp_serve_http` integration test for discovery-backed JWT admission plus stable subject derivation, `cargo test -p pact-cli remote_mcp::tests -- --nocapture`, `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_jwt_and_uses_azure_ad_profile_mapping -- --nocapture`, and full `cargo test --workspace`
+  - verified with direct unit coverage for Azure AD principal mapping and provider-profile discovery derivation, a full `mcp_serve_http` integration test for discovery-backed JWT admission plus stable subject derivation, `cargo test -p arc-cli remote_mcp::tests -- --nocapture`, `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_jwt_and_uses_azure_ad_profile_mapping -- --nocapture`, and full `cargo test --workspace`
 - `P3-18` completed on 2026-03-24
-  - widened discovery-backed `pact mcp serve-http` JWT federation from Ed25519-only bootstrap into JWKS verification for `EdDSA`, RSA (`RS*`, `PS*`), and EC (`ES256`, `ES384`) signing keys
+  - widened discovery-backed `arc mcp serve-http` JWT federation from Ed25519-only bootstrap into JWKS verification for `EdDSA`, RSA (`RS*`, `PS*`), and EC (`ES256`, `ES384`) signing keys
   - kept the verifier fail-closed by resolving trusted keys through `kid` plus algorithm compatibility, denying tokens without `kid` whenever the JWKS exposes more than one compatible key
   - added end-to-end OIDC discovery coverage for `RS256` and `ES256`, focused verifier coverage for `PS256` and `ES384`, and hardened the revocation admin-path tests onto bind-retry startup handling after the workspace run exposed a readiness flake
-  - verified with `cargo test -p pact-cli remote_mcp::tests -- --nocapture`, `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_rs256_tokens -- --nocapture`, `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_es256_tokens -- --nocapture`, targeted admin-revocation test reruns, `cargo test --workspace`, and `git diff --check`
+  - verified with `cargo test -p arc-cli remote_mcp::tests -- --nocapture`, `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_rs256_tokens -- --nocapture`, `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_oidc_discovery_verifies_es256_tokens -- --nocapture`, targeted admin-revocation test reruns, `cargo test --workspace`, and `git diff --check`
 - `P3-19` completed on 2026-03-24
-  - added explicit OAuth2 token introspection for opaque bearer admission on `pact mcp serve-http`, including confidential-client authentication to the introspection endpoint and the same stable principal-to-subject derivation path used for JWT-backed federation
+  - added explicit OAuth2 token introspection for opaque bearer admission on `arc mcp serve-http`, including confidential-client authentication to the introspection endpoint and the same stable principal-to-subject derivation path used for JWT-backed federation
   - kept the non-JWT lane fail-closed: introspection endpoints must use `https` or localhost-only `http`, inactive tokens deny, issuer/audience/scope checks still apply, and introspection only accepts bearer-style token types when the provider returns one
   - added pure verifier coverage for active/inactive introspected tokens plus an end-to-end `mcp_serve_http` integration test proving opaque tokens map to stable federated subjects across sessions
-  - verified with `cargo test -p pact-cli remote_mcp::tests -- --nocapture`, `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_token_introspection_verifies_opaque_tokens_and_derives_stable_subjects -- --nocapture`, `cargo test -p pact-cli`, `cargo test --workspace`, and `git diff --check`
+  - verified with `cargo test -p arc-cli remote_mcp::tests -- --nocapture`, `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_token_introspection_verifies_opaque_tokens_and_derives_stable_subjects -- --nocapture`, `cargo test -p arc-cli`, `cargo test --workspace`, and `git diff --check`
 - `P3-20` completed on 2026-03-24
-  - extended `pact-a2a-adapter` so declared `apiKeySecurityScheme` requirements can now be satisfied for `location: query` and `location: cookie`, not just `location: header`
+  - extended `arc-a2a-adapter` so declared `apiKeySecurityScheme` requirements can now be satisfied for `location: query` and `location: cookie`, not just `location: header`
   - widened the adapter request-auth model into one truthful transport shape that carries headers, query params, cookies, and TLS mode together, so every mediated A2A path applies the same fail-closed auth logic
   - kept the auth surface fail-closed: missing query or cookie credentials still deny locally before the upstream call, while adapter-level and kernel end-to-end coverage now prove query-authenticated invocation produces normal allow receipts
-  - verified with `cargo test -p pact-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
+  - verified with `cargo test -p arc-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
 - `P3-21` completed on 2026-03-24
-  - hardened `pact-a2a-adapter` lifecycle semantics so `historyLength` is only sent on `SendMessage` and `GetTask` when the Agent Card advertises `capabilities.stateTransitionHistory = true`
-  - closed a protocol-truth gap where PACT already parsed the capability but did not enforce it, keeping unsupported task-history requests fail-closed at the adapter boundary instead of probing upstream behavior
+  - hardened `arc-a2a-adapter` lifecycle semantics so `historyLength` is only sent on `SendMessage` and `GetTask` when the Agent Card advertises `capabilities.stateTransitionHistory = true`
+  - closed a protocol-truth gap where ARC already parsed the capability but did not enforce it, keeping unsupported task-history requests fail-closed at the adapter boundary instead of probing upstream behavior
   - added direct lifecycle-capability tests for unsupported `history_length` usage while preserving the existing supported-path transport and kernel receipt coverage for cards that do advertise state-transition history
-  - verified with `cargo test -p pact-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
+  - verified with `cargo test -p arc-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
 - `P3-22` completed on 2026-03-24
-  - hardened `pact-a2a-adapter` task lifecycle validation so `SendMessage` task responses, `GetTask` results, streamed `statusUpdate` events, and streamed `artifactUpdate` events are rejected fail-closed when required lifecycle fields are missing
-  - closed a second protocol-truth gap where PACT previously accepted malformed upstream task objects after only counting top-level response variants instead of validating the lifecycle payloads themselves
+  - hardened `arc-a2a-adapter` task lifecycle validation so `SendMessage` task responses, `GetTask` results, streamed `statusUpdate` events, and streamed `artifactUpdate` events are rejected fail-closed when required lifecycle fields are missing
+  - closed a second protocol-truth gap where ARC previously accepted malformed upstream task objects after only counting top-level response variants instead of validating the lifecycle payloads themselves
   - added direct validation tests for malformed task, status-update, and artifact-update payloads while preserving the existing good-path transport and kernel receipt coverage
-  - verified with `cargo test -p pact-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
+  - verified with `cargo test -p arc-a2a-adapter -- --nocapture`, `cargo test --workspace`, and `git diff --check`
 - `P3-23` completed on 2026-03-24
-  - deepened `pact mcp serve-http` identity federation by propagating canonical enterprise identity metadata into `authContext.method.federatedClaims` instead of discarding it after principal derivation
+  - deepened `arc mcp serve-http` identity federation by propagating canonical enterprise identity metadata into `authContext.method.federatedClaims` instead of discarding it after principal derivation
   - the bearer-authenticated lane now preserves `clientId`, `objectId`, `tenantId`, `organizationId`, `groups`, and `roles` from verified JWT and introspection claims, with normalization and provider-aware client/object claim capture
   - added unit coverage for claim normalization plus end-to-end `mcp_serve_http` coverage proving the admin trust surface exposes federated claim context for direct JWT, Azure-profile OIDC discovery, and opaque-token introspection flows
-  - verified with `cargo test -p pact-core -- --nocapture`, `cargo test -p pact-cli remote_mcp::tests -- --nocapture`, targeted `mcp_serve_http` federation integration tests, and `git diff --check`
+  - verified with `cargo test -p arc-core -- --nocapture`, `cargo test -p arc-cli remote_mcp::tests -- --nocapture`, targeted `mcp_serve_http` federation integration tests, and `git diff --check`
 - `P3-24` completed on 2026-03-24
-  - extended `pact-a2a-adapter` so declared `httpAuthSecurityScheme: { scheme: \"basic\" }` requirements can now be satisfied truthfully instead of being treated as unsupported
+  - extended `arc-a2a-adapter` so declared `httpAuthSecurityScheme: { scheme: \"basic\" }` requirements can now be satisfied truthfully instead of being treated as unsupported
   - added adapter configuration for HTTP Basic auth, fail-closed local denial when required Basic credentials are missing, and a kernel end-to-end allow-receipt path for Basic-authenticated A2A invocation
   - narrowed the remaining A2A auth-matrix gap from “HTTP auth beyond bearer” to custom schemes and deeper federation/partner hardening
-  - verified with `cargo test -p pact-a2a-adapter -- --nocapture`, targeted `pact-core` and `pact-cli` auth tests, and `git diff --check`
+  - verified with `cargo test -p arc-a2a-adapter -- --nocapture`, targeted `arc-core` and `arc-cli` auth tests, and `git diff --check`
 - `P3-25` completed on 2026-03-24
   - added the first challenge-bound Agent Passport presentation protocol on top of the shipped single-issuer passport alpha
   - introduced portable presentation challenge documents with verifier identity, nonce, TTL, selective-disclosure hints, and optional embedded verifier policy, plus holder-signed responses bound to the passport subject DID
-  - exposed the full relying-party loop through `pact passport challenge create`, `pact passport challenge respond`, and `pact passport challenge verify`, while keeping the current alpha boundary honest by avoiding fake multi-issuer aggregation or wallet transport claims
-  - verified with new `pact-credentials` challenge/presentation tests, expanded CLI passport end-to-end coverage, `cargo test -p pact-credentials`, `cargo test -p pact-cli --test passport`, `cargo test --workspace`, and `git diff --check`
+  - exposed the full relying-party loop through `arc passport challenge create`, `arc passport challenge respond`, and `arc passport challenge verify`, while keeping the current alpha boundary honest by avoiding fake multi-issuer aggregation or wallet transport claims
+  - verified with new `arc-credentials` challenge/presentation tests, expanded CLI passport end-to-end coverage, `cargo test -p arc-credentials`, `cargo test -p arc-cli --test passport`, `cargo test --workspace`, and `git diff --check`
 - `P3-26` completed on 2026-03-24
-  - added the first operator-facing local-versus-portable reputation comparison surface through `pact reputation compare --subject-public-key ... --passport ...`
+  - added the first operator-facing local-versus-portable reputation comparison surface through `arc reputation compare --subject-public-key ... --passport ...`
   - kept the comparison truthful by reusing the exact existing local inspection path plus the exact existing passport verification/evaluation path, then computing explicit per-credential metric drift as `local_minus_portable` without inventing new scoring semantics
   - supports both direct `--receipt-db` / `--budget-db` operation and `--control-url` for trust-service-backed local inspection while still evaluating the portable artifact client-side
-  - verified with new CLI integration coverage for both direct and trust-service-backed comparison flows, `cargo test -p pact-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
+  - verified with new CLI integration coverage for both direct and trust-service-backed comparison flows, `cargo test -p arc-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
 - `P3-27` completed on 2026-03-24
-  - added signed bilateral receipt-sharing policy documents through `pact evidence federation-policy create`
-  - extended `pact evidence export --federation-policy ...` so the export query is constrained to the signed bilateral scope, proof requirements can be enforced by policy, and the resulting package carries the signed policy document for offline handoff
-  - extended `pact evidence verify` so it verifies the federation policy signature, package export timestamp, proof requirements, and query containment instead of treating the policy as an inert attachment
-  - verified with new `evidence_export` integration coverage for signed-policy roundtrip and out-of-scope denial, `cargo test -p pact-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
+  - added signed bilateral receipt-sharing policy documents through `arc evidence federation-policy create`
+  - extended `arc evidence export --federation-policy ...` so the export query is constrained to the signed bilateral scope, proof requirements can be enforced by policy, and the resulting package carries the signed policy document for offline handoff
+  - extended `arc evidence verify` so it verifies the federation policy signature, package export timestamp, proof requirements, and query containment instead of treating the policy as an inert attachment
+  - verified with new `evidence_export` integration coverage for signed-policy roundtrip and out-of-scope denial, `cargo test -p arc-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 - `P3-28` completed on 2026-03-24
   - extended local-versus-portable comparison from CLI into trust-control through `POST /v1/reputation/compare/:subject_key`
   - moved the remote CLI `reputation compare --control-url` path onto that shared backend contract so trust-control and CLI do not drift
   - added a dashboard-side portable comparison panel that uploads a passport JSON artifact, calls the trust-control comparison endpoint, and renders subject match, local score, policy acceptance, and per-credential drift
-  - verified with new trust-service HTTP integration coverage, dashboard API and component tests, `npm test`, `npm run build`, `cargo test -p pact-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
+  - verified with new trust-service HTTP integration coverage, dashboard API and component tests, `npm test`, `npm run build`, `cargo test -p arc-cli --test local_reputation`, full `cargo test --workspace`, and `git diff --check`
 - `P3-29` completed on 2026-03-24
   - extended trust-control with live remote evidence export through `POST /v1/evidence/export`
-  - moved `pact evidence export --control-url ...` onto the same prepared-query, signed federation-policy, and proof-requirement contract already used by local evidence export
-  - verified with new end-to-end remote `evidence_export` integration coverage, `cargo test -p pact-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
+  - moved `arc evidence export --control-url ...` onto the same prepared-query, signed federation-policy, and proof-requirement contract already used by local evidence export
+  - verified with new end-to-end remote `evidence_export` integration coverage, `cargo test -p arc-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 - `P3-30` completed on 2026-03-24
-  - added the first live cross-org portable-trust issuance flow through `pact trust federated-issue` and `POST /v1/federation/capabilities/issue`
-  - trust-control now consumes an exact expected passport challenge plus a challenge-bound presentation response, requires an embedded verifier policy, derives the subject key from the presented `did:pact`, and issues exactly one locally signed capability from a supplied capability policy
+  - added the first live cross-org portable-trust issuance flow through `arc trust federated-issue` and `POST /v1/federation/capabilities/issue`
+  - trust-control now consumes an exact expected passport challenge plus a challenge-bound presentation response, requires an embedded verifier policy, derives the subject key from the presented `did:arc`, and issues exactly one locally signed capability from a supplied capability policy
   - kept the scope boundary honest by supporting one requested default capability per request instead of pretending multi-capability federated issuance is atomic
-  - verified with new `federated_issue` integration coverage, `cargo test -p pact-cli --test federated_issue`, full `cargo test --workspace`, and `git diff --check`
+  - verified with new `federated_issue` integration coverage, `cargo test -p arc-cli --test federated_issue`, full `cargo test --workspace`, and `git diff --check`
 - `P3-31` completed on 2026-03-24
-  - added signed federated delegation-policy documents through `pact trust federated-delegation-policy-create`
-  - extended `pact trust federated-issue` and `POST /v1/federation/capabilities/issue` with an optional delegation-policy ceiling that enforces scope and TTL attenuation, requires a locally trusted signer, and persists a delegation anchor into capability lineage
+  - added signed federated delegation-policy documents through `arc trust federated-delegation-policy-create`
+  - extended `arc trust federated-issue` and `POST /v1/federation/capabilities/issue` with an optional delegation-policy ceiling that enforces scope and TTL attenuation, requires a locally trusted signer, and persists a delegation anchor into capability lineage
   - verified with expanded `federated_issue` integration coverage for successful anchored issuance plus fail-closed ceiling rejection, full `cargo test --workspace`, and `git diff --check`
 - `P3-32` completed on 2026-03-24
-  - added bilateral evidence consumption through `pact evidence import` and `POST /v1/evidence/import`, with full package verification before persistence plus imported federated-share indexing for upstream capability lookup
-  - extended `pact trust federated-issue` and `POST /v1/federation/capabilities/issue` with `--upstream-capability-id` and parent-bound delegation policies so a new local delegation anchor can bridge to an imported upstream capability and reconstruct a truthful multi-hop cross-org chain
+  - added bilateral evidence consumption through `arc evidence import` and `POST /v1/evidence/import`, with full package verification before persistence plus imported federated-share indexing for upstream capability lookup
+  - extended `arc trust federated-issue` and `POST /v1/federation/capabilities/issue` with `--upstream-capability-id` and parent-bound delegation policies so a new local delegation anchor can bridge to an imported upstream capability and reconstruct a truthful multi-hop cross-org chain
   - kept the boundary honest by preserving local lineage foreign keys and modeling the cross-org hop through explicit federated lineage bridges instead of pretending imported parents are native local issuers
-  - verified with new multi-hop `federated_issue` integration coverage, `cargo test -p pact-cli --test federated_issue`, `cargo test -p pact-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
+  - verified with new multi-hop `federated_issue` integration coverage, `cargo test -p arc-cli --test federated_issue`, `cargo test -p arc-cli --test evidence_export`, full `cargo test --workspace`, and `git diff --check`
 
 | ID | Task | Why it matters | Effort | Depends on | Acceptance |
 | --- | --- | --- | --- | --- | --- |
@@ -302,9 +302,9 @@ Completed:
 - `P3-06` completed on 2026-03-23
 - Exit criteria:
   - local reputation is enforced
-  - `did:pact` and Agent Passport alpha exist
+  - `did:arc` and Agent Passport alpha exist
   - portable trust artifacts build on the already-shipped evidence package
-  - at least one non-MCP ecosystem adapter produces truthful PACT receipts
+  - at least one non-MCP ecosystem adapter produces truthful ARC receipts
 
 ## Bottom Line
 

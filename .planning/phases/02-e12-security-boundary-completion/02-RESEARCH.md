@@ -8,20 +8,20 @@ Turn negotiated roots into an enforced runtime boundary for filesystem-shaped to
 
 ### Roots are negotiated and stored, but not normalized or enforced
 
-- `crates/pact-core/src/session.rs` defines `RootDefinition` as `{ uri, name }` only. There is no normalized root model, filesystem classification, or enforcement metadata.
-- `crates/pact-kernel/src/session.rs` stores roots as raw `Vec<RootDefinition>` on the session and replaces them wholesale via `replace_roots`.
-- `crates/pact-kernel/src/lib.rs` refreshes roots through nested `roots/list` and stores them on the session with `replace_roots`, but it does not enforce them on tool calls or resource reads.
+- `crates/arc-core/src/session.rs` defines `RootDefinition` as `{ uri, name }` only. There is no normalized root model, filesystem classification, or enforcement metadata.
+- `crates/arc-kernel/src/session.rs` stores roots as raw `Vec<RootDefinition>` on the session and replaces them wholesale via `replace_roots`.
+- `crates/arc-kernel/src/lib.rs` refreshes roots through nested `roots/list` and stores them on the session with `replace_roots`, but it does not enforce them on tool calls or resource reads.
 - `docs/research/03-gap-analysis.md` already calls this out directly: roots snapshots and propagation exist, but root-aware enforcement is still missing.
 
 ### Tool-side filesystem classification exists already
 
-- `crates/pact-guards/src/action.rs` already classifies common filesystem-shaped tool calls into `ToolAction::FileAccess` and `ToolAction::FileWrite`.
-- `crates/pact-guards/src/path_allowlist.rs` already has path normalization and allowlist enforcement, including symlink-aware normalization behavior.
-- `crates/pact-cli/src/policy.rs` currently wires only `ForbiddenPathGuard`, `ShellCommandGuard`, and `EgressAllowlistGuard` from the operator-facing YAML path. There is no root-aware guard in the runtime pipeline today.
+- `crates/arc-guards/src/action.rs` already classifies common filesystem-shaped tool calls into `ToolAction::FileAccess` and `ToolAction::FileWrite`.
+- `crates/arc-guards/src/path_allowlist.rs` already has path normalization and allowlist enforcement, including symlink-aware normalization behavior.
+- `crates/arc-cli/src/policy.rs` currently wires only `ForbiddenPathGuard`, `ShellCommandGuard`, and `EgressAllowlistGuard` from the operator-facing YAML path. There is no root-aware guard in the runtime pipeline today.
 
 ### Resource reads do not use roots
 
-- `crates/pact-kernel/src/lib.rs` evaluates resource reads by validating capability scope and then calling `provider.read_resource(&operation.uri)`.
+- `crates/arc-kernel/src/lib.rs` evaluates resource reads by validating capability scope and then calling `provider.read_resource(&operation.uri)`.
 - There is no resource-side classification step for filesystem-backed URIs versus non-filesystem URIs.
 - There is no root check before `provider.read_resource`.
 
@@ -69,24 +69,24 @@ The phase needs explicit answers for:
 
 ### Roots/session state
 
-- `crates/pact-core/src/session.rs`
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-kernel/src/lib.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
+- `crates/arc-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-kernel/src/lib.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
 
 ### Tool-side enforcement
 
-- `crates/pact-guards/src/action.rs`
-- `crates/pact-guards/src/path_normalization.rs`
-- `crates/pact-guards/src/path_allowlist.rs`
-- `crates/pact-guards/src/forbidden_path.rs`
-- `crates/pact-cli/src/policy.rs`
-- `crates/pact-policy/src/compiler.rs`
+- `crates/arc-guards/src/action.rs`
+- `crates/arc-guards/src/path_normalization.rs`
+- `crates/arc-guards/src/path_allowlist.rs`
+- `crates/arc-guards/src/forbidden_path.rs`
+- `crates/arc-cli/src/policy.rs`
+- `crates/arc-policy/src/compiler.rs`
 
 ### Resource-side enforcement
 
-- `crates/pact-kernel/src/lib.rs`
-- resource provider implementations under `crates/pact-kernel` and `crates/pact-mcp-adapter`
+- `crates/arc-kernel/src/lib.rs`
+- resource provider implementations under `crates/arc-kernel` and `crates/arc-mcp-adapter`
 
 ### Phase docs
 

@@ -41,8 +41,8 @@ This phase is not general sandboxing. It is specifically about making the existi
 <specifics>
 ## Specific Ideas
 
-- `pact-kernel` already stores session roots and refreshes them through nested `roots/list`, so the phase should build on that substrate rather than reworking session ownership.
-- `pact-guards` already classifies common filesystem tools and already has robust path normalization and allowlist behavior, so tool-side enforcement should start there.
+- `arc-kernel` already stores session roots and refreshes them through nested `roots/list`, so the phase should build on that substrate rather than reworking session ownership.
+- `arc-guards` already classifies common filesystem tools and already has robust path normalization and allowlist behavior, so tool-side enforcement should start there.
 - Resource enforcement is the higher-risk part because `read_resource` currently delegates directly to providers after scope checks and does not distinguish filesystem-backed from non-filesystem URIs.
 
 </specifics>
@@ -58,20 +58,20 @@ This phase is not general sandboxing. It is specifically about making the existi
 - `docs/research/03-gap-analysis.md`
 
 ### Existing roots/session substrate
-- `crates/pact-core/src/session.rs`
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-kernel/src/lib.rs`
+- `crates/arc-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-kernel/src/lib.rs`
 
 ### Existing filesystem classification and guards
-- `crates/pact-guards/src/action.rs`
-- `crates/pact-guards/src/path_normalization.rs`
-- `crates/pact-guards/src/path_allowlist.rs`
-- `crates/pact-guards/src/forbidden_path.rs`
-- `crates/pact-cli/src/policy.rs`
-- `crates/pact-policy/src/compiler.rs`
+- `crates/arc-guards/src/action.rs`
+- `crates/arc-guards/src/path_normalization.rs`
+- `crates/arc-guards/src/path_allowlist.rs`
+- `crates/arc-guards/src/forbidden_path.rs`
+- `crates/arc-cli/src/policy.rs`
+- `crates/arc-policy/src/compiler.rs`
 
 ### MCP edge / resource surface
-- `crates/pact-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
 - `docs/epics/E5-nested-flows-roots-sampling-elicitation.md`
 
 </canonical_refs>
@@ -82,7 +82,7 @@ This phase is not general sandboxing. It is specifically about making the existi
 ### Reusable Assets
 - `Session::replace_roots` and `Kernel::replace_session_roots` already keep roots as session-scoped state.
 - `SessionNestedFlowBridge::list_roots` already refreshes roots from the client and stores the latest snapshot on the session.
-- `extract_action` in `crates/pact-guards/src/action.rs` already identifies common filesystem-shaped tool calls.
+- `extract_action` in `crates/arc-guards/src/action.rs` already identifies common filesystem-shaped tool calls.
 - `PathAllowlistGuard` already has symlink-aware path normalization behavior that Phase 2 should reuse.
 
 ### Missing Pieces
@@ -92,7 +92,7 @@ This phase is not general sandboxing. It is specifically about making the existi
 - The operator-facing YAML policy path does not currently expose a root-aware guard.
 
 ### Integration Points
-- Tool-side enforcement will likely need changes in `pact-kernel`, `pact-guards`, and the loaded policy/guard pipeline path.
+- Tool-side enforcement will likely need changes in `arc-kernel`, `arc-guards`, and the loaded policy/guard pipeline path.
 - Resource-side enforcement will likely need kernel-side classification plus adapter/provider-aware tests.
 - Cross-transport proof will need direct, wrapped, and remote coverage, because roots are negotiated over the MCP edge rather than local-only APIs.
 

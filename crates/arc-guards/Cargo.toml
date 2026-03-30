@@ -1,0 +1,28 @@
+[package]
+name = "arc-guards"
+description = "Security guards for the ARC runtime kernel, adapted from ClawdStrike"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_guards"
+
+[dependencies]
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-core = { package = "arc-core", path = "../arc-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+glob = "0.3"
+regex = "1"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

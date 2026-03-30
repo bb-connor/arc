@@ -27,10 +27,10 @@ key-files:
   created:
     - .planning/phases/02-e12-security-boundary-completion/02-01-SUMMARY.md
   modified:
-    - crates/pact-core/src/session.rs
-    - crates/pact-kernel/src/session.rs
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-guards/src/path_normalization.rs
+    - crates/arc-core/src/session.rs
+    - crates/arc-kernel/src/session.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-guards/src/path_normalization.rs
     - docs/epics/E12-security-boundary-completion.md
 key-decisions:
   - "Sessions should preserve raw root transport data and separately cache the normalized runtime root view needed by enforcement"
@@ -72,10 +72,10 @@ No task commits were created in this session because the repository is still bei
 
 ## Files Created/Modified
 
-- `crates/pact-core/src/session.rs` - formatted the preexisting normalized-root implementation so the workspace formatting gate passes
-- `crates/pact-kernel/src/session.rs` - added cached normalized roots plus enforceable-root accessors on sessions
-- `crates/pact-kernel/src/lib.rs` - exposed normalized session roots and enforceable filesystem root paths for later enforcement slices
-- `crates/pact-guards/src/path_normalization.rs` - added lexical-absolute and root-containment tests, including Windows-drive cases
+- `crates/arc-core/src/session.rs` - formatted the preexisting normalized-root implementation so the workspace formatting gate passes
+- `crates/arc-kernel/src/session.rs` - added cached normalized roots plus enforceable-root accessors on sessions
+- `crates/arc-kernel/src/lib.rs` - exposed normalized session roots and enforceable filesystem root paths for later enforcement slices
+- `crates/arc-guards/src/path_normalization.rs` - added lexical-absolute and root-containment tests, including Windows-drive cases
 - `docs/epics/E12-security-boundary-completion.md` - documented the frozen root contract and explicit fail-closed semantics for non-provable root sets
 - `.planning/phases/02-e12-security-boundary-completion/02-01-SUMMARY.md` - recorded the slice outcome and verification
 
@@ -93,8 +93,8 @@ No task commits were created in this session because the repository is still bei
 - **Found during:** Task 2 verification
 - **Issue:** `Path::is_absolute()` on the host platform did not treat `C:/...` examples as absolute, which caused the first Windows-drive containment test to incorrectly join against the Unix cwd
 - **Fix:** Taught the test helper to recognize Windows-drive absolute paths lexically before falling back to cwd-based absolutization
-- **Files modified:** `crates/pact-guards/src/path_normalization.rs`
-- **Verification:** `cargo test -p pact-guards path_normalization` passes after the fix
+- **Files modified:** `crates/arc-guards/src/path_normalization.rs`
+- **Verification:** `cargo test -p arc-guards path_normalization` passes after the fix
 - **Committed in:** working tree only
 
 ---
@@ -104,13 +104,13 @@ No task commits were created in this session because the repository is still bei
 
 ## Verification
 
-- `cargo test -p pact-kernel roots` - passed
-- `cargo test -p pact-guards path_normalization` - passed
+- `cargo test -p arc-kernel roots` - passed
+- `cargo test -p arc-guards path_normalization` - passed
 - `cargo fmt --all -- --check` - passed
 
 ## Issues Encountered
 
-- `cargo fmt --all -- --check` initially failed because the earlier partial `NormalizedRoot` work in `crates/pact-core/src/session.rs` had not yet been rustfmt-formatted
+- `cargo fmt --all -- --check` initially failed because the earlier partial `NormalizedRoot` work in `crates/arc-core/src/session.rs` had not yet been rustfmt-formatted
 - Running multiple `cargo` verification commands in parallel created package-cache lock contention, so the final gate sequence was run serially
 
 ## User Setup Required

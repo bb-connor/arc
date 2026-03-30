@@ -1,10 +1,12 @@
--- PACT Formal Verification -- Root import file
+-- ARC formal verification -- root import file.
 
-import Pact.Core.Capability
-import Pact.Core.Scope
-import Pact.Core.Revocation
-import Pact.Spec.Properties
+import Arc.Core.Capability
+import Arc.Core.Scope
+import Arc.Core.Revocation
+import Arc.Spec.Properties
 
--- Proof modules not imported into root to avoid pulling in sorry.
--- Import individually for proof checking:
---   Pact.Proofs.Monotonicity
+-- Standalone proof modules are not imported into the launch-claim root until
+-- they are free of `sorry`. The shipped release gate relies on the executable
+-- differential tests under `formal/diff-tests` plus runtime/conformance lanes.
+-- Import individually for exploratory proof checking:
+--   Arc.Proofs.Monotonicity

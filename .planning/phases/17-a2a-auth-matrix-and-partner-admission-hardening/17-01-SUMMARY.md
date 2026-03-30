@@ -13,7 +13,7 @@ key-files:
   created:
     - .planning/phases/17-a2a-auth-matrix-and-partner-admission-hardening/17-01-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
 requirements-completed:
   - A2A-01
 completed: 2026-03-25
@@ -34,4 +34,4 @@ invocation without bespoke per-call code.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`

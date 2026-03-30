@@ -38,8 +38,8 @@ created: 2026-03-22
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 09-01-01 | 01 | 1 | COMP-03, COMP-04 | unit | `cargo test -p pact-kernel retention` | ❌ W0 | ⬜ pending |
-| 09-02-01 | 02 | 1 | SEC-03, SEC-04 | unit | `cargo test -p pact-kernel dpop` | ❌ W0 | ⬜ pending |
+| 09-01-01 | 01 | 1 | COMP-03, COMP-04 | unit | `cargo test -p arc-kernel retention` | ❌ W0 | ⬜ pending |
+| 09-02-01 | 02 | 1 | SEC-03, SEC-04 | unit | `cargo test -p arc-kernel dpop` | ❌ W0 | ⬜ pending |
 | 09-03-01 | 03 | 2 | COMP-01 | integration | `cargo test --workspace` | ✅ | ⬜ pending |
 | 09-04-01 | 04 | 2 | COMP-02 | integration | `cargo test --workspace` | ✅ | ⬜ pending |
 
@@ -49,8 +49,8 @@ created: 2026-03-22
 
 ## Wave 0 Requirements
 
-- [ ] Retention policy tests in `crates/pact-kernel/src/receipt_store.rs` or new retention module
-- [ ] DPoP proof and nonce replay tests in `crates/pact-kernel/src/dpop.rs`
+- [ ] Retention policy tests in `crates/arc-kernel/src/receipt_store.rs` or new retention module
+- [ ] DPoP proof and nonce replay tests in `crates/arc-kernel/src/dpop.rs`
 
 *Existing test infrastructure (cargo test) covers all framework needs.*
 

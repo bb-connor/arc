@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Capability lineage index in pact-kernel persisting capability snapshots at issuance time with delegation chain tracking, agent-centric receipt queries via JOIN extension, and a React 18 + Vite 6 receipt dashboard SPA served by axum via tower_http::ServeDir. Non-engineer stakeholders can filter receipts by agent/tool/outcome/time and inspect delegation chains and budget views.
+Capability lineage index in arc-kernel persisting capability snapshots at issuance time with delegation chain tracking, agent-centric receipt queries via JOIN extension, and a React 18 + Vite 6 receipt dashboard SPA served by axum via tower_http::ServeDir. Non-engineer stakeholders can filter receipts by agent/tool/outcome/time and inspect delegation chains and budget views.
 
 </domain>
 
@@ -14,7 +14,7 @@ Capability lineage index in pact-kernel persisting capability snapshots at issua
 ## Implementation Decisions
 
 ### Capability Lineage Index Design
-- Index stored in SQLite table in pact-kernel alongside receipt store -- co-located for efficient joins
+- Index stored in SQLite table in arc-kernel alongside receipt store -- co-located for efficient joins
 - Capability snapshots persisted at issuance time (when kernel creates a new capability)
 - Keyed by capability_id with subject, issuer, grants, and delegation metadata
 - Agent-centric queries via JOIN capability_lineage ON capability_id extending existing receipt_query.rs with agent filter
@@ -46,10 +46,10 @@ Capability lineage index in pact-kernel persisting capability snapshots at issua
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-kernel/src/receipt_query.rs` -- ReceiptQuery, query_receipts for receipt filtering and pagination
-- `pact-kernel/src/receipt_store.rs` -- SqliteReceiptStore, receipt persistence, seq-based cursors
-- `pact-cli/src/trust_control.rs` -- axum HTTP server, existing trust-control endpoints, Bearer auth
-- `pact-core/src/capability.rs` -- CapabilityToken, ToolGrant, PactScope for capability snapshots
+- `arc-kernel/src/receipt_query.rs` -- ReceiptQuery, query_receipts for receipt filtering and pagination
+- `arc-kernel/src/receipt_store.rs` -- SqliteReceiptStore, receipt persistence, seq-based cursors
+- `arc-cli/src/trust_control.rs` -- axum HTTP server, existing trust-control endpoints, Bearer auth
+- `arc-core/src/capability.rs` -- CapabilityToken, ToolGrant, ArcScope for capability snapshots
 
 ### Established Patterns
 - SQLite stores with WAL mode, SYNCHRONOUS=FULL

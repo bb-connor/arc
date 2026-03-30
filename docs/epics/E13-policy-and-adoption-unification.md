@@ -4,7 +4,7 @@
 
 Complete.
 
-The supported YAML path now exposes all shipped guards, including `tool_access`, `secret_patterns`, and `patch_integrity`. The canonical authoring path is now explicit for new work: HushSpec is the recommended policy format, while legacy PACT YAML remains a supported compatibility input. The repo now also ships an initial native authoring surface through `NativePactServiceBuilder` plus a maintained migration guide, canonical HushSpec example, and native example crate.
+The supported YAML path now exposes all shipped guards, including `tool_access`, `secret_patterns`, and `patch_integrity`. The canonical authoring path is now explicit for new work: HushSpec is the recommended policy format, while legacy PACT YAML remains a supported compatibility input. The repo now also ships an initial native authoring surface through `NativeArcServiceBuilder` plus a maintained migration guide, canonical HushSpec example, and native example crate.
 
 ## Suggested issue title
 
@@ -12,7 +12,7 @@ The supported YAML path now exposes all shipped guards, including `tool_access`,
 
 ## Problem
 
-PACT's runtime is much closer to one canonical policy path than it used to be.
+ARC's runtime is much closer to one canonical policy path than it used to be.
 
 The product surface is still not fully unified:
 
@@ -31,8 +31,8 @@ By the end of E13:
 
 - one policy path is explicitly documented as canonical
 - all shipped guard capabilities are reachable through the supported policy story
-- migration from wrapped MCP to native PACT is documented and example-backed
-- native PACT services can be authored through a higher-level router or service abstraction
+- migration from wrapped MCP to native ARC is documented and example-backed
+- native ARC services can be authored through a higher-level router or service abstraction
 
 ## Scope
 
@@ -52,12 +52,12 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-cli/src/policy.rs`
-- `crates/pact-policy/src/`
-- `crates/pact-guards/src/`
+- `crates/arc-cli/src/policy.rs`
+- `crates/arc-policy/src/`
+- `crates/arc-guards/src/`
 - `examples/policies/`
 - `examples/hello-tool/`
-- `crates/pact-mcp-adapter`
+- `crates/arc-mcp-adapter`
 - `docs/`
 - new SDK or helper crate if added
 
@@ -91,7 +91,7 @@ Responsibilities:
 
 Requirements:
 
-- document wrapped MCP to native PACT migration
+- document wrapped MCP to native ARC migration
 - provide small, maintained examples that show the recommended path
 
 Responsibilities:
@@ -158,11 +158,11 @@ Responsibilities:
 
 - docs identify one canonical policy authoring path
 - all shipped guards are configurable through the supported story
-- migration docs exist for wrapped MCP to native PACT adoption
+- migration docs exist for wrapped MCP to native ARC adoption
 - at least one higher-level native authoring example exists and is test-covered
 
 ## Definition of done
 
 - implementation and docs merged
 - the review finding about split policy surface is materially addressed
-- teams evaluating PACT can tell what to author, how to migrate, and how to build a native service without reading internal crates first
+- teams evaluating ARC can tell what to author, how to migrate, and how to build a native service without reading internal crates first

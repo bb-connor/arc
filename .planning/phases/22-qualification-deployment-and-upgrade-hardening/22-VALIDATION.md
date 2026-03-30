@@ -22,8 +22,8 @@ created: 2026-03-25
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 22-01 | PROD-09 | `rg -n "check-dashboard-release|check-pact-ts-release|check-pact-py-release|check-pact-go-release|qualify-release" docs/release/QUALIFICATION.md` |
-| 22-02 | PROD-09 | `./scripts/check-dashboard-release.sh`, `./scripts/check-pact-ts-release.sh`, `./scripts/qualify-release.sh` |
+| 22-01 | PROD-09 | `rg -n "check-dashboard-release|check-arc-ts-release|check-arc-py-release|check-arc-go-release|qualify-release" docs/release/QUALIFICATION.md` |
+| 22-02 | PROD-09 | `./scripts/check-dashboard-release.sh`, `./scripts/check-arc-ts-release.sh`, `./scripts/qualify-release.sh` |
 | 22-03 | PROD-10 | `rg -n "backup|restore|upgrade|rollback|admin/sessions|/health" docs/release/OPERATIONS_RUNBOOK.md` |
 
 ## Coverage Notes

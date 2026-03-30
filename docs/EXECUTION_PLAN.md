@@ -1,4 +1,4 @@
-# PACT Execution Plan
+# ARC Execution Plan
 
 ## Purpose
 
@@ -25,7 +25,7 @@ Initial execution artifacts:
 ## Planning Assumptions
 
 - the repo remains a Rust workspace
-- `pact-core`, `pact-kernel`, `pact-guards`, `pact-policy`, `pact-manifest`, and `pact-mcp-adapter` remain the base crates
+- `arc-core`, `arc-kernel`, `arc-guards`, `arc-policy`, `arc-manifest`, and `arc-mcp-adapter` remain the base crates
 - early work should prefer modules inside existing crates over immediate crate explosion
 - compatibility at the edge and stronger trust in the core remain the primary strategy
 - HushSpec becomes the canonical policy path before `v1`
@@ -36,8 +36,8 @@ Execution is on track if all of the following become true in order:
 
 1. the runtime has a session abstraction instead of only ad hoc request handling
 2. compiled HushSpec is the real runtime contract
-3. a stock MCP client can talk to PACT for tool workflows
-4. PACT supports resources and prompts as first-class concepts
+3. a stock MCP client can talk to ARC for tool workflows
+4. ARC supports resources and prompts as first-class concepts
 5. nested sampling and elicitation flows are implemented safely
 6. long-running operations have correct progress, cancellation, and receipt semantics
 7. remote trust no longer depends on in-memory state
@@ -49,11 +49,11 @@ Use five execution lanes.
 
 | Lane | Purpose | Primary repo areas |
 | --- | --- | --- |
-| `protocol` | session model, JSON-RPC, MCP edge, message evolution | `pact-core`, `pact-kernel`, new edge modules |
-| `policy` | HushSpec runtime integration and policy fixtures | `pact-policy`, `pact-cli` |
-| `runtime` | providers, dispatch, streaming, nested flows | `pact-kernel`, `pact-mcp-adapter` |
-| `trust` | CA, revocation, receipt persistence, remote identity | new services plus `pact-kernel` |
-| `interop` | adapters, fixtures, conformance, migration docs | `pact-mcp-adapter`, `tests`, `docs` |
+| `protocol` | session model, JSON-RPC, MCP edge, message evolution | `arc-core`, `arc-kernel`, new edge modules |
+| `policy` | HushSpec runtime integration and policy fixtures | `arc-policy`, `arc-cli` |
+| `runtime` | providers, dispatch, streaming, nested flows | `arc-kernel`, `arc-mcp-adapter` |
+| `trust` | CA, revocation, receipt persistence, remote identity | new services plus `arc-kernel` |
+| `interop` | adapters, fixtures, conformance, migration docs | `arc-mcp-adapter`, `tests`, `docs` |
 
 ## Current planning note
 
@@ -78,35 +78,35 @@ The following items that appear as planned work elsewhere in this document shipp
 
 ### Monetary budgets (shipped in v2.0)
 
-`MonetaryAmount`, `max_cost_per_invocation`, and `max_total_cost` on `ToolGrant` are implemented in `crates/pact-core/src/capability.rs`. `BudgetStore::try_charge_cost` enforces atomic monetary limits in `crates/pact-kernel/src/budget_store.rs`. `FinancialReceiptMetadata` is embedded in the receipt `metadata` field for every monetized invocation. See [AGENT_ECONOMY.md](AGENT_ECONOMY.md) for the full design; Phase 1 of that document is now implemented. Operator guide: [MONETARY_BUDGETS_GUIDE.md](MONETARY_BUDGETS_GUIDE.md).
+`MonetaryAmount`, `max_cost_per_invocation`, and `max_total_cost` on `ToolGrant` are implemented in `crates/arc-core/src/capability.rs`. `BudgetStore::try_charge_cost` enforces atomic monetary limits in `crates/arc-kernel/src/budget_store.rs`. `FinancialReceiptMetadata` is embedded in the receipt `metadata` field for every monetized invocation. See [AGENT_ECONOMY.md](AGENT_ECONOMY.md) for the full design; Phase 1 of that document is now implemented. Operator guide: [MONETARY_BUDGETS_GUIDE.md](MONETARY_BUDGETS_GUIDE.md).
 
 ### DPoP proof-of-possession (shipped in v2.0)
 
-`ToolGrant.dpop_required` enables per-grant DPoP enforcement. The kernel validates `pact.dpop_proof.v1` proofs with nonce replay prevention. Implementation is in `crates/pact-kernel/src/dpop.rs`. Operator guide: [DPOP_INTEGRATION_GUIDE.md](DPOP_INTEGRATION_GUIDE.md).
+`ToolGrant.dpop_required` enables per-grant DPoP enforcement. The kernel validates `arc.dpop_proof.v1` proofs with nonce replay prevention. Implementation is in `crates/arc-kernel/src/dpop.rs`. Operator guide: [DPOP_INTEGRATION_GUIDE.md](DPOP_INTEGRATION_GUIDE.md).
 
 ### Receipt query API (shipped in v2.0)
 
-`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `pact receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/pact-kernel/src/receipt_query.rs` and `crates/pact-kernel/src/capability_lineage.rs`. Operator guide: [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md).
+`GET /v1/receipts/query` on the trust-control service supports eight filter dimensions and cursor-based pagination. The CLI exposes `arc receipt list` with equivalent filters. Capability lineage JOINs (`/v1/lineage/{capability_id}/chain`, `GET /v1/agents/{subject_key}/receipts`) are also available. See `crates/arc-kernel/src/receipt_query.rs` and `crates/arc-kernel/src/capability_lineage.rs`. Operator guide: [RECEIPT_QUERY_API.md](RECEIPT_QUERY_API.md).
 
 ### Velocity guard (shipped in v2.0)
 
-`VelocityGuard` token-bucket rate limiting per `(capability_id, grant_index)` is in `crates/pact-guards/src/velocity.rs`. It runs in the standard guard pipeline before any tool server invocation. Operator guide: [VELOCITY_GUARDS.md](VELOCITY_GUARDS.md).
+`VelocityGuard` token-bucket rate limiting per `(capability_id, grant_index)` is in `crates/arc-guards/src/velocity.rs`. It runs in the standard guard pipeline before any tool server invocation. Operator guide: [VELOCITY_GUARDS.md](VELOCITY_GUARDS.md).
 
 ### Merkle-committed receipt batches (shipped in v2.0)
 
-`KernelCheckpoint` commits batches of receipts to a Merkle root signed by the kernel key. See `crates/pact-kernel/src/checkpoint.rs`.
+`KernelCheckpoint` commits batches of receipts to a Merkle root signed by the kernel key. See `crates/arc-kernel/src/checkpoint.rs`.
 
 ### SIEM exporters (shipped in v2.0)
 
-Splunk HEC and Elasticsearch bulk exporters with a bounded dead-letter queue ship in `crates/pact-siem`, enabled via `--features siem` on `pact-cli`.
+Splunk HEC and Elasticsearch bulk exporters with a bounded dead-letter queue ship in `crates/arc-siem`, enabled via `--features siem` on `arc-cli`.
 
 ### Receipt retention with time/size rotation (shipped in v2.0)
 
-`RetentionConfig` on `KernelConfig` supports automatic archival by age (days) and live database size. See `crates/pact-kernel/src/receipt_store.rs`.
+`RetentionConfig` on `KernelConfig` supports automatic archival by age (days) and live database size. See `crates/arc-kernel/src/receipt_store.rs`.
 
 ### TypeScript SDK 1.0 (shipped in v2.0)
 
-`@pact-protocol/sdk` v1.0.0 ships in `packages/sdk/pact-ts/`. It covers capability invariants, receipt verification, DPoP proof construction, a receipt query client, and Streamable HTTP session management.
+`@arc-protocol/sdk` v1.0.0 ships in `packages/sdk/arc-ts/`. It covers capability invariants, receipt verification, DPoP proof construction, a receipt query client, and Streamable HTTP session management.
 
 ### Compliance documents (shipped in v2.0)
 
@@ -139,7 +139,7 @@ Blocks:
 
 Decision:
 
-- keep `PactScope` tool-only until after tool parity
+- keep `ArcScope` tool-only until after tool parity
 - or widen the grant model before resources/prompts land
 
 Recommendation:
@@ -188,12 +188,12 @@ Blocks:
 
 Decision:
 
-- overload `pact-mcp-adapter`
+- overload `arc-mcp-adapter`
 - or introduce separate MCP edge runtime
 
 Recommendation:
 
-- keep `pact-mcp-adapter` as migration adapter
+- keep `arc-mcp-adapter` as migration adapter
 - add separate MCP edge module or crate
 
 Blocks:
@@ -286,8 +286,8 @@ Create the session substrate that everything else will use.
 
 ### Primary repo areas
 
-- `crates/pact-core`
-- `crates/pact-kernel`
+- `crates/arc-core`
+- `crates/arc-kernel`
 
 ### Deliverables
 
@@ -332,13 +332,13 @@ Create the session substrate that everything else will use.
 
 ### Objective
 
-Make HushSpec and `pact-policy` the runtime truth.
+Make HushSpec and `arc-policy` the runtime truth.
 
 ### Primary repo areas
 
-- `crates/pact-policy`
-- `crates/pact-cli`
-- `crates/pact-kernel`
+- `crates/arc-policy`
+- `crates/arc-cli`
+- `crates/arc-kernel`
 
 ### Deliverables
 
@@ -351,7 +351,7 @@ Make HushSpec and `pact-policy` the runtime truth.
 #### `WP2.1` Policy loader unification
 
 - replace HushSpec detect-and-discard flow
-- preserve PACT YAML support as a compatibility input, not the core runtime model
+- preserve ARC YAML support as a compatibility input, not the core runtime model
 
 #### `WP2.2` Receipt semantics
 
@@ -368,11 +368,11 @@ Make HushSpec and `pact-policy` the runtime truth.
 
 - HushSpec policy produces the same runtime behavior across CLI and direct kernel construction
 - compiled policy changes alter receipt policy identity deterministically
-- PACT YAML policies still load or fail with explicit migration guidance
+- ARC YAML policies still load or fail with explicit migration guidance
 
 ### Exit criteria
 
-- no mainline runtime path depends on the original `PactPolicy` shape for new features
+- no mainline runtime path depends on the original `ArcPolicy` shape for new features
 
 ## E3: MCP Tool Edge Parity
 
@@ -383,9 +383,9 @@ Support MCP-compatible tool workflows at the edge.
 ### Primary repo areas
 
 - new MCP edge module or crate
-- `crates/pact-core`
-- `crates/pact-kernel`
-- `crates/pact-mcp-adapter`
+- `crates/arc-core`
+- `crates/arc-kernel`
+- `crates/arc-mcp-adapter`
 
 ### Deliverables
 
@@ -419,12 +419,12 @@ Support MCP-compatible tool workflows at the edge.
 ### Acceptance tests
 
 - a stock MCP client can connect and execute representative tool flows
-- `pact-mcp-adapter` wrapping does not lose critical tool metadata
+- `arc-mcp-adapter` wrapping does not lose critical tool metadata
 - notification and pagination semantics are stable
 
 ### Exit criteria
 
-- PACT is a realistic secure MCP tool edge, not just a local demo kernel
+- ARC is a realistic secure MCP tool edge, not just a local demo kernel
 
 ## E4: Resources, Prompts, Completion, and Logging
 
@@ -435,8 +435,8 @@ Implement non-tool server primitives.
 ### Primary repo areas
 
 - new edge module or crate
-- `crates/pact-core`
-- `crates/pact-kernel`
+- `crates/arc-core`
+- `crates/arc-kernel`
 - provider interfaces
 
 ### Deliverables
@@ -479,11 +479,11 @@ Implement non-tool server primitives.
 - resource listing, template listing, and reads work with policy and scope enforcement
 - prompt retrieval works without pretending prompts are tools
 - completion APIs return deterministic results for fixture providers
-- `pact mcp serve` exposes wrapped resources, prompts, and completion when the upstream server advertises them
+- `arc mcp serve` exposes wrapped resources, prompts, and completion when the upstream server advertises them
 
 ### Exit criteria
 
-- PACT can host contextual MCP-style servers, not only action endpoints
+- ARC can host contextual MCP-style servers, not only action endpoints
 
 ## E5: Nested Flows
 
@@ -495,9 +495,9 @@ Implement roots, sampling, and elicitation with safe lineage.
 
 - session module
 - edge runtime
-- `pact-core`
-- `pact-kernel`
-- `pact-policy`
+- `arc-core`
+- `arc-kernel`
+- `arc-policy`
 
 ### Deliverables
 
@@ -539,7 +539,7 @@ Implement roots, sampling, and elicitation with safe lineage.
 
 ### Exit criteria
 
-- PACT supports agentic server workflows without trust blind spots
+- ARC supports agentic server workflows without trust blind spots
 
 ## E6: Long-Running Operations
 
@@ -550,8 +550,8 @@ Make long-running work first-class.
 ### Primary repo areas
 
 - session module
-- `crates/pact-core`
-- `crates/pact-kernel`
+- `crates/arc-core`
+- `crates/arc-kernel`
 
 ### Deliverables
 
@@ -597,8 +597,8 @@ Replace local-only trust assumptions with service-backed trust.
 ### Primary repo areas
 
 - new trust services or crates
-- `crates/pact-kernel`
-- `crates/pact-core`
+- `crates/arc-kernel`
+- `crates/arc-core`
 
 ### Deliverables
 
@@ -619,7 +619,7 @@ Replace local-only trust assumptions with service-backed trust.
 
 - SQLite backend first
 - append-only semantics at application layer
-- receipt query API for verification and ops -- **shipped in v2.0** as `GET /v1/receipts/query` on the trust-control service and `pact receipt list` CLI; see `crates/pact-kernel/src/receipt_query.rs`
+- receipt query API for verification and ops -- **shipped in v2.0** as `GET /v1/receipts/query` on the trust-control service and `arc receipt list` CLI; see `crates/arc-kernel/src/receipt_query.rs`
 
 #### `WP7.3` Remote runtime
 
@@ -644,7 +644,7 @@ Make adoption cheap and claims test-backed.
 
 ### Primary repo areas
 
-- `crates/pact-mcp-adapter`
+- `crates/arc-mcp-adapter`
 - `tests`
 - `docs`
 - generated schema or SDK areas if added
@@ -673,7 +673,7 @@ Make adoption cheap and claims test-backed.
 #### `WP8.3` Migration docs and examples
 
 - MCP deployment replacement guide
-- examples for wrapped MCP servers and native PACT providers
+- examples for wrapped MCP servers and native ARC providers
 
 ### Acceptance tests
 
@@ -682,7 +682,7 @@ Make adoption cheap and claims test-backed.
 
 ### Exit criteria
 
-- PACT can be adopted incrementally by teams that already use MCP
+- ARC can be adopted incrementally by teams that already use MCP
 
 ## E9: HA Trust-Control Reliability
 
@@ -692,8 +692,8 @@ Make the clustered trust-control path deterministic enough for repeated full-sui
 
 ### Primary repo areas
 
-- `crates/pact-cli/src/trust_control.rs`
-- `crates/pact-kernel/src/budget_store.rs`
+- `crates/arc-cli/src/trust_control.rs`
+- `crates/arc-kernel/src/budget_store.rs`
 - authority, receipt, and revocation store implementations
 - clustered trust-control tests
 
@@ -738,10 +738,10 @@ Turn the authenticated remote MCP edge into a reconnect-safe, deployment-hard ru
 
 ### Primary repo areas
 
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-mcp-adapter`
-- `crates/pact-core`
-- `crates/pact-kernel`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-mcp-adapter`
+- `crates/arc-core`
+- `crates/arc-kernel`
 
 ### Deliverables
 
@@ -784,10 +784,10 @@ Finish one coherent ownership model for tasks, streams, cancellation, and async 
 
 ### Primary repo areas
 
-- `crates/pact-core`
-- `crates/pact-kernel`
-- `crates/pact-mcp-adapter`
-- `crates/pact-cli/src/remote_mcp.rs`
+- `crates/arc-core`
+- `crates/arc-kernel`
+- `crates/arc-mcp-adapter`
+- `crates/arc-cli/src/remote_mcp.rs`
 - conformance and integration tests
 
 ### Deliverables
@@ -831,11 +831,11 @@ Turn negotiated roots into an enforced boundary for filesystem-shaped tool and r
 
 ### Primary repo areas
 
-- `crates/pact-core`
-- `crates/pact-kernel`
-- `crates/pact-guards`
-- `crates/pact-policy`
-- `crates/pact-cli`
+- `crates/arc-core`
+- `crates/arc-kernel`
+- `crates/arc-guards`
+- `crates/arc-policy`
+- `crates/arc-cli`
 
 ### Deliverables
 
@@ -878,9 +878,9 @@ Make the policy story and native adoption story coherent for operators and devel
 
 ### Primary repo areas
 
-- `crates/pact-cli/src/policy.rs`
-- `crates/pact-policy`
-- `crates/pact-guards`
+- `crates/arc-cli/src/policy.rs`
+- `crates/arc-policy`
+- `crates/arc-guards`
 - `examples`
 - `docs`
 - new SDK/helper crate if added
@@ -1022,8 +1022,8 @@ Finish E0 and make E1 and E2 real.
 ### Suggested task list
 
 1. add `docs/adr/` and write D1 through D5
-2. add `session` module skeleton under `pact-kernel`
-3. introduce internal operation and context types in `pact-core` or `pact-kernel`
+2. add `session` module skeleton under `arc-kernel`
+3. introduce internal operation and context types in `arc-core` or `arc-kernel`
 4. refactor CLI policy loading to keep compiled HushSpec alive
 5. add fixture policies for tool-only and deny-by-default cases
 6. add tests proving HushSpec drives runtime behavior

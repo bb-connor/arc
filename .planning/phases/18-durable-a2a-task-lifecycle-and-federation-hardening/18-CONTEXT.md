@@ -42,7 +42,7 @@ server, interface, and binding that created the task.
 
 - `.planning/ROADMAP.md` -- Phase 18 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `A2A-03`, `A2A-04`, `A2A-05`
-- `crates/pact-a2a-adapter/src/lib.rs` -- task registry and lifecycle
+- `crates/arc-a2a-adapter/src/lib.rs` -- task registry and lifecycle
   validation
 - `docs/A2A_ADAPTER_GUIDE.md` -- durable task-correlation docs
 

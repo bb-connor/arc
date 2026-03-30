@@ -1,29 +1,29 @@
 ---
 phase: 08-core-enforcement
 plan: 03
-subsystem: pact-guards
+subsystem: arc-guards
 tags: [velocity, rate-limiting, token-bucket, guard, kernel]
 dependency_graph:
-  requires: [pact-kernel Guard trait, pact-core CapabilityToken]
+  requires: [arc-kernel Guard trait, arc-core CapabilityToken]
   provides: [VelocityGuard, VelocityConfig, TokenBucket, matched_grant_index on GuardContext]
-  affects: [pact-guards, pact-kernel, pact-cli]
+  affects: [arc-guards, arc-kernel, arc-cli]
 tech_stack:
   added: [std::sync::Mutex for synchronous token bucket state]
   patterns: [token bucket algorithm with elapsed-time refill, per-(capability_id, grant_index) keyed buckets]
 key_files:
   created:
-    - crates/pact-guards/src/velocity.rs
+    - crates/arc-guards/src/velocity.rs
   modified:
-    - crates/pact-guards/src/lib.rs
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-guards/src/pipeline.rs
-    - crates/pact-guards/src/mcp_tool.rs
-    - crates/pact-guards/src/secret_leak.rs
-    - crates/pact-guards/src/patch_integrity.rs
-    - crates/pact-guards/src/path_allowlist.rs
-    - crates/pact-cli/src/policy.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-kernel/src/receipt_store.rs
+    - crates/arc-guards/src/lib.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-guards/src/pipeline.rs
+    - crates/arc-guards/src/mcp_tool.rs
+    - crates/arc-guards/src/secret_leak.rs
+    - crates/arc-guards/src/patch_integrity.rs
+    - crates/arc-guards/src/path_allowlist.rs
+    - crates/arc-cli/src/policy.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-kernel/src/receipt_store.rs
 decisions:
   - "Use elapsed-time refill in try_consume rather than a background thread to keep the guard synchronous and lock-free between invocations"
   - "matched_grant_index defaults to None in all existing GuardContext construction sites; population happens in plan 08-04"
@@ -42,16 +42,16 @@ VelocityGuard with synchronous Mutex-wrapped token buckets, rate limiting per (c
 
 ## What Was Built
 
-### VelocityGuard (crates/pact-guards/src/velocity.rs)
+### VelocityGuard (crates/arc-guards/src/velocity.rs)
 
 - `TokenBucket` (private): capacity/tokens/refill_rate/last_refill struct with `try_consume` that refills via elapsed time
 - `VelocityConfig`: max_invocations_per_window, max_spend_per_window, window_secs, burst_factor
 - `VelocityGuard`: two `Mutex<HashMap<(String, usize), TokenBucket>>` fields (invocation + spend buckets), keyed by (capability_id, grant_index)
 - `impl Guard for VelocityGuard`: name returns "velocity", evaluate checks invocation limit then spend limit, returns `Verdict::Deny` on rate exceeded (never `Err` for rate limiting)
 
-### GuardContext Extension (crates/pact-kernel/src/lib.rs)
+### GuardContext Extension (crates/arc-kernel/src/lib.rs)
 
-Added `pub matched_grant_index: Option<usize>` field. Updated the single kernel-internal construction site to include `matched_grant_index: None`. All 10 external construction sites in pact-guards and pact-cli also updated.
+Added `pub matched_grant_index: Option<usize>` field. Updated the single kernel-internal construction site to include `matched_grant_index: None`. All 10 external construction sites in arc-guards and arc-cli also updated.
 
 ## Tests (10 passing)
 
@@ -70,18 +70,18 @@ Added `pub matched_grant_index: Option<usize>` field. Updated the single kernel-
 
 ### Auto-fixed Issues
 
-**1. [Rule 3 - Blocking] Fixed pre-existing pact-cli RemoteBudgetStore missing try_charge_cost**
+**1. [Rule 3 - Blocking] Fixed pre-existing arc-cli RemoteBudgetStore missing try_charge_cost**
 - **Found during:** Task 1 (compilation check)
-- **Issue:** `BudgetStore` trait gained `try_charge_cost` in an earlier plan but `RemoteBudgetStore` in pact-cli was not updated. Also two `BudgetUsageRecord` initializers missing the new `total_cost_charged` field.
+- **Issue:** `BudgetStore` trait gained `try_charge_cost` in an earlier plan but `RemoteBudgetStore` in arc-cli was not updated. Also two `BudgetUsageRecord` initializers missing the new `total_cost_charged` field.
 - **Fix:** Added stub `try_charge_cost` returning `Ok(true)` (pass-through, authority node handles cost). Added `total_cost_charged: 0` to two struct initializers.
-- **Files modified:** `crates/pact-cli/src/trust_control.rs`
+- **Files modified:** `crates/arc-cli/src/trust_control.rs`
 - **Commit:** f3d254a
 
 **2. [Rule 3 - Blocking] Fixed pre-existing receipt_store.rs serde_json::Error::custom usage**
 - **Found during:** Task 1 (test compilation)
 - **Issue:** `serde_json::Error::custom` requires `serde::de::Error` trait in scope. Two call sites used it incorrectly.
 - **Fix:** Replaced with `ReceiptStoreError::CryptoDecode(e.to_string())` and `ReceiptStoreError::Canonical(e.to_string())` which are the correct purpose-built variants already defined in the error enum.
-- **Files modified:** `crates/pact-kernel/src/receipt_store.rs`
+- **Files modified:** `crates/arc-kernel/src/receipt_store.rs`
 - **Commit:** f3d254a
 
 ## Commits
@@ -92,7 +92,7 @@ Added `pub matched_grant_index: Option<usize>` field. Updated the single kernel-
 
 ## Self-Check: PASSED
 
-- FOUND: crates/pact-guards/src/velocity.rs
-- FOUND: crates/pact-guards/src/lib.rs
-- FOUND: crates/pact-kernel/src/lib.rs
+- FOUND: crates/arc-guards/src/velocity.rs
+- FOUND: crates/arc-guards/src/lib.rs
+- FOUND: crates/arc-kernel/src/lib.rs
 - FOUND: commit f3d254a

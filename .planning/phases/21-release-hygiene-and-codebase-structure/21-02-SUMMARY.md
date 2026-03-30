@@ -16,7 +16,7 @@ key-files:
   modified:
     - .gitignore
     - scripts/ci-workspace.sh
-    - packages/sdk/pact-py/build/lib/pact/__init__.py
+    - packages/sdk/arc-py/build/lib/arc/__init__.py
     - tests/conformance/fixtures/wave1/__pycache__/mock_mcp_server.cpython-314.pyc
 requirements-completed:
   - PROD-07

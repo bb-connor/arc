@@ -13,7 +13,7 @@
 - Provider onboarding is fail-closed; a provider cannot participate in portable-trust admission until required metadata, trust anchors, and subject-mapping inputs validate successfully.
 - Provider-specific mapping remains explicit and reviewable; current Generic/Auth0/Okta/Azure AD heuristics may seed defaults but must not remain hidden one-off flag behavior.
 - JWT, introspection, SCIM, and SAML inputs normalize into one canonical enterprise-origin envelope that preserves provider, tenant, organization, object/client identifiers, roles, groups, and raw subject identifiers.
-- Stable PACT subject derivation must key off provider-scoped canonical principal identifiers, not mutable display data.
+- Stable ARC subject derivation must key off provider-scoped canonical principal identifiers, not mutable display data.
 - Trust-control policy narrows admission with explicit provider/tenant/organization/role/group matches and must never widen trust silently.
 - Admin and operator surfaces must show provider, federation method, normalized principal, derived subject key, and the exact enterprise context used for allow/deny decisions.
 
@@ -46,13 +46,13 @@
 
 ## Summary
 
-Phase 13 should be implemented as an extension of the shipped federation alpha, not a parallel subsystem. The core seam already exists: `crates/pact-cli/src/remote_mcp.rs` authenticates bearer requests, derives stable principal strings, normalizes tenant/org/group/role data into `OAuthBearerFederatedClaims`, and exposes that context through `SessionAuthContext`. The missing work is turning that bearer-only alpha into an administrable enterprise federation surface with explicit provider records, SCIM/SAML normalization, portable-trust admission gating, and operator diagnostics.
+Phase 13 should be implemented as an extension of the shipped federation alpha, not a parallel subsystem. The core seam already exists: `crates/arc-cli/src/remote_mcp.rs` authenticates bearer requests, derives stable principal strings, normalizes tenant/org/group/role data into `OAuthBearerFederatedClaims`, and exposes that context through `SessionAuthContext`. The missing work is turning that bearer-only alpha into an administrable enterprise federation surface with explicit provider records, SCIM/SAML normalization, portable-trust admission gating, and operator diagnostics.
 
-The most important architectural recommendation is to introduce a transport-agnostic enterprise identity context instead of stretching `OAuthBearerFederatedClaims` to cover every new source. `OAuthBearerFederatedClaims` is already bearer-specific by name and shape inside `pact-core/src/session.rs`; forcing SCIM and SAML through it would leak transport assumptions into future phases. Bearer JWT/introspection inputs should convert into the broader enterprise identity context, and SCIM/SAML normalization should produce the same structure directly.
+The most important architectural recommendation is to introduce a transport-agnostic enterprise identity context instead of stretching `OAuthBearerFederatedClaims` to cover every new source. `OAuthBearerFederatedClaims` is already bearer-specific by name and shape inside `arc-core/src/session.rs`; forcing SCIM and SAML through it would leak transport assumptions into future phases. Bearer JWT/introspection inputs should convert into the broader enterprise identity context, and SCIM/SAML normalization should produce the same structure directly.
 
-The policy side already has a natural home for this work. `pact-policy` exposes `OriginContext`, `OriginMatch`, and origin-profile scoring today, but the model only has `provider`, `tenant_id`, and a single `actor_role`. Phase 13 should extend that existing origin-matching path with `organization_id`, repeated `groups`, and repeated `roles` rather than hiding enterprise identity in generic tags or inventing a second policy engine. That keeps portable-trust admission on one truthful policy path and makes allow/deny explanations reusable across CLI, HTTP, and tests.
+The policy side already has a natural home for this work. `arc-policy` exposes `OriginContext`, `OriginMatch`, and origin-profile scoring today, but the model only has `provider`, `tenant_id`, and a single `actor_role`. Phase 13 should extend that existing origin-matching path with `organization_id`, repeated `groups`, and repeated `roles` rather than hiding enterprise identity in generic tags or inventing a second policy engine. That keeps portable-trust admission on one truthful policy path and makes allow/deny explanations reusable across CLI, HTTP, and tests.
 
-**Primary recommendation:** land Phase 13 in four slices that mirror the roadmap plans: provider-admin model and persistence in `pact-cli`; transport-agnostic enterprise identity normalization in `pact-core` plus source-specific adapters in `pact-cli`; policy origin-model expansion in `pact-policy`; then admin/reporting/test/doc wiring in `pact-cli/tests`, guides, and changelog. Keep bearer federation backward-compatible by treating JWT/introspection as provider kinds inside the broader provider-admin model.
+**Primary recommendation:** land Phase 13 in four slices that mirror the roadmap plans: provider-admin model and persistence in `arc-cli`; transport-agnostic enterprise identity normalization in `arc-core` plus source-specific adapters in `arc-cli`; policy origin-model expansion in `arc-policy`; then admin/reporting/test/doc wiring in `arc-cli/tests`, guides, and changelog. Keep bearer federation backward-compatible by treating JWT/introspection as provider kinds inside the broader provider-admin model.
 
 ---
 
@@ -60,23 +60,23 @@ The policy side already has a natural home for this work. `pact-policy` exposes 
 
 ### What already exists
 
-- `crates/pact-cli/src/remote_mcp.rs`
+- `crates/arc-cli/src/remote_mcp.rs`
   - verifies JWTs and introspected opaque tokens
   - supports provider-profile principal mapping for Generic/Auth0/Okta/Azure AD
   - derives stable subject keys from normalized principals
   - preserves `tenant_id`, `organization_id`, `groups`, and `roles`
   - already has direct tests for normalized federated claims and stable subject derivation
-- `crates/pact-core/src/session.rs`
+- `crates/arc-core/src/session.rs`
   - serializes normalized bearer auth context into `SessionAuthContext`
   - carries `OAuthBearerFederatedClaims` with `client_id`, `object_id`, `tenant_id`, `organization_id`, `groups`, and `roles`
-- `crates/pact-policy/src/models.rs` and `crates/pact-policy/src/evaluate.rs`
+- `crates/arc-policy/src/models.rs` and `crates/arc-policy/src/evaluate.rs`
   - already provide a policy origin model and origin-profile selection logic
   - can match `provider` and `tenant_id` today
   - do not yet represent organization, group lists, or multiple roles cleanly
-- `crates/pact-cli/src/trust_control.rs`
+- `crates/arc-cli/src/trust_control.rs`
   - already hosts portable-trust issuance and operator/debugging HTTP surfaces
   - is the natural place to enforce provenance-aware portable-trust admission and expose federation diagnostics
-- `crates/pact-cli/tests/mcp_serve_http.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
   - already verifies `authContext.method.federatedClaims` values over the real HTTP/admin surface
   - should be reused for enterprise-provider regression coverage
 
@@ -97,7 +97,7 @@ The policy side already has a natural home for this work. `pact-policy` exposes 
 | Library | Purpose | Recommendation |
 |---------|---------|----------------|
 | Existing Rust workspace types (`serde`, `serde_json`, `url`, `reqwest`, `thiserror`, `tracing`) | Provider config, metadata fetch, normalization, fail-closed diagnostics | Reuse existing workspace stack; no new dependency is needed for provider-admin, JWT/introspection extension, or policy expansion |
-| Existing HTTP/admin surfaces in `axum` | Provider-admin and operator diagnostics endpoints | Reuse current `pact-cli` service surface rather than creating a separate admin service |
+| Existing HTTP/admin surfaces in `axum` | Provider-admin and operator diagnostics endpoints | Reuse current `arc-cli` service surface rather than creating a separate admin service |
 
 ### Conditional
 
@@ -116,22 +116,22 @@ The research supports a conservative dependency posture: Phase 13 can make real 
 ### Recommended Project Structure
 
 ```text
-crates/pact-core/src/
+crates/arc-core/src/
 ├── session.rs                    # existing auth context types; may gain transport-agnostic enterprise identity type
 └── [new shared identity module]  # if needed for source-agnostic enterprise identity structs
 
-crates/pact-policy/src/
+crates/arc-policy/src/
 ├── models.rs                     # extend origin matching schema
 ├── evaluate.rs                   # extend origin matching + allow/deny reporting
 └── receipt.rs                    # ensure evaluation output stays provenance-visible
 
-crates/pact-cli/src/
+crates/arc-cli/src/
 ├── remote_mcp.rs                 # current bearer federation; refactor to reuse shared enterprise identity normalization
 ├── trust_control.rs              # provider-admin APIs, portable-trust gating, diagnostics/reporting
 ├── policy.rs                     # bridge normalized enterprise identity into portable-trust policy evaluation
 └── [new federation admin module] # provider records, validation, SCIM/SAML normalization helpers if extraction is warranted
 
-crates/pact-cli/tests/
+crates/arc-cli/tests/
 ├── mcp_serve_http.rs             # extend bearer/admin trust assertions
 ├── federated_issue.rs            # extend portable-trust issuance gating coverage
 └── [new federation admin tests]  # provider-admin + SCIM/SAML normalization integration tests
@@ -152,7 +152,7 @@ crates/pact-cli/tests/
 
 **What:** Introduce a shared normalized identity structure that can be produced from bearer JWT/introspection, SCIM, and SAML without tying the downstream policy path to one transport.
 
-**Why:** `OAuthBearerFederatedClaims` already proves the fields PACT needs, but the name and location make it a poor long-term home for SCIM/SAML. Phase 13 needs one canonical context for subject derivation, policy evaluation, and diagnostics.
+**Why:** `OAuthBearerFederatedClaims` already proves the fields ARC needs, but the name and location make it a poor long-term home for SCIM/SAML. Phase 13 needs one canonical context for subject derivation, policy evaluation, and diagnostics.
 
 **Recommendation:**
 - Bearer flows convert existing normalized claims into the broader enterprise identity context.
@@ -169,9 +169,9 @@ crates/pact-cli/tests/
 
 ### Pattern 3: Extend Existing Origin Matching, Do Not Fork Policy
 
-**What:** Reuse `pact-policy`'s `OriginContext` / `OriginMatch` path rather than creating a separate enterprise-policy evaluator.
+**What:** Reuse `arc-policy`'s `OriginContext` / `OriginMatch` path rather than creating a separate enterprise-policy evaluator.
 
-**Why:** `pact-policy` already does fail-closed origin-profile selection, which is the closest existing contract to enterprise-provider admission. Forking policy logic here would make allow/deny explanations diverge.
+**Why:** `arc-policy` already does fail-closed origin-profile selection, which is the closest existing contract to enterprise-provider admission. Forking policy logic here would make allow/deny explanations diverge.
 
 **Recommendation:**
 - Extend the origin model with:
@@ -217,7 +217,7 @@ crates/pact-cli/tests/
 
 **Why it matters:** This would lock Phase 13 into transport-specific naming and make later identity sources harder to reason about.
 
-**Mitigation:** Introduce a transport-agnostic identity type in `pact-core` and convert bearer claims into it.
+**Mitigation:** Introduce a transport-agnostic identity type in `arc-core` and convert bearer claims into it.
 
 ### Risk 2: Hiding enterprise identity inside generic policy tags
 
@@ -249,11 +249,11 @@ crates/pact-cli/tests/
 
 ### Existing infrastructure to reuse
 
-- `cargo test -p pact-cli mcp_serve_http`
+- `cargo test -p arc-cli mcp_serve_http`
   - already exercises remote bearer admission and admin trust surfaces
-- `cargo test -p pact-cli federated_issue`
+- `cargo test -p arc-cli federated_issue`
   - already exercises portable-trust issuance surfaces
-- `cargo test -p pact-policy`
+- `cargo test -p arc-policy`
   - already validates origin matching logic
 
 ### High-value new tests
@@ -275,30 +275,30 @@ crates/pact-cli/tests/
 |----------|-------|
 | Framework | Rust built-in test harness (`cargo test`) |
 | Config file | none -- inline `#[test]` and `#[tokio::test]` plus existing integration-test crates |
-| Quick run command | `cargo test -p pact-cli --test mcp_serve_http --test federated_issue && cargo test -p pact-policy` |
+| Quick run command | `cargo test -p arc-cli --test mcp_serve_http --test federated_issue && cargo test -p arc-policy` |
 | Full suite command | `cargo test --workspace` |
 
 ### Phase Requirements to Test Map
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| FED-01 | Provider-admin surface persists explicit provider records with validation and status reporting | integration | `cargo test -p pact-cli provider_admin` | No -- Wave 0 |
-| FED-01 | SCIM-backed identity payloads normalize into stable principal and subject derivation inputs | unit/integration | `cargo test -p pact-cli scim_identity` | No -- Wave 0 |
-| FED-01 | SAML-backed identity payloads/assertions normalize or fail closed on ambiguous mappings | unit/integration | `cargo test -p pact-cli saml_identity` | No -- Wave 0 |
-| FED-02 | Policy origin matching supports provider, tenant, organization, groups, and roles without fallback widening | unit | `cargo test -p pact-policy enterprise_origin` | No -- Wave 0 |
-| FED-02 | Portable-trust admission explainably allows/denies based on enterprise identity context | integration | `cargo test -p pact-cli federated_issue enterprise_admission` | Partially -- extend existing |
-| FED-02 | Admin/operator diagnostics show normalized provenance consistently across HTTP and CLI | integration | `cargo test -p pact-cli mcp_serve_http enterprise_diagnostics` | Partially -- extend existing |
+| FED-01 | Provider-admin surface persists explicit provider records with validation and status reporting | integration | `cargo test -p arc-cli provider_admin` | No -- Wave 0 |
+| FED-01 | SCIM-backed identity payloads normalize into stable principal and subject derivation inputs | unit/integration | `cargo test -p arc-cli scim_identity` | No -- Wave 0 |
+| FED-01 | SAML-backed identity payloads/assertions normalize or fail closed on ambiguous mappings | unit/integration | `cargo test -p arc-cli saml_identity` | No -- Wave 0 |
+| FED-02 | Policy origin matching supports provider, tenant, organization, groups, and roles without fallback widening | unit | `cargo test -p arc-policy enterprise_origin` | No -- Wave 0 |
+| FED-02 | Portable-trust admission explainably allows/denies based on enterprise identity context | integration | `cargo test -p arc-cli federated_issue enterprise_admission` | Partially -- extend existing |
+| FED-02 | Admin/operator diagnostics show normalized provenance consistently across HTTP and CLI | integration | `cargo test -p arc-cli mcp_serve_http enterprise_diagnostics` | Partially -- extend existing |
 
 ### Sampling Rate
 
-- **Per task commit:** run the smallest relevant crate/test target for the files touched (`pact-policy`, `mcp_serve_http`, `federated_issue`, or new provider-admin tests)
+- **Per task commit:** run the smallest relevant crate/test target for the files touched (`arc-policy`, `mcp_serve_http`, `federated_issue`, or new provider-admin tests)
 - **Per wave merge:** `cargo test --workspace`
 - **Phase gate:** full workspace tests green before verification closeout
 
 ### Wave 0 Gaps
 
-- [ ] Shared enterprise identity type or module in `pact-core` if Phase 13 extracts transport-agnostic normalization
-- [ ] Provider-admin record types and validation path in `pact-cli`
+- [ ] Shared enterprise identity type or module in `arc-core` if Phase 13 extracts transport-agnostic normalization
+- [ ] Provider-admin record types and validation path in `arc-cli`
 - [ ] SCIM normalization fixtures/tests
 - [ ] SAML normalization fixtures/tests
 - [ ] Policy schema/evaluator coverage for organization, groups, and roles
@@ -316,11 +316,11 @@ crates/pact-cli/tests/
 - `CLAUDE.md` -- project conventions and release gates
 - `docs/IDENTITY_FEDERATION_GUIDE.md` -- shipped federation alpha boundary
 - `docs/AGENT_PASSPORT_GUIDE.md` -- current portable-trust and federated issue surfaces
-- `crates/pact-cli/src/remote_mcp.rs` -- normalized bearer federation, stable principal derivation, admin trust surfaces, and existing tests
-- `crates/pact-core/src/session.rs` -- `SessionAuthContext` and `OAuthBearerFederatedClaims`
-- `crates/pact-policy/src/models.rs` and `crates/pact-policy/src/evaluate.rs` -- origin model and fail-closed matching logic
-- `crates/pact-cli/src/trust_control.rs` -- portable-trust admission and operator surface entrypoints
-- `crates/pact-cli/tests/mcp_serve_http.rs` -- current end-to-end enterprise-claim/admin-surface coverage
+- `crates/arc-cli/src/remote_mcp.rs` -- normalized bearer federation, stable principal derivation, admin trust surfaces, and existing tests
+- `crates/arc-core/src/session.rs` -- `SessionAuthContext` and `OAuthBearerFederatedClaims`
+- `crates/arc-policy/src/models.rs` and `crates/arc-policy/src/evaluate.rs` -- origin model and fail-closed matching logic
+- `crates/arc-cli/src/trust_control.rs` -- portable-trust admission and operator surface entrypoints
+- `crates/arc-cli/tests/mcp_serve_http.rs` -- current end-to-end enterprise-claim/admin-surface coverage
 
 ### Secondary (MEDIUM confidence)
 

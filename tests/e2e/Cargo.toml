@@ -1,6 +1,6 @@
 [package]
-name = "pact-e2e"
-description = "End-to-end integration tests for the PACT runtime stack"
+name = "arc-e2e"
+description = "End-to-end integration tests for the ARC runtime stack"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,9 +9,9 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-pact-core = { path = "../../crates/pact-core" }
-pact-kernel = { path = "../../crates/pact-kernel" }
-pact-guards = { path = "../../crates/pact-guards" }
+arc-core = { package = "arc-core", path = "../../crates/arc-core" }
+arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
+arc-guards = { package = "arc-guards", path = "../../crates/arc-guards" }
 serde_json = { workspace = true }
 
 [lints.clippy]

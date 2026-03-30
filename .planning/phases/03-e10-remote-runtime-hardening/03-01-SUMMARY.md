@@ -25,8 +25,8 @@ key-files:
   created:
     - .planning/phases/03-e10-remote-runtime-hardening/03-01-SUMMARY.md
   modified:
-    - crates/pact-cli/src/remote_mcp.rs
-    - crates/pact-cli/tests/mcp_serve_http.rs
+    - crates/arc-cli/src/remote_mcp.rs
+    - crates/arc-cli/tests/mcp_serve_http.rs
     - docs/epics/E10-remote-runtime-hardening.md
     - docs/POST_REVIEW_EXECUTION_PLAN.md
 key-decisions:
@@ -69,8 +69,8 @@ No task commits were created in this session because the repository is still bei
 
 ## Files Created/Modified
 
-- `crates/pact-cli/src/remote_mcp.rs` - added remote-session lifecycle state, lifecycle validation, and lifecycle serialization on the admin trust response
-- `crates/pact-cli/tests/mcp_serve_http.rs` - added lifecycle-contract and auth-continuity coverage
+- `crates/arc-cli/src/remote_mcp.rs` - added remote-session lifecycle state, lifecycle validation, and lifecycle serialization on the admin trust response
+- `crates/arc-cli/tests/mcp_serve_http.rs` - added lifecycle-contract and auth-continuity coverage
 - `docs/epics/E10-remote-runtime-hardening.md` - documented the initial bounded reconnect contract
 - `docs/POST_REVIEW_EXECUTION_PLAN.md` - updated Gate G3 with explicit lifecycle and authenticated-continuity wording
 
@@ -85,15 +85,15 @@ No task commits were created in this session because the repository is still bei
 ### Auto-fixed Issues
 
 **1. [Parallel harness stability] `mcp_serve_http` temp-dir generation was too collision-prone under parallel runs**
-- **Found during:** `cargo test -p pact-cli mcp_serve_http`
+- **Found during:** `cargo test -p arc-cli mcp_serve_http`
 - **Issue:** the HTTP suite showed intermittent startup and authority-state interference under the default parallel lane
 - **Fix:** hardened `unique_test_dir()` to include process id plus a monotonic counter instead of relying on timestamp-only naming
-- **Files modified:** `crates/pact-cli/tests/mcp_serve_http.rs`
-- **Verification:** `cargo test -p pact-cli mcp_serve_http` passed after the helper change
+- **Files modified:** `crates/arc-cli/tests/mcp_serve_http.rs`
+- **Verification:** `cargo test -p arc-cli mcp_serve_http` passed after the helper change
 
 ## Verification
 
-- `cargo test -p pact-cli mcp_serve_http` - passed
+- `cargo test -p arc-cli mcp_serve_http` - passed
 - `cargo fmt --all -- --check` - passed
 
 ## Issues Encountered

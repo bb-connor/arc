@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk exporters, ExporterManager with cursor-pull from receipt store, bounded in-memory dead-letter queue, and FinancialReceiptMetadata enrichment. All SIEM I/O isolated from pact-kernel TCB -- no HTTP client dependencies in the kernel.
+New arc-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk exporters, ExporterManager with cursor-pull from receipt store, bounded in-memory dead-letter queue, and FinancialReceiptMetadata enrichment. All SIEM I/O isolated from arc-kernel TCB -- no HTTP client dependencies in the kernel.
 
 </domain>
 
@@ -14,7 +14,7 @@ New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk
 ## Implementation Decisions
 
 ### SIEM Event Format
-- Events use PACT-native JSON matching PactReceipt schema -- consumers map to their SIEM's schema
+- Events use ARC-native JSON matching ArcReceipt schema -- consumers map to their SIEM's schema
 - Full receipt JSON included (not summary) -- SIEM teams want raw data for custom parsing/alerting
 - FinancialReceiptMetadata nested under "financial" key when present, omitted when absent (matches existing receipt.metadata pattern)
 - Event timestamp is receipt.timestamp (canonical, signed), not export time
@@ -32,7 +32,7 @@ New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk
 - Failure reporting via tracing::warn on individual failures, tracing::error when DLQ is full
 
 ### Claude's Discretion
-- pact-siem crate internal module organization
+- arc-siem crate internal module organization
 - Splunk HEC event field mapping details
 - Elasticsearch index naming and document ID strategy
 - ExporterManager polling loop implementation (tokio interval vs std thread)
@@ -44,9 +44,9 @@ New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-kernel/src/receipt_store.rs` -- SqliteReceiptStore.list_tool_receipts_after_seq for cursor-pull
-- `pact-core/src/receipt.rs` -- PactReceipt, FinancialReceiptMetadata types for event serialization
-- `pact-kernel/src/receipt_query.rs` -- ReceiptQuery and cursor pagination patterns
+- `arc-kernel/src/receipt_store.rs` -- SqliteReceiptStore.list_tool_receipts_after_seq for cursor-pull
+- `arc-core/src/receipt.rs` -- ArcReceipt, FinancialReceiptMetadata types for event serialization
+- `arc-kernel/src/receipt_query.rs` -- ReceiptQuery and cursor pagination patterns
 
 ### Established Patterns
 - Feature flags via Cargo.toml `[features]` section
@@ -56,8 +56,8 @@ New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk
 
 ### Integration Points
 - ExporterManager reads from SqliteReceiptStore via list_tool_receipts_after_seq (existing method)
-- pact-siem depends on pact-core (for receipt types) but NOT pact-kernel (isolation requirement)
-- Feature flag gates pact-siem compilation in workspace Cargo.toml
+- arc-siem depends on arc-core (for receipt types) but NOT arc-kernel (isolation requirement)
+- Feature flag gates arc-siem compilation in workspace Cargo.toml
 
 </code_context>
 
@@ -66,7 +66,7 @@ New pact-siem crate behind a feature flag with Splunk HEC and Elasticsearch bulk
 
 - Reference docs/CLAWDSTRIKE_INTEGRATION.md for SIEM exporter port strategy (ClawdStrike has 6 exporters)
 - Only Splunk HEC and Elasticsearch bulk are in scope for this phase (2 of 6)
-- The pact-kernel TCB isolation requirement is a hard gate -- verify no reqwest/hyper in pact-kernel deps
+- The arc-kernel TCB isolation requirement is a hard gate -- verify no reqwest/hyper in arc-kernel deps
 - Phase 10's receipt query API provides the cursor-pull foundation
 
 </specifics>

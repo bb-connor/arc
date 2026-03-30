@@ -14,7 +14,7 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo test` |
-| **Quick run command** | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
 | **Docs verification** | `rg -n "partner admission|request headers|query params|cookies" docs/A2A_ADAPTER_GUIDE.md` |
 
@@ -22,9 +22,9 @@ created: 2026-03-25
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 17-01 | A2A-01 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
-| 17-02 | A2A-02 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
-| 17-03 | A2A-01, A2A-02 | `cargo test -p pact-a2a-adapter --lib -- --nocapture` |
+| 17-01 | A2A-01 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
+| 17-02 | A2A-02 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
+| 17-03 | A2A-01, A2A-02 | `cargo test -p arc-a2a-adapter --lib -- --nocapture` |
 
 ## Coverage Notes
 

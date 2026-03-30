@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Receipt retention is configurable with time-based and size-based rotation (archived receipts verify against Merkle checkpoints). DPoP proof-of-possession is implemented as PACT-native Ed25519-signed canonical JSON proofs with LRU nonce replay rejection. Colorado SB 24-205 and EU AI Act Article 19 compliance mapping documents are published with clause-to-test-artifact reference tables. No new APIs, dashboards, or SDK changes -- enforcement + documentation.
+Receipt retention is configurable with time-based and size-based rotation (archived receipts verify against Merkle checkpoints). DPoP proof-of-possession is implemented as ARC-native Ed25519-signed canonical JSON proofs with LRU nonce replay rejection. Colorado SB 24-205 and EU AI Act Article 19 compliance mapping documents are published with clause-to-test-artifact reference tables. No new APIs, dashboards, or SDK changes -- enforcement + documentation.
 
 </domain>
 
@@ -21,7 +21,7 @@ Receipt retention is configurable with time-based and size-based rotation (archi
 - Archived receipts must remain verifiable against stored Merkle checkpoint roots (COMP-04)
 
 ### DPoP Proof Design
-- DPoP proof format: canonical JSON signed with Ed25519, consistent with all PACT signing (PACT-native per STATE.md decision, not HTTP-shaped)
+- DPoP proof format: canonical JSON signed with Ed25519, consistent with all ARC signing (ARC-native per STATE.md decision, not HTTP-shaped)
 - Proof message binds: capability_id + tool_server + tool_name + action_hash + nonce (per SEC-03)
 - Nonce replay store: in-memory LRU with configurable capacity -- DPoP nonces are ephemeral, no persistence across restarts
 - Default TTL window: 5 minutes (standard DPoP practice), configurable
@@ -50,12 +50,12 @@ Receipt retention is configurable with time-based and size-based rotation (archi
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-core/src/crypto.rs` -- Keypair, Ed25519 signing, canonical_json_bytes for proof signing
-- `pact-core/src/merkle.rs` -- MerkleTree, MerkleProof for archived receipt verification
-- `pact-kernel/src/receipt_store.rs` -- SqliteReceiptStore with seq-based queries, kernel_checkpoints table
-- `pact-kernel/src/checkpoint.rs` -- KernelCheckpoint, build_checkpoint, verify_checkpoint_signature
-- `pact-kernel/src/budget_store.rs` -- Pattern for SQLite IMMEDIATE transactions, migration helpers (ensure_* pattern)
-- `pact-core/src/capability.rs` -- ToolGrant struct where dpop_required field would be added
+- `arc-core/src/crypto.rs` -- Keypair, Ed25519 signing, canonical_json_bytes for proof signing
+- `arc-core/src/merkle.rs` -- MerkleTree, MerkleProof for archived receipt verification
+- `arc-kernel/src/receipt_store.rs` -- SqliteReceiptStore with seq-based queries, kernel_checkpoints table
+- `arc-kernel/src/checkpoint.rs` -- KernelCheckpoint, build_checkpoint, verify_checkpoint_signature
+- `arc-kernel/src/budget_store.rs` -- Pattern for SQLite IMMEDIATE transactions, migration helpers (ensure_* pattern)
+- `arc-core/src/capability.rs` -- ToolGrant struct where dpop_required field would be added
 
 ### Established Patterns
 - SQLite stores: WAL mode, SYNCHRONOUS=FULL, IMMEDIATE transactions for writes
@@ -68,14 +68,14 @@ Receipt retention is configurable with time-based and size-based rotation (archi
 - ToolGrant gets new dpop_required: Option<bool> field (forward-compatible, None = not required)
 - DPoP verification happens in kernel evaluation before guard pipeline (proof must be valid before checking guards)
 - Receipt retention operates on SqliteReceiptStore (archive + compact)
-- Compliance docs reference tests across pact-kernel, pact-core, pact-guards
+- Compliance docs reference tests across arc-kernel, arc-core, arc-guards
 
 </code_context>
 
 <specifics>
 ## Specific Ideas
 
-- DPoP proof message is explicitly PACT-native (not HTTP-shaped) per STATE.md decision from 2026-03-21
+- DPoP proof message is explicitly ARC-native (not HTTP-shaped) per STATE.md decision from 2026-03-21
 - Compliance documents must reference passing test artifacts, not planned features (STATE.md decision)
 - Colorado deadline June 30, 2026 and EU deadline August 2, 2026 are hard gates (STATE.md blockers)
 - Reference docs/CLAWDSTRIKE_INTEGRATION.md for DPoP port strategy

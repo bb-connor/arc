@@ -18,9 +18,9 @@ created: 2026-03-22
 | Property | Value |
 |----------|-------|
 | **Framework** | cargo test (Rust), vitest (TypeScript) |
-| **Config file** | Cargo.toml, packages/sdk/pact-ts/package.json |
+| **Config file** | Cargo.toml, packages/sdk/arc-ts/package.json |
 | **Quick run command** | `cargo test --workspace --lib` |
-| **Full suite command** | `cargo test --workspace && cd packages/sdk/pact-ts && npx vitest run` |
+| **Full suite command** | `cargo test --workspace && cd packages/sdk/arc-ts && npx vitest run` |
 | **Estimated runtime** | ~45 seconds |
 
 ---
@@ -38,9 +38,9 @@ created: 2026-03-22
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 10-01-01 | 01 | 1 | PROD-01 | unit | `cargo test -p pact-kernel receipt_query` | ❌ W0 | ⬜ pending |
-| 10-02-01 | 02 | 2 | PROD-01 | integration | `cargo test -p pact-cli receipt_list` | ❌ W0 | ⬜ pending |
-| 10-03-01 | 03 | 2 | PROD-06 | unit | `cd packages/sdk/pact-ts && npx vitest run` | ❌ W0 | ⬜ pending |
+| 10-01-01 | 01 | 1 | PROD-01 | unit | `cargo test -p arc-kernel receipt_query` | ❌ W0 | ⬜ pending |
+| 10-02-01 | 02 | 2 | PROD-01 | integration | `cargo test -p arc-cli receipt_list` | ❌ W0 | ⬜ pending |
+| 10-03-01 | 03 | 2 | PROD-06 | unit | `cd packages/sdk/arc-ts && npx vitest run` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,7 +48,7 @@ created: 2026-03-22
 
 ## Wave 0 Requirements
 
-- [ ] Receipt query tests in `crates/pact-kernel/src/receipt_store.rs` or receipt_query module
+- [ ] Receipt query tests in `crates/arc-kernel/src/receipt_store.rs` or receipt_query module
 - [ ] TypeScript SDK DPoP and query client tests
 
 *Existing test infrastructure covers framework needs.*

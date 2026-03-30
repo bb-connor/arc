@@ -1,6 +1,6 @@
 [package]
 name = "hello-tool"
-description = "Example PACT tool server exposing a simple greet tool"
+description = "Example ARC tool server exposing a simple greet tool"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,9 +8,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-pact-core = { path = "../../crates/pact-core" }
-pact-kernel = { path = "../../crates/pact-kernel" }
-pact-manifest = { path = "../../crates/pact-manifest" }
-pact-mcp-adapter = { path = "../../crates/pact-mcp-adapter" }
+arc-core = { package = "arc-core", path = "../../crates/arc-core" }
+arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
+arc-manifest = { package = "arc-manifest", path = "../../crates/arc-manifest" }
+arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../../crates/arc-mcp-adapter" }
 serde = { workspace = true }
 serde_json = { workspace = true }

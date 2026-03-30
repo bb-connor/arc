@@ -13,7 +13,7 @@ key-files:
   created:
     - .planning/phases/18-durable-a2a-task-lifecycle-and-federation-hardening/18-01-SUMMARY.md
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
 requirements-completed:
   - A2A-03
 completed: 2026-03-25
@@ -32,4 +32,4 @@ versioned registry file.
 
 ## Verification
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`

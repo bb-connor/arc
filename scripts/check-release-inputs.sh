@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 matches=()
 while IFS= read -r path; do
   case "${path}" in
-    */__pycache__/*|*.pyc|*.pyo|*.pyd|packages/sdk/pact-py/build/*|packages/sdk/pact-py/src/*.egg-info|packages/sdk/pact-py/src/*.egg-info/*|packages/sdk/pact-ts/dist/*|packages/sdk/pact-ts/node_modules/*|crates/pact-cli/dashboard/dist/*|crates/pact-cli/dashboard/node_modules/*|tests/conformance/results/generated/*|tests/conformance/reports/generated/*)
+    */__pycache__/*|*.pyc|*.pyo|*.pyd|packages/sdk/arc-py/build/*|packages/sdk/arc-py/src/*.egg-info|packages/sdk/arc-py/src/*.egg-info/*|packages/sdk/arc-ts/dist/*|packages/sdk/arc-ts/node_modules/*|crates/arc-cli/dashboard/dist/*|crates/arc-cli/dashboard/node_modules/*|tests/conformance/results/generated/*|tests/conformance/reports/generated/*)
       matches+=("${path}")
       ;;
   esac

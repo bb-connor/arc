@@ -38,10 +38,10 @@ created: 2026-03-23
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 12-01-01 | 01 | 1 | PROD-02 | unit | `cargo test -p pact-kernel capability_index` | ❌ W0 | ⬜ pending |
-| 12-02-01 | 02 | 2 | PROD-03 | unit | `cargo test -p pact-kernel agent_query` | ❌ W0 | ⬜ pending |
+| 12-01-01 | 01 | 1 | PROD-02 | unit | `cargo test -p arc-kernel capability_index` | ❌ W0 | ⬜ pending |
+| 12-02-01 | 02 | 2 | PROD-03 | unit | `cargo test -p arc-kernel agent_query` | ❌ W0 | ⬜ pending |
 | 12-03-01 | 03 | 2 | PROD-04 | build | `cd dashboard && npm run build` | ❌ W0 | ⬜ pending |
-| 12-04-01 | 04 | 3 | PROD-05 | integration | `cargo test -p pact-cli dashboard` | ❌ W0 | ⬜ pending |
+| 12-04-01 | 04 | 3 | PROD-05 | integration | `cargo test -p arc-cli dashboard` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -49,7 +49,7 @@ created: 2026-03-23
 
 ## Wave 0 Requirements
 
-- [ ] Capability lineage tests in pact-kernel
+- [ ] Capability lineage tests in arc-kernel
 - [ ] Dashboard SPA scaffolded with React 18 + Vite 6
 
 *Existing test infrastructure covers Rust; npm handles frontend.*

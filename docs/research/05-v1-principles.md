@@ -2,7 +2,7 @@
 
 ## 1. Compatibility at the edge, stronger guarantees underneath
 
-PACT should meet the ecosystem where it is.
+ARC should meet the ecosystem where it is.
 
 That means:
 
@@ -13,7 +13,7 @@ If the project chooses purity over adoption too early, it loses leverage.
 
 ## 2. Security invariants must stay central
 
-Do not trade away the reason PACT exists.
+Do not trade away the reason ARC exists.
 
 The following should remain non-negotiable:
 
@@ -25,7 +25,7 @@ The following should remain non-negotiable:
 
 ## 3. Session auth and action auth are separate concerns
 
-PACT needs both:
+ARC needs both:
 
 - transport/session authentication
 - action-level capability authorization
@@ -50,13 +50,13 @@ MCP's primitives encode different control models:
 - resources are application-controlled
 - tools are model-controlled
 
-PACT needs equally first-class representations for all three. If everything gets flattened into "tool call," the protocol will be less expressive and less usable than MCP.
+ARC needs equally first-class representations for all three. If everything gets flattened into "tool call," the protocol will be less expressive and less usable than MCP.
 
 ## 6. One policy language
 
 The `v1` line should not ship with competing policy paths.
 
-Pick one canonical policy model, likely HushSpec plus PACT compilation, and make it the runtime truth.
+Pick one canonical policy model, likely HushSpec plus ARC compilation, and make it the runtime truth.
 
 ## 7. Remote trust must be real
 
@@ -72,7 +72,7 @@ Otherwise "cryptographic protocol" stays mostly local theater.
 
 ## 8. Evidence matters as much as enforcement
 
-PACT's differentiator is not only blocking.
+ARC's differentiator is not only blocking.
 
 It is producing verifiable evidence about:
 

@@ -1,0 +1,33 @@
+[package]
+name = "arc-policy"
+description = "HushSpec policy format for the ARC runtime -- parse, validate, merge, evaluate, and compile to ARC guards"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_policy"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-guards = { package = "arc-guards", path = "../arc-guards" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+regex = "1"
+sha2 = { workspace = true }
+hex = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+
+[dev-dependencies]
+pretty_assertions = "1"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

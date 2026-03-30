@@ -1,23 +1,23 @@
 # Project Research Summary
 
-**Project:** PACT v2.0 Agent Economy Foundation
+**Project:** ARC v2.0 Agent Economy Foundation
 **Domain:** Capability-based security protocol with economic primitives and compliance observability
 **Researched:** 2026-03-21
 **Confidence:** HIGH
 
 ## Executive Summary
 
-PACT v2.0 is a security protocol milestone that transforms an existing capability-based access control system into a full agent economy infrastructure. The v1.0 foundation (Ed25519 signing, fail-closed guards, signed receipts, HA cluster replication) is solid and validated. The v2.0 work adds the economic and compliance layer on top: monetary budgets, tamper-evident Merkle receipt commitment, velocity controls, SIEM integration, and a receipt dashboard. The core challenge is not building new infrastructure from scratch but sequencing extensions to existing types correctly, porting and adapting ClawdStrike code without inheriting its domain-specific assumptions, and meeting two hard regulatory deadlines (Colorado AI Act June 30, 2026; EU AI Act August 2, 2026).
+ARC v2.0 is a security protocol milestone that transforms an existing capability-based access control system into a full agent economy infrastructure. The v1.0 foundation (Ed25519 signing, fail-closed guards, signed receipts, HA cluster replication) is solid and validated. The v2.0 work adds the economic and compliance layer on top: monetary budgets, tamper-evident Merkle receipt commitment, velocity controls, SIEM integration, and a receipt dashboard. The core challenge is not building new infrastructure from scratch but sequencing extensions to existing types correctly, porting and adapting ClawdStrike code without inheriting its domain-specific assumptions, and meeting two hard regulatory deadlines (Colorado AI Act June 30, 2026; EU AI Act August 2, 2026).
 
 The recommended approach is a strict dependency-ordered build sequence. A schema compatibility release must ship first to remove `deny_unknown_fields` from 18 serialized types before any new fields appear on the wire -- this is a critical gate with no exceptions. The monetary budget and Merkle commitment work can proceed in parallel after that gate, followed by the velocity guard, receipt query API, and DPoP proof-of-possession. Q3 work (SIEM exporters, capability lineage index, receipt dashboard) depends on Q2 foundations being stable. The TypeScript SDK must reach 1.0 quality in parallel with the core protocol work to unblock the largest developer population.
 
-The primary risks are sequencing failures (new fields shipping before schema migration lands, breaking old kernels), incorrect port decisions (using ClawdStrike's HTTP-shaped DPoP proof message instead of a PACT-native invocation proof), and compliance document timing (filing documents that describe planned features rather than shipped code). All three risks are preventable through explicit phase gates and per-phase verification criteria. The monetary budget HA consistency model also requires deliberate design documentation: the existing LWW replication strategy has a bounded overrun window under split-brain that must be explicitly acknowledged rather than silently inherited from the invocation-count model.
+The primary risks are sequencing failures (new fields shipping before schema migration lands, breaking old kernels), incorrect port decisions (using ClawdStrike's HTTP-shaped DPoP proof message instead of a ARC-native invocation proof), and compliance document timing (filing documents that describe planned features rather than shipped code). All three risks are preventable through explicit phase gates and per-phase verification criteria. The monetary budget HA consistency model also requires deliberate design documentation: the existing LWW replication strategy has a bounded overrun window under split-brain that must be explicitly acknowledged rather than silently inherited from the invocation-count model.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing Rust workspace stack (Rust 1.93 MSRV, tokio 1, axum 0.8, rusqlite 0.37 bundled, serde/serde_json 1, ed25519-dalek 2, uuid 1, chrono 0.4) requires minimal additions for v2.0. New dependencies are kept deliberately small: `lru 0.12` for DPoP nonce replay prevention in `pact-kernel`, and `reqwest 0.13` plus `tower 0.5` in a new `pact-siem` crate for SIEM HTTP fan-out. SQLite FTS5 for receipt full-text search is already enabled in the bundled rusqlite build. Monetary arithmetic uses plain `u64` micro-unit integers rather than a decimal library, eliminating floating-point precision risk with zero new dependencies.
+The existing Rust workspace stack (Rust 1.93 MSRV, tokio 1, axum 0.8, rusqlite 0.37 bundled, serde/serde_json 1, ed25519-dalek 2, uuid 1, chrono 0.4) requires minimal additions for v2.0. New dependencies are kept deliberately small: `lru 0.12` for DPoP nonce replay prevention in `arc-kernel`, and `reqwest 0.13` plus `tower 0.5` in a new `arc-siem` crate for SIEM HTTP fan-out. SQLite FTS5 for receipt full-text search is already enabled in the bundled rusqlite build. Monetary arithmetic uses plain `u64` micro-unit integers rather than a decimal library, eliminating floating-point precision risk with zero new dependencies.
 
 The receipt dashboard is a static React 18 / Vite 6 / TypeScript 5 SPA served by the existing axum server via `tower_http::ServeDir`. TanStack Table 8 handles the receipt audit log; Recharts 2 handles time-series charts; TanStack Query 5 manages data fetching. This is the correct weight for an operator-facing compliance dashboard -- no SSR, no heavy component libraries, no Redux.
 
@@ -36,7 +36,7 @@ The v2.0 feature set is anchored to two hard regulatory deadlines and one adopti
 **Must have (table stakes for v2.0 launch, Q2-Q3 2026):**
 - `deny_unknown_fields` removal -- unblocks every other v2.0 feature; must ship first
 - Merkle receipt commitment with signed checkpoints -- compliance tamper-evident claim must be backed by code before Colorado deadline
-- Monetary budgets (single currency, `MonetaryAmount` with `u64` micro-units) -- makes PACT legible to CFOs
+- Monetary budgets (single currency, `MonetaryAmount` with `u64` micro-units) -- makes ARC legible to CFOs
 - Colorado AI Act compliance mapping (deadline June 30, 2026) -- deployment blocker for US regulated customers
 - EU AI Act Article 19 compliance mapping (deadline August 2, 2026) -- deployment blocker for EU regulated customers
 - Receipt query API with pagination -- write-only audit trail has no compliance value
@@ -62,21 +62,21 @@ The v2.0 feature set is anchored to two hard regulatory deadlines and one adopti
 
 ### Architecture Approach
 
-PACT v2.0 extends the existing 7-crate workspace without adding new top-level crates in Q2. New functionality lands as modules inside existing crates: `pact-core` gains monetary types, `pact-kernel` gains `checkpoint.rs`, `dpop.rs`, and `receipt_query.rs`, and `pact-guards` gains `velocity.rs`. A new `pact-siem` crate ships in Q3 behind a feature flag to isolate HTTP client dependencies from the TCB (Trusted Computing Base). The kernel's synchronous guard contract is a hard architectural constraint: all guards use `std::sync::Mutex`, not `tokio::Mutex`. SIEM export uses a cursor-based pull model against the receipt store so it never touches the kernel hot path. Monetary debits happen atomically before guard evaluation using SQLite `IMMEDIATE` transactions; the kernel fails closed if the debit fails.
+ARC v2.0 extends the existing 7-crate workspace without adding new top-level crates in Q2. New functionality lands as modules inside existing crates: `arc-core` gains monetary types, `arc-kernel` gains `checkpoint.rs`, `dpop.rs`, and `receipt_query.rs`, and `arc-guards` gains `velocity.rs`. A new `arc-siem` crate ships in Q3 behind a feature flag to isolate HTTP client dependencies from the TCB (Trusted Computing Base). The kernel's synchronous guard contract is a hard architectural constraint: all guards use `std::sync::Mutex`, not `tokio::Mutex`. SIEM export uses a cursor-based pull model against the receipt store so it never touches the kernel hot path. Monetary debits happen atomically before guard evaluation using SQLite `IMMEDIATE` transactions; the kernel fails closed if the debit fails.
 
 **Major components and v2.0 changes:**
-1. `pact-core` -- ADD `MonetaryAmount`, `ToolInvocationCost`, new `ToolGrant` fields; REMOVE `deny_unknown_fields`
-2. `pact-kernel` -- ADD `checkpoint.rs` (Merkle batching), `dpop.rs` (proof validation), `receipt_query.rs`; EXTEND `budget_store.rs` with `try_charge_cost()`
-3. `pact-guards` -- ADD `velocity.rs` (synchronous token-bucket, `std::sync::Mutex`)
-4. `pact-siem` (new crate, Q3) -- ExporterManager cursor-pull, 6 exporters (Splunk, Elastic, Datadog, Sumo, Webhooks, Alerting), DLQ, per-exporter rate limit
-5. `pact-kernel::capability_index` (Q3) -- snapshot persistence at issuance time; enables agent-centric joins
+1. `arc-core` -- ADD `MonetaryAmount`, `ToolInvocationCost`, new `ToolGrant` fields; REMOVE `deny_unknown_fields`
+2. `arc-kernel` -- ADD `checkpoint.rs` (Merkle batching), `dpop.rs` (proof validation), `receipt_query.rs`; EXTEND `budget_store.rs` with `try_charge_cost()`
+3. `arc-guards` -- ADD `velocity.rs` (synchronous token-bucket, `std::sync::Mutex`)
+4. `arc-siem` (new crate, Q3) -- ExporterManager cursor-pull, 6 exporters (Splunk, Elastic, Datadog, Sumo, Webhooks, Alerting), DLQ, per-exporter rate limit
+5. `arc-kernel::capability_index` (Q3) -- snapshot persistence at issuance time; enables agent-centric joins
 6. Receipt dashboard SPA (Q3) -- React/Vite, served via `tower_http::ServeDir`, reads receipt query API
 
 ### Critical Pitfalls
 
 1. **`deny_unknown_fields` not removed before new fields ship** -- 18 types carry this attribute; old kernels will hard-reject tokens containing new fields (MonetaryAmount, DPoP binding, etc.). Prevention: ship the removal as a dedicated first release; verify with a cross-version round-trip test. Recovery cost if missed: HIGH (requires rolling back all new-field-bearing kernels and re-issuing all active capability tokens).
 
-2. **DPoP proof message copied from ClawdStrike's HTTP shape** -- ClawdStrike binds proofs to `method + url + body_sha256`; PACT must bind to `capability_id + tool_server + tool_name + arg_hash + issued_at + nonce`. Copying the HTTP shape means proofs do not actually bind to specific PACT invocations. Prevention: rewrite `binding_proof_message()` explicitly; test that a proof for invocation A is rejected for invocation B. Recovery cost if missed: HIGH (requires rotating all active tokens and patching all clients).
+2. **DPoP proof message copied from ClawdStrike's HTTP shape** -- ClawdStrike binds proofs to `method + url + body_sha256`; ARC must bind to `capability_id + tool_server + tool_name + arg_hash + issued_at + nonce`. Copying the HTTP shape means proofs do not actually bind to specific ARC invocations. Prevention: rewrite `binding_proof_message()` explicitly; test that a proof for invocation A is rejected for invocation B. Recovery cost if missed: HIGH (requires rotating all active tokens and patching all clients).
 
 3. **Velocity guard implemented with `tokio::Mutex` or `async fn`** -- `Guard::evaluate()` is a synchronous trait method; async implementation causes executor-within-executor panics. Prevention: use `std::sync::Mutex` with synchronous `try_acquire()` returning `Verdict::Deny` immediately; verify with a `#[test]` (non-async) harness.
 
@@ -94,7 +94,7 @@ Based on the dependency graph in ARCHITECTURE.md and the regulatory deadlines in
 
 **Rationale:** `deny_unknown_fields` removal is a hard prerequisite for every other v2.0 feature. Nothing with new wire fields can ship until this gate is closed. Monetary types (`MonetaryAmount`, `ToolInvocationCost`) and the `ToolGrant` cost fields must ship in the same release to establish the economic primitive before the Colorado deadline. This phase establishes the foundation without yet wiring enforcement.
 
-**Delivers:** Forward-compatible serialized types; `MonetaryAmount` and `ToolInvocationCost` types in `pact-core`; new optional fields on `ToolGrant`; migration test for pre-existing databases.
+**Delivers:** Forward-compatible serialized types; `MonetaryAmount` and `ToolInvocationCost` types in `arc-core`; new optional fields on `ToolGrant`; migration test for pre-existing databases.
 
 **Addresses:** `deny_unknown_fields` removal (table stakes P1), monetary budget types (table stakes P1), schema forward-compatibility (table stakes P1)
 
@@ -104,9 +104,9 @@ Based on the dependency graph in ARCHITECTURE.md and the regulatory deadlines in
 
 ### Phase 2: Core Enforcement (Parallel Track)
 
-**Rationale:** After Phase 1 lands, three enforcement features can be built in parallel since they share no runtime dependencies on each other: monetary debit (`try_charge_cost` in `pact-kernel`), Merkle checkpoint batching, and velocity guard. Wiring all three into the kernel execution path comes after the individual modules are validated. This phase also delivers the receipt query API and the `pact receipt list` CLI subcommand, which are needed before the Colorado deadline to make receipts queryable.
+**Rationale:** After Phase 1 lands, three enforcement features can be built in parallel since they share no runtime dependencies on each other: monetary debit (`try_charge_cost` in `arc-kernel`), Merkle checkpoint batching, and velocity guard. Wiring all three into the kernel execution path comes after the individual modules are validated. This phase also delivers the receipt query API and the `arc receipt list` CLI subcommand, which are needed before the Colorado deadline to make receipts queryable.
 
-**Delivers:** `try_charge_cost()` with SQLite IMMEDIATE transactions; `checkpoint.rs` with batch-N Merkle signing; `VelocityGuard` with synchronous token-bucket; `ReceiptQuery` API with pagination; `pact receipt list` CLI subcommand.
+**Delivers:** `try_charge_cost()` with SQLite IMMEDIATE transactions; `checkpoint.rs` with batch-N Merkle signing; `VelocityGuard` with synchronous token-bucket; `ReceiptQuery` API with pagination; `arc receipt list` CLI subcommand.
 
 **Addresses:** Monetary budget enforcement (P1), velocity guard (P1), Merkle commitment (P1), receipt query API (P1)
 
@@ -138,13 +138,13 @@ Based on the dependency graph in ARCHITECTURE.md and the regulatory deadlines in
 
 ### Phase 5: SIEM Integration (Q3)
 
-**Rationale:** SIEM exporters depend on the receipt query API (Phase 2) and pull from the SQLite store via cursor. The `pact-siem` crate must be feature-flagged to keep pact-kernel's TCB lean. This phase delivers enterprise security stack integration and is a P2 priority requiring at least 2 exporters (Splunk + Elasticsearch) at launch.
+**Rationale:** SIEM exporters depend on the receipt query API (Phase 2) and pull from the SQLite store via cursor. The `arc-siem` crate must be feature-flagged to keep arc-kernel's TCB lean. This phase delivers enterprise security stack integration and is a P2 priority requiring at least 2 exporters (Splunk + Elasticsearch) at launch.
 
-**Delivers:** `pact-siem` crate with ExporterManager, DLQ with size cap, 6 exporters (Splunk, Elastic, Datadog, Sumo Logic, Webhooks, Alerting), ECS/CEF/OCSF/Native schema formats.
+**Delivers:** `arc-siem` crate with ExporterManager, DLQ with size cap, 6 exporters (Splunk, Elastic, Datadog, Sumo Logic, Webhooks, Alerting), ECS/CEF/OCSF/Native schema formats.
 
 **Addresses:** SIEM exporters (P2), FinancialReceiptMetadata enrichment (P2)
 
-**Avoids:** Pitfall 8 (SIEM DLQ unbounded growth), anti-pattern 1 (HTTP deps in pact-kernel)
+**Avoids:** Pitfall 8 (SIEM DLQ unbounded growth), anti-pattern 1 (HTTP deps in arc-kernel)
 
 **Research flag:** SIEM target APIs (Splunk HEC, Elasticsearch bulk, Datadog) have well-documented integration patterns. Skip phase research.
 
@@ -165,7 +165,7 @@ Based on the dependency graph in ARCHITECTURE.md and the regulatory deadlines in
 - **Schema migration must precede all wire-format changes** -- this is not a soft dependency; it is a hard wire compatibility gate. Any plan that sequences new fields before the migration is incorrect.
 - **Enforcement before compliance documentation** -- the Colorado and EU AI Act compliance artifacts must describe working, tested code. The compliance phase (Phase 3) is gated on Phase 2 acceptance tests passing.
 - **Lineage index before dashboard** -- building the dashboard against a stub API (empty index) is explicitly called out in PITFALLS.md as the correct approach; building against workaround joins is the anti-pattern to avoid.
-- **SIEM isolation** -- pact-siem ships as a feature-flagged crate to protect pact-kernel's TCB audit surface. This is a hard architectural boundary, not an optimization.
+- **SIEM isolation** -- arc-siem ships as a feature-flagged crate to protect arc-kernel's TCB audit surface. This is a hard architectural boundary, not an optimization.
 - **TS SDK parallel track** -- SDK work does not block core protocol work but must complete before v2.0 launch; DPoP helpers depend on Phase 3 kernel verifier.
 
 ### Research Flags
@@ -193,7 +193,7 @@ Phases with standard patterns (skip research-phase):
 
 ### Gaps to Address
 
-- **Tower 0.5 retry layer for SIEM:** The retry/timeout middleware pattern for reqwest + tower in pact-siem is conceptually sound but has not been tested against actual SIEM endpoints. Validate the ServiceBuilder retry pattern in a spike before committing to it in Phase 5.
+- **Tower 0.5 retry layer for SIEM:** The retry/timeout middleware pattern for reqwest + tower in arc-siem is conceptually sound but has not been tested against actual SIEM endpoints. Validate the ServiceBuilder retry pattern in a spike before committing to it in Phase 5.
 - **Dashboard embedding strategy:** The exact approach for embedding the Vite SPA dist directory in the axum binary (especially for air-gapped or Docker deployments) has MEDIUM confidence. The `include_dir!` macro approach for embedded deployments vs. `ServeDir` for standard deployments needs a concrete decision before Phase 6 planning.
 - **Monetary HA overrun bound:** The acceptable overrun window under split-brain is a product decision, not a technical one. Research can document the pattern but the bound (`max_cost_per_invocation x node_count`) must be agreed by product and documented in the capability spec before Phase 2 ships.
 - **Colorado SB 24-205 specifics:** The compliance research confirms the deadline and general requirement (records of AI system outputs and basis for outputs) but the exact filing format and recordkeeping specifications need regulatory review before Phase 3 drafts the document.
@@ -204,10 +204,10 @@ Phases with standard patterns (skip research-phase):
 - `docs/CLAWDSTRIKE_INTEGRATION.md` -- port plan, type mappings, risk register (Sections 3.1, 3.2, 3.3, 3.5, 8)
 - `docs/AGENT_ECONOMY.md` -- monetary budget design, velocity controls, receipt metadata, payment rail abstraction
 - `docs/STRATEGIC_ROADMAP.md` -- Q2/Q3 deliverables, debate resolution sequencing, regulatory deadlines
-- `crates/pact-core/src/capability.rs` -- 18 `deny_unknown_fields` annotations confirmed by direct inspection
-- `crates/pact-core/src/receipt.rs` -- receipt type structures confirmed
-- `crates/pact-kernel/src/lib.rs` -- synchronous `Guard::evaluate()` trait confirmed
-- `crates/pact-core/src/merkle.rs` -- `MerkleTree::from_leaves` semantics confirmed
+- `crates/arc-core/src/capability.rs` -- 18 `deny_unknown_fields` annotations confirmed by direct inspection
+- `crates/arc-core/src/receipt.rs` -- receipt type structures confirmed
+- `crates/arc-kernel/src/lib.rs` -- synchronous `Guard::evaluate()` trait confirmed
+- `crates/arc-core/src/merkle.rs` -- `MerkleTree::from_leaves` semantics confirmed
 - `.planning/PROJECT.md` -- v2.0 milestone scope, constraints, regulatory deadlines
 - `rusqlite 0.37` releases (GitHub) -- FTS5 enabled in bundled build with SQLite 3.50.2
 - `reqwest 0.13.2` (docs.rs) -- current stable, rustls-tls default

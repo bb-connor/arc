@@ -8,7 +8,7 @@ re_verification: false
 
 # Phase 11: SIEM Integration Verification Report
 
-**Phase Goal:** Enterprise security teams can receive PACT receipt events in their existing SIEM via at least 2 tested exporters.
+**Phase Goal:** Enterprise security teams can receive ARC receipt events in their existing SIEM via at least 2 tested exporters.
 **Verified:** 2026-03-22
 **Status:** passed
 **Re-verification:** No -- initial verification
@@ -23,11 +23,11 @@ All truths are derived from must_haves across plans 11-01, 11-02, and 11-03.
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | pact-siem crate compiles as a workspace member | VERIFIED | `cargo build -p pact-siem` passes; `"crates/pact-siem"` in workspace Cargo.toml line 13 |
-| 2 | pact-kernel has no transitive reqwest/hyper dependency | VERIFIED | `cargo tree -p pact-kernel \| grep -E reqwest\|hyper` returns empty; pact-siem Cargo.toml lists only pact-core as sibling dep |
+| 1 | arc-siem crate compiles as a workspace member | VERIFIED | `cargo build -p arc-siem` passes; `"crates/arc-siem"` in workspace Cargo.toml line 13 |
+| 2 | arc-kernel has no transitive reqwest/hyper dependency | VERIFIED | `cargo tree -p arc-kernel \| grep -E reqwest\|hyper` returns empty; arc-siem Cargo.toml lists only arc-core as sibling dep |
 | 3 | DeadLetterQueue drops oldest entry when at capacity; never exceeds max_capacity | VERIFIED | dlq_bounded_growth and dlq_drop_oldest_on_overflow tests pass; dlq.rs lines 49-59 implement pop_front before push_back |
 | 4 | ExporterManager opens its own rusqlite connection and pulls receipts via seq-based cursor query | VERIFIED | manager.rs lines 130-161 open read-only rusqlite connection per poll in spawn_blocking; SQL on lines 139-143 matches spec |
-| 5 | pact-siem is gated behind optional siem feature in pact-cli | VERIFIED | pact-cli/Cargo.toml line 38: `pact-siem = { path = "../pact-siem", optional = true }`; line 41: `siem = ["pact-siem"]`; `cargo build -p pact-cli --features siem` passes |
+| 5 | arc-siem is gated behind optional siem feature in arc-cli | VERIFIED | arc-cli/Cargo.toml line 38: `arc-siem = { path = "../arc-siem", optional = true }`; line 41: `siem = ["arc-siem"]`; `cargo build -p arc-cli --features siem` passes |
 | 6 | SplunkHecExporter sends newline-separated JSON envelopes to /services/collector/event with Authorization: Splunk header | VERIFIED | splunk.rs lines 93-104; splunk_hec_sends_correct_envelope test passes against wiremock |
 | 7 | ElasticsearchExporter sends NDJSON action+document pairs to /_bulk with receipt.id as _id | VERIFIED | elastic.rs lines 80-98, 100; elastic_bulk_sends_correct_ndjson test passes against wiremock |
 | 8 | Elasticsearch bulk response partial failures detected by checking errors field and per-item status >= 400 | VERIFIED | elastic.rs lines 141-186; elastic_bulk_detects_partial_failure test passes (succeeded:1, failed:1 from errors:true body) |
@@ -46,18 +46,18 @@ All truths are derived from must_haves across plans 11-01, 11-02, and 11-03.
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `crates/pact-siem/Cargo.toml` | Crate definition with pact-core dep, reqwest, rusqlite, etc. | VERIFIED | Exists; dependencies match spec; lints.clippy deny unwrap_used/expect_used |
-| `crates/pact-siem/src/lib.rs` | Re-exports ExporterManager, SiemConfig, SiemError, Exporter, SiemEvent, DeadLetterQueue, ExportFuture, both exporters | VERIFIED | Lines 23-28 re-export all required types including ExportFuture (documented deviation from plan) |
-| `crates/pact-siem/src/event.rs` | SiemEvent wrapping PactReceipt with extracted FinancialReceiptMetadata | VERIFIED | Substantive: from_receipt extracts metadata["financial"] via serde_json::from_value |
-| `crates/pact-siem/src/exporter.rs` | Exporter trait with export_batch and name; ExportError enum | VERIFIED | Uses Pin<Box<dyn Future>> (dyn-compatible deviation from plan's impl Trait); ExportError has HttpError, SerializationError, PartialFailure |
-| `crates/pact-siem/src/dlq.rs` | DeadLetterQueue with VecDeque, bounded capacity, drop-oldest overflow | VERIFIED | Substantive: push() checks len >= max_capacity, pops front, emits tracing::error |
-| `crates/pact-siem/src/manager.rs` | ExporterManager with cursor-pull loop, retry, DLQ, fan-out | VERIFIED | Substantive: poll_once opens per-poll rusqlite connection in spawn_blocking; export_with_retry with exponential backoff; cursor advances past DLQ'd batches |
-| `crates/pact-siem/src/exporters/splunk.rs` | SplunkHecExporter implementing Exporter trait | VERIFIED | `impl Exporter for SplunkHecExporter` present; /services/collector/event endpoint; Authorization: Splunk header |
-| `crates/pact-siem/src/exporters/elastic.rs` | ElasticsearchExporter implementing Exporter trait | VERIFIED | `impl Exporter for ElasticsearchExporter` present; /_bulk endpoint; NDJSON; partial failure detection |
-| `crates/pact-siem/tests/splunk_export.rs` | Integration tests for SplunkHecExporter against wiremock | VERIFIED | 2 tests: splunk_hec_sends_correct_envelope, splunk_hec_returns_error_on_401 -- both pass |
-| `crates/pact-siem/tests/elastic_export.rs` | Integration tests for ElasticsearchExporter against wiremock | VERIFIED | 3 tests: correct_ndjson, detects_partial_failure, financial_metadata_in_payload -- all pass |
-| `crates/pact-siem/tests/dlq_bounded.rs` | Unit tests for DeadLetterQueue bounded growth | VERIFIED | 3 tests: dlq_bounded_growth, dlq_drop_oldest_on_overflow, dlq_empty_operations -- all pass |
-| `crates/pact-siem/tests/manager_integration.rs` | Integration tests for ExporterManager cursor-pull, retry, DLQ, failure isolation | VERIFIED | 3 tests: cursor_advance_after_export, failure_isolation_dlq, cursor_advances_past_dlq -- all pass |
+| `crates/arc-siem/Cargo.toml` | Crate definition with arc-core dep, reqwest, rusqlite, etc. | VERIFIED | Exists; dependencies match spec; lints.clippy deny unwrap_used/expect_used |
+| `crates/arc-siem/src/lib.rs` | Re-exports ExporterManager, SiemConfig, SiemError, Exporter, SiemEvent, DeadLetterQueue, ExportFuture, both exporters | VERIFIED | Lines 23-28 re-export all required types including ExportFuture (documented deviation from plan) |
+| `crates/arc-siem/src/event.rs` | SiemEvent wrapping ArcReceipt with extracted FinancialReceiptMetadata | VERIFIED | Substantive: from_receipt extracts metadata["financial"] via serde_json::from_value |
+| `crates/arc-siem/src/exporter.rs` | Exporter trait with export_batch and name; ExportError enum | VERIFIED | Uses Pin<Box<dyn Future>> (dyn-compatible deviation from plan's impl Trait); ExportError has HttpError, SerializationError, PartialFailure |
+| `crates/arc-siem/src/dlq.rs` | DeadLetterQueue with VecDeque, bounded capacity, drop-oldest overflow | VERIFIED | Substantive: push() checks len >= max_capacity, pops front, emits tracing::error |
+| `crates/arc-siem/src/manager.rs` | ExporterManager with cursor-pull loop, retry, DLQ, fan-out | VERIFIED | Substantive: poll_once opens per-poll rusqlite connection in spawn_blocking; export_with_retry with exponential backoff; cursor advances past DLQ'd batches |
+| `crates/arc-siem/src/exporters/splunk.rs` | SplunkHecExporter implementing Exporter trait | VERIFIED | `impl Exporter for SplunkHecExporter` present; /services/collector/event endpoint; Authorization: Splunk header |
+| `crates/arc-siem/src/exporters/elastic.rs` | ElasticsearchExporter implementing Exporter trait | VERIFIED | `impl Exporter for ElasticsearchExporter` present; /_bulk endpoint; NDJSON; partial failure detection |
+| `crates/arc-siem/tests/splunk_export.rs` | Integration tests for SplunkHecExporter against wiremock | VERIFIED | 2 tests: splunk_hec_sends_correct_envelope, splunk_hec_returns_error_on_401 -- both pass |
+| `crates/arc-siem/tests/elastic_export.rs` | Integration tests for ElasticsearchExporter against wiremock | VERIFIED | 3 tests: correct_ndjson, detects_partial_failure, financial_metadata_in_payload -- all pass |
+| `crates/arc-siem/tests/dlq_bounded.rs` | Unit tests for DeadLetterQueue bounded growth | VERIFIED | 3 tests: dlq_bounded_growth, dlq_drop_oldest_on_overflow, dlq_empty_operations -- all pass |
+| `crates/arc-siem/tests/manager_integration.rs` | Integration tests for ExporterManager cursor-pull, retry, DLQ, failure isolation | VERIFIED | 3 tests: cursor_advance_after_export, failure_isolation_dlq, cursor_advances_past_dlq -- all pass |
 
 ---
 
@@ -65,17 +65,17 @@ All truths are derived from must_haves across plans 11-01, 11-02, and 11-03.
 
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| `crates/pact-siem/src/event.rs` | pact-core receipt types | `use pact_core::receipt::{FinancialReceiptMetadata, PactReceipt}` | WIRED | Confirmed line 3 of event.rs |
-| `crates/pact-siem/src/manager.rs` | SQLite receipt database | `SELECT seq, raw_json FROM pact_tool_receipts WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2` | WIRED | Confirmed lines 139-143 of manager.rs; exact SQL matches spec |
-| `Cargo.toml` | `crates/pact-siem` | workspace members list | WIRED | Line 13 of root Cargo.toml |
-| `crates/pact-cli/Cargo.toml` | pact-siem optional dep | `pact-siem = { path = "../pact-siem", optional = true }` and `siem = ["pact-siem"]` | WIRED | Lines 38 and 41 of pact-cli/Cargo.toml |
-| `crates/pact-siem/src/exporters/splunk.rs` | Splunk HEC API | `POST {endpoint}/services/collector/event` | WIRED | Line 94 of splunk.rs; Authorization: Splunk header on line 99 |
-| `crates/pact-siem/src/exporters/elastic.rs` | Elasticsearch Bulk API | `POST {endpoint}/_bulk` with `Content-Type: application/x-ndjson` | WIRED | Line 100 of elastic.rs; content-type header on line 106 |
-| `crates/pact-siem/src/exporters/splunk.rs` | Exporter trait | `impl Exporter for SplunkHecExporter` | WIRED | Line 59 of splunk.rs |
-| `crates/pact-siem/src/exporters/elastic.rs` | Exporter trait | `impl Exporter for ElasticsearchExporter` | WIRED | Line 64 of elastic.rs |
-| `crates/pact-siem/tests/splunk_export.rs` | SplunkHecExporter | `SplunkHecExporter::new` | WIRED | Line 106 of splunk_export.rs |
-| `crates/pact-siem/tests/elastic_export.rs` | ElasticsearchExporter | `ElasticsearchExporter::new` | WIRED | Line 108 of elastic_export.rs |
-| `crates/pact-siem/tests/manager_integration.rs` | ExporterManager + SQLite | `ExporterManager::new` + raw rusqlite schema | WIRED | Lines 181, 300, 330 of manager_integration.rs; no pact-kernel import |
+| `crates/arc-siem/src/event.rs` | arc-core receipt types | `use arc_core::receipt::{FinancialReceiptMetadata, ArcReceipt}` | WIRED | Confirmed line 3 of event.rs |
+| `crates/arc-siem/src/manager.rs` | SQLite receipt database | `SELECT seq, raw_json FROM arc_tool_receipts WHERE seq > ?1 ORDER BY seq ASC LIMIT ?2` | WIRED | Confirmed lines 139-143 of manager.rs; exact SQL matches spec |
+| `Cargo.toml` | `crates/arc-siem` | workspace members list | WIRED | Line 13 of root Cargo.toml |
+| `crates/arc-cli/Cargo.toml` | arc-siem optional dep | `arc-siem = { path = "../arc-siem", optional = true }` and `siem = ["arc-siem"]` | WIRED | Lines 38 and 41 of arc-cli/Cargo.toml |
+| `crates/arc-siem/src/exporters/splunk.rs` | Splunk HEC API | `POST {endpoint}/services/collector/event` | WIRED | Line 94 of splunk.rs; Authorization: Splunk header on line 99 |
+| `crates/arc-siem/src/exporters/elastic.rs` | Elasticsearch Bulk API | `POST {endpoint}/_bulk` with `Content-Type: application/x-ndjson` | WIRED | Line 100 of elastic.rs; content-type header on line 106 |
+| `crates/arc-siem/src/exporters/splunk.rs` | Exporter trait | `impl Exporter for SplunkHecExporter` | WIRED | Line 59 of splunk.rs |
+| `crates/arc-siem/src/exporters/elastic.rs` | Exporter trait | `impl Exporter for ElasticsearchExporter` | WIRED | Line 64 of elastic.rs |
+| `crates/arc-siem/tests/splunk_export.rs` | SplunkHecExporter | `SplunkHecExporter::new` | WIRED | Line 106 of splunk_export.rs |
+| `crates/arc-siem/tests/elastic_export.rs` | ElasticsearchExporter | `ElasticsearchExporter::new` | WIRED | Line 108 of elastic_export.rs |
+| `crates/arc-siem/tests/manager_integration.rs` | ExporterManager + SQLite | `ExporterManager::new` + raw rusqlite schema | WIRED | Lines 181, 300, 330 of manager_integration.rs; no arc-kernel import |
 
 ---
 
@@ -98,9 +98,9 @@ No anti-patterns detected.
 | All src/*.rs | TODO/FIXME/HACK/PLACEHOLDER | None found |
 | All src/*.rs | Stub returns (return null, return {}, return []) | None found |
 | manager.rs, splunk.rs, elastic.rs | `.unwrap()`, `.expect()` in production code | None found; only permitted `.unwrap_or` and `.unwrap_or_else` variants |
-| pact-siem/Cargo.toml | pact-kernel as dependency | Not present -- kernel isolation confirmed |
+| arc-siem/Cargo.toml | arc-kernel as dependency | Not present -- kernel isolation confirmed |
 
-`cargo clippy -p pact-siem -- -D warnings` passes with no warnings.
+`cargo clippy -p arc-siem -- -D warnings` passes with no warnings.
 
 ---
 

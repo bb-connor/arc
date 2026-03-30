@@ -14,7 +14,7 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | Rust integration tests plus doc contract verification with `rg` |
-| **Quick run command** | `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture` |
 | **Canonical verification** | targeted trust-control, hosted-edge, and certification tests plus doc checks |
 | **Operational doc verification** | `rg` against `docs/release/OBSERVABILITY.md`, `docs/release/OPERATIONS_RUNBOOK.md`, and `spec/PROTOCOL.md` |
 
@@ -23,7 +23,7 @@ created: 2026-03-25
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
 | 23-01 | PROD-11 | `rg -n '/admin/health|/health|/v1/internal/cluster/status|task registry' docs/release/OBSERVABILITY.md docs/release/OPERATIONS_RUNBOOK.md docs/A2A_ADAPTER_GUIDE.md` |
-| 23-02 | PROD-11 | `cargo test -p pact-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture`, `cargo test -p pact-cli --test provider_admin trust_service_health_reports_enterprise_and_verifier_policy_state -- --nocapture`, `cargo test -p pact-cli --test certify certify_registry_remote_publish_list_get_resolve_and_revoke_work -- --nocapture` |
+| 23-02 | PROD-11 | `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture`, `cargo test -p arc-cli --test provider_admin trust_service_health_reports_enterprise_and_verifier_policy_state -- --nocapture`, `cargo test -p arc-cli --test certify certify_registry_remote_publish_list_get_resolve_and_revoke_work -- --nocapture` |
 | 23-03 | PROD-12 | `rg -n 'Version:\\*\\* 2.0|Capability Contract|Receipt Contract|Trust-Control Contract|A2A Adapter Contract|Certification Contract' spec/PROTOCOL.md` |
 
 ## Coverage Notes

@@ -5,18 +5,18 @@
 ## Directory Layout
 
 ```text
-pact/
+arc/
 ├── .github/              # CI workflow definitions
 ├── assets/               # Project images and branding assets
 ├── crates/               # Main Rust workspace crates
-│   ├── pact-cli/         # Operator CLI, HTTP serving, trust-control surfaces
-│   ├── pact-conformance/ # Live conformance harness support
-│   ├── pact-core/        # Core wire types, crypto, receipts, sessions
-│   ├── pact-guards/      # Guard implementations and pipeline logic
-│   ├── pact-kernel/      # Runtime mediation, session state, trust stores
-│   ├── pact-manifest/    # Manifest signing and verification
-│   ├── pact-mcp-adapter/ # MCP wrapping, transport, and edge logic
-│   └── pact-policy/      # Policy compilation, merge, validation, evaluation
+│   ├── arc-cli/         # Operator CLI, HTTP serving, trust-control surfaces
+│   ├── arc-conformance/ # Live conformance harness support
+│   ├── arc-core/        # Core wire types, crypto, receipts, sessions
+│   ├── arc-guards/      # Guard implementations and pipeline logic
+│   ├── arc-kernel/      # Runtime mediation, session state, trust stores
+│   ├── arc-manifest/    # Manifest signing and verification
+│   ├── arc-mcp-adapter/ # MCP wrapping, transport, and edge logic
+│   └── arc-policy/      # Policy compilation, merge, validation, evaluation
 ├── docs/                 # Research, roadmap, ADRs, and epic specs
 ├── examples/             # Example tool server and example policies
 ├── formal/               # Formal and differential test work
@@ -30,7 +30,7 @@ pact/
 **crates/**
 - Purpose: Main product code split by responsibility
 - Contains: Individual Cargo crates with `src/`, tests, and crate manifests
-- Key files: `crates/pact-cli/src/main.rs`, `crates/pact-kernel/src/lib.rs`, `crates/pact-core/src/lib.rs`
+- Key files: `crates/arc-cli/src/main.rs`, `crates/arc-kernel/src/lib.rs`, `crates/arc-core/src/lib.rs`
 - Subdirectories: One crate per subsystem
 
 **docs/**
@@ -66,8 +66,8 @@ pact/
 ## Key File Locations
 
 **Entry Points:**
-- `crates/pact-cli/src/main.rs`: Main `pact` CLI entrypoint
-- `crates/pact-mcp-adapter/src/edge.rs`: MCP edge/session bridge
+- `crates/arc-cli/src/main.rs`: Main `arc` CLI entrypoint
+- `crates/arc-mcp-adapter/src/edge.rs`: MCP edge/session bridge
 - `tests/e2e/tests/full_flow.rs`: Full-flow system verification
 
 **Configuration:**
@@ -76,15 +76,15 @@ pact/
 - `.planning/config.json`: GSD execution configuration
 
 **Core Logic:**
-- `crates/pact-core/src/`: Core types, crypto, sessions, receipts
-- `crates/pact-kernel/src/`: Kernel mediation, session state, trust stores
-- `crates/pact-cli/src/trust_control.rs`: Trust-control service and clustering logic
-- `crates/pact-cli/src/remote_mcp.rs`: Remote HTTP/MCP serving path
-- `crates/pact-policy/src/`: Policy compiler and evaluation logic
+- `crates/arc-core/src/`: Core types, crypto, sessions, receipts
+- `crates/arc-kernel/src/`: Kernel mediation, session state, trust stores
+- `crates/arc-cli/src/trust_control.rs`: Trust-control service and clustering logic
+- `crates/arc-cli/src/remote_mcp.rs`: Remote HTTP/MCP serving path
+- `crates/arc-policy/src/`: Policy compiler and evaluation logic
 
 **Testing:**
-- `crates/pact-cli/tests/`: CLI, remote MCP, trust cluster, and trust revocation integration tests
-- `crates/pact-conformance/tests/`: Live conformance wave tests
+- `crates/arc-cli/tests/`: CLI, remote MCP, trust cluster, and trust revocation integration tests
+- `crates/arc-conformance/tests/`: Live conformance wave tests
 - `tests/e2e/`: End-to-end Cargo test crate
 - `formal/diff-tests/`: Differential security/property tests
 
@@ -97,7 +97,7 @@ pact/
 
 **Files:**
 - Rust modules use `snake_case.rs`
-- Cargo crates use `pact-*` names for workspace components
+- Cargo crates use `arc-*` names for workspace components
 - Epic docs use `E<number>-<slug>.md`
 
 **Directories:**
@@ -112,17 +112,17 @@ pact/
 ## Where to Add New Code
 
 **New runtime feature:**
-- Primary code: `crates/pact-kernel/src/` or the most relevant existing crate
+- Primary code: `crates/arc-kernel/src/` or the most relevant existing crate
 - Tests: Matching crate `tests/` plus any needed conformance/e2e coverage
 - Docs: `docs/epics/`, `docs/EXECUTION_PLAN.md`, and `.planning/` if it changes phase execution
 
 **New edge or transport behavior:**
-- Implementation: `crates/pact-mcp-adapter/src/` and/or `crates/pact-cli/src/remote_mcp.rs`
-- Tests: `crates/pact-cli/tests/mcp_serve*.rs`, `crates/pact-conformance/tests/`
+- Implementation: `crates/arc-mcp-adapter/src/` and/or `crates/arc-cli/src/remote_mcp.rs`
+- Tests: `crates/arc-cli/tests/mcp_serve*.rs`, `crates/arc-conformance/tests/`
 - Docs: `README.md`, `docs/epics/`, `docs/research/` as needed
 
 **New policy or guard behavior:**
-- Implementation: `crates/pact-policy/src/`, `crates/pact-guards/src/`, `crates/pact-cli/src/policy.rs`
+- Implementation: `crates/arc-policy/src/`, `crates/arc-guards/src/`, `crates/arc-cli/src/policy.rs`
 - Tests: Crate tests plus example-policy coverage
 - Docs: `examples/policies/`, `README.md`, `docs/epics/`
 

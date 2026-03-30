@@ -26,8 +26,8 @@ re_verification:
 
 | # | Truth | Status | Evidence |
 | --- | --- | --- | --- |
-| 1 | A successful forwarded control-plane write has one documented visibility guarantee. | ✓ VERIFIED | `crates/pact-cli/src/trust_control.rs:1980` defines `respond_after_leader_visible_write`, and `crates/pact-cli/src/trust_control.rs:1998` adds `handledBy`, `leaderUrl`, and `visibleAtLeader` to successful responses. `docs/epics/E9-ha-trust-control-reliability.md:33` documents the per-request leader-visible durable-state contract. |
-| 2 | Leader- and follower-originated mutating requests exercise the same visible-write contract in tests. | ✓ VERIFIED | `crates/pact-cli/tests/trust_cluster.rs:291` asserts the leader metadata contract. `crates/pact-cli/tests/trust_cluster.rs:448`, `485`, `533`, `578`, and `614` cover leader-originated authority, receipt, revocation, and budget writes. `crates/pact-cli/tests/trust_cluster.rs:458`, `504`, `552`, `588`, and `629` cover follower-originated writes, including the corrected budget assertion at `crates/pact-cli/tests/trust_cluster.rs:640` and immediate leader readback at `crates/pact-cli/tests/trust_cluster.rs:642`. |
+| 1 | A successful forwarded control-plane write has one documented visibility guarantee. | ✓ VERIFIED | `crates/arc-cli/src/trust_control.rs:1980` defines `respond_after_leader_visible_write`, and `crates/arc-cli/src/trust_control.rs:1998` adds `handledBy`, `leaderUrl`, and `visibleAtLeader` to successful responses. `docs/epics/E9-ha-trust-control-reliability.md:33` documents the per-request leader-visible durable-state contract. |
+| 2 | Leader- and follower-originated mutating requests exercise the same visible-write contract in tests. | ✓ VERIFIED | `crates/arc-cli/tests/trust_cluster.rs:291` asserts the leader metadata contract. `crates/arc-cli/tests/trust_cluster.rs:448`, `485`, `533`, `578`, and `614` cover leader-originated authority, receipt, revocation, and budget writes. `crates/arc-cli/tests/trust_cluster.rs:458`, `504`, `552`, `588`, and `629` cover follower-originated writes, including the corrected budget assertion at `crates/arc-cli/tests/trust_cluster.rs:640` and immediate leader readback at `crates/arc-cli/tests/trust_cluster.rs:642`. |
 
 **Score:** 2/2 truths verified
 
@@ -37,22 +37,22 @@ Scoped note: this re-verification judges Plan 01-02 only against `HA-02`. `HA-01
 
 | Artifact | Expected | Status | Details |
 | --- | --- | --- | --- |
-| `crates/pact-cli/src/trust_control.rs` | Shared helper verifies leader-visible state before forwarded mutating writes report success. | ✓ VERIFIED | The shared helper is present at `crates/pact-cli/src/trust_control.rs:1980`. Forwarded authority, revocation, tool-receipt, child-receipt, and budget handlers route through it at `crates/pact-cli/src/trust_control.rs:1060`, `1164`, `1255`, `1358`, and `1455`. The budget handler now returns the leader-read `invocation_count` from `list_usages` at `crates/pact-cli/src/trust_control.rs:1459`. |
-| `crates/pact-cli/tests/trust_cluster.rs` | HA test asserts the contract through leader and follower entry points. | ✓ VERIFIED | The test is substantive end-to-end coverage against the real HTTP handlers. It verifies response metadata, immediate leader visibility, follower replication, and post-failover behavior, including the previously failing follower budget path now passing at `crates/pact-cli/tests/trust_cluster.rs:629`. |
+| `crates/arc-cli/src/trust_control.rs` | Shared helper verifies leader-visible state before forwarded mutating writes report success. | ✓ VERIFIED | The shared helper is present at `crates/arc-cli/src/trust_control.rs:1980`. Forwarded authority, revocation, tool-receipt, child-receipt, and budget handlers route through it at `crates/arc-cli/src/trust_control.rs:1060`, `1164`, `1255`, `1358`, and `1455`. The budget handler now returns the leader-read `invocation_count` from `list_usages` at `crates/arc-cli/src/trust_control.rs:1459`. |
+| `crates/arc-cli/tests/trust_cluster.rs` | HA test asserts the contract through leader and follower entry points. | ✓ VERIFIED | The test is substantive end-to-end coverage against the real HTTP handlers. It verifies response metadata, immediate leader visibility, follower replication, and post-failover behavior, including the previously failing follower budget path now passing at `crates/arc-cli/tests/trust_cluster.rs:629`. |
 | `docs/epics/E9-ha-trust-control-reliability.md` | E9 doc states the concrete write-visibility guarantee. | ✓ VERIFIED | The epic explicitly states that success means the handling leader can immediately read the durable mutation and that follower convergence is separate at `docs/epics/E9-ha-trust-control-reliability.md:33`. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 | --- | --- | --- | --- | --- |
-| `forward_post_to_leader`-backed mutating handlers | Shared visibility helper | handler flow | ✓ WIRED | Forwarded mutating handlers hand off to the leader, perform the local write on that leader, then pass through `respond_after_leader_visible_write` before returning success. The budget path is wired through `handle_try_increment_budget` at `crates/pact-cli/src/trust_control.rs:1436` and reads leader-local state before returning at `crates/pact-cli/src/trust_control.rs:1459`. |
-| `crates/pact-cli/tests/trust_cluster.rs` | Actual trust-control HTTP handlers | end-to-end requests | ✓ WIRED | The integration test posts to `/v1/authority`, `/v1/receipts/tools`, `/v1/receipts/children`, `/v1/revocations`, and `/v1/budgets/increment`, then confirms the leader-visible contract using real GET readbacks and the returned leader metadata. |
+| `forward_post_to_leader`-backed mutating handlers | Shared visibility helper | handler flow | ✓ WIRED | Forwarded mutating handlers hand off to the leader, perform the local write on that leader, then pass through `respond_after_leader_visible_write` before returning success. The budget path is wired through `handle_try_increment_budget` at `crates/arc-cli/src/trust_control.rs:1436` and reads leader-local state before returning at `crates/arc-cli/src/trust_control.rs:1459`. |
+| `crates/arc-cli/tests/trust_cluster.rs` | Actual trust-control HTTP handlers | end-to-end requests | ✓ WIRED | The integration test posts to `/v1/authority`, `/v1/receipts/tools`, `/v1/receipts/children`, `/v1/revocations`, and `/v1/budgets/increment`, then confirms the leader-visible contract using real GET readbacks and the returned leader metadata. |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 | --- | --- | --- | --- | --- |
-| `HA-02` | `01-02-PLAN.md` | Forwarded trust-control writes have one documented read-after-write visibility contract. | ✓ SATISFIED | The code enforces leader-local visibility before success in `crates/pact-cli/src/trust_control.rs`, the contract is documented in `docs/epics/E9-ha-trust-control-reliability.md:33`, and the independent `cargo test -p pact-cli --test trust_cluster` rerun passed with the follower budget assertion intact. |
+| `HA-02` | `01-02-PLAN.md` | Forwarded trust-control writes have one documented read-after-write visibility contract. | ✓ SATISFIED | The code enforces leader-local visibility before success in `crates/arc-cli/src/trust_control.rs`, the contract is documented in `docs/epics/E9-ha-trust-control-reliability.md:33`, and the independent `cargo test -p arc-cli --test trust_cluster` rerun passed with the follower budget assertion intact. |
 
 ### Anti-Patterns Found
 
@@ -62,7 +62,7 @@ No placeholder, TODO, stub, or logging-only anti-patterns were found in the scop
 
 | Command | Result |
 | --- | --- |
-| `cargo test -p pact-cli --test trust_cluster` | Exit `0`. `trust_control_cluster_replicates_state_and_survives_leader_failover ... ok`; test result: `1 passed; 0 failed`; finished in `32.07s`. |
+| `cargo test -p arc-cli --test trust_cluster` | Exit `0`. `trust_control_cluster_replicates_state_and_survives_leader_failover ... ok`; test result: `1 passed; 0 failed`; finished in `32.07s`. |
 | `cargo fmt --all -- --check` | Exit `0`. No formatting diffs reported. |
 
 ### Human Verification Required

@@ -13,7 +13,7 @@ key-files:
   created:
     - .planning/phases/15-multi-issuer-passport-composition/15-01-SUMMARY.md
   modified:
-    - crates/pact-credentials/src/lib.rs
+    - crates/arc-credentials/src/lib.rs
 requirements-completed:
   - PASS-01
 completed: 2026-03-24
@@ -32,4 +32,4 @@ explicit instead of implicit rejection.
 
 ## Verification
 
-- `cargo test -p pact-credentials -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`

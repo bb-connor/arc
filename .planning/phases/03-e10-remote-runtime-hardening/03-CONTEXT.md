@@ -59,14 +59,14 @@ This phase is not a new auth federation program and it is not a distributed-cont
 - `docs/research/01-current-state.md`
 
 ### Remote runtime implementation
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
 
 ### Session lifecycle substrate
-- `crates/pact-kernel/src/session.rs`
-- `crates/pact-core/src/session.rs`
+- `crates/arc-kernel/src/session.rs`
+- `crates/arc-core/src/session.rs`
 
 </canonical_refs>
 

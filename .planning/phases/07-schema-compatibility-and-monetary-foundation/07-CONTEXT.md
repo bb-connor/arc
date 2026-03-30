@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Remove `deny_unknown_fields` from 18 serializable types in pact-core (capability.rs, receipt.rs, manifest.rs) and add MonetaryAmount type with cost fields on ToolGrant plus cost-reduction attenuation variants. This is a pure schema/type-system change -- no kernel enforcement logic, no guard changes, no new APIs.
+Remove `deny_unknown_fields` from 18 serializable types in arc-core (capability.rs, receipt.rs, manifest.rs) and add MonetaryAmount type with cost fields on ToolGrant plus cost-reduction attenuation variants. This is a pure schema/type-system change -- no kernel enforcement logic, no guard changes, no new APIs.
 
 </domain>
 
@@ -28,16 +28,16 @@ All implementation choices are at Claude's discretion -- pure infrastructure pha
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-core/src/capability.rs` -- ToolGrant struct (line 162), Attenuation enum (line 396), PactScope (line 121)
-- `pact-core/src/receipt.rs` -- PactReceipt, PactReceiptBody, ChildRequestReceipt, Decision, GuardEvidence
-- `pact-core/src/manifest.rs` -- ToolManifest, ToolDefinition
-- `pact-core/src/crypto.rs` -- canonical JSON signing
+- `arc-core/src/capability.rs` -- ToolGrant struct (line 162), Attenuation enum (line 396), ArcScope (line 121)
+- `arc-core/src/receipt.rs` -- ArcReceipt, ArcReceiptBody, ChildRequestReceipt, Decision, GuardEvidence
+- `arc-core/src/manifest.rs` -- ToolManifest, ToolDefinition
+- `arc-core/src/crypto.rs` -- canonical JSON signing
 
 ### Established Patterns
 - All serializable types use `#[serde(rename_all = "snake_case")]`
 - Optional fields use `#[serde(default, skip_serializing_if = "Option::is_none")]`
 - Canonical JSON (RFC 8785) for all signed payloads
-- `is_subset_of` method on PactScope/ToolGrant for attenuation validation
+- `is_subset_of` method on ArcScope/ToolGrant for attenuation validation
 
 ### Integration Points
 - ToolGrant.max_invocations pattern is the template for max_cost_per_invocation and max_total_cost

@@ -1,0 +1,1221 @@
+use serde::{Deserialize, Serialize};
+
+use arc_core::capability::{
+    GovernedCallChainContext, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
+};
+use arc_core::receipt::{
+    ArcReceipt, Decision, GovernedTransactionReceiptMetadata, MeteredUsageEvidenceReceiptMetadata,
+    SettlementStatus, SignedExportEnvelope,
+};
+use arc_core::session::ArcIdentityAssertion;
+use arc_core::{
+    ArcGovernedAuthorizationBinding, ArcPortableClaimCatalog, ArcPortableIdentityBinding,
+};
+
+use crate::cost_attribution::CostAttributionQuery;
+use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
+use crate::receipt_analytics::{AnalyticsTimeBucket, ReceiptAnalyticsResponse};
+use crate::receipt_query::ReceiptQuery;
+use crate::receipt_store::FederatedEvidenceShareSummary;
+use crate::CostAttributionReport;
+
+/// Maximum number of budget rows returned in a single operator report.
+pub const MAX_OPERATOR_BUDGET_LIMIT: usize = 200;
+/// Maximum number of shared-evidence reference rows returned in one query.
+pub const MAX_SHARED_EVIDENCE_LIMIT: usize = 200;
+/// Maximum number of settlement backlog rows returned in one report.
+pub const MAX_SETTLEMENT_BACKLOG_LIMIT: usize = 200;
+/// Maximum number of receipt detail rows returned in one behavioral feed.
+pub const MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT: usize = 200;
+/// Maximum number of metered-billing reconciliation rows returned in one report.
+pub const MAX_METERED_BILLING_LIMIT: usize = 200;
+/// Maximum number of authorization-context rows returned in one report.
+pub const MAX_AUTHORIZATION_CONTEXT_LIMIT: usize = 200;
+/// Stable schema identifier for ARC's normative OAuth-family authorization profile.
+pub const ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA: &str = "arc.oauth.authorization-profile.v1";
+/// Stable schema identifier for ARC's sender-constraint profile.
+pub const ARC_OAUTH_SENDER_CONSTRAINT_SCHEMA: &str = "arc.oauth.sender-constraint.v1";
+/// Stable schema identifier for ARC authorization-context reports.
+pub const ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA: &str =
+    "arc.oauth.authorization-context-report.v1";
+/// Stable schema identifier for ARC authorization-profile metadata artifacts.
+pub const ARC_OAUTH_AUTHORIZATION_METADATA_SCHEMA: &str = "arc.oauth.authorization-metadata.v1";
+/// Stable schema identifier for ARC enterprise IAM reviewer packs.
+pub const ARC_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA: &str =
+    "arc.oauth.authorization-review-pack.v1";
+/// Stable identifier for ARC's first governed authorization-details profile.
+pub const ARC_OAUTH_AUTHORIZATION_PROFILE_ID: &str = "arc-governed-rar-v1";
+/// Detail type for the primary governed tool action.
+pub const ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE: &str = "arc_governed_tool";
+/// Detail type for governed commerce scope.
+pub const ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE: &str = "arc_governed_commerce";
+/// Detail type for governed metered-billing scope.
+pub const ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE: &str =
+    "arc_governed_metered_billing";
+/// Stable label for ARC's capability-subject sender binding.
+pub const ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT: &str = "capability_subject";
+/// Stable label for ARC's ARC-native DPoP proof requirement.
+pub const ARC_OAUTH_SENDER_PROOF_ARC_DPOP: &str = "arc_dpop_v1";
+/// Stable label for ARC's bounded mTLS-thumbprint sender adapter.
+pub const ARC_OAUTH_SENDER_PROOF_ARC_MTLS: &str = "arc_mtls_thumbprint_v1";
+/// Stable label for ARC's bounded attestation-bound sender adapter.
+pub const ARC_OAUTH_SENDER_PROOF_ARC_ATTESTATION: &str = "arc_attestation_binding_v1";
+/// Stable request-time parameter for ARC governed authorization details.
+pub const ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER: &str = "authorization_details";
+/// Stable request-time parameter for ARC governed transaction context.
+pub const ARC_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER: &str = "arc_transaction_context";
+/// Stable access-token claim for ARC governed authorization details.
+pub const ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM: &str = "authorization_details";
+/// Stable access-token claim for ARC governed transaction context.
+pub const ARC_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM: &str = "arc_transaction_context";
+
+/// Filter surface for the operator-facing reporting API.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OperatorReportQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_bucket: Option<AnalyticsTimeBucket>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attribution_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metered_limit: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_limit: Option<usize>,
+}
+
+impl Default for OperatorReportQuery {
+    fn default() -> Self {
+        Self {
+            capability_id: None,
+            agent_subject: None,
+            tool_server: None,
+            tool_name: None,
+            since: None,
+            until: None,
+            group_limit: Some(50),
+            time_bucket: Some(AnalyticsTimeBucket::Day),
+            attribution_limit: Some(100),
+            budget_limit: Some(50),
+            settlement_limit: Some(50),
+            metered_limit: Some(50),
+            authorization_limit: Some(50),
+        }
+    }
+}
+
+impl OperatorReportQuery {
+    #[must_use]
+    pub fn to_receipt_analytics_query(&self) -> crate::ReceiptAnalyticsQuery {
+        crate::ReceiptAnalyticsQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            since: self.since,
+            until: self.until,
+            group_limit: self.group_limit,
+            time_bucket: self.time_bucket,
+        }
+    }
+
+    #[must_use]
+    pub fn to_cost_attribution_query(&self) -> CostAttributionQuery {
+        CostAttributionQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            since: self.since,
+            until: self.until,
+            limit: self.attribution_limit,
+        }
+    }
+
+    #[must_use]
+    pub fn to_evidence_export_query(&self) -> EvidenceExportQuery {
+        EvidenceExportQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            since: self.since,
+            until: self.until,
+        }
+    }
+
+    #[must_use]
+    pub fn direct_evidence_export_supported(&self) -> bool {
+        self.tool_server.is_none() && self.tool_name.is_none()
+    }
+
+    #[must_use]
+    pub fn budget_limit_or_default(&self) -> usize {
+        self.budget_limit
+            .unwrap_or(50)
+            .clamp(1, MAX_OPERATOR_BUDGET_LIMIT)
+    }
+
+    #[must_use]
+    pub fn settlement_limit_or_default(&self) -> usize {
+        self.settlement_limit
+            .unwrap_or(50)
+            .clamp(1, MAX_SETTLEMENT_BACKLOG_LIMIT)
+    }
+
+    #[must_use]
+    pub fn metered_limit_or_default(&self) -> usize {
+        self.metered_limit
+            .unwrap_or(50)
+            .clamp(1, MAX_METERED_BILLING_LIMIT)
+    }
+
+    #[must_use]
+    pub fn authorization_limit_or_default(&self) -> usize {
+        self.authorization_limit
+            .unwrap_or(50)
+            .clamp(1, MAX_AUTHORIZATION_CONTEXT_LIMIT)
+    }
+
+    #[must_use]
+    pub fn to_shared_evidence_query(&self) -> SharedEvidenceQuery {
+        SharedEvidenceQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            since: self.since,
+            until: self.until,
+            issuer: None,
+            partner: None,
+            limit: self.group_limit,
+        }
+    }
+}
+
+/// Filter surface for the signed insurer/risk behavioral feed export.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_limit: Option<usize>,
+}
+
+impl Default for BehavioralFeedQuery {
+    fn default() -> Self {
+        Self {
+            capability_id: None,
+            agent_subject: None,
+            tool_server: None,
+            tool_name: None,
+            since: None,
+            until: None,
+            receipt_limit: Some(100),
+        }
+    }
+}
+
+impl BehavioralFeedQuery {
+    #[must_use]
+    pub fn receipt_limit_or_default(&self) -> usize {
+        self.receipt_limit
+            .unwrap_or(100)
+            .clamp(1, MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT)
+    }
+
+    #[must_use]
+    pub fn normalized(&self) -> Self {
+        let mut normalized = self.clone();
+        normalized.receipt_limit = Some(self.receipt_limit_or_default());
+        normalized
+    }
+
+    #[must_use]
+    pub fn to_operator_report_query(&self) -> OperatorReportQuery {
+        OperatorReportQuery {
+            capability_id: self.capability_id.clone(),
+            agent_subject: self.agent_subject.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            since: self.since,
+            until: self.until,
+            ..OperatorReportQuery::default()
+        }
+    }
+
+    #[must_use]
+    pub fn to_receipt_query(&self) -> ReceiptQuery {
+        ReceiptQuery {
+            capability_id: self.capability_id.clone(),
+            tool_server: self.tool_server.clone(),
+            tool_name: self.tool_name.clone(),
+            outcome: None,
+            since: self.since,
+            until: self.until,
+            min_cost: None,
+            max_cost: None,
+            cursor: None,
+            limit: self.receipt_limit_or_default(),
+            agent_subject: self.agent_subject.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedEvidenceQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<usize>,
+}
+
+impl Default for SharedEvidenceQuery {
+    fn default() -> Self {
+        Self {
+            capability_id: None,
+            agent_subject: None,
+            tool_server: None,
+            tool_name: None,
+            since: None,
+            until: None,
+            issuer: None,
+            partner: None,
+            limit: Some(50),
+        }
+    }
+}
+
+impl SharedEvidenceQuery {
+    #[must_use]
+    pub fn limit_or_default(&self) -> usize {
+        self.limit.unwrap_or(50).clamp(1, MAX_SHARED_EVIDENCE_LIMIT)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetUtilizationSummary {
+    pub matching_grants: u64,
+    pub returned_grants: u64,
+    pub distinct_capabilities: u64,
+    pub distinct_subjects: u64,
+    pub total_invocations: u64,
+    pub total_cost_charged: u64,
+    pub near_limit_count: u64,
+    pub exhausted_count: u64,
+    pub rows_missing_scope: u64,
+    pub rows_missing_lineage: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetDimensionUsage {
+    pub used: u64,
+    pub limit: u64,
+    pub remaining: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub utilization_rate: Option<f64>,
+    pub near_limit: bool,
+    pub exhausted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetDimensionProfile {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocations: Option<BudgetDimensionUsage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub money: Option<BudgetDimensionUsage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetUtilizationRow {
+    pub capability_id: String,
+    pub grant_index: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_server: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+    pub invocation_count: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_invocations: Option<u32>,
+    pub total_cost_charged: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_total_cost_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remaining_cost_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation_utilization_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_utilization_rate: Option<f64>,
+    pub near_limit: bool,
+    pub exhausted: bool,
+    pub updated_at: i64,
+    pub scope_resolved: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_resolution_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dimensions: Option<BudgetDimensionProfile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetUtilizationReport {
+    pub summary: BudgetUtilizationSummary,
+    pub rows: Vec<BudgetUtilizationRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ComplianceReport {
+    pub matching_receipts: u64,
+    pub evidence_ready_receipts: u64,
+    pub uncheckpointed_receipts: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint_coverage_rate: Option<f64>,
+    pub lineage_covered_receipts: u64,
+    pub lineage_gap_receipts: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lineage_coverage_rate: Option<f64>,
+    pub pending_settlement_receipts: u64,
+    pub failed_settlement_receipts: u64,
+    pub direct_evidence_export_supported: bool,
+    pub child_receipt_scope: EvidenceChildReceiptScope,
+    pub proofs_complete: bool,
+    pub export_query: EvidenceExportQuery,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_scope_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SettlementReconciliationState {
+    Open,
+    Reconciled,
+    Ignored,
+    RetryScheduled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementReconciliationSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub pending_receipts: u64,
+    pub failed_receipts: u64,
+    pub actionable_receipts: u64,
+    pub reconciled_receipts: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementReconciliationRow {
+    pub receipt_id: String,
+    pub timestamp: u64,
+    pub capability_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_reference: Option<String>,
+    pub settlement_status: SettlementStatus,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    pub reconciliation_state: SettlementReconciliationState,
+    pub action_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SettlementReconciliationReport {
+    pub summary: SettlementReconciliationSummary,
+    pub receipts: Vec<SettlementReconciliationRow>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MeteredBillingReconciliationState {
+    Open,
+    Reconciled,
+    Ignored,
+    RetryScheduled,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MeteredBillingEvidenceRecord {
+    pub usage_evidence: MeteredUsageEvidenceReceiptMetadata,
+    pub billed_cost: MonetaryAmount,
+    pub recorded_at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MeteredBillingReconciliationSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub evidence_attached_receipts: u64,
+    pub missing_evidence_receipts: u64,
+    pub over_quoted_units_receipts: u64,
+    pub over_max_billed_units_receipts: u64,
+    pub over_quoted_cost_receipts: u64,
+    pub financial_mismatch_receipts: u64,
+    pub actionable_receipts: u64,
+    pub reconciled_receipts: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MeteredBillingReconciliationRow {
+    pub receipt_id: String,
+    pub timestamp: u64,
+    pub capability_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub settlement_mode: MeteredSettlementMode,
+    pub provider: String,
+    pub quote_id: String,
+    pub billing_unit: String,
+    pub quoted_units: u64,
+    pub quoted_cost: MonetaryAmount,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_billed_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub financial_cost_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub financial_currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<MeteredBillingEvidenceRecord>,
+    pub reconciliation_state: MeteredBillingReconciliationState,
+    pub action_required: bool,
+    pub evidence_missing: bool,
+    pub exceeds_quoted_units: bool,
+    pub exceeds_max_billed_units: bool,
+    pub exceeds_quoted_cost: bool,
+    pub financial_mismatch: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MeteredBillingReconciliationReport {
+    pub summary: MeteredBillingReconciliationSummary,
+    pub receipts: Vec<MeteredBillingReconciliationRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedAuthorizationCommerceDetail {
+    pub seller: String,
+    pub shared_payment_token_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedAuthorizationMeteredBillingDetail {
+    pub settlement_mode: MeteredSettlementMode,
+    pub provider: String,
+    pub quote_id: String,
+    pub billing_unit: String,
+    pub quoted_units: u64,
+    pub quoted_cost: MonetaryAmount,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_billed_units: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedAuthorizationDetail {
+    #[serde(rename = "type")]
+    pub detail_type: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub locations: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_amount: Option<MonetaryAmount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commerce: Option<GovernedAuthorizationCommerceDetail>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metered_billing: Option<GovernedAuthorizationMeteredBillingDetail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedAuthorizationTransactionContext {
+    pub intent_id: String,
+    pub intent_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_token_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_approved: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approver_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_assurance_tier: Option<RuntimeAssuranceTier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_assurance_verifier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_assurance_evidence_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call_chain: Option<GovernedCallChainContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_assertion: Option<ArcIdentityAssertion>,
+}
+
+fn default_authorization_context_report_schema() -> String {
+    ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA.to_string()
+}
+
+fn default_arc_oauth_authorization_profile() -> ArcOAuthAuthorizationProfile {
+    ArcOAuthAuthorizationProfile::default()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationProfile {
+    pub schema: String,
+    pub id: String,
+    pub authoritative_source: String,
+    pub authorization_detail_types: Vec<String>,
+    pub transaction_context_fields: Vec<String>,
+    #[serde(default)]
+    pub portable_claim_catalog: ArcPortableClaimCatalog,
+    #[serde(default)]
+    pub portable_identity_binding: ArcPortableIdentityBinding,
+    #[serde(default)]
+    pub governed_auth_binding: ArcGovernedAuthorizationBinding,
+    #[serde(default)]
+    pub request_time_contract: ArcOAuthRequestTimeContract,
+    #[serde(default)]
+    pub resource_binding: ArcOAuthResourceBinding,
+    #[serde(default)]
+    pub artifact_boundary: ArcOAuthArtifactBoundary,
+    pub sender_constraints: ArcOAuthSenderConstraintProfile,
+    pub unsupported_shapes_fail_closed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthRequestTimeContract {
+    pub authorization_details_parameter: String,
+    pub transaction_context_parameter: String,
+    pub access_token_authorization_details_claim: String,
+    pub access_token_transaction_context_claim: String,
+    pub request_time_authorization_details_supported: bool,
+    pub request_time_transaction_context_supported: bool,
+    pub governed_receipts_authoritative_post_execution: bool,
+}
+
+impl Default for ArcOAuthRequestTimeContract {
+    fn default() -> Self {
+        Self {
+            authorization_details_parameter: ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
+                .to_string(),
+            transaction_context_parameter: ARC_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_PARAMETER
+                .to_string(),
+            access_token_authorization_details_claim:
+                ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM.to_string(),
+            access_token_transaction_context_claim:
+                ARC_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM.to_string(),
+            request_time_authorization_details_supported: true,
+            request_time_transaction_context_supported: true,
+            governed_receipts_authoritative_post_execution: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthResourceBinding {
+    pub protected_resource_field: String,
+    pub request_resource_parameter: String,
+    pub access_token_audience_claim: String,
+    pub access_token_resource_claim: String,
+    pub request_resource_must_match_protected_resource: bool,
+    pub bearer_token_must_include_audience_or_resource: bool,
+}
+
+impl Default for ArcOAuthResourceBinding {
+    fn default() -> Self {
+        Self {
+            protected_resource_field: "resource".to_string(),
+            request_resource_parameter: "resource".to_string(),
+            access_token_audience_claim: "aud".to_string(),
+            access_token_resource_claim: "resource".to_string(),
+            request_resource_must_match_protected_resource: true,
+            bearer_token_must_include_audience_or_resource: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthArtifactBoundary {
+    pub access_tokens_runtime_admission_supported: bool,
+    pub approval_tokens_runtime_admission_supported: bool,
+    pub capabilities_runtime_admission_supported: bool,
+    pub reviewer_evidence_runtime_admission_supported: bool,
+    pub governed_receipts_audit_evidence_supported: bool,
+}
+
+impl Default for ArcOAuthArtifactBoundary {
+    fn default() -> Self {
+        Self {
+            access_tokens_runtime_admission_supported: true,
+            approval_tokens_runtime_admission_supported: false,
+            capabilities_runtime_admission_supported: false,
+            reviewer_evidence_runtime_admission_supported: false,
+            governed_receipts_audit_evidence_supported: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthSenderConstraintProfile {
+    pub schema: String,
+    pub subject_binding: String,
+    pub proof_types_supported: Vec<String>,
+    pub proof_required_when: String,
+    pub runtime_assurance_binding_fields: Vec<String>,
+    pub delegated_call_chain_field: String,
+    pub unsupported_sender_shapes_fail_closed: bool,
+}
+
+impl Default for ArcOAuthSenderConstraintProfile {
+    fn default() -> Self {
+        Self {
+            schema: ARC_OAUTH_SENDER_CONSTRAINT_SCHEMA.to_string(),
+            subject_binding: ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT.to_string(),
+            proof_types_supported: vec![
+                ARC_OAUTH_SENDER_PROOF_ARC_DPOP.to_string(),
+                ARC_OAUTH_SENDER_PROOF_ARC_MTLS.to_string(),
+                ARC_OAUTH_SENDER_PROOF_ARC_ATTESTATION.to_string(),
+            ],
+            proof_required_when: "matchedGrant.dpopRequired == true".to_string(),
+            runtime_assurance_binding_fields: vec![
+                "runtimeAssuranceTier".to_string(),
+                "runtimeAssuranceVerifier".to_string(),
+                "runtimeAssuranceEvidenceSha256".to_string(),
+            ],
+            delegated_call_chain_field: "callChain".to_string(),
+            unsupported_sender_shapes_fail_closed: true,
+        }
+    }
+}
+
+impl Default for ArcOAuthAuthorizationProfile {
+    fn default() -> Self {
+        Self {
+            schema: ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA.to_string(),
+            id: ARC_OAUTH_AUTHORIZATION_PROFILE_ID.to_string(),
+            authoritative_source: "governed_receipt_projection".to_string(),
+            authorization_detail_types: vec![
+                ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE.to_string(),
+                ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE.to_string(),
+                ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE.to_string(),
+            ],
+            transaction_context_fields: vec![
+                "intentId".to_string(),
+                "intentHash".to_string(),
+                "approvalTokenId".to_string(),
+                "approvalApproved".to_string(),
+                "approverKey".to_string(),
+                "runtimeAssuranceTier".to_string(),
+                "runtimeAssuranceVerifier".to_string(),
+                "runtimeAssuranceEvidenceSha256".to_string(),
+                "callChain".to_string(),
+                "identityAssertion".to_string(),
+            ],
+            portable_claim_catalog: ArcPortableClaimCatalog::default(),
+            portable_identity_binding: ArcPortableIdentityBinding::default(),
+            governed_auth_binding: ArcGovernedAuthorizationBinding::default(),
+            request_time_contract: ArcOAuthRequestTimeContract::default(),
+            resource_binding: ArcOAuthResourceBinding::default(),
+            artifact_boundary: ArcOAuthArtifactBoundary::default(),
+            sender_constraints: ArcOAuthSenderConstraintProfile::default(),
+            unsupported_shapes_fail_closed: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorizationContextSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub approval_receipts: u64,
+    pub approved_receipts: u64,
+    pub commerce_receipts: u64,
+    pub metered_billing_receipts: u64,
+    pub runtime_assurance_receipts: u64,
+    pub call_chain_receipts: u64,
+    pub max_amount_receipts: u64,
+    pub sender_bound_receipts: u64,
+    pub dpop_bound_receipts: u64,
+    pub runtime_assurance_bound_receipts: u64,
+    pub delegated_sender_bound_receipts: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorizationContextSenderConstraint {
+    pub subject_key: String,
+    pub subject_key_source: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub issuer_key: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub issuer_key_source: String,
+    pub matched_grant_index: u32,
+    pub proof_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_schema: Option<String>,
+    pub runtime_assurance_bound: bool,
+    pub delegated_call_chain_bound: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorizationContextRow {
+    pub receipt_id: String,
+    pub timestamp: u64,
+    pub capability_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub decision: Decision,
+    pub authorization_details: Vec<GovernedAuthorizationDetail>,
+    pub transaction_context: GovernedAuthorizationTransactionContext,
+    pub sender_constraint: AuthorizationContextSenderConstraint,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorizationContextReport {
+    #[serde(default = "default_authorization_context_report_schema")]
+    pub schema: String,
+    #[serde(default = "default_arc_oauth_authorization_profile")]
+    pub profile: ArcOAuthAuthorizationProfile,
+    pub summary: AuthorizationContextSummary,
+    pub receipts: Vec<AuthorizationContextRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationDiscoveryMetadata {
+    pub protected_resource_metadata_paths: Vec<String>,
+    pub authorization_server_metadata_path_template: String,
+    pub discovery_informational_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationSupportBoundary {
+    pub governed_receipts_authoritative: bool,
+    pub hosted_request_time_authorization_supported: bool,
+    pub resource_indicator_binding_supported: bool,
+    pub sender_constrained_projection: bool,
+    pub runtime_assurance_projection: bool,
+    pub delegated_call_chain_projection: bool,
+    pub generic_token_issuance_supported: bool,
+    pub oidc_identity_assertions_supported: bool,
+    pub mtls_transport_binding_in_profile: bool,
+    pub approval_tokens_runtime_authorization_supported: bool,
+    pub capabilities_runtime_authorization_supported: bool,
+    pub reviewer_evidence_runtime_authorization_supported: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationExampleMapping {
+    pub authorization_detail_types: Vec<String>,
+    pub transaction_context_fields: Vec<String>,
+    pub sender_constraint_fields: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationMetadataReport {
+    pub schema: String,
+    pub generated_at: u64,
+    pub profile: ArcOAuthAuthorizationProfile,
+    pub report_schema: String,
+    pub discovery: ArcOAuthAuthorizationDiscoveryMetadata,
+    pub support_boundary: ArcOAuthAuthorizationSupportBoundary,
+    pub example_mapping: ArcOAuthAuthorizationExampleMapping,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationReviewPackSummary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub dpop_required_receipts: u64,
+    pub runtime_assurance_receipts: u64,
+    pub delegated_call_chain_receipts: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationReviewPackRecord {
+    pub receipt_id: String,
+    pub capability_id: String,
+    pub authorization_context: AuthorizationContextRow,
+    pub governed_transaction: GovernedTransactionReceiptMetadata,
+    pub signed_receipt: ArcReceipt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArcOAuthAuthorizationReviewPack {
+    pub schema: String,
+    pub generated_at: u64,
+    pub filters: OperatorReportQuery,
+    pub metadata: ArcOAuthAuthorizationMetadataReport,
+    pub summary: ArcOAuthAuthorizationReviewPackSummary,
+    pub records: Vec<ArcOAuthAuthorizationReviewPackRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedEvidenceReferenceSummary {
+    pub matching_shares: u64,
+    pub matching_references: u64,
+    pub matching_local_receipts: u64,
+    pub remote_tool_receipts: u64,
+    pub remote_lineage_records: u64,
+    pub distinct_remote_subjects: u64,
+    pub proof_required_shares: u64,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedEvidenceReferenceRow {
+    pub share: FederatedEvidenceShareSummary,
+    pub capability_id: String,
+    pub subject_key: String,
+    pub issuer_key: String,
+    pub delegation_depth: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_anchor_capability_id: Option<String>,
+    pub matched_local_receipts: u64,
+    pub allow_count: u64,
+    pub deny_count: u64,
+    pub cancelled_count: u64,
+    pub incomplete_count: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_seen: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedEvidenceReferenceReport {
+    pub summary: SharedEvidenceReferenceSummary,
+    pub references: Vec<SharedEvidenceReferenceRow>,
+}
+
+/// Stable schema identifier for insurer-facing behavioral feed exports.
+pub const BEHAVIORAL_FEED_SCHEMA: &str = "arc.behavioral-feed.v1";
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedPrivacyBoundary {
+    pub matching_receipts: u64,
+    pub returned_receipts: u64,
+    pub direct_evidence_export_supported: bool,
+    pub child_receipt_scope: EvidenceChildReceiptScope,
+    pub proofs_complete: bool,
+    pub export_query: EvidenceExportQuery,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub export_scope_note: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedDecisionSummary {
+    pub allow_count: u64,
+    pub deny_count: u64,
+    pub cancelled_count: u64,
+    pub incomplete_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedSettlementSummary {
+    pub pending_receipts: u64,
+    pub settled_receipts: u64,
+    pub failed_receipts: u64,
+    pub not_applicable_receipts: u64,
+    pub actionable_receipts: u64,
+    pub reconciled_receipts: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedGovernedActionSummary {
+    pub governed_receipts: u64,
+    pub approval_receipts: u64,
+    pub approved_receipts: u64,
+    pub commerce_receipts: u64,
+    pub max_amount_receipts: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedMeteredBillingSummary {
+    pub metered_receipts: u64,
+    pub evidence_attached_receipts: u64,
+    pub missing_evidence_receipts: u64,
+    pub over_quoted_units_receipts: u64,
+    pub over_max_billed_units_receipts: u64,
+    pub over_quoted_cost_receipts: u64,
+    pub financial_mismatch_receipts: u64,
+    pub actionable_receipts: u64,
+    pub reconciled_receipts: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedReputationSummary {
+    pub subject_key: String,
+    pub effective_score: f64,
+    pub probationary: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_tier: Option<String>,
+    pub imported_signal_count: usize,
+    pub accepted_imported_signal_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedReceiptRow {
+    pub receipt_id: String,
+    pub timestamp: u64,
+    pub capability_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer_key: Option<String>,
+    pub tool_server: String,
+    pub tool_name: String,
+    pub decision: Decision,
+    pub settlement_status: SettlementStatus,
+    pub reconciliation_state: SettlementReconciliationState,
+    pub action_required: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempted_cost: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed: Option<GovernedTransactionReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metered_reconciliation: Option<BehavioralFeedMeteredBillingRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedMeteredBillingRow {
+    pub reconciliation_state: MeteredBillingReconciliationState,
+    pub action_required: bool,
+    pub evidence_missing: bool,
+    pub exceeds_quoted_units: bool,
+    pub exceeds_max_billed_units: bool,
+    pub exceeds_quoted_cost: bool,
+    pub financial_mismatch: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<MeteredBillingEvidenceRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedReceiptSelection {
+    pub matching_receipts: u64,
+    pub receipts: Vec<BehavioralFeedReceiptRow>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BehavioralFeedReport {
+    pub schema: String,
+    pub generated_at: u64,
+    pub filters: BehavioralFeedQuery,
+    pub privacy: BehavioralFeedPrivacyBoundary,
+    pub decisions: BehavioralFeedDecisionSummary,
+    pub settlements: BehavioralFeedSettlementSummary,
+    pub governed_actions: BehavioralFeedGovernedActionSummary,
+    pub metered_billing: BehavioralFeedMeteredBillingSummary,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reputation: Option<BehavioralFeedReputationSummary>,
+    pub shared_evidence: SharedEvidenceReferenceSummary,
+    pub receipts: Vec<BehavioralFeedReceiptRow>,
+}
+
+pub type SignedBehavioralFeed = SignedExportEnvelope<BehavioralFeedReport>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OperatorReport {
+    pub generated_at: u64,
+    pub filters: OperatorReportQuery,
+    pub activity: ReceiptAnalyticsResponse,
+    pub cost_attribution: CostAttributionReport,
+    pub budget_utilization: BudgetUtilizationReport,
+    pub compliance: ComplianceReport,
+    pub settlement_reconciliation: SettlementReconciliationReport,
+    pub metered_billing_reconciliation: MeteredBillingReconciliationReport,
+    pub authorization_context: AuthorizationContextReport,
+    pub shared_evidence: SharedEvidenceReferenceReport,
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn operator_report_behavioral_feed_query_clamps_limit_and_translates_filters() {
+        let query = BehavioralFeedQuery {
+            capability_id: Some("cap-1".to_string()),
+            agent_subject: Some("subject-1".to_string()),
+            tool_server: Some("shell".to_string()),
+            tool_name: Some("bash".to_string()),
+            since: Some(10),
+            until: Some(20),
+            receipt_limit: Some(5_000),
+        };
+
+        assert_eq!(
+            query.receipt_limit_or_default(),
+            MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT
+        );
+        assert_eq!(
+            query.normalized().receipt_limit,
+            Some(MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT)
+        );
+
+        let operator_query = query.to_operator_report_query();
+        assert_eq!(operator_query.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(operator_query.agent_subject.as_deref(), Some("subject-1"));
+        assert_eq!(operator_query.tool_server.as_deref(), Some("shell"));
+        assert_eq!(operator_query.tool_name.as_deref(), Some("bash"));
+        assert_eq!(operator_query.since, Some(10));
+        assert_eq!(operator_query.until, Some(20));
+        assert_eq!(operator_query.metered_limit_or_default(), 50);
+
+        let receipt_query = query.to_receipt_query();
+        assert_eq!(receipt_query.limit, MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT);
+        assert_eq!(receipt_query.agent_subject.as_deref(), Some("subject-1"));
+    }
+
+    #[test]
+    fn operator_report_query_direct_export_support_requires_no_tool_filters() {
+        let unrestricted = OperatorReportQuery::default();
+        assert!(unrestricted.direct_evidence_export_supported());
+
+        let with_tool_filter = OperatorReportQuery {
+            tool_server: Some("shell".to_string()),
+            ..OperatorReportQuery::default()
+        };
+        assert!(!with_tool_filter.direct_evidence_export_supported());
+    }
+
+    #[test]
+    fn operator_report_query_clamps_metered_limit() {
+        let query = OperatorReportQuery {
+            metered_limit: Some(5_000),
+            ..OperatorReportQuery::default()
+        };
+
+        assert_eq!(query.metered_limit_or_default(), MAX_METERED_BILLING_LIMIT);
+    }
+
+    #[test]
+    fn operator_report_query_clamps_authorization_limit() {
+        let query = OperatorReportQuery {
+            authorization_limit: Some(5_000),
+            ..OperatorReportQuery::default()
+        };
+
+        assert_eq!(
+            query.authorization_limit_or_default(),
+            MAX_AUTHORIZATION_CONTEXT_LIMIT
+        );
+    }
+}

@@ -1,8 +1,0 @@
-include README.md
-include pyproject.toml
-recursive-include src/pact *.py
-recursive-include src/pact py.typed
-prune src/pact.egg-info
-prune src/pact_py.egg-info
-global-exclude __pycache__
-global-exclude *.py[cod]

@@ -6,9 +6,9 @@
 
 ## Context
 
-Current `PactScope` is tool-centric:
+Current `ArcScope` is tool-centric:
 
-- `PactScope { grants: Vec<ToolGrant> }`
+- `ArcScope { grants: Vec<ToolGrant> }`
 
 That is workable for the prototype, but resources, prompts, sampling, and elicitation will not fit cleanly forever as tool-like shapes.
 
@@ -19,9 +19,9 @@ There are two timing options:
 
 ## Decision
 
-PACT will keep `ToolGrant` as the operational grant type through early MCP tool parity work.
+ARC will keep `ToolGrant` as the operational grant type through early MCP tool parity work.
 
-Before resources and prompts become first-class runtime features, PACT will introduce a broader grant model, likely an enum-based `Grant` family.
+Before resources and prompts become first-class runtime features, ARC will introduce a broader grant model, likely an enum-based `Grant` family.
 
 ## Rationale
 

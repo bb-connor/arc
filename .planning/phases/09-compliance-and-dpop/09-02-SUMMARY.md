@@ -2,16 +2,16 @@
 phase: 09-compliance-and-dpop
 plan: 02
 subsystem: auth
-tags: [dpop, ed25519, lru, nonce-replay, proof-of-possession, capability-token, pact-kernel]
+tags: [dpop, ed25519, lru, nonce-replay, proof-of-possession, capability-token, arc-kernel]
 
 requires:
   - phase: 07-schema-compatibility-and-monetary-foundation
     provides: ToolGrant struct with serde skip_serializing_if pattern and MonetaryAmount fields
   - phase: 08-core-enforcement
-    provides: KernelError enum and pact-kernel module structure
+    provides: KernelError enum and arc-kernel module structure
 
 provides:
-  - DPoP proof-of-possession module (crates/pact-kernel/src/dpop.rs)
+  - DPoP proof-of-possession module (crates/arc-kernel/src/dpop.rs)
   - verify_dpop_proof function binding capability_id + tool_server + tool_name + action_hash + nonce
   - DpopNonceStore with LRU-backed in-memory nonce replay rejection
   - DpopVerificationFailed(String) variant on KernelError
@@ -30,26 +30,26 @@ tech-stack:
 
 key-files:
   created:
-    - crates/pact-kernel/src/dpop.rs
-    - crates/pact-kernel/tests/dpop.rs
+    - crates/arc-kernel/src/dpop.rs
+    - crates/arc-kernel/tests/dpop.rs
   modified:
-    - crates/pact-core/src/capability.rs (dpop_required field added to ToolGrant)
-    - crates/pact-kernel/src/lib.rs (pub mod dpop, DpopVerificationFailed, pub use exports)
-    - crates/pact-kernel/Cargo.toml (lru = "0.16.3" dependency)
+    - crates/arc-core/src/capability.rs (dpop_required field added to ToolGrant)
+    - crates/arc-kernel/src/lib.rs (pub mod dpop, DpopVerificationFailed, pub use exports)
+    - crates/arc-kernel/Cargo.toml (lru = "0.16.3" dependency)
     - formal/diff-tests/src/generators.rs (dpop_required: None)
-    - crates/pact-cli/src/policy.rs (dpop_required: None)
-    - crates/pact-core/src/message.rs (dpop_required: None)
-    - crates/pact-core/src/session.rs (dpop_required: None)
-    - crates/pact-core/tests/forward_compat.rs (dpop_required: None)
-    - crates/pact-core/tests/monetary_types.rs (dpop_required: None)
-    - crates/pact-guards/tests/integration.rs (dpop_required: None)
-    - crates/pact-mcp-adapter/src/edge.rs (dpop_required: None)
-    - crates/pact-policy/src/compiler.rs (dpop_required: None)
-    - crates/pact-bindings-core/src/capability.rs (dpop_required: None)
-    - crates/pact-bindings-core/tests/vector_fixtures.rs (dpop_required: None)
+    - crates/arc-cli/src/policy.rs (dpop_required: None)
+    - crates/arc-core/src/message.rs (dpop_required: None)
+    - crates/arc-core/src/session.rs (dpop_required: None)
+    - crates/arc-core/tests/forward_compat.rs (dpop_required: None)
+    - crates/arc-core/tests/monetary_types.rs (dpop_required: None)
+    - crates/arc-guards/tests/integration.rs (dpop_required: None)
+    - crates/arc-mcp-adapter/src/edge.rs (dpop_required: None)
+    - crates/arc-policy/src/compiler.rs (dpop_required: None)
+    - crates/arc-bindings-core/src/capability.rs (dpop_required: None)
+    - crates/arc-bindings-core/tests/vector_fixtures.rs (dpop_required: None)
 
 key-decisions:
-  - "DPoP proof message is PACT-native (capability_id + tool_server + tool_name + action_hash + nonce) -- not HTTP-shaped"
+  - "DPoP proof message is ARC-native (capability_id + tool_server + tool_name + action_hash + nonce) -- not HTTP-shaped"
   - "DpopNonceStore uses std::sync::Mutex with LruCache keyed by (nonce, capability_id) -- synchronous, no async, fits Guard pipeline"
   - "verify_dpop_proof checks nonce replay AFTER signature verification -- invalid signatures cannot poison the nonce store"
   - "dpop_required: Option<bool> with serde(default, skip_serializing_if = Option::is_none) -- forward compatible with SCHEMA-01 pattern"
@@ -75,8 +75,8 @@ completed: 2026-03-22
 
 ## Accomplishments
 
-- Implemented `crates/pact-kernel/src/dpop.rs` with full DPoP proof-of-possession: `DpopProofBody`, `DpopProof`, `DpopConfig`, `DpopNonceStore`, and `verify_dpop_proof`
-- Added `DpopVerificationFailed(String)` to `KernelError` and exposed all DPoP types via `pub use` from `pact-kernel`
+- Implemented `crates/arc-kernel/src/dpop.rs` with full DPoP proof-of-possession: `DpopProofBody`, `DpopProof`, `DpopConfig`, `DpopNonceStore`, and `verify_dpop_proof`
+- Added `DpopVerificationFailed(String)` to `KernelError` and exposed all DPoP types via `pub use` from `arc-kernel`
 - Added `dpop_required: Option<bool>` to `ToolGrant` with correct serde skip annotation; updated all struct initializers across the workspace to include `dpop_required: None`
 - All 7 DPoP tests pass: valid proof accepted, wrong action hash rejected (cross-invocation replay), wrong agent key rejected, expired proof rejected, nonce replay within TTL rejected, nonce replay after TTL=0 accepted, dpop_required field roundtrip
 
@@ -87,16 +87,16 @@ completed: 2026-03-22
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/dpop.rs` - Core DPoP implementation: proof types, nonce store, verify_dpop_proof
-- `crates/pact-kernel/tests/dpop.rs` - 7 integration tests covering all DPoP verification steps
-- `crates/pact-kernel/src/lib.rs` - Added `pub mod dpop`, `DpopVerificationFailed` variant, `pub use` exports
-- `crates/pact-kernel/Cargo.toml` - Already had `lru = "0.16.3"` dependency
-- `crates/pact-core/src/capability.rs` - `dpop_required: Option<bool>` field already present; `dpop_required: None` added to test helpers
+- `crates/arc-kernel/src/dpop.rs` - Core DPoP implementation: proof types, nonce store, verify_dpop_proof
+- `crates/arc-kernel/tests/dpop.rs` - 7 integration tests covering all DPoP verification steps
+- `crates/arc-kernel/src/lib.rs` - Added `pub mod dpop`, `DpopVerificationFailed` variant, `pub use` exports
+- `crates/arc-kernel/Cargo.toml` - Already had `lru = "0.16.3"` dependency
+- `crates/arc-core/src/capability.rs` - `dpop_required: Option<bool>` field already present; `dpop_required: None` added to test helpers
 - 12 other files across workspace - `dpop_required: None` added to all ToolGrant struct initializers
 
 ## Decisions Made
 
-- DPoP proof message is PACT-native (capability_id + tool_server + tool_name + action_hash + nonce) -- not HTTP-shaped; this was already decided in Phase 08 planning
+- DPoP proof message is ARC-native (capability_id + tool_server + tool_name + action_hash + nonce) -- not HTTP-shaped; this was already decided in Phase 08 planning
 - Nonce replay check runs AFTER signature verification so invalid signatures cannot pollute the nonce store
 - `NonZeroUsize` capacity fallback uses `unwrap_or_else` (not `expect`) to satisfy `clippy::expect_used = "deny"`
 
@@ -106,9 +106,9 @@ completed: 2026-03-22
 
 **1. [Rule 3 - Blocking] Fixed missing `dpop_required` field in 12 additional files**
 - **Found during:** Task 1 (workspace compile verification)
-- **Issue:** `cargo check -p pact-kernel` passed but `cargo test --workspace` revealed 20+ compile errors across workspace in files not covered by single-crate check (pact-cli, pact-core tests, pact-guards tests, pact-mcp-adapter, pact-policy, pact-bindings-core, formal/diff-tests)
+- **Issue:** `cargo check -p arc-kernel` passed but `cargo test --workspace` revealed 20+ compile errors across workspace in files not covered by single-crate check (arc-cli, arc-core tests, arc-guards tests, arc-mcp-adapter, arc-policy, arc-bindings-core, formal/diff-tests)
 - **Fix:** Added `dpop_required: None` to all remaining ToolGrant struct initializers across the full workspace
-- **Files modified:** crates/pact-cli/src/policy.rs, crates/pact-core/src/message.rs, crates/pact-core/src/session.rs, crates/pact-core/tests/forward_compat.rs, crates/pact-core/tests/monetary_types.rs, crates/pact-guards/tests/integration.rs, crates/pact-mcp-adapter/src/edge.rs, crates/pact-policy/src/compiler.rs, crates/pact-bindings-core/src/capability.rs, crates/pact-bindings-core/tests/vector_fixtures.rs, formal/diff-tests/src/generators.rs, tests/e2e/tests/full_flow.rs
+- **Files modified:** crates/arc-cli/src/policy.rs, crates/arc-core/src/message.rs, crates/arc-core/src/session.rs, crates/arc-core/tests/forward_compat.rs, crates/arc-core/tests/monetary_types.rs, crates/arc-guards/tests/integration.rs, crates/arc-mcp-adapter/src/edge.rs, crates/arc-policy/src/compiler.rs, crates/arc-bindings-core/src/capability.rs, crates/arc-bindings-core/tests/vector_fixtures.rs, formal/diff-tests/src/generators.rs, tests/e2e/tests/full_flow.rs
 - **Verification:** `cargo test --workspace` passes with 0 failures
 - **Committed in:** b57bdfe (Task 1 commit)
 

@@ -5,7 +5,7 @@
 ## APIs & External Services
 
 **MCP peers:**
-- External MCP servers and clients - The core interoperability surface PACT wraps or replaces
+- External MCP servers and clients - The core interoperability surface ARC wraps or replaces
   - Integration method: stdio and HTTP transport adapters
   - Auth: Capability tokens plus optional bearer/JWT auth on remote HTTP serving
   - Endpoints used: MCP tool/resource/prompt/completion/logging/session flows
@@ -57,7 +57,7 @@
 
 **Hosting:**
 - Self-hosted Rust binary / local process execution
-  - Deployment: Manual local runs or custom hosting around `pact`
+  - Deployment: Manual local runs or custom hosting around `arc`
   - Environment vars: Limited; most runtime config comes from CLI flags and file inputs
 
 **CI Pipeline:**

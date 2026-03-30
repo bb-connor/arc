@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document researches how PACT should build E8 Slice A:
+This document researches how ARC should build E8 Slice A:
 
 - cross-language interoperability testing
 - versioned spec-scenario testing
@@ -10,20 +10,20 @@ This document researches how PACT should build E8 Slice A:
 
 It is grounded in:
 
-- PACT's current shipped test surface
+- ARC's current shipped test surface
 - the local `../rust-sdk` reference repository
 - the current MCP spec
 
-## Current PACT Baseline
+## Current ARC Baseline
 
-PACT already has stronger repo-local integration coverage than it did when E8 was first planned.
+ARC already has stronger repo-local integration coverage than it did when E8 was first planned.
 
 The important current assets are:
 
-- `crates/pact-cli/tests/mcp_serve.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
-- `crates/pact-cli/tests/mcp_auth_server.rs`
-- `crates/pact-cli/tests/trust_cluster.rs`
+- `crates/arc-cli/tests/mcp_serve.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
+- `crates/arc-cli/tests/mcp_auth_server.rs`
+- `crates/arc-cli/tests/trust_cluster.rs`
 
 What those tests already cover well:
 
@@ -41,11 +41,11 @@ It should reuse this local suite as the implementation-controlled layer and add 
 
 ## What Is Missing Today
 
-PACT still lacks four things:
+ARC still lacks four things:
 
 ### 1. Real external peers
 
-Current tests are overwhelmingly driven by PACT-owned harness logic and mock servers.
+Current tests are overwhelmingly driven by ARC-owned harness logic and mock servers.
 
 That is useful, but not enough to make ecosystem claims.
 
@@ -85,7 +85,7 @@ Primary spec references:
 - Authorization: <https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization>
 - Tasks: <https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks>
 
-Implication for PACT:
+Implication for ARC:
 
 The harness must test negotiated behavior, not just happy-path method availability.
 
@@ -99,19 +99,19 @@ Useful patterns worth copying:
 
 `crates/rmcp/tests/test_with_js.rs` and `crates/rmcp/tests/test_with_python.rs` validate interoperability against actual external runtimes rather than only synthetic mocks.
 
-PACT should copy that discipline.
+ARC should copy that discipline.
 
 ### 2. Separate conformance binaries
 
 The `conformance/src/bin/server.rs` and `conformance/src/bin/client.rs` layout is useful because it creates a stable test target for scenario-driven execution.
 
-PACT should likely do the same through a dedicated harness crate instead of piling more orchestration into `pact-cli/tests`.
+ARC should likely do the same through a dedicated harness crate instead of piling more orchestration into `arc-cli/tests`.
 
 ### 3. Published result artifacts
 
 The `conformance/results/2026-02-25-rust-sdk-assessment.md` and remediation docs show the value of generated assessment output.
 
-PACT should copy the reporting discipline, even if it does not copy the exact tier model.
+ARC should copy the reporting discipline, even if it does not copy the exact tier model.
 
 ### 4. Scenario naming and inventory
 
@@ -121,22 +121,22 @@ The rust-sdk assessment shows named scenario inventory such as:
 - `server-prompts-get-with-args`
 - `auth/scope-step-up`
 
-PACT should adopt stable scenario IDs early so results remain comparable over time.
+ARC should adopt stable scenario IDs early so results remain comparable over time.
 
 ## What Not to Copy from the Local Rust SDK
 
-PACT should not blindly copy:
+ARC should not blindly copy:
 
 ### 1. Runtime assumptions
 
-PACT has a different security center:
+ARC has a different security center:
 
 - capabilities
 - guards
 - signed receipts
 - explicit trust-plane behavior
 
-The harness must preserve those distinctions rather than flattening PACT into “just another MCP runtime.”
+The harness must preserve those distinctions rather than flattening ARC into “just another MCP runtime.”
 
 ### 2. The tier audit model
 
@@ -148,9 +148,9 @@ The rust-sdk assessment mixes:
 - triage process
 - release management
 
-That may be useful for program management, but it is too broad for the first PACT conformance harness.
+That may be useful for program management, but it is too broad for the first ARC conformance harness.
 
-PACT should start with protocol and interoperability truth first.
+ARC should start with protocol and interoperability truth first.
 
 ### 3. One-SDK-centric truth
 
@@ -162,7 +162,7 @@ The MCP spec remains the source of truth.
 
 ## Recommended Harness Architecture
 
-## 1. Keep current PACT integration tests as the base layer
+## 1. Keep current ARC integration tests as the base layer
 
 Do not replace:
 
@@ -190,18 +190,18 @@ The harness should have peer adapters for:
 - JS
 - Python
 - Rust reference peer
-- PACT self-controlled peers where needed
+- ARC self-controlled peers where needed
 
 Scenarios should be written once and mapped onto peer adapters where possible.
 
-## 4. Distinguish MCP-core and PACT-extension assertions
+## 4. Distinguish MCP-core and ARC-extension assertions
 
 There should be two report lanes:
 
 - MCP core compatibility
-- PACT extension and trust semantics
+- ARC extension and trust semantics
 
-That avoids overstating compatibility while still making PACT-specific guarantees visible.
+That avoids overstating compatibility while still making ARC-specific guarantees visible.
 
 ## Proposed Scenario Families
 
@@ -260,7 +260,7 @@ That avoids overstating compatibility while still making PACT-specific guarantee
 - token exchange
 - insufficient scope and step-up behavior
 
-## Family G: PACT-specific trust behavior
+## Family G: ARC-specific trust behavior
 
 - deny receipts
 - child-request receipts
@@ -306,7 +306,7 @@ That should come after the harness format and peer adapters are already stable.
 
 ### Risk: conformance scope explodes
 
-PACT now has a lot of surface area.
+ARC now has a lot of surface area.
 
 If Slice A tries to encode every existing integration test as a fixture immediately, it will stall.
 
@@ -327,16 +327,16 @@ Recommendation:
 
 ### Risk: the report overstates compatibility
 
-PACT has experimental and PACT-specific features on the edge.
+ARC has experimental and ARC-specific features on the edge.
 
 Recommendation:
 
 - separate standard MCP pass/fail from experimental extension coverage
-- explicitly label `experimental`, `extension`, and `PACT-specific`
+- explicitly label `experimental`, `extension`, and `ARC-specific`
 
 ## Research Conclusion
 
-PACT is ready for E8 Slice A.
+ARC is ready for E8 Slice A.
 
 Not because the problem is solved, but because the prerequisites are now genuinely in place:
 

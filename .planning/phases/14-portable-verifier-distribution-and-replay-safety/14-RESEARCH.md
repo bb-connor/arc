@@ -20,8 +20,8 @@ local and remote verifier API parity
 
 Phase 14 should be implemented as a thin verifier-infrastructure layer around
 the existing passport alpha rather than a new protocol family. The best seam is
-to keep verifier policy semantics in `pact-credentials`, add durable storage and
-policy-reference helpers in `pact-cli`, and then expose the same contract over
+to keep verifier policy semantics in `arc-credentials`, add durable storage and
+policy-reference helpers in `arc-cli`, and then expose the same contract over
 trust-control for remote relying parties.
 
 The critical design constraint is that replay safety must bind to the exact
@@ -37,13 +37,13 @@ window. That check belongs on both the local and remote verifier paths.
 ## Recommended Architecture
 
 ### Signed Verifier Policy Artifacts
-- Add signed verifier policy document types to `pact-credentials`
+- Add signed verifier policy document types to `arc-credentials`
 - Verify schema, signer signature, validity window, and required IDs there
-- Use a versioned JSON registry in `pact-cli` for durable local and remote
+- Use a versioned JSON registry in `arc-cli` for durable local and remote
   storage
 
 ### Replay-Safe Challenge Store
-- Use SQLite in `pact-cli` because the verifier state must survive restarts and
+- Use SQLite in `arc-cli` because the verifier state must survive restarts and
   fits existing local operator deployment patterns
 - Store:
   - `challenge_id`
@@ -94,15 +94,15 @@ remote paths.
 ## Validation Strategy
 
 - Local file-backed verifier policy reference plus replay-safe verification:
-  `cargo test -p pact-cli --test passport -- --nocapture`
+  `cargo test -p arc-cli --test passport -- --nocapture`
 - Remote trust-control replay-safe verifier issue path:
-  `cargo test -p pact-cli --test federated_issue -- --nocapture`
+  `cargo test -p arc-cli --test federated_issue -- --nocapture`
 - Remote verifier policy admin CRUD:
-  `cargo test -p pact-cli --test provider_admin -- --nocapture`
+  `cargo test -p arc-cli --test provider_admin -- --nocapture`
 
 ## Conclusion
 
 The shipped implementation path is coherent: signed verifier policies live in
-`pact-credentials`, durable registry and replay-state storage live in
-`pact-cli`, and trust-control exposes the same semantics remotely without
+`arc-credentials`, durable registry and replay-state storage live in
+`arc-cli`, and trust-control exposes the same semantics remotely without
 inventing a second verifier model.

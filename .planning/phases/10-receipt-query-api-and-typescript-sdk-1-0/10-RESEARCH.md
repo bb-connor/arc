@@ -15,7 +15,7 @@
 - Cursor-based pagination using receipt seq (receipt_store already uses seq for delta queries); response includes next_cursor
 - Budget impact filtering via min_cost and max_cost as separate optional params (range queries)
 - Flat list response with total_count and next_cursor -- grouping deferred to Phase 12 dashboard
-- Query module lives in receipt_query.rs in pact-kernel, co-located with receipt_store for direct SQLite access
+- Query module lives in receipt_query.rs in arc-kernel, co-located with receipt_store for direct SQLite access
 - Filter parameters: capability_id, tool_server, tool_name, time_range (since/until), outcome, min_cost, max_cost
 
 **CLI Receipt List UX**
@@ -25,10 +25,10 @@
 - HTTP API endpoint: GET /receipts on existing trust-control axum server
 
 **TypeScript SDK 1.0 Scope**
-- Typed error classes extending PactError base: DpopSignError, QueryError, TransportError with error codes
+- Typed error classes extending ArcError base: DpopSignError, QueryError, TransportError with error codes
 - Explicit signDpopProof(params) function returning signed proof object -- not auto-middleware
 - ReceiptQueryClient class included in SDK for querying receipts via HTTP API
-- npm package name: @pact-protocol/sdk
+- npm package name: @arc-protocol/sdk
 - SDK version bumped from 0.1.0 to 1.0.0 with semantic versioning
 
 ### Claude's Discretion
@@ -50,18 +50,18 @@ None -- discussion stayed within phase scope
 | ID | Description | Research Support |
 |----|-------------|-----------------|
 | PROD-01 | Receipt query API supports filtering by capability, tool, time range, outcome, and budget impact | receipt_query.rs extends SqliteReceiptStore.list_tool_receipts with seq cursor + timestamp range + cost range; existing indexed columns cover all filters |
-| PROD-06 | TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning | SDK rename from @pact/sdk to @pact-protocol/sdk, version bump to 1.0.0, typed PactError hierarchy, DPoP helpers, ReceiptQueryClient, npm publish pipeline |
+| PROD-06 | TypeScript SDK published to npm at 1.0 with stable API contract and semantic versioning | SDK rename from @arc/sdk to @arc-protocol/sdk, version bump to 1.0.0, typed ArcError hierarchy, DPoP helpers, ReceiptQueryClient, npm publish pipeline |
 </phase_requirements>
 
 ---
 
 ## Summary
 
-Phase 10 is a product surface and developer experience phase with no new enforcement logic. It extends the existing receipt storage infrastructure with richer filtering, adds a new GET /receipts HTTP endpoint to the trust-control axum server, introduces a `pact receipt list` CLI subcommand, and hardens the TypeScript SDK to 1.0 stability with typed errors, DPoP proof generation helpers, and a ReceiptQueryClient.
+Phase 10 is a product surface and developer experience phase with no new enforcement logic. It extends the existing receipt storage infrastructure with richer filtering, adds a new GET /receipts HTTP endpoint to the trust-control axum server, introduces a `arc receipt list` CLI subcommand, and hardens the TypeScript SDK to 1.0 stability with typed errors, DPoP proof generation helpers, and a ReceiptQueryClient.
 
 The Rust side is well-scoped because `SqliteReceiptStore` already has the indexed columns (`capability_id`, `tool_server`, `tool_name`, `decision_kind`, `timestamp`) and an existing `list_tool_receipts` query pattern using parameterized IS NULL OR clauses. The new `receipt_query.rs` adds two missing filter dimensions: time range (via the existing `timestamp` column) and budget impact (via JSON extraction from `raw_json` against `metadata.financial.cost_charged`). Cursor pagination reuses the `seq` AUTOINCREMENT primary key -- the same approach used by `list_tool_receipts_after_seq` and the SIEM delta queries. The existing `ReceiptDeltaQuery.after_seq` pattern is a direct model.
 
-The TypeScript SDK rename and hardening is the most procedural part of the phase. The package is currently named `@pact/sdk` at `0.1.0` and is marked `private: true`, so it has never been published. Renaming to `@pact-protocol/sdk`, removing `private: true`, writing a proper build pipeline (tsc, declarations), and adding a typed error hierarchy are all prerequisite steps before the DPoP and ReceiptQueryClient additions.
+The TypeScript SDK rename and hardening is the most procedural part of the phase. The package is currently named `@arc/sdk` at `0.1.0` and is marked `private: true`, so it has never been published. Renaming to `@arc-protocol/sdk`, removing `private: true`, writing a proper build pipeline (tsc, declarations), and adding a typed error hierarchy are all prerequisite steps before the DPoP and ReceiptQueryClient additions.
 
 **Primary recommendation:** Build receipt_query.rs as a thin layer that composes parameterized WHERE clauses in SQL -- do not deserialize receipts to filter in Rust memory. The JSON extraction for cost filtering should use SQLite's `json_extract(raw_json, '$.metadata.financial.cost_charged')` -- no new indexed column needed for the initial implementation.
 
@@ -74,21 +74,21 @@ The TypeScript SDK rename and hardening is the most procedural part of the phase
 |---------|---------|---------|--------------|
 | rusqlite | workspace | SQLite access with parameterized queries | Already in workspace; `json_extract` via SQLite 3.38+ built-in JSON functions |
 | axum | 0.8 | HTTP endpoint for GET /receipts | Already used for all trust-control endpoints |
-| clap | 4 (derive) | New `pact receipt list` subcommand | Already used for all CLI subcommands |
+| clap | 4 (derive) | New `arc receipt list` subcommand | Already used for all CLI subcommands |
 | serde / serde_json | workspace | Query struct serialization and URL-encoding | Already used everywhere |
-| serde_urlencoded | 0.7 | Query param encoding for TrustControlClient | Already present in pact-cli Cargo.toml |
+| serde_urlencoded | 0.7 | Query param encoding for TrustControlClient | Already present in arc-cli Cargo.toml |
 
 ### Core (TypeScript SDK)
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
-| node:crypto | built-in | Ed25519 signing/verification | Already used in crypto.ts for all PACT signing |
+| node:crypto | built-in | Ed25519 signing/verification | Already used in crypto.ts for all ARC signing |
 | TypeScript | 5.x | Typed declarations, build output | Already in use; needs tsc output for npm |
 | @noble/ed25519 | optional | Browser-compatible fallback | Only if browser support is required -- Node crypto sufficient for 1.0 |
 
 ### Supporting
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| npm / bun publish | - | Package publication pipeline | For the 1.0 release of @pact-protocol/sdk |
+| npm / bun publish | - | Package publication pipeline | For the 1.0 release of @arc-protocol/sdk |
 
 **Installation (new packages -- none required):**
 All dependencies are already present in the workspace. No new Cargo.toml entries are needed.
@@ -99,10 +99,10 @@ All dependencies are already present in the workspace. No new Cargo.toml entries
 
 ### receipt_query.rs Layout
 
-The new module lives at `crates/pact-kernel/src/receipt_query.rs` and is declared in `crates/pact-kernel/src/lib.rs`. It takes a read-only `&SqliteReceiptStore` reference (the SQLite connection is on the store, not behind a trait lock).
+The new module lives at `crates/arc-kernel/src/receipt_query.rs` and is declared in `crates/arc-kernel/src/lib.rs`. It takes a read-only `&SqliteReceiptStore` reference (the SQLite connection is on the store, not behind a trait lock).
 
 ```
-crates/pact-kernel/src/
+crates/arc-kernel/src/
 ├── receipt_store.rs      -- existing SqliteReceiptStore; unchanged except pub re-exports
 ├── receipt_query.rs      -- NEW: ReceiptQuery struct, query_receipts(), ReceiptQueryResult
 └── lib.rs                -- pub mod receipt_query; pub use receipt_query::*
@@ -127,7 +127,7 @@ pub struct ReceiptQuery {
 
 #[derive(Debug)]
 pub struct ReceiptQueryResult {
-    pub receipts: Vec<StoredToolReceipt>,  // seq + PactReceipt pairs
+    pub receipts: Vec<StoredToolReceipt>,  // seq + ArcReceipt pairs
     pub total_count: u64,                  // COUNT(*) with same filters, no limit
     pub next_cursor: Option<u64>,          // last seq in results if more exist
 }
@@ -140,7 +140,7 @@ The SQL uses the IS NULL OR parameterized pattern established in `list_tool_rece
 ```sql
 -- Source: derived from existing patterns in receipt_store.rs
 SELECT seq, raw_json
-FROM pact_tool_receipts
+FROM arc_tool_receipts
 WHERE (?1 IS NULL OR capability_id = ?1)
   AND (?2 IS NULL OR tool_server = ?2)
   AND (?3 IS NULL OR tool_name = ?3)
@@ -201,7 +201,7 @@ Response shape:
 pub struct ReceiptQueryResponse {
     pub total_count: u64,
     pub next_cursor: Option<u64>,
-    pub receipts: Vec<serde_json::Value>,  // serialized PactReceipts
+    pub receipts: Vec<serde_json::Value>,  // serialized ArcReceipts
 }
 ```
 
@@ -247,9 +247,9 @@ CLI output: one JSON object per line (NDJSON / JSON Lines). Auto-paginate means 
 
 ### TypeScript SDK 1.0 Architecture
 
-The SDK currently lives at `packages/sdk/pact-ts/` with package name `@pact/sdk` at `0.1.0` marked `private: true`. Phase 10 requires:
+The SDK currently lives at `packages/sdk/arc-ts/` with package name `@arc/sdk` at `0.1.0` marked `private: true`. Phase 10 requires:
 
-1. Rename to `@pact-protocol/sdk` in package.json
+1. Rename to `@arc-protocol/sdk` in package.json
 2. Remove `private: true`
 3. Add TypeScript compilation + declaration output for npm publication
 4. Add typed error hierarchy
@@ -260,23 +260,23 @@ The SDK currently lives at `packages/sdk/pact-ts/` with package name `@pact/sdk`
 **Error hierarchy:**
 ```typescript
 // New file: src/errors.ts
-export class PactError extends Error {
+export class ArcError extends Error {
   readonly code: string;
   constructor(code: string, message: string, options?: ErrorOptions) {
     super(message, options);
-    this.name = "PactError";
+    this.name = "ArcError";
     this.code = code;
   }
 }
 
-export class DpopSignError extends PactError {
+export class DpopSignError extends ArcError {
   constructor(message: string, options?: ErrorOptions) {
     super("dpop_sign_error", message, options);
     this.name = "DpopSignError";
   }
 }
 
-export class QueryError extends PactError {
+export class QueryError extends ArcError {
   readonly status?: number;
   constructor(message: string, status?: number, options?: ErrorOptions) {
     super("query_error", message, options);
@@ -285,7 +285,7 @@ export class QueryError extends PactError {
   }
 }
 
-export class TransportError extends PactError {
+export class TransportError extends ArcError {
   constructor(message: string, options?: ErrorOptions) {
     super("transport_error", message, options);
     this.name = "TransportError";
@@ -293,15 +293,15 @@ export class TransportError extends PactError {
 }
 ```
 
-**DPoP proof generation -- exact schema match with pact-kernel:**
+**DPoP proof generation -- exact schema match with arc-kernel:**
 
-The `DpopProofBody` struct in `crates/pact-kernel/src/dpop.rs` requires these exact fields in canonical JSON order (RFC 8785 -- alphabetical key order):
+The `DpopProofBody` struct in `crates/arc-kernel/src/dpop.rs` requires these exact fields in canonical JSON order (RFC 8785 -- alphabetical key order):
 - `action_hash`: SHA-256 hex of serialized tool arguments
 - `agent_key`: hex-encoded Ed25519 public key
 - `capability_id`: string
 - `issued_at`: u64 Unix seconds
 - `nonce`: string
-- `schema`: `"pact.dpop_proof.v1"`
+- `schema`: `"arc.dpop_proof.v1"`
 - `tool_name`: string
 - `tool_server`: string
 
@@ -317,7 +317,7 @@ import { canonicalizeJson } from "./invariants/json.ts";
 import { signEd25519Message, sha256Hex } from "./invariants/crypto.ts";
 import { DpopSignError } from "./errors.ts";
 
-export const DPOP_SCHEMA = "pact.dpop_proof.v1";
+export const DPOP_SCHEMA = "arc.dpop_proof.v1";
 
 export interface DpopProofBody {
   action_hash: string;
@@ -369,13 +369,13 @@ export interface ReceiptQueryParams {
 export interface ReceiptQueryResponse {
   totalCount: number;
   nextCursor?: number;
-  receipts: PactReceipt[];
+  receipts: ArcReceipt[];
 }
 
 export class ReceiptQueryClient {
   constructor(baseUrl: string, authToken: string, fetchImpl?: typeof fetch);
   async query(params?: ReceiptQueryParams): Promise<ReceiptQueryResponse>;
-  async *paginate(params?: ReceiptQueryParams): AsyncGenerator<PactReceipt[]>;
+  async *paginate(params?: ReceiptQueryParams): AsyncGenerator<ArcReceipt[]>;
 }
 ```
 
@@ -429,14 +429,14 @@ export class ReceiptQueryClient {
 **How to avoid:** Cursor semantics = `WHERE seq > ?cursor`. The `next_cursor` in the response IS the `seq` of the last item returned, not `seq + 1`.
 
 ### Pitfall 5: SDK Package Name Collision
-**What goes wrong:** `@pact/sdk` conflicts with existing npm packages in the `@pact` scope.
-**Why it happens:** The `@pact` scope is not controlled by the PACT project.
-**How to avoid:** The locked decision is `@pact-protocol/sdk`. Verify the `@pact-protocol` npm organization is registered before publishing.
+**What goes wrong:** `@arc/sdk` conflicts with existing npm packages in the `@arc` scope.
+**Why it happens:** The `@arc` scope is not controlled by the ARC project.
+**How to avoid:** The locked decision is `@arc-protocol/sdk`. Verify the `@arc-protocol` npm organization is registered before publishing.
 
 ### Pitfall 6: clap Subcommand Collision with Existing Trust Commands
 **What goes wrong:** Adding `Commands::Receipt` alongside `Commands::Trust` and `Commands::Mcp` could conflict with the global `--receipt-db` flag name.
 **Why it happens:** clap argument parsing across subcommand levels.
-**How to avoid:** Use `pact receipt list` as the subcommand, with filter flags (not `--receipt-db`) that are local to the `list` subcommand. The `--receipt-db` global flag already controls which DB to open.
+**How to avoid:** Use `arc receipt list` as the subcommand, with filter flags (not `--receipt-db`) that are local to the `list` subcommand. The `--receipt-db` global flag already controls which DB to open.
 
 ### Pitfall 7: SDK has no Build Step for npm
 **What goes wrong:** The current `package.json` exports `./src/index.ts` directly (TypeScript source). This is fine for bun-based local use but does not work for npm consumers expecting compiled JavaScript.
@@ -450,7 +450,7 @@ export class ReceiptQueryClient {
 ### receipt_query.rs: Core Query Function
 
 ```rust
-// Source: extends patterns from crates/pact-kernel/src/receipt_store.rs
+// Source: extends patterns from crates/arc-kernel/src/receipt_store.rs
 pub fn query_receipts(
     store: &SqliteReceiptStore,
     query: &ReceiptQuery,
@@ -460,7 +460,7 @@ pub fn query_receipts(
     let mut stmt = store.connection.prepare(
         r#"
         SELECT seq, raw_json
-        FROM pact_tool_receipts
+        FROM arc_tool_receipts
         WHERE (?1 IS NULL OR capability_id = ?1)
           AND (?2 IS NULL OR tool_server = ?2)
           AND (?3 IS NULL OR tool_name = ?3)
@@ -483,7 +483,7 @@ Note: The `connection` field on `SqliteReceiptStore` is currently private. `rece
 ### TypeScript signDpopProof
 
 ```typescript
-// Source: matches DpopProofBody in crates/pact-kernel/src/dpop.rs
+// Source: matches DpopProofBody in crates/arc-kernel/src/dpop.rs
 export function signDpopProof(params: SignDpopProofParams): DpopProof {
   const nonce = params.nonce ?? generateNonce();
   const issuedAt = params.issuedAt ?? Math.floor(Date.now() / 1000);
@@ -519,7 +519,7 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
 }
 ```
 
-### CLI: pact receipt list output pattern
+### CLI: arc receipt list output pattern
 
 ```
 // JSON Lines output (one receipt per line):
@@ -532,8 +532,8 @@ export function signDpopProof(params: SignDpopProofParams): DpopProof {
 ### ReceiptQueryClient.paginate()
 
 ```typescript
-// Source: pattern from PactSession in src/session/session.ts
-async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<PactReceipt[]> {
+// Source: pattern from ArcSession in src/session/session.ts
+async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<ArcReceipt[]> {
   let cursor: number | undefined = params.cursor;
   while (true) {
     const response = await this.query({ ...params, cursor });
@@ -555,8 +555,8 @@ async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<PactReceipt[]> 
 | Old Approach | Current Approach | Impact |
 |--------------|------------------|--------|
 | Offset-based pagination | Cursor (seq) pagination | Stable, no drift under inserts |
-| `@pact/sdk` private package | `@pact-protocol/sdk` public 1.0 | npm-publishable |
-| Plain `Error` throws | Typed `PactError` subclasses | Catchable by error code, not string matching |
+| `@arc/sdk` private package | `@arc-protocol/sdk` public 1.0 | npm-publishable |
+| Plain `Error` throws | Typed `ArcError` subclasses | Catchable by error code, not string matching |
 | No DPoP client helpers | `signDpopProof()` explicit function | Agent can prove possession without building its own signing stack |
 
 **No deprecated APIs affected:** All existing `SqliteReceiptStore` methods are unchanged. The new `query_receipts` (or `query_tool_receipts`) method is additive.
@@ -576,9 +576,9 @@ async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<PactReceipt[]> 
    - Recommendation: Use `crypto.randomBytes(16).toString("hex")` from `node:crypto` (already imported in crypto.ts). This produces 32 hex chars of randomness, sufficient for replay prevention.
 
 3. **npm org registration**
-   - What we know: The locked package name is `@pact-protocol/sdk`
-   - What's unclear: Whether the `@pact-protocol` npm org exists and is accessible
-   - Recommendation: Verify org ownership before the publish task in plan 10-03. If org is unavailable, fall back to `pact-protocol-sdk` (unscoped) -- but this is a plan-level decision to note.
+   - What we know: The locked package name is `@arc-protocol/sdk`
+   - What's unclear: Whether the `@arc-protocol` npm org exists and is accessible
+   - Recommendation: Verify org ownership before the publish task in plan 10-03. If org is unavailable, fall back to `arc-protocol-sdk` (unscoped) -- but this is a plan-level decision to note.
 
 4. **total_count semantics under concurrent writes**
    - What we know: Count and list are two separate queries; a write between them will cause total_count to be stale
@@ -594,52 +594,52 @@ async *paginate(params: ReceiptQueryParams = {}): AsyncGenerator<PactReceipt[]> 
 |----------|-------|
 | Framework | Rust: `cargo test` (built-in); TypeScript: `node --experimental-strip-types --test` |
 | Config file | Rust: none (workspace `Cargo.toml`); TS: none (package.json scripts) |
-| Quick run command | `cargo test -p pact-kernel receipt_query` |
-| Full suite command | `cargo test --workspace && node --experimental-strip-types --test packages/sdk/pact-ts/test/*.test.ts` |
+| Quick run command | `cargo test -p arc-kernel receipt_query` |
+| Full suite command | `cargo test --workspace && node --experimental-strip-types --test packages/sdk/arc-ts/test/*.test.ts` |
 
 ### Phase Requirements -> Test Map
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| PROD-01 | query_receipts filters by capability_id | unit | `cargo test -p pact-kernel test_query_filter_capability` | Wave 0 |
-| PROD-01 | query_receipts filters by time range (since/until) | unit | `cargo test -p pact-kernel test_query_filter_time_range` | Wave 0 |
-| PROD-01 | query_receipts filters by outcome | unit | `cargo test -p pact-kernel test_query_filter_outcome` | Wave 0 |
-| PROD-01 | query_receipts filters by min_cost/max_cost | unit | `cargo test -p pact-kernel test_query_filter_cost_range` | Wave 0 |
-| PROD-01 | query_receipts cursor pagination advances correctly | unit | `cargo test -p pact-kernel test_query_cursor_pagination` | Wave 0 |
-| PROD-01 | GET /receipts returns filtered results over HTTP | integration | `cargo test -p pact-cli --test trust_cluster receipts_http_endpoint` | Wave 0 |
-| PROD-01 | pact receipt list CLI returns JSON lines | integration | `cargo test -p pact-cli --test receipt_list_cmd` | Wave 0 |
-| PROD-06 | signDpopProof produces proof verifiable by pact-kernel | unit | `node --experimental-strip-types --test packages/sdk/pact-ts/test/dpop.test.ts` | Wave 0 |
-| PROD-06 | PactError subclasses have correct name and code | unit | `node --experimental-strip-types --test packages/sdk/pact-ts/test/errors.test.ts` | existing |
-| PROD-06 | ReceiptQueryClient.paginate() yields all pages | unit | `node --experimental-strip-types --test packages/sdk/pact-ts/test/receipt_query_client.test.ts` | Wave 0 |
-| PROD-06 | SDK package.json exports resolve correctly | smoke | `node -e "import('@pact-protocol/sdk')"` | Wave 0 |
+| PROD-01 | query_receipts filters by capability_id | unit | `cargo test -p arc-kernel test_query_filter_capability` | Wave 0 |
+| PROD-01 | query_receipts filters by time range (since/until) | unit | `cargo test -p arc-kernel test_query_filter_time_range` | Wave 0 |
+| PROD-01 | query_receipts filters by outcome | unit | `cargo test -p arc-kernel test_query_filter_outcome` | Wave 0 |
+| PROD-01 | query_receipts filters by min_cost/max_cost | unit | `cargo test -p arc-kernel test_query_filter_cost_range` | Wave 0 |
+| PROD-01 | query_receipts cursor pagination advances correctly | unit | `cargo test -p arc-kernel test_query_cursor_pagination` | Wave 0 |
+| PROD-01 | GET /receipts returns filtered results over HTTP | integration | `cargo test -p arc-cli --test trust_cluster receipts_http_endpoint` | Wave 0 |
+| PROD-01 | arc receipt list CLI returns JSON lines | integration | `cargo test -p arc-cli --test receipt_list_cmd` | Wave 0 |
+| PROD-06 | signDpopProof produces proof verifiable by arc-kernel | unit | `node --experimental-strip-types --test packages/sdk/arc-ts/test/dpop.test.ts` | Wave 0 |
+| PROD-06 | ArcError subclasses have correct name and code | unit | `node --experimental-strip-types --test packages/sdk/arc-ts/test/errors.test.ts` | existing |
+| PROD-06 | ReceiptQueryClient.paginate() yields all pages | unit | `node --experimental-strip-types --test packages/sdk/arc-ts/test/receipt_query_client.test.ts` | Wave 0 |
+| PROD-06 | SDK package.json exports resolve correctly | smoke | `node -e "import('@arc-protocol/sdk')"` | Wave 0 |
 
 ### Sampling Rate
-- **Per task commit:** `cargo test -p pact-kernel` (receipt_query unit tests)
-- **Per wave merge:** `cargo test --workspace && node --experimental-strip-types --test packages/sdk/pact-ts/test/*.test.ts`
+- **Per task commit:** `cargo test -p arc-kernel` (receipt_query unit tests)
+- **Per wave merge:** `cargo test --workspace && node --experimental-strip-types --test packages/sdk/arc-ts/test/*.test.ts`
 - **Phase gate:** Full suite green before `/gsd:verify-work`
 
 ### Wave 0 Gaps
-- [ ] `crates/pact-kernel/src/receipt_query.rs` -- new module, all tests live here
-- [ ] `crates/pact-cli/tests/receipt_list_cmd.rs` -- integration test for CLI subcommand
-- [ ] `packages/sdk/pact-ts/test/dpop.test.ts` -- signDpopProof cross-language verification
-- [ ] `packages/sdk/pact-ts/test/receipt_query_client.test.ts` -- ReceiptQueryClient pagination
-- [ ] `packages/sdk/pact-ts/src/errors.ts` -- PactError hierarchy (replaces/extends existing errors.ts)
-- [ ] `packages/sdk/pact-ts/src/dpop.ts` -- signDpopProof function
+- [ ] `crates/arc-kernel/src/receipt_query.rs` -- new module, all tests live here
+- [ ] `crates/arc-cli/tests/receipt_list_cmd.rs` -- integration test for CLI subcommand
+- [ ] `packages/sdk/arc-ts/test/dpop.test.ts` -- signDpopProof cross-language verification
+- [ ] `packages/sdk/arc-ts/test/receipt_query_client.test.ts` -- ReceiptQueryClient pagination
+- [ ] `packages/sdk/arc-ts/src/errors.ts` -- ArcError hierarchy (replaces/extends existing errors.ts)
+- [ ] `packages/sdk/arc-ts/src/dpop.ts` -- signDpopProof function
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code inspection: `crates/pact-kernel/src/receipt_store.rs` -- existing SQL query patterns, indexed columns, cursor semantics
-- Direct code inspection: `crates/pact-kernel/src/dpop.rs` -- DpopProofBody field names and types, DPOP_SCHEMA constant, verify_dpop_proof steps
-- Direct code inspection: `crates/pact-cli/src/trust_control.rs` -- existing axum handler pattern, ToolReceiptQuery, ReceiptListResponse, router structure
-- Direct code inspection: `crates/pact-cli/src/main.rs` -- TrustCommands enum, clap derive patterns, configure_receipt_store
-- Direct code inspection: `packages/sdk/pact-ts/src/invariants/crypto.ts` -- signEd25519Message, sha256Hex implementations
-- Direct code inspection: `packages/sdk/pact-ts/src/invariants/json.ts` -- canonicalizeJson RFC 8785 implementation
-- Direct code inspection: `packages/sdk/pact-ts/src/invariants/errors.ts` -- existing PactInvariantError base class
-- Direct code inspection: `packages/sdk/pact-ts/package.json` -- current name (@pact/sdk), version (0.1.0), private flag
-- Direct code inspection: `crates/pact-core/src/receipt.rs` -- FinancialReceiptMetadata fields including cost_charged
+- Direct code inspection: `crates/arc-kernel/src/receipt_store.rs` -- existing SQL query patterns, indexed columns, cursor semantics
+- Direct code inspection: `crates/arc-kernel/src/dpop.rs` -- DpopProofBody field names and types, DPOP_SCHEMA constant, verify_dpop_proof steps
+- Direct code inspection: `crates/arc-cli/src/trust_control.rs` -- existing axum handler pattern, ToolReceiptQuery, ReceiptListResponse, router structure
+- Direct code inspection: `crates/arc-cli/src/main.rs` -- TrustCommands enum, clap derive patterns, configure_receipt_store
+- Direct code inspection: `packages/sdk/arc-ts/src/invariants/crypto.ts` -- signEd25519Message, sha256Hex implementations
+- Direct code inspection: `packages/sdk/arc-ts/src/invariants/json.ts` -- canonicalizeJson RFC 8785 implementation
+- Direct code inspection: `packages/sdk/arc-ts/src/invariants/errors.ts` -- existing ArcInvariantError base class
+- Direct code inspection: `packages/sdk/arc-ts/package.json` -- current name (@arc/sdk), version (0.1.0), private flag
+- Direct code inspection: `crates/arc-core/src/receipt.rs` -- FinancialReceiptMetadata fields including cost_charged
 
 ### Secondary (MEDIUM confidence)
 - SQLite json_extract function: standard in SQLite 3.38+ (2022); WAL-mode SQLite already in use -- json_extract available

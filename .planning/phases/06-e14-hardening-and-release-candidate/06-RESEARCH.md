@@ -12,8 +12,8 @@ focus:
 ## What Already Existed
 
 - strong semantic coverage from `E9` through `E13`
-- live JS/Python conformance waves in `crates/pact-conformance/tests/`
-- the ignored five-run trust-cluster qualifier in `crates/pact-cli/tests/trust_cluster.rs`
+- live JS/Python conformance waves in `crates/arc-conformance/tests/`
+- the ignored five-run trust-cluster qualifier in `crates/arc-cli/tests/trust_cluster.rs`
 - draft close-out intent in `docs/epics/E14-hardening-and-release-candidate.md`
 
 ## What Was Missing

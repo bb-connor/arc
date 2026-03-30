@@ -15,7 +15,7 @@ created: 2026-03-24
 |----------|-------|
 | **Framework** | `cargo test` (Rust integration + unit tests) |
 | **Config file** | `Cargo.toml` / crate-local `Cargo.toml` files |
-| **Quick run command** | `cargo test -p pact-cli --test passport -- --nocapture` |
+| **Quick run command** | `cargo test -p arc-cli --test passport -- --nocapture` |
 | **Full suite command** | `cargo test --workspace` |
 | **Targeted feedback loop** | 10-30 seconds after build warmup |
 
@@ -23,10 +23,10 @@ created: 2026-03-24
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 14-01 | VER-01 | `cargo test -p pact-cli --test passport -- --nocapture` |
-| 14-02 | VER-02 | `cargo test -p pact-cli --test passport -- --nocapture` |
-| 14-03 | VER-03 | `cargo test -p pact-cli --test federated_issue -- --nocapture` |
-| 14-04 | VER-01, VER-02, VER-03 | `cargo test -p pact-cli --test provider_admin -- --nocapture` and doc assertions |
+| 14-01 | VER-01 | `cargo test -p arc-cli --test passport -- --nocapture` |
+| 14-02 | VER-02 | `cargo test -p arc-cli --test passport -- --nocapture` |
+| 14-03 | VER-03 | `cargo test -p arc-cli --test federated_issue -- --nocapture` |
+| 14-04 | VER-01, VER-02, VER-03 | `cargo test -p arc-cli --test provider_admin -- --nocapture` and doc assertions |
 
 ## Wave 0 Requirements
 

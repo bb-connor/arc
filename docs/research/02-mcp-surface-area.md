@@ -2,7 +2,7 @@
 
 ## Why This Matters
 
-If PACT wants to replace MCP, it must replace more than `tools/call`.
+If ARC wants to replace MCP, it must replace more than `tools/call`.
 
 MCP is not just a tool invocation format. It is a session protocol with:
 
@@ -31,7 +31,7 @@ MCP requires JSON-RPC 2.0 message semantics:
 - notifications
 - request IDs unique within a session
 
-PACT currently does not expose a JSON-RPC session edge. It uses its own framed message protocol internally.
+ARC currently does not expose a JSON-RPC session edge. It uses its own framed message protocol internally.
 
 ## 2. Lifecycle
 
@@ -44,9 +44,9 @@ Lifecycle is part of MCP's mandatory core. That includes:
 
 This is not optional if the goal is true protocol replacement.
 
-PACT implication:
+ARC implication:
 
-- PACT needs a session handshake and negotiated feature model
+- ARC needs a session handshake and negotiated feature model
 - capabilities in the security sense are not the same thing as session capability negotiation
 
 ## 3. Authorization and Transport
@@ -56,11 +56,11 @@ MCP now defines an authorization model for HTTP-based transports, with OAuth-ori
 Key point:
 
 - MCP transport auth is about authenticating access to a server session
-- PACT capability auth is about authorizing tool actions inside the session
+- ARC capability auth is about authorizing tool actions inside the session
 
-PACT implication:
+ARC implication:
 
-- PACT should not treat its capability model as a substitute for session transport auth
+- ARC should not treat its capability model as a substitute for session transport auth
 - a real replacement needs both
 
 ## 4. Server Features

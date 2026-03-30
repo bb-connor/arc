@@ -8,7 +8,7 @@ Plan `03-04`: lifecycle diagnostics, cleanup behavior, and hosted-runtime operat
 
 ```bash
 cargo fmt --all -- --check
-cargo test -p pact-cli --test mcp_serve_http
+cargo test -p arc-cli --test mcp_serve_http
 cargo test --workspace
 ```
 

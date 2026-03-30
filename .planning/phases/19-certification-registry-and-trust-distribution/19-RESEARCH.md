@@ -36,8 +36,8 @@ metadata.
 
 ### CLI and Trust-Control
 - local CLI:
-  - `pact certify verify`
-  - `pact certify registry publish|list|get|resolve|revoke`
+  - `arc certify verify`
+  - `arc certify registry publish|list|get|resolve|revoke`
 - remote trust-control:
   - `GET/POST /v1/certifications`
   - `GET /v1/certifications/{artifact_id}`
@@ -51,7 +51,7 @@ metadata.
 
 ## Validation Strategy
 
-- `cargo test -p pact-cli --test certify -- --nocapture`
+- `cargo test -p arc-cli --test certify -- --nocapture`
 
 ## Conclusion
 

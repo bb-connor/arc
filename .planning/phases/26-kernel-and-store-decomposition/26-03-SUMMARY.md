@@ -13,13 +13,13 @@ provides:
   - Smaller kernel facade and requalified storage-backed coverage
 key-files:
   created:
-    - crates/pact-kernel/src/runtime.rs
-    - crates/pact-kernel/src/revocation_runtime.rs
+    - crates/arc-kernel/src/runtime.rs
+    - crates/arc-kernel/src/revocation_runtime.rs
   modified:
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-kernel/tests/retention.rs
-    - crates/pact-cli/tests/receipt_query.rs
-    - crates/pact-cli/tests/mcp_serve_http.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-kernel/tests/retention.rs
+    - crates/arc-cli/tests/receipt_query.rs
+    - crates/arc-cli/tests/mcp_serve_http.rs
 requirements-completed:
   - ARCH-04
   - ARCH-05
@@ -34,16 +34,16 @@ after the extraction.
 ## Accomplishments
 
 - extracted runtime-facing request/response and tool-server ownership types into
-  `crates/pact-kernel/src/runtime.rs`
+  `crates/arc-kernel/src/runtime.rs`
 - moved revocation runtime contracts into
-  `crates/pact-kernel/src/revocation_runtime.rs`, reducing
-  `crates/pact-kernel/src/lib.rs` to 8,568 lines
+  `crates/arc-kernel/src/revocation_runtime.rs`, reducing
+  `crates/arc-kernel/src/lib.rs` to 8,568 lines
 - requalified kernel storage behavior, `receipt_query`, and hosted MCP runtime
   flows after the store split
 
 ## Verification
 
-- `cargo test -p pact-kernel -- --nocapture`
-- `cargo test -p pact-cli --test receipt_query -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture --test-threads=1`
-- `wc -l crates/pact-kernel/src/lib.rs crates/pact-kernel/src/runtime.rs crates/pact-kernel/src/revocation_runtime.rs`
+- `cargo test -p arc-kernel -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture --test-threads=1`
+- `wc -l crates/arc-kernel/src/lib.rs crates/arc-kernel/src/runtime.rs crates/arc-kernel/src/revocation_runtime.rs`

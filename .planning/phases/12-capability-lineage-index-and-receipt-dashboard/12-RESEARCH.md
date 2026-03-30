@@ -9,7 +9,7 @@
 
 ### Locked Decisions
 
-- Index stored in SQLite table in pact-kernel alongside receipt store -- co-located for efficient joins
+- Index stored in SQLite table in arc-kernel alongside receipt store -- co-located for efficient joins
 - Capability snapshots persisted at issuance time (when kernel creates a new capability)
 - Keyed by capability_id with subject, issuer, grants, and delegation metadata
 - Agent-centric queries via JOIN capability_lineage ON capability_id extending existing receipt_query.rs with agent filter
@@ -52,13 +52,13 @@ None -- discussion stayed within phase scope
 
 ## Summary
 
-Phase 12 has two distinct implementation layers that compose cleanly. The Rust layer (plans 12-01 and 12-02) extends pact-kernel with a `capability_lineage` SQLite table and adds agent-subject filtering to the existing receipt query path. The frontend layer (plans 12-03 and 12-04) builds a React 18 SPA and wires it into the running axum server via `tower_http::ServeDir`.
+Phase 12 has two distinct implementation layers that compose cleanly. The Rust layer (plans 12-01 and 12-02) extends arc-kernel with a `capability_lineage` SQLite table and adds agent-subject filtering to the existing receipt query path. The frontend layer (plans 12-03 and 12-04) builds a React 18 SPA and wires it into the running axum server via `tower_http::ServeDir`.
 
 The Rust side is low-risk: it follows the exact same SQLite store pattern already used in `receipt_store.rs`, `budget_store.rs`, and `revocation_store.rs`. The new table co-locates with the receipt database so agent-centric queries can be answered via a single JOIN rather than a log replay. Delegation chain inspection uses SQLite's `WITH RECURSIVE` CTE, which is fully supported by rusqlite without any additional dependencies.
 
 The frontend side uses a locked, well-understood stack: React 18 (current: 19.2.4 -- but the decision locked React 18, so pin 18.x), Vite 6 (current: 8.0.1 -- note: Vite 6 is not the latest; latest stable is 6.x), TanStack Table 8.21.3, and Recharts 3.8.0 (note: Recharts "2" major series is now at 3.x; latest "2" series tag is 2.15.x). The SPA is served by axum via `tower-http` `ServeDir`, which is the idiomatic pattern for axum 0.8 SPAs.
 
-**Primary recommendation:** Implement `capability_lineage.rs` in pact-kernel following the receipt_store.rs pattern, extend `ReceiptQuery` with `agent_subject: Option<String>`, build the SPA with `@tanstack/react-table@8`, `recharts@2` (pin to 2.x), React 18, Vite 6, and serve via `tower-http` `ServeDir` nested at `/`.
+**Primary recommendation:** Implement `capability_lineage.rs` in arc-kernel following the receipt_store.rs pattern, extend `ReceiptQuery` with `agent_subject: Option<String>`, build the SPA with `@tanstack/react-table@8`, `recharts@2` (pin to 2.x), React 18, Vite 6, and serve via `tower-http` `ServeDir` nested at `/`.
 
 ---
 
@@ -68,7 +68,7 @@ The frontend side uses a locked, well-understood stack: React 18 (current: 19.2.
 | Library | Version | Purpose | Why Standard |
 |---------|---------|---------|--------------|
 | rusqlite | 0.37 (bundled) | SQLite capability_lineage table, WITH RECURSIVE queries | Already in workspace.dependencies; bundled avoids system lib dep |
-| axum | 0.8 | HTTP router; ServeDir wiring | Already in pact-cli Cargo.toml |
+| axum | 0.8 | HTTP router; ServeDir wiring | Already in arc-cli Cargo.toml |
 | tower-http | 0.6.x | ServeDir for static SPA dist/ | Required companion to axum 0.8 for file serving |
 | serde_json | 1 | JSON serialization of grants/scope into lineage rows | Already in workspace.dependencies |
 
@@ -97,7 +97,7 @@ The frontend side uses a locked, well-understood stack: React 18 (current: 19.2.
 | Vite 6 | esbuild standalone | Vite gives HMR + React plugin out of the box |
 | WITH RECURSIVE CTE | Application-layer chain walk | CTE handles arbitrarily deep chains in one query; app-layer is O(n) round trips |
 
-**Installation (Rust -- add to pact-cli Cargo.toml):**
+**Installation (Rust -- add to arc-cli Cargo.toml):**
 ```toml
 tower-http = { version = "0.6", features = ["fs"] }
 ```
@@ -123,13 +123,13 @@ npm install @tanstack/react-table@8 recharts@2 date-fns lucide-react
 ### Recommended Project Structure
 
 ```
-crates/pact-kernel/src/
+crates/arc-kernel/src/
 ├── capability_lineage.rs    # New: CapabilityLineageStore, SQLite table, WITH RECURSIVE
 ├── receipt_query.rs         # Extended: add agent_subject field to ReceiptQuery
 ├── receipt_store.rs         # Extended: query_receipts_impl uses LEFT JOIN lineage
 └── lib.rs                   # Re-export CapabilityLineageStore
 
-crates/pact-cli/src/
+crates/arc-cli/src/
 ├── trust_control.rs         # Extended: ServeDir nest, /v1/lineage/* routes
 └── dashboard/               # SPA source tree (Vite project)
     ├── package.json
@@ -149,7 +149,7 @@ crates/pact-cli/src/
 
 ### Pattern 1: capability_lineage SQLite Table
 
-**What:** A new table in the same SQLite database as `pact_tool_receipts`. Rows are inserted at capability issuance time. The `parent_capability_id` column is a self-referencing nullable FK enabling recursive chain walks.
+**What:** A new table in the same SQLite database as `arc_tool_receipts`. Rows are inserted at capability issuance time. The `parent_capability_id` column is a self-referencing nullable FK enabling recursive chain walks.
 
 **When to use:** Called from the kernel's `issue_capability` path (in `authority.rs` or wherever `LocalCapabilityAuthority::issue` constructs a new `CapabilityToken`).
 
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS capability_lineage (
     issuer_key      TEXT NOT NULL,         -- hex-encoded Ed25519 public key
     issued_at       INTEGER NOT NULL,      -- Unix seconds
     expires_at      INTEGER NOT NULL,      -- Unix seconds
-    grants_json     TEXT NOT NULL,         -- JSON array of ToolGrant/etc from PactScope
+    grants_json     TEXT NOT NULL,         -- JSON array of ToolGrant/etc from ArcScope
     delegation_depth INTEGER NOT NULL DEFAULT 0,
     parent_capability_id TEXT REFERENCES capability_lineage(capability_id)
 );
@@ -217,7 +217,7 @@ pub fn record_capability_snapshot(
 ```sql
 -- Extended data query (agent_subject filter added):
 SELECT r.seq, r.raw_json
-FROM pact_tool_receipts r
+FROM arc_tool_receipts r
 LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
 WHERE (?1 IS NULL OR r.capability_id = ?1)
   AND (?2 IS NULL OR r.tool_server = ?2)
@@ -399,7 +399,7 @@ In production, no proxy is needed because the SPA and API are served from the sa
 
 **How to avoid:** The simplest approach: accept `?token=<bearer>` as a query parameter in the SPA on first load, store it in `sessionStorage`, and attach it to every fetch:
 ```typescript
-const token = sessionStorage.getItem('pact_token') ?? new URLSearchParams(location.search).get('token') ?? ''
+const token = sessionStorage.getItem('arc_token') ?? new URLSearchParams(location.search).get('token') ?? ''
 fetch('/v1/receipts/query?...', { headers: { Authorization: `Bearer ${token}` } })
 ```
 This avoids adding a new unauthenticated endpoint. Non-engineers receive a URL with the token embedded, which is acceptable for internal dashboards.
@@ -410,18 +410,18 @@ This avoids adding a new unauthenticated endpoint. Non-engineers receive a URL w
 
 **Why it happens:** `tower-http` gates filesystem serving behind the `"fs"` feature to keep compile times low.
 
-**How to avoid:** Add to pact-cli Cargo.toml:
+**How to avoid:** Add to arc-cli Cargo.toml:
 ```toml
 tower-http = { version = "0.6", features = ["fs"] }
 ```
 
 ### Pitfall 4: capability_lineage Table in Wrong Database File
 
-**What goes wrong:** `capability_lineage` rows are inserted to a different SQLite connection than `pact_tool_receipts`, making the JOIN in `query_receipts_impl` fail with "no such table" at query time.
+**What goes wrong:** `capability_lineage` rows are inserted to a different SQLite connection than `arc_tool_receipts`, making the JOIN in `query_receipts_impl` fail with "no such table" at query time.
 
-**Why it happens:** pact-kernel currently has separate database files for receipts, budgets, and revocations. If `capability_lineage` opens its own connection to a new file, the JOIN cannot span connections.
+**Why it happens:** arc-kernel currently has separate database files for receipts, budgets, and revocations. If `capability_lineage` opens its own connection to a new file, the JOIN cannot span connections.
 
-**How to avoid:** Add the `capability_lineage` table to the same SQLite file as `pact_tool_receipts` (the receipt DB). Open it in `SqliteReceiptStore::open` alongside the existing `CREATE TABLE IF NOT EXISTS` batch. This is the explicit decision in CONTEXT.md ("co-located for efficient joins").
+**How to avoid:** Add the `capability_lineage` table to the same SQLite file as `arc_tool_receipts` (the receipt DB). Open it in `SqliteReceiptStore::open` alongside the existing `CREATE TABLE IF NOT EXISTS` batch. This is the explicit decision in CONTEXT.md ("co-located for efficient joins").
 
 ### Pitfall 5: Vite Build outDir Mismatch
 
@@ -429,7 +429,7 @@ tower-http = { version = "0.6", features = ["fs"] }
 
 **Why it happens:** Vite's default `outDir` is relative to the project root (`dashboard/`), so it emits to `dashboard/dist` by default -- which matches. But if the axum binary is run from a different working directory, the relative path breaks.
 
-**How to avoid:** Use an absolute path based on a compile-time `CARGO_MANIFEST_DIR` embed, or document that `pact trust-serve` must be run from the workspace root. Add a clear error message if `dist/index.html` is not found at startup.
+**How to avoid:** Use an absolute path based on a compile-time `CARGO_MANIFEST_DIR` embed, or document that `arc trust-serve` must be run from the workspace root. Add a clear error message if `dist/index.html` is not found at startup.
 
 ### Pitfall 6: React 18 vs 19 API Differences
 
@@ -456,7 +456,7 @@ Verified patterns from official sources and codebase analysis:
 
 ### Lineage Store Opening (follows receipt_store.rs pattern exactly)
 ```rust
-// Mirrors SqliteReceiptStore::open in crates/pact-kernel/src/receipt_store.rs
+// Mirrors SqliteReceiptStore::open in crates/arc-kernel/src/receipt_store.rs
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
         // ...existing setup...
@@ -490,7 +490,7 @@ impl SqliteReceiptStore {
 
 ### Agent-Centric Query Extension (ReceiptQuery struct)
 ```rust
-// In crates/pact-kernel/src/receipt_query.rs
+// In crates/arc-kernel/src/receipt_query.rs
 pub struct ReceiptQuery {
     // ... existing fields ...
     /// Filter by agent subject public key (hex-encoded Ed25519).
@@ -501,7 +501,7 @@ pub struct ReceiptQuery {
 
 ### axum ServeDir Integration
 ```rust
-// In crates/pact-cli/src/trust_control.rs
+// In crates/arc-cli/src/trust_control.rs
 // Add to Cargo.toml: tower-http = { version = "0.6", features = ["fs"] }
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -565,8 +565,8 @@ const table = useReactTable({
 
 1. **Dashboard build location and binary path**
    - What we know: `ServeDir::new("dashboard/dist")` uses a path relative to the process working directory.
-   - What's unclear: Should the `pact` binary embed the dashboard dist at compile time (via `include_dir!`) or expect it on-disk at runtime?
-   - Recommendation: Use runtime path for Phase 12 (simplest). Document that `pact trust-serve` must be run from the workspace root where `dashboard/dist/` exists. Embedding can be done in a future hardening phase.
+   - What's unclear: Should the `arc` binary embed the dashboard dist at compile time (via `include_dir!`) or expect it on-disk at runtime?
+   - Recommendation: Use runtime path for Phase 12 (simplest). Document that `arc trust-serve` must be run from the workspace root where `dashboard/dist/` exists. Embedding can be done in a future hardening phase.
 
 2. **Capability snapshot hook location**
    - What we know: `CapabilityToken` is issued by `LocalCapabilityAuthority::issue` in `authority.rs`.
@@ -587,41 +587,41 @@ const table = useReactTable({
 |----------|-------|
 | Framework | `cargo test` (Rust unit + integration); no separate JS test framework required for Phase 12 |
 | Config file | `Cargo.toml` workspace (existing); `package.json` for frontend build verification |
-| Quick run command | `cargo test -p pact-kernel -- capability_lineage` |
+| Quick run command | `cargo test -p arc-kernel -- capability_lineage` |
 | Full suite command | `cargo test --workspace` |
 
 ### Phase Requirements -> Test Map
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| PROD-02 | capability_lineage rows persist at issuance with correct subject/issuer/grants | unit | `cargo test -p pact-kernel -- capability_lineage::tests` | ❌ Wave 0 |
-| PROD-02 | grants_json round-trips through serde_json without loss | unit | `cargo test -p pact-kernel -- capability_lineage::tests::grants_roundtrip` | ❌ Wave 0 |
-| PROD-03 | agent_subject filter returns only receipts from that agent's capabilities | unit | `cargo test -p pact-kernel -- receipt_query::tests::test_query_agent_subject` | ❌ Wave 0 |
+| PROD-02 | capability_lineage rows persist at issuance with correct subject/issuer/grants | unit | `cargo test -p arc-kernel -- capability_lineage::tests` | ❌ Wave 0 |
+| PROD-02 | grants_json round-trips through serde_json without loss | unit | `cargo test -p arc-kernel -- capability_lineage::tests::grants_roundtrip` | ❌ Wave 0 |
+| PROD-03 | agent_subject filter returns only receipts from that agent's capabilities | unit | `cargo test -p arc-kernel -- receipt_query::tests::test_query_agent_subject` | ❌ Wave 0 |
 | PROD-03 | agent-centric query does not replay issuance logs (resolved via JOIN) | unit | Verified by query plan inspection or by ensuring no seq scan on raw_json | ❌ Wave 0 |
-| PROD-04 | GET /v1/lineage/:id/chain returns delegation chain in root-first order | integration | `cargo test -p pact-cli --test receipt_query -- lineage_chain` | ❌ Wave 0 |
-| PROD-05 | dashboard index.html served at GET / by axum | integration | `cargo test -p pact-cli --test receipt_query -- spa_serves_index` | ❌ Wave 0 |
-| PROD-05 | missing asset path falls back to index.html (SPA client routing) | integration | `cargo test -p pact-cli --test receipt_query -- spa_fallback` | ❌ Wave 0 |
+| PROD-04 | GET /v1/lineage/:id/chain returns delegation chain in root-first order | integration | `cargo test -p arc-cli --test receipt_query -- lineage_chain` | ❌ Wave 0 |
+| PROD-05 | dashboard index.html served at GET / by axum | integration | `cargo test -p arc-cli --test receipt_query -- spa_serves_index` | ❌ Wave 0 |
+| PROD-05 | missing asset path falls back to index.html (SPA client routing) | integration | `cargo test -p arc-cli --test receipt_query -- spa_fallback` | ❌ Wave 0 |
 
 ### Sampling Rate
-- **Per task commit:** `cargo test -p pact-kernel --lib` (unit only, < 10 s)
+- **Per task commit:** `cargo test -p arc-kernel --lib` (unit only, < 10 s)
 - **Per wave merge:** `cargo test --workspace` (full suite including integration tests)
 - **Phase gate:** Full suite green + `npm run build` in `dashboard/` exits 0, before `/gsd:verify-work`
 
 ### Wave 0 Gaps
 - [ ] Unit tests for `capability_lineage.rs` -- covers PROD-02
 - [ ] Extended `receipt_query.rs` tests for `agent_subject` filter -- covers PROD-03
-- [ ] Integration test in `crates/pact-cli/tests/receipt_query.rs` for lineage chain endpoint -- covers PROD-04
+- [ ] Integration test in `crates/arc-cli/tests/receipt_query.rs` for lineage chain endpoint -- covers PROD-04
 - [ ] Integration test for SPA serving and fallback -- covers PROD-05
-- [ ] `npm run build` in `crates/pact-cli/dashboard/` -- frontend build gate
+- [ ] `npm run build` in `crates/arc-cli/dashboard/` -- frontend build gate
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Codebase analysis: `crates/pact-kernel/src/receipt_store.rs` -- SQLite WAL mode, SYNCHRONOUS=FULL pattern, params! macro usage
-- Codebase analysis: `crates/pact-kernel/src/receipt_query.rs` -- ReceiptQuery struct, query_receipts_impl, filter/cursor pattern
-- Codebase analysis: `crates/pact-cli/src/trust_control.rs` -- axum Router::new, route registration order, Bearer auth pattern
-- Codebase analysis: `crates/pact-core/src/capability.rs` -- CapabilityToken fields (id, issuer, subject, scope, issued_at, expires_at, delegation_chain)
+- Codebase analysis: `crates/arc-kernel/src/receipt_store.rs` -- SQLite WAL mode, SYNCHRONOUS=FULL pattern, params! macro usage
+- Codebase analysis: `crates/arc-kernel/src/receipt_query.rs` -- ReceiptQuery struct, query_receipts_impl, filter/cursor pattern
+- Codebase analysis: `crates/arc-cli/src/trust_control.rs` -- axum Router::new, route registration order, Bearer auth pattern
+- Codebase analysis: `crates/arc-core/src/capability.rs` -- CapabilityToken fields (id, issuer, subject, scope, issued_at, expires_at, delegation_chain)
 - `npm view @tanstack/react-table version` -> 8.21.3 (verified 2026-03-22)
 - `npm view recharts dist-tags` -> latest: 3.8.0 (Recharts 2.x is 2.x branch; pin `recharts@2`)
 - `npm view vite dist-tags` -> latest: 8.0.1, previous: 5.4.21 (Vite 6 must be pinned as `vite@6`)

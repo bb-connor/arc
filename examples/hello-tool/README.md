@@ -4,7 +4,7 @@ This example is the maintained native-side landing zone for wrapped-MCP-to-nativ
 
 ## What it shows
 
-- a native PACT service built with `NativePactServiceBuilder`
+- a native ARC service built with `NativeArcServiceBuilder`
 - one tool (`greet`)
 - one resource (`memory://hello/template`)
 - one prompt (`compose_greeting`)
@@ -13,7 +13,7 @@ This example is the maintained native-side landing zone for wrapped-MCP-to-nativ
 
 ## Why this example exists
 
-The repo already has strong wrapped-MCP support through `pact mcp serve` and `pact mcp serve-http`.
+The repo already has strong wrapped-MCP support through `arc mcp serve` and `arc mcp serve-http`.
 
 This example shows the next step after that adapter layer:
 
@@ -24,13 +24,13 @@ This example shows the next step after that adapter layer:
 
 ## Migration map
 
-| Wrapped MCP shape | Native PACT shape |
+| Wrapped MCP shape | Native ARC shape |
 | --- | --- |
-| upstream `tools/list` | `NativeTool` definitions in `NativePactServiceBuilder` |
+| upstream `tools/list` | `NativeTool` definitions in `NativeArcServiceBuilder` |
 | upstream `tools/call` | Rust handler closures registered on the builder |
-| adapted manifest generation | `NativePactService::manifest()` |
+| adapted manifest generation | `NativeArcService::manifest()` |
 | adapter-backed resource / prompt providers | `NativeResource` and `NativePrompt` registrations |
-| late upstream notifications | `NativePactService::emit_event()` and `drain_events()` |
+| late upstream notifications | `NativeArcService::emit_event()` and `drain_events()` |
 
 The example is intentionally small. If you need resource templates, advanced completion, or transport bootstrapping, drop down to the lower-level traits and edge types directly.
 

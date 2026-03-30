@@ -9,7 +9,7 @@ It answers:
 - what a scenario is
 - how results should be recorded
 - how the generated matrix should be structured
-- how to keep reports honest as PACT adds both MCP-core and PACT-specific behavior
+- how to keep reports honest as ARC adds both MCP-core and ARC-specific behavior
 
 ## Core Design Rule
 
@@ -32,7 +32,7 @@ Suggested shape:
   "area": "tools",
   "specVersions": ["2025-11-25"],
   "transport": ["stdio", "streamable-http"],
-  "peerRoles": ["client_to_pact_server", "pact_client_to_server"],
+  "peerRoles": ["client_to_arc_server", "arc_client_to_server"],
   "deploymentModes": ["wrapped_stdio", "native_stdio", "remote_http"],
   "category": "mcp-core",
   "requiredCapabilities": {
@@ -64,7 +64,7 @@ Every scenario should belong to exactly one category:
 
 - `mcp-core`
 - `mcp-experimental`
-- `pact-extension`
+- `arc-extension`
 - `infra`
 
 ### `mcp-core`
@@ -88,15 +88,15 @@ Examples:
 - tasks
 - some auth edge cases if treated separately
 
-### `pact-extension`
+### `arc-extension`
 
-PACT-native behavior that should be reported, but never counted as MCP compliance.
+ARC-native behavior that should be reported, but never counted as MCP compliance.
 
 Examples:
 
 - deny receipts
 - child-request receipts
-- `notifications/pact/tool_call_chunk`
+- `notifications/arc/tool_call_chunk`
 
 ### `infra`
 
@@ -118,7 +118,7 @@ Suggested JSON shape:
 {
   "scenarioId": "tools-call-simple-text",
   "peer": "js",
-  "peerRole": "client_to_pact_server",
+  "peerRole": "client_to_arc_server",
   "deploymentMode": "remote_http",
   "transport": "streamable-http",
   "specVersion": "2025-11-25",
@@ -219,7 +219,7 @@ Example:
 
 Rules:
 
-- use separate sections for `mcp-core`, `mcp-experimental`, and `pact-extension`
+- use separate sections for `mcp-core`, `mcp-experimental`, and `arc-extension`
 - show `unsupported` explicitly rather than hiding it
 - link scenario IDs to raw JSON artifacts where practical
 
@@ -231,12 +231,12 @@ Good aggregates:
 
 - MCP-core pass rate
 - experimental pass rate
-- PACT-extension pass count
+- ARC-extension pass count
 - per-peer pass/fail summaries
 
 Bad aggregates:
 
-- one global pass rate across core, experimental, and PACT-only features
+- one global pass rate across core, experimental, and ARC-only features
 
 That would be misleading.
 
@@ -269,9 +269,9 @@ For remote/auth cases, also keep:
 - metadata documents returned
 - token flow step trace with secrets redacted
 
-## PACT-Specific Reporting Rules
+## ARC-Specific Reporting Rules
 
-PACT-specific features must never inflate MCP compliance claims.
+ARC-specific features must never inflate MCP compliance claims.
 
 Report them separately.
 
@@ -292,7 +292,7 @@ They are just not the same as MCP-core compatibility.
 1. Summary
 2. MCP-core scenario matrix
 3. MCP experimental scenario matrix
-4. PACT extension matrix
+4. ARC extension matrix
 5. Failures by area
 6. Failures by peer
 7. Raw artifact links
@@ -320,11 +320,11 @@ They are just not the same as MCP-core compatibility.
 - `oauth-auth-code-pkce`
 - `oauth-token-exchange`
 
-### PACT extension
+### ARC extension
 
 - `deny-receipt-emitted`
 - `child-receipt-lineage`
-- `pact-tool-streaming-notification`
+- `arc-tool-streaming-notification`
 - `distributed-revocation-enforced`
 - `shared-budget-enforced`
 

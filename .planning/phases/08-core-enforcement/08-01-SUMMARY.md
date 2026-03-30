@@ -9,7 +9,7 @@ requires:
     provides: MonetaryAmount type and ToolGrant monetary fields (max_cost_per_invocation, max_total_cost)
 
 provides:
-  - FinancialReceiptMetadata struct in pact-core with all required fields
+  - FinancialReceiptMetadata struct in arc-core with all required fields
   - BudgetStore.try_charge_cost trait method (per-invocation + total cost enforcement)
   - SqliteBudgetStore.try_charge_cost (IMMEDIATE transaction, atomic)
   - InMemoryBudgetStore.try_charge_cost (HashMap-based, mirrors SQLite semantics)
@@ -33,10 +33,10 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - crates/pact-core/src/receipt.rs
-    - crates/pact-core/src/lib.rs
-    - crates/pact-kernel/src/budget_store.rs
-    - crates/pact-kernel/src/lib.rs
+    - crates/arc-core/src/receipt.rs
+    - crates/arc-core/src/lib.rs
+    - crates/arc-kernel/src/budget_store.rs
+    - crates/arc-kernel/src/lib.rs
 
 key-decisions:
   - "FinancialReceiptMetadata uses settlement_status as a String (not enum) to allow extension without schema migration"
@@ -69,7 +69,7 @@ completed: 2026-03-22
 
 ## Accomplishments
 
-- Added `FinancialReceiptMetadata` to pact-core with all required audit fields (grant_index, cost_charged, currency, budget_remaining, budget_total, delegation_depth, root_budget_holder, settlement_status, and optional payment_reference, cost_breakdown, attempted_cost)
+- Added `FinancialReceiptMetadata` to arc-core with all required audit fields (grant_index, cost_charged, currency, budget_remaining, budget_total, delegation_depth, root_budget_holder, settlement_status, and optional payment_reference, cost_breakdown, attempted_cost)
 - Extended `BudgetStore` trait with `try_charge_cost` and implemented it for both `SqliteBudgetStore` (IMMEDIATE transaction) and `InMemoryBudgetStore`; also added `total_cost_charged` to `BudgetUsageRecord` with LWW MAX conflict resolution in `upsert_usage`
 - Added `ToolInvocationCost` struct and `invoke_with_cost` default method to `ToolServerConnection`; existing servers get None-cost default without breaking changes
 
@@ -80,10 +80,10 @@ completed: 2026-03-22
 
 ## Files Created/Modified
 
-- `crates/pact-core/src/receipt.rs` - Added FinancialReceiptMetadata struct + 3 tests
-- `crates/pact-core/src/lib.rs` - Re-exported FinancialReceiptMetadata
-- `crates/pact-kernel/src/budget_store.rs` - Added total_cost_charged field, try_charge_cost trait method and both implementations, ensure_total_cost_charged_column, updated upsert_usage/list_usages/list_usages_after, 11 new tests
-- `crates/pact-kernel/src/lib.rs` - Added ToolInvocationCost struct, invoke_with_cost default method, 2 tests
+- `crates/arc-core/src/receipt.rs` - Added FinancialReceiptMetadata struct + 3 tests
+- `crates/arc-core/src/lib.rs` - Re-exported FinancialReceiptMetadata
+- `crates/arc-kernel/src/budget_store.rs` - Added total_cost_charged field, try_charge_cost trait method and both implementations, ensure_total_cost_charged_column, updated upsert_usage/list_usages/list_usages_after, 11 new tests
+- `crates/arc-kernel/src/lib.rs` - Added ToolInvocationCost struct, invoke_with_cost default method, 2 tests
 
 ## Decisions Made
 

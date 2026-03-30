@@ -1,6 +1,6 @@
 # Observability Guide
 
-PACT `v2.3` treats observability as a supported operator contract, not a
+ARC `v2.8` treats observability as a supported operator contract, not a
 best-effort debugging convenience. The goal is that an operator can identify
 trust, lifecycle, federation, and evidence problems without reading Rust source
 or replaying raw traffic by hand.
@@ -18,7 +18,7 @@ or replaying raw traffic by hand.
 
 ### Trust-Control
 
-`pact trust serve` exposes:
+`arc trust serve` exposes:
 
 - `GET /health`
 - `GET /v1/authority`
@@ -34,6 +34,8 @@ or replaying raw traffic by hand.
   total, enabled, validated, invalid, and the currently loaded snapshot
 - `federation.verifierPolicies`: configured/available state plus total and
   active policy counts, including the currently loaded runtime view
+- `runtimeAssurancePolicyConfigured`: whether trust-control is currently
+  enforcing runtime-assurance issuance tiers from policy
 - `federation.certifications`: configured/available state plus active,
   superseded, and revoked certification counts
 - `cluster`: peer totals, healthy/unhealthy/unknown counts, and the current
@@ -44,7 +46,7 @@ leader visibility rather than general service health.
 
 ### Hosted MCP Edge
 
-`pact mcp serve-http` exposes:
+`arc mcp serve-http` exposes:
 
 - `GET /admin/health`
 - `GET /admin/authority`
@@ -87,6 +89,8 @@ scraping:
 - `GET /v1/certifications/resolve/{tool_server_id}`
 - `GET /v1/federation/evidence-shares`
 - `GET /v1/reports/operator`
+- `GET /v1/reports/behavioral-feed`
+- `GET /v1/reports/settlements`
 - `POST /v1/reputation/compare/{subject_key}`
 
 These surfaces intentionally preserve invalid or incomplete state:
@@ -99,7 +103,7 @@ These surfaces intentionally preserve invalid or incomplete state:
 
 ## A2A Diagnostics
 
-`pact-a2a-adapter` does not ship a separate HTTP health server. Its production
+`arc-a2a-adapter` does not ship a separate HTTP health server. Its production
 diagnostic contract is:
 
 - fail-closed discovery and invocation errors with explicit reason strings
@@ -128,6 +132,7 @@ Common operator-visible A2A error classes:
 | One session denies unexpectedly | `/admin/sessions/{session_id}/trust` | subject key, auth context, per-capability revocation status |
 | Passport or shared-evidence comparison looks wrong | `/v1/reputation/compare/{subject_key}` | subject mismatch, per-credential drift, shared-evidence provenance |
 | Evidence export seems incomplete | `/v1/reports/operator`, `/v1/federation/evidence-shares` | checkpoint coverage, export readiness, referenced upstream shares |
+| Behavioral feed or runtime assurance looks wrong | `/health`, `/v1/reports/behavioral-feed`, `/v1/reports/operator` | `runtimeAssurancePolicyConfigured`, feed filter scope, signed export envelope, settlement/governed breakdown |
 | Certification status is unclear | `/v1/certifications/resolve/{tool_server_id}` | active vs superseded vs revoked |
 | A2A follow-up after restart fails | task-registry file plus adapter error | task id was never recorded or binding/tenant/tool context no longer matches |
 

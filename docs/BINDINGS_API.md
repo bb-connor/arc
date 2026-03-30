@@ -1,14 +1,14 @@
-# PACT Bindings API Contract
+# ARC Bindings API Contract
 
 ## Purpose
 
-Freeze the initial `pact-bindings-core` boundary so SDK work can proceed without turning the bindings layer into a second runtime.
+Freeze the initial `arc-bindings-core` boundary so SDK work can proceed without turning the bindings layer into a second runtime.
 
 This document is intentionally small. It describes the current contract that SDKs may rely on during the SDK parity roadmap.
 
 ## Scope
 
-`pact-bindings-core` is the bindings-friendly Rust facade for deterministic invariant logic only.
+`arc-bindings-core` is the bindings-friendly Rust facade for deterministic invariant logic only.
 
 It is allowed to own:
 
@@ -138,15 +138,15 @@ The contract is considered frozen under the following rules:
 1. New public entrypoints require an owning vector, unit test, or both.
 2. Changes that widen scope into transport or runtime behavior should be rejected by default.
 3. Error code removals or renames are breaking changes.
-4. SDKs should consume helpers through this facade rather than reaching into `pact-core` or `pact-manifest` directly.
+4. SDKs should consume helpers through this facade rather than reaching into `arc-core` or `arc-manifest` directly.
 
 ## Deferred Work
 
 The following are intentionally deferred until the SDK parity roadmap proves the package-backed remote-edge model:
 
-- `pact-bindings-ffi`
-- `pact-bindings-wasm`
-- `pact-native`
+- `arc-bindings-ffi`
+- `arc-bindings-wasm`
+- `arc-native`
 - Go CGO bridge work
 - policy compilation helpers
 

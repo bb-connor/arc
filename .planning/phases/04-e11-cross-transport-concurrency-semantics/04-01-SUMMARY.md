@@ -21,7 +21,7 @@ completed: 2026-03-20T02:53:04Z
 
 # Phase 4 Plan 04-01: E11 Ownership Model Summary
 
-**PACT now exposes one concrete ownership model across direct, wrapped, and remote paths: request-owned session work is explicit on remote diagnostics, task-owned work is explicit on task surfaces, and terminal task results carry lineage metadata instead of collapsing to bare task ids**
+**ARC now exposes one concrete ownership model across direct, wrapped, and remote paths: request-owned session work is explicit on remote diagnostics, task-owned work is explicit on task surfaces, and terminal task results carry lineage metadata instead of collapsing to bare task ids**
 
 ## Accomplishments
 
@@ -34,11 +34,11 @@ completed: 2026-03-20T02:53:04Z
 
 ## Key Files
 
-- `crates/pact-mcp-adapter/src/edge.rs`
-- `crates/pact-mcp-adapter/src/transport.rs`
-- `crates/pact-cli/src/remote_mcp.rs`
-- `crates/pact-cli/tests/mcp_serve.rs`
-- `crates/pact-cli/tests/mcp_serve_http.rs`
+- `crates/arc-mcp-adapter/src/edge.rs`
+- `crates/arc-mcp-adapter/src/transport.rs`
+- `crates/arc-cli/src/remote_mcp.rs`
+- `crates/arc-cli/tests/mcp_serve.rs`
+- `crates/arc-cli/tests/mcp_serve_http.rs`
 - `docs/epics/E11-cross-transport-concurrency-semantics.md`
 - `.planning/ROADMAP.md`
 - `.planning/REQUIREMENTS.md`
@@ -53,9 +53,9 @@ completed: 2026-03-20T02:53:04Z
 ## Verification
 
 - `cargo fmt --all -- --check`
-- `cargo test -p pact-mcp-adapter -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve -- --nocapture`
-- `cargo test -p pact-cli --test mcp_serve_http -- --nocapture`
+- `cargo test -p arc-mcp-adapter -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve -- --nocapture`
+- `cargo test -p arc-cli --test mcp_serve_http -- --nocapture`
 - `cargo test --workspace`
 
 ## Next Phase Readiness

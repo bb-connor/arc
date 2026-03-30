@@ -29,4 +29,4 @@ Phase 6 turned the closing-cycle work into named release proof.
 
 ## Outcome
 
-PACT now has a scoped `v1` release-candidate story that is backed by explicit artifacts instead of spread across test names and planning prose.
+ARC now has a scoped `v1` release-candidate story that is backed by explicit artifacts instead of spread across test names and planning prose.

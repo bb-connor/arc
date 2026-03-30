@@ -2,11 +2,11 @@
 
 ## Findings
 
-1. `pact trust serve` already exposed `/health`, `/v1/authority`, and
+1. `arc trust serve` already exposed `/health`, `/v1/authority`, and
    `/v1/internal/cluster/status`, but the top-level health payload did not yet
    summarize authority availability, store configuration, federation registry
    state, or cluster peer counts.
-2. `pact mcp serve-http` already exposed `/admin/authority`,
+2. `arc mcp serve-http` already exposed `/admin/authority`,
    `/admin/sessions`, and per-session trust views, but it lacked a single
    additive `/admin/health` snapshot covering auth mode, store setup, session
    counts, federation configuration, and OAuth metadata.

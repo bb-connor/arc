@@ -89,6 +89,348 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "arc-a2a-adapter"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-kernel",
+ "arc-manifest",
+ "base64",
+ "rcgen",
+ "rustls-pemfile",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+ "ureq",
+ "url",
+ "webpki-roots 0.26.11",
+]
+
+[[package]]
+name = "arc-bindings-core"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-manifest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-cli"
+version = "0.1.0"
+dependencies = [
+ "arc-conformance",
+ "arc-control-plane",
+ "arc-core",
+ "arc-credentials",
+ "arc-did",
+ "arc-guards",
+ "arc-hosted-mcp",
+ "arc-kernel",
+ "arc-mcp-adapter",
+ "arc-policy",
+ "arc-reputation",
+ "arc-siem",
+ "arc-store-sqlite",
+ "async-stream",
+ "axum",
+ "base64",
+ "chrono",
+ "clap",
+ "hex",
+ "p256",
+ "p384",
+ "percent-encoding",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yaml",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "ureq",
+ "url",
+]
+
+[[package]]
+name = "arc-conformance"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-control-plane"
+version = "0.1.0"
+dependencies = [
+ "arc-conformance",
+ "arc-core",
+ "arc-credentials",
+ "arc-did",
+ "arc-guards",
+ "arc-kernel",
+ "arc-mcp-adapter",
+ "arc-policy",
+ "arc-reputation",
+ "arc-store-sqlite",
+ "axum",
+ "base64",
+ "chrono",
+ "ciborium",
+ "clap",
+ "hex",
+ "p384",
+ "percent-encoding",
+ "rcgen",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "serde_yaml",
+ "sha2",
+ "thiserror 1.0.69",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "ureq",
+ "url",
+ "x509-cert",
+]
+
+[[package]]
+name = "arc-core"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "percent-encoding",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "arc-credentials"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-did",
+ "arc-reputation",
+ "base64",
+ "chrono",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-did"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "bs58",
+ "serde",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "arc-e2e"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-guards",
+ "arc-kernel",
+ "serde_json",
+]
+
+[[package]]
+name = "arc-formal-diff-tests"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "proptest",
+ "serde_json",
+]
+
+[[package]]
+name = "arc-guards"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-kernel",
+ "glob",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tracing",
+]
+
+[[package]]
+name = "arc-hosted-mcp"
+version = "0.1.0"
+dependencies = [
+ "arc-control-plane",
+ "arc-core",
+ "arc-kernel",
+ "arc-mcp-adapter",
+ "arc-store-sqlite",
+ "async-stream",
+ "axum",
+ "base64",
+ "p256",
+ "p384",
+ "reqwest",
+ "rsa",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "tracing",
+ "ureq",
+ "url",
+]
+
+[[package]]
+name = "arc-kernel"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-store-sqlite",
+ "lru",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "ureq",
+ "uuid",
+]
+
+[[package]]
+name = "arc-manifest"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-mcp-adapter"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-kernel",
+ "arc-manifest",
+ "arc-mcp-edge",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "arc-mcp-edge"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-kernel",
+ "arc-manifest",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "arc-policy"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-guards",
+ "arc-kernel",
+ "chrono",
+ "chrono-tz",
+ "hex",
+ "pretty_assertions",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "arc-reputation"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-siem"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "wiremock",
+ "zeroize",
+]
+
+[[package]]
+name = "arc-store-sqlite"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-kernel",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "assert-json-diff"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,6 +642,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "ciborium"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42e69ffd6f0917f5c029256a24d0161db17cea3997d185db0d35926308770f0e"
+dependencies = [
+ "ciborium-io",
+ "ciborium-ll",
+ "serde",
+]
+
+[[package]]
+name = "ciborium-io"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05afea1e0a06c9be33d539b876f1ce3692f4afea2cb41f740e7743225ed1c757"
+
+[[package]]
+name = "ciborium-ll"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57663b653d948a338bfb3eeba9bb2fd5fcfaecb9e199e87e1eda4d9e8b240fd9"
+dependencies = [
+ "ciborium-io",
+ "half",
+]
+
+[[package]]
 name = "clap"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -376,6 +745,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "crunchy"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
+
+[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -449,8 +824,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid",
+ "der_derive",
+ "flagset",
  "pem-rfc7468",
  "zeroize",
+]
+
+[[package]]
+name = "der_derive"
+version = "0.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8034092389675178f570469e6c3b0465d3d30b4505c294a6550db47f3c17ad18"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -606,6 +994,12 @@ name = "find-msvc-tools"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5baebc0774151f905a1a2cc41989300b1e6fbb29aff0ceffa1064fdd3088d582"
+
+[[package]]
+name = "flagset"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7ac824320a75a52197e8f2d787f6a38b6718bb6897a35142d749af3c0e8f4fe"
 
 [[package]]
 name = "flate2"
@@ -820,6 +1214,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "half"
+version = "2.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
+dependencies = [
+ "cfg-if",
+ "crunchy",
+ "zerocopy",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -858,10 +1263,10 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 name = "hello-tool"
 version = "0.1.0"
 dependencies = [
- "pact-core",
- "pact-kernel",
- "pact-manifest",
- "pact-mcp-adapter",
+ "arc-core",
+ "arc-kernel",
+ "arc-manifest",
+ "arc-mcp-adapter",
  "serde",
  "serde_json",
 ]
@@ -1435,335 +1840,6 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2",
-]
-
-[[package]]
-name = "pact-a2a-adapter"
-version = "0.1.0"
-dependencies = [
- "base64",
- "pact-core",
- "pact-kernel",
- "pact-manifest",
- "rcgen",
- "rustls-pemfile",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
- "ureq",
- "url",
- "webpki-roots 0.26.11",
-]
-
-[[package]]
-name = "pact-bindings-core"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "pact-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "pact-cli"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "axum",
- "base64",
- "chrono",
- "clap",
- "hex",
- "p256",
- "p384",
- "pact-conformance",
- "pact-control-plane",
- "pact-core",
- "pact-credentials",
- "pact-did",
- "pact-guards",
- "pact-hosted-mcp",
- "pact-kernel",
- "pact-mcp-adapter",
- "pact-policy",
- "pact-reputation",
- "pact-siem",
- "pact-store-sqlite",
- "reqwest",
- "rsa",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "serde_yaml",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "ureq",
- "url",
-]
-
-[[package]]
-name = "pact-conformance"
-version = "0.1.0"
-dependencies = [
- "reqwest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "pact-control-plane"
-version = "0.1.0"
-dependencies = [
- "axum",
- "chrono",
- "clap",
- "hex",
- "pact-conformance",
- "pact-core",
- "pact-credentials",
- "pact-did",
- "pact-guards",
- "pact-kernel",
- "pact-mcp-adapter",
- "pact-policy",
- "pact-reputation",
- "pact-store-sqlite",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "serde_yaml",
- "sha2",
- "thiserror 1.0.69",
- "tokio",
- "tower-http",
- "tracing",
- "ureq",
-]
-
-[[package]]
-name = "pact-core"
-version = "0.1.0"
-dependencies = [
- "ed25519-dalek",
- "hex",
- "percent-encoding",
- "rand_core 0.6.4",
- "ryu",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "pact-credentials"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "pact-core",
- "pact-did",
- "pact-reputation",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "pact-did"
-version = "0.1.0"
-dependencies = [
- "bs58",
- "pact-core",
- "serde",
- "thiserror 1.0.69",
- "url",
-]
-
-[[package]]
-name = "pact-e2e"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "pact-guards",
- "pact-kernel",
- "serde_json",
-]
-
-[[package]]
-name = "pact-formal-diff-tests"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "proptest",
- "serde_json",
-]
-
-[[package]]
-name = "pact-guards"
-version = "0.1.0"
-dependencies = [
- "glob",
- "pact-core",
- "pact-kernel",
- "regex",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
-]
-
-[[package]]
-name = "pact-hosted-mcp"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "axum",
- "base64",
- "p256",
- "p384",
- "pact-control-plane",
- "pact-core",
- "pact-kernel",
- "pact-mcp-adapter",
- "pact-store-sqlite",
- "reqwest",
- "rsa",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2",
- "tokio",
- "tracing",
- "ureq",
- "url",
-]
-
-[[package]]
-name = "pact-kernel"
-version = "0.1.0"
-dependencies = [
- "lru",
- "pact-core",
- "pact-store-sqlite",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "ureq",
- "uuid",
-]
-
-[[package]]
-name = "pact-manifest"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "pact-mcp-adapter"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "pact-core",
- "pact-kernel",
- "pact-manifest",
- "pact-mcp-edge",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "pact-mcp-edge"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "pact-core",
- "pact-kernel",
- "pact-manifest",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "pact-policy"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "chrono-tz",
- "hex",
- "pact-core",
- "pact-guards",
- "pact-kernel",
- "pretty_assertions",
- "regex",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "pact-reputation"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "pact-siem"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "wiremock",
- "zeroize",
-]
-
-[[package]]
-name = "pact-store-sqlite"
-version = "0.1.0"
-dependencies = [
- "pact-core",
- "pact-kernel",
- "rusqlite",
- "serde",
- "serde_json",
- "uuid",
 ]
 
 [[package]]
@@ -2705,6 +2781,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
+name = "tls_codec"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0de2e01245e2bb89d6f05801c564fa27624dbd7b1846859876c7dad82e90bf6b"
+dependencies = [
+ "tls_codec_derive",
+ "zeroize",
+]
+
+[[package]]
+name = "tls_codec_derive"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d2e76690929402faae40aebdda620a2c0e25dd6d3b9afe48867dfd95991f4bd"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "tokio"
 version = "1.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3498,6 +3595,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9edde0db4769d2dc68579893f2306b26c6ecfbe0ef499b013d731b7b9247e0b9"
 
 [[package]]
+name = "x509-cert"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1301e935010a701ae5f8655edc0ad17c44bad3ac5ce8c39185f75453b720ae94"
+dependencies = [
+ "const-oid",
+ "der",
+ "spki",
+ "tls_codec",
+]
+
+[[package]]
 name = "yansi"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3581,6 +3690,20 @@ name = "zeroize"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b97154e67e32c85465826e8bcc1c59429aaaf107c1e4a9e53c8d8ccd5eff88d0"
+dependencies = [
+ "zeroize_derive",
+]
+
+[[package]]
+name = "zeroize_derive"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85a5b4158499876c763cb03bc4e49185d3cccbabb15b33c627f7884f43db852e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "zerotrie"

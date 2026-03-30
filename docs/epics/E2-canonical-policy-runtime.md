@@ -6,7 +6,7 @@
 
 ## Problem
 
-The repository already contains the richer policy system in `pact-policy`, but the CLI and runtime still center the original PACT YAML path. That creates:
+The repository already contains the richer policy system in `arc-policy`, but the CLI and runtime still center the original ARC YAML path. That creates:
 
 - split-brain runtime behavior
 - duplicated policy semantics
@@ -38,10 +38,10 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-cli/src/policy.rs`
-- `crates/pact-cli/src/main.rs`
-- `crates/pact-policy/src/`
-- `crates/pact-kernel/src/lib.rs`
+- `crates/arc-cli/src/policy.rs`
+- `crates/arc-cli/src/main.rs`
+- `crates/arc-policy/src/`
+- `crates/arc-kernel/src/lib.rs`
 - `examples/policies/`
 
 ## Proposed implementation slices
@@ -52,7 +52,7 @@ Candidate shape:
 
 ```rust
 enum LoadedPolicy {
-    PactYaml(PactPolicy),
+    ArcYaml(ArcPolicy),
     HushSpec {
         spec: HushSpec,
         compiled: CompiledPolicy,
@@ -106,7 +106,7 @@ Recommended:
 
 ### `T2.5` Add regression tests
 
-- HushSpec and PACT YAML behavior comparison where appropriate
+- HushSpec and ARC YAML behavior comparison where appropriate
 - deterministic policy identity tests
 - guard coverage compilation tests
 
@@ -118,11 +118,11 @@ Recommended:
 ## Risks
 
 - accidental breakage of existing example policies
-- hidden assumptions in CLI/kernel setup about the original PACT YAML policy shape
+- hidden assumptions in CLI/kernel setup about the original ARC YAML policy shape
 
 ## Mitigations
 
-- keep compatibility input path for PACT YAML policies
+- keep compatibility input path for ARC YAML policies
 - add explicit test fixtures before refactor completion
 
 ## Acceptance criteria
@@ -130,7 +130,7 @@ Recommended:
 - HushSpec policies no longer validate and then fall back to empty runtime behavior
 - compiled policy drives guard and default-scope setup
 - receipts carry a stable policy identity tied to runtime meaning
-- tests cover both PACT YAML and HushSpec load paths
+- tests cover both ARC YAML and HushSpec load paths
 
 ## Definition of done
 

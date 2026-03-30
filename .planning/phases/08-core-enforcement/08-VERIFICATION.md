@@ -40,7 +40,7 @@ gaps: []
 | 17 | `matched_grant_index` is populated in GuardContext before guards run | VERIFIED | `GuardContext.matched_grant_index` field at `lib.rs` L341; `check_and_increment_budget` returns `(matched_grant_index, ...)` at L2267; test `matched_grant_index_populated_in_guard_context` at L7052 |
 | 18 | After N receipts, a Merkle checkpoint is triggered and stored | VERIFIED | `maybe_trigger_checkpoint` logic at `lib.rs` L2921-2923; `build_checkpoint` call at L2965; integration test `checkpoint_triggers_at_100_receipts` at L7199 |
 | 19 | VelocityGuard denials produce signed deny receipts without kernel panics | VERIFIED | Test `velocity_guard_denial_produces_signed_deny_receipt_no_panic` at L7132 (uses CountingRateLimitGuard inline due to circular dep constraint) |
-| 20 | Full pipeline (budget check -> velocity guard -> dispatch -> receipt) works end to end | VERIFIED | Test `monetary_full_pipeline_three_invocations_third_denied` at L7014; all 121 pact-kernel tests pass |
+| 20 | Full pipeline (budget check -> velocity guard -> dispatch -> receipt) works end to end | VERIFIED | Test `monetary_full_pipeline_three_invocations_third_denied` at L7014; all 121 arc-kernel tests pass |
 
 **Score:** 20/20 truths verified
 
@@ -50,14 +50,14 @@ gaps: []
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `crates/pact-core/src/receipt.rs` | FinancialReceiptMetadata struct | VERIFIED | `pub struct FinancialReceiptMetadata` at L285; all required fields present: grant_index, cost_charged, currency, budget_remaining, budget_total, delegation_depth, root_budget_holder, settlement_status, attempted_cost |
-| `crates/pact-core/src/lib.rs` | Re-export of FinancialReceiptMetadata | VERIFIED | `FinancialReceiptMetadata` in re-export at L35 |
-| `crates/pact-kernel/src/budget_store.rs` | try_charge_cost method and total_cost_charged column | VERIFIED | `fn try_charge_cost` at L52 (trait) and L372 (SqliteBudgetStore impl) and L110 (InMemoryBudgetStore); `total_cost_charged: u64` field in BudgetUsageRecord at L24 |
-| `crates/pact-kernel/src/lib.rs` | ToolInvocationCost struct and invoke_with_cost default method | VERIFIED | `pub struct ToolInvocationCost` at L467; `fn invoke_with_cost` default method at L504 |
-| `crates/pact-kernel/src/checkpoint.rs` | KernelCheckpoint, checkpoint building, inclusion proof verification | VERIFIED | All three public structs and three public functions present; 10 unit tests all pass |
-| `crates/pact-kernel/src/receipt_store.rs` | kernel_checkpoints table, append_pact_receipt_returning_seq | VERIFIED | All 5 required methods present; kernel_checkpoints DDL present; as_any_mut downcast present |
-| `crates/pact-guards/src/velocity.rs` | VelocityGuard, TokenBucket, VelocityConfig | VERIFIED | All present; `impl Guard for VelocityGuard` with Mutex<HashMap> per plan; 10 unit tests all pass |
-| `crates/pact-guards/src/lib.rs` | pub mod velocity and VelocityGuard re-export | VERIFIED | `pub mod velocity` at L45; `pub use velocity::VelocityGuard` at L55 |
+| `crates/arc-core/src/receipt.rs` | FinancialReceiptMetadata struct | VERIFIED | `pub struct FinancialReceiptMetadata` at L285; all required fields present: grant_index, cost_charged, currency, budget_remaining, budget_total, delegation_depth, root_budget_holder, settlement_status, attempted_cost |
+| `crates/arc-core/src/lib.rs` | Re-export of FinancialReceiptMetadata | VERIFIED | `FinancialReceiptMetadata` in re-export at L35 |
+| `crates/arc-kernel/src/budget_store.rs` | try_charge_cost method and total_cost_charged column | VERIFIED | `fn try_charge_cost` at L52 (trait) and L372 (SqliteBudgetStore impl) and L110 (InMemoryBudgetStore); `total_cost_charged: u64` field in BudgetUsageRecord at L24 |
+| `crates/arc-kernel/src/lib.rs` | ToolInvocationCost struct and invoke_with_cost default method | VERIFIED | `pub struct ToolInvocationCost` at L467; `fn invoke_with_cost` default method at L504 |
+| `crates/arc-kernel/src/checkpoint.rs` | KernelCheckpoint, checkpoint building, inclusion proof verification | VERIFIED | All three public structs and three public functions present; 10 unit tests all pass |
+| `crates/arc-kernel/src/receipt_store.rs` | kernel_checkpoints table, append_arc_receipt_returning_seq | VERIFIED | All 5 required methods present; kernel_checkpoints DDL present; as_any_mut downcast present |
+| `crates/arc-guards/src/velocity.rs` | VelocityGuard, TokenBucket, VelocityConfig | VERIFIED | All present; `impl Guard for VelocityGuard` with Mutex<HashMap> per plan; 10 unit tests all pass |
+| `crates/arc-guards/src/lib.rs` | pub mod velocity and VelocityGuard re-export | VERIFIED | `pub mod velocity` at L45; `pub use velocity::VelocityGuard` at L55 |
 
 ---
 
@@ -68,13 +68,13 @@ gaps: []
 | `budget_store.rs` | capability_grant_budgets table | `ensure_total_cost_charged_column` | WIRED | Column added via ALTER TABLE migration guard at L501; used in all SELECT/UPSERT paths |
 | `lib.rs` evaluate path | `budget_store.try_charge_cost` | `check_and_increment_budget` | WIRED | `self.budget_store.try_charge_cost(...)` call at L2297 for monetary grants |
 | `receipt.rs` | `receipt.metadata["financial"]` | `serde_json::json!` with financial key | WIRED | `finalize_tool_output_with_cost` at L2571 wraps FinancialReceiptMetadata under `"financial"` key; `build_monetary_deny_response` at L2455 does the same |
-| `checkpoint.rs` | `pact_core::merkle::MerkleTree` | `MerkleTree::from_leaves` | WIRED | `MerkleTree::from_leaves(receipt_canonical_bytes_batch)` at L107 |
-| `checkpoint.rs` | `pact_core::crypto::Keypair` | `keypair.sign` | WIRED | `keypair.sign(&body_bytes)` at L121 |
-| `checkpoint.rs` | `pact_core::canonical::canonical_json_bytes` | signed checkpoint body | WIRED | `canonical_json_bytes(&body)` at L119 |
+| `checkpoint.rs` | `arc_core::merkle::MerkleTree` | `MerkleTree::from_leaves` | WIRED | `MerkleTree::from_leaves(receipt_canonical_bytes_batch)` at L107 |
+| `checkpoint.rs` | `arc_core::crypto::Keypair` | `keypair.sign` | WIRED | `keypair.sign(&body_bytes)` at L121 |
+| `checkpoint.rs` | `arc_core::canonical::canonical_json_bytes` | signed checkpoint body | WIRED | `canonical_json_bytes(&body)` at L119 |
 | `receipt_store.rs` | kernel_checkpoints table | `INSERT INTO kernel_checkpoints` | WIRED | `store_checkpoint` method at L340 |
-| `velocity.rs` | `pact_kernel::Guard` trait | `impl Guard for VelocityGuard` | WIRED | `impl Guard for VelocityGuard` at L105; name returns "velocity"; evaluate returns Verdict |
+| `velocity.rs` | `arc_kernel::Guard` trait | `impl Guard for VelocityGuard` | WIRED | `impl Guard for VelocityGuard` at L105; name returns "velocity"; evaluate returns Verdict |
 | `velocity.rs` | `std::sync::Mutex` | Mutex-wrapped HashMap | WIRED | `Mutex<HashMap<(String, usize), TokenBucket>>` at L89 |
-| `lib.rs` evaluate path | `checkpoint::build_checkpoint` | `record_pact_receipt`/`maybe_trigger_checkpoint` | WIRED | `checkpoint::build_checkpoint(...)` call at L2965 after seq threshold check at L2921 |
+| `lib.rs` evaluate path | `checkpoint::build_checkpoint` | `record_arc_receipt`/`maybe_trigger_checkpoint` | WIRED | `checkpoint::build_checkpoint(...)` call at L2965 after seq threshold check at L2921 |
 | `lib.rs` run_guards | `VelocityGuard` via `matched_grant_index` | `matched_grant_index: Some(matched_grant_index)` | WIRED | `GuardContext { matched_grant_index: Some(matched_grant_index), ... }` at L1843 |
 | `lib.rs` build_deny_response | `FinancialReceiptMetadata` | metadata with financial key | WIRED | `FinancialReceiptMetadata { settlement_status: "not_applicable", attempted_cost: Some(...), ... }` at L2455 |
 
@@ -86,8 +86,8 @@ gaps: []
 |-------------|------------|-------------|--------|---------|
 | SCHEMA-04 | 08-01 | BudgetStore supports try_charge_cost for monetary budget enforcement | SATISFIED | `fn try_charge_cost` on BudgetStore trait; both Sqlite and InMemory implementations; 14 budget_store tests pass |
 | SCHEMA-05 | 08-01 | Tool servers can report invocation cost via ToolInvocationCost struct | SATISFIED | `pub struct ToolInvocationCost` with units, currency, breakdown; `invoke_with_cost` default method; used in `dispatch_tool_call_with_cost` |
-| SCHEMA-06 | 08-01, 08-04 | FinancialReceiptMetadata populated in receipt.metadata for monetary grants | SATISFIED | FinancialReceiptMetadata in pact-core; populated on both allow and deny receipts under "financial" key; 3 receipt tests + 3 kernel integration tests |
-| SEC-01 | 08-02 | Receipt batches produce Merkle roots with signed kernel checkpoint statements | SATISFIED | `build_checkpoint` uses MerkleTree; `KernelCheckpoint.body.schema = "pact.checkpoint_statement.v1"`; Ed25519 signature; checkpoint triggered after N receipts in kernel |
+| SCHEMA-06 | 08-01, 08-04 | FinancialReceiptMetadata populated in receipt.metadata for monetary grants | SATISFIED | FinancialReceiptMetadata in arc-core; populated on both allow and deny receipts under "financial" key; 3 receipt tests + 3 kernel integration tests |
+| SEC-01 | 08-02 | Receipt batches produce Merkle roots with signed kernel checkpoint statements | SATISFIED | `build_checkpoint` uses MerkleTree; `KernelCheckpoint.body.schema = "arc.checkpoint_statement.v1"`; Ed25519 signature; checkpoint triggered after N receipts in kernel |
 | SEC-02 | 08-02, 08-04 | Receipt inclusion proofs verify against published checkpoint roots | SATISFIED | `build_inclusion_proof` + `ReceiptInclusionProof::verify`; kernel integration test `inclusion_proof_verifies_against_stored_checkpoint`; 100-leaf all-verify test |
 | SEC-05 | 08-03 | Velocity guard denies requests exceeding configured windows | SATISFIED | `VelocityGuard` implements `Guard`; token bucket per (capability_id, grant_index); `Verdict::Deny` on exhaustion; matched_grant_index populated; 10 velocity tests pass |
 
@@ -99,7 +99,7 @@ No orphaned requirements detected. All Phase 8 requirements (SCHEMA-04, SCHEMA-0
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `crates/pact-guards/src/velocity.rs` | 147 | `// Consume 1 unit per invocation; Phase 8 integration will pass actual cost.` | Info | The spend rate limit (`max_spend_per_window`) consumes 1.0 unit per invocation rather than the actual monetary cost. The comment acknowledges this is deferred. Invocation rate limiting is fully functional. This does not block SEC-05 (requirement is that velocity throttling is enforced, which it is), but the spend-velocity path is a stub until actual cost is threaded from kernel to guard. |
+| `crates/arc-guards/src/velocity.rs` | 147 | `// Consume 1 unit per invocation; Phase 8 integration will pass actual cost.` | Info | The spend rate limit (`max_spend_per_window`) consumes 1.0 unit per invocation rather than the actual monetary cost. The comment acknowledges this is deferred. Invocation rate limiting is fully functional. This does not block SEC-05 (requirement is that velocity throttling is enforced, which it is), but the spend-velocity path is a stub until actual cost is threaded from kernel to guard. |
 
 ---
 
@@ -115,12 +115,12 @@ All test suites pass with zero failures:
 
 | Crate / Suite | Tests | Result |
 |---------------|-------|--------|
-| `pact-core` receipt module | 15 | PASS |
-| `pact-kernel` budget_store | 14 | PASS |
-| `pact-kernel` checkpoint | 15 | PASS |
-| `pact-kernel` receipt_store | 8 | PASS |
-| `pact-kernel` all (including integration) | 121 | PASS |
-| `pact-guards` velocity | 10 | PASS |
+| `arc-core` receipt module | 15 | PASS |
+| `arc-kernel` budget_store | 14 | PASS |
+| `arc-kernel` checkpoint | 15 | PASS |
+| `arc-kernel` receipt_store | 8 | PASS |
+| `arc-kernel` all (including integration) | 121 | PASS |
+| `arc-guards` velocity | 10 | PASS |
 | Full workspace | all | PASS (no failures) |
 
 ---
@@ -131,7 +131,7 @@ No gaps found. All three enforcement mechanisms are wired at kernel evaluation t
 
 1. **Monetary budget enforcement**: `check_and_increment_budget` calls `try_charge_cost` for monetary grants; `FinancialReceiptMetadata` is populated on both allow and deny receipts; `invoke_with_cost` is used in the dispatch path.
 
-2. **Merkle-committed receipt batches**: `record_pact_receipt` triggers `maybe_trigger_checkpoint` after every `checkpoint_batch_size` receipts; `build_checkpoint` produces a signed `KernelCheckpoint`; `store_checkpoint` persists it to the `kernel_checkpoints` table; inclusion proofs verify correctly.
+2. **Merkle-committed receipt batches**: `record_arc_receipt` triggers `maybe_trigger_checkpoint` after every `checkpoint_batch_size` receipts; `build_checkpoint` produces a signed `KernelCheckpoint`; `store_checkpoint` persists it to the `kernel_checkpoints` table; inclusion proofs verify correctly.
 
 3. **Velocity throttling**: `VelocityGuard` implements the `Guard` trait with synchronous token buckets per `(capability_id, grant_index)`; `matched_grant_index` is populated in `GuardContext` before guards run; `Verdict::Deny` is returned without panics.
 

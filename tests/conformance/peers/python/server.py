@@ -4,7 +4,7 @@ import json
 import sys
 
 if "--help" in sys.argv:
-    print("PACT Python conformance server scaffold")
+    print("ARC Python conformance server scaffold")
     raise SystemExit(0)
 
 print(

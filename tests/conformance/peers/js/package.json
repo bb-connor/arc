@@ -1,5 +1,5 @@
 {
-  "name": "pact-conformance-js-peer",
+  "name": "arc-conformance-js-peer",
   "private": true,
   "type": "module",
   "scripts": {

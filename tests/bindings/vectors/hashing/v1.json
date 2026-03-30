@@ -15,10 +15,10 @@
     {
       "description": "SHA-256 operates on UTF-8 bytes for non-ASCII strings too.",
       "id": "unicode_utf8",
-      "input_utf8": "pact 🔐",
-      "sha256_hex": "a2c80884f0e01e16154a4c8083e595f669cc33af7ac75e6c5e86997ec2cceb83"
+      "input_utf8": "arc 🔐",
+      "sha256_hex": "c5e5dab63b091da05bd6319406961cad0056eaf11be37de98b3295e1ec0b5d55"
     }
   ],
-  "generated_by": "pact-bindings-core",
+  "generated_by": "arc-bindings-core",
   "version": 1
 }

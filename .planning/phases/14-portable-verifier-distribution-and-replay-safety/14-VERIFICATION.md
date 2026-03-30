@@ -12,9 +12,9 @@ durable replay-safe challenge state, and local/remote verifier API parity.
 
 ## Automated Verification
 
-- `cargo test -p pact-cli --test passport -- --nocapture`
-- `cargo test -p pact-cli --test federated_issue -- --nocapture`
-- `cargo test -p pact-cli --test provider_admin -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test federated_issue -- --nocapture`
+- `cargo test -p arc-cli --test provider_admin -- --nocapture`
 - `rg -n "passport policy|verifier-policies-file|verifier-challenge-db|policyId|policySource|replayState" docs/AGENT_PASSPORT_GUIDE.md docs/CHANGELOG.md`
 
 ## Result

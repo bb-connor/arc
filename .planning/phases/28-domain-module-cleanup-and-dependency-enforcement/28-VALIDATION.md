@@ -14,19 +14,19 @@ created: 2026-03-25
 | Property | Value |
 |----------|-------|
 | **Framework** | `cargo check`, crate tests, shell guardrail checks |
-| **Quick run command** | `cargo check -p pact-credentials -p pact-reputation -p pact-policy` |
+| **Quick run command** | `cargo check -p arc-credentials -p arc-reputation -p arc-policy` |
 | **Layering guard command** | `./scripts/check-workspace-layering.sh` |
-| **Credentials regression command** | `cargo test -p pact-credentials -- --nocapture` |
-| **Reputation regression command** | `cargo test -p pact-reputation -- --nocapture` |
-| **Policy regression command** | `cargo test -p pact-policy -- --nocapture` |
+| **Credentials regression command** | `cargo test -p arc-credentials -- --nocapture` |
+| **Reputation regression command** | `cargo test -p arc-reputation -- --nocapture` |
+| **Policy regression command** | `cargo test -p arc-policy -- --nocapture` |
 
 ## Per-Plan Verification Map
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 28-01 | ARCH-08 | `cargo check -p pact-credentials -p pact-reputation -p pact-policy`, `wc -l crates/pact-credentials/src/lib.rs crates/pact-reputation/src/lib.rs crates/pact-policy/src/evaluate.rs` |
+| 28-01 | ARCH-08 | `cargo check -p arc-credentials -p arc-reputation -p arc-policy`, `wc -l crates/arc-credentials/src/lib.rs crates/arc-reputation/src/lib.rs crates/arc-policy/src/evaluate.rs` |
 | 28-02 | ARCH-09 | `./scripts/check-workspace-layering.sh`, `rg -n "check-workspace-layering|WORKSPACE_STRUCTURE" scripts/ci-workspace.sh docs/architecture/WORKSPACE_STRUCTURE.md` |
-| 28-03 | ARCH-08, ARCH-09 | `cargo test -p pact-credentials -- --nocapture`, `cargo test -p pact-reputation -- --nocapture`, `cargo test -p pact-policy -- --nocapture`, `./scripts/check-workspace-layering.sh` |
+| 28-03 | ARCH-08, ARCH-09 | `cargo test -p arc-credentials -- --nocapture`, `cargo test -p arc-reputation -- --nocapture`, `cargo test -p arc-policy -- --nocapture`, `./scripts/check-workspace-layering.sh` |
 
 ## Coverage Notes
 
@@ -40,7 +40,7 @@ created: 2026-03-25
 
 ## Sign-Off
 
-- [x] `pact-credentials`, `pact-reputation`, and `pact-policy` now use thin
+- [x] `arc-credentials`, `arc-reputation`, and `arc-policy` now use thin
   entry modules over named source files
 - [x] workspace layering is documented and enforced by script
 - [x] the domain crate test lanes passed after the split

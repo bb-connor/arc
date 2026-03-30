@@ -10,7 +10,7 @@ Proposed.
 
 ## Problem
 
-PACT now has a real trust-control service with shared authority, revocation, receipt, and budget state.
+ARC now has a real trust-control service with shared authority, revocation, receipt, and budget state.
 
 What it does not yet have is enough determinism to treat that path as fully reliable under load.
 
@@ -56,13 +56,13 @@ Out of scope:
 
 ## Primary files and areas
 
-- `crates/pact-cli/src/trust_control.rs`
-- `crates/pact-kernel/src/budget_store.rs`
-- `crates/pact-kernel/src/authority.rs`
-- `crates/pact-kernel/src/receipt_store.rs`
-- `crates/pact-kernel/src/revocation_store.rs`
-- `crates/pact-cli/tests/trust_cluster.rs`
-- `crates/pact-cli/tests/trust_revocation.rs`
+- `crates/arc-cli/src/trust_control.rs`
+- `crates/arc-kernel/src/budget_store.rs`
+- `crates/arc-kernel/src/authority.rs`
+- `crates/arc-kernel/src/receipt_store.rs`
+- `crates/arc-kernel/src/revocation_store.rs`
+- `crates/arc-cli/tests/trust_cluster.rs`
+- `crates/arc-cli/tests/trust_revocation.rs`
 - `docs/HA_CONTROL_AUTH_PLAN.md`
 
 ## Proposed implementation slices

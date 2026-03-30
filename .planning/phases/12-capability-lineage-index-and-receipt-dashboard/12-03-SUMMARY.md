@@ -11,7 +11,7 @@ requires:
     provides: GET /v1/receipts/query and GET /v1/agents/:key/receipts API endpoints
 
 provides:
-  - React 18 + Vite 6 SPA at crates/pact-cli/dashboard/ with production dist/ output
+  - React 18 + Vite 6 SPA at crates/arc-cli/dashboard/ with production dist/ output
   - FilterSidebar with agent/tool/outcome/time filter controls
   - ReceiptTable using TanStack Table 8 with server-side cursor pagination and detail panel
   - DelegationChain expandable tree component calling GET /v1/lineage/:id/chain
@@ -40,21 +40,21 @@ tech-stack:
 
 key-files:
   created:
-    - crates/pact-cli/dashboard/package.json
-    - crates/pact-cli/dashboard/tsconfig.json
-    - crates/pact-cli/dashboard/tsconfig.app.json
-    - crates/pact-cli/dashboard/vite.config.ts
-    - crates/pact-cli/dashboard/index.html
-    - crates/pact-cli/dashboard/src/main.tsx
-    - crates/pact-cli/dashboard/src/App.tsx
-    - crates/pact-cli/dashboard/src/types.ts
-    - crates/pact-cli/dashboard/src/api.ts
-    - crates/pact-cli/dashboard/src/index.css
-    - crates/pact-cli/dashboard/src/vite-env.d.ts
-    - crates/pact-cli/dashboard/src/components/FilterSidebar.tsx
-    - crates/pact-cli/dashboard/src/components/ReceiptTable.tsx
-    - crates/pact-cli/dashboard/src/components/DelegationChain.tsx
-    - crates/pact-cli/dashboard/src/components/BudgetSparkline.tsx
+    - crates/arc-cli/dashboard/package.json
+    - crates/arc-cli/dashboard/tsconfig.json
+    - crates/arc-cli/dashboard/tsconfig.app.json
+    - crates/arc-cli/dashboard/vite.config.ts
+    - crates/arc-cli/dashboard/index.html
+    - crates/arc-cli/dashboard/src/main.tsx
+    - crates/arc-cli/dashboard/src/App.tsx
+    - crates/arc-cli/dashboard/src/types.ts
+    - crates/arc-cli/dashboard/src/api.ts
+    - crates/arc-cli/dashboard/src/index.css
+    - crates/arc-cli/dashboard/src/vite-env.d.ts
+    - crates/arc-cli/dashboard/src/components/FilterSidebar.tsx
+    - crates/arc-cli/dashboard/src/components/ReceiptTable.tsx
+    - crates/arc-cli/dashboard/src/components/DelegationChain.tsx
+    - crates/arc-cli/dashboard/src/components/BudgetSparkline.tsx
   modified:
     - .gitignore (added dashboard/node_modules/ and dashboard/dist/ exclusions)
 
@@ -98,15 +98,15 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `crates/pact-cli/dashboard/package.json` - Pinned React 18 + Vite 6 + TanStack 8 + Recharts 2 dependencies
-- `crates/pact-cli/dashboard/tsconfig.app.json` - Strict TypeScript, react-jsx, bundler module resolution
-- `crates/pact-cli/dashboard/vite.config.ts` - /v1 dev proxy to localhost:8080, dist/ build output
-- `crates/pact-cli/dashboard/src/types.ts` - Receipt, CapabilitySnapshot, Filters, DecisionKind, formatMinorUnits
-- `crates/pact-cli/dashboard/src/api.ts` - fetchReceipts, fetchLineage, fetchDelegationChain, fetchAgentReceipts, fetchAgentCostSeries
-- `crates/pact-cli/dashboard/src/components/FilterSidebar.tsx` - 6 filter controls with datetime-local to Unix seconds conversion
-- `crates/pact-cli/dashboard/src/components/ReceiptTable.tsx` - TanStack Table 8, cursor stack pagination, detail panel with delegation chain
-- `crates/pact-cli/dashboard/src/components/DelegationChain.tsx` - Expandable chain nodes with grants JSON toggle
-- `crates/pact-cli/dashboard/src/components/BudgetSparkline.tsx` - Recharts 2 AreaChart with minor-unit tooltip
+- `crates/arc-cli/dashboard/package.json` - Pinned React 18 + Vite 6 + TanStack 8 + Recharts 2 dependencies
+- `crates/arc-cli/dashboard/tsconfig.app.json` - Strict TypeScript, react-jsx, bundler module resolution
+- `crates/arc-cli/dashboard/vite.config.ts` - /v1 dev proxy to localhost:8080, dist/ build output
+- `crates/arc-cli/dashboard/src/types.ts` - Receipt, CapabilitySnapshot, Filters, DecisionKind, formatMinorUnits
+- `crates/arc-cli/dashboard/src/api.ts` - fetchReceipts, fetchLineage, fetchDelegationChain, fetchAgentReceipts, fetchAgentCostSeries
+- `crates/arc-cli/dashboard/src/components/FilterSidebar.tsx` - 6 filter controls with datetime-local to Unix seconds conversion
+- `crates/arc-cli/dashboard/src/components/ReceiptTable.tsx` - TanStack Table 8, cursor stack pagination, detail panel with delegation chain
+- `crates/arc-cli/dashboard/src/components/DelegationChain.tsx` - Expandable chain nodes with grants JSON toggle
+- `crates/arc-cli/dashboard/src/components/BudgetSparkline.tsx` - Recharts 2 AreaChart with minor-unit tooltip
 - `.gitignore` - Added dashboard/node_modules/ and dashboard/dist/ entries
 
 ## Decisions Made
@@ -124,7 +124,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (npm run build)
 - **Issue:** `tsc -b` failed with TS2307: Cannot find module './index.css' -- Vite react-ts templates include this file but it was not listed in the plan's file list
 - **Fix:** Created `src/vite-env.d.ts` with `/// <reference types="vite/client" />`
-- **Files modified:** crates/pact-cli/dashboard/src/vite-env.d.ts
+- **Files modified:** crates/arc-cli/dashboard/src/vite-env.d.ts
 - **Verification:** `npm run build` exits 0; tsc --noEmit passes
 - **Committed in:** bae0436 (Task 2 commit)
 

@@ -1,10 +1,10 @@
-# PACT Roadmap to v1
+# ARC Roadmap to v1
 
 Detailed sequencing, work packages, and milestone gates live in [EXECUTION_PLAN.md](EXECUTION_PLAN.md).
 
 ## Goal
 
-Make PACT the default way to run MCP-class agent integrations when teams need stronger trust boundaries, least-privilege access, and verifiable audit receipts.
+Make ARC the default way to run MCP-class agent integrations when teams need stronger trust boundaries, least-privilege access, and verifiable audit receipts.
 
 The target end state is not "different from MCP."
 
@@ -16,7 +16,7 @@ The target end state is:
 
 ## V1 Definition
 
-PACT `v1.0` should satisfy all of the following:
+ARC `v1.0` should satisfy all of the following:
 
 ### Protocol
 
@@ -62,8 +62,8 @@ Owns:
 
 Likely home:
 
-- `pact-kernel::session` first
-- dedicated `pact-session` crate later if needed
+- `arc-kernel::session` first
+- dedicated `arc-session` crate later if needed
 
 ### Workstream B: Policy unification
 
@@ -76,8 +76,8 @@ Owns:
 
 Likely home:
 
-- `pact-policy`
-- `pact-cli`
+- `arc-policy`
+- `arc-cli`
 - kernel construction path
 
 ### Workstream C: MCP-compatible edge
@@ -92,7 +92,7 @@ Owns:
 Likely home:
 
 - new edge module or crate
-- not inside `pact-mcp-adapter` alone
+- not inside `arc-mcp-adapter` alone
 
 ### Workstream D: Trust plane
 
@@ -113,7 +113,7 @@ Likely home:
 Owns:
 
 - MCP compatibility fixtures
-- PACT security fixtures
+- ARC security fixtures
 - migration guides
 - adapter hardening
 
@@ -123,11 +123,11 @@ The current repository can absorb early work without a massive rewrite, but `v1`
 
 | Area | Current home | Likely future home |
 | --- | --- | --- |
-| session state | `pact-kernel` | `pact-kernel::session` or `pact-session` |
+| session state | `arc-kernel` | `arc-kernel::session` or `arc-session` |
 | JSON-RPC edge | none | new MCP edge crate/module |
-| trust services | `pact-kernel` in-memory | new CA and receipt-store services |
-| policy runtime contract | split between `pact-cli` and `pact-policy` | `pact-policy` as canonical source |
-| MCP migration | `pact-mcp-adapter` | adapter plus separate MCP-compatible edge |
+| trust services | `arc-kernel` in-memory | new CA and receipt-store services |
+| policy runtime contract | split between `arc-cli` and `arc-policy` | `arc-policy` as canonical source |
+| MCP migration | `arc-mcp-adapter` | adapter plus separate MCP-compatible edge |
 
 ## Release Strategy
 
@@ -167,7 +167,7 @@ Move from a narrow internal tool-call protocol to a real session model.
 ### Required design choices
 
 - whether the external edge is directly JSON-RPC or an adapter over the current internal messages
-- how PACT capability tokens coexist with session capability negotiation
+- how ARC capability tokens coexist with session capability negotiation
 
 ### Exit criteria
 
@@ -184,8 +184,8 @@ Make one policy model real.
 
 ### Deliverables
 
-- promote HushSpec plus `pact-policy` compilation to the main runtime path
-- retire or de-emphasize the original PACT YAML format as the primary runtime path
+- promote HushSpec plus `arc-policy` compilation to the main runtime path
+- retire or de-emphasize the original ARC YAML format as the primary runtime path
 - wire compiled policies into CLI and runtime behavior
 - add docs and examples for real policy authoring
 - add policy compatibility tests
@@ -194,7 +194,7 @@ Make one policy model real.
 
 ### Exit criteria
 
-- CLI no longer validates HushSpec and then drops back to an empty PACT YAML placeholder
+- CLI no longer validates HushSpec and then drops back to an empty ARC YAML placeholder
 - all current shipped guards can be configured through the canonical policy path
 - policy hash and receipt generation remain stable and test-covered
 
@@ -218,8 +218,8 @@ Become a serious secure MCP tool runtime rather than a partial adapter.
 
 ### Exit criteria
 
-- a stock MCP client can use PACT as a secure tool server edge for common tool workflows
-- PACT can wrap MCP tool servers without dropping important tool metadata
+- a stock MCP client can use ARC as a secure tool server edge for common tool workflows
+- ARC can wrap MCP tool servers without dropping important tool metadata
 
 ## Phase 4: `v0.5` Resources, Prompts, Completion, and Logging
 
@@ -251,7 +251,7 @@ Follow-on work after this phase:
 
 ### Exit criteria
 
-- PACT can host MCP-style contextual servers, not only action servers
+- ARC can host MCP-style contextual servers, not only action servers
 - prompts and resources are no longer forced through tool semantics
 
 ## Phase 5: `v0.6` Nested Flows: Roots, Sampling, and Elicitation
@@ -335,13 +335,13 @@ Make adoption cheap.
 - better MCP adapter coverage beyond tools where feasible
 - language bindings or generated schemas for common platforms
 - protocol conformance suite
-- interoperability fixtures for both MCP-facing and PACT-native flows
+- interoperability fixtures for both MCP-facing and ARC-native flows
 - operator and migration guides
 - compatibility matrix that explicitly states which MCP features are complete, partial, or intentionally unsupported
 
 ### Exit criteria
 
-- teams can adopt PACT incrementally without rewriting everything
+- teams can adopt ARC incrementally without rewriting everything
 - compatibility claims are test-backed, not aspirational
 
 ## Phase 9: `v1.0-rc` Hardening
@@ -358,7 +358,7 @@ Prove the system, not just the design.
 - generated conformance evidence against the maintained JS and Python peers
 - release docs covering guarantees, non-goals, migration path, and extension policy
 - final milestone audit and go/no-go evidence
-- explicit extension policy for PACT-native features
+- explicit extension policy for ARC-native features
 
 ### Exit criteria
 
@@ -371,7 +371,7 @@ Prove the system, not just the design.
 ### What ships
 
 - MCP-compatible session edge for the selected feature set
-- PACT-native security core with capability enforcement and signed receipts
+- ARC-native security core with capability enforcement and signed receipts
 - canonical policy system
 - persistent trust infrastructure
 - compatibility and conformance test suites
@@ -379,9 +379,9 @@ Prove the system, not just the design.
 
 ### What should be true on launch day
 
-- users can say "replace our MCP deployment with PACT" without re-architecting core workflows
-- security teams can say "PACT gives us stronger controls than MCP alone"
-- developers can say "PACT is understandable and testable"
+- users can say "replace our MCP deployment with ARC" without re-architecting core workflows
+- security teams can say "ARC gives us stronger controls than MCP alone"
+- developers can say "ARC is understandable and testable"
 
 ## Scope Boundaries for `v1`
 
@@ -420,12 +420,12 @@ That order keeps the project from polishing local crypto while the ecosystem-fac
 
 The following questions should be answered in the next design cycle, not deferred to late implementation:
 
-1. Is the public edge protocol directly JSON-RPC, or is there a thin translation layer from JSON-RPC into a native PACT session model?
-2. Does `PactScope` stay tool-centric for one more iteration, or do resource and prompt grants arrive before `v0.5`?
+1. Is the public edge protocol directly JSON-RPC, or is there a thin translation layer from JSON-RPC into a native ARC session model?
+2. Does `ArcScope` stay tool-centric for one more iteration, or do resource and prompt grants arrive before `v0.5`?
 3. Is sampling implemented as a child request inside the same session state machine, or as a separate nested session abstraction?
 4. What is the first durable receipt backend: SQLite, file append-only log, or remote service?
-5. Does `pact-mcp-adapter` stay a migration adapter only, or does the repo add a separate first-class MCP edge runtime?
+5. Does `arc-mcp-adapter` stay a migration adapter only, or does the repo add a separate first-class MCP edge runtime?
 
 ## The One-Sentence Roadmap
 
-PACT gets to `v1` by becoming an MCP-compatible session protocol at the edge, a capability-enforced trust kernel at the core, and an adoption-friendly migration path in practice.
+ARC gets to `v1` by becoming an MCP-compatible session protocol at the edge, a capability-enforced trust kernel at the core, and an adoption-friendly migration path in practice.

@@ -9,17 +9,17 @@ if ! command -v rg >/dev/null 2>&1; then
 fi
 
 domain_manifests=(
-  "crates/pact-core/Cargo.toml"
-  "crates/pact-manifest/Cargo.toml"
-  "crates/pact-did/Cargo.toml"
-  "crates/pact-guards/Cargo.toml"
-  "crates/pact-policy/Cargo.toml"
-  "crates/pact-reputation/Cargo.toml"
-  "crates/pact-credentials/Cargo.toml"
-  "crates/pact-kernel/Cargo.toml"
+  "crates/arc-core/Cargo.toml"
+  "crates/arc-manifest/Cargo.toml"
+  "crates/arc-did/Cargo.toml"
+  "crates/arc-guards/Cargo.toml"
+  "crates/arc-policy/Cargo.toml"
+  "crates/arc-reputation/Cargo.toml"
+  "crates/arc-credentials/Cargo.toml"
+  "crates/arc-kernel/Cargo.toml"
 )
 
-blocked_workspace_paths='path = "\\.\\./(pact-cli|pact-control-plane|pact-hosted-mcp)"'
+blocked_workspace_paths='path = "\\.\\./(arc-cli|arc-control-plane|arc-hosted-mcp)"'
 blocked_transport_deps='^(clap|axum|reqwest)\\s*='
 failed=0
 

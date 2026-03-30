@@ -27,11 +27,11 @@ key-files:
   created:
     - .planning/phases/02-e12-security-boundary-completion/02-04-SUMMARY.md
   modified:
-    - crates/pact-kernel/src/session.rs
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-mcp-adapter/src/edge.rs
-    - crates/pact-cli/tests/mcp_serve.rs
-    - crates/pact-cli/src/main.rs
+    - crates/arc-kernel/src/session.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-mcp-adapter/src/edge.rs
+    - crates/arc-cli/tests/mcp_serve.rs
+    - crates/arc-cli/src/main.rs
     - docs/epics/E12-security-boundary-completion.md
     - docs/POST_REVIEW_EXECUTION_PLAN.md
 key-decisions:
@@ -62,10 +62,10 @@ completed: 2026-03-19
 
 ## Accomplishments
 
-- Added `SessionOperationResponse::ResourceReadDenied` so filesystem-backed resource denials can return a signed `PactReceipt` instead of only a plain error
+- Added `SessionOperationResponse::ResourceReadDenied` so filesystem-backed resource denials can return a signed `ArcReceipt` instead of only a plain error
 - Signed resource-read deny receipts at the kernel boundary with the roots guard encoded in the receipt decision
 - Updated the MCP edge to translate signed resource-read denials into JSON-RPC errors with `error.data.receipt`
-- Added live `pact mcp serve` coverage for in-root allow, out-of-root deny, and missing-roots fail-closed behavior using the real wrapped transport path
+- Added live `arc mcp serve` coverage for in-root allow, out-of-root deny, and missing-roots fail-closed behavior using the real wrapped transport path
 - Updated the E12 epic and post-review plan so they describe roots as an enforced boundary with fail-closed missing-roots semantics and signed evidence for filesystem-backed resource denials
 
 ## Task Commits
@@ -77,11 +77,11 @@ No task commits were created in this session because the repository is still bei
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/session.rs` - added the signed resource-read deny response variant
-- `crates/pact-kernel/src/lib.rs` - built signed deny receipts for filesystem-backed resource reads and returned them through the session response
-- `crates/pact-mcp-adapter/src/edge.rs` - propagated signed deny evidence through JSON-RPC `error.data`
-- `crates/pact-cli/tests/mcp_serve.rs` - added live transport coverage for in-root allow, out-of-root deny, and missing-roots fail-closed resource reads
-- `crates/pact-cli/src/main.rs` - updated CLI response matches for the new session response variant
+- `crates/arc-kernel/src/session.rs` - added the signed resource-read deny response variant
+- `crates/arc-kernel/src/lib.rs` - built signed deny receipts for filesystem-backed resource reads and returned them through the session response
+- `crates/arc-mcp-adapter/src/edge.rs` - propagated signed deny evidence through JSON-RPC `error.data`
+- `crates/arc-cli/tests/mcp_serve.rs` - added live transport coverage for in-root allow, out-of-root deny, and missing-roots fail-closed resource reads
+- `crates/arc-cli/src/main.rs` - updated CLI response matches for the new session response variant
 - `docs/epics/E12-security-boundary-completion.md` - documented enforced roots, fail-closed missing-roots semantics, and signed resource-read evidence
 - `docs/POST_REVIEW_EXECUTION_PLAN.md` - updated the post-review boundary description and gate language
 
@@ -96,17 +96,17 @@ No task commits were created in this session because the repository is still bei
 ### Auto-fixed Issues
 
 **1. [Rule 1 - Test strictness] Live transport tests initially assumed a quiet notification channel**
-- **Found during:** `cargo test -p pact-cli mcp_serve`
+- **Found during:** `cargo test -p arc-cli mcp_serve`
 - **Issue:** the wrapped `mcp serve` path emitted additional notifications during resource reads, which made the new tests too strict
 - **Fix:** relaxed the tests to assert the response contract and signed receipt data directly, rather than requiring an empty notification list
-- **Files modified:** `crates/pact-cli/tests/mcp_serve.rs`
-- **Verification:** `cargo test -p pact-cli mcp_serve` passed after the adjustment
+- **Files modified:** `crates/arc-cli/tests/mcp_serve.rs`
+- **Verification:** `cargo test -p arc-cli mcp_serve` passed after the adjustment
 
 ## Verification
 
-- `cargo test -p pact-kernel read_resource` - passed
-- `cargo test -p pact-mcp-adapter resources_read` - passed
-- `cargo test -p pact-cli mcp_serve` - passed
+- `cargo test -p arc-kernel read_resource` - passed
+- `cargo test -p arc-mcp-adapter resources_read` - passed
+- `cargo test -p arc-cli mcp_serve` - passed
 - `cargo fmt --all -- --check` - passed
 
 ## Issues Encountered

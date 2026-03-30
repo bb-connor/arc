@@ -1,0 +1,60 @@
+[package]
+name = "arc-cli"
+description = "CLI binary for the ARC runtime kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+default-run = "arc"
+autobins = false
+
+[[bin]]
+name = "arc"
+path = "src/bin/arc.rs"
+
+[dependencies]
+arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plane" }
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
+arc-did = { package = "arc-did", path = "../arc-did" }
+arc-hosted-mcp = { package = "arc-hosted-mcp", path = "../arc-hosted-mcp" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-guards = { package = "arc-guards", path = "../arc-guards" }
+arc-policy = { package = "arc-policy", path = "../arc-policy" }
+arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../arc-mcp-adapter" }
+arc-conformance = { package = "arc-conformance", path = "../arc-conformance" }
+arc-reputation = { package = "arc-reputation", path = "../arc-reputation" }
+arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = "0.9"
+thiserror = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = { workspace = true }
+hex = { workspace = true }
+tokio = { workspace = true }
+axum = "0.8"
+async-stream = "0.3"
+url = "2"
+percent-encoding = "2"
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+ureq = { version = "2.10", features = ["json"] }
+serde_urlencoded = "0.7"
+rusqlite = { workspace = true }
+arc-siem = { package = "arc-siem", path = "../arc-siem", optional = true }
+tower-http = { version = "0.6", features = ["fs", "set-header"] }
+chrono = { version = "0.4", features = ["clock"] }
+rsa = { version = "0.9", features = ["sha2"] }
+p256 = { version = "0.13", features = ["ecdsa"] }
+p384 = { version = "0.13", features = ["ecdsa"] }
+
+[features]
+siem = ["arc-siem"]
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

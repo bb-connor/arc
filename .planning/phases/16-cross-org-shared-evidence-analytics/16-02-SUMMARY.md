@@ -14,9 +14,9 @@ key-files:
   created:
     - .planning/phases/16-cross-org-shared-evidence-analytics/16-02-SUMMARY.md
   modified:
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/src/reputation.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/src/reputation.rs
 requirements-completed:
   - FED-03
   - XORG-02
@@ -37,4 +37,4 @@ share provenance.
 
 ## Verification
 
-- `cargo test -p pact-cli --test receipt_query -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query -- --nocapture`

@@ -44,7 +44,7 @@ without writing bespoke per-call glue.
 
 - `.planning/ROADMAP.md` -- Phase 17 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `A2A-01`, `A2A-02`
-- `crates/pact-a2a-adapter/src/lib.rs` -- adapter config, auth negotiation, and
+- `crates/arc-a2a-adapter/src/lib.rs` -- adapter config, auth negotiation, and
   partner policy implementation
 - `docs/A2A_ADAPTER_GUIDE.md` -- operator-facing auth and partner-admission docs
 

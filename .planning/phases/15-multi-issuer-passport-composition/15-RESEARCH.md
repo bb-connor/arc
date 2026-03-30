@@ -22,7 +22,7 @@ implementation is to remove the single-issuer alpha guard, keep the same-subject
 and independent-signature guarantees, and make issuer identity explicit in the
 verification and evaluation outputs.
 
-The most important non-goal is aggregate truth synthesis. PACT still should not
+The most important non-goal is aggregate truth synthesis. ARC still should not
 invent a cross-issuer composite score, averaged reputation, or bundle-level
 issuer claim. Acceptance remains "at least one credential matched the verifier
 policy" and rejection remains "no credential matched," with issuer identity
@@ -61,6 +61,6 @@ verification/evaluation feature, not a new local authoring pipeline.
 
 ## Validation
 
-- `cargo test -p pact-credentials -- --nocapture`
-- `cargo test -p pact-cli --test passport -- --nocapture`
-- `cargo test -p pact-cli --test local_reputation -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test local_reputation -- --nocapture`

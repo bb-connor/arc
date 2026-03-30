@@ -4,7 +4,7 @@ This directory now contains the first executable JavaScript peer adapter.
 
 Current shipped slice:
 
-- Streamable HTTP client against a live `pact mcp serve-http` edge
+- Streamable HTTP client against a live `arc mcp serve-http` edge
 - machine-readable `ScenarioResult` JSON output
 - transcript emission for debugging failed runs
 

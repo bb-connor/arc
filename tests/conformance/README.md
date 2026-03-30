@@ -1,4 +1,4 @@
-# PACT Conformance Fixtures
+# ARC Conformance Fixtures
 
 This directory holds the E8 Slice A interoperability and conformance assets.
 
@@ -20,28 +20,28 @@ Rules:
 - scenario descriptors are the source of truth for scenario identity and categorization
 - reports are generated, not hand-edited
 - peer assets should be minimal, explicit, and easy to reproduce in CI
-- PACT-specific trust assertions should be reported separately from MCP-core compatibility
+- ARC-specific trust assertions should be reported separately from MCP-core compatibility
 
 The first Wave 1 scenario set lives under `scenarios/wave1/`.
 
 Generate a sample Markdown matrix from the checked-in sample result artifact with:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-report -- \
+cargo run -p arc-conformance --bin arc-conformance-report -- \
   --scenarios-dir tests/conformance/scenarios \
   --results-dir tests/conformance/results \
-  --output /tmp/pact-compatibility-matrix.md
+  --output /tmp/arc-compatibility-matrix.md
 ```
 
 Run the live Wave 1 remote HTTP harness with real JS and Python peers:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner --
+cargo run -p arc-conformance --bin arc-conformance-runner --
 ```
 
 By default that command:
 
-- boots `pact mcp serve-http` against `fixtures/wave1/mock_mcp_server.py`
+- boots `arc mcp serve-http` against `fixtures/wave1/mock_mcp_server.py`
 - runs the JS and Python client peers against the remote edge
 - writes JSON result artifacts under `tests/conformance/results/generated/wave1-live/`
 - writes a generated report to `tests/conformance/reports/generated/wave1-live.md`
@@ -68,7 +68,7 @@ Current live status:
 Generate the Wave 3 auth matrix against the local OAuth-backed edge with:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --auth-mode oauth-local \
   --scenarios-dir tests/conformance/scenarios/wave3 \
   --results-dir tests/conformance/results/generated/wave3-auth \
@@ -78,7 +78,7 @@ cargo run -p pact-conformance --bin pact-conformance-runner -- \
 Generate the Wave 4 notification matrix with:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --scenarios-dir tests/conformance/scenarios/wave4 \
   --results-dir tests/conformance/results/generated/wave4-notifications \
   --report-output tests/conformance/reports/generated/wave4-notifications.md
@@ -87,7 +87,7 @@ cargo run -p pact-conformance --bin pact-conformance-runner -- \
 Generate the Wave 5 nested-flow matrix with:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --scenarios-dir tests/conformance/scenarios/wave5 \
   --results-dir tests/conformance/results/generated/wave5-nested-flows \
   --report-output tests/conformance/reports/generated/wave5-nested-flows.md
@@ -96,7 +96,7 @@ cargo run -p pact-conformance --bin pact-conformance-runner -- \
 Run the Go live lanes with:
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --peer go \
   --scenarios-dir tests/conformance/scenarios/wave1 \
   --results-dir tests/conformance/results/generated/wave1-go-live \
@@ -104,7 +104,7 @@ cargo run -p pact-conformance --bin pact-conformance-runner -- \
 ```
 
 ```bash
-cargo run -p pact-conformance --bin pact-conformance-runner -- \
+cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --peer go \
   --auth-mode oauth-local \
   --scenarios-dir tests/conformance/scenarios/wave3 \

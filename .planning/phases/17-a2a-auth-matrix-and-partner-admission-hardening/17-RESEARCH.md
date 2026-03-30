@@ -48,7 +48,7 @@ security scheme, and optional allowed interface origins.
 
 ## Validation Strategy
 
-- `cargo test -p pact-a2a-adapter --lib -- --nocapture`
+- `cargo test -p arc-a2a-adapter --lib -- --nocapture`
 
 ## Conclusion
 

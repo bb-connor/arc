@@ -44,11 +44,11 @@ describes the shipped repository profile instead of an aspirational draft.
 
 - `.planning/ROADMAP.md` -- Phase 23 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `PROD-11`, `PROD-12`
-- `crates/pact-cli/src/trust_control.rs` -- trust-control `/health`
-- `crates/pact-cli/src/remote_mcp.rs` -- hosted-edge `/admin/health`
-- `crates/pact-cli/tests/provider_admin.rs` -- trust-control health regression
-- `crates/pact-cli/tests/mcp_serve_http.rs` -- hosted-edge health regression
-- `crates/pact-cli/tests/certify.rs` -- certification health coverage
+- `crates/arc-cli/src/trust_control.rs` -- trust-control `/health`
+- `crates/arc-cli/src/remote_mcp.rs` -- hosted-edge `/admin/health`
+- `crates/arc-cli/tests/provider_admin.rs` -- trust-control health regression
+- `crates/arc-cli/tests/mcp_serve_http.rs` -- hosted-edge health regression
+- `crates/arc-cli/tests/certify.rs` -- certification health coverage
 - `docs/release/OBSERVABILITY.md` -- operator diagnostics contract
 - `docs/release/OPERATIONS_RUNBOOK.md` -- deploy-time use of the health/admin
   surfaces

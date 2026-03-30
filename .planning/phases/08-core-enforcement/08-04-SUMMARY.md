@@ -10,7 +10,7 @@ requires:
     provides: FinancialReceiptMetadata, BudgetStore.try_charge_cost, ToolInvocationCost
   - phase: 08-core-enforcement
     plan: 02
-    provides: build_checkpoint, SqliteReceiptStore.append_pact_receipt_returning_seq, store_checkpoint, receipts_canonical_bytes_range
+    provides: build_checkpoint, SqliteReceiptStore.append_arc_receipt_returning_seq, store_checkpoint, receipts_canonical_bytes_range
   - phase: 08-core-enforcement
     plan: 03
     provides: VelocityGuard, matched_grant_index on GuardContext
@@ -21,8 +21,8 @@ provides:
   - FinancialReceiptMetadata on deny receipts (attempted_cost, settlement_status=not_applicable)
   - invoke_with_cost dispatch for monetary grants (actual cost recorded vs worst-case debit)
   - matched_grant_index populated in GuardContext before guards run
-  - Merkle checkpoint triggering in record_pact_receipt (every checkpoint_batch_size receipts)
-  - checkpoint_batch_size field in KernelConfig and PactKernel
+  - Merkle checkpoint triggering in record_arc_receipt (every checkpoint_batch_size receipts)
+  - checkpoint_batch_size field in KernelConfig and ArcKernel
   - DEFAULT_CHECKPOINT_BATCH_SIZE=100 constant
   - as_any_mut() on ReceiptStore trait for SqliteReceiptStore downcast
   - BudgetChargeResult private struct for carrying monetary charge info through the pipeline
@@ -32,9 +32,9 @@ provides:
   - build_allow_response_with_metadata for merging extra metadata into allow receipts
 
 affects:
-  - pact-cli (KernelConfig now requires checkpoint_batch_size)
-  - pact-mcp-adapter (KernelConfig update in edge.rs tests)
-  - pact-guards/tests/integration.rs (KernelConfig update)
+  - arc-cli (KernelConfig now requires checkpoint_batch_size)
+  - arc-mcp-adapter (KernelConfig update in edge.rs tests)
+  - arc-guards/tests/integration.rs (KernelConfig update)
   - tests/e2e/tests/full_flow.rs (KernelConfig update)
 
 tech-stack:
@@ -43,17 +43,17 @@ tech-stack:
     - Downcast via as_any_mut() + downcast_mut::<SqliteReceiptStore>() for checkpoint triggering without trait bloat
     - BudgetChargeResult private struct threads monetary info from budget check to receipt building
     - Worst-case pre-execution debit: kernel charges max_cost_per_invocation upfront; actual cost from invoke_with_cost determines settlement_status
-    - Checkpoint trigger: (seq - last_checkpoint_seq) >= checkpoint_batch_size in record_pact_receipt
+    - Checkpoint trigger: (seq - last_checkpoint_seq) >= checkpoint_batch_size in record_arc_receipt
 
 key-files:
   created: []
   modified:
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-kernel/Cargo.toml
-    - crates/pact-cli/src/main.rs
-    - crates/pact-mcp-adapter/src/edge.rs
-    - crates/pact-guards/tests/integration.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-kernel/Cargo.toml
+    - crates/arc-cli/src/main.rs
+    - crates/arc-mcp-adapter/src/edge.rs
+    - crates/arc-guards/tests/integration.rs
     - tests/e2e/tests/full_flow.rs
 
 key-decisions:
@@ -71,7 +71,7 @@ completed: 2026-03-22
 
 # Phase 08 Plan 04: Kernel Enforcement Integration Summary
 
-Monetary enforcement, Merkle checkpointing, and velocity guard integration wired into the pact-kernel evaluate_tool_call pipeline with 9 new integration tests.
+Monetary enforcement, Merkle checkpointing, and velocity guard integration wired into the arc-kernel evaluate_tool_call pipeline with 9 new integration tests.
 
 ## Performance
 
@@ -89,9 +89,9 @@ Monetary enforcement, Merkle checkpointing, and velocity guard integration wired
 - `dispatch_tool_call_with_cost` calls `invoke_with_cost` for monetary grants; servers that report actual costs have those costs recorded in `FinancialReceiptMetadata.cost_charged`
 - `build_monetary_deny_response` produces deny receipts with `FinancialReceiptMetadata` under `"financial"` key (`settlement_status="not_applicable"`, `attempted_cost` set)
 - `finalize_tool_output_with_cost` produces allow receipts with `FinancialReceiptMetadata` under `"financial"` key (`settlement_status="authorized"` or `"failed"` if server overran cap)
-- `record_pact_receipt` triggers Merkle checkpoints by downcasting to `SqliteReceiptStore` when `(seq - last_checkpoint_seq) >= checkpoint_batch_size`
+- `record_arc_receipt` triggers Merkle checkpoints by downcasting to `SqliteReceiptStore` when `(seq - last_checkpoint_seq) >= checkpoint_batch_size`
 - Added `as_any_mut()` to `ReceiptStore` trait (default `None`); `SqliteReceiptStore` overrides with `Some(self)`
-- Added `checkpoint_batch_size` field to `KernelConfig` and `PactKernel`, with `DEFAULT_CHECKPOINT_BATCH_SIZE=100` constant
+- Added `checkpoint_batch_size` field to `KernelConfig` and `ArcKernel`, with `DEFAULT_CHECKPOINT_BATCH_SIZE=100` constant
 
 ## Task Commits
 
@@ -99,12 +99,12 @@ Monetary enforcement, Merkle checkpointing, and velocity guard integration wired
 
 ## Files Created/Modified
 
-- `crates/pact-kernel/src/lib.rs` - BudgetChargeResult struct, updated check_and_increment_budget, updated run_guards signature, updated PactKernel struct (3 checkpoint fields), updated KernelConfig (checkpoint_batch_size), updated PactKernel::new, updated evaluate_tool_call_with_session_roots and nested flow path, added dispatch_tool_call_with_cost, build_monetary_deny_response, finalize_tool_output_with_cost, build_allow_response_with_metadata, record_pact_receipt with checkpoint triggering, maybe_trigger_checkpoint; 9 new integration tests; removed dead dispatch_tool_call
-- `crates/pact-kernel/src/receipt_store.rs` - Added as_any_mut() to ReceiptStore trait; SqliteReceiptStore overrides it
-- `crates/pact-kernel/Cargo.toml` - No new production deps (dev-dep add/remove cycle, net unchanged)
-- `crates/pact-cli/src/main.rs` - Added checkpoint_batch_size to KernelConfig literal
-- `crates/pact-mcp-adapter/src/edge.rs` - Added checkpoint_batch_size to 3 KernelConfig literals in test helpers
-- `crates/pact-guards/tests/integration.rs` - Added checkpoint_batch_size to KernelConfig literal
+- `crates/arc-kernel/src/lib.rs` - BudgetChargeResult struct, updated check_and_increment_budget, updated run_guards signature, updated ArcKernel struct (3 checkpoint fields), updated KernelConfig (checkpoint_batch_size), updated ArcKernel::new, updated evaluate_tool_call_with_session_roots and nested flow path, added dispatch_tool_call_with_cost, build_monetary_deny_response, finalize_tool_output_with_cost, build_allow_response_with_metadata, record_arc_receipt with checkpoint triggering, maybe_trigger_checkpoint; 9 new integration tests; removed dead dispatch_tool_call
+- `crates/arc-kernel/src/receipt_store.rs` - Added as_any_mut() to ReceiptStore trait; SqliteReceiptStore overrides it
+- `crates/arc-kernel/Cargo.toml` - No new production deps (dev-dep add/remove cycle, net unchanged)
+- `crates/arc-cli/src/main.rs` - Added checkpoint_batch_size to KernelConfig literal
+- `crates/arc-mcp-adapter/src/edge.rs` - Added checkpoint_batch_size to 3 KernelConfig literals in test helpers
+- `crates/arc-guards/tests/integration.rs` - Added checkpoint_batch_size to KernelConfig literal
 - `tests/e2e/tests/full_flow.rs` - Added checkpoint_batch_size to 3 KernelConfig literals
 
 ## Decisions Made
@@ -121,22 +121,22 @@ Monetary enforcement, Merkle checkpointing, and velocity guard integration wired
 
 **1. [Rule 3 - Blocking] KernelConfig struct extension required updating 6+ call sites**
 - **Found during:** Task 1 (build check after adding checkpoint_batch_size field)
-- **Issue:** Adding `checkpoint_batch_size` to `KernelConfig` broke all existing struct initializers in pact-cli, pact-mcp-adapter, pact-guards tests, and e2e tests
-- **Fix:** Added `checkpoint_batch_size: pact_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE` to all 7 external KernelConfig initializers
-- **Files modified:** crates/pact-cli/src/main.rs, crates/pact-mcp-adapter/src/edge.rs (3 sites), crates/pact-guards/tests/integration.rs, tests/e2e/tests/full_flow.rs (3 sites)
+- **Issue:** Adding `checkpoint_batch_size` to `KernelConfig` broke all existing struct initializers in arc-cli, arc-mcp-adapter, arc-guards tests, and e2e tests
+- **Fix:** Added `checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE` to all 7 external KernelConfig initializers
+- **Files modified:** crates/arc-cli/src/main.rs, crates/arc-mcp-adapter/src/edge.rs (3 sites), crates/arc-guards/tests/integration.rs, tests/e2e/tests/full_flow.rs (3 sites)
 - **Commit:** 083e888
 
 **2. [Rule 1 - Bug] VelocityGuard test would create circular dependency**
-- **Found during:** Task 1 (attempting to add pact-guards as dev-dependency of pact-kernel)
-- **Issue:** pact-guards depends on pact-kernel for the Guard trait, so adding pact-guards as dev-dep creates a cycle
+- **Found during:** Task 1 (attempting to add arc-guards as dev-dependency of arc-kernel)
+- **Issue:** arc-guards depends on arc-kernel for the Guard trait, so adding arc-guards as dev-dep creates a cycle
 - **Fix:** Implemented an equivalent counting rate-limit guard inline in the test (CountingRateLimitGuard), testing the same kernel behavior (guard denial produces signed receipt) without the circular dep
-- **Files modified:** crates/pact-kernel/src/lib.rs
+- **Files modified:** crates/arc-kernel/src/lib.rs
 - **Commit:** 083e888
 
 ## Self-Check: PASSED
 
-- FOUND: crates/pact-kernel/src/lib.rs
-- FOUND: crates/pact-kernel/src/receipt_store.rs
+- FOUND: crates/arc-kernel/src/lib.rs
+- FOUND: crates/arc-kernel/src/receipt_store.rs
 - FOUND: commit 083e888
 
 ## Next Phase Readiness

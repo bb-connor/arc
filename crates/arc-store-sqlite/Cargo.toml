@@ -1,0 +1,23 @@
+[package]
+name = "arc-store-sqlite"
+description = "SQLite-backed persistence, query, and report implementations for ARC"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_store_sqlite"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rusqlite = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

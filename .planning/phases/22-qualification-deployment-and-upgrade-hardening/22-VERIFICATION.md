@@ -14,9 +14,9 @@ Phase 22 passed the full production qualification lane and now satisfies the
 
 - `./scripts/check-release-inputs.sh`
 - `./scripts/check-dashboard-release.sh`
-- `./scripts/check-pact-ts-release.sh`
-- `./scripts/check-pact-py-release.sh`
-- `./scripts/check-pact-go-release.sh`
+- `./scripts/check-arc-ts-release.sh`
+- `./scripts/check-arc-py-release.sh`
+- `./scripts/check-arc-go-release.sh`
 - `./scripts/qualify-release.sh`
 
 ## Result

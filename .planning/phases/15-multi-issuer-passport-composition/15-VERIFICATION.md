@@ -12,9 +12,9 @@ issuer-aware verifier reporting.
 
 ## Automated Verification
 
-- `cargo test -p pact-credentials -- --nocapture`
-- `cargo test -p pact-cli --test passport -- --nocapture`
-- `cargo test -p pact-cli --test local_reputation -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test local_reputation -- --nocapture`
 
 ## Result
 

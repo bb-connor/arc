@@ -40,13 +40,13 @@ artifact IDs and immutable verification.
 
 - `.planning/ROADMAP.md` -- Phase 19 goal and success criteria
 - `.planning/REQUIREMENTS.md` -- `CERT-01`, `CERT-02`
-- `crates/pact-cli/src/certify.rs` -- registry model and local CLI flows
-- `crates/pact-cli/src/main.rs` -- CLI command wiring
-- `crates/pact-cli/src/trust_control.rs` -- remote registry endpoints and
+- `crates/arc-cli/src/certify.rs` -- registry model and local CLI flows
+- `crates/arc-cli/src/main.rs` -- CLI command wiring
+- `crates/arc-cli/src/trust_control.rs` -- remote registry endpoints and
   client calls
-- `crates/pact-cli/tests/certify.rs` -- local and remote registry integration
+- `crates/arc-cli/tests/certify.rs` -- local and remote registry integration
   tests
-- `docs/PACT_CERTIFY_GUIDE.md` -- operator-facing registry docs
+- `docs/ARC_CERTIFY_GUIDE.md` -- operator-facing registry docs
 
 </canonical_refs>
 

@@ -25,8 +25,8 @@ key-files:
   created:
     - .planning/phases/01-e9-ha-trust-control-reliability/01-02-SUMMARY.md
   modified:
-    - crates/pact-cli/src/trust_control.rs
-    - crates/pact-cli/tests/trust_cluster.rs
+    - crates/arc-cli/src/trust_control.rs
+    - crates/arc-cli/tests/trust_cluster.rs
     - docs/epics/E9-ha-trust-control-reliability.md
 key-decisions:
   - "leaderUrl and handledBy should report the node that actually handled and locally verified the successful write"
@@ -66,8 +66,8 @@ No task commits were created in this session because the repository currently ha
 3. **Task 3: Tighten the E9 doc to describe the concrete write guarantee** - working tree only
 
 ## Files Created/Modified
-- `crates/pact-cli/src/trust_control.rs` - added shared post-write verification and stable response metadata for leader-visible success
-- `crates/pact-cli/tests/trust_cluster.rs` - added immediate leader-read assertions across authority, receipt, revocation, and budget writes
+- `crates/arc-cli/src/trust_control.rs` - added shared post-write verification and stable response metadata for leader-visible success
+- `crates/arc-cli/tests/trust_cluster.rs` - added immediate leader-read assertions across authority, receipt, revocation, and budget writes
 - `docs/epics/E9-ha-trust-control-reliability.md` - documented the per-request leader-visible durability guarantee
 
 ## Decisions Made
@@ -83,8 +83,8 @@ No task commits were created in this session because the repository currently ha
 - **Found during:** Task 2 (Expand trust-cluster coverage to prove the write contract from both entry points)
 - **Issue:** Response metadata recomputed `leaderUrl` from live cluster health instead of the handling node, and the HA test assumed the initial elected leader stayed constant across the full run
 - **Fix:** Bound `leaderUrl` and `handledBy` to the node that actually handled and verified the write, then updated the test to read back through the returned leader URL
-- **Files modified:** `crates/pact-cli/src/trust_control.rs`, `crates/pact-cli/tests/trust_cluster.rs`, `docs/epics/E9-ha-trust-control-reliability.md`
-- **Verification:** `cargo test -p pact-cli --test trust_cluster` passes after the fix
+- **Files modified:** `crates/arc-cli/src/trust_control.rs`, `crates/arc-cli/tests/trust_cluster.rs`, `docs/epics/E9-ha-trust-control-reliability.md`
+- **Verification:** `cargo test -p arc-cli --test trust_cluster` passes after the fix
 - **Committed in:** working tree only
 
 ---
@@ -94,7 +94,7 @@ No task commits were created in this session because the repository currently ha
 
 ## Issues Encountered
 
-- An intermediate `cargo test -p pact-cli --test trust_cluster` run exposed an outdated budget replication expectation; corrected before final verification
+- An intermediate `cargo test -p arc-cli --test trust_cluster` run exposed an outdated budget replication expectation; corrected before final verification
 - Your local rerun exposed that the response metadata and test were both leaning on a stale leader assumption; fixed before plan closeout
 
 ## User Setup Required

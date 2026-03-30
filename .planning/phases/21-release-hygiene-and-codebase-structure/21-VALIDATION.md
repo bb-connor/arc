@@ -15,16 +15,16 @@ created: 2026-03-25
 |----------|-------|
 | **Framework** | shell guard, `cargo fmt`, `cargo clippy`, targeted `cargo test` |
 | **Quick run command** | `./scripts/check-release-inputs.sh` |
-| **Targeted lint command** | `cargo clippy -p pact-cli -- -D warnings` |
-| **Targeted regression command** | `cargo test -p pact-cli --test provider_admin -- --nocapture` |
+| **Targeted lint command** | `cargo clippy -p arc-cli -- -D warnings` |
+| **Targeted regression command** | `cargo test -p arc-cli --test provider_admin -- --nocapture` |
 
 ## Per-Plan Verification Map
 
 | Plan | Requirement | Verification |
 |------|-------------|--------------|
-| 21-01 | PROD-07, PROD-08 | `wc -l crates/pact-cli/src/main.rs crates/pact-cli/src/admin.rs` |
+| 21-01 | PROD-07, PROD-08 | `wc -l crates/arc-cli/src/main.rs crates/arc-cli/src/admin.rs` |
 | 21-02 | PROD-07 | `./scripts/check-release-inputs.sh` |
-| 21-03 | PROD-08 | `cargo fmt --all -- --check`, `cargo clippy -p pact-cli -- -D warnings`, `cargo test -p pact-cli --test provider_admin -- --nocapture`, `cargo test -p pact-cli --test certify -- --nocapture`, `cargo test -p pact-cli --test federated_issue -- --nocapture`, `cargo test -p pact-cli --test evidence_export -- --nocapture`, `cargo test -p pact-cli --test reputation_issuance -- --nocapture` |
+| 21-03 | PROD-08 | `cargo fmt --all -- --check`, `cargo clippy -p arc-cli -- -D warnings`, `cargo test -p arc-cli --test provider_admin -- --nocapture`, `cargo test -p arc-cli --test certify -- --nocapture`, `cargo test -p arc-cli --test federated_issue -- --nocapture`, `cargo test -p arc-cli --test evidence_export -- --nocapture`, `cargo test -p arc-cli --test reputation_issuance -- --nocapture` |
 
 ## Coverage Notes
 
@@ -32,7 +32,7 @@ created: 2026-03-25
 - provider admin, certification registry, and federated issuance prove the new
   admin module still behaves end to end
 - evidence export and reputation issuance cover the small lint cleanup changes
-  needed to make the targeted `pact-cli` gate credible
+  needed to make the targeted `arc-cli` gate credible
 
 ## Sign-Off
 

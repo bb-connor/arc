@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a Python SDK that is strong enough to replace the current Python conformance peer and later serve as the maintained Python client for the PACT edge.
+Build a Python SDK that is strong enough to replace the current Python conformance peer and later serve as the maintained Python client for the ARC edge.
 
 The Python plan should optimize for:
 
@@ -32,7 +32,7 @@ Implication:
 
 ## Recommended Product Split
 
-### `pact`
+### `arc`
 
 Purpose:
 
@@ -48,12 +48,12 @@ Should include:
 - transcript/debug hooks
 - pure Python invariant helpers where practical
 
-### `pact-native`
+### `arc-native`
 
 Purpose:
 
 - optional PyO3-backed accelerator and invariant helper package
-- imported opportunistically by `pact`
+- imported opportunistically by `arc`
 - not required for remote-edge usage
 
 Should include:
@@ -87,16 +87,16 @@ At the same time:
 
 So the safest product model is:
 
-- `pact` pure Python package first
-- `pact-native` optional native helper package second
+- `arc` pure Python package first
+- `arc-native` optional native helper package second
 
 ## Recommended Repository Layout
 
 ```text
-packages/sdk/pact-py/
+packages/sdk/arc-py/
   pyproject.toml
   src/
-    pact/
+    arc/
       __init__.py
       client/
       auth/
@@ -109,11 +109,11 @@ packages/sdk/pact-py/
       py.typed
   tests/
 
-packages/sdk/pact-py/pact-native/
+packages/sdk/arc-py/arc-native/
   Cargo.toml
   pyproject.toml
   python/
-    pact_native/
+    arc_native/
       __init__.py
       py.typed
   src/
@@ -122,8 +122,8 @@ packages/sdk/pact-py/pact-native/
 
 Alternative:
 
-- publish `pact-native` as a hidden implementation detail loaded by `pact`
-- or keep the import path internal as `pact._native`
+- publish `arc-native` as a hidden implementation detail loaded by `arc`
+- or keep the import path internal as `arc._native`
 
 The public package split still matters even if the internal import name is hidden.
 
@@ -131,7 +131,7 @@ The public package split still matters even if the internal import name is hidde
 
 ### Pure Python package
 
-Use a normal Python build backend for `pact`, for example:
+Use a normal Python build backend for `arc`, for example:
 
 - Hatchling
 - setuptools
@@ -144,7 +144,7 @@ Reason:
 
 ### Native package
 
-Use `maturin` for `pact-native`.
+Use `maturin` for `arc-native`.
 
 Reasons from the official docs:
 
@@ -191,8 +191,8 @@ Implication:
 
 Use a submodule import path to avoid mixed-package confusion:
 
-- public Python package: `pact`
-- native module import path: `pact._native`
+- public Python package: `arc`
+- native module import path: `arc._native`
 
 This follows maturin's documented mixed-project guidance and makes IDEs happier.
 
@@ -200,7 +200,7 @@ This follows maturin's documented mixed-project guidance and makes IDEs happier.
 
 ### First release target
 
-The first Python SDK should target the remote HTTP PACT edge.
+The first Python SDK should target the remote HTTP ARC edge.
 
 It should support:
 
@@ -239,8 +239,8 @@ Why:
 
 Suggested package shape:
 
-- `pact.client.Client`
-- `pact.client.AsyncClient`
+- `arc.client.Client`
+- `arc.client.AsyncClient`
 
 with shared models and routing logic beneath them.
 
@@ -286,10 +286,10 @@ The current peer proves the first two auth modes:
 
 Recommended modules:
 
-- `pact.auth.static`
-- `pact.auth.protected_resource`
-- `pact.auth.oauth_local`
-- `pact.auth.pkce`
+- `arc.auth.static`
+- `arc.auth.protected_resource`
+- `arc.auth.oauth_local`
+- `arc.auth.pkce`
 
 The auth layer should yield token providers rather than owning the transport outright.
 
@@ -297,7 +297,7 @@ The auth layer should yield token providers rather than owning the transport out
 
 ### Pure Python first
 
-The first `pact` package should have pure Python helpers where practical:
+The first `arc` package should have pure Python helpers where practical:
 
 - canonical JSON
 - hash helpers
@@ -307,18 +307,18 @@ That is enough to:
 
 - exercise shared vectors
 - keep installation simple
-- make `pact-native` optional rather than foundational
+- make `arc-native` optional rather than foundational
 
 ### Native helper second
 
-The `pact-native` package should then provide:
+The `arc-native` package should then provide:
 
 - faster or byte-authoritative versions of the same helpers
-- an import-time optional backend selected by `pact`
+- an import-time optional backend selected by `arc`
 
 Selection model:
 
-- try import `pact._native`
+- try import `arc._native`
 - if unavailable, fall back to pure Python helper implementations
 
 For remote-edge transport:
@@ -346,7 +346,7 @@ Reason:
 
 ### Native CI and wheels
 
-For `pact-native`:
+For `arc-native`:
 
 - build wheels in CI for Linux, macOS, and Windows
 - prefer manylinux-compliant builds for Linux
@@ -362,7 +362,7 @@ Useful official references:
 
 Both packages should publish sdists.
 
-For `pact-native`, ensure the sdist includes:
+For `arc-native`, ensure the sdist includes:
 
 - Rust sources
 - any generated vector fixtures or schema assets needed at build time
@@ -397,7 +397,7 @@ The Python package should validate:
 Migrate the current Python conformance peer in stages:
 
 1. keep `client.py` as a thin CLI wrapper
-2. move protocol logic into `packages/sdk/pact-py`
+2. move protocol logic into `packages/sdk/arc-py`
 3. import the package from the wrapper
 4. then replace bespoke peer logic with package usage
 
@@ -428,7 +428,7 @@ Scope:
 
 Scope:
 
-- `pact-native`
+- `arc-native`
 - optional native helper backend
 - wheel CI
 - vector-backed parity checks
@@ -439,15 +439,15 @@ Scope:
 
 Mitigation:
 
-- keep `pact` pure Python
-- make `pact-native` optional
+- keep `arc` pure Python
+- make `arc-native` optional
 
 ### Risk: mixed Rust/Python layout causes import confusion
 
 Mitigation:
 
 - use the documented `python-source` layout
-- import the native module as `pact._native`
+- import the native module as `arc._native`
 
 ### Risk: choosing too old a Python minimum expands the support burden too early
 
@@ -466,17 +466,17 @@ Mitigation:
 ## Open Questions
 
 - Should the public minimum Python version be 3.11 or 3.10?
-- Should `pact-native` be a separate install extra like `pact[native]`, or an internal optional dependency?
+- Should `arc-native` be a separate install extra like `arc[native]`, or an internal optional dependency?
 - Do we need an async client in the first public alpha, or only after the harness migration?
 - Should the native package expose raw helper functions or only a tiny internal backend interface?
 
 ## Recommended First Implementation Slice
 
-1. Create `packages/sdk/pact-py` as a pure Python package.
+1. Create `packages/sdk/arc-py` as a pure Python package.
 2. Move the current remote HTTP logic out of [tests/conformance/peers/python/client.py](../../tests/conformance/peers/python/client.py) into `client/`, `session/`, and `auth/`.
 3. Keep `client.py` as a thin wrapper importing the new package.
 4. Add pure Python invariant helpers and vector tests.
-5. After the package-backed peer is stable, add `packages/sdk/pact-py/pact-native` using PyO3 and maturin.
+5. After the package-backed peer is stable, add `packages/sdk/arc-py/arc-native` using PyO3 and maturin.
 
 ## Research Inputs
 

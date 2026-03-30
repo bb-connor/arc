@@ -15,9 +15,9 @@ direction is harder to regress.
 
 ## Current Reality
 
-- `crates/pact-credentials/src/lib.rs` is still 1,790 LOC
-- `crates/pact-reputation/src/lib.rs` is still 967 LOC
-- `crates/pact-policy/src/evaluate.rs` is still 1,811 LOC
+- `crates/arc-credentials/src/lib.rs` is still 1,790 LOC
+- `crates/arc-reputation/src/lib.rs` is still 967 LOC
+- `crates/arc-policy/src/evaluate.rs` is still 1,811 LOC
 - the core architecture work from Phases 25-27 is in place, but the domain
   layer still hides too much behavior inside a few files
 - there is no dedicated script that fails closed when domain crates start

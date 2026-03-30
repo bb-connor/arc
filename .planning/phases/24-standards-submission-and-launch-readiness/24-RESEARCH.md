@@ -7,8 +7,8 @@
 2. `docs/release/RELEASE_CANDIDATE.md` and `docs/release/RELEASE_AUDIT.md`
    still described the older scoped `v1` release candidate instead of the
    current production-candidate surface.
-3. `packages/sdk/pact-ts/package.json` already used `@pact-protocol/sdk`, but
-   the README still advertised `@pact/sdk`.
+3. `packages/sdk/arc-ts/package.json` already used `@arc-protocol/sdk`, but
+   the README still advertised `@arc/sdk`.
 4. Python and Go SDK READMEs were mostly accurate but still needed explicit
    alignment to the current `v2.3` protocol and release docs.
 5. There were no dedicated standards-submission artifacts yet for receipts or

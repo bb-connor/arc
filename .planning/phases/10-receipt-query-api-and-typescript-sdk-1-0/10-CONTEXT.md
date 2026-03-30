@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Receipt query API in pact-kernel with cursor-based pagination and multi-filter support, exposed via CLI subcommand and HTTP endpoint. TypeScript SDK hardened to 1.0 with typed errors, DPoP proof generation helpers, and ReceiptQueryClient. No new enforcement logic or protocol changes -- product surface and developer experience.
+Receipt query API in arc-kernel with cursor-based pagination and multi-filter support, exposed via CLI subcommand and HTTP endpoint. TypeScript SDK hardened to 1.0 with typed errors, DPoP proof generation helpers, and ReceiptQueryClient. No new enforcement logic or protocol changes -- product surface and developer experience.
 
 </domain>
 
@@ -17,7 +17,7 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 - Cursor-based pagination using receipt seq (receipt_store already uses seq for delta queries); response includes next_cursor
 - Budget impact filtering via min_cost and max_cost as separate optional params (range queries)
 - Flat list response with total_count and next_cursor -- grouping deferred to Phase 12 dashboard
-- Query module lives in receipt_query.rs in pact-kernel, co-located with receipt_store for direct SQLite access
+- Query module lives in receipt_query.rs in arc-kernel, co-located with receipt_store for direct SQLite access
 - Filter parameters: capability_id, tool_server, tool_name, time_range (since/until), outcome, min_cost, max_cost
 
 ### CLI Receipt List UX
@@ -27,10 +27,10 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 - HTTP API endpoint: GET /v1/receipts/query on existing trust-control axum server (versioned path)
 
 ### TypeScript SDK 1.0 Scope
-- Typed error classes extending PactError base: DpopSignError, QueryError, TransportError with error codes
+- Typed error classes extending ArcError base: DpopSignError, QueryError, TransportError with error codes
 - Explicit signDpopProof(params) function returning signed proof object -- not auto-middleware
 - ReceiptQueryClient class included in SDK for querying receipts via HTTP API
-- npm package name: @pact-protocol/sdk
+- npm package name: @arc-protocol/sdk
 - SDK version bumped from 0.1.0 to 1.0.0 with semantic versioning
 
 ### Claude's Discretion
@@ -46,11 +46,11 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 ## Existing Code Insights
 
 ### Reusable Assets
-- `pact-kernel/src/receipt_store.rs` -- SqliteReceiptStore with list_tool_receipts (5-filter query), list_tool_receipts_after_seq (cursor-based), seq-based pagination
-- `pact-cli/src/trust_control.rs` -- Existing axum HTTP endpoints for trust-control operations
-- `pact-cli/src/main.rs` -- CLI subcommand routing with clap
-- `packages/sdk/pact-ts/` -- Existing TS SDK at v0.1.0 with auth/, client/, session/, transport/ modules
-- `pact-kernel/src/dpop.rs` -- DpopProofBody, DpopProof::sign for TS SDK to mirror
+- `arc-kernel/src/receipt_store.rs` -- SqliteReceiptStore with list_tool_receipts (5-filter query), list_tool_receipts_after_seq (cursor-based), seq-based pagination
+- `arc-cli/src/trust_control.rs` -- Existing axum HTTP endpoints for trust-control operations
+- `arc-cli/src/main.rs` -- CLI subcommand routing with clap
+- `packages/sdk/arc-ts/` -- Existing TS SDK at v0.1.0 with auth/, client/, session/, transport/ modules
+- `arc-kernel/src/dpop.rs` -- DpopProofBody, DpopProof::sign for TS SDK to mirror
 
 ### Established Patterns
 - SQLite queries use parameterized WHERE with IS NULL OR pattern for optional filters
@@ -62,7 +62,7 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 - receipt_query.rs builds on top of SqliteReceiptStore's existing list_tool_receipts method
 - CLI receipt list subcommand calls receipt_query through the same kernel instance used by other CLI commands
 - HTTP GET /receipts endpoint added to trust-control's axum router
-- TS SDK DPoP helpers must produce proofs compatible with pact-kernel's verify_dpop_proof
+- TS SDK DPoP helpers must produce proofs compatible with arc-kernel's verify_dpop_proof
 
 </code_context>
 
@@ -70,7 +70,7 @@ Receipt query API in pact-kernel with cursor-based pagination and multi-filter s
 ## Specific Ideas
 
 - The existing list_tool_receipts in receipt_store.rs already supports 5 filters -- receipt_query.rs extends this with budget impact and cursor pagination
-- TS SDK DPoP proof generation must match the exact DpopProofBody schema from pact-kernel/src/dpop.rs (canonical JSON + Ed25519)
+- TS SDK DPoP proof generation must match the exact DpopProofBody schema from arc-kernel/src/dpop.rs (canonical JSON + Ed25519)
 - Phase 12 (dashboard) will consume the receipt query API -- keep the API stable and well-documented
 - SIEM exporters (Phase 11) use cursor-pull against the same receipt store -- align cursor semantics
 

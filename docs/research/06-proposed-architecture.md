@@ -5,11 +5,11 @@
 The cleanest `v1` architecture is:
 
 - MCP-compatible JSON-RPC at the edge
-- PACT capability enforcement in the middle
+- ARC capability enforcement in the middle
 - transport-specific tool adapters underneath
 - durable trust services beside the runtime
 
-This lets PACT preserve its strongest idea, explicit authority plus signed evidence, without forcing the ecosystem to abandon the MCP interaction model on day one.
+This lets ARC preserve its strongest idea, explicit authority plus signed evidence, without forcing the ecosystem to abandon the MCP interaction model on day one.
 
 ## Target Logical Architecture
 
@@ -18,17 +18,17 @@ MCP Client / Host Application
         |
         | JSON-RPC session
         v
-PACT Edge Session Layer
+ARC Edge Session Layer
         |
         | normalized requests + negotiated features
         v
-PACT Kernel
+ARC Kernel
         |
         | capability check -> guard pipeline -> dispatch
         v
-PACT Tool Runtime / Adapters
+ARC Tool Runtime / Adapters
         |
-        +--> Native PACT tool servers
+        +--> Native ARC tool servers
         +--> MCP-wrapped tool servers
         +--> Resource providers
         +--> Prompt providers
@@ -49,7 +49,7 @@ Responsibilities:
 
 - expose JSON-RPC request, response, and notification handling
 - negotiate protocol revision and supported features
-- map MCP session concepts onto internal PACT operations
+- map MCP session concepts onto internal ARC operations
 - own in-flight request tracking for progress and cancellation
 - own subscriptions, list-change notifications, and pagination cursors
 
@@ -74,7 +74,7 @@ The kernel should not know whether a request originated from:
 - a local CLI session
 - an MCP client over stdio
 - an MCP client over HTTP
-- a future native PACT edge
+- a future native ARC edge
 
 It should receive normalized operations.
 
@@ -140,7 +140,7 @@ Examples:
 
 ## Session State Model
 
-PACT needs a first-class session object.
+ARC needs a first-class session object.
 
 Suggested state machine:
 
@@ -169,16 +169,16 @@ The current repo can support this without a total reorg, but `v1` probably wants
 
 ## Existing crates to preserve
 
-- `pact-core`
-- `pact-kernel`
-- `pact-guards`
-- `pact-policy`
-- `pact-manifest`
-- `pact-mcp-adapter`
+- `arc-core`
+- `arc-kernel`
+- `arc-guards`
+- `arc-policy`
+- `arc-manifest`
+- `arc-mcp-adapter`
 
 ## Likely new crates or major modules
 
-### `pact-session`
+### `arc-session`
 
 Purpose:
 
@@ -190,14 +190,14 @@ Purpose:
 
 Alternative:
 
-- keep this inside `pact-kernel` as a `session` module
+- keep this inside `arc-kernel` as a `session` module
 
 Recommendation:
 
 - new crate if you expect both MCP-edge and native-edge frontends
 - module if you want to stay small until `v0.4`
 
-### `pact-jsonrpc`
+### `arc-jsonrpc`
 
 Purpose:
 
@@ -206,22 +206,22 @@ Purpose:
 
 Alternative:
 
-- fold into `pact-session`
+- fold into `arc-session`
 
 Recommendation:
 
 - separate crate only if you want reuse or generated schema support
 
-### `pact-edge-mcp`
+### `arc-edge-mcp`
 
 Purpose:
 
 - implement MCP-compatible server and client feature handling at the edge
 - translate edge requests into normalized internal operations
 
-This is likely cleaner than bloating `pact-mcp-adapter`, which currently plays a different role.
+This is likely cleaner than bloating `arc-mcp-adapter`, which currently plays a different role.
 
-### `pact-ca`
+### `arc-ca`
 
 Purpose:
 
@@ -231,7 +231,7 @@ Purpose:
 
 Could begin as a library plus in-memory server implementation.
 
-### `pact-receipt-store`
+### `arc-receipt-store`
 
 Purpose:
 
@@ -247,7 +247,7 @@ Could initially target:
 
 ## Existing crate evolution
 
-### `pact-core`
+### `arc-core`
 
 Should continue to hold:
 
@@ -266,7 +266,7 @@ Should probably not gain:
 - transport-specific code
 - JSON-RPC plumbing
 
-### `pact-kernel`
+### `arc-kernel`
 
 Should evolve into:
 
@@ -286,11 +286,11 @@ Should probably stop assuming:
 - all operations are single-shot
 - receipts only represent allow or deny
 
-### `pact-mcp-adapter`
+### `arc-mcp-adapter`
 
 Should remain:
 
-- migration adapter from MCP servers into PACT runtime
+- migration adapter from MCP servers into ARC runtime
 
 Should gain:
 

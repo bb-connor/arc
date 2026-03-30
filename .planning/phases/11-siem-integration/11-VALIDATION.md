@@ -19,7 +19,7 @@ created: 2026-03-23
 |----------|-------|
 | **Framework** | cargo test (Rust built-in) |
 | **Config file** | Cargo.toml workspace |
-| **Quick run command** | `cargo test -p pact-siem` |
+| **Quick run command** | `cargo test -p arc-siem` |
 | **Full suite command** | `cargo test --workspace` |
 | **Estimated runtime** | ~30 seconds |
 
@@ -27,7 +27,7 @@ created: 2026-03-23
 
 ## Sampling Rate
 
-- **After every task commit:** Run `cargo test -p pact-siem`
+- **After every task commit:** Run `cargo test -p arc-siem`
 - **After every plan wave:** Run `cargo test --workspace`
 - **Before `/gsd:verify-work`:** Full suite must be green
 - **Max feedback latency:** 30 seconds
@@ -38,9 +38,9 @@ created: 2026-03-23
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 11-01-01 | 01 | 1 | COMP-05 | unit | `cargo test -p pact-siem` | ❌ W0 | ⬜ pending |
-| 11-02-01 | 02 | 2 | COMP-05 | unit | `cargo test -p pact-siem` | ❌ W0 | ⬜ pending |
-| 11-03-01 | 03 | 3 | COMP-05 | integration | `cargo test -p pact-siem --test integration` | ❌ W0 | ⬜ pending |
+| 11-01-01 | 01 | 1 | COMP-05 | unit | `cargo test -p arc-siem` | ❌ W0 | ⬜ pending |
+| 11-02-01 | 02 | 2 | COMP-05 | unit | `cargo test -p arc-siem` | ❌ W0 | ⬜ pending |
+| 11-03-01 | 03 | 3 | COMP-05 | integration | `cargo test -p arc-siem --test integration` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -48,7 +48,7 @@ created: 2026-03-23
 
 ## Wave 0 Requirements
 
-- [ ] pact-siem crate with Cargo.toml and src/lib.rs
+- [ ] arc-siem crate with Cargo.toml and src/lib.rs
 - [ ] ExporterManager and DLQ unit tests
 - [ ] Splunk HEC and ES bulk exporter unit tests with wiremock
 
@@ -60,7 +60,7 @@ created: 2026-03-23
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| pact-kernel has no HTTP client deps | COMP-05 SC-2 | Dep graph inspection | `cargo tree -p pact-kernel \| grep -i reqwest` returns empty |
+| arc-kernel has no HTTP client deps | COMP-05 SC-2 | Dep graph inspection | `cargo tree -p arc-kernel \| grep -i reqwest` returns empty |
 
 ---
 

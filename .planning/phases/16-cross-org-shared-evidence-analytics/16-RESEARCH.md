@@ -18,7 +18,7 @@
 
 ## Chosen Approach
 
-- Build one shared-evidence report type in `pact-kernel`
+- Build one shared-evidence report type in `arc-kernel`
 - Reuse it in:
   - `GET /v1/federation/evidence-shares`
   - `GET /v1/reports/operator`

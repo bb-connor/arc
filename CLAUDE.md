@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-## What is PACT?
+## What is ARC?
 
-PACT (Provable Agent Capability Transport) is a protocol for secure, attested tool access in AI agent systems. It replaces MCP with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation.
+ARC (Provable Agent Capability Transport) is a protocol for secure, attested tool access in AI agent systems. It replaces MCP with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation.
 
-PACT is the protocol layer. ClawdStrike is the policy engine that plugs into the PACT kernel as the guard evaluation backend.
+ARC is the protocol layer. ClawdStrike is the policy engine that plugs into the ARC kernel as the guard evaluation backend.
 
 ## Five Components
 
@@ -18,10 +18,10 @@ PACT is the protocol layer. ClawdStrike is the policy engine that plugs into the
 
 | Crate | Purpose |
 |-------|---------|
-| `pact-core` | Shared types: capabilities, scopes, grants, receipts, canonical JSON, signing |
-| `pact-kernel` | Runtime kernel: capability validation, guard pipeline, receipt signing |
-| `pact-manifest` | Tool server manifest format: tool definitions, signing, verification |
-| `pact-mcp-adapter` | Wraps existing MCP servers as PACT tool servers |
+| `arc-core` | Shared types: capabilities, scopes, grants, receipts, canonical JSON, signing |
+| `arc-kernel` | Runtime kernel: capability validation, guard pipeline, receipt signing |
+| `arc-manifest` | Tool server manifest format: tool definitions, signing, verification |
+| `arc-mcp-adapter` | Wraps existing MCP servers as ARC tool servers |
 | `hello-tool` | Example tool server (in `examples/`) |
 
 ## Build and Test
@@ -44,7 +44,7 @@ cargo fmt --all -- --check
 ## Key Files
 
 - Protocol spec: `spec/PROTOCOL.md`
-- Core types: `crates/pact-core/src/lib.rs`
-- Kernel: `crates/pact-kernel/src/lib.rs`
-- Manifest: `crates/pact-manifest/src/lib.rs`
-- MCP adapter: `crates/pact-mcp-adapter/src/lib.rs`
+- Core types: `crates/arc-core/src/lib.rs`
+- Kernel: `crates/arc-kernel/src/lib.rs`
+- Manifest: `crates/arc-manifest/src/lib.rs`
+- MCP adapter: `crates/arc-mcp-adapter/src/lib.rs`

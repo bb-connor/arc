@@ -33,4 +33,4 @@ goal.
 
 ## Verification
 
-- `wc -l crates/pact-cli/src/main.rs crates/pact-cli/src/admin.rs`
+- `wc -l crates/arc-cli/src/main.rs crates/arc-cli/src/admin.rs`

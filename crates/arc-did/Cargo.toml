@@ -1,0 +1,22 @@
+[package]
+name = "arc-did"
+description = "Self-certifying did:arc documents and resolution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_did"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+bs58 = { workspace = true }
+url = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

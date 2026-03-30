@@ -13,18 +13,18 @@ provides:
   - Concern-based A2A source-file split with a thin crate facade
 key-files:
   created:
-    - crates/pact-a2a-adapter/src/config.rs
-    - crates/pact-a2a-adapter/src/partner_policy.rs
-    - crates/pact-a2a-adapter/src/invoke.rs
-    - crates/pact-a2a-adapter/src/protocol.rs
-    - crates/pact-a2a-adapter/src/task_registry.rs
-    - crates/pact-a2a-adapter/src/mapping.rs
-    - crates/pact-a2a-adapter/src/discovery.rs
-    - crates/pact-a2a-adapter/src/auth.rs
-    - crates/pact-a2a-adapter/src/transport.rs
-    - crates/pact-a2a-adapter/src/tests.rs
+    - crates/arc-a2a-adapter/src/config.rs
+    - crates/arc-a2a-adapter/src/partner_policy.rs
+    - crates/arc-a2a-adapter/src/invoke.rs
+    - crates/arc-a2a-adapter/src/protocol.rs
+    - crates/arc-a2a-adapter/src/task_registry.rs
+    - crates/arc-a2a-adapter/src/mapping.rs
+    - crates/arc-a2a-adapter/src/discovery.rs
+    - crates/arc-a2a-adapter/src/auth.rs
+    - crates/arc-a2a-adapter/src/transport.rs
+    - crates/arc-a2a-adapter/src/tests.rs
   modified:
-    - crates/pact-a2a-adapter/src/lib.rs
+    - crates/arc-a2a-adapter/src/lib.rs
 requirements-completed:
   - ARCH-07
 completed: 2026-03-25
@@ -34,7 +34,7 @@ completed: 2026-03-25
 
 ## Accomplishments
 
-- reduced `crates/pact-a2a-adapter/src/lib.rs` to a 40-line facade
+- reduced `crates/arc-a2a-adapter/src/lib.rs` to a 40-line facade
 - split the prior 8k-line A2A implementation into separate source files for
   config, partner policy, invocation, protocol models, task registry, mapping,
   discovery, auth, transport, and tests
@@ -43,5 +43,5 @@ completed: 2026-03-25
 
 ## Verification
 
-- `cargo check -p pact-a2a-adapter`
-- `wc -l crates/pact-a2a-adapter/src/lib.rs crates/pact-a2a-adapter/src/*.rs | sort -nr | head -n 12`
+- `cargo check -p arc-a2a-adapter`
+- `wc -l crates/arc-a2a-adapter/src/lib.rs crates/arc-a2a-adapter/src/*.rs | sort -nr | head -n 12`

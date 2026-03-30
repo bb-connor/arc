@@ -1,24 +1,24 @@
 ---
 phase: 11-siem-integration
 plan: "02"
-subsystem: pact-siem
+subsystem: arc-siem
 tags: [siem, exporter, splunk-hec, elasticsearch-bulk, reqwest, ndjson, kernel-isolation]
 dependency_graph:
-  requires: [pact-core, pact-siem/exporter.rs (Exporter trait from 11-01)]
+  requires: [arc-core, arc-siem/exporter.rs (Exporter trait from 11-01)]
   provides: [SplunkHecExporter, ElasticsearchExporter, SplunkConfig, ElasticConfig, ElasticAuthConfig]
-  affects: [crates/pact-siem/src/exporters/mod.rs, crates/pact-siem/src/lib.rs]
+  affects: [crates/arc-siem/src/exporters/mod.rs, crates/arc-siem/src/lib.rs]
 tech_stack:
   added: []
   patterns: [newline-separated JSON envelopes for Splunk HEC, NDJSON action+document pairs for ES bulk, reqwest::RequestBuilder::basic_auth for no-base64 Basic auth, bulk response body parsing for ES partial failure detection]
 key_files:
   created:
-    - crates/pact-siem/src/exporters/splunk.rs
-    - crates/pact-siem/src/exporters/elastic.rs
+    - crates/arc-siem/src/exporters/splunk.rs
+    - crates/arc-siem/src/exporters/elastic.rs
   modified:
-    - crates/pact-siem/src/exporters/mod.rs (added pub mod splunk; pub mod elastic;)
-    - crates/pact-siem/src/lib.rs (re-exported SplunkHecExporter, SplunkConfig, ElasticsearchExporter, ElasticConfig, ElasticAuthConfig)
+    - crates/arc-siem/src/exporters/mod.rs (added pub mod splunk; pub mod elastic;)
+    - crates/arc-siem/src/lib.rs (re-exported SplunkHecExporter, SplunkConfig, ElasticsearchExporter, ElasticConfig, ElasticAuthConfig)
 decisions:
-  - SplunkConfig.sourcetype defaults to "pact:receipt" -- allows Splunk teams to write sourcetype-based searches without per-event config
+  - SplunkConfig.sourcetype defaults to "arc:receipt" -- allows Splunk teams to write sourcetype-based searches without per-event config
   - ElasticAuthConfig is an enum (ApiKey vs Basic) rather than optional fields -- makes invalid states unrepresentable at the type level
   - ES partial failure detection iterates items array only when errors field is true -- avoids JSON traversal on the happy path
   - reqwest::RequestBuilder::basic_auth used for Basic auth -- no base64 crate needed, reqwest handles encoding internally
@@ -43,10 +43,10 @@ metrics:
 
 ## Verification Results
 
-1. `cargo build -p pact-siem` -- PASS
-2. `cargo clippy -p pact-siem -- -D warnings` -- PASS (no warnings)
+1. `cargo build -p arc-siem` -- PASS
+2. `cargo clippy -p arc-siem -- -D warnings` -- PASS (no warnings)
 3. Both SplunkHecExporter and ElasticsearchExporter re-exported from lib.rs -- PASS
-4. `cargo tree -p pact-kernel | grep reqwest` -- PASS (empty -- kernel isolation verified)
+4. `cargo tree -p arc-kernel | grep reqwest` -- PASS (empty -- kernel isolation verified)
 
 ## Key Decisions
 
@@ -80,7 +80,7 @@ None -- plan executed exactly as written.
 
 ## Self-Check: PASSED
 
-- `crates/pact-siem/src/exporters/splunk.rs` -- EXISTS
-- `crates/pact-siem/src/exporters/elastic.rs` -- EXISTS
+- `crates/arc-siem/src/exporters/splunk.rs` -- EXISTS
+- `crates/arc-siem/src/exporters/elastic.rs` -- EXISTS
 - Task 1 commit 24bbc8b -- VERIFIED (git log)
 - Task 2 commit be7b700 -- VERIFIED (git log)

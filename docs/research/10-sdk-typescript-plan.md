@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a TypeScript SDK that is good enough to replace the current JS conformance peer code and then grow into the maintained JS/TS client surface for the PACT edge.
+Build a TypeScript SDK that is good enough to replace the current JS conformance peer code and then grow into the maintained JS/TS client surface for the ARC edge.
 
 The first release should optimize for:
 
@@ -23,7 +23,7 @@ Local evidence:
 
 - the current JS peer is hand-rolled and already covers initialization, auth, session reuse, nested callbacks, transcript capture, and scenario execution in one file: [tests/conformance/peers/js/client.mjs](../../tests/conformance/peers/js/client.mjs)
 - the peer is ESM-only today: [tests/conformance/peers/js/package.json](../../tests/conformance/peers/js/package.json)
-- `pact-core` is intentionally runtime-free and already states it is suitable for WASM and embedded environments: [crates/pact-core/src/lib.rs](../../crates/pact-core/src/lib.rs)
+- `arc-core` is intentionally runtime-free and already states it is suitable for WASM and embedded environments: [crates/arc-core/src/lib.rs](../../crates/arc-core/src/lib.rs)
 
 Implication:
 
@@ -32,7 +32,7 @@ Implication:
 
 ## Recommended Product Split
 
-### `@pact/sdk`
+### `@arc/sdk`
 
 Purpose:
 
@@ -51,12 +51,12 @@ Should include:
 - nested sampling, elicitation, and roots callback routing
 - pure TS invariant helpers for day-one usability
 
-### `@pact/sdk-wasm`
+### `@arc/sdk-wasm`
 
 Purpose:
 
 - optional acceleration and byte-identity helper package
-- compiled from `crates/pact-bindings-wasm`
+- compiled from `crates/arc-bindings-wasm`
 - not required for ordinary SDK usage
 
 Should include:
@@ -93,13 +93,13 @@ will accumulate packaging complexity fast.
 
 The cleanest initial model is:
 
-- `@pact/sdk` stays pure TS and easy to install
-- `@pact/sdk-wasm` stays optional and narrowly scoped
+- `@arc/sdk` stays pure TS and easy to install
+- `@arc/sdk-wasm` stays optional and narrowly scoped
 
 ## Recommended Repository Layout
 
 ```text
-packages/sdk/pact-ts/
+packages/sdk/arc-ts/
   package.json
   tsconfig.json
   tsup.config.ts
@@ -121,11 +121,11 @@ packages/sdk/pact-ts/
 If the optional WASM package ships separately:
 
 ```text
-crates/pact-bindings-wasm/
-packages/sdk/pact-ts-wasm/
+crates/arc-bindings-wasm/
+packages/sdk/arc-ts-wasm/
 ```
 
-The `pact-ts-wasm` package can either:
+The `arc-ts-wasm` package can either:
 
 - wrap the generated output from `wasm-pack`
 - or publish the generated output directly if the release workflow is simple enough
@@ -153,7 +153,7 @@ If CJS is added later:
 
 ### First-class protocol target
 
-The TS SDK should target the PACT MCP-compatible edge over remote HTTP first.
+The TS SDK should target the ARC MCP-compatible edge over remote HTTP first.
 
 The first-class transport should:
 
@@ -262,8 +262,8 @@ Reason:
 
 Once vector tests exist and the remote-edge package shape is stable:
 
-- add `@pact/sdk-wasm`
-- lazily load it from `@pact/sdk`
+- add `@arc/sdk-wasm`
+- lazily load it from `@arc/sdk`
 - use it as an optional backend for invariant helpers
 
 Recommended target sequence:
@@ -307,7 +307,7 @@ Run the existing JS conformance waves through the package instead of the hand-ro
 Migration path:
 
 1. keep `client.mjs` as a thin CLI shim
-2. move actual protocol logic into `packages/sdk/pact-ts`
+2. move actual protocol logic into `packages/sdk/arc-ts`
 3. import the package from `client.mjs`
 4. later replace the peer shim entirely if helpful
 
@@ -394,7 +394,7 @@ Mitigation:
 
 ## Recommended First Implementation Slice
 
-1. Create `packages/sdk/pact-ts`.
+1. Create `packages/sdk/arc-ts`.
 2. Move the current remote HTTP JSON-RPC logic out of [tests/conformance/peers/js/client.mjs](../../tests/conformance/peers/js/client.mjs) into `transport/` and `session/`.
 3. Keep `client.mjs` as a CLI wrapper that imports the new package.
 4. Add pure TS invariant helpers behind a small `invariants/` module.
@@ -406,7 +406,7 @@ Local:
 
 - [tests/conformance/peers/js/client.mjs](../../tests/conformance/peers/js/client.mjs)
 - [tests/conformance/peers/js/package.json](../../tests/conformance/peers/js/package.json)
-- [crates/pact-core/src/lib.rs](../../crates/pact-core/src/lib.rs)
+- [crates/arc-core/src/lib.rs](../../crates/arc-core/src/lib.rs)
 - [../BINDINGS_CORE_PLAN.md](../BINDINGS_CORE_PLAN.md)
 
 External:

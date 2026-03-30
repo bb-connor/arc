@@ -7,19 +7,19 @@ tags: [merkle, sqlite, cryptography, receipts, checkpointing, ed25519]
 # Dependency graph
 requires:
   - phase: 07-schema-compatibility-and-monetary-foundation
-    provides: MonetaryAmount, forward-compat schema, pact-core types (MerkleTree, Keypair, canonical_json_bytes)
+    provides: MonetaryAmount, forward-compat schema, arc-core types (MerkleTree, Keypair, canonical_json_bytes)
 provides:
-  - KernelCheckpoint struct with "pact.checkpoint_statement.v1" schema
+  - KernelCheckpoint struct with "arc.checkpoint_statement.v1" schema
   - build_checkpoint: batch signing of receipt canonical bytes via MerkleTree
   - build_inclusion_proof: per-leaf Merkle proof generation
   - verify_checkpoint_signature: Ed25519 verification of checkpoint body
   - ReceiptInclusionProof: proof struct with verify method
   - kernel_checkpoints SQLite table in SqliteReceiptStore
-  - append_pact_receipt_returning_seq: returns AUTOINCREMENT seq for batch trigger
+  - append_arc_receipt_returning_seq: returns AUTOINCREMENT seq for batch trigger
   - store_checkpoint / load_checkpoint_by_seq: checkpoint persistence and retrieval
   - receipts_canonical_bytes_range: RFC 8785 canonical bytes for Merkle leaf hashing
 affects:
-  - pact-kernel enforcement pipeline (batch checkpoint triggering)
+  - arc-kernel enforcement pipeline (batch checkpoint triggering)
   - audit / compliance layer (SEC-01, SEC-02)
   - receipt log integrity proofs
 
@@ -34,16 +34,16 @@ tech-stack:
 
 key-files:
   created:
-    - crates/pact-kernel/src/checkpoint.rs
+    - crates/arc-kernel/src/checkpoint.rs
   modified:
-    - crates/pact-kernel/src/lib.rs
-    - crates/pact-kernel/src/receipt_store.rs
-    - crates/pact-kernel/src/budget_store.rs
+    - crates/arc-kernel/src/lib.rs
+    - crates/arc-kernel/src/receipt_store.rs
+    - crates/arc-kernel/src/budget_store.rs
 
 key-decisions:
   - "KernelCheckpointBody is the signed unit (not the full KernelCheckpoint); signature covers canonical JSON of body only"
   - "kernel_checkpoints stores signature as hex string (to_hex/from_hex) not raw bytes, matching existing crypto serialization convention"
-  - "receipts_canonical_bytes_range uses canonical_json_bytes on deserialized PactReceipt for RFC 8785 determinism, not raw stored JSON"
+  - "receipts_canonical_bytes_range uses canonical_json_bytes on deserialized ArcReceipt for RFC 8785 determinism, not raw stored JSON"
   - "ReceiptStoreError extended with CryptoDecode and Canonical variants to avoid serde_json::Error::custom pattern"
 
 patterns-established:
@@ -70,10 +70,10 @@ completed: 2026-03-22
 - **Files modified:** 4
 
 ## Accomplishments
-- KernelCheckpoint struct with "pact.checkpoint_statement.v1" schema, signed via canonical JSON of body
+- KernelCheckpoint struct with "arc.checkpoint_statement.v1" schema, signed via canonical JSON of body
 - build_checkpoint/build_inclusion_proof/verify_checkpoint_signature fully implemented and tested with 100-leaf batches
 - kernel_checkpoints SQLite table added to SqliteReceiptStore with batch_end_seq index for checkpoint triggering queries
-- append_pact_receipt_returning_seq, store_checkpoint, load_checkpoint_by_seq, receipts_canonical_bytes_range methods added
+- append_arc_receipt_returning_seq, store_checkpoint, load_checkpoint_by_seq, receipts_canonical_bytes_range methods added
 
 ## Task Commits
 
@@ -83,15 +83,15 @@ Each task was committed atomically:
 2. **Task 2: kernel_checkpoints table and checkpoint persistence** - `6c18354` (feat)
 
 ## Files Created/Modified
-- `crates/pact-kernel/src/checkpoint.rs` - KernelCheckpointBody, KernelCheckpoint, ReceiptInclusionProof, build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, 10 unit tests
-- `crates/pact-kernel/src/lib.rs` - Added pub mod checkpoint, re-exports for checkpoint types
-- `crates/pact-kernel/src/receipt_store.rs` - kernel_checkpoints table, 5 new methods, 6 new tests, CryptoDecode/Canonical error variants
-- `crates/pact-kernel/src/budget_store.rs` - Pre-existing bug fix: added ensure_total_cost_charged_column, fixed missing field in test struct literal
+- `crates/arc-kernel/src/checkpoint.rs` - KernelCheckpointBody, KernelCheckpoint, ReceiptInclusionProof, build_checkpoint, build_inclusion_proof, verify_checkpoint_signature, 10 unit tests
+- `crates/arc-kernel/src/lib.rs` - Added pub mod checkpoint, re-exports for checkpoint types
+- `crates/arc-kernel/src/receipt_store.rs` - kernel_checkpoints table, 5 new methods, 6 new tests, CryptoDecode/Canonical error variants
+- `crates/arc-kernel/src/budget_store.rs` - Pre-existing bug fix: added ensure_total_cost_charged_column, fixed missing field in test struct literal
 
 ## Decisions Made
-- KernelCheckpointBody is the signed unit (canonical JSON of body is signed, not the full checkpoint). This matches the existing receipt signing pattern in pact-core.
-- kernel_checkpoints stores signature as hex string using to_hex/from_hex, matching existing crypto serialization convention across pact-core.
-- receipts_canonical_bytes_range deserializes raw_json to PactReceipt then calls canonical_json_bytes, rather than storing raw_json directly as leaf bytes. This ensures RFC 8785 determinism regardless of how the receipt was originally serialized.
+- KernelCheckpointBody is the signed unit (canonical JSON of body is signed, not the full checkpoint). This matches the existing receipt signing pattern in arc-core.
+- kernel_checkpoints stores signature as hex string using to_hex/from_hex, matching existing crypto serialization convention across arc-core.
+- receipts_canonical_bytes_range deserializes raw_json to ArcReceipt then calls canonical_json_bytes, rather than storing raw_json directly as leaf bytes. This ensures RFC 8785 determinism regardless of how the receipt was originally serialized.
 - ReceiptStoreError extended with CryptoDecode and Canonical variants rather than using serde_json::Error::custom (which doesn't exist on serde_json::Error in this context).
 
 ## Deviations from Plan
@@ -99,18 +99,18 @@ Each task was committed atomically:
 ### Auto-fixed Issues
 
 **1. [Rule 3 - Blocking] Fixed pre-existing budget_store.rs compilation errors**
-- **Found during:** Task 1 (first attempt to compile pact-kernel tests)
+- **Found during:** Task 1 (first attempt to compile arc-kernel tests)
 - **Issue:** budget_store.rs called ensure_total_cost_charged_column (not defined), SqliteBudgetStore impl was missing try_charge_cost, list_usages lacked total_cost_charged in SELECT, test BudgetUsageRecord literals missing total_cost_charged field
 - **Fix:** Added ensure_total_cost_charged_column function, added try_charge_cost for SqliteBudgetStore, fixed list_usages SELECT query, added total_cost_charged to test struct literal
-- **Files modified:** crates/pact-kernel/src/budget_store.rs
-- **Verification:** cargo clippy -p pact-kernel -- -D warnings passes
+- **Files modified:** crates/arc-kernel/src/budget_store.rs
+- **Verification:** cargo clippy -p arc-kernel -- -D warnings passes
 - **Committed in:** f7e910b (Task 1 commit)
 
 **2. [Rule 1 - Bug] Fixed serde_json::Error::custom usage in receipt_store.rs**
 - **Found during:** Task 2 (first compilation attempt of receipt_store additions)
 - **Issue:** Used serde_json::Error::custom to wrap non-JSON errors, but this method doesn't exist on serde_json::Error without importing serde::de::Error trait
 - **Fix:** Added CryptoDecode(String) and Canonical(String) variants to ReceiptStoreError, used those instead
-- **Files modified:** crates/pact-kernel/src/receipt_store.rs
+- **Files modified:** crates/arc-kernel/src/receipt_store.rs
 - **Verification:** Compiles clean, all tests pass
 - **Committed in:** 6c18354 (Task 2 commit)
 

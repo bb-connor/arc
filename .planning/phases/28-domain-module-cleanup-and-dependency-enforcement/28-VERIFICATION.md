@@ -10,18 +10,18 @@ blocks CLI and HTTP dependencies from leaking back into the core domain crates.
 
 ## Evidence
 
-- `cargo check -p pact-credentials -p pact-reputation -p pact-policy`
-- `wc -l crates/pact-credentials/src/lib.rs crates/pact-reputation/src/lib.rs crates/pact-policy/src/evaluate.rs`
+- `cargo check -p arc-credentials -p arc-reputation -p arc-policy`
+- `wc -l crates/arc-credentials/src/lib.rs crates/arc-reputation/src/lib.rs crates/arc-policy/src/evaluate.rs`
 - `./scripts/check-workspace-layering.sh`
-- `cargo test -p pact-credentials -- --nocapture`
-- `cargo test -p pact-reputation -- --nocapture`
-- `cargo test -p pact-policy -- --nocapture`
+- `cargo test -p arc-credentials -- --nocapture`
+- `cargo test -p arc-reputation -- --nocapture`
+- `cargo test -p arc-policy -- --nocapture`
 - `rg -n "check-workspace-layering|WORKSPACE_STRUCTURE" scripts/ci-workspace.sh docs/architecture/WORKSPACE_STRUCTURE.md`
 
 ## Notes
 
-- facade line counts dropped to 39 lines for `pact-credentials/src/lib.rs`,
-  24 lines for `pact-reputation/src/lib.rs`, and 22 lines for
-  `pact-policy/src/evaluate.rs`
+- facade line counts dropped to 39 lines for `arc-credentials/src/lib.rs`,
+  24 lines for `arc-reputation/src/lib.rs`, and 22 lines for
+  `arc-policy/src/evaluate.rs`
 - the new layering check is enforced through `scripts/ci-workspace.sh`, so the
   broader qualification lane now inherits the architecture guard automatically

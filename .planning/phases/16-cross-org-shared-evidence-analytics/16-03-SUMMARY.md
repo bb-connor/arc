@@ -15,9 +15,9 @@ key-files:
   created:
     - .planning/phases/16-cross-org-shared-evidence-analytics/16-03-SUMMARY.md
   modified:
-    - crates/pact-cli/dashboard/src/types.ts
-    - crates/pact-cli/dashboard/src/components/OperatorSummary.tsx
-    - crates/pact-cli/dashboard/src/components/PortableReputationPanel.tsx
+    - crates/arc-cli/dashboard/src/types.ts
+    - crates/arc-cli/dashboard/src/components/OperatorSummary.tsx
+    - crates/arc-cli/dashboard/src/components/PortableReputationPanel.tsx
 requirements-completed:
   - XORG-01
   - XORG-02
@@ -39,4 +39,4 @@ instead of inventing client-side provenance logic.
 
 ## Verification
 
-- `npm --prefix crates/pact-cli/dashboard test -- --run`
+- `npm --prefix crates/arc-cli/dashboard test -- --run`

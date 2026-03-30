@@ -16,7 +16,7 @@ key-files:
   created:
     - .planning/phases/15-multi-issuer-passport-composition/15-03-SUMMARY.md
   modified:
-    - crates/pact-cli/tests/passport.rs
+    - crates/arc-cli/tests/passport.rs
     - docs/AGENT_PASSPORT_GUIDE.md
     - docs/CHANGELOG.md
 requirements-completed:
@@ -40,5 +40,5 @@ Phase 15 now has CLI-facing evidence and docs, not just library support.
 
 ## Verification
 
-- `cargo test -p pact-cli --test passport -- --nocapture`
-- `cargo test -p pact-cli --test local_reputation -- --nocapture`
+- `cargo test -p arc-cli --test passport -- --nocapture`
+- `cargo test -p arc-cli --test local_reputation -- --nocapture`
