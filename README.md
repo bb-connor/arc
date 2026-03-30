@@ -18,16 +18,16 @@
 </p>
 
 <p align="center">
-  <code><img src="assets/icons/fail-closed.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Fail-closed&nbsp;mediation</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/capability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Capability-scoped&nbsp;authorization</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/bonded.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Bonded&nbsp;execution</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/liability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Liability&nbsp;coverage</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/credit.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Credit&nbsp;facilities</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/exposure.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Exposure&nbsp;ledger</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/merkle.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Merkle-committed&nbsp;receipts</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/passport.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Agent&nbsp;passports</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/attestation.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Multi-cloud&nbsp;attestation</code>&nbsp;&nbsp;
-  <code><img src="assets/icons/lean4.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Lean&nbsp;4&nbsp;verified</code>
+  <nobr><code><img src="assets/icons/fail-closed.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Fail-closed&nbsp;mediation</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/capability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Capability-scoped&nbsp;authorization</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/bonded.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Bonded&nbsp;execution</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/liability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Liability&nbsp;coverage</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/credit.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Credit&nbsp;facilities</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/exposure.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Exposure&nbsp;ledger</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/merkle.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Merkle-committed&nbsp;receipts</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/passport.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Agent&nbsp;passports</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/attestation.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Multi-cloud&nbsp;attestation</code></nobr>&nbsp;&nbsp;
+  <nobr><code><img src="assets/icons/lean4.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Lean&nbsp;4&nbsp;verified</code></nobr>
 </p>
 
 <p align="center">
