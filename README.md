@@ -6,33 +6,35 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/MSRV-1.93-orange?style=flat-square&logo=rust" alt="MSRV: 1.93">
   <img src="https://img.shields.io/badge/status-production--candidate-yellow?style=flat-square" alt="Status: Production candidate">
+  <img src="https://img.shields.io/badge/MCP-compatible-green?style=flat-square" alt="MCP compatible">
+  <img src="https://img.shields.io/badge/A2A-interop-green?style=flat-square" alt="A2A interop">
 </p>
 
 <h1 align="center">ARC</h1>
 
 <p align="center">
   <strong>Attested Rights Channel</strong><br/>
-  <em>Governed agent actions with bounded spend and verifiable receipts.</em>
+  <em>Economic trust infrastructure for autonomous AI systems.</em>
 </p>
 
 <p align="center">
-  Capability tokens
+  Fail-closed mediation
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Fail-closed kernel mediation
+  Capability-scoped authorization
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Cascade revocation
+  Bonded execution
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Monetary budget enforcement
+  Liability coverage
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Signed audit receipts
+  Credit facilities
+  <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
+  Exposure ledger
+  <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
+  Merkle-committed receipts
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
   Agent passports
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
   Multi-cloud attestation
-  <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  MCP compatible
-  <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  A2A interop
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
   Lean 4 verified
 </p>
