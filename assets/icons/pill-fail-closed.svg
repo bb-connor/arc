@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 182 24" fill="none">
+  <rect x="0.5" y="0.5" width="181" height="23" rx="4" fill="#1c2128" stroke="#3d444d"/>
+  <!-- shield with X -->
+  <path d="M14 5L10 6.5V9.5C10 12 11.5 13.5 14 15C16.5 13.5 18 12 18 9.5V6.5L14 5Z" stroke="#9ca3af" stroke-width="1" fill="none"/>
+  <path d="M12.2 8.2L15.8 11.8M15.8 8.2L12.2 11.8" stroke="#9ca3af" stroke-width="1" stroke-linecap="round"/>
+  <text x="24" y="16" font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,monospace" font-size="12" fill="#c9d1d9">Fail-closed mediation</text>
+</svg>

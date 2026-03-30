@@ -18,16 +18,16 @@
 </p>
 
 <p align="center">
-  <nobr><code><img src="assets/icons/fail-closed.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Fail-closed&nbsp;mediation</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/capability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Capability-scoped&nbsp;authorization</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/bonded.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Bonded&nbsp;execution</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/liability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Liability&nbsp;coverage</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/credit.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Credit&nbsp;facilities</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/exposure.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Exposure&nbsp;ledger</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/merkle.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Merkle-committed&nbsp;receipts</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/passport.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Agent&nbsp;passports</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/attestation.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Multi-cloud&nbsp;attestation</code></nobr>&nbsp;&nbsp;
-  <nobr><code><img src="assets/icons/lean4.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Lean&nbsp;4&nbsp;verified</code></nobr>
+  <img src="assets/icons/pill-fail-closed.svg" height="24" alt="Fail-closed mediation" />
+  <img src="assets/icons/pill-capability.svg" height="24" alt="Capability-scoped authorization" />
+  <img src="assets/icons/pill-bonded.svg" height="24" alt="Bonded execution" />
+  <img src="assets/icons/pill-liability.svg" height="24" alt="Liability coverage" />
+  <img src="assets/icons/pill-credit.svg" height="24" alt="Credit facilities" />
+  <img src="assets/icons/pill-exposure.svg" height="24" alt="Exposure ledger" />
+  <img src="assets/icons/pill-merkle.svg" height="24" alt="Merkle-committed receipts" />
+  <img src="assets/icons/pill-passport.svg" height="24" alt="Agent passports" />
+  <img src="assets/icons/pill-attestation.svg" height="24" alt="Multi-cloud attestation" />
+  <img src="assets/icons/pill-lean4.svg" height="24" alt="Lean 4 verified" />
 </p>
 
 <p align="center">

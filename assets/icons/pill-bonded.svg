@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 156 24" fill="none">
+  <rect x="0.5" y="0.5" width="155" height="23" rx="4" fill="#1c2128" stroke="#3d444d"/>
+  <!-- interlocked rings -->
+  <circle cx="11" cy="12" r="4" stroke="#9ca3af" stroke-width="1" fill="none"/>
+  <circle cx="17" cy="12" r="4" stroke="#9ca3af" stroke-width="1" fill="none"/>
+  <text x="24" y="16" font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,monospace" font-size="12" fill="#c9d1d9">Bonded execution</text>
+</svg>

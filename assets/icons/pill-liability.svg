@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 162 24" fill="none">
+  <rect x="0.5" y="0.5" width="161" height="23" rx="4" fill="#1c2128" stroke="#3d444d"/>
+  <!-- umbrella -->
+  <path d="M14 5C11 5 8 7.5 8 11H20C20 7.5 17 5 14 5Z" stroke="#9ca3af" stroke-width="1" fill="none"/>
+  <path d="M14 5V16C14 17 13 18 12 18" stroke="#9ca3af" stroke-width="1" stroke-linecap="round" fill="none"/>
+  <text x="24" y="16" font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,monospace" font-size="12" fill="#c9d1d9">Liability coverage</text>
+</svg>

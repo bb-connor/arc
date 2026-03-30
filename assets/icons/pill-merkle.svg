@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 212 24" fill="none">
+  <rect x="0.5" y="0.5" width="211" height="23" rx="4" fill="#1c2128" stroke="#3d444d"/>
+  <!-- binary tree -->
+  <circle cx="14" cy="6" r="2" stroke="#9ca3af" stroke-width="0.8" fill="none"/>
+  <circle cx="10" cy="14" r="2" stroke="#9ca3af" stroke-width="0.8" fill="none"/>
+  <circle cx="18" cy="14" r="2" stroke="#9ca3af" stroke-width="0.8" fill="none"/>
+  <path d="M12.5 7.5L11 12" stroke="#9ca3af" stroke-width="0.8"/>
+  <path d="M15.5 7.5L17 12" stroke="#9ca3af" stroke-width="0.8"/>
+  <rect x="7.5" y="18" width="2.5" height="2" rx="0.5" stroke="#9ca3af" stroke-width="0.6" fill="none"/>
+  <rect x="12.5" y="18" width="2.5" height="2" rx="0.5" stroke="#9ca3af" stroke-width="0.6" fill="none"/>
+  <rect x="17.5" y="18" width="2.5" height="2" rx="0.5" stroke="#9ca3af" stroke-width="0.6" fill="none"/>
+  <path d="M8.8 18V16" stroke="#9ca3af" stroke-width="0.6"/>
+  <path d="M13.8 18V16" stroke="#9ca3af" stroke-width="0.6"/>
+  <path d="M18.8 18V16" stroke="#9ca3af" stroke-width="0.6"/>
+  <text x="26" y="16" font-family="ui-monospace,SFMono-Regular,SF Mono,Menlo,monospace" font-size="12" fill="#c9d1d9">Merkle-committed receipts</text>
+</svg>
