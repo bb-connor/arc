@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Binary tree: Merkle-committed receipts -->
+  <circle cx="8" cy="3" r="1.5" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <circle cx="4" cy="9" r="1.5" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <circle cx="12" cy="9" r="1.5" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <path d="M6.8 4.2L5.2 7.8" stroke="#c9d1d9" stroke-width="1.2"/>
+  <path d="M9.2 4.2L10.8 7.8" stroke="#c9d1d9" stroke-width="1.2"/>
+  <rect x="2" y="12.5" width="3" height="2" rx="0.5" stroke="#c9d1d9" stroke-width="0.8" fill="none"/>
+  <rect x="6.5" y="12.5" width="3" height="2" rx="0.5" stroke="#c9d1d9" stroke-width="0.8" fill="none"/>
+  <rect x="11" y="12.5" width="3" height="2" rx="0.5" stroke="#c9d1d9" stroke-width="0.8" fill="none"/>
+  <path d="M3.5 12.5V10.5" stroke="#c9d1d9" stroke-width="0.8"/>
+  <path d="M8 12.5V10.5" stroke="#c9d1d9" stroke-width="0.8"/>
+  <path d="M12.5 12.5V10.5" stroke="#c9d1d9" stroke-width="0.8"/>
+</svg>

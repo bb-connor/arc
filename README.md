@@ -18,25 +18,25 @@
 </p>
 
 <p align="center">
-  Fail-closed mediation
+  <img src="assets/icons/fail-closed.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Fail-closed mediation
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Capability-scoped authorization
+  <img src="assets/icons/capability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Capability-scoped authorization
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Bonded execution
+  <img src="assets/icons/bonded.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Bonded execution
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Liability coverage
+  <img src="assets/icons/liability.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Liability coverage
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Credit facilities
+  <img src="assets/icons/credit.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Credit facilities
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Exposure ledger
+  <img src="assets/icons/exposure.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Exposure ledger
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Merkle-committed receipts
+  <img src="assets/icons/merkle.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Merkle-committed receipts
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Agent passports
+  <img src="assets/icons/passport.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Agent passports
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Multi-cloud attestation
+  <img src="assets/icons/attestation.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Multi-cloud attestation
   <span style="opacity:0.55;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>
-  Lean 4 verified
+  <img src="assets/icons/lean4.svg" height="14" alt="" style="vertical-align: middle;" />&nbsp;Lean 4 verified
 </p>
 
 <p align="center">

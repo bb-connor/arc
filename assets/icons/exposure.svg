@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Open ledger: exposure ledger -->
+  <path d="M8 2V14" stroke="#c9d1d9" stroke-width="1.2"/>
+  <path d="M8 2C6 2 2 2.5 2 3.5V13C2 12 6 12.5 8 14" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <path d="M8 2C10 2 14 2.5 14 3.5V13C14 12 10 12.5 8 14" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+</svg>

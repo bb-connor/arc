@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Shield with X: fail-closed mediation -->
+  <path d="M8 1L2 3.5V7.5C2 11 4.5 13.5 8 15C11.5 13.5 14 11 14 7.5V3.5L8 1Z" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <path d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="#c9d1d9" stroke-width="1.2" stroke-linecap="round"/>
+</svg>

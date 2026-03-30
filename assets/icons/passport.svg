@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <!-- Passport/ID: agent passports -->
+  <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="#c9d1d9" stroke-width="1.2" fill="none"/>
+  <circle cx="8" cy="6.5" r="2" stroke="#c9d1d9" stroke-width="1" fill="none"/>
+  <path d="M5 12C5 10.3 6.3 9.5 8 9.5C9.7 9.5 11 10.3 11 12" stroke="#c9d1d9" stroke-width="1" fill="none"/>
+</svg>
