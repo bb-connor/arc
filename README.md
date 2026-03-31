@@ -56,9 +56,11 @@ That gap becomes structural once agents are allowed to hold real authority. An a
 
 ARC exists to provide that layer.
 
-ARC inserts a fail-closed kernel between agents and tools and treats every invocation as a governed act. Capability tokens define delegated rights. Policy and constraint checks determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into non-repudiable evidence rather than an ordinary log event.
+ARC inserts a fail-closed kernel between the agents to the llms and tools while it treats every invocation as a governed act. Capability tokens define delegated rights. Preventative policy and constraint determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into non-repudiable evidence rather than an ordinary log event.
 
-The result is a stronger primitive than transport, payment, or audit alone. A capability in ARC is not just permission to call a function. It is a programmable authorization instrument. A delegation chain is not just access-control metadata. It is a cost-responsibility chain. A receipt log is not just telemetry. It has the structure of an audit trail, a billing ledger, and a compliance record at once. That is why ARC belongs above payment rails and below agent frameworks: it is the layer that can prove an agent was authorized to do something consequential, under what constraints, at what cost, and with what outcome.
+Together, those pieces add up to a single, stronger idea than any one of them alone. A capability in ARC is not just permission to call a function. It is a programmable authorization instrument. A delegation chain is not just access-control metadata. It is a cost-responsibility chain. A receipt log is not just telemetry. It has the structure of an audit trail, a billing ledger, and a compliance record at once. That is why ARC belongs above payment rails and below agent frameworks: it is the layer that can prove an agent was authorized to do something consequential, under what constraints, at what cost, and with what outcome.
+
+Moreover, composing these guardrails on the execution path also improves efficiency in practice. Policy and capability checks run before dispatch, so agents spend fewer model turns recovering from disallowed calls and fewer cycles on tool invocations that could not have succeeded under the same constraints, to say nothing of blocking operations that policy should never allow in the first place. That saves meaningful compute and latency alongside the authority and accountability benefits.
 
 ## How It Works
 
@@ -284,6 +286,7 @@ Production candidate (`v2.5`). The protocol spec in [spec/PROTOCOL.md](spec/PROT
 - Automatic SCIM lifecycle management
 - Synthetic cross-issuer passport trust aggregation
 - Theorem-prover completion for every protocol claim
+
 
 ## License
 
