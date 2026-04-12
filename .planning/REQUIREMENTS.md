@@ -4,12 +4,188 @@
 **Latest completed milestone:** v2.65 MERCURY Portfolio Revenue Boundary Qualification,
 Commercial Handoff, and Channel Boundary
 (completed locally 2026-04-04)
-**Active milestone:** none currently queued locally
-**Next planned milestone:** none currently queued locally
+**Active milestone:** v2.66 Test Coverage for Untested Crates
+**Planned milestones:** v2.67-v2.73 (Ship Readiness Roadmap)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust across organizational boundaries.
+
+## Ship Readiness Requirements (v2.66-v2.73)
+
+### v2.66 Test Coverage for Untested Crates
+
+- [ ] **TEST-01**: arc-hosted-mcp has unit tests covering session lifecycle creation, resumption, and expiry
+- [ ] **TEST-02**: arc-hosted-mcp has unit tests covering multi-tenant isolation between concurrent sessions
+- [ ] **TEST-03**: arc-hosted-mcp has unit tests covering auth flows (bearer, JWT, OAuth with PKCE)
+- [ ] **TEST-04**: arc-hosted-mcp has unit tests covering error paths and fail-closed behavior
+- [ ] **TEST-05**: arc-wall has unit tests covering validation rule enforcement for all rule types
+- [ ] **TEST-06**: arc-wall has unit tests covering edge cases and boundary conditions
+- [ ] **TEST-07**: arc-wall has unit tests covering barrier review logic and control-room decisions
+- [ ] **TEST-08**: arc-siem has unit tests covering Splunk HEC export formatting and delivery
+- [ ] **TEST-09**: arc-siem has unit tests covering Elasticsearch bulk export formatting and delivery
+- [ ] **TEST-10**: arc-siem has unit tests covering DLQ behavior on export failure
+- [ ] **TEST-11**: arc-siem has unit tests covering per-exporter rate limiting
+- [ ] **TEST-12**: Cross-crate integration tests exercise the hosted-mcp -> kernel -> wall -> siem path
+- [ ] **TEST-13**: Cross-crate integration tests verify fail-closed behavior across crate boundaries
+
+### v2.67 Kernel Panic Hardening
+
+- [ ] **HARDEN-01**: All 22 panic! calls in arc-kernel are audited and classified as invariant-violation vs input-dependent
+- [ ] **HARDEN-02**: Input-dependent panics are converted to typed Result errors without changing fail-closed posture
+- [ ] **HARDEN-03**: Protocol marshalling errors return structured errors instead of crashing the kernel
+- [ ] **HARDEN-04**: Remaining invariant panics use debug_assert! in dev and structured error logging in prod
+- [ ] **HARDEN-05**: Adversarial input tests prove the kernel does not crash on malformed JSON-RPC
+- [ ] **HARDEN-06**: Adversarial input tests prove the kernel does not crash on truncated messages
+- [ ] **HARDEN-07**: Adversarial input tests prove the kernel does not crash on wrong-type payloads
+
+### v2.68 Quality Infrastructure
+
+- [ ] **QUAL-01**: proptest property tests cover Ed25519 sign/verify roundtrips with arbitrary payloads
+- [ ] **QUAL-02**: proptest property tests cover monetary arithmetic (budget overflow, underflow, precision)
+- [ ] **QUAL-03**: proptest property tests cover capability attenuation subset relationships
+- [ ] **QUAL-04**: Criterion benchmarks establish baseline for Ed25519 signature verification throughput
+- [ ] **QUAL-05**: Criterion benchmarks establish baseline for canonical JSON serialization
+- [ ] **QUAL-06**: Criterion benchmarks establish baseline for Merkle proof generation and verification
+- [ ] **QUAL-07**: Criterion benchmarks establish baseline for capability validation latency
+- [ ] **QUAL-08**: Code coverage reporting via cargo-tarpaulin is wired into CI
+- [ ] **QUAL-09**: Coverage reports are generated and stored in coverage/ directory
+- [ ] **QUAL-10**: A meaningful coverage floor is set based on actual measured coverage
+
+### v2.69 CI Gate and Release Qualification
+
+- [ ] **CI-01**: ci.yml runs green in hosted GitHub Actions on stable Rust and MSRV
+- [ ] **CI-02**: release-qualification.yml runs green in hosted GitHub Actions
+- [ ] **CI-03**: Conformance wave 1-5 all pass across JS, Python, Go peers in hosted environment
+- [ ] **CI-04**: qualify-release.sh produces signed qualification artifacts in hosted CI
+- [ ] **CI-05**: Release candidate is tagged after hosted observation confirms all gates green
+
+### v2.70 Developer Experience and Packaging
+
+- [ ] **DX-01**: Multi-stage Dockerfile produces minimal Alpine-based arc CLI image
+- [ ] **DX-02**: Docker Compose example wraps an MCP server with ARC policy enforcement
+- [ ] **DX-03**: Working example shows arc mcp serve as tool provider for Claude via Anthropic SDK
+- [ ] **DX-04**: Working example wraps ARC-governed tool server as a LangChain tool
+- [ ] **DX-05**: README updated with container quickstart, framework examples, and 5-minute-to-production path
+
+### v2.71 Web3 Live Activation
+
+- [ ] **WEB3-01**: ARC contracts deployed to Base Sepolia testnet
+- [ ] **WEB3-02**: End-to-end flow runs: capability -> tool call -> receipt -> settlement with test tokens
+- [ ] **WEB3-03**: OpenTimestamps super-root aggregation wired into integration tests
+- [ ] **WEB3-04**: Solana memo publication added to conformance harness
+- [ ] **WEB3-05**: Cross-chain proof bundle verification passes across EVM, Bitcoin, and Solana lanes
+- [ ] **WEB3-06**: Multi-chain qualification report documents all three chains working
+- [ ] **WEB3-07**: Operator runbook covers enabling and monitoring web3 settlement
+
+### v2.72 Distributed Systems and Federation
+
+- [ ] **DIST-01**: Trust-control service supports Raft-based consensus replication
+- [ ] **DIST-02**: Raft implementation handles split-brain, log compaction, and snapshot transfer
+- [ ] **DIST-03**: Operators can publish open-admission federation policies with anti-sybil controls
+- [ ] **DIST-04**: Reputation-gated federation entry is supported
+- [ ] **DIST-05**: SCIM 2.0 endpoint supports automatic provisioning from external IdP
+- [ ] **DIST-06**: SCIM 2.0 endpoint supports automatic deprovisioning from external IdP
+- [ ] **DIST-07**: Trust-control deployed across 3 regions proves consistency under network partition
+- [ ] **DIST-08**: Replication lag is measured and documented under partition scenarios
+
+### v2.73 Formal Verification
+
+- [ ] **FORMAL-01**: Every sorry placeholder in Lean 4 tree is inventoried and classified
+- [ ] **FORMAL-02**: Attenuation monotonicity is proven in Lean 4
+- [ ] **FORMAL-03**: Delegation chain integrity is proven in Lean 4
+- [ ] **FORMAL-04**: Budget non-negative invariant is proven in Lean 4
+- [ ] **FORMAL-05**: Merkle inclusion soundness is proven in Lean 4
+- [ ] **FORMAL-06**: Checkpoint consistency is proven in Lean 4
+- [ ] **FORMAL-07**: Receipt immutability is proven in Lean 4
+- [ ] **FORMAL-08**: Lean 4 lake build runs in CI and fails on any new sorry in proven modules
+
+## Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| TEST-01 | Phase 273 | Pending |
+| TEST-02 | Phase 273 | Pending |
+| TEST-03 | Phase 273 | Pending |
+| TEST-04 | Phase 273 | Pending |
+| TEST-05 | Phase 274 | Pending |
+| TEST-06 | Phase 274 | Pending |
+| TEST-07 | Phase 274 | Pending |
+| TEST-08 | Phase 275 | Pending |
+| TEST-09 | Phase 275 | Pending |
+| TEST-10 | Phase 275 | Pending |
+| TEST-11 | Phase 275 | Pending |
+| TEST-12 | Phase 276 | Pending |
+| TEST-13 | Phase 276 | Pending |
+| HARDEN-01 | Phase 277 | Pending |
+| HARDEN-02 | Phase 278 | Pending |
+| HARDEN-03 | Phase 278 | Pending |
+| HARDEN-04 | Phase 279 | Pending |
+| HARDEN-05 | Phase 280 | Pending |
+| HARDEN-06 | Phase 280 | Pending |
+| HARDEN-07 | Phase 280 | Pending |
+| QUAL-01 | Phase 281 | Pending |
+| QUAL-02 | Phase 281 | Pending |
+| QUAL-03 | Phase 281 | Pending |
+| QUAL-04 | Phase 282 | Pending |
+| QUAL-05 | Phase 282 | Pending |
+| QUAL-06 | Phase 282 | Pending |
+| QUAL-07 | Phase 282 | Pending |
+| QUAL-08 | Phase 283 | Pending |
+| QUAL-09 | Phase 283 | Pending |
+| QUAL-10 | Phase 283 | Pending |
+| CI-01 | Phase 284 | Pending |
+| CI-02 | Phase 284 | Pending |
+| CI-03 | Phase 285 | Pending |
+| CI-04 | Phase 286 | Pending |
+| CI-05 | Phase 286 | Pending |
+| DX-01 | Phase 287 | Pending |
+| DX-02 | Phase 287 | Pending |
+| DX-03 | Phase 288 | Pending |
+| DX-04 | Phase 289 | Pending |
+| DX-05 | Phase 290 | Pending |
+| WEB3-01 | Phase 291 | Pending |
+| WEB3-02 | Phase 291 | Pending |
+| WEB3-03 | Phase 292 | Pending |
+| WEB3-04 | Phase 293 | Pending |
+| WEB3-05 | Phase 293 | Pending |
+| WEB3-06 | Phase 294 | Pending |
+| WEB3-07 | Phase 294 | Pending |
+| DIST-01 | Phase 295 | Pending |
+| DIST-02 | Phase 295 | Pending |
+| DIST-03 | Phase 296 | Pending |
+| DIST-04 | Phase 296 | Pending |
+| DIST-05 | Phase 297 | Pending |
+| DIST-06 | Phase 297 | Pending |
+| DIST-07 | Phase 298 | Pending |
+| DIST-08 | Phase 298 | Pending |
+| FORMAL-01 | Phase 299 | Pending |
+| FORMAL-02 | Phase 300 | Pending |
+| FORMAL-03 | Phase 300 | Pending |
+| FORMAL-04 | Phase 300 | Pending |
+| FORMAL-05 | Phase 301 | Pending |
+| FORMAL-06 | Phase 301 | Pending |
+| FORMAL-07 | Phase 301 | Pending |
+| FORMAL-08 | Phase 302 | Pending |
+
+**Coverage:**
+- Ship readiness requirements: 63 total
+- Mapped to phases: 63
+- Unmapped: 0
+
+## Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| WebSocket transport | HTTP event-stream serves the same role |
+| gRPC transport | Streamable HTTP is the multi-client surface |
+| Agent-framework maintained plugins | Examples only; ARC is transport-layer agnostic by design |
+| Mobile SDK | Web-first, CLI-first; mobile later |
+| GUI admin dashboard | CLI and HTTP admin endpoints sufficient for operators |
+
+---
+*Requirements defined: 2026-03-27*
+*Last updated: 2026-04-12 after ship readiness ladder definition (v2.66-v2.73)*
 
 ## Historical Milestone Requirement Snapshots
 
