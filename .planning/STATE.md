@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: defining requirements
-stopped_at: milestone v2.66 started; defining requirements and roadmap for ship readiness ladder
+status: roadmap complete
+stopped_at: roadmap created for ship readiness ladder (v2.66-v2.73), 30 phases, 63 requirements
 last_updated: "2026-04-12T00:00:00Z"
-last_activity: 2026-04-12 -- started v2.66 ship readiness ladder (v2.66-v2.73)
+last_activity: 2026-04-12 -- created ship readiness roadmap (phases 273-302)
 progress:
-  total_phases: 4
+  total_phases: 30
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -30,14 +30,11 @@ production-candidate and production release.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: --
-Status: Defining requirements and roadmap for the ship readiness ladder.
-Last activity: 2026-04-12 -- Started milestone v2.66 as first of 8 ship
-readiness milestones. The full ladder covers test coverage (v2.66), kernel
-hardening (v2.67), quality infrastructure (v2.68), CI gate (v2.69), developer
-experience (v2.70), web3 live activation (v2.71), distributed systems (v2.72),
-and formal verification (v2.73).
+Phase: 273 of 302 (arc-hosted-mcp Unit Tests)
+Plan: -- (not yet planned)
+Status: Roadmap complete, ready to plan phase 273
+Last activity: 2026-04-12 -- Created ship readiness roadmap covering 8
+milestones (v2.66-v2.73), 30 phases (273-302), 63 requirements.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -77,5 +74,6 @@ Progress: [░░░░░░░░░░] 0%
 ## Session Continuity
 
 Last session: 2026-04-12
-Stopped at: v2.66 milestone initialized; defining requirements
+Stopped at: Ship readiness roadmap created (v2.66-v2.73, phases 273-302).
+Next action: `/gsd:plan-phase 273`
 Resume file: None

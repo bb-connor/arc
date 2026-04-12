@@ -142,6 +142,411 @@
 - [x] **v2.65 MERCURY Portfolio Revenue Boundary Qualification, Commercial
   Handoff, and Channel Boundary** - Phases 269-272 (completed locally
   2026-04-04)
+- [ ] **v2.66 Test Coverage for Untested Crates** - Phases 273-276
+- [ ] **v2.67 Kernel Panic Hardening** - Phases 277-280
+- [ ] **v2.68 Quality Infrastructure** - Phases 281-283
+- [ ] **v2.69 CI Gate and Release Qualification** - Phases 284-286
+- [ ] **v2.70 Developer Experience and Packaging** - Phases 287-290
+- [ ] **v2.71 Web3 Live Activation** - Phases 291-294
+- [ ] **v2.72 Distributed Systems and Federation** - Phases 295-298
+- [ ] **v2.73 Formal Verification** - Phases 299-302
+
+## Ship Readiness Ladder (v2.66-v2.73)
+
+Eight milestones closing the gap between production-candidate and production
+release. Dependencies: v2.66+v2.67+v2.68 (parallel) -> v2.69 -> v2.70 ->
+v2.71+v2.72+v2.73 (parallel).
+
+### v2.66 Test Coverage for Untested Crates (Phases 273-276)
+
+**Milestone Goal:** Add meaningful unit and integration tests to the three
+untested crates (arc-hosted-mcp, arc-wall, arc-siem) and create cross-crate
+integration tests exercising the hosted-mcp -> kernel -> wall -> siem
+workflow path.
+
+### Phase 273: arc-hosted-mcp Unit Tests
+**Goal**: Hosted MCP sessions are exercised under test so regressions in session lifecycle, tenant isolation, auth, and error handling are caught before CI
+**Depends on**: Nothing (first phase of ship readiness ladder)
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
+**Success Criteria** (what must be TRUE):
+  1. A session can be created, resumed by token, and expires after its TTL -- verified by test assertions, not manual inspection
+  2. Two concurrent sessions with different tenant IDs cannot read each other's tool registrations or receipts
+  3. Bearer, JWT, and OAuth-with-PKCE auth flows each succeed for valid credentials and reject invalid ones under test
+  4. Malformed requests, expired tokens, and missing headers all return structured errors and never panic
+**Plans**: TBD
+
+### Phase 274: arc-wall Unit Tests
+**Goal**: Wall validation rules, edge cases, and barrier review logic are exercised under test so security policy regressions are caught before CI
+**Depends on**: Nothing (parallel with 273)
+**Requirements**: TEST-05, TEST-06, TEST-07
+**Success Criteria** (what must be TRUE):
+  1. Every rule type defined in arc-wall (allow, deny, conditional, scoped) has at least one passing and one rejecting test case
+  2. Boundary conditions -- empty input, maximum-length fields, Unicode edge cases, zero-length scopes -- produce correct accept/reject outcomes
+  3. Barrier review decisions (approve, reject, escalate) propagate correctly through the control-room pipeline under test
+**Plans**: TBD
+
+### Phase 275: arc-siem Unit Tests
+**Goal**: SIEM export pipelines (Splunk HEC, Elasticsearch bulk, DLQ, rate limiting) are exercised under test so export regressions are caught before CI
+**Depends on**: Nothing (parallel with 273, 274)
+**Requirements**: TEST-08, TEST-09, TEST-10, TEST-11
+**Success Criteria** (what must be TRUE):
+  1. Splunk HEC export produces correctly formatted JSON events and handles HTTP response codes (200, 400, 503) appropriately
+  2. Elasticsearch bulk export produces valid NDJSON bulk payloads and handles partial-success responses
+  3. When an export fails, the event lands in the dead-letter queue and can be retried or inspected
+  4. Per-exporter rate limiting throttles burst traffic and does not drop events silently
+**Plans**: TBD
+
+### Phase 276: Cross-Crate Integration Tests
+**Goal**: The full hosted-mcp -> kernel -> wall -> siem workflow path is exercised end-to-end under test so cross-boundary regressions are caught
+**Depends on**: Phase 273, Phase 274, Phase 275
+**Requirements**: TEST-12, TEST-13
+**Success Criteria** (what must be TRUE):
+  1. A tool call arriving at arc-hosted-mcp flows through arc-kernel guard evaluation, arc-wall policy enforcement, and arc-siem event export -- all observable in a single integration test
+  2. When any crate in the chain returns an error, the upstream crate fails closed -- the tool call is denied and no partial receipt is emitted
+**Plans**: TBD
+
+---
+
+### v2.67 Kernel Panic Hardening (Phases 277-280)
+
+**Milestone Goal:** Convert all 22 kernel panics from DoS vectors into typed
+errors while preserving the fail-closed security posture. After this
+milestone, no external input can crash the kernel process.
+
+### Phase 277: Panic Audit and Classification
+**Goal**: Every panic site in arc-kernel is inventoried and classified so conversion work targets the right sites
+**Depends on**: Nothing (parallel with v2.66, v2.68)
+**Requirements**: HARDEN-01
+**Success Criteria** (what must be TRUE):
+  1. A published audit document lists all 22 panic sites with file, line, triggering condition, and classification (invariant-violation vs input-dependent)
+  2. Each panic site is tagged as "convert" (input-dependent) or "harden" (invariant) with rationale
+**Plans**: TBD
+
+### Phase 278: Input-Dependent Panic Conversion
+**Goal**: All panics reachable by external input return typed Result errors instead of crashing the process
+**Depends on**: Phase 277
+**Requirements**: HARDEN-02, HARDEN-03
+**Success Criteria** (what must be TRUE):
+  1. Every panic classified as input-dependent in the audit now returns a typed error variant from a KernelError enum
+  2. Protocol marshalling errors (malformed JSON-RPC, missing fields, wrong types) return structured error responses with error codes, not process crashes
+  3. The kernel's fail-closed posture is preserved -- converted panics deny the operation, they do not silently succeed
+**Plans**: TBD
+
+### Phase 279: Invariant Panic Hardening
+**Goal**: Remaining invariant panics use debug_assert in dev and structured error logging in production so they never crash a production kernel
+**Depends on**: Phase 278
+**Requirements**: HARDEN-04
+**Success Criteria** (what must be TRUE):
+  1. Panics classified as invariant-violation use debug_assert! (fires in dev/test, absent in release)
+  2. In release builds, the same code paths emit structured error logs and return error results instead of panicking
+  3. No panic! macro remains in arc-kernel source outside of debug_assert! blocks
+**Plans**: TBD
+
+### Phase 280: Adversarial Input Tests
+**Goal**: The kernel is proven crash-resistant against adversarial protocol inputs through dedicated fuzz-like test coverage
+**Depends on**: Phase 278, Phase 279
+**Requirements**: HARDEN-05, HARDEN-06, HARDEN-07
+**Success Criteria** (what must be TRUE):
+  1. A test suite sends malformed JSON-RPC (invalid JSON, wrong method types, missing id fields) and the kernel returns errors without panicking
+  2. A test suite sends truncated messages (half payloads, zero-length bodies, connection-reset mid-stream) and the kernel returns errors without panicking
+  3. A test suite sends wrong-type payloads (string where int expected, array where object expected, null capabilities) and the kernel returns errors without panicking
+**Plans**: TBD
+
+---
+
+### v2.68 Quality Infrastructure (Phases 281-283)
+
+**Milestone Goal:** Establish property-based testing, performance benchmarks,
+and code coverage measurement so the project has quantitative quality signals
+beyond pass/fail unit tests.
+
+### Phase 281: Property-Based Testing with proptest
+**Goal**: Core cryptographic and economic invariants are validated across random inputs so edge-case bugs surface automatically
+**Depends on**: Nothing (parallel with v2.66, v2.67)
+**Requirements**: QUAL-01, QUAL-02, QUAL-03
+**Success Criteria** (what must be TRUE):
+  1. Arbitrary byte payloads round-trip through Ed25519 sign then verify -- proptest finds no counterexample in 256+ cases
+  2. Arbitrary budget arithmetic (add, subtract, split) never overflows, underflows, or loses precision -- proptest finds no counterexample
+  3. Capability attenuation produces strict subsets -- for any parent capability and attenuation, the child scope is always a subset of the parent scope
+**Plans**: TBD
+
+### Phase 282: Criterion Benchmark Suite
+**Goal**: Performance baselines are established for critical-path operations so regressions are detectable
+**Depends on**: Nothing (parallel with 281)
+**Requirements**: QUAL-04, QUAL-05, QUAL-06, QUAL-07
+**Success Criteria** (what must be TRUE):
+  1. `cargo bench` runs Criterion benchmarks for Ed25519 signature verification and reports ops/sec with statistical confidence intervals
+  2. `cargo bench` runs Criterion benchmarks for canonical JSON serialization of receipt-sized payloads and reports throughput
+  3. `cargo bench` runs Criterion benchmarks for Merkle proof generation and verification and reports latency
+  4. `cargo bench` runs Criterion benchmarks for capability validation (scope check, expiry check, delegation depth) and reports latency
+**Plans**: TBD
+
+### Phase 283: Code Coverage with cargo-tarpaulin
+**Goal**: Code coverage is measured, reported, and gated so coverage regressions are visible
+**Depends on**: Nothing (parallel with 281, 282)
+**Requirements**: QUAL-08, QUAL-09, QUAL-10
+**Success Criteria** (what must be TRUE):
+  1. `cargo tarpaulin` runs in CI and reports line coverage percentage for the workspace
+  2. Coverage reports (HTML and/or lcov) are generated and stored in the coverage/ directory
+  3. A coverage floor is set in CI configuration based on actual measured coverage so that future changes that drop coverage below the floor fail the build
+**Plans**: TBD
+
+---
+
+### v2.69 CI Gate and Release Qualification (Phases 284-286)
+
+**Milestone Goal:** Observe all CI workflows running green in hosted GitHub
+Actions and produce signed release qualification artifacts, closing the
+hosted-observation hold that has blocked external publication.
+
+### Phase 284: CI Workflow Audit and Fixes
+**Goal**: CI workflows run green on hosted GitHub Actions for both stable Rust and MSRV
+**Depends on**: Phase 276, Phase 280, Phase 283 (v2.66+v2.67+v2.68 complete)
+**Requirements**: CI-01, CI-02
+**Success Criteria** (what must be TRUE):
+  1. ci.yml passes on hosted GitHub Actions runners using both stable Rust and the declared MSRV without manual intervention
+  2. release-qualification.yml passes on hosted GitHub Actions runners without manual intervention
+**Plans**: TBD
+
+### Phase 285: Conformance Wave Validation
+**Goal**: All five conformance waves pass across JS, Python, and Go SDK peers in the hosted environment
+**Depends on**: Phase 284
+**Requirements**: CI-03
+**Success Criteria** (what must be TRUE):
+  1. Conformance waves 1 through 5 all pass against the JS peer in hosted CI
+  2. Conformance waves 1 through 5 all pass against the Python peer in hosted CI
+  3. Conformance waves 1 through 5 all pass against the Go peer in hosted CI
+**Plans**: TBD
+
+### Phase 286: Release Qualification Observation
+**Goal**: A signed release candidate is tagged after hosted observation confirms all qualification gates are green
+**Depends on**: Phase 285
+**Requirements**: CI-04, CI-05
+**Success Criteria** (what must be TRUE):
+  1. qualify-release.sh produces signed qualification artifacts (checksums, conformance results, coverage report) in hosted CI
+  2. A release candidate tag is created in the repository after all hosted gates pass
+**Plans**: TBD
+
+---
+
+### v2.70 Developer Experience and Packaging (Phases 287-290)
+
+**Milestone Goal:** Package ARC for easy adoption with container images,
+framework integration examples, and an updated quickstart so developers can
+go from zero to ARC-governed tool access in under 5 minutes.
+
+### Phase 287: Dockerfile and Container Images
+**Goal**: ARC ships as a minimal container image that developers can pull and run without building from source
+**Depends on**: Phase 286 (v2.69 complete)
+**Requirements**: DX-01, DX-02
+**Success Criteria** (what must be TRUE):
+  1. A multi-stage Dockerfile produces a minimal Alpine-based image containing the arc CLI binary and nothing else unnecessary
+  2. A Docker Compose example file wraps an MCP server with ARC policy enforcement -- `docker compose up` starts both the MCP server and the ARC kernel with a working policy
+**Plans**: TBD
+
+### Phase 288: Anthropic SDK Integration Example
+**Goal**: Developers can see how to use arc mcp serve as a tool provider for Claude via the Anthropic SDK
+**Depends on**: Phase 287
+**Requirements**: DX-03
+**Success Criteria** (what must be TRUE):
+  1. A working example in examples/ shows arc mcp serve providing tools to Claude via the Anthropic SDK
+  2. The example includes a README explaining setup, prerequisites, and expected output
+**Plans**: TBD
+
+### Phase 289: LangChain/LlamaIndex Example
+**Goal**: Developers can see how to wrap an ARC-governed tool server as a LangChain tool
+**Depends on**: Phase 287
+**Requirements**: DX-04
+**Success Criteria** (what must be TRUE):
+  1. A working example in examples/ wraps an ARC-governed tool server as a LangChain tool with policy enforcement intact
+  2. The example includes a README explaining setup, prerequisites, and expected output
+**Plans**: TBD
+
+### Phase 290: Quickstart Guide Refresh
+**Goal**: The project README provides a clear 5-minute path from zero to ARC-governed tool access using container or source builds
+**Depends on**: Phase 288, Phase 289
+**Requirements**: DX-05
+**Success Criteria** (what must be TRUE):
+  1. README contains a container quickstart section showing docker pull, docker run, and first policy-enforced tool call
+  2. README contains a framework examples section pointing to the Anthropic SDK and LangChain examples
+  3. A developer following the README can go from zero to a working ARC-governed tool call in under 5 minutes
+**Plans**: TBD
+
+---
+
+### v2.71 Web3 Live Activation (Phases 291-294)
+
+**Milestone Goal:** Activate ARC's web3 settlement, Bitcoin OTS anchoring,
+and Solana memo publication on live testnets so the multi-chain proof story
+is exercised against real external infrastructure.
+
+### Phase 291: Web3 Settlement E2E on Testnet
+**Goal**: ARC smart contracts are deployed to a live testnet and the full capability-to-settlement flow runs with real test tokens
+**Depends on**: Phase 290 (v2.70 complete)
+**Requirements**: WEB3-01, WEB3-02
+**Success Criteria** (what must be TRUE):
+  1. ARC contracts are deployed to Base Sepolia testnet with verified contract addresses recorded in configuration
+  2. An end-to-end flow runs: capability issuance -> tool call -> receipt signing -> on-chain settlement using test tokens, observable in a block explorer
+**Plans**: TBD
+
+### Phase 292: Bitcoin OTS Anchoring in Test Suite
+**Goal**: OpenTimestamps super-root aggregation is wired into integration tests so Bitcoin anchoring is exercised automatically
+**Depends on**: Phase 291
+**Requirements**: WEB3-03
+**Success Criteria** (what must be TRUE):
+  1. Integration tests produce an OTS receipt that aggregates multiple ARC receipt hashes into a single Bitcoin-anchored super-root
+  2. The OTS proof can be independently verified using the OpenTimestamps toolchain
+**Plans**: TBD
+
+### Phase 293: Solana Memo Publication
+**Goal**: Solana memo publication is added to the conformance harness and cross-chain proof bundles verify across EVM, Bitcoin, and Solana
+**Depends on**: Phase 291
+**Requirements**: WEB3-04, WEB3-05
+**Success Criteria** (what must be TRUE):
+  1. The conformance harness publishes ARC receipt hashes as Solana memo instructions on devnet/testnet
+  2. A cross-chain proof bundle containing EVM settlement proof, Bitcoin OTS proof, and Solana memo proof verifies successfully in a single test
+**Plans**: TBD
+
+### Phase 294: Multi-Chain Qualification Report
+**Goal**: A qualification report documents all three chains working and an operator runbook covers enabling and monitoring web3 settlement
+**Depends on**: Phase 292, Phase 293
+**Requirements**: WEB3-06, WEB3-07
+**Success Criteria** (what must be TRUE):
+  1. A multi-chain qualification report documents EVM settlement, Bitcoin OTS anchoring, and Solana memo publication all passing with evidence (tx hashes, block numbers)
+  2. An operator runbook covers how to enable web3 settlement, configure chain endpoints, monitor transaction status, and handle failures
+**Plans**: TBD
+
+---
+
+### v2.72 Distributed Systems and Federation (Phases 295-298)
+
+**Milestone Goal:** Upgrade trust-control from single-node to Raft-replicated
+consensus, enable permissionless federation with anti-sybil controls, and
+automate identity lifecycle via SCIM so ARC can operate in multi-region
+production deployments.
+
+### Phase 295: Raft Consensus for Trust-Control
+**Goal**: Trust-control supports Raft-based consensus replication so the service can tolerate node failures without losing state
+**Depends on**: Phase 290 (v2.70 complete)
+**Requirements**: DIST-01, DIST-02
+**Success Criteria** (what must be TRUE):
+  1. Trust-control can be started as a 3-node Raft cluster where leader election completes within a bounded timeout
+  2. The Raft implementation handles split-brain (network partition heals with consistent state), log compaction (log does not grow unbounded), and snapshot transfer (new node catches up from snapshot)
+**Plans**: TBD
+
+### Phase 296: Permissionless Federation Policy
+**Goal**: Operators can publish open-admission federation policies with anti-sybil controls and reputation-gated entry
+**Depends on**: Phase 295
+**Requirements**: DIST-03, DIST-04
+**Success Criteria** (what must be TRUE):
+  1. An operator can publish an open-admission federation policy that allows any peer to join, subject to configurable anti-sybil controls (rate limits, proof-of-work, deposit bonds)
+  2. Federation entry can be gated on minimum reputation score so that peers below the threshold are rejected
+**Plans**: TBD
+
+### Phase 297: SCIM Lifecycle Automation
+**Goal**: External identity providers can automatically provision and deprovision ARC identities via SCIM 2.0
+**Depends on**: Phase 295
+**Requirements**: DIST-05, DIST-06
+**Success Criteria** (what must be TRUE):
+  1. A SCIM 2.0 POST /Users request from an external IdP creates a corresponding ARC identity with correct attributes and entitlements
+  2. A SCIM 2.0 DELETE /Users request from an external IdP deactivates the corresponding ARC identity, revokes active capabilities, and emits a deprovisioning receipt
+**Plans**: TBD
+
+### Phase 298: Multi-Region Qualification
+**Goal**: Trust-control deployed across 3 regions proves consistency under network partition and replication lag is measured
+**Depends on**: Phase 296, Phase 297
+**Requirements**: DIST-07, DIST-08
+**Success Criteria** (what must be TRUE):
+  1. A 3-region trust-control deployment maintains consistency (no split-brain decisions) when one region is network-partitioned and then restored
+  2. Replication lag under partition scenarios is measured and documented with p50, p95, and p99 latency numbers
+**Plans**: TBD
+
+---
+
+### v2.73 Formal Verification (Phases 299-302)
+
+**Milestone Goal:** Complete the Lean 4 formal verification tree by filling
+all sorry placeholders, proving core capability and receipt invariants, and
+wiring the proof build into CI so no future change can silently break a
+proven theorem.
+
+### Phase 299: Sorry Placeholder Audit
+**Goal**: Every sorry placeholder in the Lean 4 tree is inventoried and classified so proof completion work targets the right gaps
+**Depends on**: Phase 290 (v2.70 complete)
+**Requirements**: FORMAL-01
+**Success Criteria** (what must be TRUE):
+  1. A published audit document lists every sorry placeholder with file, theorem name, and classification (straightforward / needs-lemma / needs-redesign)
+  2. Each sorry is assigned to either Phase 300 (capability proofs) or Phase 301 (receipt proofs) based on the theorem's domain
+**Plans**: TBD
+
+### Phase 300: Core Capability Proofs
+**Goal**: Attenuation monotonicity, delegation chain integrity, and budget non-negative invariant are proven in Lean 4 with no sorry
+**Depends on**: Phase 299
+**Requirements**: FORMAL-02, FORMAL-03, FORMAL-04
+**Success Criteria** (what must be TRUE):
+  1. The theorem stating attenuation always produces a strict subset of the parent capability's scope is proven (no sorry) and lake build passes
+  2. The theorem stating delegation chains preserve integrity (no capability in a chain exceeds its parent's authority) is proven (no sorry) and lake build passes
+  3. The theorem stating budget values are always non-negative after any sequence of operations is proven (no sorry) and lake build passes
+**Plans**: TBD
+
+### Phase 301: Receipt Proof Completion
+**Goal**: Merkle inclusion soundness, checkpoint consistency, and receipt immutability are proven in Lean 4 with no sorry
+**Depends on**: Phase 300
+**Requirements**: FORMAL-05, FORMAL-06, FORMAL-07
+**Success Criteria** (what must be TRUE):
+  1. The theorem stating Merkle inclusion proofs are sound (a valid proof implies the receipt exists in the committed tree) is proven (no sorry) and lake build passes
+  2. The theorem stating checkpoint consistency (no two checkpoints for the same epoch with different roots) is proven (no sorry) and lake build passes
+  3. The theorem stating receipt immutability (a signed receipt's content hash cannot be altered without invalidating the signature) is proven (no sorry) and lake build passes
+**Plans**: TBD
+
+### Phase 302: Lean 4 CI Integration
+**Goal**: The Lean 4 proof build runs in CI and fails on any new sorry in proven modules so proofs cannot regress
+**Depends on**: Phase 301
+**Requirements**: FORMAL-08
+**Success Criteria** (what must be TRUE):
+  1. A CI job runs `lake build` on the Lean 4 tree and fails if any sorry appears in a module that was previously sorry-free
+  2. The CI job completes in reasonable time (under 10 minutes) and is wired into the same gate as the Rust CI
+**Plans**: TBD
+
+---
+
+## Ship Readiness Progress
+
+**Execution Order:**
+v2.66+v2.67+v2.68 (parallel) -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 (parallel)
+
+| Phase | Milestone | Title | Plans | Status |
+|------:|-----------|-------|-------|--------|
+| 273 | v2.66 | arc-hosted-mcp Unit Tests | TBD | Not started |
+| 274 | v2.66 | arc-wall Unit Tests | TBD | Not started |
+| 275 | v2.66 | arc-siem Unit Tests | TBD | Not started |
+| 276 | v2.66 | Cross-Crate Integration Tests | TBD | Not started |
+| 277 | v2.67 | Panic Audit and Classification | TBD | Not started |
+| 278 | v2.67 | Input-Dependent Panic Conversion | TBD | Not started |
+| 279 | v2.67 | Invariant Panic Hardening | TBD | Not started |
+| 280 | v2.67 | Adversarial Input Tests | TBD | Not started |
+| 281 | v2.68 | Property-Based Testing with proptest | TBD | Not started |
+| 282 | v2.68 | Criterion Benchmark Suite | TBD | Not started |
+| 283 | v2.68 | Code Coverage with cargo-tarpaulin | TBD | Not started |
+| 284 | v2.69 | CI Workflow Audit and Fixes | TBD | Not started |
+| 285 | v2.69 | Conformance Wave Validation | TBD | Not started |
+| 286 | v2.69 | Release Qualification Observation | TBD | Not started |
+| 287 | v2.70 | Dockerfile and Container Images | TBD | Not started |
+| 288 | v2.70 | Anthropic SDK Integration Example | TBD | Not started |
+| 289 | v2.70 | LangChain/LlamaIndex Example | TBD | Not started |
+| 290 | v2.70 | Quickstart Guide Refresh | TBD | Not started |
+| 291 | v2.71 | Web3 Settlement E2E on Testnet | TBD | Not started |
+| 292 | v2.71 | Bitcoin OTS Anchoring in Test Suite | TBD | Not started |
+| 293 | v2.71 | Solana Memo Publication | TBD | Not started |
+| 294 | v2.71 | Multi-Chain Qualification Report | TBD | Not started |
+| 295 | v2.72 | Raft Consensus for Trust-Control | TBD | Not started |
+| 296 | v2.72 | Permissionless Federation Policy | TBD | Not started |
+| 297 | v2.72 | SCIM Lifecycle Automation | TBD | Not started |
+| 298 | v2.72 | Multi-Region Qualification | TBD | Not started |
+| 299 | v2.73 | Sorry Placeholder Audit | TBD | Not started |
+| 300 | v2.73 | Core Capability Proofs | TBD | Not started |
+| 301 | v2.73 | Receipt Proof Completion | TBD | Not started |
+| 302 | v2.73 | Lean 4 CI Integration | TBD | Not started |
 
 ## Milestone Status
 
