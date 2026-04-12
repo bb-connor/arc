@@ -23,9 +23,37 @@ security, regulatory compliance, and portable trust.
 Commercial Handoff, and Channel Boundary
 (completed locally 2026-04-04)
 **Audit:** `.planning/v2.65-MILESTONE-AUDIT.md`
-**Active milestone:** none currently queued locally
-**Next planned milestone:** none currently queued locally
-**Next GSD action:** `$gsd-new-milestone`
+**Active milestone:** v2.66 Test Coverage for Untested Crates
+**Next planned milestones:** v2.67-v2.73 (Ship Readiness Roadmap)
+**Next GSD action:** `/gsd:plan-phase 273`
+
+## Current Milestone: v2.66 Test Coverage for Untested Crates
+
+**Goal:** Add meaningful unit and integration tests to the three untested crates
+(arc-hosted-mcp, arc-wall, arc-siem) and create cross-crate integration tests
+exercising the hosted-mcp -> kernel -> wall -> siem workflow path.
+
+**Target features:**
+- Unit tests for arc-hosted-mcp: session lifecycle, multi-tenant isolation, auth flows, error paths
+- Unit tests for arc-wall: validation rule enforcement, edge cases, barrier review logic
+- Unit tests for arc-siem: Splunk HEC export, Elasticsearch bulk export, DLQ behavior, rate limiting
+- Cross-crate integration tests: hosted-mcp -> kernel -> wall -> siem paths
+
+## Ship Readiness Roadmap (v2.66-v2.73)
+
+Eight milestones closing the gap between production-candidate and production release.
+Dependencies: v2.66+v2.67+v2.68 parallel -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 parallel.
+
+| Milestone | Name | Phases | Focus |
+|-----------|------|--------|-------|
+| v2.66 | Test Coverage for Untested Crates | 273-276 | Fill test gaps in arc-hosted-mcp, arc-wall, arc-siem |
+| v2.67 | Kernel Panic Hardening | 277-280 | Convert 22 kernel panics to typed errors |
+| v2.68 | Quality Infrastructure | 281-283 | Property tests, benchmarks, code coverage |
+| v2.69 | CI Gate and Release Qualification | 284-286 | Observe hosted CI green, tag release |
+| v2.70 | Developer Experience and Packaging | 287-290 | Docker, framework examples, quickstart |
+| v2.71 | Web3 Live Activation | 291-294 | Testnet settlement, BTC/SOL anchoring |
+| v2.72 | Distributed Systems and Federation | 295-298 | Raft consensus, permissionless federation, SCIM |
+| v2.73 | Formal Verification | 299-302 | Complete Lean 4 proofs, CI integration |
 
 `v2.5` through `v2.8` executed the rename, governed-economics, portable-trust,
 and launch-closure ladder derived from `docs/research/DEEP_RESEARCH_1.md`.
