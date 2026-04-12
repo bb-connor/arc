@@ -1,7 +1,7 @@
 # ARC Credential Interop Guide
 
 This guide explains the narrow portable-credential interop path ARC currently
-ships.
+ships, plus the bounded public identity-network contract layered on top of it.
 
 ## What ARC Proves Today
 
@@ -47,6 +47,11 @@ against the live trust-control service.
   signed ARC holder response lane
 - lifecycle and replay truth remain operator-scoped mutable side state, not
   new trust roots
+- ARC now also ships one bounded public identity profile over `did:arc` plus
+  explicit `did:web`, `did:key`, and `did:jwk` compatibility inputs, one
+  verifier-bound wallet-directory entry, one replay-safe wallet-routing
+  manifest, and one qualification matrix that proves supported and fail-closed
+  multi-wallet or cross-operator cases before broader interop is claimed
 
 ## Admin Versus Holder Surfaces
 
@@ -114,6 +119,10 @@ Shipped:
 - one issuer `JWKS` and one portable type-metadata contract per advertised
   projected profile
 - one portable lifecycle distribution and public resolution contract
+- one signed public issuer-discovery document, one signed public
+  verifier-discovery document, and one signed transparency snapshot over those
+  metadata surfaces, each with explicit informational-only/manual-review
+  import guardrails
 - one narrow OID4VP verifier profile with:
   one transport-neutral wallet exchange descriptor and canonical transaction
   state,
@@ -136,7 +145,8 @@ Not shipped:
 - DIDComm or mobile-wallet messaging stacks
 - generic SD-JWT VC or JWT VC interoperability beyond ARC's documented
   passport profile family
-- public verifier discovery or a global wallet network
+- permissionless public issuer, verifier, identity, or wallet networks, or any
+  claim that public discovery visibility widens local trust automatically
 - any claim that ARC passports are generic VC wallet artifacts outside the
   documented ARC transport profile
 
@@ -174,6 +184,53 @@ artifacts. DPoP and mTLS bind the runtime sender to the issued token, while
 the attestation digest is only accepted when it matches the carried
 `runtimeAssuranceEvidenceSha256` and is paired with DPoP or mTLS. Missing,
 replayed, or contradictory sender proof fails closed.
+
+## Cross-Issuer Portfolios
+
+ARC now also supports one bounded cross-issuer composition contract over the
+same passport truth:
+
+- `arc.cross-issuer-portfolio.v1` for a visible holder or operator portfolio
+- `arc.cross-issuer-trust-pack.v1` for explicit local activation policy
+- `arc.cross-issuer-migration.v1` for explicit subject or issuer continuity
+
+The important boundary is conservative:
+
+- a portfolio is an evidence container, not a synthetic new trust root
+- imported or migrated entries stay distinguishable from native local entries
+- visibility does not imply admission
+- trust-pack evaluation remains per entry and may activate only a subset of the
+  visible portfolio
+- a subject mismatch fails closed unless one signed migration artifact links
+  that entry to the portfolio subject
+- duplicate or contradictory migration provenance fails closed
+
+ARC still does not claim automatic federation admission, ambient trust from
+public identity or wallet discovery visibility, or a synthetic cross-issuer
+trust score.
+
+## Public Identity Network Contract
+
+ARC's broadened public identity claim is still bounded and machine-readable.
+The shipped artifact family is:
+
+- `arc.public-identity-profile.v1`
+- `arc.public-wallet-directory-entry.v1`
+- `arc.public-wallet-routing-manifest.v1`
+- `arc.identity-interop-qualification-matrix.v1`
+
+The important boundary stays conservative:
+
+- `did:arc` remains the provenance anchor even when a public profile names
+  `did:web`, `did:key`, or `did:jwk` as compatibility inputs
+- public wallet-directory entries remain verifier-bound references to existing
+  issuer, verifier, and portable-profile state
+- wallet-routing manifests require signed request objects, replay anchors, and
+  explicit fail-closed handling for subject mismatch, stale routing, and
+  cross-operator issuer mismatch
+- qualification must cover supported and fail-closed multi-wallet,
+  multi-issuer, and cross-operator cases before ARC claims broader public
+  identity interoperability
 
 ## Current Portable Profile Contracts
 

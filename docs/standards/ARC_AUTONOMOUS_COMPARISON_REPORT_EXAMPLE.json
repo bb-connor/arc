@@ -1,0 +1,17 @@
+{
+  "schema": "arc.autonomous-comparison-report.v1",
+  "comparison_id": "acr-1",
+  "generated_at": 1743379500,
+  "pricing_decision_ref": "apd-1",
+  "manual_decision_ref": "uwd-manual-1",
+  "disposition": "narrower_than_manual",
+  "deltas": [
+    {
+      "field": "premium_units",
+      "automated_value": "4800",
+      "manual_value": "5100",
+      "description": "Automation priced inside the manual ceiling."
+    }
+  ],
+  "note": "Shows automation staying narrower than the comparable manual decision."
+}

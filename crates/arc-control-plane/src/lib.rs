@@ -122,7 +122,8 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         allow_elicitation: kernel_policy.allow_elicitation,
         max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
-        checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+        require_web3_evidence: kernel_policy.require_web3_evidence,
+        checkpoint_batch_size: kernel_policy.checkpoint_batch_size,
         retention_config: None,
     };
 
@@ -167,6 +168,7 @@ pub fn configure_receipt_store(
         }
         (None, None) => {}
     }
+    kernel.validate_web3_evidence_prerequisites()?;
     Ok(())
 }
 
@@ -374,4 +376,79 @@ fn write_authority_seed_file(path: &Path, keypair: &Keypair) -> Result<(), CliEr
     }
     fs::rename(temp_path, path)?;
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    fn make_kernel(require_web3_evidence: bool) -> ArcKernel {
+        ArcKernel::new(KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: vec![],
+            max_delegation_depth: 5,
+            policy_hash: "control-plane-test-policy".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence,
+            checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        })
+    }
+
+    fn unique_receipt_db_path(prefix: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
+    }
+
+    #[test]
+    fn web3_evidence_requires_local_receipt_store() {
+        let mut kernel = make_kernel(true);
+
+        let error = configure_receipt_store(&mut kernel, None, None, None).unwrap_err();
+        assert!(matches!(
+            error,
+            CliError::Kernel(arc_kernel::KernelError::Web3EvidenceUnavailable(_))
+        ));
+    }
+
+    #[test]
+    fn web3_evidence_accepts_checkpoint_capable_sqlite_receipt_store() {
+        let path = unique_receipt_db_path("arc-control-plane-web3-evidence");
+        let mut kernel = make_kernel(true);
+
+        configure_receipt_store(&mut kernel, Some(&path), None, None).unwrap();
+        kernel.validate_web3_evidence_prerequisites().unwrap();
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn web3_evidence_rejects_remote_append_only_receipt_store() {
+        let mut kernel = make_kernel(true);
+
+        let error = configure_receipt_store(
+            &mut kernel,
+            None,
+            Some("http://127.0.0.1:8080"),
+            Some("test-token"),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            CliError::Kernel(arc_kernel::KernelError::Web3EvidenceUnavailable(_))
+        ));
+        assert!(error
+            .to_string()
+            .contains("append-only remote receipt mirrors are unsupported"));
+    }
 }

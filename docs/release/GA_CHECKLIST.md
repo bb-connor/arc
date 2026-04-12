@@ -1,11 +1,19 @@
 # GA Checklist
 
 Use this checklist before claiming general-availability readiness for the
-current `v2.8 Risk, Attestation, and Launch Closure` launch candidate.
+current post-`v2.41` ARC production candidate.
+
+This checklist is procedural. Use
+[RELEASE_AUDIT.md](RELEASE_AUDIT.md) for the authoritative repo-local
+release-go decision,
+[RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md) for supported scope, and
+[QUALIFICATION.md](QUALIFICATION.md) for the required evidence lanes.
 
 - [x] `./scripts/ci-workspace.sh` passes
 - [x] `./scripts/check-sdk-parity.sh` passes
+- [x] `./scripts/check-web3-contract-parity.sh` passes
 - [x] `./scripts/qualify-release.sh` passes
+- [x] local web3 qualification, `e2e`, ops-control, and promotion lanes pass
 - [x] release-input guards prevent generated artifacts from entering source
 - [x] dashboard release build and test lane is green
 - [x] TypeScript SDK pack/install qualification is green
@@ -21,4 +29,6 @@ current `v2.8 Risk, Attestation, and Launch Closure` launch candidate.
 - [x] release audit and risk register are updated for this candidate
 - [ ] hosted `CI` workflow green on the candidate commit
 - [ ] hosted `Release Qualification` workflow green on the candidate commit
+- [ ] hosted web3 bundle under `target/release-qualification/web3-runtime/`
+  includes runtime, `e2e`, ops, and promotion evidence for the candidate
 - [ ] final release tag and publication decision taken by operator

@@ -1,7 +1,7 @@
 # ARC Protocol
 
 **Version:** 2.0
-**Date:** 2026-03-25
+**Date:** 2026-04-02
 **Status:** Shipped repository profile
 
 ---
@@ -17,6 +17,26 @@ In this repository it ships as:
 - trust-control services for authority, revocation, receipt, budget, and
   federation state
 - hosted MCP-compatible edges and adapters that keep the same trust contract
+- machine-readable official-stack, extension-manifest, negotiation, and
+  qualification artifacts over ARC's named extension points
+- machine-readable web3 trust, anchoring, oracle, and settlement artifacts
+  for one official external rail stack
+- one bounded off-chain `arc-link` oracle runtime plus operator and
+  qualification artifacts for conservative cross-currency budget enforcement
+- one bounded `arc-anchor` runtime plus discovery, proof-bundle, and
+  qualification artifacts for multi-lane checkpoint anchoring over that
+  official web3 stack
+- one bounded `arc-settle` runtime plus finality, Solana-preparation, and
+  qualification artifacts for real settlement dispatch over that official web3
+  stack
+- one bounded Functions fallback, automation-job, CCIP settlement-
+  coordination, and payment-interop surface over that official web3 stack
+- one bounded web3 operations surface plus promotion-policy and partner-proof
+  artifacts for operating and reviewing that official web3 stack honestly
+- machine-readable autonomous pricing, capital-pool, execution, rollback, and
+  qualification artifacts for one bounded insurance-automation lane
+- machine-readable public identity-profile, wallet-directory, routing, and
+  qualification artifacts for one bounded public identity network
 - portable trust artifacts for `did:arc`, ARC-branded schema issuance,
   challenge/response presentation, evidence export, and certification
 
@@ -38,6 +58,35 @@ The shipped `v2` contract covers:
 - A2A v1.0.0 mediation through `arc-a2a-adapter`
 - signed certification checks plus operator-scoped registry and discovery-network
   surfaces
+- one machine-readable extension inventory plus an official ARC stack package,
+  custom extension manifest contract, fail-closed negotiation report, and
+  extension qualification matrix
+- one machine-readable web3 trust profile, contract package, chain
+  configuration, anchor-proof, oracle-evidence, dispatch, settlement-receipt,
+  and qualification artifact family for the official web3 rail
+- one bounded `arc-link` runtime profile, operator configuration, runtime
+  report, receipt policy, and qualification artifact family for conservative
+  cross-currency budget enforcement over that official web3 stack
+- one bounded `arc-anchor` runtime profile, discovery artifact, imported
+  OpenTimestamps and Solana memo secondary-lane contract, shared proof-bundle
+  contract, and qualification artifact family over the official web3 stack
+- one bounded `arc-settle` runtime profile, finality report, Solana release
+  example, qualification artifact family, and runbook over the official web3
+  stack
+- one bounded Functions fallback profile plus request/response examples, one
+  automation profile plus anchor/settlement job artifacts, one CCIP message
+  profile plus reconciliation artifacts, and one payment-interop profile plus
+  x402, EIP-3009, Circle, and ERC-4337 compatibility artifacts over the
+  official web3 stack
+- one bounded web3 operations profile plus anchor and settlement runtime
+  reports, one deployment-promotion policy, and one reviewer-facing external
+  qualification matrix over the official web3 stack
+- one machine-readable autonomous pricing-input, authority-envelope,
+  pricing-decision, capital-pool optimization, execution, rollback, drift,
+  and qualification artifact family for the bounded automation lane
+- one machine-readable public identity-profile, wallet-directory entry,
+  wallet-routing manifest, and identity-interop qualification artifact family
+  for the bounded public identity network
 
 The shipped `v2` contract does not claim:
 
@@ -46,6 +95,17 @@ The shipped `v2` contract does not claim:
 - automatic SCIM provisioning lifecycle
 - synthetic cross-issuer passport scoring
 - full theorem-prover completion for every security property
+- arbitrary plugins that can redefine signed ARC truth or widen trust outside
+  named extension points
+- permissionless public identity or wallet discovery that widens local trust
+- generic OID4VP, SIOP, DIDComm, or permissionless wallet-network
+  compatibility beyond ARC's documented public identity-profile and routing
+  contract
+- permissionless anchor discovery or arbitrary chain anchoring beyond ARC's
+  documented EVM, OpenTimestamps, and Solana memo lanes
+- arbitrary cross-chain fund routing, generic keeper authority, or direct fund
+  release from Functions or paymaster infrastructure beyond ARC's documented
+  bounded web3 interop surfaces
 - a replacement of MCP or A2A at the wire-protocol ecosystem level
 
 Compatibility rule:
@@ -75,6 +135,8 @@ The security boundary that matters is constant across these surfaces:
 - every mediated action is bound to explicit capability or authenticated hosted
   session state
 - denials are explicit, signed, and auditable
+- extensions may replace only named seams and must still preserve local policy
+  activation plus signed ARC truth
 - registry and artifact mismatches fail closed instead of degrading silently
 
 ## 4. Serialization And Identity
@@ -128,6 +190,11 @@ did:arc:{64-hex-ed25519-public-key}
 
 Resolution is local and self-certifying. Optional service endpoints, such as a
 receipt-log URL, may be attached by the resolving environment.
+
+Broader public identity profiles may also name `did:web`, `did:key`, and
+`did:jwk` as compatibility inputs for wallet or issuer interoperability, but
+those methods do not replace `did:arc` as ARC's canonical provenance anchor in
+this release.
 
 ## 5. Capability Contract
 
@@ -372,7 +439,10 @@ arc.checkpoint_statement.v1
 
 Legacy `arc.checkpoint_statement.v1` checkpoints remain valid for verification
 and evidence import. Checkpoint verification is part of exported evidence and
-compliance-oriented operator reporting.
+compliance-oriented operator reporting. ARC's web3 anchoring and settlement
+lanes additionally require durable local receipt storage and kernel-signed
+checkpoint issuance; append-only remote receipt mirrors are insufficient when
+the runtime claims Merkle or Solana evidence readiness.
 
 ## 7. Manifest Contract
 
@@ -464,6 +534,9 @@ Core operator and cluster surfaces include:
 - `/v1/settlements/reconcile`
 - `/v1/federation/evidence-shares`
 - `/v1/reputation/compare/{subject_key}`
+- `/v1/reputation/portable/summaries/issue`
+- `/v1/reputation/portable/events/issue`
+- `/v1/reputation/portable/evaluate`
 
 Federation and certification administration includes:
 
@@ -634,12 +707,12 @@ receipt truth without bespoke ARC-specific joins.
 
 ARC also validates assurance-bound and delegated-call-chain projection
 integrity fail closed. If a row claims runtime assurance, the projection must
-also carry the accepted verifier and evidence digest. If a row claims
-delegated call-chain context, the projection must carry non-empty `chainId`,
-`parentRequestId`, `originSubject`, and `delegatorSubject` values, plus a
-non-empty `parentReceiptId` when present. ARC does not emit partial or
-degraded enterprise-profile rows when that projection cannot be represented
-truthfully.
+also carry the accepted schema, verifier family, verifier, and evidence
+digest. If a row claims delegated call-chain context, the projection must
+carry non-empty `chainId`, `parentRequestId`, `originSubject`, and
+`delegatorSubject` values, plus a non-empty `parentReceiptId` when present.
+ARC does not emit partial or degraded enterprise-profile rows when that
+projection cannot be represented truthfully.
 
 `/v1/capabilities/issue` accepts the same typed capability-issuance contract
 used by the local CLI path, including optional `runtimeAttestation` evidence.
@@ -711,9 +784,179 @@ artifact over the same evidence. The appraisal contract separates:
 - vendor-scoped claims preserved without claiming cross-vendor equivalence
 - explicit reason codes and the effective runtime tier carried forward
 
+In the outward-facing artifact shape, those layers are now explicit nested
+components:
+
+- `evidence` for raw evidence identity and freshness metadata
+- `verifier` for adapter and verifier-family identity
+- `claims` for normalized ARC-visible assertions, structured normalized claim
+  descriptors, and preserved vendor-scoped claims
+- `policy` for verdict, carried-forward effective tier, reason codes, and the
+  corresponding structured reason descriptors
+
+ARC's normalized claim vocabulary is now explicit and versioned. The current
+portable claim catalog covers:
+
+- `attestation_type`
+- `runtime_identity`
+- `workload_identity_scheme`
+- `workload_identity_uri`
+- `module_id`
+- `measurement_digest`
+- `measurement_registers`
+- `hardware_model`
+- `secure_boot_state`
+
+Each structured normalized claim carries:
+
+- portable claim `code`
+- compatibility `legacyAssertionKey`
+- claim `category`
+- claim `confidence`
+- claim `freshness`
+- claim `provenance`
+- normalized `value`
+
+ARC's reason taxonomy is also explicit and versioned. Structured reasons carry:
+
+- reason `code`
+- reason `group`
+- reason `disposition`
+- human-readable `description`
+
+The current shared reason taxonomy includes pass, warn, deny, degrade, and
+unknown dispositions over verification, compatibility, freshness,
+measurement, debug-posture, and policy groups. ARC preserves the flat
+`reasonCodes` array for compatibility, but the structured reason objects are
+the portable contract going forward.
+
+ARC also carries one migration inventory over the current concrete bridges. At
+this stage that inventory is fixed to Azure MAA, AWS Nitro, Google
+Confidential VM, and ARC's signed `enterprise_verifier` family, and it makes
+the vendor claim namespace plus normalized key set, normalized claim codes,
+and default reason codes explicit for each bridge without claiming generic
+cross-vendor standardization.
+
 ARC treats that appraisal contract as the stable adapter boundary. New
 verifier families must project into the same appraisal shape instead of
 inventing new policy-specific blobs.
+
+ARC now also externalizes one signed appraisal-result contract over that same
+artifact boundary. The signed result carries:
+
+- result `schema`: `arc.runtime-attestation.appraisal-result.v1`
+- deterministic `resultId`
+- `exportedAt`
+- exporting `issuer`
+- nested `appraisal` artifact
+- exporting `exporterPolicyOutcome`
+- explicit `subject` provenance over `runtimeIdentity` and optional
+  `workloadIdentity`
+
+The signed envelope authenticates the result body with the exporter's signing
+key, but that signature does not itself widen local trust. Imported appraisal
+results must still pass one explicit local import policy. ARC's import-policy
+surface carries:
+
+- trusted `issuer` identifiers
+- trusted signer-key fingerprints
+- allowed verifier families
+- maximum result age
+- maximum evidence age
+- optional local maximum effective tier
+- required portable normalized-claim values
+
+Import evaluation yields one structured local outcome with disposition
+`allow`, `attenuate`, or `reject`. ARC rejects fail closed when:
+
+- no explicit local import policy is present
+- the signed result fails signature verification
+- the result or nested artifact schema is unsupported
+- the evidence schema and declared verifier family do not match ARC's bounded
+  appraisal bridge inventory
+- the result is stale
+- the underlying evidence is stale
+- the exporter itself rejected the appraisal
+- the issuer or signer is not explicitly trusted
+- the verifier family is outside local policy
+- a required portable claim is missing or mismatched
+
+If the imported result is otherwise acceptable but exceeds the locally allowed
+effective runtime-assurance tier, ARC attenuates the tier explicitly instead
+of rejecting the result silently or widening local authority.
+
+ARC now locally qualifies that appraisal-result boundary across the shipped
+Azure MAA, AWS Nitro, Google Confidential VM, and bounded
+`enterprise_verifier` bridges. The qualified negative paths include stale
+results, stale evidence, unsupported verifier-family policy, and contradictory
+portable claims. ARC does not currently claim one-time consume or
+replay-registry semantics for imported results; the current replay defense at
+this boundary is explicit signature plus freshness validation.
+
+ARC now also defines one bounded verifier-federation metadata layer over that
+same appraisal boundary. The portable artifacts are:
+
+- signed verifier descriptor
+  `arc.runtime-attestation.verifier-descriptor.v1`
+- signed reference-value set
+  `arc.runtime-attestation.reference-values.v1`
+- signed trust bundle
+  `arc.runtime-attestation.trust-bundle.v1`
+
+The signed verifier descriptor makes verifier identity machine-readable
+without collapsing it into local policy. The descriptor carries:
+
+- stable `descriptorId`
+- verifier `verifier` identifier
+- verifier `verifierFamily`
+- concrete ARC adapter `adapter`
+- bounded compatible `attestationSchemas`
+- canonical `appraisalArtifactSchema`
+- canonical `appraisalResultSchema`
+- trusted signer-key fingerprints for that verifier
+- optional `referenceValuesUri`
+- explicit `issuedAt` and `expiresAt`
+
+Signed reference-value sets distribute one verifier-family and one
+attestation-schema-specific measurement package without hiding freshness or
+replacement state. Each set carries:
+
+- stable `referenceValueId`
+- bound `descriptorId`
+- verifier `verifierFamily`
+- compatible `attestationSchema`
+- optional source URI
+- explicit issuance and expiry
+- lifecycle state `active`, `superseded`, or `revoked`
+- explicit `supersededBy` only for superseded sets
+- explicit `revokedReason` only for revoked sets
+- one non-empty measurement map
+
+The signed trust bundle is the portable distribution artifact. It carries:
+
+- stable `bundleId`
+- publishing `publisher`
+- explicit integer `version`
+- explicit issuance and expiry
+- one bounded set of signed verifier descriptors
+- one bounded set of signed reference-value sets
+
+ARC fails closed when trust-bundle material is stale, not yet valid, unsigned,
+partially signed, internally contradictory, or outside the declared verifier
+contract. The fail-closed conditions include:
+
+- duplicate descriptor ids or duplicate reference-value ids
+- reference-value sets that point to an unknown descriptor
+- verifier-family mismatch between a descriptor and a reference-value set
+- attestation-schema mismatch between a descriptor and a reference-value set
+- ambiguous active reference values for one `{descriptorId, attestationSchema}`
+  slot
+- superseded reference-value sets that do not name an existing successor
+
+These bundle artifacts do not themselves widen local trust. They make verifier
+identity, signer material, and reference values portable and signed, but
+operators must still decide explicitly how or whether those artifacts inform
+local trust admission.
 
 When ARC emits governed receipt metadata or underwriting evidence derived from
 trusted runtime attestation, it carries the accepted attestation `schema`,
@@ -876,6 +1119,48 @@ closed. Sparse history can still produce a scorecard, but only as explicit
 low-confidence probationary posture rather than a confident facility-ready
 decision.
 
+`POST /v1/reputation/portable/summaries/issue`,
+`POST /v1/reputation/portable/events/issue`, and
+`POST /v1/reputation/portable/evaluate` are ARC's portable market-discipline
+exchange surfaces. They sign one portable reputation-summary artifact and one
+portable negative-event artifact over explicit issuer, subject, evidence, and
+issuance or freshness state, then evaluate imported artifacts only through one
+local weighting profile. Evaluation requires subject agreement, unique issuers,
+allowed issuers, bounded freshness, non-contradictory summary or event timing,
+and explicit attenuation or penalty settings. Unsupported, stale, future-dated,
+duplicate, blocked, or contradictory inputs fail closed. This is portable
+evidence, not a universal trust oracle, global trust score, or automatic
+runtime-admission path.
+
+ARC now also defines one bounded shared-clearing lane over those imported
+artifacts through `arc.federation-reputation-clearing.v1`. That clearing
+contract references one local weighting policy, one federated admission
+policy, one bounded operator set, and one explicit anti-sybil policy. Accepted
+positive reputation inputs must come from independent issuers, per-issuer input
+count is capped, and blocking negative events require corroboration when the
+policy says so. Shared clearing is still operator-local evaluation truth, not a
+universal oracle or automatic runtime admission.
+
+`POST /v1/registry/market/fees/issue`,
+`POST /v1/registry/market/penalties/issue`, and
+`POST /v1/registry/market/penalties/evaluate` are ARC's bounded open-market
+economics surfaces. They sign one fee-schedule artifact over explicit
+namespace, actor-kind, operator-id, and admission-class scope plus publication,
+dispute, and market-participation fees and bond requirements, then sign one
+market-penalty artifact over matched listing, trust-activation, governance
+charter, sanction or appeal case, abuse class, bond class, and penalty amount.
+Evaluation requires signature-valid listing, fee-schedule, governance, and
+penalty artifacts; fail-closed freshness for fee schedules and governance
+authority; explicit scope matching against the current publisher, actor kind,
+and admission class; matching bond requirement and slashability; currency-safe
+penalty sizing; and valid prior-penalty linkage for reversal. This is explicit
+bounded market discipline, not permissionless slashing, global penalties, or
+ambient trust admission. Under adversarial multi-operator conditions, invalid
+mirrored listing signatures remain visible but untrusted, divergent replica
+freshness yields non-admission rather than silent preference, and governance or
+market-penalty evaluation rejects trust activations not issued by the
+governing local operator.
+
 `GET /v1/reports/facility-policy` evaluates that scorecard plus runtime
 assurance and optional tool-server certification posture into one bounded
 capital-allocation report. `POST /v1/facilities/issue` signs and persists that
@@ -890,6 +1175,9 @@ following operator claims explicit:
   certification evidence is missing
 - ARC can force manual review when the book is mixed-currency or still carries
   settlement-risk posture that ARC will not auto-net or auto-price away
+- ARC can also force manual review when runtime-assurance evidence spans
+  multiple verifier families, because ARC will not auto-allocate capital from
+  heterogeneous assurance provenance alone
 - supersession and expiry change operator-visible lifecycle state without
   rewriting the previously signed facility artifact
 
@@ -932,6 +1220,190 @@ contract. ARC can now package honest credit posture for external capital review,
 but it still does not bind external capital, execute reserves, or run a
 liability market from `v2.18` alone.
 
+`GET /v1/reports/capital-book` is ARC's signed live source-of-funds ledger for
+that same bounded credit layer. It returns:
+
+- one subject-scoped capital-book summary over receipts, facilities, bonds, and
+  loss-lifecycle state
+- one attributable facility-commitment source plus one reserve-book source when
+  the scoped book can be represented honestly
+- one event stream over committed, held, drawn, disbursed, released, repaid,
+  and impaired capital state linked back to facility, bond, loss-lifecycle, and
+  receipt evidence
+- one explicit support boundary that says ARC is authoritative about the source
+  attribution it emits but still does not auto-net across currencies or execute
+  external custody movement
+
+This surface is intentionally conservative. It fails closed when a subject
+scope is missing, receipt counterparty attribution is missing or contradictory,
+the selected book spans multiple currencies, more than one live facility or
+bond would need to be blended into one source-of-funds story, or no active
+granted facility exists to explain committed capital.
+
+`POST /v1/capital/instructions/issue` is ARC's custody-neutral reserve and
+escrow instruction surface over that same capital book. It signs one explicit
+instruction artifact carrying:
+
+- one subject-scoped capital-book query and one resolved live source
+- one typed action `lock_reserve`, `hold_reserve`, `release_reserve`,
+  `transfer_funds`, or `cancel_instruction`
+- one explicit authority chain with role, principal, approval time, and
+  expiry for each approving or executing actor
+- one explicit execution window plus one custody-neutral rail descriptor
+- one separate intended-state versus reconciled-state projection so ARC never
+  claims external execution from intent alone
+- one bounded evidence set tying the instruction back to facility, bond, and
+  capital-book event provenance
+
+This surface is also intentionally conservative. It fails closed when:
+
+- the requested action does not match the selected live source kind
+- the execution window is already expired or internally contradictory
+- any authority step is stale, malformed, or expires before the execution
+  window closes
+- the authority chain does not include both source-owner approval and the
+  named custody-provider execution step
+- the intended amount is zero, overstates the available live source amount, or
+  mixes currency with the selected capital source
+- observed external execution falls outside the execution window or does not
+  match the intended amount exactly
+
+ARC signs the instruction contract it emits. By itself, this endpoint remains a
+custody-neutral intent surface and does not prove external execution. Under
+the shipped official web3 stack, a separate
+`arc.web3-settlement-dispatch.v1` artifact may bind that instruction to one
+escrow and bond-vault lane, but observed settlement still must reconcile
+through explicit proof artifacts.
+
+`POST /v1/capital/allocations/issue` is ARC's simulation-first live
+capital-allocation surface for governed actions over that same capital book. It
+signs one explicit allocation-decision artifact carrying:
+
+- one subject-scoped capital-book query plus one selected governed receipt
+- one resolved facility-commitment source, one optional reserve-book source,
+  and one typed allocation outcome `allocate`, `queue`, `manual_review`, or
+  `deny`
+- one explicit authority chain, execution window, and custody-neutral rail
+  descriptor for the eventual capital movement
+- one current outstanding, reserve, utilization, and concentration view tied
+  back to active facility terms when a live facility already exists
+- one bounded instruction-draft set describing the transfer and reserve actions
+  ARC would take if the allocation can proceed
+
+This surface is intentionally conservative too. It fails closed when:
+
+- the scoped query does not resolve exactly one approved actionable governed
+  receipt or the caller omits `receiptId` while multiple such receipts exist
+- the selected receipt lacks governed `max_amount` truth or contradicts the
+  scoped subject/currency posture
+- the authority chain is stale, the custody step is missing, or the shared
+  execution envelope is internally contradictory
+- no active live source-of-funds state can explain the requested governed
+  action honestly
+- reserve backing would need to be created implicitly rather than tied to one
+  explicit reserve book
+- concentration or utilization posture prevents immediate allocation, in which
+  case ARC emits an explicit `deny` or `queue` decision instead of inferring
+  execution
+
+ARC signs the allocation decision it emits, but the allocation artifact itself
+is not proof of external execution. Under the shipped official web3 stack,
+execution remains a separate dispatch-plus-settlement-receipt artifact family,
+so allocation stays the deterministic operator and counterparty contract for
+what ARC would allocate and why.
+
+This is ARC's current live-capital boundary. ARC now proves explicit
+source-of-funds state, custody-neutral instruction contracts, simulation-first
+governed allocation, and one bounded official web3 execution surface over
+canonical economic evidence while keeping regulated-role assumptions explicit
+instead of ambient.
+
+The shipped official web3 execution surface is artifact-driven rather than
+permissionless. It consists of `arc.web3-trust-profile.v1`,
+`arc.web3-contract-package.v1`, `arc.web3-chain-configuration.v1`,
+`arc.anchor-inclusion-proof.v1`, `arc.oracle-conversion-evidence.v1`,
+`arc.web3-settlement-dispatch.v1`,
+`arc.web3-settlement-execution-receipt.v1`, and
+`arc.web3-qualification-matrix.v1`. Those artifacts bind one official
+Base-first escrow and bond-vault lane back to ARC receipts, checkpoints, and
+capital state without mutating prior signed truth or hiding custody
+assumptions. That surface is now backed locally by one packaged Solidity
+contract family in `contracts/`, one artifact-derived Rust Alloy bindings
+target in `crates/arc-web3-bindings/`, and one bounded local-devnet
+qualification run. Four contracts in that package are immutable; the one
+exception is `IArcIdentityRegistry`, which remains owner-managed and mutable
+for operator registration and key-binding changes. ARC therefore does not
+claim universal immutability for every contract surface in the package.
+
+The shipped bounded `arc-link` oracle-runtime surface is explicit rather than
+ambient. It consists of one `arc-link` runtime profile plus a pinned operator
+configuration artifact, one runtime-report schema instance,
+one receipt-boundary policy note, and one qualification matrix. That surface
+binds cross-currency budget enforcement to pinned Chainlink or Pyth inputs,
+trusted Base and standby Arbitrum chain inventory, sequencer downtime and
+recovery gating, explicit operator pause or disable controls, and
+conservative conversion margins recorded back into receipt financial metadata.
+`arc_link_runtime_v1` is the only supported runtime FX authority model on this
+surface; backend labels such as Chainlink or Pyth remain subordinate source
+details inside that authority envelope. It is backed locally by
+`crates/arc-link/`, kernel integration in `crates/arc-kernel/`, and
+deterministic qualification coverage rather than live external infrastructure.
+The auxiliary `ArcPriceResolver` contract is a contract-side reference reader,
+not a replacement authority for kernel charging or settlement receipts. This
+surface is not a universal oracle network, automatic cross-chain execution
+lane, or justification to widen spend beyond configured pair, chain, and
+freshness policy.
+
+The shipped bounded `arc-settle` runtime surface is also explicit rather than
+ambient. It consists of one `arc-settle` runtime profile, one representative
+finality-report artifact, one representative Solana settlement-preparation
+artifact, one qualification matrix, and one operator runbook. That surface
+binds approved capital instructions to explicit ERC-20 approval, escrow
+create/release/refund, and bond-vault lifecycle calls; projects chain state
+back into canonical `arc.web3-settlement-execution-receipt.v1` artifacts with
+tiered confirmation and dispute-window policy; preserves reserve requirement
+metadata from signed bond artifacts while only locking collateral on-chain in
+the bond vault; and keeps Solana support
+bounded to Ed25519 verification plus canonical instruction preparation rather
+than live broadcast. It is backed locally by `crates/arc-settle/`, the shared
+official contracts in `contracts/`, and one runtime-devnet qualification lane.
+Those lanes are only claimed when ARC also has local durable receipt storage,
+kernel-signed checkpoints, and evidence exports that keep checkpoint signer
+truth bound to the receipt kernel key.
+It is not permissionless settlement routing, automatic dispute adjudication,
+cross-chain fund movement, gas sponsorship, or a claim that ARC itself is the
+custodian or regulated insurer.
+
+The shipped bounded web3-operations surface is explicit rather than ambient.
+It consists of one `ARC_WEB3_OPERATIONS_PROFILE.md`, one anchor runtime-report
+example, one settlement runtime-report example, one operations qualification
+matrix, one deployment-promotion policy, one focused readiness audit, and one
+reviewer-facing external qualification matrix plus partner-proof package. That
+surface binds operator visibility to explicit indexer lag, drift, replay,
+finality, and emergency-mode semantics, and it keeps local qualification,
+operator-reviewed templates, and external publication holds separate instead
+of implying that a green local devnet run already means live deployment. The
+hosted release bundle under `target/release-qualification/web3-runtime/`
+remains the publication-facing evidence family; local evidence alone is not a
+public-release claim.
+
+The shipped bounded autonomous insurance-automation surface is also
+artifact-driven rather than ambient. It consists of
+`arc.autonomous-pricing-input.v1`,
+`arc.autonomous-pricing-authority-envelope.v1`,
+`arc.autonomous-pricing-decision.v1`,
+`arc.capital-pool-optimization.v1`,
+`arc.capital-pool-simulation-report.v1`,
+`arc.autonomous-execution-decision.v1`,
+`arc.autonomous-rollback-plan.v1`,
+`arc.autonomous-comparison-report.v1`,
+`arc.autonomous-drift-report.v1`, and
+`arc.autonomous-qualification-matrix.v1`. Those artifacts bind one bounded
+autonomous pricing lane back to underwriting, credit, capital, liability, and
+official-web3 truth while keeping execution subordinate to explicit authority
+envelopes, rollback plans, human interrupt contacts, and operator-visible
+comparison evidence.
+
 `GET /v1/reports/bond-policy` evaluates canonical exposure plus the latest
 active granted facility into one reserve-state report. `POST /v1/bonds/issue`
 signs and persists that same report as a bond artifact, and
@@ -964,20 +1436,30 @@ immutable lifecycle artifact, and `GET /v1/reports/bond-losses` projects the
 current event stream for operator review. These surfaces make the following
 claims explicit:
 
-- ARC records delinquency, recovery, reserve-release, and write-off as
+- ARC records delinquency, recovery, reserve-release, reserve-slash, and
+  write-off as
   separate immutable signed artifacts instead of mutating bond, facility, or
   receipt rows in place
 - delinquency booking is derived from the newest matching failed-loss evidence
   rather than from a truncated exposure page
 - recovery and write-off amounts are bounded by previously recorded
   outstanding delinquency, with currency mismatches failing closed
+- reserve release and reserve slash are executable reserve-control artifacts
+  with explicit `authorityChain`, `executionWindow`, custody-rail, optional
+  `observedExecution`, reconciliation-state, and appeal-window semantics
 - reserve release requires both cleared delinquency and no unbooked remaining
-  outstanding exposure
+  outstanding exposure, while reserve slash requires outstanding delinquency
+  plus available reserve backing
+- stale authority, missing execution metadata, contradictory observed movement,
+  and invalid appeal windows fail closed during reserve-control issuance
 
 This is still bounded lifecycle accounting rather than a claims network or
-live escrow engine. ARC now makes bond-backed loss and recovery state
-auditable, but it still does not execute external collateral movement, insurer
-placement, or cross-organization claim adjudication from phase `87` alone.
+live escrow engine. Phases `87`, `113`, `115`, and `116` now make bond-backed
+loss and recovery state auditable and add a bounded claims-payment plus
+settlement lane through explicit payout instructions, payout receipts,
+settlement instructions, and settlement receipts, but ARC still does not
+execute insurer placement or open-ended cross-organization recovery clearing
+from reserve-control state alone.
 
 ### 9.1 Launch And Standards Boundary
 
@@ -1000,32 +1482,52 @@ shipping evidence plus deterministic operator-visible runtime evaluation:
 - signed provider-facing risk packages for external capital review
 - reserve-backed autonomy-tier gating over explicit delegation-bond posture
 - immutable bond-loss lifecycle artifacts over delinquency, recovery,
-  reserve-release, and write-off state
+  reserve-release, reserve-slash, and write-off state, plus executable reserve
+  release/slash controls with explicit authority, reconciliation, and appeal
+  state
 - non-mutating bonded-execution simulation with operator control policy,
   kill-switch semantics, and sandbox qualification over signed bond truth
 - curated liability-provider registry artifacts with explicit jurisdiction,
   coverage-class, currency, and evidence-requirement policy plus fail-closed
   provider resolution
+- delegated pricing-authority artifacts linked to one provider or
+  regulated-role envelope plus underwriting, facility, and capital-book truth,
+  with explicit coverage and premium ceilings plus fail-closed stale-authority
+  rejection
 - provider-neutral liability quote-request, quote-response, placement, and
   bound-coverage artifacts over one signed provider-risk package, with
   fail-closed stale-provider, expiry, mismatch, and unsupported-policy checks
+- automatic coverage-binding decisions that remain subordinate to delegated
+  pricing-authority ceilings and fail closed on out-of-envelope coverage or
+  premium requests
 - immutable liability claim-package, provider-response, dispute, and
   adjudication artifacts linked back to bound coverage, exposure, bond, loss,
   and receipt evidence, with fail-closed oversized-claim and invalid-dispute
   state checks
+- automatic claim-payout instruction and payout-receipt artifacts that stay
+  subordinate to adjudicated claim outcomes and capital-execution truth, with
+  fail-closed duplicate, stale-window, and mismatch handling
+- claim-settlement instruction and settlement-receipt artifacts that make one
+  reimbursement or recovery topology explicit over matched payout and
+  capital-book truth, with fail-closed stale-authority and counterparty- or
+  amount-mismatch handling
 - runtime-assurance-aware issuance and governed-execution constraints
 
 The current liability-market claim is intentionally bounded: ARC now proves a
-curated provider-admission, quote/bind, and claim/dispute/adjudication
-orchestration layer over canonical evidence, but not an insurer network,
-claims-payment rail, autonomous pricing engine, or permissionless market.
+curated provider-admission, delegated pricing-authority, quote/bind, and
+claim/dispute/adjudication/payout-and-settlement orchestration layer over
+canonical evidence, but not an insurer network, open-ended recovery-clearing
+network, open-ended autonomous pricing beyond the documented bounded authority-
+envelope and rollback lane, or permissionless market.
 
 External launch, partner, or standards materials should derive claims from this
 protocol document, the release-qualification corpus, and the release audit.
-They must not imply liability-market capital allocation, autonomous insurer
-pricing beyond the documented underwriting policy surface, claim or dispute
-adjudication beyond the documented liability-market surface, or theorem-prover
-completion beyond the boundary defined in Section 5.4.
+They must not imply permissionless or arbitrary external capital dispatch
+beyond the documented official web3 lane, implicit regulated-actor status,
+autonomous insurer pricing beyond the documented bounded autonomous-pricing
+surface, claim or dispute adjudication beyond the documented liability-market
+surface, or theorem-prover completion beyond the boundary defined in Section
+5.4.
 
 ## 10. Portable Trust And Federation
 
@@ -1040,14 +1542,27 @@ accepting legacy `arc.*` artifacts:
 | Verifier policy | `arc.passport-verifier-policy.v1` |
 | Presentation challenge | `arc.agent-passport-presentation-challenge.v1` |
 | Presentation response | `arc.agent-passport-presentation-response.v1` |
+| Cross-issuer portfolio | `arc.cross-issuer-portfolio.v1` |
+| Cross-issuer trust pack | `arc.cross-issuer-trust-pack.v1` |
+| Cross-issuer migration | `arc.cross-issuer-migration.v1` |
 
 The current shipped semantics are:
 
-- issuer and subject identities currently remain `did:arc`
+- issuer and subject identities inside shipped ARC passport artifacts
+  currently remain `did:arc`
 - a passport may contain multiple credentials from different issuers as long as
   they all bind to one subject
 - verifier evaluation remains per credential
 - acceptance requires at least one credential to satisfy the verifier policy
+- ARC now also defines one bounded cross-issuer portfolio contract over those
+  existing passport artifacts
+- portfolio visibility, possession, and local trust activation remain separate
+- cross-subject or cross-issuer rebinding requires one explicit signed
+  migration artifact; ARC does not infer continuity from overlapping display
+  claims or discovery visibility
+- local portfolio activation requires one explicit signed trust pack and still
+  evaluates per entry rather than inventing a synthetic cross-issuer trust
+  score
 - replay-safe challenge verification can be backed by durable SQLite state
 - ARC may expose one public holder transport over stored challenge state:
   `GET /v1/public/passport/challenges/{challenge_id}` and
@@ -1135,11 +1650,61 @@ Portable lifecycle resolution itself remains ARC-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
-This protocol does not yet claim support for generic `ldp_vc`, generic JWT VC
+ARC now also ships one bounded public discovery layer over those existing
+issuer and verifier metadata surfaces:
+
+- `GET /v1/public/passport/discovery/issuer`
+- `GET /v1/public/passport/discovery/verifier`
+- `GET /v1/public/passport/discovery/transparency`
+
+That discovery layer is intentionally conservative:
+
+- issuer discovery is one signed, versioned, TTL-bounded projection over the
+  already-published `/.well-known/openid-credential-issuer` metadata and its
+  configured portable lifecycle distribution
+- verifier discovery is one signed, versioned, TTL-bounded projection over the
+  already-published `/.well-known/arc-oid4vp-verifier` metadata, verifier
+  `JWKS`, and request-URI prefix
+- transparency is one signed snapshot over the current issuer and verifier
+  discovery documents, carrying per-entry hashes plus publication and expiry
+  windows
+- every discovery document carries explicit import guardrails requiring
+  informational-only visibility, explicit local policy import, and manual
+  review before any activation
+- missing authority signing material makes the public discovery routes
+  unavailable
+- unsigned, stale, malformed, contradictory, or incomplete discovery
+  documents fail closed
+- discovery visibility, searchability, or fetchability never equals local
+  trust activation or runtime admission
+
+Cross-issuer portfolio composition remains bounded and explicit:
+
+- a cross-issuer portfolio is a holder- or operator-assembled evidence set over
+  existing ARC passport artifacts, not a new synthetic identity root
+- a portfolio may contain visible imported entries that are not locally
+  activated
+- imported or migrated entries remain distinguishable from native local
+  entries through explicit `sourceKind` and optional `source`
+- subject rebinding into the portfolio subject requires one signed
+  cross-issuer migration artifact with explicit issuer, subject, prior
+  passport, and time-bound continuity references
+- trust-pack policy may activate issuers, profile families, entry kinds,
+  migration ids, certification references, and active lifecycle requirements,
+  but it must not widen visibility into automatic federation admission
+- duplicate migration identifiers, mismatched lifecycle projections, unknown
+  migration references, and subject rebinding without an explicit migration all
+  fail closed
+- portfolio acceptance remains per entry; ARC may report activated entries and
+  activated issuers, but it does not publish a synthetic cross-issuer trust
+  score
+
+This protocol does not claim support for generic `ldp_vc`, generic JWT VC
 interoperability beyond ARC's documented passport profile family, generic
-SD-JWT VC interoperability beyond ARC's documented passport profile family,
-public issuer discovery, or wallet qualification beyond this ARC-specific
-profile set.
+SD-JWT VC interoperability beyond ARC's documented passport profile family, or
+permissionless multi-operator issuer, verifier, or wallet discovery beyond
+ARC's documented public identity-profile, wallet-directory, and routing-
+manifest contract.
 
 ### 10.1.2 OID4VP Verifier Interop
 
@@ -1220,9 +1785,10 @@ The profile is intentionally narrow:
   state, stale or mismatched identity assertions, unsupported request shapes,
   stale lifecycle state, mismatched issuers, or untrusted keys fail closed
 
-This protocol does not yet claim generic OID4VP wallet compatibility, SIOP,
-DIDComm, or public verifier marketplace semantics beyond this ARC-specific
-profile.
+This protocol does not claim generic OID4VP wallet compatibility, SIOP,
+DIDComm, or permissionless verifier marketplace semantics beyond this
+ARC-specific verifier profile plus the bounded public identity-network routing
+contract.
 
 ### 10.1.3 Holder Presentation Transport
 
@@ -1267,7 +1833,48 @@ The contract is challenge-bound, not session-marketplace state:
 
 This transport is ARC-specific. It coexists with the separate OID4VP verifier
 profile above, but it does not itself imply generic OID4VP, DIDComm, or other
-wallet transport compatibility claims.
+wallet transport compatibility claims beyond the bounded public identity-
+network contract described below.
+
+### 10.1.4 Public Identity Network Artifacts
+
+ARC now also ships one bounded public identity-network artifact family over
+the existing passport, projected credential, discovery, verifier, federation,
+and cross-issuer substrate:
+
+| Artifact | Schema |
+| --- | --- |
+| Public identity profile | `arc.public-identity-profile.v1` |
+| Public wallet-directory entry | `arc.public-wallet-directory-entry.v1` |
+| Public wallet-routing manifest | `arc.public-wallet-routing-manifest.v1` |
+| Identity interop qualification matrix | `arc.identity-interop-qualification-matrix.v1` |
+
+The bounded semantics are:
+
+- every public identity profile must preserve `did:arc` as the provenance
+  anchor while making any broader `did:web`, `did:key`, or `did:jwk`
+  compatibility input explicit
+- public identity profiles must preserve the existing ARC-native
+  `arc-agent-passport+json` lane plus the projected `application/dc+sd-jwt`
+  and `jwt_vc_json` passport families; they do not imply support for
+  arbitrary VC formats
+- wallet-directory entries are verifier-bound references over existing
+  portable-trust and verifier-discovery state; they do not create a new trust
+  root or ambient wallet-admission path
+- wallet-routing manifests must require signed request objects, replay
+  anchors, explicit response or relay URLs, and fail-closed handling for
+  subject mismatch, stale routing state, or cross-operator issuer mismatch
+- directory and routing artifacts remain informational or reviewable inputs
+  unless a local verifier or operator explicitly imports them under policy
+- the qualification matrix must cover supported and fail-closed scenarios for
+  unsupported DID methods, unsupported credential families, directory
+  poisoning, route replay, multi-wallet selection, and cross-operator issuer
+  mismatch before ARC claims broader public identity interoperability
+
+This artifact family does not claim generic OID4VP, SIOP, DIDComm, universal
+wallet-network routing, automatic subject rebinding, or universal cross-issuer
+trust. It is the strongest bounded public identity and wallet claim ARC makes
+in this release.
 
 ### 10.2 Federation Artifacts
 
@@ -1389,6 +1996,87 @@ This is a governed public certification marketplace surface backed by signed
 operator evidence. It is not a permissionless trust oracle, global mutable
 trust network, or automatic runtime-admission mechanism.
 
+ARC now also ships one bounded generic public registry substrate over those
+existing operator-owned surfaces:
+
+- `GET /v1/public/registry/namespace`
+- `GET /v1/public/registry/listings/search`
+- `POST /v1/registry/trust-activations/issue`
+- `POST /v1/registry/trust-activations/evaluate`
+- one signed namespace artifact that makes namespace ownership, registry URL,
+  and publication signer explicit
+- one signed listing envelope shared across current tool-server, credential-
+  issuer, credential-verifier, and liability-provider publication flows
+- explicit `origin`, `mirror`, and `indexer` publisher roles plus freshness
+  windows and a reproducible search-policy contract over generic listing
+  reports
+- one deterministic generic-registry ranking algorithm,
+  `freshness-status-kind-actor-published-at-v1`, that preserves visibility
+  ordering without implying trust activation or endorsement
+- compatibility references that preserve the underlying certification,
+  discovery, or provider-artifact provenance instead of replacing it
+- one signed local trust-activation artifact that binds one current listing,
+  one local operator decision, one review context, one admission class, and
+  bounded eligibility rules into explicit runtime import truth
+- four machine-readable admission classes, `public_untrusted`, `reviewable`,
+  `bond_backed`, and `role_gated`, that preserve local operator review and do
+  not collapse visibility into runtime admission
+- one signed governance-charter artifact plus one signed governance-case
+  artifact family over that same registry surface, with explicit namespace,
+  listing, operator, and activation scope for dispute, freeze, sanction, and
+  appeal actions
+- one signed federation-activation exchange artifact that carries one local
+  trust activation, one listing, one optional governing charter, one bounded
+  scope, and one fail-closed import policy across operators
+- one signed federation-quorum report over origin, mirror, and indexer
+  observations with explicit freshness, conflict, and anti-eclipse evidence
+- one signed federated open-admission policy plus one signed federated
+  reputation-clearing artifact over stake or bond requirements, local
+  weighting, independent-issuer diversity, and corroborated negative events
+- one signed federation-qualification matrix that covers hostile publisher,
+  conflicting activation, insufficient quorum, eclipse, reputation-sybil, and
+  governance-interop cases before ARC claims bounded cross-operator trust
+- fail-closed rejection when one namespace resolves to conflicting ownership
+  claims or when a projected listing or aggregated replica set is stale,
+  divergent, malformed, or otherwise unverifiable
+- explicit separation between listing visibility and any later trust-activation
+  or admission decision
+
+The current generic registry claim is intentionally bounded:
+
+- local operator publication currently emits `origin`-role reports over
+  operator-owned state; mirror/indexer replication and aggregation can now
+  participate in one bounded quorum report without claiming permissionless
+  federation or automatic trust
+- listing visibility does not imply trust import, runtime admission, or market
+  activation
+- trust activation now supports one explicit cross-operator exchange contract,
+  but imported activation remains visibility-only until local review and local
+  activation accept it
+- governance charters and governance-case evaluation remain operator-scoped
+  issue/evaluate flows; federation may reference that state, but it does not
+  imply permissionless global arbitration or automatic sanctions across
+  operators
+- missing, stale, divergent, expired, denied, unsigned, or policy-incompatible
+  activation state fails closed
+- insufficient quorum, missing origin or indexer observation, stale publisher
+  state, excessive upstream hops, or unresolved conflict evidence fail closed
+- freeze or sanction cases only block local admission when explicitly enforced
+  and bound to current local trust-activation truth
+- expired, mismatched, unsupported, or unauthorized governance actions fail
+  closed
+- federated `bond_backed` participation remains review-visible only until
+  separate slashable bond proof is bound through the live economic surface
+- shared portable reputation may flow through one bounded clearing contract,
+  but local weighting, independent issuers, and corroborated blocking events
+  remain mandatory; it is not a universal oracle
+- current listings project from local operator state plus bounded federation
+  evidence; they are not a permissionless global registry
+- adversarial replica visibility does not override local trust policy:
+  invalid mirror signatures, divergent freshness, and forged remote
+  activation authority remain visible as evidence but fail closed for
+  admission, governance, and market-penalty evaluation
+
 ## 13. Observability Contract
 
 Production observability is part of the shipped contract.
@@ -1403,6 +2091,8 @@ Stable operator surfaces include:
   surfaces
 - operator report and shared-evidence analytics
 - durable A2A task-registry rejection when follow-up correlation is unsafe
+- bounded web3 runtime reports for `arc-link`, `arc-anchor`, and `arc-settle`
+  with explicit drift, replay, recovery, and emergency-mode state
 
 Field additions are allowed. Silent fail-open downgrades are not.
 
@@ -1410,6 +2100,7 @@ For operational guidance, see:
 
 - `docs/release/OBSERVABILITY.md`
 - `docs/release/OPERATIONS_RUNBOOK.md`
+- `docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md`
 
 ## 14. Explicit Gaps
 
@@ -1417,11 +2108,20 @@ The following are intentionally outside the shipped `v2` contract:
 
 - permissionless or auto-trusting public federation or certification
   marketplace semantics
-- public federation beyond configured local or operator-controlled trust
+- permissionless mirror/indexer publication as automatic trust, sanction, or
+  market-penalty authority
+- public federation beyond ARC's documented bounded federation-activation
+  exchange, quorum, open-admission, reputation-clearing, and qualification
   surfaces
+- portable reputation as a universal trust oracle or automatic cross-issuer
+  score
 - automatic enterprise identity propagation into every portable artifact
 - custom A2A auth schemes beyond the shipped matrix
 - full automatic wallet/distribution semantics for passports
+- permissionless or arbitrary external capital dispatch beyond the documented
+  official web3 lane, or autonomous insurer pricing beyond the documented
+  autonomous-pricing, capital-pool, rollback, live-capital, reserve-control,
+  payout, and settlement surfaces
 - performance claims beyond the qualification and documentation surfaces
 
 These gaps are documented explicitly so operators and integrators do not have

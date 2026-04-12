@@ -1,0 +1,20 @@
+{
+  "name": "@arc/web3-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Official ARC web3 runtime contract package",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "compile": "node ./scripts/compile.mjs",
+    "qualify:devnet": "node ./scripts/qualify-devnet.mjs",
+    "qualify:promotion": "node ./scripts/qualify-promotion.mjs",
+    "promote:reviewed": "node ./scripts/promote-deployment.mjs",
+    "devnet:smoke": "pnpm compile && pnpm qualify:devnet"
+  },
+  "devDependencies": {
+    "ethers": "^6.16.0",
+    "ganache": "^7.9.2",
+    "solc": "0.8.30"
+  }
+}

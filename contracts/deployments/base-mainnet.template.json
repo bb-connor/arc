@@ -1,0 +1,88 @@
+{
+  "manifest_id": "arc.web3-deployment.base-mainnet.template.v1",
+  "network_name": "Base Mainnet",
+  "chain_id": "eip155:8453",
+  "role": "primary",
+  "deployment_mode": "deterministic-template",
+  "deployer_strategy": "create2",
+  "salt_namespace": "arc.web3.v0.1.0",
+  "settlement_token": {
+    "symbol": "USDC",
+    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
+  "oracle_configuration": {
+    "sequencer_uptime_feed": "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3",
+    "feeds": [
+      {
+        "pair": "ETH/USD",
+        "address": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+        "heartbeat_seconds": 1200
+      },
+      {
+        "pair": "BTC/USD",
+        "address": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+        "heartbeat_seconds": 1200
+      },
+      {
+        "pair": "USDC/USD",
+        "address": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "heartbeat_seconds": 86400
+      },
+      {
+        "pair": "LINK/USD",
+        "address": "0x17CAb8FE31cA45e4684Ea7bCB9D30Ba03e38BF2C",
+        "heartbeat_seconds": 1200
+      }
+    ]
+  },
+  "contracts": [
+    {
+      "contract_id": "arc.identity-registry",
+      "artifact": "contracts/artifacts/ArcIdentityRegistry.json",
+      "source": "contracts/src/ArcIdentityRegistry.sol",
+      "constructor_args": [
+        "<registry_admin_address>"
+      ],
+      "create2_salt": "arc.identity-registry.base.v0.1.0"
+    },
+    {
+      "contract_id": "arc.root-registry",
+      "artifact": "contracts/artifacts/ArcRootRegistry.json",
+      "source": "contracts/src/ArcRootRegistry.sol",
+      "constructor_args": [
+        "<identity_registry_address>"
+      ],
+      "create2_salt": "arc.root-registry.base.v0.1.0"
+    },
+    {
+      "contract_id": "arc.escrow",
+      "artifact": "contracts/artifacts/ArcEscrow.json",
+      "source": "contracts/src/ArcEscrow.sol",
+      "constructor_args": [
+        "<root_registry_address>",
+        "<identity_registry_address>"
+      ],
+      "create2_salt": "arc.escrow.base.v0.1.0"
+    },
+    {
+      "contract_id": "arc.bond-vault",
+      "artifact": "contracts/artifacts/ArcBondVault.json",
+      "source": "contracts/src/ArcBondVault.sol",
+      "constructor_args": [
+        "<root_registry_address>",
+        "<identity_registry_address>"
+      ],
+      "create2_salt": "arc.bond-vault.base.v0.1.0"
+    },
+    {
+      "contract_id": "arc.price-resolver",
+      "artifact": "contracts/artifacts/ArcPriceResolver.json",
+      "source": "contracts/src/ArcPriceResolver.sol",
+      "constructor_args": [
+        "<price_admin_address>",
+        "0xBCF85224fc0756B9Fa45aAb7d157a8263913aDb3"
+      ],
+      "create2_salt": "arc.price-resolver.base.v0.1.0"
+    }
+  ]
+}

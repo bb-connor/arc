@@ -1,0 +1,78 @@
+{
+  "schema": "arc.web3-trust-profile.v1",
+  "profile_id": "arc.official-web3-stack",
+  "arc_contract_version": "2.0",
+  "primary_chain_id": "eip155:8453",
+  "secondary_chain_ids": [
+    "eip155:42161"
+  ],
+  "operator_binding": {
+    "certificate": {
+      "schema": "arc.key-binding-certificate.v1",
+      "arc_identity": "did:arc:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "arc_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "settlement_address": "0x1111111111111111111111111111111111111111",
+      "issued_at": 1743292800,
+      "expires_at": 1774828800,
+      "nonce": "0123456789abcdef0123456789abcdef"
+    },
+    "signature": "d1978bdd761495173d855841000bdc52c9f195ed10b11d14066836541083de955033d52f8cf18c639af08154fde2f63cea483fa2553ab6a5d75f386eb822d505"
+  },
+  "proof_bundle_required": true,
+  "dispute_windows": [
+    {
+      "settlement_path": "dual_signature",
+      "challenge_window_secs": 600,
+      "recovery_window_secs": 3600,
+      "dispute_policy": "off_chain_arbitration"
+    },
+    {
+      "settlement_path": "merkle_proof",
+      "challenge_window_secs": 900,
+      "recovery_window_secs": 86400,
+      "dispute_policy": "timeout_refund"
+    }
+  ],
+  "finality_rules": [
+    {
+      "chain_id": "eip155:8453",
+      "mode": "optimistic_l2",
+      "min_confirmations": 20
+    },
+    {
+      "chain_id": "eip155:42161",
+      "mode": "l1_finalized",
+      "min_confirmations": 12
+    }
+  ],
+  "regulated_roles": [
+    {
+      "role": "operator",
+      "actor_id": "arc-operator-main",
+      "responsibility": "Originates governed dispatch and maintains local policy activation.",
+      "custody_boundary_explicit": true
+    },
+    {
+      "role": "custodian",
+      "actor_id": "custodian-base-main",
+      "responsibility": "Holds settlement-side keys and custody accounts for the official stack.",
+      "custody_boundary_explicit": true
+    },
+    {
+      "role": "arbitrator",
+      "actor_id": "settlement-dispute-panel",
+      "responsibility": "Handles off-chain challenge and reversal review during dispute windows.",
+      "custody_boundary_explicit": true
+    }
+  ],
+  "custody_boundary_note": "ARC governs intent, proofs, and policy admission; custodians and payment institutions remain explicit operators of record.",
+  "local_policy_activation_required": true
+}

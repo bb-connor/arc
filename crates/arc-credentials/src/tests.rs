@@ -103,6 +103,46 @@ mod tests {
         }
     }
 
+    fn sample_passport(subject_seed: u8, issuer_seed: u8) -> AgentPassport {
+        let subject = Keypair::from_seed(&[subject_seed; 32]);
+        let issuer = Keypair::from_seed(&[issuer_seed; 32]);
+        let credential = issue_reputation_credential(
+            &issuer,
+            sample_scorecard(&subject.public_key().to_hex()),
+            sample_evidence(),
+            1_710_000_000,
+            1_710_086_400,
+        )
+        .expect("credential");
+        let subject_did = DidArc::from_public_key(subject.public_key());
+        build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport")
+    }
+
+    fn active_lifecycle_resolution(
+        passport: &AgentPassport,
+        now: u64,
+    ) -> PassportLifecycleResolution {
+        let verification = verify_agent_passport(passport, now).expect("passport verification");
+        PassportLifecycleResolution {
+            passport_id: verification.passport_id,
+            subject: verification.subject,
+            issuers: verification.issuers,
+            issuer_count: verification.issuer_count,
+            state: PassportLifecycleState::Active,
+            published_at: Some(1_710_000_000),
+            updated_at: Some(1_710_000_100),
+            superseded_by: None,
+            revoked_at: None,
+            revoked_reason: None,
+            distribution: PassportStatusDistribution {
+                resolve_urls: vec!["https://status.example.com/passports".to_string()],
+                cache_ttl_secs: Some(300),
+            },
+            valid_until: passport.valid_until.clone(),
+            source: Some("https://status.example.com".to_string()),
+        }
+    }
+
     fn rewrite_portable_compact(
         compact: &str,
         issuer: &Keypair,
@@ -301,6 +341,279 @@ mod tests {
         assert_eq!(verification.issuer, None);
         assert_eq!(verification.issuer_count, 2);
         assert_eq!(verification.issuers.len(), 2);
+    }
+
+    #[test]
+    fn cross_issuer_portfolio_visibility_does_not_imply_activation() {
+        let native_passport = sample_passport(7, 1);
+        let imported_passport = sample_passport(7, 2);
+        let subject = native_passport.subject.clone();
+        let native_issuer = native_passport.credentials[0].unsigned.issuer.clone();
+
+        let portfolio = CrossIssuerPortfolio {
+            schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
+            portfolio_id: "portfolio-1".to_string(),
+            subject,
+            entries: vec![
+                CrossIssuerPortfolioEntry {
+                    entry_id: "native".to_string(),
+                    profile_family: PASSPORT_SCHEMA.to_string(),
+                    source_kind: CrossIssuerPortfolioEntryKind::Native,
+                    source: None,
+                    passport: native_passport.clone(),
+                    lifecycle: Some(active_lifecycle_resolution(&native_passport, 1_710_000_200)),
+                    certification_refs: vec!["cert-alpha".to_string()],
+                    migration_id: None,
+                },
+                CrossIssuerPortfolioEntry {
+                    entry_id: "imported".to_string(),
+                    profile_family: PASSPORT_SCHEMA.to_string(),
+                    source_kind: CrossIssuerPortfolioEntryKind::Imported,
+                    source: Some("https://issuer-b.example/portfolio.json".to_string()),
+                    passport: imported_passport.clone(),
+                    lifecycle: Some(active_lifecycle_resolution(&imported_passport, 1_710_000_200)),
+                    certification_refs: vec!["cert-beta".to_string()],
+                    migration_id: None,
+                },
+            ],
+            migrations: Vec::new(),
+        };
+        let trust_pack = create_signed_cross_issuer_trust_pack(
+            &Keypair::from_seed(&[9u8; 32]),
+            "pack-1",
+            "https://rp.example.com",
+            1_710_000_000,
+            1_710_086_400,
+            CrossIssuerTrustPackPolicy {
+                allowed_issuers: [native_issuer].into_iter().collect(),
+                allowed_profile_families: [PASSPORT_SCHEMA.to_string()].into_iter().collect(),
+                allowed_entry_kinds: [
+                    CrossIssuerPortfolioEntryKind::Native,
+                    CrossIssuerPortfolioEntryKind::Imported,
+                ]
+                .into_iter()
+                .collect(),
+                require_active_lifecycle: true,
+                ..CrossIssuerTrustPackPolicy::default()
+            },
+        )
+        .expect("trust pack");
+
+        let evaluation =
+            evaluate_cross_issuer_portfolio(&portfolio, 1_710_000_200, &trust_pack).expect("evaluation");
+
+        assert!(evaluation.accepted);
+        assert_eq!(evaluation.activated_entry_ids, vec!["native".to_string()]);
+        assert_eq!(evaluation.entry_results.len(), 2);
+        assert!(evaluation.entry_results[0].accepted);
+        assert!(!evaluation.entry_results[1].accepted);
+        assert!(evaluation.entry_results[1]
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("outside the trust pack allowlist")));
+    }
+
+    #[test]
+    fn cross_issuer_portfolio_requires_explicit_migration_for_subject_rebinding() {
+        let imported_passport = sample_passport(6, 1);
+        let target_subject =
+            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+        let issuer = imported_passport.credentials[0].unsigned.issuer.clone();
+        let portfolio = CrossIssuerPortfolio {
+            schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
+            portfolio_id: "portfolio-2".to_string(),
+            subject: target_subject,
+            entries: vec![CrossIssuerPortfolioEntry {
+                entry_id: "imported".to_string(),
+                profile_family: PASSPORT_SCHEMA.to_string(),
+                source_kind: CrossIssuerPortfolioEntryKind::Imported,
+                source: Some("https://issuer-a.example/import".to_string()),
+                passport: imported_passport,
+                lifecycle: None,
+                certification_refs: vec!["cert-alpha".to_string()],
+                migration_id: None,
+            }],
+            migrations: Vec::new(),
+        };
+        let trust_pack = create_signed_cross_issuer_trust_pack(
+            &Keypair::from_seed(&[9u8; 32]),
+            "pack-2",
+            "https://rp.example.com",
+            1_710_000_000,
+            1_710_086_400,
+            CrossIssuerTrustPackPolicy {
+                allowed_issuers: [issuer].into_iter().collect(),
+                allowed_profile_families: [PASSPORT_SCHEMA.to_string()].into_iter().collect(),
+                allowed_entry_kinds: [CrossIssuerPortfolioEntryKind::Imported]
+                    .into_iter()
+                    .collect(),
+                ..CrossIssuerTrustPackPolicy::default()
+            },
+        )
+        .expect("trust pack");
+
+        let evaluation =
+            evaluate_cross_issuer_portfolio(&portfolio, 1_710_000_200, &trust_pack).expect("evaluation");
+
+        assert!(!evaluation.accepted);
+        assert!(evaluation
+            .entry_results[0]
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("without an explicit migration")));
+    }
+
+    #[test]
+    fn cross_issuer_portfolio_accepts_explicit_migration_link() {
+        let migrated_passport = sample_passport(5, 1);
+        let old_subject = migrated_passport.subject.clone();
+        let target_subject =
+            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+        let issuer = migrated_passport.credentials[0].unsigned.issuer.clone();
+        let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
+        let migration = create_signed_cross_issuer_migration(
+            &Keypair::from_seed(&[9u8; 32]),
+            "migration-1",
+            "https://rp.example.com/migrations/1",
+            issuer.clone(),
+            issuer.clone(),
+            old_subject,
+            target_subject.clone(),
+            vec![passport_id],
+            "issuer migration",
+            "ledger://continuity/1",
+            1_710_000_000,
+            Some(1_710_086_400),
+        )
+        .expect("migration");
+        let portfolio = CrossIssuerPortfolio {
+            schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
+            portfolio_id: "portfolio-3".to_string(),
+            subject: target_subject,
+            entries: vec![CrossIssuerPortfolioEntry {
+                entry_id: "migrated".to_string(),
+                profile_family: PASSPORT_SCHEMA.to_string(),
+                source_kind: CrossIssuerPortfolioEntryKind::Migrated,
+                source: Some("https://issuer-a.example/migration".to_string()),
+                passport: migrated_passport,
+                lifecycle: None,
+                certification_refs: vec!["cert-alpha".to_string()],
+                migration_id: Some("migration-1".to_string()),
+            }],
+            migrations: vec![migration],
+        };
+        let trust_pack = create_signed_cross_issuer_trust_pack(
+            &Keypair::from_seed(&[10u8; 32]),
+            "pack-3",
+            "https://rp.example.com",
+            1_710_000_000,
+            1_710_086_400,
+            CrossIssuerTrustPackPolicy {
+                allowed_issuers: [issuer].into_iter().collect(),
+                allowed_profile_families: [PASSPORT_SCHEMA.to_string()].into_iter().collect(),
+                allowed_entry_kinds: [CrossIssuerPortfolioEntryKind::Migrated]
+                    .into_iter()
+                    .collect(),
+                allowed_migration_ids: ["migration-1".to_string()].into_iter().collect(),
+                ..CrossIssuerTrustPackPolicy::default()
+            },
+        )
+        .expect("trust pack");
+
+        let evaluation =
+            evaluate_cross_issuer_portfolio(&portfolio, 1_710_000_200, &trust_pack).expect("evaluation");
+
+        assert!(evaluation.accepted);
+        assert_eq!(evaluation.activated_entry_ids, vec!["migrated".to_string()]);
+        assert!(evaluation.entry_results[0].accepted);
+    }
+
+    #[test]
+    fn cross_issuer_portfolio_rejects_duplicate_migration_ids() {
+        let migrated_passport = sample_passport(5, 1);
+        let old_subject = migrated_passport.subject.clone();
+        let target_subject =
+            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+        let issuer = migrated_passport.credentials[0].unsigned.issuer.clone();
+        let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
+        let migration_a = create_signed_cross_issuer_migration(
+            &Keypair::from_seed(&[9u8; 32]),
+            "migration-dup",
+            "https://rp.example.com/migrations/a",
+            issuer.clone(),
+            issuer.clone(),
+            old_subject.clone(),
+            target_subject.clone(),
+            vec![passport_id.clone()],
+            "issuer migration",
+            "ledger://continuity/a",
+            1_710_000_000,
+            Some(1_710_086_400),
+        )
+        .expect("migration");
+        let migration_b = create_signed_cross_issuer_migration(
+            &Keypair::from_seed(&[10u8; 32]),
+            "migration-dup",
+            "https://rp.example.com/migrations/b",
+            issuer.clone(),
+            issuer,
+            old_subject,
+            target_subject.clone(),
+            vec![passport_id],
+            "issuer migration",
+            "ledger://continuity/b",
+            1_710_000_000,
+            Some(1_710_086_400),
+        )
+        .expect("migration");
+        let portfolio = CrossIssuerPortfolio {
+            schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
+            portfolio_id: "portfolio-4".to_string(),
+            subject: target_subject,
+            entries: vec![CrossIssuerPortfolioEntry {
+                entry_id: "migrated".to_string(),
+                profile_family: PASSPORT_SCHEMA.to_string(),
+                source_kind: CrossIssuerPortfolioEntryKind::Migrated,
+                source: Some("https://issuer-a.example/migration".to_string()),
+                passport: migrated_passport,
+                lifecycle: None,
+                certification_refs: vec!["cert-alpha".to_string()],
+                migration_id: Some("migration-dup".to_string()),
+            }],
+            migrations: vec![migration_a, migration_b],
+        };
+
+        let error =
+            verify_cross_issuer_portfolio(&portfolio, 1_710_000_200).expect_err("duplicate migration ids");
+        assert!(matches!(
+            error,
+            CredentialError::InvalidCrossIssuerPortfolio(_)
+        ));
+    }
+
+    #[test]
+    fn cross_issuer_trust_pack_rejects_tampered_signature_boundary() {
+        let signer = Keypair::from_seed(&[9u8; 32]);
+        let mut trust_pack = create_signed_cross_issuer_trust_pack(
+            &signer,
+            "pack-4",
+            "https://rp.example.com",
+            1_710_000_000,
+            1_710_086_400,
+            CrossIssuerTrustPackPolicy {
+                allowed_profile_families: [PASSPORT_SCHEMA.to_string()].into_iter().collect(),
+                ..CrossIssuerTrustPackPolicy::default()
+            },
+        )
+        .expect("trust pack");
+        trust_pack.body.verifier = "https://tampered.example.com".to_string();
+
+        let error = verify_signed_cross_issuer_trust_pack(&trust_pack, 1_710_000_200)
+            .expect_err("tampered trust pack");
+        assert!(matches!(
+            error,
+            CredentialError::InvalidCrossIssuerTrustPack(_)
+        ));
     }
 
     #[test]

@@ -1,0 +1,15 @@
+{
+  "plan_id": "arc.web3-rollback-plan.base-mainnet.v1",
+  "generated_at": "2026-04-02T18:15:00Z",
+  "environment": "base-mainnet",
+  "manifest_id": "arc.web3-deployment.base-mainnet.reviewed.v1",
+  "approval_id": "arc.web3-deployment-approval.base-mainnet.v1",
+  "rollback_mode": "manual-replacement-deployment",
+  "stop_on_error": true,
+  "require_manual_retry_after_failure": true,
+  "rollback_executed": false,
+  "failure_stage": null,
+  "notes": [
+    "Live rollback is replacement-oriented: stop broader promotion, retain the reviewed manifest and approval artifact, and cut a superseding reviewed manifest if remediation is required."
+  ]
+}

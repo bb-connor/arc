@@ -75,6 +75,18 @@ pub enum CredentialError {
     #[error("signed verifier policy has expired")]
     SignedVerifierPolicyExpired,
 
+    #[error("invalid public discovery document: {0}")]
+    InvalidPublicDiscoveryDocument(String),
+
+    #[error("public discovery signature verification failed")]
+    InvalidPublicDiscoverySignature,
+
+    #[error("public discovery document is not yet valid")]
+    PublicDiscoveryNotYetValid,
+
+    #[error("public discovery document has expired")]
+    PublicDiscoveryExpired,
+
     #[error("challenge schema must be {PASSPORT_PRESENTATION_CHALLENGE_SCHEMA} or legacy {LEGACY_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA}")]
     InvalidChallengeSchema,
 
@@ -146,6 +158,18 @@ pub enum CredentialError {
 
     #[error("invalid passport lifecycle contract: {0}")]
     InvalidPassportLifecycle(String),
+
+    #[error("invalid cross-issuer portfolio contract: {0}")]
+    InvalidCrossIssuerPortfolio(String),
+
+    #[error("invalid cross-issuer trust pack: {0}")]
+    InvalidCrossIssuerTrustPack(String),
+
+    #[error("invalid cross-issuer migration record: {0}")]
+    InvalidCrossIssuerMigration(String),
+
+    #[error("invalid portable reputation contract: {0}")]
+    InvalidPortableReputation(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

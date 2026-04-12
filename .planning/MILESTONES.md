@@ -2,30 +2,338 @@
 
 ## Active Milestone
 
-### v2.23 Common Appraisal Vocabulary and External Result Interop
+No active milestone is currently queued locally.
 
-**Executable phases:** 101-104
+## Next Planned Milestone
 
-**Why this milestone matters:** ARC now has concrete multi-cloud verifier
-bridges, but those outputs still stop at ARC-local adapter semantics. `v2.23`
-is where ARC turns appraisal into a portable external result contract with one
-claim vocabulary, one reason taxonomy, and explicit import/export guardrails.
+No next milestone is currently queued locally.
+
+## Latest Completed Milestone
+
+### v2.65 MERCURY Portfolio Revenue Boundary Qualification, Commercial Handoff, and Channel Boundary
+
+**Status:** complete locally 2026-04-04; phases `269` through `272` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 269-272
+**Goal:** Qualify one bounded Mercury portfolio-revenue-boundary lane over the
+existing program-family package so Mercury can prove one named commercial
+handoff can consume program-family evidence without widening into generic
+revenue operations systems, forecasting stacks, billing platforms, channel
+programs, merged shells, or ARC commercial surfaces.
+
+### v2.64 MERCURY Program Family Qualification, Shared Review Package, and Portfolio Claim Discipline
+
+**Status:** complete locally 2026-04-04; phases `265` through `268` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 265-268
+**Goal:** Qualify one bounded Mercury program-family lane over the existing
+third-program package so Mercury can prove one explicitly named small program
+family can be reviewed together without widening into generic portfolio-
+management tooling, revenue operations systems, forecasting stacks, billing
+platforms, channel programs, merged shells, or ARC commercial surfaces.
+
+### v2.63 MERCURY Third Program Qualification, Reuse Repeatability, and Multi-Program Boundary
+
+**Status:** complete locally 2026-04-04; phases `261` through `264` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 261-264
+**Goal:** Qualify one bounded Mercury third-program lane over the existing
+second-portfolio-program package so Mercury can prove one evidence-backed
+multi-account program family can support one additional adjacent program
+reuse decision without widening into generic portfolio-management tooling,
+revenue operations systems, forecasting stacks, billing platforms, channel
+programs, merged shells, or ARC commercial surfaces.
+
+### v2.62 MERCURY Second Portfolio Program Qualification, Reuse Discipline, and Revenue Boundary
+
+**Status:** complete locally 2026-04-04; phases `257` through `260` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 257-260
+**Goal:** Qualify one bounded Mercury second-portfolio-program lane over the
+existing portfolio-program package so Mercury can prove one evidence-backed
+multi-account program can support one adjacent program reuse decision
+without widening into generic portfolio-management tooling, revenue
+operations systems, forecasting stacks, billing platforms, channel
+programs, merged shells, or ARC commercial surfaces.
+
+### v2.61 MERCURY Portfolio Program Qualification, Multi-Account Boundary, and Revenue Operations Guardrails
+
+**Status:** complete locally 2026-04-04; phases `253` through `256` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 253-256
+**Goal:** Qualify one bounded Mercury portfolio-program lane over the
+existing second-account-expansion package so Mercury can prove one renewed
+workflow can support one explicitly governed multi-account program without
+widening into generic customer-success tooling, account-management
+platforms, revenue operations systems, channel marketplaces, merged shells,
+or ARC commercial surfaces.
+
+### v2.60 MERCURY Second-Account Expansion Qualification, Portfolio Boundary, and Reuse Governance
+
+**Status:** complete locally 2026-04-04; phases `249` through `252` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 249-252
+**Goal:** Qualify one bounded Mercury second-account expansion lane over the
+existing renewal-qualification package so Mercury can prove one renewed
+account can support one adjacent account expansion decision without widening
+into generic customer-success tooling, account-management platforms, revenue
+operations systems, multi-account portfolio programs, channel marketplaces,
+merged shells, or ARC commercial surfaces.
+
+### v2.59 MERCURY Renewal Qualification, Outcome Review, and Expansion Boundary
+
+**Status:** complete locally 2026-04-04; phases `245` through `248` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 245-248
+**Goal:** Qualify one bounded Mercury renewal lane over the existing
+delivery-continuity package so Mercury can prove one activated account can
+cross one evidence-backed renewal decision boundary without widening into
+generic customer-success tooling, CRM workflows, account-management
+platforms, channel marketplaces, merged shells, or ARC commercial surfaces.
+
+### v2.58 MERCURY Controlled Delivery Continuity, Outcome Evidence, and Renewal Gate
+
+**Status:** complete locally 2026-04-04; phases `241` through `244` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 241-244
+**Goal:** Qualify one bounded Mercury controlled-delivery continuity lane
+over the existing selective-account-activation package so Mercury can prove
+one activated account remains evidence-backed, renewal-gated, and supportable
+without widening into generic onboarding tooling, CRM workflows, support
+desks, channel marketplaces, or ARC commercial surfaces.
+
+### v2.57 MERCURY Selective Account Activation, Controlled Delivery, and Claim Containment
+
+**Status:** complete locally 2026-04-04; phases `237` through `240` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 237-240
+**Goal:** Qualify one bounded Mercury selective-account activation lane over
+the existing broader-distribution package so Mercury can move one governed
+qualified account into controlled delivery without widening into generic
+onboarding tooling, CRM workflows, channel marketplaces, merged shells, or
+ARC commercial surfaces.
+
+### v2.56 MERCURY Broader Distribution Readiness, Selective Account Qualification, and Claim Governance
+
+**Status:** complete locally 2026-04-04; phases `233` through `236` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 233-236
+**Goal:** Qualify one bounded Mercury broader-distribution lane over the
+existing reference-distribution package so Mercury can use one approved
+reference-backed bundle to support selective account qualification without
+widening into generic sales tooling, CRM workflows, merged shells, or ARC
+commercial surfaces.
+
+### v2.55 MERCURY Reference Distribution, Landed-Account Expansion, and Claim Discipline
+
+**Status:** complete locally 2026-04-03; phases `229` through `232` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 229-232
+**Goal:** Qualify one bounded Mercury reference-distribution and landed-
+account expansion lane over the existing controlled-adoption package so
+Mercury can turn one referenceable win into a repeatable expansion motion
+without widening into generic sales tooling, merged shells, or ARC generic
+commercial surfaces.
+
+### v2.54 MERCURY Controlled Adoption, Renewal Evidence, and Reference Readiness
+
+**Status:** complete locally 2026-04-03; phases `225` through `228` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 225-228
+**Goal:** Qualify one bounded post-launch Mercury adoption lane over the
+existing release-readiness package so Mercury can prove renewal and reference
+readiness without widening into new product lines, merged shells, or ARC
+generic release surfaces.
+
+### v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled Adoption
+
+**Status:** complete locally 2026-04-03; phases `221` through `224` are
+implemented, verified, audited, and archived locally.
+**Executable phases:** 221-224
+**Goal:** Package Mercury's dedicated app surface into one bounded
+release-readiness lane over the existing Mercury artifacts, covering reviewer
+and partner delivery, operator support handoff, and explicit launch
+qualification without pulling Mercury logic back into ARC generic crates or
+widening into a new product line.
+
+### v2.52 MERCURY Extensions ARC Purity Restoration, Boundary Cleanup, and Qualification
+
+**Status:** complete locally 2026-04-03; phases `217` through `220` are
+implemented, verified, audited, and archived.
+**Executable phases:** 217-220
+**Goal:** Restore ARC's generic substrate boundary by removing product-
+specific Mercury and ARC-Wall logic from ARC control-plane, CLI, query, and
+store surfaces, then validate the resulting purity pass with low-memory
+regression checks.
+
+## Previous Completed Milestone
+
+### v2.50 ARC-Wall Companion Product Core, Guard Evidence, and Buyer Motion
+
+**Status:** complete locally 2026-04-03; phases `209` through `212` are
+implemented, verified, audited, and archived.
+**Executable phases:** 209-212
+**Goal:** Deliver one bounded ARC-Wall companion-product lane on ARC,
+reusing the same checkpoint, publication, and verification substrate while
+freezing one buyer motion, one information-domain evidence contract, and one
+control-path guard surface without turning MERCURY into ARC-Wall or widening
+immediately into multi-product hardening.
+
+## Earlier Completed Milestone
+
+### v2.49 MERCURY Trust Network Witness, Publication, and Proof-Profile Interoperability
+
+**Status:** complete locally 2026-04-03; phases `205` through `208` are
+implemented, verified, audited, and archived.
+**Executable phases:** 205-208
+**Goal:** Deliver one bounded trust-network lane over the existing MERCURY
+proof, inquiry, publication, supervised-live, downstream, governance,
+assurance, and embedded-OEM artifacts, covering one shared trust-anchor and
+witness continuity contract, one proof-profile interoperability surface, and
+one explicit rollout boundary without widening into ARC-Wall, multi-network
+trust services, or generic ecosystem infrastructure.
+
+## Earlier Completed Milestone
+
+### v2.48 MERCURY Embedded OEM Distribution, Partner Packaging, and Bounded SDK Surface
+
+**Status:** complete locally 2026-04-03; phases `201` through `204` are
+implemented, verified, audited, and archived.
+**Executable phases:** 201-204
+**Goal:** Deliver one bounded embedded OEM distribution lane over the existing
+MERCURY proof, inquiry, publication, supervised-live, downstream, governance,
+and assurance artifacts, covering one embedded packaging profile, one partner
+packaging surface, and one explicit operating boundary without turning MERCURY
+into a generic SDK platform or multi-partner OEM program.
+
+## Earlier Completed Milestone
+
+### v2.47 MERCURY Assurance Suite Reviewer Packages, Investigation Packaging, and External Review Readiness
+
+**Status:** complete locally 2026-04-03; phases `197` through `200` are
+implemented, verified, audited, and archived.
+**Executable phases:** 197-200
+**Goal:** Deliver one bounded assurance-suite lane over the existing MERCURY
+proof, inquiry, publication, supervised-live, downstream, and governance
+artifacts, covering internal, auditor, and counterparty reviewer packages plus
+investigation-ready export surfaces without turning MERCURY into a generic
+review portal or OEM platform.
+
+## Earlier Completed Milestone
+
+### v2.46 MERCURY Governance Workbench Approval, Release, and Exception Controls
+
+**Status:** complete locally 2026-04-03; phases `193` through `196` are
+implemented, verified, audited, and archived.
+**Executable phases:** 193-196
+**Goal:** Deliver one bounded governance-workbench workflow over the existing
+MERCURY proof, inquiry, publication, and supervised-live artifacts, covering
+governed change review plus release, rollback, approval, and exception
+controls without turning MERCURY into a generic workflow engine.
+
+## Earlier Completed Milestone
+
+### v2.45 MERCURY Downstream Review Distribution and Assurance Packaging
+
+**Status:** complete locally 2026-04-02; phases `189` through `192` are
+implemented, verified, audited, and archived.
+**Executable phases:** 189-192
+**Goal:** Deliver one downstream archive/review/case-management distribution
+path and one reviewer-assurance package family over the existing MERCURY
+proof, inquiry, and supervised-live reviewer artifacts without widening into
+OEM packaging, generic connector sprawl, or deep runtime coupling.
+
+## Earlier Completed Milestone
+
+### v2.44 MERCURY Supervised-Live Bridge and Controlled Productionization
+
+**Status:** complete locally 2026-04-02; phases `185` through `188` are
+implemented, verified, audited, and archived.
+**Executable phases:** 185-188
+**Goal:** Move the same controlled release, rollback, and inquiry workflow
+from replay/shadow into supervised-live operation while the customer's
+existing execution systems remain primary.
+
+## Earlier Completed Milestone
+
+### v2.43 MERCURY Evidence Productization Foundation
+
+**Status:** complete locally 2026-04-02; phases `181` through `184` plus
+corrective phase `184.1` are implemented, verified, and audited.
+**Executable phases:** 181-184 plus corrective 184.1
+**Goal:** Package ARC's receipt/checkpoint/export substrate into MERCURY, the
+finance-specific evidence platform for governed AI trading workflows, starting
+with controlled release, rollback, and inquiry handling.
+
+## Earlier Completed Milestone
+
+### v2.42 Release Truth, Planning Integrity, and Assurance Backfill
+
+**Status:** complete locally 2026-04-02; phases `177` through `180` are
+implemented, verified, and audited.
+**Executable phases:** 177-180
+**Goal:** Make ARC's release governance, authoritative docs, planning
+tooling, and late-phase assurance artifacts as trustworthy as the runtime
+stack they describe.
+
+### v2.41 Hosted Qualification, Deployment Promotion, and Operator Controls
+
+**Status:** complete locally 2026-04-02; phases `173` through `176` are
+implemented, verified, and audited.
+**Executable phases:** 173-176
+**Goal:** Turn ARC's bounded web3-runtime stack from a locally qualified
+surface into one with hosted proof, reproducible promotion, and exercised
+operator controls.
+
+## Earlier Completed Milestone
+
+### v2.40 Web3 Runtime Integrity, Evidence Gating, and Contract Coherence
+
+**Status:** complete locally 2026-04-02; phases `169` through `172` are
+implemented, verified, and audited.
+**Executable phases:** 169-172
+**Goal:** Make ARC's bounded web3 runtime concurrency-safe, evidence-
+mandatory, and internally consistent across kernel, runtime, bindings, and
+contracts.
+
+## Earlier Completed Milestones
+
+### v2.32 Federated Trust Activation, Open Admission, and Shared Reputation Network
+
+**Status:** complete locally 2026-03-31; phases `137` through `140` are
+implemented, verified, and audited.
+**Executable phases:** 137-140
+**Goal:** Move ARC beyond local trust activation into cross-operator
+federation, more open admission, and shared reputation networking.
+
+### v2.28 Portable Reputation, Marketplace Economics, and Endgame Qualification
+
+**Executable phases:** 121-124
+
+**Why this milestone matters:** ARC now has bounded live-money execution,
+open-registry structure, trust activation, and governance artifacts, but the
+full research endgame still needs portable reputation, market-discipline
+economics, abuse resistance, and adversarial open-market qualification.
+`v2.28` is where ARC closes that final gap without collapsing visibility into
+ambient trust.
 
 **Research basis:**
-- `docs/research/DEEP_RESEARCH_1.md` on verifier-result portability,
-  standards-facing attestation semantics, and vendor-neutral appraisal layers
-- `spec/PROTOCOL.md` and `docs/release/RELEASE_CANDIDATE.md` on ARC's current
-  bounded appraisal contract and multi-cloud bridge boundary
+- `docs/research/DEEP_RESEARCH_1.md` on portable reputation, abuse
+  resistance, and endgame market-discipline structure
+- `docs/release/RELEASE_CANDIDATE.md`, `docs/AGENT_ECONOMY.md`, and
+  `spec/PROTOCOL.md` on ARC's current market claim still remaining bounded
+  after the open-registry milestone
 - `.planning/research/POST_V2_20_FULL_ENDGAME_SYNTHESIS.md` on the normalized
   post-`v2.20` endgame sequence
 
 **Key intended outcomes:**
-- one outward-facing appraisal artifact boundary
-- one normalized claim and reason vocabulary shared across verifier families
-- signed appraisal import/export with explicit local policy mapping
-- qualification evidence honest enough to claim external appraisal interop
+- portable reputation and negative-event exchange
+- fee schedules, bonds, slashing, and abuse resistance
+- adversarial multi-operator qualification
+- final partner-proof and release-boundary rewrite
 
-**Status:** active; phases `101` through `104` are executable on disk.
+**Status:** complete locally 2026-03-30; phases `121` through `124` are
+implemented, verified, and audited.
 
 ### v2.22 Wallet Exchange, Identity Assertions, and Sender-Constrained Authorization
 
@@ -59,79 +367,73 @@ implemented, verified, and audited.
 
 ## Remaining Activated Milestones
 
-### v2.23 Common Appraisal Vocabulary and External Result Interop
-
-**Executable phases:** 101-104
-**Goal:** Turn ARC's current appraisal bridge into a versioned external result
-contract with normalized claims, reason taxonomy, and import or export
-semantics that remain separated from local policy decisions.
-
-### v2.24 Verifier Federation, Cross-Issuer Portability, and Discovery
-
-**Executable phases ready:** 105-108
-**Goal:** Add cross-issuer trust packs, verifier descriptors, trust bundles,
-public issuer or verifier discovery, and assurance-aware downstream policy
-without ambient trust widening.
-
-### v2.25 Live Capital Allocation and Escrow Execution
-
-**Executable phases ready:** 109-112
-**Goal:** Convert bounded facility and bond policy into live capital books,
-escrow or reserve instructions, governed-action allocation, and regulated-role
-baseline profiles.
-
-### v2.26 Reserve Control, Autonomous Pricing, and Claims Payment
-
-**Executable phases ready:** 113-116
-**Goal:** Add executable reserve control, delegated pricing authority,
-automatic coverage binding, claims payment, and recovery or reinsurance
-clearing under explicit role topology.
-
-### v2.27 Open Registry, Trust Activation, and Governance Network
-
-**Executable phases ready:** 117-120
-**Goal:** Generalize ARC's curated public discovery into a generic open
-registry with trust activation, open admission classes, governance charters,
-and federated dispute escalation.
-
-### v2.28 Portable Reputation, Marketplace Economics, and Endgame Qualification
-
-**Executable phases ready:** 121-124
-**Goal:** Close the full research endgame with portable reputation,
-marketplace economics, abuse resistance, adversarial multi-operator
-qualification, and the final partner-proof and release-boundary rewrite.
+- v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled
+  Adoption (phases `221` through `224` queued locally)
 
 ---
 
 ## Latest Completed Milestone
 
-### v2.22 Wallet Exchange, Identity Assertions, and Sender-Constrained Authorization
+### v2.27 Open Registry, Trust Activation, and Governance Network
 
-**Executable phases:** 97-100
+**Executable phases:** 117-120
 
-**Why this milestone matters:** ARC now has a standards-native credential and
-request-time authorization fabric, but it still lacked bounded wallet
-exchange, identity continuity, and live sender-constrained runtime behavior.
-`v2.22` is where ARC turned those next interop claims into real replay-safe
-flows.
+**Why this milestone matters:** ARC already had bounded live-money execution,
+but public discovery still stopped at curated/operator-scoped surfaces.
+`v2.27` is where ARC generalized that into a generic registry substrate with
+namespace ownership, trust activation, and bounded governance semantics
+without turning visibility into runtime trust.
 
 **Research basis:**
-- `docs/research/DEEP_RESEARCH_1.md` on wallet exchange, session continuity,
-  and sender-constrained live authorization
-- `spec/PROTOCOL.md` and `docs/release/RELEASE_CANDIDATE.md` on ARC's current
-  bounded OID4VP and hosted auth boundary
+- `docs/research/DEEP_RESEARCH_1.md` on open registry structure, trust
+  activation, and governance after the bounded live-money layer
+- `spec/PROTOCOL.md`, `docs/release/RELEASE_CANDIDATE.md`, and
+  `docs/AGENT_ECONOMY.md` on ARC's pre-`v2.27` discovery boundary remaining
+  public-but-curated and non-auto-trusting
 - `.planning/research/POST_V2_20_FULL_ENDGAME_SYNTHESIS.md` on the normalized
   post-`v2.20` endgame sequence
 
 **Key intended outcomes:**
-- transport-neutral wallet exchange descriptors and replay-safe transaction
-  state
-- one optional identity-assertion lane for verifier continuity
-- bounded DPoP, mTLS, and attestation-bound sender semantics at runtime
-- qualification evidence across same-device, cross-device, and asynchronous
-  exchange paths
+- generic listing and namespace contracts
+- mirror/index/search freshness semantics
+- trust activation and open admission classes
+- governance charter, sanctions, and appeal artifacts
 
-**Status:** complete locally 2026-03-30; phases `97` through `100` are
+**Status:** complete locally 2026-03-30; phases `117` through `120` are
+implemented, verified, and audited.
+
+---
+
+## Previous Completed Milestone
+
+### v2.23 Common Appraisal Vocabulary and External Result Interop
+
+**Executable phases:** 101-104
+
+**Why this milestone matters:** ARC already had concrete Azure, AWS Nitro, and
+Google verifier bridges, but the outward-facing result surface still stopped
+at ARC-local adapter semantics. `v2.23` is where ARC turned appraisal into a
+portable external result contract with one claim vocabulary, one reason
+taxonomy, one signed result exchange lane, and an honest mixed-provider
+qualification boundary.
+
+**Research basis:**
+- `docs/research/DEEP_RESEARCH_1.md` on verifier-result portability,
+  standards-facing attestation semantics, and vendor-neutral appraisal layers
+- `spec/PROTOCOL.md`, `docs/release/RELEASE_CANDIDATE.md`, and
+  `docs/WORKLOAD_IDENTITY_RUNBOOK.md` on ARC's bounded appraisal bridge and
+  current public claim surface
+- `.planning/research/POST_V2_20_FULL_ENDGAME_SYNTHESIS.md` on the normalized
+  post-`v2.20` endgame sequence
+
+**Key intended outcomes:**
+- one outward-facing appraisal artifact boundary
+- one normalized claim and reason vocabulary shared across verifier families
+- signed appraisal-result import/export with explicit local policy mapping
+- mixed-provider qualification evidence honest enough to claim bounded
+  external appraisal-result interop
+
+**Status:** complete locally 2026-03-30; phases `101` through `104` are
 implemented, verified, and audited.
 
 ---

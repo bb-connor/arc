@@ -1,0 +1,60 @@
+{
+  "schema": "arc.federation-activation-exchange.v1",
+  "exchangeId": "fex-1",
+  "issuedAt": 1743552000,
+  "expiresAt": 1743638400,
+  "sourceOperatorId": "origin-operator",
+  "targetOperatorId": "consumer-operator",
+  "listingId": "listing-liability-provider-1",
+  "activationRef": {
+    "kind": "trust_activation",
+    "schema": "arc.registry.trust-activation.v1",
+    "artifactId": "activation-1",
+    "operatorId": "origin-operator",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "uri": "https://origin-operator.arc.example/artifacts/activation-1"
+  },
+  "listingRef": {
+    "kind": "listing",
+    "schema": "arc.registry.listing.v1",
+    "artifactId": "listing-liability-provider-1",
+    "operatorId": "origin-operator",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "uri": "https://origin-operator.arc.example/artifacts/listing-liability-provider-1"
+  },
+  "governingCharterRef": {
+    "kind": "governance_charter",
+    "schema": "arc.registry.governance-charter.v1",
+    "artifactId": "charter-1",
+    "operatorId": "origin-operator",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "uri": "https://origin-operator.arc.example/artifacts/charter-1"
+  },
+  "scope": {
+    "namespace": "registry.arc.example/liability",
+    "subjectOperatorId": "origin-operator",
+    "allowedActorKinds": [
+      "liability_provider"
+    ],
+    "allowedAdmissionClasses": [
+      "reviewable",
+      "bond_backed"
+    ],
+    "policyReference": "policy/federation/default"
+  },
+  "delegationControl": {
+    "delegatorOperatorId": "origin-operator",
+    "delegateOperatorId": "consumer-operator",
+    "maxHops": 2,
+    "attenuationRequired": true,
+    "visibilityOnlyUntilLocalActivation": true
+  },
+  "importControl": {
+    "explicitLocalActivationRequired": true,
+    "manualReviewRequired": true,
+    "rejectStaleInputs": true,
+    "allowVisibilityWithoutRuntimeTrust": true,
+    "prohibitAmbientRuntimeAdmission": true
+  },
+  "note": "Shares one reviewed trust activation without widening runtime trust."
+}

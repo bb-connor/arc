@@ -1,0 +1,35 @@
+{
+  "schema": "arc.autonomous-execution-decision.v1",
+  "execution_id": "aed-1",
+  "issued_at": 1743379440,
+  "pricing_decision_ref": "apd-1",
+  "optimization_ref": "cpo-1",
+  "authority_envelope_ref": "ape-1",
+  "subject_key": "subject-1",
+  "provider_id": "carrier-1",
+  "currency": "USD",
+  "action": "bind",
+  "lifecycle_state": "executed",
+  "quote_response_ref": "quote-response-1",
+  "auto_bind_decision_ref": "auto-bind-1",
+  "bound_coverage_ref": "bound-coverage-1",
+  "settlement_dispatch_ref": "dispatch-web3-1",
+  "safety_gates": [
+    {
+      "name": "authority-within-envelope",
+      "passed": true,
+      "description": "Coverage and premium remain inside the active authority envelope."
+    },
+    {
+      "name": "capital-headroom",
+      "passed": true,
+      "description": "Capital-pool optimization preserved minimum reserve headroom."
+    }
+  ],
+  "rollback_control": {
+    "rollback_plan_ref": "arp-1",
+    "interruptible": true,
+    "human_interrupt_contact": "ops@arc.example"
+  },
+  "note": "Executes one bounded autonomous bind over the official web3 lane."
+}

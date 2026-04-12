@@ -1,0 +1,29 @@
+[package]
+name = "arc-anchor"
+description = "Anchoring runtime and proof normalization for ARC checkpoints"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_anchor"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-web3-bindings = { package = "arc-web3-bindings", path = "../arc-web3-bindings" }
+alloy-primitives = { version = "1.4.1", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "1.4.1", default-features = false, features = ["std"] }
+base64 = { workspace = true }
+hex = { workspace = true }
+opentimestamps = "0.2.0"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

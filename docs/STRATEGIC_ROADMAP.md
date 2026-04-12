@@ -156,6 +156,24 @@ ARC should pursue a partner map that matches the control-plane thesis:
   evidence so the project remains legible in NIST, OAuth, OpenID, and W3C
   conversations
 
+## Commercialization Posture
+
+ARC is the platform thesis, not the single product packaging.
+
+That distinction matters:
+
+- ARC remains the broad rights, receipts, governance, and trust substrate for
+  consequential agent actions
+- vertical products can package ARC for specific high-value markets without
+  shrinking the underlying platform ambition
+- the first finance-specific product layer is MERCURY
+- ARC-Wall remains a separate companion product line built on the same
+  substrate, not a redefinition of ARC itself
+
+The commercial mistake would be to let a narrow first wedge redefine the full
+project. The strategic goal is the opposite: use narrow wedges to prove the
+broader ARC thesis in markets that can buy earlier.
+
 ## Success Conditions
 
 ARC is on the right path if the following become true in order:

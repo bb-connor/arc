@@ -53,6 +53,7 @@ fn sample_receipt_with_financial(id: &str) -> ArcReceipt {
         payment_reference: None,
         settlement_status: SettlementStatus::Pending,
         cost_breakdown: None,
+        oracle_evidence: None,
         attempted_cost: None,
     };
     let metadata = serde_json::json!({

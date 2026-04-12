@@ -1,0 +1,68 @@
+{
+  "schema": "arc.anchor-discovery.v1",
+  "arc_identity": "did:arc:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+  "operator_binding": {
+    "certificate": {
+      "schema": "arc.key-binding-certificate.v1",
+      "arc_identity": "did:arc:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "arc_public_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+      "chain_scope": [
+        "eip155:8453",
+        "eip155:42161"
+      ],
+      "purpose": [
+        "anchor",
+        "settle"
+      ],
+      "settlement_address": "0x1111111111111111111111111111111111111111",
+      "issued_at": 1743292800,
+      "expires_at": 1774828800,
+      "nonce": "0123456789abcdef0123456789abcdef"
+    },
+    "signature": "d1978bdd761495173d855841000bdc52c9f195ed10b11d14066836541083de955033d52f8cf18c639af08154fde2f63cea483fa2553ab6a5d75f386eb822d505"
+  },
+  "service": {
+    "id": "did:arc:ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c#anchor",
+    "type": "ArcAnchorService",
+    "service_endpoint": {
+      "chains": [
+        {
+          "chain_id": "eip155:8453",
+          "contract_address": "0x1000000000000000000000000000000000000001",
+          "operator_address": "0x1111111111111111111111111111111111111111",
+          "publisher_address": "0x1111111111111111111111111111111111111111",
+          "requires_delegate_authorization": false
+        },
+        {
+          "chain_id": "eip155:42161",
+          "contract_address": "0x2000000000000000000000000000000000000001",
+          "operator_address": "0x1111111111111111111111111111111111111111",
+          "publisher_address": "0x2222222222222222222222222222222222222222",
+          "requires_delegate_authorization": true
+        }
+      ],
+      "bitcoin_anchor_method": "opentimestamps",
+      "ots_calendars": [
+        "https://alice.btc.calendar.opentimestamps.org",
+        "https://bob.btc.calendar.opentimestamps.org"
+      ],
+      "solana_cluster": "solana:mainnet-beta"
+    }
+  },
+  "root_publication_ownership": [
+    {
+      "chain_id": "eip155:8453",
+      "root_owner_address": "0x1111111111111111111111111111111111111111",
+      "publisher_address": "0x1111111111111111111111111111111111111111",
+      "delegate_publication_allowed": false,
+      "ownership_rule": "operator-published"
+    },
+    {
+      "chain_id": "eip155:42161",
+      "root_owner_address": "0x1111111111111111111111111111111111111111",
+      "publisher_address": "0x2222222222222222222222222222222222222222",
+      "delegate_publication_allowed": true,
+      "ownership_rule": "operator-owned-root delegate-published-via-root-registry-authorization"
+    }
+  ]
+}

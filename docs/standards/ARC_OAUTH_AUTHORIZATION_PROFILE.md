@@ -60,6 +60,8 @@ ARC carries approval-bound context outside `authorizationDetails` in
 - `approvalApproved`
 - `approverKey`
 - `runtimeAssuranceTier`
+- `runtimeAssuranceSchema`
+- `runtimeAssuranceVerifierFamily`
 - `runtimeAssuranceVerifier`
 - `runtimeAssuranceEvidenceSha256`
 - `callChain`
@@ -167,7 +169,8 @@ alignment used by ARC's portable credential metadata:
   - sender binding fields: `subjectKey`, `subjectKeySource`,
     `issuerKey`, `issuerKeySource`
   - runtime assurance binding fields:
-    `runtimeAssuranceTier`, `runtimeAssuranceVerifier`,
+    `runtimeAssuranceTier`, `runtimeAssuranceSchema`,
+    `runtimeAssuranceVerifierFamily`, `runtimeAssuranceVerifier`,
     `runtimeAssuranceEvidenceSha256`
   - delegated call-chain field: `callChain`
   - optional identity continuity field: `identityAssertion`
@@ -220,6 +223,8 @@ ARC's sender-binding story is therefore:
   binding
 - attestation binding is only a confirmation of already-carried runtime
   assurance evidence, must match
+  `transactionContext.runtimeAssuranceSchema`,
+  `transactionContext.runtimeAssuranceVerifierFamily`,
   `transactionContext.runtimeAssuranceEvidenceSha256`, and must be paired
   with DPoP or mTLS
 - attestation alone never authorizes a sender

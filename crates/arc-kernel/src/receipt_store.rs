@@ -86,6 +86,10 @@ pub trait ReceiptStore: Send {
         Ok(())
     }
 
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        false
+    }
+
     fn record_capability_snapshot(
         &mut self,
         _token: &CapabilityToken,

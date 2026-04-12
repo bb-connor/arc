@@ -1,0 +1,90 @@
+{
+  "schema": "arc.anchor.qualification-matrix.v1",
+  "profileId": "arc.anchor.profile",
+  "cases": [
+    {
+      "id": "evm-publication-guard",
+      "name": "EVM publication readiness stays explicit and fail closed",
+      "requirementIds": [
+        "ANCHORX-01",
+        "ANCHORX-04"
+      ],
+      "scenario": "publisher_authorization_and_sequence_guard",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "ARC now models publisher authorization, delegate requirement, and next checkpoint sequence before publication."
+    },
+    {
+      "id": "evm-inclusion-proof",
+      "name": "Primary proof verification ties receipts back to the official root registry",
+      "requirementIds": [
+        "ANCHORX-01",
+        "ANCHORX-05"
+      ],
+      "scenario": "primary_evm_anchor_inclusion",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Receipt inclusion, checkpoint projection, and on-chain proof calls all share one canonical proof family."
+    },
+    {
+      "id": "bitcoin-secondary-linkage",
+      "name": "OpenTimestamps linkage must match the ARC super-root digest and a Bitcoin attestation",
+      "requirementIds": [
+        "ANCHORX-02",
+        "ANCHORX-05"
+      ],
+      "scenario": "ots_payload_matches_super_root_and_block_height",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "ARC rejects pending-only or mismatched OTS payloads instead of treating opaque base64 as anchored proof."
+    },
+    {
+      "id": "bitcoin-pending-denied",
+      "name": "Pending-only OTS payloads fail closed",
+      "requirementIds": [
+        "ANCHORX-02"
+      ],
+      "scenario": "ots_without_bitcoin_attestation",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The secondary lane is not considered anchored until a Bitcoin attestation exists."
+    },
+    {
+      "id": "solana-memo-normalization",
+      "name": "Solana memo records must exactly match canonical checkpoint data",
+      "requirementIds": [
+        "ANCHORX-03",
+        "ANCHORX-05"
+      ],
+      "scenario": "solana_memo_matches_checkpoint_root_and_payload",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Memo program id, memo payload, checkpoint sequence, and anchored root all fail closed on mismatch."
+    },
+    {
+      "id": "bundle-mismatch-denied",
+      "name": "Unsupported or inconsistent multi-lane bundles are rejected",
+      "requirementIds": [
+        "ANCHORX-03",
+        "ANCHORX-04",
+        "ANCHORX-05"
+      ],
+      "scenario": "declared_secondary_lane_missing_or_mismatched",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Bundle declarations cannot silently widen proof trust beyond the imported evidence that actually exists."
+    },
+    {
+      "id": "canonical-evidence-bundle-gate",
+      "name": "Canonical evidence bundles reject uncheckpointed or incomplete proof inputs",
+      "requirementIds": [
+        "ANCHORX-01",
+        "ANCHORX-05"
+      ],
+      "scenario": "canonical_bundle_requires_receipt_checkpoint_and_inclusion_proof",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "ARC now projects anchor proofs only from canonical evidence bundles that contain the receipt, one checkpoint, and one inclusion proof; stale or uncheckpointed exports fail closed."
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 portable OID4VCI-compatible issuance, holder transport over public
 challenge/submit routes, multi-issuer composition, and shared-evidence
 analytics shipped
-**Date:** 2026-03-27
+**Date:** 2026-03-31
 
 ---
 
@@ -75,6 +75,13 @@ accepts legacy `arc.*` passport artifacts:
 
 Issuer and subject identifiers currently remain `did:arc`. `did:arc` is the
 shipped canonical DID method.
+
+ARC now also publishes one bounded public identity-profile and wallet-routing
+contract over the passport substrate in
+`docs/standards/ARC_PUBLIC_IDENTITY_PROFILE.md`. That profile may name
+`did:web`, `did:key`, and `did:jwk` as compatibility inputs, but the shipped
+passport artifact and projected portable responses still keep `did:arc` as the
+signed provenance anchor.
 
 ## OID4VCI-Compatible Issuance
 
@@ -148,8 +155,10 @@ Remote compatibility is bounded intentionally:
 - if the trust-control service is configured for portable lifecycle support,
   offer creation fails closed until the target passport is already published
   active into that lifecycle registry
-- ARC does not yet claim generic wallet qualification, public issuer
-  discovery, or non-ARC credential formats
+- ARC now also publishes one bounded public identity-profile, wallet-
+  directory, and routing contract for the documented passport profile family
+- ARC still does not claim generic OID4VP, DIDComm, permissionless public-
+  wallet, or arbitrary non-ARC credential compatibility
 
 ## Create
 
@@ -295,6 +304,25 @@ The verifier contract remains conservative:
 This means multi-issuer support is a verification/evaluation/presentation
 feature, not a claim that ARC now synthesizes a new trust signal across
 issuers.
+
+## Cross-Issuer Portfolios
+
+ARC now also defines one bounded cross-issuer portfolio layer over those same
+passport artifacts:
+
+- a portfolio can hold native, imported, or explicitly migrated passport
+  entries
+- each entry keeps its own issuer provenance and optional lifecycle state
+- visibility of an entry does not imply local admission
+- local activation comes only from one explicit signed trust pack
+- subject rebinding requires one explicit signed migration artifact
+
+That keeps cross-issuer portability honest:
+
+- no synthetic cross-issuer trust score is invented
+- no implicit subject continuity is inferred from similar display claims
+- duplicate or mismatched migration provenance fails closed
+- portfolio acceptance still reduces to explicit per-entry outcomes
 
 ## Evaluate
 
@@ -695,6 +723,9 @@ Shipped now:
   continuation contract over DPoP, mTLS thumbprint binding, and one
   attestation-confirmation profile, same-device and cross-device launch
   artifacts, public verifier metadata, and verifier `JWKS` trust bootstrap
+- signed public issuer-discovery and verifier-discovery documents plus one
+  signed transparency snapshot over those metadata surfaces, with explicit
+  informational-only/manual-review import guardrails
 - holder-facing challenge fetch and response submit transport over public
   trust-control routes
 - conservative imported reputation reporting with provenance, attenuation, and
@@ -705,8 +736,11 @@ Not shipped yet:
 - `did:arc` issuance and resolution
 - `did:arc:update` rotation flows
 - zero-knowledge selective disclosure
-- generic OID4VP, DIDComm, or non-ARC wallet qualification claims beyond the
-  documented ARC verifier profile
+- generic OID4VP, DIDComm, or universal wallet qualification beyond the
+  documented ARC verifier profile plus bounded public identity-profile and
+  wallet-routing contract
+- permissionless or auto-trusting public issuer, verifier, or wallet
+  discovery networks
 - mandatory identity-provider or universal login semantics for presentation
 - cluster-wide verifier-state replication beyond a configured verifier store
 - automatic local multi-issuer bundle authoring beyond external composition

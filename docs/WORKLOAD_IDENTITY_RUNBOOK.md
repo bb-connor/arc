@@ -14,6 +14,13 @@ and attestation trust.
   identity, normalized assertions, and vendor-scoped claims
 - signed runtime-attestation appraisal reports through
   `arc trust appraisal export` and `POST /v1/reports/runtime-attestation-appraisal`
+- signed runtime-attestation appraisal results plus explicit local import
+  evaluation through `arc trust appraisal export-result`,
+  `arc trust appraisal import`,
+  `POST /v1/reports/runtime-attestation-appraisal-result`, and
+  `POST /v1/reports/runtime-attestation-appraisal/import`
+- signed verifier descriptors, signed reference-value sets, and signed trust
+  bundles over the bounded appraisal boundary
 - HushSpec runtime-assurance ceilings through
   `extensions.runtime_assurance.tiers`
 - Explicit verifier trust and rebinding through
@@ -41,6 +48,35 @@ locally with:
 or remotely through:
 
 - `POST /v1/reports/runtime-attestation-appraisal`
+
+ARC can also exchange one signed appraisal result over that same contract and
+evaluate imported results only through one explicit local import policy. The
+current shipped import boundary is:
+
+- signature-verified and issuer-provenanced
+- constrained to ARC's bounded Azure/AWS Nitro/Google/enterprise-verifier
+  bridge inventory
+- freshness-bound for both result age and underlying evidence age
+- verifier-family and portable-claim mapped through explicit local policy
+
+ARC does not currently implement one-time consume or replay-registry semantics
+for imported appraisal results. The current replay defense at this boundary is
+explicit signature plus freshness validation.
+
+ARC now also defines one bounded verifier-federation metadata layer over the
+same appraisal contract:
+
+- one signed verifier descriptor that names the verifier, family, adapter,
+  compatible attestation schemas, trusted signer-key fingerprints, and
+  optional reference-value publication URI
+- one signed reference-value-set contract with explicit `active`,
+  `superseded`, or `revoked` lifecycle state
+- one signed trust-bundle contract that versions a descriptor set plus its
+  compatible reference-value material
+
+These artifacts are transportable verifier metadata, not automatic trust
+admission. Operators may publish or import them, but local `trusted_verifiers`
+policy still decides whether runtime assurance is widened.
 
 The signed report captures the canonical appraisal plus the policy-visible
 accept or reject outcome ARC derived at export time. It is an operator-facing
@@ -96,6 +132,16 @@ extensions:
 ## Fail-Closed Conditions
 
 - explicit `workloadIdentity` conflicts with raw `runtimeIdentity`
+- verifier descriptor is not yet valid, expired, unsigned, or structurally
+  incomplete
+- trust bundle is not yet valid, expired, unsigned, or structurally incomplete
+- trust bundle carries duplicate verifier descriptors or duplicate
+  reference-value ids
+- trust bundle carries a reference-value set whose verifier family or
+  attestation schema is outside the bound descriptor contract
+- trust bundle carries ambiguous active reference values for one
+  `{descriptorId, attestationSchema}` slot
+- superseded reference-value state names an unknown replacement
 - attestation evidence is expired or older than the configured verifier rule
 - attestation schema or verifier does not match any configured trusted verifier
 - attestation claims are missing a required attestation type, carry a
@@ -134,10 +180,17 @@ extensions:
   confirm the workload is requesting a token for the configured relying party
   and that the verifier rule's `required_assertions` reflect the intended
   production hardware and boot posture exactly.
+- Ambiguous or stale trust bundle:
+  reject the bundle wholesale, refresh it from the publisher, and do not
+  cherry-pick reference values from a partially invalid bundle.
+- Descriptor/reference-value mismatch:
+  treat it as publisher metadata corruption or version skew. Do not remap the
+  verifier family or attestation schema locally just to make the bundle fit.
 
 ## Qualification Commands
 
 - `cargo test -p arc-core appraisal -- --nocapture`
+- `cargo test -p arc-core trust_bundle -- --nocapture`
 - `cargo test -p arc-core runtime_attestation_trust_policy -- --nocapture`
 - `cargo test -p arc-policy runtime_assurance_validation -- --nocapture`
 - `cargo test -p arc-control-plane azure_maa -- --nocapture`
@@ -148,3 +201,5 @@ extensions:
 - `cargo test -p arc-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
 - `cargo test -p arc-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`

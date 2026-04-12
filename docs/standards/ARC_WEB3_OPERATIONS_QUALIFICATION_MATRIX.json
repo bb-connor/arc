@@ -1,0 +1,65 @@
+{
+  "matrixId": "arc.web3-operations-qualification.v1",
+  "generatedAt": "2026-04-02T19:10:00Z",
+  "cases": [
+    {
+      "id": "link.global_pause_and_runtime_alerts",
+      "component": "arc-link",
+      "evidence": [
+        "crates/arc-link/src/lib.rs",
+        "target/web3-ops-qualification/runtime-reports/arc-link-runtime-report.json",
+        "target/web3-ops-qualification/control-state/arc-link-control-state.json",
+        "target/web3-ops-qualification/control-traces/arc-link-control-trace.json"
+      ],
+      "command": "./scripts/qualify-web3-ops-controls.sh",
+      "expectedOutcome": "Generated runtime report surfaces exercised pair-pause and standby-chain disable state, with matching persisted control snapshots and append-only trace records."
+    },
+    {
+      "id": "anchor.indexer_drift_and_recovery_only_controls",
+      "component": "arc-anchor",
+      "evidence": [
+        "crates/arc-anchor/src/ops.rs",
+        "target/web3-ops-qualification/runtime-reports/arc-anchor-runtime-report.json",
+        "target/web3-ops-qualification/control-state/arc-anchor-control-state.json",
+        "target/web3-ops-qualification/control-traces/arc-anchor-control-trace.json"
+      ],
+      "command": "./scripts/qualify-web3-ops-controls.sh",
+      "expectedOutcome": "Generated anchor evidence records publish-paused and recovery-only transitions, and the final runtime posture denies new roots while keeping replay state explicit."
+    },
+    {
+      "id": "settle.reorg_recovery_and_refund_only_controls",
+      "component": "arc-settle",
+      "evidence": [
+        "crates/arc-settle/src/ops.rs",
+        "target/web3-ops-qualification/runtime-reports/arc-settle-runtime-report.json",
+        "target/web3-ops-qualification/control-state/arc-settle-control-state.json",
+        "target/web3-ops-qualification/control-traces/arc-settle-control-trace.json"
+      ],
+      "command": "./scripts/qualify-web3-ops-controls.sh",
+      "expectedOutcome": "Generated settlement evidence records dispatch-paused and refund-only transitions, and the final runtime report blocks new dispatch while refund-first recovery remains active."
+    },
+    {
+      "id": "runtime.devnet_e2e_chain_observation",
+      "component": "contracts-plus-runtime",
+      "evidence": [
+        "contracts/reports/local-devnet-qualification.json",
+        "contracts/deployments/runtime-devnet.json",
+        "crates/arc-settle/tests/runtime_devnet.rs"
+      ],
+      "command": "pnpm --dir contracts devnet:smoke && CARGO_TARGET_DIR=target/arc-settle-runtime CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p arc-settle --test runtime_devnet -- --nocapture",
+      "expectedOutcome": "The local end-to-end lane keeps contract, anchor, settlement, and observation evidence aligned."
+    },
+    {
+      "id": "kernel.web3_evidence_fail_closed_gates",
+      "component": "arc-kernel-plus-control-plane",
+      "evidence": [
+        "crates/arc-kernel/src/lib.rs",
+        "crates/arc-control-plane/src/lib.rs",
+        "scripts/qualify-web3-runtime.sh",
+        "target/web3-ops-qualification/incident-audit.json"
+      ],
+      "command": "CARGO_TARGET_DIR=target/arc-control-plane-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p arc-control-plane web3_evidence -- --test-threads=1 && CARGO_TARGET_DIR=target/arc-kernel-verify CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p arc-kernel web3_evidence -- --test-threads=1",
+      "expectedOutcome": "Web3-enabled deployments fail closed without local durable receipt storage, checkpoint issuance, and kernel-signed checkpoint support."
+    }
+  ]
+}

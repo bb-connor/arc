@@ -1,0 +1,64 @@
+{
+  "schema": "arc.federation-qualification-matrix.v1",
+  "profileId": "arc.federation.profile",
+  "exchangeRef": "fex-1",
+  "quorumReportRef": "fqr-1",
+  "reputationClearingRef": "frc-1",
+  "cases": [
+    {
+      "id": "activation-exchange",
+      "name": "Federated activation exchange stays visibility-first and locally reviewable",
+      "requirementIds": [
+        "TRUSTMAX-01"
+      ],
+      "scenario": "conflicting_activation",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Remote trust activation remains an explicit exchange contract and never becomes ambient runtime trust."
+    },
+    {
+      "id": "quorum-conflict",
+      "name": "Quorum, freshness, and anti-eclipse posture remain machine-reviewable",
+      "requirementIds": [
+        "TRUSTMAX-02"
+      ],
+      "scenario": "insufficient_quorum",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Conflicting or stale publisher state fails closed instead of silently rewriting trust."
+    },
+    {
+      "id": "open-admission-boundary",
+      "name": "Open admission stays bounded by explicit stake and review policy",
+      "requirementIds": [
+        "TRUSTMAX-03"
+      ],
+      "scenario": "governance_interop",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Visibility and participation stay distinct from runtime trust, even when bond-backed admission is allowed."
+    },
+    {
+      "id": "shared-reputation-sybil",
+      "name": "Shared reputation clearing resists duplicate-issuer and oracle collapse",
+      "requirementIds": [
+        "TRUSTMAX-04"
+      ],
+      "scenario": "reputation_sybil",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Accepted summaries come from distinct issuers and blocking negative events require corroboration."
+    },
+    {
+      "id": "adversarial-federation",
+      "name": "Hostile publisher and eclipse attempts fail closed under the federation boundary",
+      "requirementIds": [
+        "TRUSTMAX-05"
+      ],
+      "scenario": "eclipse_attempt",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Hostile federation inputs remain visible but do not collapse governance or admission into ambient trust."
+    }
+  ]
+}

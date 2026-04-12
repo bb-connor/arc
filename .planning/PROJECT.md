@@ -19,14 +19,13 @@ security, regulatory compliance, and portable trust.
 
 ## Current State
 
-**Latest completed milestone:** v2.22 Wallet Exchange, Identity Assertions, and
-Sender-Constrained Authorization (completed locally 2026-03-30)
-**Archive:** `.planning/milestones/v2.22-MILESTONE-AUDIT.md`
-**Audit:** `.planning/v2.22-MILESTONE-AUDIT.md`
-**Active milestone:** v2.23 Common Appraisal Vocabulary and External Result
-Interop
-**Next milestone after active:** v2.24 Verifier Federation, Cross-Issuer
-Portability, and Discovery
+**Latest completed milestone:** v2.65 MERCURY Portfolio Revenue Boundary Qualification,
+Commercial Handoff, and Channel Boundary
+(completed locally 2026-04-04)
+**Audit:** `.planning/v2.65-MILESTONE-AUDIT.md`
+**Active milestone:** none currently queued locally
+**Next planned milestone:** none currently queued locally
+**Next GSD action:** `$gsd-new-milestone`
 
 `v2.5` through `v2.8` executed the rename, governed-economics, portable-trust,
 and launch-closure ladder derived from `docs/research/DEEP_RESEARCH_1.md`.
@@ -50,13 +49,632 @@ quote-response, placement, and bound-coverage artifacts over one signed risk
 package, plus immutable claim-package, provider-response, dispute, and
 adjudication artifacts, with `v2.20` now closing the liability-market ladder
 locally through marketplace qualification and partner-proof boundary updates.
-The remaining work is no longer "core ARC." It is the post-`v2.20` endgame
-ladder that turns ARC from a bounded research-complete control plane into a
-full standards-native, assurance-federated, live-capital, and open-market
-infrastructure surface. That ladder is now normalized in
+The post-`v2.20` endgame ladder is now complete locally through `v2.28`.
+ARC now has a bounded standards-native, assurance-federated, live-capital,
+open-registry, and adversarially qualified open-market control plane with
+explicit residual non-goals instead of a partially normalized research plan.
+That endgame ladder remains normalized in
 `.planning/research/POST_V2_20_FULL_ENDGAME_SYNTHESIS.md`.
+The post-`v2.28` maximal-endgame ladder was captured in
+`.planning/research/POST_V2_28_MAXIMAL_ENDGAME_ROADMAP.md` and is now fully
+consumed locally.
+`v2.29` is now complete locally with one machine-readable extension
+inventory, one official ARC stack package, one fail-closed extension
+manifest and negotiation contract, and one qualification matrix that later
+web3/live-money work can consume without redefining ARC truth. `v2.30` is now
+also complete locally with one official web3 trust profile, contract package,
+chain configuration, anchor-proof and oracle-evidence substrate, and one
+bounded settlement-dispatch plus execution-receipt contract that reconciles
+real external rail behavior back to ARC truth. `v2.31` is now also complete
+locally with one bounded autonomous pricing-input, authority-envelope,
+pricing-decision, capital-pool optimization, execution, rollback, drift, and
+qualification surface over that explicit web3 and capital substrate. `v2.32`
+is now also complete locally with one bounded federation-activation exchange,
+quorum-report, open-admission-policy, shared reputation-clearing, and
+qualification surface over the generic registry, governance, open-market, and
+portable-reputation substrate. `v2.33` is now also complete locally with one
+bounded public identity profile, wallet-directory, wallet-routing, and
+identity-interop qualification surface over the existing passport, verifier,
+discovery, and federation substrate. That maximal-endgame ladder is complete,
+but it closed at the bounded artifact and contract boundary rather than the
+full runtime realization described in the late-March 2026 web3 research set.
+ARC now also completes `v2.34` locally with one packaged Solidity contract
+family, compiled artifacts, Base/Arbitrum deployment templates, local-devnet
+qualification, measured gas/security release evidence, and one Alloy binding
+crate for the official web3 runtime substrate. ARC now also completes `v2.35`
+locally with one bounded `arc-link` oracle runtime and completes `v2.36`
+locally with one bounded `arc-anchor` publication, discovery, and proof-bundle
+runtime. ARC now also completes `v2.37` locally with one bounded `arc-settle`
+runtime over escrow create/release/refund, bond lifecycle calls, explicit
+finality or recovery projection, Solana-native settlement preparation, and a
+real runtime-devnet qualification lane. ARC now also completes `v2.38`
+locally with one bounded Functions fallback, one bounded automation surface,
+one bounded CCIP settlement-coordination message family, and one bounded
+payment-interop layer for x402, EIP-3009, Circle-managed custody, and
+ERC-4337/paymaster compatibility. ARC now also completes `v2.39` locally with
+one bounded runtime-operations layer over `arc-link`, `arc-anchor`, and
+`arc-settle`, including explicit runtime reports, lane-health and emergency
+control semantics, deployment-promotion policy, readiness-audit and
+partner-proof packages, and the final protocol/release boundary rewrite that
+closes the appended late-March 2026 web3 research ladder honestly.
+ARC now also completes `v2.40` locally with deterministic settlement identity,
+mandatory checkpoint evidence gates, truthful bond/collateral and oracle
+authority semantics, cryptographic Bitcoin secondary-lane verification, and
+artifact-derived contract-binding parity qualification across the bounded web3
+stack. ARC now also completes `v2.41` locally with hosted qualification,
+reviewed promotion, exercised operator controls, and partner-visible end-to-end
+settlement proof, and completes `v2.42` locally with authoritative release
+truth, planning/tooling integrity, assurance backfill, and runtime boundary
+decomposition. `v2.43 MERCURY Evidence Productization Foundation` is now also
+complete locally, including the corrective `184.1` boundary-extraction phase
+that keeps Mercury as an app on ARC rather than an `arc` subcommand.
+After `v2.43`, the repo executed `v2.44 MERCURY Supervised-Live Bridge and
+Controlled Productionization`. That milestone kept the same controlled
+release, rollback, and inquiry workflow, moved it from replay/shadow toward
+supervised-live use, and explicitly forbade broad connector or workflow
+expansion before the same workflow proved sticky in controlled production.
+Phase `185` is now complete locally: the same-workflow bridge, the human
+operating envelope, and the proceed/defer/stop decision artifact are frozen in
+the Mercury docs. Phase `186` is now also complete locally: `arc-mercury-core`
+and `arc-mercury` now accept typed supervised-live captures in `live` or
+`mirrored` mode and export them through the same ARC evidence, proof, and
+inquiry contracts as the pilot path. Phase `187` is now also complete locally:
+supervised-live capture now carries explicit release/rollback gates,
+evidence-health state, coverage state, and interruption records; export fails
+closed when that control state is unsafe; and the Mercury docs now include one
+canonical supervised-live operations runbook. Phase `188` can now focus on the
+partner-facing qualification corpus and bridge-close artifact without reopening
+scope or safety posture. Phase `188` is now also complete locally:
+`mercury supervised-live qualify` generates the canonical reviewer package and
+qualification report, the bridge now closes with one explicit `proceed`
+decision artifact, and later governance, downstream-consumer, connector, and
+OEM tracks remain deferred. `v2.44` now has all four phases complete locally
+and has now passed milestone audit with the same-workflow reviewer package and
+explicit bridge-close decision archived under `.planning/milestones/`. After
+`v2.44`, the repo executed
+`v2.45 MERCURY Downstream Review Distribution and Assurance Packaging`. That
+milestone kept expansion limited to one downstream archive/review/case-
+management consumer and one reviewer-assurance delivery path over the same
+proof and inquiry contracts. Phase `189` is now complete locally: the Mercury
+docs freeze one downstream `case_management_review` lane, its owner, delivery
+mode, and explicit non-goals. Phase `190` is now also complete locally:
+`arc-mercury-core` defines one downstream review package profile and one
+assurance-package family rooted in existing proof, inquiry, reviewer, and
+qualification artifacts. Phase `191` is now also complete locally:
+`arc-mercury` exports one bounded downstream review package, consumer
+manifest, delivery acknowledgement, and paired internal/external assurance
+packages over that single consumer lane. Phase `192` is now also complete
+locally: `mercury downstream-review validate` generates the downstream
+validation bundle, writes the explicit `proceed_case_management_only`
+decision artifact, and the Mercury docs now define the operating model and
+recovery posture for that lane. `v2.45` now has all four phases complete
+locally and has now passed milestone audit with downstream review artifacts
+and milestone snapshots archived under `.planning/milestones/`. After
+`v2.45`, the repo executed
+`v2.46 MERCURY Governance Workbench Approval, Release, and Exception
+Controls`. That milestone kept expansion limited to one governance-workbench
+workflow over the same evidence and publication model, covering governed
+change review plus bounded release, rollback, approval, and exception control
+without widening into multiple downstream connectors, OEM packaging,
+trust-network work, or deep runtime coupling. Phase `193` is now complete
+locally: the Mercury docs freeze one governance-workbench
+`change_review_release_control` path, one workflow owner, one control-team
+owner, and explicit non-goals. Phase `194` is now also complete locally:
+`arc-mercury-core` defines one governance decision package and one bounded
+review-package family for workflow-owner and control-team audiences over the
+same proof and qualification artifacts. Phase `195` is now also complete
+locally: `arc-mercury` exports one bounded governance-workbench package with
+explicit control-state, workflow-owner/control-team review packages, and
+fail-closed behavior rooted in the existing Mercury proof chain. Phase `196`
+is now also complete locally: `mercury governance-workbench validate`
+generates the governance validation bundle, writes the explicit
+`proceed_governance_workbench_only` decision artifact, and the Mercury docs
+now define the operating model and support boundary for that lane. `v2.46`
+now has all four phases complete locally and has now passed milestone audit
+with governance-workbench artifacts and milestone snapshots archived under
+`.planning/milestones/`. `v2.47` is now also complete locally: Mercury ships
+one bounded assurance-suite lane for internal, auditor, and counterparty
+reviewer packaging over the same proof, qualification, and governance
+artifacts, one repo-native `mercury assurance-suite export` / `validate`
+surface, one reviewer operating model, and one explicit
+`proceed_assurance_suite_only` decision. `v2.47` now has all four phases
+complete locally and has now passed milestone audit with assurance-suite
+artifacts and milestone snapshots archived under `.planning/milestones/`.
+`v2.48 MERCURY Embedded OEM Distribution, Partner Packaging, and Bounded SDK
+Surface` is now also complete locally: Mercury ships one bounded
+`embedded-oem` lane over the validated assurance suite, one
+`reviewer_workbench_embed` partner surface, one `signed_artifact_bundle`
+manifest contract, one copied counterparty-review bundle, one partner
+operating model, and one explicit `proceed_embedded_oem_only` decision
+without widening into multi-partner OEM breadth, trust-network services,
+ARC-Wall, or a generic SDK platform. `v2.48` now has all four phases complete
+locally and has now passed milestone audit with embedded OEM artifacts and
+milestone snapshots archived under `.planning/milestones/`.
+`v2.49 MERCURY Trust Network Witness, Publication, and Proof-Profile
+Interoperability` is now also complete locally: Mercury ships one bounded
+`trust-network` lane over the validated embedded-OEM stack, one
+`counterparty_review_exchange` sponsor boundary, one
+`arc_checkpoint_witness_chain` trust anchor, one
+`proof_inquiry_bundle_exchange` interoperability surface, one shared proof and
+inquiry bundle, one explicit operating model, and one explicit
+`proceed_trust_network_only` decision without widening into generic
+trust-broker services, ARC-Wall, or multi-product platform hardening. `v2.49`
+now has all four phases complete locally and has now passed milestone audit
+with trust-network artifacts and milestone snapshots archived under
+`.planning/milestones/`.
+`v2.50 ARC-Wall Companion Product Core, Guard Evidence, and Buyer Motion` is
+now also complete locally: ARC-Wall ships as one bounded companion product on
+ARC through separate `arc-wall-core` and `arc-wall` crates, one
+`control_room_barrier_review` buyer motion, one `tool_access_domain_boundary`
+control surface over `research -> execution`, one ARC evidence export path,
+one buyer-review package, and one explicit `proceed_arc_wall_only` decision
+without widening into MERCURY expansion, generic barrier-platform breadth, or
+multi-product hardening. `v2.50` now has all four phases complete locally and
+has now passed milestone audit with ARC-Wall artifacts and milestone snapshots
+archived under `.planning/milestones/`.
+`v2.51 MERCURY Extensions Shared Service Boundaries, Cross-Product
+Governance, and Platform Hardening` is now complete locally, but its ARC-side
+`product-surface` command direction was too coupled to the current Mercury
+and ARC-Wall product set. `v2.52 MERCURY Extensions ARC Purity Restoration,
+Boundary Cleanup, and Qualification` is now also complete locally: ARC no
+longer exposes product-specific `product-surface` entrypoints, ARC's generic
+receipt query and trust-control surfaces no longer name Mercury-specific
+filters, and ARC's SQLite receipt store no longer depends on
+`arc-mercury-core` or maintain a Mercury-only receipt index. The resulting
+boundary is explicit again: ARC stays generic, Mercury stays opinionated, and
+Mercury-specific retrieval or packaging concerns stay out of the ARC kernel,
+store, and generic CLI.
+`v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled Adoption`
+is now complete locally. The milestone returns to the Mercury app surface
+itself and packages the existing Mercury lanes into one bounded release-
+readiness program without reintroducing Mercury-specific logic into ARC
+generic crates. `v2.54 MERCURY Controlled Adoption, Renewal Evidence, and
+Reference Readiness` is now also complete locally: Mercury ships one bounded
+post-launch adoption lane over the existing release-readiness stack, one
+controlled-adoption export and validate surface, one renewal-evidence bundle,
+one customer-success and reference-readiness operating model, and one explicit
+`scale_controlled_adoption_only` decision without widening Mercury into new
+delivery surfaces or pulling product logic back into ARC generic crates.
+`v2.55 MERCURY Reference Distribution, Landed-Account Expansion, and Claim
+Discipline` is now also complete locally: Mercury ships one bounded
+reference-distribution export and validate surface, one landed-account
+account-motion freeze, one claim-discipline and buyer-approval model, one
+sales-handoff brief, and one explicit
+`proceed_reference_distribution_only` decision without widening into generic
+sales tooling, merged shells, or ARC commercial surfaces. `v2.56 MERCURY
+Broader Distribution Readiness, Selective Account Qualification, and Claim
+Governance` is now also complete locally: Mercury ships one bounded
+`broader-distribution` export and validate surface, one selective-account
+target freeze, one claim-governance and approval model, one distribution-
+handoff brief, and one explicit `proceed_broader_distribution_only`
+decision without widening into generic sales tooling, CRM workflows, merged
+shells, or ARC commercial surfaces. `v2.57 MERCURY Selective Account
+Activation, Controlled Delivery, and Claim Containment` is now also complete
+locally: Mercury exports one bounded selective-account-activation package,
+one controlled-delivery bundle, one claim-containment and approval-refresh
+path, one customer-handoff brief, one validation report, and one explicit
+`proceed_selective_account_activation_only` decision without widening into
+generic onboarding tooling, CRM workflows, channel marketplaces, merged
+shells, or ARC commercial surfaces.
+`v2.60 MERCURY Second-Account Expansion Qualification, Portfolio Boundary,
+and Reuse Governance` is now also complete locally: Mercury exports one
+bounded second-account-expansion package, one portfolio-review bundle, one
+expansion-approval artifact, one reuse-governance artifact, one explicit
+second-account handoff, one validation report, and one explicit
+`proceed_second_account_expansion_only` decision without widening into
+generic customer-success tooling, account-management platforms, revenue
+operations systems, multi-account portfolio programs, or ARC commercial
+surfaces.
+`v2.61 MERCURY Portfolio Program Qualification, Multi-Account Boundary, and
+Revenue Operations Guardrails` is now also complete locally: Mercury exports
+one bounded portfolio-program package, one program-review bundle, one
+portfolio-approval artifact, one revenue-operations-guardrails artifact, one
+explicit program handoff, one validation report, and one explicit
+`proceed_portfolio_program_only` decision without widening into generic
+account-management tooling, revenue operations systems, forecasting stacks,
+billing platforms, channel programs, or ARC commercial surfaces.
+`v2.62 MERCURY Second Portfolio Program Qualification, Reuse Discipline, and
+Revenue Boundary` is now also complete locally: Mercury exports one bounded
+second-portfolio-program package, one portfolio-reuse bundle, one portfolio-
+reuse approval artifact, one revenue-boundary-guardrails artifact, one
+explicit second-program handoff, one validation report, and one explicit
+`proceed_second_portfolio_program_only` decision without widening into generic
+portfolio-management tooling, revenue operations systems, forecasting stacks,
+billing platforms, channel programs, or ARC commercial surfaces.
+`v2.63`, `v2.64`, and `v2.65` are now also complete locally: Mercury exports
+one bounded `third_program` lane, one bounded `program_family` lane, and one
+bounded `portfolio_revenue_boundary` lane over the same dedicated Mercury app
+surface, each with product-owned approval or handoff artifacts, real export
+and validation bundles, and one explicit proceed decision, without reopening
+ARC generic boundary work.
 
-## Planned Roadmap
+## Latest Roadmap Closure
+
+### v2.65 MERCURY Portfolio Revenue Boundary Qualification, Commercial Handoff, and Channel Boundary
+
+**Goal:** Qualify one bounded Mercury portfolio-revenue-boundary lane over the
+existing program-family package so Mercury can prove one named commercial
+handoff can consume program-family evidence without widening into generic
+revenue operations systems, forecasting stacks, billing platforms, channel
+programs, merged shells, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 269 complete: Mercury revenue boundary scope lock and commercial
+  handoff freeze
+- Phase 270 complete: Mercury revenue boundary package and commercial review
+  contract
+- Phase 271 complete: Mercury commercial approval, channel boundary rules,
+  and handoff
+- Phase 272 complete: Mercury revenue boundary validation, proceed decision,
+  and boundary
+
+### v2.64 MERCURY Program Family Qualification, Shared Review Package, and Portfolio Claim Discipline
+
+**Goal:** Qualify one bounded Mercury program-family lane over the existing
+third-program package so Mercury can prove one explicitly named small program
+family can be reviewed together without widening into generic portfolio-
+management tooling, revenue operations systems, forecasting stacks, billing
+platforms, channel programs, merged shells, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 265 complete: Mercury program family scope lock and shared review
+  boundary freeze
+- Phase 266 complete: Mercury program family package and shared review
+  contract
+- Phase 267 complete: Mercury program family approval, portfolio claim
+  discipline, and family handoff
+- Phase 268 complete: Mercury program family validation, proceed decision,
+  and boundary
+
+### v2.63 MERCURY Third Program Qualification, Reuse Repeatability, and Multi-Program Boundary
+
+**Goal:** Qualify one bounded Mercury third-program lane over the existing
+second-portfolio-program package so Mercury can prove one evidence-backed
+multi-account program family can support one additional adjacent program reuse
+decision without widening into generic portfolio-management tooling, revenue
+operations systems, forecasting stacks, billing platforms, channel programs,
+merged shells, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 261 complete: Mercury third program scope lock and repeatability
+  boundary freeze
+- Phase 262 complete: Mercury third program package and repeated portfolio
+  reuse contract
+- Phase 263 complete: Mercury third-program approval refresh, multi-program
+  guardrails, and handoff
+- Phase 264 complete: Mercury third program validation, proceed decision, and
+  boundary
+
+### v2.62 MERCURY Second Portfolio Program Qualification, Reuse Discipline, and Revenue Boundary
+
+**Goal:** Qualify one bounded Mercury second-portfolio-program lane over the
+existing portfolio-program package so Mercury can prove one evidence-backed
+multi-account program can support one adjacent program reuse decision without
+widening into generic portfolio-management tooling, revenue operations
+systems, forecasting stacks, billing platforms, channel programs, merged
+shells, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 257 complete: Mercury second portfolio program scope lock and reuse
+  boundary freeze
+- Phase 258 complete: Mercury second portfolio program package and portfolio
+  reuse contract
+- Phase 259 complete: Mercury portfolio reuse approval, revenue boundary
+  guardrails, and second-program handoff
+- Phase 260 complete: Mercury second portfolio program validation, proceed
+  decision, and boundary
+
+### v2.61 MERCURY Portfolio Program Qualification, Multi-Account Boundary, and Revenue Operations Guardrails
+
+**Goal:** Qualify one bounded Mercury portfolio-program lane over the
+existing second-account-expansion package so Mercury can prove one renewed
+workflow can support one explicitly governed multi-account program without
+widening into generic customer-success tooling, account-management
+platforms, revenue operations systems, channel marketplaces, merged shells,
+or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 253 complete: Mercury portfolio program scope lock and multi-account
+  boundary freeze
+- Phase 254 complete: Mercury portfolio program package and program review
+  contract
+- Phase 255 complete: Mercury portfolio approval, revenue operations
+  guardrails, and program handoff
+- Phase 256 complete: Mercury portfolio program validation, proceed decision,
+  and boundary
+
+### v2.60 MERCURY Second-Account Expansion Qualification, Portfolio Boundary, and Reuse Governance
+
+**Goal:** Qualify one bounded Mercury second-account expansion lane over the
+existing renewal-qualification package so Mercury can prove one renewed
+account can support one adjacent account expansion decision without widening
+into generic customer-success tooling, account-management platforms,
+multi-account renewal programs, channel marketplaces, merged shells, or ARC
+commercial surfaces.
+
+**Executable phase status:**
+- Phase 249 complete: Mercury second-account expansion scope lock and
+  portfolio boundary freeze
+- Phase 250 complete: Mercury expansion-readiness package and portfolio
+  review contract
+- Phase 251 complete: Mercury expansion approval, reuse governance, and
+  second-account handoff
+- Phase 252 complete: Mercury expansion validation, proceed decision, and
+  boundary
+
+### v2.59 MERCURY Renewal Qualification, Outcome Review, and Expansion Boundary
+
+**Goal:** Qualify one bounded Mercury renewal lane over the existing delivery-
+continuity package so Mercury can prove one activated account can cross one
+evidence-backed renewal decision boundary without widening into generic
+customer-success tooling, CRM workflows, account-management platforms, channel
+marketplaces, merged shells, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 245 complete: Mercury renewal qualification scope lock and renewal
+  boundary freeze
+- Phase 246 complete: Mercury renewal package and outcome review contract
+- Phase 247 complete: Mercury renewal approval, reference reuse discipline,
+  and expansion boundary handoff
+- Phase 248 complete: Mercury renewal validation, renew decision, and
+  boundary
+
+### v2.58 MERCURY Controlled Delivery Continuity, Outcome Evidence, and Renewal Gate
+
+**Goal:** Qualify one bounded Mercury controlled-delivery continuity lane
+over the existing selective-account-activation package so Mercury can prove
+one activated account remains evidence-backed, renewal-gated, and supportable
+without widening into generic onboarding tooling, CRM workflows, support
+desks, channel marketplaces, or ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 241 complete: Mercury controlled delivery continuity scope lock and
+  account boundary freeze
+- Phase 242 complete: Mercury delivery continuity package and outcome evidence
+  contract
+- Phase 243 complete: Mercury renewal gate, delivery escalation, and customer
+  evidence handoff
+- Phase 244 complete: Mercury controlled delivery continuity validation,
+  renewal decision, and boundary
+
+### v2.57 MERCURY Selective Account Activation, Controlled Delivery, and Claim Containment
+
+**Goal:** Qualify one bounded Mercury selective-account activation lane over
+the existing broader-distribution package so Mercury can move one governed
+qualified account into controlled delivery without widening into generic
+onboarding tooling, CRM workflows, channel marketplaces, merged shells, or
+ARC commercial surfaces.
+
+**Executable phase status:**
+- Phase 237 complete: Mercury selective-account activation scope lock and
+  delivery freeze
+- Phase 238 complete: Mercury activation package and controlled delivery
+  contract
+- Phase 239 complete: Mercury claim containment, activation approval refresh,
+  and customer handoff
+- Phase 240 complete: Mercury selective-account activation validation,
+  proceed decision, and boundary
+
+### v2.56 MERCURY Broader Distribution Readiness, Selective Account Qualification, and Claim Governance
+
+**Goal:** Qualify one bounded Mercury broader-distribution lane over the
+existing reference-distribution package so Mercury can use one approved
+reference-backed bundle to support selective account qualification without
+widening into generic sales tooling, CRM workflows, merged shells, or ARC
+commercial surfaces.
+
+**Executable phase status:**
+- Phase 233 complete: Mercury broader-distribution scope lock and target-
+  account freeze
+- Phase 234 complete: Mercury qualification package and governed distribution
+  contract
+- Phase 235 complete: Mercury claim governance, selective account approval,
+  and distribution handoff
+- Phase 236 complete: Mercury broader-distribution validation, proceed
+  decision, and boundary
+
+### v2.55 MERCURY Reference Distribution, Landed-Account Expansion, and Claim Discipline
+
+**Goal:** Qualify one bounded Mercury reference-distribution and landed-
+account expansion lane over the existing controlled-adoption package so
+Mercury can turn one referenceable win into a repeatable expansion motion
+without widening into generic sales tooling, merged shells, or ARC generic
+commercial surfaces.
+
+**Executable phase status:**
+- Phase 229 complete: Mercury reference expansion scope lock and account-motion
+  freeze
+- Phase 230 complete: Mercury reference package and expansion evidence contract
+- Phase 231 complete: Mercury claim discipline, buyer-reference approval, and
+  sales handoff
+- Phase 232 complete: Mercury reference expansion validation, proceed
+  decision, and boundary
+
+### v2.54 MERCURY Controlled Adoption, Renewal Evidence, and Reference Readiness
+
+**Goal:** Qualify one bounded post-launch Mercury adoption lane over the
+existing release-readiness package so Mercury can prove renewal and reference
+readiness without widening into new product lines, merged shells, or ARC
+generic release surfaces.
+
+**Executable phase status:**
+- Phase 225 complete: Mercury controlled adoption scope lock and cohort freeze
+- Phase 226 complete: Mercury adoption evidence and renewal package contract
+- Phase 227 complete: Mercury customer success, reference readiness, and
+  support escalation
+- Phase 228 complete: Mercury controlled adoption validation, scale decision,
+  and expansion boundary
+
+### v2.53 MERCURY Release Readiness, Partner Delivery, and Controlled Adoption
+
+**Goal:** Package Mercury's dedicated app surface into one bounded
+release-readiness lane over the existing pilot, supervised-live, downstream,
+governance, assurance, embedded-OEM, and trust-network artifacts without
+pulling product logic back into ARC or widening into a new product line.
+
+**Executable phase status:**
+- Phase 221 complete: Mercury release readiness scope lock and boundary freeze
+- Phase 222 complete: Mercury reviewer and partner delivery package contract
+- Phase 223 complete: Mercury operator release controls, escalation, and
+  support handoff
+- Phase 224 complete: Mercury release-readiness validation, launch decision,
+  and expansion boundary
+
+### v2.52 MERCURY Extensions ARC Purity Restoration, Boundary Cleanup, and Qualification
+
+**Goal:** Restore ARC's generic substrate boundary by removing product-specific
+Mercury and ARC-Wall logic from ARC control-plane, CLI, query, and store
+surfaces, then validate the resulting purity pass with low-memory regression
+checks.
+
+**Executable phase status:**
+- Phase 217 complete: ARC substrate purity boundary correction
+- Phase 218 complete: generic receipt query surface cleanup
+- Phase 219 complete: SQLite receipt store decoupling from Mercury
+- Phase 220 complete: ARC purity validation and milestone closeout
+
+### v2.51 MERCURY Extensions Shared Service Boundaries, Cross-Product Governance, and Platform Hardening
+
+**Goal:** Define the shared-service, release-governance, and trust-material
+boundaries across the validated MERCURY and ARC-Wall products on ARC, then
+publish one bounded platform-hardening backlog for sustained multi-product
+operation without collapsing the products together or widening ARC's generic
+substrate.
+
+**Executable phase status:**
+- Phase 213 complete: shared service boundary review and product ownership
+  freeze
+- Phase 214 complete: cross-product governance, release, and trust-material
+  operating model
+- Phase 215 complete: platform hardening backlog, dependency map, and
+  qualification envelope
+- Phase 216 complete: multi-product validation, operating decision, and next-
+  step boundary
+
+### v2.50 ARC-Wall Companion Product Core, Guard Evidence, and Buyer Motion
+
+**Goal:** Deliver one bounded ARC-Wall companion-product lane on ARC,
+reusing the same checkpoint, publication, and verification substrate while
+freezing one buyer motion, one information-domain evidence contract, and one
+control-path guard surface without turning MERCURY into ARC-Wall or widening
+immediately into multi-product hardening.
+
+**Executable phase status:**
+- Phase 209 complete: ARC-Wall scope lock and buyer boundary freeze
+- Phase 210 complete: information-domain evidence schema and ARC-Wall contract
+- Phase 211 complete: control-path guard surface and companion-product
+  packaging path
+- Phase 212 complete: ARC-Wall validation, buyer packaging, and expansion
+  decision
+
+### v2.49 MERCURY Trust Network Witness, Publication, and Proof-Profile Interoperability
+
+**Goal:** Deliver one bounded trust-network lane over the existing MERCURY
+proof, inquiry, publication, supervised-live, downstream, governance,
+assurance, and embedded-OEM artifacts, covering one shared trust-anchor and
+witness continuity contract, one proof-profile interoperability surface, and
+one explicit rollout boundary without widening into ARC-Wall, multi-network
+trust services, or generic ecosystem infrastructure.
+
+**Executable phase status:**
+- Phase 205 complete: trust-network scope lock and sponsor boundary freeze
+- Phase 206 complete: trust-anchor, witness, and publication continuity
+  contract
+- Phase 207 complete: shared proof-profile interoperability and reviewer
+  distribution path
+- Phase 208 complete: trust-network rollout plan, operating model, and
+  expansion decision
+
+### v2.48 MERCURY Embedded OEM Distribution, Partner Packaging, and Bounded SDK Surface
+
+**Goal:** Deliver one bounded embedded OEM distribution lane over the existing
+MERCURY proof, inquiry, publication, supervised-live, downstream, governance,
+and assurance artifacts, covering one embedded packaging profile, one partner
+packaging surface, and one explicit operating boundary without turning MERCURY
+into a generic SDK platform or multi-partner OEM program.
+
+**Executable phase status:**
+- Phase 201 complete: embedded OEM scope lock and partner boundary freeze
+- Phase 202 complete: embedded packaging profile and OEM contract
+- Phase 203 complete: partner packaging surface and embedded distribution path
+- Phase 204 complete: OEM validation, operating model, and expansion decision
+
+### v2.47 MERCURY Assurance Suite Reviewer Packages, Investigation Packaging, and External Review Readiness
+
+**Goal:** Deliver one bounded assurance-suite lane over the existing MERCURY
+proof, inquiry, publication, supervised-live, downstream, and governance
+artifacts, covering internal, auditor, and counterparty reviewer packages plus
+investigation-ready export surfaces without turning MERCURY into a generic
+review portal or OEM platform.
+
+**Executable phase status:**
+- Phase 197 complete: assurance suite scope lock and reviewer population
+  freeze
+- Phase 198 complete: assurance package family and disclosure profile
+  contracts
+- Phase 199 complete: reviewer export surfaces and investigation packaging
+- Phase 200 complete: assurance validation, reviewer operations, and expansion
+  decision
+
+### v2.46 MERCURY Governance Workbench Approval, Release, and Exception Controls
+
+**Goal:** Deliver one bounded governance-workbench workflow over the existing
+MERCURY proof, inquiry, publication, and supervised-live artifacts, covering
+governed change review plus release, rollback, approval, and exception
+controls without turning MERCURY into a generic workflow engine.
+
+**Executable phase status:**
+- Phase 193 complete: governance workbench scope lock and control-team
+  contract freeze
+- Phase 194 complete: change-review evidence model and governance decision
+  package
+- Phase 195 complete: release, rollback, approval, and exception workflow
+  controls
+- Phase 196 complete: governance validation, operations, and expansion
+  decision
+
+### v2.45 MERCURY Downstream Review Distribution and Assurance Packaging
+
+**Goal:** Deliver one downstream archive/review/case-management distribution
+path and one reviewer-assurance package family over the existing MERCURY
+proof, inquiry, and supervised-live reviewer artifacts without widening into
+OEM packaging, generic connector sprawl, or deep runtime coupling.
+
+**Executable phase status:**
+- Phase 189 complete: downstream review scope lock and consumer contract freeze
+- Phase 190 complete: downstream distribution package and delivery contract
+- Phase 191 complete: review-system connector and assurance export path
+- Phase 192 complete: downstream validation, operations, and expansion
+  decision
+
+### v2.44 MERCURY Supervised-Live Bridge and Controlled Productionization
+
+**Goal:** Move the same controlled release, rollback, and inquiry workflow
+from replay/shadow into supervised-live operation while existing customer
+execution systems remain primary and ARC stays the generic substrate.
+
+**Executable phase status:**
+- Phase 185 complete: supervised-live scope lock, entry criteria, and
+  operating envelope
+- Phase 186 complete: live/mirrored workflow intake and proof continuity
+- Phase 187 complete: approval gates, interrupts, and degraded-mode operations
+- Phase 188 complete: supervised-live qualification, conversion package, and
+  bridge closure
+
+### v2.43 MERCURY Evidence Productization Foundation
+
+**Goal:** Package ARC's signed-evidence substrate into MERCURY, the first
+finance-specific review-grade evidence platform for governed AI trading
+workflows, starting with controlled release, rollback, and inquiry handling.
+
+**Executable phase status:**
+- Phase 181 complete: MERCURY scope lock, ARC reuse map, and workflow freeze
+- Phase 182 complete: MERCURY core evidence model, metadata, and query
+  indexing
+- Phase 183 complete: `Proof Package v1`, `Inquiry Package v1`, and verifier
+  path
+- Phase 184 complete: replay/shadow pilot harness and design-partner readiness
+- Phase 184.1 complete: Mercury app boundary extraction from `arc-cli`
 
 ### v2.21 Standards-Native Authorization and Credential Fabric
 
@@ -92,11 +710,11 @@ normalized claims, reason taxonomy, and signed result import or export without
 widening trust from raw foreign evidence.
 
 **Executable phase status:**
-- Phase 101 ready: common appraisal schema split and artifact inventory
-- Phase 102 ready: normalized claim vocabulary and reason taxonomy
-- Phase 103 ready: external signed appraisal result import/export and policy
+- Phase 101 complete: common appraisal schema split and artifact inventory
+- Phase 102 complete: normalized claim vocabulary and reason taxonomy
+- Phase 103 complete: external signed appraisal result import/export and policy
   mapping
-- Phase 104 ready: mixed-provider appraisal qualification and boundary rewrite
+- Phase 104 complete: mixed-provider appraisal qualification and boundary rewrite
 
 ### v2.24 Verifier Federation, Cross-Issuer Portability, and Discovery
 
@@ -105,13 +723,13 @@ public issuer or verifier discovery, and assurance-aware downstream policy
 without creating ambient federation trust.
 
 **Executable phase status:**
-- Phase 105 ready: cross-issuer portfolios, trust packs, and migration
+- Phase 105 complete: cross-issuer portfolios, trust packs, and migration
   semantics
-- Phase 106 ready: verifier descriptors, trust bundles, and reference-value
+- Phase 106 complete: verifier descriptors, trust bundles, and reference-value
   distribution
-- Phase 107 ready: public issuer/verifier discovery, transparency, and local
-  policy import guardrails
-- Phase 108 ready: wider provider support and assurance-aware auth/economic
+- Phase 107 complete: public issuer/verifier discovery, transparency, and
+  local policy import guardrails
+- Phase 108 complete: wider provider support and assurance-aware auth/economic
   policy
 
 ### v2.25 Live Capital Allocation and Escrow Execution
@@ -121,10 +739,10 @@ escrow or reserve instructions, governed-action allocation, and regulated-role
 baseline profiles.
 
 **Executable phase status:**
-- Phase 109 ready: capital book and source-of-funds ledger
-- Phase 110 ready: escrow and reserve instruction contract
-- Phase 111 ready: live allocation engine for governed actions
-- Phase 112 ready: capital execution qualification and regulated-role baseline
+- Phase 109 complete: capital book and source-of-funds ledger
+- Phase 110 complete: escrow and reserve instruction contract
+- Phase 111 complete: live allocation engine for governed actions
+- Phase 112 complete: capital execution qualification and regulated-role baseline
 
 ### v2.26 Reserve Control, Autonomous Pricing, and Claims Payment
 
@@ -133,10 +751,10 @@ control, then add delegated pricing authority, automatic binding, claims
 payment, and recovery clearing.
 
 **Executable phase status:**
-- Phase 113 ready: executable reserve impairment, release, and slash controls
-- Phase 114 ready: delegated pricing authority and automatic coverage binding
-- Phase 115 ready: automatic claims payment and payout reconciliation
-- Phase 116 ready: recovery clearing, reinsurance/facility settlement, and
+- Phase 113 complete: executable reserve impairment, release, and slash controls
+- Phase 114 complete: delegated pricing authority and automatic coverage binding
+- Phase 115 complete: automatic claims payment and payout reconciliation
+- Phase 116 complete: recovery clearing, reinsurance/facility settlement, and
   role topology
 
 ### v2.27 Open Registry, Trust Activation, and Governance Network
@@ -146,11 +764,11 @@ open registry with trust activation, open admission classes, governance
 charters, and dispute escalation.
 
 **Executable phase status:**
-- Phase 117 ready: generic listing artifact and namespace model
-- Phase 118 ready: origin, mirror, indexer, search, ranking, and freshness
+- Phase 117 complete: generic listing artifact and namespace model
+- Phase 118 complete: origin, mirror, indexer, search, ranking, and freshness
   semantics
-- Phase 119 ready: trust activation artifacts and open admission classes
-- Phase 120 ready: governance charters, dispute escalation, sanctions, and
+- Phase 119 complete: trust activation artifacts and open admission classes
+- Phase 120 complete: governance charters, dispute escalation, sanctions, and
   appeals
 
 ### v2.28 Portable Reputation, Marketplace Economics, and Endgame Qualification
@@ -160,12 +778,226 @@ bond economics, abuse resistance, adversarial multi-operator qualification, and
 the final public boundary rewrite.
 
 **Executable phase status:**
-- Phase 121 ready: portable reputation, negative-event exchange, and weighting
-  profiles
-- Phase 122 ready: fee schedules, bonds, slashing, and abuse resistance
-- Phase 123 ready: adversarial multi-operator open-market qualification
-- Phase 124 ready: partner proof, release boundary, and honest endgame claim
-  closure
+- Phase 121 complete: portable reputation, negative-event exchange, and
+  weighting profiles
+- Phase 122 complete: fee schedules, bonds, slashing, and abuse resistance
+- Phase 123 complete: adversarial multi-operator open-market qualification
+- Phase 124 complete: partner proof, release boundary, and honest endgame
+  claim closure
+
+### v2.29 Official Stack and Extension SDK
+
+**Goal:** Freeze ARC's extension boundary so the project can ship one official
+stack while allowing custom rails, anchors, oracles, identity providers,
+stores, wallets, registries, and pricing engines to plug in under ARC-owned
+contracts.
+
+**Executable phase status:**
+- Phase 125 complete: extension-point inventory and canonical boundary classes
+- Phase 126 complete: extension manifests, negotiation, and official stack
+  packaging
+- Phase 127 complete: trust-preserving adapter runtime and policy enforcement
+- Phase 128 complete: extension qualification, compatibility matrix, and
+  boundary closure
+
+### v2.30 Web3 Settlement Rail Dispatch and External Capital Execution
+
+**Goal:** Build the first real web3/live-money execution stack on top of the
+official extension substrate, moving ARC from custody-neutral and
+settlement-neutral instruction artifacts into real external rail execution with
+cryptographically reconcilable dispatch, payout, reserve, and recovery proofs.
+
+**Executable phase status:**
+- Phase 129 complete: web3 trust-boundary, identity-binding, and protocol
+  freeze
+- Phase 130 complete: unified contracts, bindings, and chain configuration
+- Phase 131 complete: receipt-root anchoring and oracle-evidence substrate
+- Phase 132 complete: escrow, bond vault, settlement dispatch, and web3
+  qualification
+
+### v2.31 Autonomous Pricing, Capital Pools, and Insurance Automation
+
+**Goal:** Expand ARC from delegated pricing and bounded bind logic into
+bounded autonomous pricing, reserve optimization, and insurer-grade capital
+automation with explicit rollback and audit controls.
+
+**Executable phase status:**
+- Phase 133 complete: autonomous pricing artifacts and authority envelopes
+- Phase 134 complete: capital-pool optimization and simulation controls
+- Phase 135 complete: automatic reprice, renew, decline, and bind orchestration
+- Phase 136 complete: drift detection, rollback, and autonomous qualification
+
+### v2.32 Federated Trust Activation, Open Admission, and Shared Reputation Network
+
+**Goal:** Move beyond local trust activation into cross-operator trust
+federation, more open admission mechanics, and shared portable-reputation
+clearing while preserving explicit anti-sybil and anti-ambient-trust controls.
+
+**Executable phase status:**
+- Phase 137 complete: cross-operator federation and trust-activation exchange
+- Phase 138 complete: mirror/indexer quorum, conflict, and anti-eclipse
+  semantics
+- Phase 139 complete: open-admission stake classes and shared-reputation
+  clearing
+- Phase 140 complete: federation qualification, abuse resistance, and
+  governance closure
+
+### v2.33 Public Identity/Wallet Network and Maximal Endgame Qualification
+
+**Goal:** Broaden ARC from bounded portable identity and wallet interop into a
+multi-network public identity and wallet fabric, then close the strongest
+possible reading of the research thesis with one final qualification package.
+
+**Executable phase status:**
+- Phase 141 complete: broader DID/VC method support and identity profiles
+- Phase 142 complete: public wallet directory, routing, and discovery
+  semantics
+- Phase 143 complete: multi-wallet, multi-issuer, and cross-operator interop
+  qualification
+- Phase 144 complete: final maximal-endgame partner proof and boundary closure
+
+### v2.34 Official Web3 Runtime Contracts and Deployment Harness
+
+**Goal:** Convert ARC's frozen official web3 package into compilable
+contracts, reproducible deployments, and generated bindings that runtime
+services can actually target.
+
+**Executable phase status:**
+- Phase 145 complete: Solidity contract package and canonical event semantics
+- Phase 146 complete: Foundry/Alloy bindings, deployment manifests, and local
+  devnet harness
+- Phase 147 complete: DID/key binding, verifier discovery, and contract-to-
+  artifact parity
+- Phase 148 complete: gas, storage, security qualification, and contract
+  package release
+
+### v2.35 arc-link Oracle Runtime and Cross-Currency Budget Enforcement
+
+**Goal:** Productize the `arc-link` research into a real oracle runtime that
+enforces cross-currency budgets with explicit provenance, staleness controls,
+and fail-closed fallback behavior.
+
+**Executable phase status:**
+- Phase 149 complete: Chainlink/Pyth oracle adapters, cache, TWAP, and
+  divergence policy
+- Phase 150 complete: oracle evidence artifacts, kernel budget enforcement,
+  and receipt integration
+- Phase 151 complete: Base/Arbitrum operator configuration, monitoring, and
+  circuit-breaker controls
+- Phase 152 complete: `arc-link` qualification, failure drills, and boundary
+  documentation
+
+### v2.36 arc-anchor Multi-Chain Anchoring and Proof Verification
+
+**Goal:** Productize `arc-anchor` as a real publication and verification
+service over Base/Arbitrum, Bitcoin OpenTimestamps, and Solana-normalized
+proof bundles.
+
+**Executable phase status:**
+- Phase 153 complete: Base/Arbitrum root publication service and inclusion proof
+  verifier
+- Phase 154 complete: Bitcoin OpenTimestamps secondary anchoring and
+  verification
+- Phase 155 complete: Solana anchor publication, proof normalization, and
+  shared proof bundle
+- Phase 156 complete: `arc-anchor` discovery, operations, compliance notes, and
+  multi-chain qualification
+
+### v2.37 arc-settle On-Chain Settlement, Escrow, and Bond Runtime
+
+**Goal:** Realize `arc-settle` as a Rust execution engine that turns approved
+ARC capital instructions into real on-chain escrow, release, refund, and bond
+state transitions.
+
+**Executable phase status:**
+- Phase 157 complete: settlement dispatch builder and escrow/bond transaction
+  orchestration
+- Phase 158 complete: settlement observer, dispute windows, refunds,
+  reversals, and bond lifecycle
+- Phase 159 complete: Solana settlement path, Ed25519-native verification, and
+  multi-chain consistency
+- Phase 160 complete: `arc-settle` qualification, custody boundary, and
+  regulated-role runbooks
+
+### v2.38 Web3 Automation, Cross-Chain Transport, and Agent Payment Interop
+
+**Goal:** Consume the parked future tracks from the research set without
+smuggling them in as hidden backlog: Chainlink Functions, Automation, CCIP,
+x402, Circle nanopayments, and ERC-4337/paymaster compatibility.
+
+**Executable phase status:**
+- Phase 161 complete: Chainlink Functions proof verification and EVM Ed25519
+  fallback strategy
+- Phase 162 complete: Chainlink Automation for anchoring, settlement
+  watchdogs, and bond jobs
+- Phase 163 complete: CCIP delegation/settlement transport and cross-chain
+  receipt reconciliation
+- Phase 164 complete: x402 surface, Circle nanopayments, and ERC-4337
+  paymaster compatibility
+
+### v2.39 Web3 Production Qualification, Operations, and Public Claim Closure
+
+**Goal:** Turn the new web3 runtime stack into something ARC can operate,
+qualify, and describe publicly without hiding residual risks.
+
+**Executable phase status:**
+- Phase 165 complete: observability, indexers, reorg recovery, and
+  pause/emergency controls
+- Phase 166 complete: security audit remediation, gas/latency budgets, and
+  deployment promotion
+- Phase 167 complete: external testnet/mainnet partner proof and full-ladder
+  qualification
+- Phase 168 complete: final protocol/release boundary rewrite and post-research
+  claim closure
+
+### v2.40 Web3 Runtime Integrity, Evidence Gating, and Contract Coherence
+
+**Goal:** Make ARC's bounded web3 runtime concurrency-safe, evidence-
+mandatory, and internally consistent across kernel, runtime, bindings, and
+contracts.
+
+**Executable phase status:**
+- Phase 169 complete: deterministic settlement identity, duplicate-replay
+  guards, and receipt reconciliation across escrow and bond dispatch
+- Phase 170 complete: mandatory receipt storage, checkpointing, and web3
+  evidence gates
+- Phase 171 complete: collateral-versus-reserve-requirement truth and
+  canonical `arc-link` oracle authority across contracts, config, evidence,
+  and docs
+- Phase 172 complete: cryptographic secondary-lane verification,
+  artifact-derived bindings, and contract/runtime parity qualification
+
+### v2.41 Hosted Qualification, Deployment Promotion, and Operator Controls
+
+**Goal:** Turn ARC's bounded web3-runtime stack from a locally qualified
+surface into one with hosted proof, reproducible promotion, and exercised
+operator controls.
+
+**Executable phase status:**
+- Phase 173 complete: hosted web3 qualification workflow, staged artifact
+  publication, and hosted gate wiring
+- Phase 174 complete: live deployment runner, promotion approvals, and
+  reproducible rollout
+- Phase 175 complete: generated runtime reports, persisted control-state
+  traces, and exercisable emergency controls
+- Phase 176 complete: integrated recovery, dual-sign settlement, and
+  partner-ready end-to-end qualification
+
+### v2.42 Release Truth, Planning Integrity, and Assurance Backfill
+
+**Goal:** Make ARC's release governance, authoritative docs, planning
+tooling, and late-phase assurance artifacts as trustworthy as the runtime
+stack they describe.
+
+**Executable phase status:**
+- Phase 177 complete: release governance, audit truth, and candidate
+  documentation alignment
+- Phase 178 complete: protocol/standards parity, research supersession, and
+  residual gap clarity
+- Phase 179 complete: GSD health, roadmap parsing, and assurance artifact
+  backfill
+- Phase 180 complete: runtime boundary decomposition, ownership hardening, and
+  source-shape regression coverage
 
 ## Previous Milestones
 
@@ -394,20 +1226,21 @@ ecosystems without inventing synthetic global trust.
 ARC is now the primary product, CLI, SDK, release, and documentation identity.
 `v2.5` through `v2.8` closed the rename, governed-economics, portable-trust,
 and launch-readiness waves derived from `docs/research/DEEP_RESEARCH_1.md`.
-What remains from that research is not the ARC core itself. It is the next
-layer above the core: generic economic evidence, runtime underwriting, external
-credential interop, and concrete workload-identity / attestation bridges.
+The later maximal-endgame ladder is now also complete locally through
+extension packaging, official web3 settlement, bounded autonomous pricing,
+federated trust activation, and the bounded public identity-network surface.
 
-Current doc boundaries are explicit about those remaining gaps:
-- `spec/PROTOCOL.md` says the behavioral feed is truthful evidence export, not
-  an underwriting model.
-- `crates/arc-credentials/src/lib.rs` still describes the credential format as
-  intentionally simple and ARC-native.
-- `docs/standards/ARC_PORTABLE_TRUST_PROFILE.md` excludes global trust
-  registry, synthetic cross-issuer scoring, and public wallet distribution
+Current doc boundaries are explicit about what still remains intentionally out
+of scope:
+- `spec/PROTOCOL.md` keeps `did:arc` as the provenance anchor even where the
+  public identity profile names bounded `did:web`, `did:key`, or `did:jwk`
+  compatibility inputs.
+- `docs/standards/ARC_PORTABLE_TRUST_PROFILE.md` excludes permissionless
+  public wallet routing, universal trust scoring, and ambient-trust discovery
   semantics.
-- `crates/arc-core/src/lib.rs` allows SPIFFE-like identifiers but currently
-  treats them as opaque strings.
+- `docs/release/RELEASE_CANDIDATE.md` and `docs/release/PARTNER_PROOF.md`
+  keep hosted workflow observation as a required publication gate beyond local
+  technical completion.
 
 Key regulatory milestones achieved:
 - Colorado SB 24-205 compliance document filed (deadline June 30, 2026)
@@ -446,4 +1279,4 @@ Key regulatory milestones achieved:
 | Workload identity bridges follow portable and economic interop | Concrete verifier integrations should bind into already-stabilized policy, credential, and economic semantics | Completed in v2.12 |
 
 ---
-*Last updated: 2026-03-28 after completing v2.12 workload identity and attestation verification bridges*
+*Last updated: 2026-04-03 after completing v2.50 ARC-Wall companion-product work and auditing phases 209-212*

@@ -1,0 +1,183 @@
+{
+  "primary": "chainlink",
+  "fallback": "pyth",
+  "refresh_interval_seconds": 60,
+  "pyth": {
+    "hermes_url": "https://hermes.pyth.network"
+  },
+  "pairs": [
+    {
+      "base": "ETH",
+      "quote": "USD",
+      "chain_id": 8453,
+      "chainlink": {
+        "address": "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70",
+        "decimals": 8,
+        "heartbeat_seconds": 300
+      },
+      "pyth": {
+        "id": "0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"
+      },
+      "policy": {
+        "max_age_seconds": 600,
+        "divergence_threshold_bps": 500,
+        "exchange_rate_margin_bps": 200,
+        "twap_enabled": true,
+        "twap_window_seconds": 600,
+        "twap_max_observations": 10,
+        "stable_pair": false,
+        "degraded_mode": {
+          "enabled": false,
+          "max_stale_age_seconds": 300,
+          "extra_margin_bps": 800
+        }
+      }
+    },
+    {
+      "base": "BTC",
+      "quote": "USD",
+      "chain_id": 8453,
+      "chainlink": {
+        "address": "0x64c911996D3c6aC71f9b455B1E8E7266BcbD848F",
+        "decimals": 8,
+        "heartbeat_seconds": 180
+      },
+      "pyth": {
+        "id": "0xe62df6c8b4a85fe1a67db44dc12de5db330f7ac66b72dc658afedf0f4a415b43"
+      },
+      "policy": {
+        "max_age_seconds": 600,
+        "divergence_threshold_bps": 500,
+        "exchange_rate_margin_bps": 200,
+        "twap_enabled": true,
+        "twap_window_seconds": 600,
+        "twap_max_observations": 10,
+        "stable_pair": false,
+        "degraded_mode": {
+          "enabled": false,
+          "max_stale_age_seconds": 300,
+          "extra_margin_bps": 800
+        }
+      }
+    },
+    {
+      "base": "USDC",
+      "quote": "USD",
+      "chain_id": 8453,
+      "chainlink": {
+        "address": "0x7e860098F58bBFC8648a4311b374B1D669a2bc6B",
+        "decimals": 8,
+        "heartbeat_seconds": 68400
+      },
+      "pyth": {
+        "id": "0xeaa020c61cc479712813461ce153894a96a6c00b21ed0cfc2798d1f9a9e9c94a"
+      },
+      "policy": {
+        "max_age_seconds": 600,
+        "divergence_threshold_bps": 500,
+        "exchange_rate_margin_bps": 200,
+        "twap_enabled": false,
+        "twap_window_seconds": 600,
+        "twap_max_observations": 10,
+        "stable_pair": true,
+        "degraded_mode": {
+          "enabled": false,
+          "max_stale_age_seconds": 300,
+          "extra_margin_bps": 800
+        }
+      }
+    },
+    {
+      "base": "LINK",
+      "quote": "USD",
+      "chain_id": 8453,
+      "chainlink": {
+        "address": "0x17CAb8FE31E32f08326e5E27412894e49B0f9D65",
+        "decimals": 8,
+        "heartbeat_seconds": 86400
+      },
+      "pyth": null,
+      "policy": {
+        "max_age_seconds": 600,
+        "divergence_threshold_bps": 500,
+        "exchange_rate_margin_bps": 200,
+        "twap_enabled": true,
+        "twap_window_seconds": 600,
+        "twap_max_observations": 10,
+        "stable_pair": false,
+        "degraded_mode": {
+          "enabled": false,
+          "max_stale_age_seconds": 300,
+          "extra_margin_bps": 800
+        }
+      }
+    }
+  ],
+  "operator": {
+    "global_pause": false,
+    "chains": [
+      {
+        "chain_id": 8453,
+        "label": "base-mainnet",
+        "caip2": "eip155:8453",
+        "rpc_endpoint": "https://base-mainnet.example.invalid",
+        "enabled": true,
+        "sequencer_uptime_feed": "0xBCF85224fc0756B9Fa45aA7892530B47e10b6433",
+        "sequencer_grace_period_seconds": 300
+      },
+      {
+        "chain_id": 42161,
+        "label": "arbitrum-one",
+        "caip2": "eip155:42161",
+        "rpc_endpoint": "https://arbitrum-mainnet.example.invalid",
+        "enabled": false,
+        "sequencer_uptime_feed": "0xFdB631F5EE196F0ed6FAa767959853A9F217697D",
+        "sequencer_grace_period_seconds": 300
+      }
+    ],
+    "pair_overrides": [
+      {
+        "base": "ETH",
+        "quote": "USD",
+        "enabled": true,
+        "force_backend": null,
+        "allow_fallback": true,
+        "divergence_threshold_bps": null,
+        "degraded_mode": null
+      },
+      {
+        "base": "BTC",
+        "quote": "USD",
+        "enabled": true,
+        "force_backend": null,
+        "allow_fallback": true,
+        "divergence_threshold_bps": null,
+        "degraded_mode": null
+      },
+      {
+        "base": "USDC",
+        "quote": "USD",
+        "enabled": true,
+        "force_backend": null,
+        "allow_fallback": true,
+        "divergence_threshold_bps": null,
+        "degraded_mode": null
+      },
+      {
+        "base": "LINK",
+        "quote": "USD",
+        "enabled": true,
+        "force_backend": null,
+        "allow_fallback": true,
+        "divergence_threshold_bps": null,
+        "degraded_mode": null
+      }
+    ],
+    "monitoring": {
+      "alert_on_fallback": true,
+      "alert_on_degraded": true,
+      "alert_on_pause": true,
+      "alert_on_sequencer": true
+    }
+  }
+}

@@ -2,6 +2,10 @@
 resolver = "2"
 members = [
     "crates/arc-bindings-core",
+    "crates/arc-anchor",
+    "crates/arc-link",
+    "crates/arc-settle",
+    "crates/arc-web3-bindings",
     "crates/arc-a2a-adapter",
     "crates/arc-control-plane",
     "crates/arc-core",
@@ -9,6 +13,10 @@ members = [
     "crates/arc-did",
     "crates/arc-hosted-mcp",
     "crates/arc-kernel",
+    "crates/arc-mercury",
+    "crates/arc-mercury-core",
+    "crates/arc-wall",
+    "crates/arc-wall-core",
     "crates/arc-store-sqlite",
     "crates/arc-reputation",
     "crates/arc-guards",
@@ -36,10 +44,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 thiserror = "1"
+chrono = "0.4"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
 rand_core = { version = "0.6", features = ["getrandom"] }
 tracing = "0.1"
 hex = "0.4"
+base64 = "0.22"
 bs58 = "0.5"
 ryu = "1"
 sha2 = "0.10"

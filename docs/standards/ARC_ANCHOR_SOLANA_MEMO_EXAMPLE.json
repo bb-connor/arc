@@ -1,0 +1,9 @@
+{
+  "schema": "arc.anchor.solana-memo-publication.v1",
+  "chain_id": "solana:mainnet-beta",
+  "operator_pubkey": "7xKXtg2CW9Q4hN7kD6A6tVWyQGm9Xxq6u9rY2T6yQkZp",
+  "memo_program_id": "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
+  "memo_data": "ARC:1042:0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea:1743292800",
+  "anchored_merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+  "anchored_checkpoint_seq": 1042
+}

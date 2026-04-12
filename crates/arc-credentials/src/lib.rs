@@ -21,7 +21,11 @@ use arc_core::{
     sha256_hex, ArcPortableClaimCatalog, ArcPortableIdentityBinding, Keypair, PublicKey, Signature,
 };
 use arc_did::{DidArc, DidError};
-use arc_reputation::{LocalReputationScorecard, MetricValue};
+use arc_reputation::{
+    BoundaryPressureMetrics, DelegationHygieneMetrics, HistoryDepthMetrics,
+    IncidentCorrelationMetrics, LeastPrivilegeMetrics, LocalReputationScorecard, MetricValue,
+    ReliabilityMetrics, ResourceStewardshipMetrics, SpecializationMetrics,
+};
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +43,10 @@ const LEGACY_PASSPORT_PRESENTATION_CHALLENGE_SCHEMA: &str =
 const PASSPORT_PRESENTATION_RESPONSE_SCHEMA: &str = "arc.agent-passport-presentation-response.v1";
 const LEGACY_PASSPORT_PRESENTATION_RESPONSE_SCHEMA: &str =
     "arc.agent-passport-presentation-response.v1";
+const CROSS_ISSUER_PORTFOLIO_SCHEMA: &str = "arc.cross-issuer-portfolio.v1";
+const CROSS_ISSUER_TRUST_PACK_SCHEMA: &str = "arc.cross-issuer-trust-pack.v1";
+const CROSS_ISSUER_MIGRATION_SCHEMA: &str = "arc.cross-issuer-migration.v1";
+const CROSS_ISSUER_PORTFOLIO_EVALUATION_SCHEMA: &str = "arc.cross-issuer-portfolio-evaluation.v1";
 const PROOF_TYPE: &str = "Ed25519Signature2020";
 const PROOF_PURPOSE: &str = "assertionMethod";
 const PRESENTATION_PROOF_PURPOSE: &str = "authentication";
@@ -63,6 +71,7 @@ fn is_supported_passport_presentation_response_schema(schema: &str) -> bool {
 
 include!("artifact.rs");
 include!("passport.rs");
+include!("cross_issuer.rs");
 include!("portable_sd_jwt.rs");
 include!("portable_jwt_vc.rs");
 include!("challenge.rs");
@@ -71,4 +80,6 @@ include!("presentation.rs");
 include!("policy.rs");
 include!("oid4vci.rs");
 include!("oid4vp.rs");
+include!("discovery.rs");
+include!("portable_reputation.rs");
 include!("tests.rs");

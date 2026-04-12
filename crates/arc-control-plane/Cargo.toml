@@ -46,6 +46,9 @@ x509-cert = "0.2"
 url = "2"
 
 [dev-dependencies]
+arc-anchor = { package = "arc-anchor", path = "../arc-anchor" }
+arc-link = { package = "arc-link", path = "../arc-link" }
+arc-settle = { package = "arc-settle", path = "../arc-settle" }
 rcgen = "0.13"
 
 [lints.clippy]

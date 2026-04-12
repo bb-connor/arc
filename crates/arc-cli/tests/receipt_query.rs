@@ -5,6 +5,7 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -12,18 +13,29 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::appraisal::{
-    RuntimeAttestationAppraisalRequest, SignedRuntimeAttestationAppraisalReport,
+    derive_runtime_attestation_appraisal, RuntimeAttestationAppraisalImportReport,
+    RuntimeAttestationAppraisalReport, RuntimeAttestationAppraisalRequest,
+    RuntimeAttestationAppraisalResult, RuntimeAttestationAppraisalResultExportRequest,
+    RuntimeAttestationImportDisposition, RuntimeAttestationImportReasonCode,
+    RuntimeAttestationImportedAppraisalPolicy, RuntimeAttestationNormalizedClaimCode,
+    RuntimeAttestationPolicyOutcome, SignedRuntimeAttestationAppraisalReport,
+    SignedRuntimeAttestationAppraisalResult, AWS_NITRO_ATTESTATION_SCHEMA,
+    AZURE_MAA_ATTESTATION_SCHEMA, ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA,
+    GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA, RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
 };
 use arc_core::capability::{
     ArcScope, CapabilityToken, CapabilityTokenBody, GovernedAutonomyTier, GovernedCallChainContext,
     MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, Operation, RuntimeAssuranceTier,
-    RuntimeAttestationEvidence, ToolGrant,
+    RuntimeAttestationEvidence, ToolGrant, WorkloadIdentity,
 };
 use arc_core::credit::{
-    CreditBondLifecycleState, CreditLossLifecycleArtifact, CreditLossLifecycleEventKind,
-    CreditLossLifecycleFinding, CreditLossLifecycleQuery, CreditLossLifecycleReasonCode,
-    CreditLossLifecycleReport, CreditLossLifecycleSummary, CreditLossLifecycleSupportBoundary,
-    CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA, CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
+    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode, CapitalBookSourceKind,
+    CapitalExecutionInstructionAction, CapitalExecutionIntendedState,
+    CapitalExecutionReconciledState, CreditBondLifecycleState, CreditLossLifecycleArtifact,
+    CreditLossLifecycleEventKind, CreditLossLifecycleFinding, CreditLossLifecycleQuery,
+    CreditLossLifecycleReasonCode, CreditLossLifecycleReport, CreditLossLifecycleSummary,
+    CreditLossLifecycleSupportBoundary, CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
+    CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
 };
 use arc_core::crypto::Keypair;
 use arc_core::receipt::{
@@ -38,10 +50,12 @@ use arc_kernel::{
     CreditBondedExecutionSimulationReport, CreditFacilityListReport, CreditFacilityReport,
     CreditLossLifecycleListReport, FederatedEvidenceShareImport, LiabilityMarketWorkflowReport,
     LiabilityProviderListReport, LiabilityProviderResolutionReport, ReceiptStore,
-    SignedBehavioralFeed, SignedCreditBond, SignedCreditFacility, SignedCreditLossLifecycle,
-    SignedCreditProviderRiskPackage, SignedCreditScorecardReport, SignedExposureLedgerReport,
-    SignedLiabilityBoundCoverage, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
-    SignedLiabilityClaimResponse, SignedLiabilityPlacement, SignedLiabilityProvider,
+    SignedBehavioralFeed, SignedCapitalAllocationDecision, SignedCapitalBookReport,
+    SignedCapitalExecutionInstruction, SignedCreditBond, SignedCreditFacility,
+    SignedCreditLossLifecycle, SignedCreditProviderRiskPackage, SignedCreditScorecardReport,
+    SignedExposureLedgerReport, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
+    SignedLiabilityClaimDispute, SignedLiabilityClaimPackage, SignedLiabilityClaimResponse,
+    SignedLiabilityPlacement, SignedLiabilityPricingAuthority, SignedLiabilityProvider,
     SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse, SignedUnderwritingDecision,
     SignedUnderwritingPolicyInput, StoredToolReceipt, UnderwritingAppealRecord,
     UnderwritingDecisionListReport, UnderwritingDecisionReport, UnderwritingSimulationReport,
@@ -78,7 +92,7 @@ fn unix_now_secs() -> u64 {
 fn sample_google_runtime_attestation() -> RuntimeAttestationEvidence {
     let now = unix_now_secs();
     RuntimeAttestationEvidence {
-        schema: "arc.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
+        schema: GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA.to_string(),
         verifier: "https://confidentialcomputing.googleapis.com".to_string(),
         tier: RuntimeAssuranceTier::Attested,
         issued_at: now.saturating_sub(30),
@@ -92,6 +106,82 @@ fn sample_google_runtime_attestation() -> RuntimeAttestationEvidence {
                 "hardwareModel": "GCP_AMD_SEV",
                 "secureBoot": "enabled",
                 "audiences": ["https://arc.example/verifier"]
+            }
+        })),
+    }
+}
+
+fn sample_azure_runtime_attestation() -> RuntimeAttestationEvidence {
+    let now = unix_now_secs();
+    RuntimeAttestationEvidence {
+        schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+        verifier: "https://maa.contoso.test".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(30),
+        expires_at: now.saturating_add(300),
+        evidence_sha256: "sha256-azure-attestation-report".to_string(),
+        runtime_identity: Some("spiffe://arc.example/workloads/azure".to_string()),
+        workload_identity: Some(
+            WorkloadIdentity::parse_spiffe_uri("spiffe://arc.example/workloads/azure")
+                .expect("parse azure workload identity"),
+        ),
+        claims: Some(serde_json::json!({
+            "azureMaa": {
+                "attestationType": "sgx"
+            }
+        })),
+    }
+}
+
+fn sample_aws_nitro_runtime_attestation() -> RuntimeAttestationEvidence {
+    let now = unix_now_secs();
+    RuntimeAttestationEvidence {
+        schema: AWS_NITRO_ATTESTATION_SCHEMA.to_string(),
+        verifier: "https://nitro.arc.example/verifier".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(30),
+        expires_at: now.saturating_add(300),
+        evidence_sha256: "sha256-aws-nitro-attestation-report".to_string(),
+        runtime_identity: None,
+        workload_identity: None,
+        claims: Some(serde_json::json!({
+            "awsNitro": {
+                "moduleId": "i-arc-nitro-enclave",
+                "digest": "SHA384:arc-nitro-measurement",
+                "pcrs": {
+                    "0": "8f7f1be8",
+                    "1": "1a2b3c4d"
+                }
+            }
+        })),
+    }
+}
+
+fn sample_enterprise_runtime_attestation() -> RuntimeAttestationEvidence {
+    let now = unix_now_secs();
+    RuntimeAttestationEvidence {
+        schema: ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA.to_string(),
+        verifier: "https://enterprise-verifier.arc.example".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(30),
+        expires_at: now.saturating_add(300),
+        evidence_sha256: "sha256-enterprise-attestation-report".to_string(),
+        runtime_identity: Some("spiffe://arc.example/workloads/enterprise".to_string()),
+        workload_identity: Some(
+            WorkloadIdentity::parse_spiffe_uri("spiffe://arc.example/workloads/enterprise")
+                .expect("parse enterprise workload identity"),
+        ),
+        claims: Some(serde_json::json!({
+            "enterpriseVerifier": {
+                "attestationType": "enterprise_signed_envelope",
+                "moduleId": "enterprise-module-1",
+                "digest": "SHA256:enterprise-module-digest",
+                "pcrs": {
+                    "0": "abcd1234",
+                    "7": "ef567890"
+                },
+                "hardwareModel": "enterprise_hsm_backed_runtime",
+                "secureBoot": "enabled"
             }
         })),
     }
@@ -195,6 +285,28 @@ fn record_test_credit_loss_event(
     event_id: &str,
     amount_units: u64,
 ) -> SignedCreditLossLifecycle {
+    record_test_credit_loss_event_with_kind(
+        receipt_db_path,
+        bond,
+        event_id,
+        CreditLossLifecycleEventKind::Delinquency,
+        amount_units,
+        CreditBondLifecycleState::Impaired,
+        CreditLossLifecycleReasonCode::DelinquencyRecorded,
+        "test delinquency lifecycle event",
+    )
+}
+
+fn record_test_credit_loss_event_with_kind(
+    receipt_db_path: &PathBuf,
+    bond: &SignedCreditBond,
+    event_id: &str,
+    event_kind: CreditLossLifecycleEventKind,
+    amount_units: u64,
+    projected_bond_lifecycle_state: CreditBondLifecycleState,
+    finding_code: CreditLossLifecycleReasonCode,
+    finding_description: &str,
+) -> SignedCreditLossLifecycle {
     let keypair = Keypair::generate();
     let issued_at = unix_now_secs();
     let currency = bond
@@ -209,7 +321,7 @@ fn record_test_credit_loss_event(
         generated_at: issued_at,
         query: CreditLossLifecycleQuery {
             bond_id: bond.body.bond_id.clone(),
-            event_kind: CreditLossLifecycleEventKind::Delinquency,
+            event_kind,
             amount: None,
         },
         summary: CreditLossLifecycleSummary {
@@ -220,15 +332,43 @@ fn record_test_credit_loss_event(
             tool_server: bond.body.report.filters.tool_server.clone(),
             tool_name: bond.body.report.filters.tool_name.clone(),
             current_bond_lifecycle_state: bond.body.lifecycle_state,
-            projected_bond_lifecycle_state: CreditBondLifecycleState::Impaired,
-            current_delinquent_amount: Some(MonetaryAmount {
+            projected_bond_lifecycle_state,
+            current_delinquent_amount: matches!(
+                event_kind,
+                CreditLossLifecycleEventKind::Delinquency | CreditLossLifecycleEventKind::WriteOff
+            )
+            .then(|| MonetaryAmount {
                 units: amount_units,
                 currency: currency.clone(),
             }),
-            current_recovered_amount: None,
-            current_written_off_amount: None,
-            current_released_reserve_amount: None,
-            outstanding_delinquent_amount: Some(MonetaryAmount {
+            current_recovered_amount: (event_kind == CreditLossLifecycleEventKind::Recovery).then(
+                || MonetaryAmount {
+                    units: amount_units,
+                    currency: currency.clone(),
+                },
+            ),
+            current_written_off_amount: (event_kind == CreditLossLifecycleEventKind::WriteOff)
+                .then(|| MonetaryAmount {
+                    units: amount_units,
+                    currency: currency.clone(),
+                }),
+            current_released_reserve_amount: (event_kind
+                == CreditLossLifecycleEventKind::ReserveRelease)
+                .then(|| MonetaryAmount {
+                    units: amount_units,
+                    currency: currency.clone(),
+                }),
+            current_slashed_reserve_amount: (event_kind
+                == CreditLossLifecycleEventKind::ReserveSlash)
+                .then(|| MonetaryAmount {
+                    units: amount_units,
+                    currency: currency.clone(),
+                }),
+            outstanding_delinquent_amount: matches!(
+                event_kind,
+                CreditLossLifecycleEventKind::Delinquency | CreditLossLifecycleEventKind::WriteOff
+            )
+            .then(|| MonetaryAmount {
                 units: amount_units,
                 currency: currency.clone(),
             }),
@@ -238,6 +378,10 @@ fn record_test_credit_loss_event(
                 .terms
                 .as_ref()
                 .map(|terms| terms.reserve_requirement_amount.clone()),
+            reserve_control_source_id: None,
+            execution_state: None,
+            appeal_state: None,
+            appeal_window_ends_at: None,
             event_amount: Some(MonetaryAmount {
                 units: amount_units,
                 currency: currency.clone(),
@@ -245,8 +389,8 @@ fn record_test_credit_loss_event(
         },
         support_boundary: CreditLossLifecycleSupportBoundary::default(),
         findings: vec![CreditLossLifecycleFinding {
-            code: CreditLossLifecycleReasonCode::DelinquencyRecorded,
-            description: "test delinquency lifecycle event".to_string(),
+            code: finding_code,
+            description: finding_description.to_string(),
             evidence_refs: Vec::new(),
         }],
     };
@@ -255,8 +399,18 @@ fn record_test_credit_loss_event(
         event_id: event_id.to_string(),
         issued_at,
         bond_id: bond.body.bond_id.clone(),
-        event_kind: CreditLossLifecycleEventKind::Delinquency,
-        projected_bond_lifecycle_state: CreditBondLifecycleState::Impaired,
+        event_kind,
+        projected_bond_lifecycle_state,
+        reserve_control_source_id: None,
+        authority_chain: Vec::new(),
+        execution_window: None,
+        rail: None,
+        observed_execution: None,
+        reconciled_state: None,
+        execution_state: None,
+        appeal_state: None,
+        appeal_window_ends_at: None,
+        description: None,
         report,
     };
     let event =
@@ -399,6 +553,7 @@ fn make_financial_receipt(
                 SettlementStatus::Settled
             },
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost,
         }
     });
@@ -448,6 +603,7 @@ fn make_financial_receipt_with_settlement_status(
             payment_reference: payment_reference.map(ToOwned::to_owned),
             settlement_status,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         }
     });
@@ -504,6 +660,7 @@ fn make_governed_financial_receipt(
             payment_reference: Some("payment-risk-1".to_string()),
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -574,6 +731,7 @@ fn make_governed_receipt(
             payment_reference: Some("pi_governed_1".to_string()),
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -652,6 +810,49 @@ fn make_governed_authorization_receipt_with_options(
     include_metered_billing: bool,
     include_call_chain: bool,
 ) -> ArcReceipt {
+    make_governed_authorization_receipt_with_runtime_profile(
+        id,
+        capability_id,
+        subject_key,
+        issuer_key,
+        tool_server,
+        tool_name,
+        timestamp,
+        settlement_status,
+        financial_currency,
+        exposure_units,
+        exposure_currency,
+        include_metered_billing,
+        include_call_chain,
+        AZURE_MAA_ATTESTATION_SCHEMA,
+        Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa),
+        RuntimeAssuranceTier::Verified,
+        "verifier.arc",
+        "sha256-attestation-auth-1",
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn make_governed_authorization_receipt_with_runtime_profile(
+    id: &str,
+    capability_id: &str,
+    subject_key: &str,
+    issuer_key: &str,
+    tool_server: &str,
+    tool_name: &str,
+    timestamp: u64,
+    settlement_status: SettlementStatus,
+    financial_currency: &str,
+    exposure_units: u64,
+    exposure_currency: &str,
+    include_metered_billing: bool,
+    include_call_chain: bool,
+    runtime_schema: &str,
+    runtime_verifier_family: Option<arc_core::appraisal::AttestationVerifierFamily>,
+    runtime_tier: RuntimeAssuranceTier,
+    runtime_verifier: &str,
+    runtime_evidence_sha256: &str,
+) -> ArcReceipt {
     let keypair = Keypair::generate();
     let metadata = serde_json::json!({
         "attribution": ReceiptAttributionMetadata {
@@ -671,6 +872,7 @@ fn make_governed_authorization_receipt_with_options(
             payment_reference: Some("pi_authorization_1".to_string()),
             settlement_status,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -710,11 +912,11 @@ fn make_governed_authorization_receipt_with_options(
                 approved: true,
             }),
             runtime_assurance: Some(RuntimeAssuranceReceiptMetadata {
-                schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
-                verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa),
-                tier: RuntimeAssuranceTier::Verified,
-                verifier: "verifier.arc".to_string(),
-                evidence_sha256: "sha256-attestation-auth-1".to_string(),
+                schema: runtime_schema.to_string(),
+                verifier_family: runtime_verifier_family,
+                tier: runtime_tier,
+                verifier: runtime_verifier.to_string(),
+                evidence_sha256: runtime_evidence_sha256.to_string(),
                 workload_identity: None,
             }),
             call_chain: include_call_chain.then_some(GovernedCallChainContext {
@@ -809,6 +1011,7 @@ fn make_credit_history_receipt(
             payment_reference: Some(format!("pi-{id}")),
             settlement_status,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -896,6 +1099,7 @@ fn make_governed_authorization_receipt_without_runtime_assurance(
             payment_reference: Some("pi_facility_1".to_string()),
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -972,6 +1176,7 @@ fn make_underwriting_simulation_receipt(
             payment_reference: Some(format!("pi-sim-{id}")),
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -1057,6 +1262,7 @@ fn make_governed_x402_receipt(
                     "recorded_units": 4200
                 }
             })),
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -1136,6 +1342,7 @@ fn make_governed_acp_receipt(
                     "recorded_units": 4200
                 }
             })),
+            oracle_evidence: None,
             attempted_cost: None,
         },
         "governed_transaction": GovernedTransactionReceiptMetadata {
@@ -3272,6 +3479,14 @@ fn test_authorization_context_report_and_cli() {
         Some("verified")
     );
     assert_eq!(
+        auth_row["transactionContext"]["runtimeAssuranceSchema"].as_str(),
+        Some("arc.runtime-attestation.azure-maa.jwt.v1")
+    );
+    assert_eq!(
+        auth_row["transactionContext"]["runtimeAssuranceVerifierFamily"].as_str(),
+        Some("azure_maa")
+    );
+    assert_eq!(
         auth_row["transactionContext"]["callChain"]["chainId"].as_str(),
         Some("chain-ext-1")
     );
@@ -3385,6 +3600,19 @@ fn test_authorization_context_report_and_cli() {
         .iter()
         .find(|row| row.receipt_id == "rc-auth-1")
         .expect("authorization CLI row");
+    assert_eq!(
+        cli_row
+            .transaction_context
+            .runtime_assurance_schema
+            .as_deref(),
+        Some("arc.runtime-attestation.azure-maa.jwt.v1")
+    );
+    assert_eq!(
+        cli_row
+            .transaction_context
+            .runtime_assurance_verifier_family,
+        Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa)
+    );
     assert_eq!(
         cli_row
             .transaction_context
@@ -3530,6 +3758,16 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
         .expect("sender constraint field list")
         .iter()
         .any(|value| value.as_str() == Some("issuerKey")));
+    assert!(metadata_body["exampleMapping"]["transactionContextFields"]
+        .as_array()
+        .expect("transaction context field list")
+        .iter()
+        .any(|value| value.as_str() == Some("runtimeAssuranceSchema")));
+    assert!(metadata_body["exampleMapping"]["transactionContextFields"]
+        .as_array()
+        .expect("transaction context field list")
+        .iter()
+        .any(|value| value.as_str() == Some("runtimeAssuranceVerifierFamily")));
     assert_eq!(
         metadata_body["profile"]["portableIdentityBinding"]["arcProvenanceAnchor"].as_str(),
         Some("did:arc")
@@ -4868,6 +5106,40 @@ extensions:
         report.body.appraisal.normalized_assertions["secureBoot"],
         serde_json::json!("enabled")
     );
+    let artifact = report
+        .body
+        .appraisal
+        .artifact
+        .as_ref()
+        .expect("appraisal export should carry nested artifact");
+    assert_eq!(
+        artifact.schema,
+        "arc.runtime-attestation.appraisal-artifact.v1"
+    );
+    assert_eq!(artifact.verifier.adapter, "google_confidential_vm");
+    assert_eq!(
+        artifact.claims.normalized_assertions["secureBoot"],
+        serde_json::json!("enabled")
+    );
+    assert!(artifact.claims.normalized_claims.iter().any(|claim| {
+        claim.code == arc_core::appraisal::RuntimeAttestationNormalizedClaimCode::SecureBootState
+            && claim.legacy_assertion_key == "secureBoot"
+            && claim.provenance
+                == arc_core::appraisal::RuntimeAttestationClaimProvenance::VendorClaims
+            && claim.value == serde_json::json!("enabled")
+    }));
+    assert_eq!(
+        artifact.policy.effective_tier,
+        RuntimeAssuranceTier::Attested
+    );
+    assert_eq!(
+        artifact.policy.reasons,
+        vec![
+            arc_core::appraisal::RuntimeAttestationAppraisalReason::from_code(
+                arc_core::appraisal::RuntimeAttestationAppraisalReasonCode::EvidenceVerified
+            )
+        ]
+    );
     assert!(!report.body.policy_outcome.trust_policy_configured);
     assert!(report.body.policy_outcome.accepted);
     assert_eq!(
@@ -4908,6 +5180,610 @@ extensions:
         cli_report.body.policy_outcome.effective_tier,
         RuntimeAssuranceTier::Verified
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_runtime_attestation_appraisal_result_import_export_surfaces() {
+    let dir = unique_dir("arc-runtime-appraisal-result");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+    let attestation_path = dir.join("runtime-attestation.json");
+    let signed_result_path = dir.join("signed-appraisal-result.json");
+    let runtime_policy_path = dir.join("runtime-policy.yaml");
+    let import_policy_path = dir.join("import-policy.json");
+    let rejecting_policy_path = dir.join("rejecting-import-policy.json");
+    let attestation = sample_google_runtime_attestation();
+    std::fs::write(
+        &attestation_path,
+        serde_json::to_vec_pretty(&attestation).expect("serialize attestation"),
+    )
+    .expect("write attestation file");
+    std::fs::write(
+        &runtime_policy_path,
+        r#"hushspec: "0.1.0"
+name: runtime-appraisal-result
+rules:
+  tool_access:
+    enabled: true
+    allow: ["payments.charge"]
+extensions:
+  runtime_assurance:
+    tiers:
+      baseline:
+        minimum_attestation_tier: none
+        max_scope:
+          operations: ["invoke"]
+          ttl_seconds: 60
+      verified:
+        minimum_attestation_tier: attested
+        max_scope:
+          operations: ["invoke"]
+          ttl_seconds: 300
+    trusted_verifiers:
+      google_prod:
+        schema: arc.runtime-attestation.google-confidential-vm.jwt.v1
+        verifier: https://confidentialcomputing.googleapis.com
+        verifier_family: google_attestation
+        effective_tier: verified
+        max_evidence_age_seconds: 120
+        allowed_attestation_types: [confidential_vm]
+        required_assertions:
+          hardwareModel: GCP_AMD_SEV
+          secureBoot: enabled
+"#,
+    )
+    .expect("write runtime policy file");
+
+    let listen = reserve_listen_addr();
+    let service_token = "runtime-appraisal-result-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal-result"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&RuntimeAttestationAppraisalResultExportRequest {
+            issuer: "did:arc:test:remote-exporter".to_string(),
+            runtime_attestation: attestation.clone(),
+        })
+        .send()
+        .expect("send runtime appraisal result export request");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let exported: SignedRuntimeAttestationAppraisalResult =
+        response.json().expect("parse signed appraisal result");
+    assert!(exported
+        .verify_signature()
+        .expect("verify signed appraisal result"));
+    assert_eq!(
+        exported.body.schema,
+        "arc.runtime-attestation.appraisal-result.v1"
+    );
+    assert_eq!(exported.body.issuer, "did:arc:test:remote-exporter");
+    assert_eq!(
+        exported.body.subject.runtime_identity.as_deref(),
+        Some("spiffe://arc.example/workloads/google")
+    );
+    std::fs::write(
+        &signed_result_path,
+        serde_json::to_vec_pretty(&exported).expect("serialize signed result"),
+    )
+    .expect("write signed result file");
+
+    let import_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec!["did:arc:test:remote-exporter".to_string()],
+        trusted_signer_keys: vec![exported.signer_key.to_hex()],
+        allowed_verifier_families: vec![
+            arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+        ],
+        max_result_age_seconds: Some(300),
+        max_evidence_age_seconds: Some(300),
+        maximum_effective_tier: Some(RuntimeAssuranceTier::Basic),
+        required_claims: std::iter::once((
+            RuntimeAttestationNormalizedClaimCode::SecureBootState,
+            "enabled".to_string(),
+        ))
+        .collect(),
+    };
+    std::fs::write(
+        &import_policy_path,
+        serde_json::to_vec_pretty(&import_policy).expect("serialize import policy"),
+    )
+    .expect("write import policy file");
+
+    let import_response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "signedResult": exported,
+            "localPolicy": import_policy,
+        }))
+        .send()
+        .expect("send runtime appraisal import request");
+    assert_eq!(import_response.status(), reqwest::StatusCode::OK);
+    let import_report: RuntimeAttestationAppraisalImportReport =
+        import_response.json().expect("parse import report");
+    assert_eq!(
+        import_report.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Attenuate
+    );
+    assert_eq!(
+        import_report.local_policy_outcome.effective_tier,
+        RuntimeAssuranceTier::Basic
+    );
+    assert_eq!(
+        import_report.local_policy_outcome.reason_codes,
+        vec![RuntimeAttestationImportReasonCode::TierAttenuated]
+    );
+
+    let cli_export_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "appraisal",
+            "export-result",
+            "--issuer",
+            "did:arc:test:cli-exporter",
+            "--input",
+            attestation_path.to_str().expect("attestation path"),
+            "--policy-file",
+            runtime_policy_path.to_str().expect("runtime policy path"),
+        ])
+        .output()
+        .expect("run appraisal result export CLI");
+    assert!(
+        cli_export_output.status.success(),
+        "runtime appraisal result export CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&cli_export_output.stdout),
+        String::from_utf8_lossy(&cli_export_output.stderr)
+    );
+    let cli_result: SignedRuntimeAttestationAppraisalResult =
+        serde_json::from_slice(&cli_export_output.stdout)
+            .expect("parse appraisal result export CLI json");
+    assert!(cli_result
+        .verify_signature()
+        .expect("verify appraisal result export CLI signature"));
+    assert!(
+        cli_result
+            .body
+            .exporter_policy_outcome
+            .trust_policy_configured
+    );
+    assert_eq!(
+        cli_result.body.exporter_policy_outcome.effective_tier,
+        RuntimeAssuranceTier::Verified
+    );
+
+    let rejecting_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec!["did:arc:test:remote-exporter".to_string()],
+        trusted_signer_keys: vec![cli_result.signer_key.to_hex()],
+        allowed_verifier_families: vec![
+            arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+        ],
+        max_result_age_seconds: Some(300),
+        max_evidence_age_seconds: Some(300),
+        maximum_effective_tier: None,
+        required_claims: std::iter::once((
+            RuntimeAttestationNormalizedClaimCode::SecureBootState,
+            "disabled".to_string(),
+        ))
+        .collect(),
+    };
+    std::fs::write(
+        &rejecting_policy_path,
+        serde_json::to_vec_pretty(&rejecting_policy).expect("serialize rejecting policy"),
+    )
+    .expect("write rejecting policy file");
+
+    let cli_import_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "trust",
+            "appraisal",
+            "import",
+            "--input",
+            signed_result_path.to_str().expect("signed result path"),
+            "--policy-file",
+            rejecting_policy_path
+                .to_str()
+                .expect("rejecting policy path"),
+        ])
+        .output()
+        .expect("run appraisal import CLI");
+    assert!(
+        cli_import_output.status.success(),
+        "runtime appraisal import CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&cli_import_output.stdout),
+        String::from_utf8_lossy(&cli_import_output.stderr)
+    );
+    let cli_import_report: RuntimeAttestationAppraisalImportReport =
+        serde_json::from_slice(&cli_import_output.stdout).expect("parse appraisal import CLI json");
+    assert_eq!(
+        cli_import_report.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert!(cli_import_report
+        .local_policy_outcome
+        .reason_codes
+        .contains(&RuntimeAttestationImportReasonCode::ClaimMismatch));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports(
+) {
+    struct ProviderCase {
+        name: &'static str,
+        attestation: RuntimeAttestationEvidence,
+        expected_family: arc_core::appraisal::AttestationVerifierFamily,
+        required_claim: (RuntimeAttestationNormalizedClaimCode, &'static str),
+    }
+
+    let dir = unique_dir("arc-runtime-appraisal-mixed-provider");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "runtime-appraisal-mixed-provider-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let providers = vec![
+        ProviderCase {
+            name: "azure",
+            attestation: sample_azure_runtime_attestation(),
+            expected_family: arc_core::appraisal::AttestationVerifierFamily::AzureMaa,
+            required_claim: (
+                RuntimeAttestationNormalizedClaimCode::AttestationType,
+                "sgx",
+            ),
+        },
+        ProviderCase {
+            name: "aws_nitro",
+            attestation: sample_aws_nitro_runtime_attestation(),
+            expected_family: arc_core::appraisal::AttestationVerifierFamily::AwsNitro,
+            required_claim: (
+                RuntimeAttestationNormalizedClaimCode::ModuleId,
+                "i-arc-nitro-enclave",
+            ),
+        },
+        ProviderCase {
+            name: "google",
+            attestation: sample_google_runtime_attestation(),
+            expected_family: arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+            required_claim: (
+                RuntimeAttestationNormalizedClaimCode::HardwareModel,
+                "GCP_AMD_SEV",
+            ),
+        },
+        ProviderCase {
+            name: "enterprise",
+            attestation: sample_enterprise_runtime_attestation(),
+            expected_family: arc_core::appraisal::AttestationVerifierFamily::EnterpriseVerifier,
+            required_claim: (
+                RuntimeAttestationNormalizedClaimCode::ModuleId,
+                "enterprise-module-1",
+            ),
+        },
+    ];
+
+    for provider in &providers {
+        let issuer = format!("did:arc:test:{}-exporter", provider.name);
+        let response = client
+            .post(format!(
+                "{base_url}/v1/reports/runtime-attestation-appraisal-result"
+            ))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {service_token}"),
+            )
+            .json(&RuntimeAttestationAppraisalResultExportRequest {
+                issuer: issuer.clone(),
+                runtime_attestation: provider.attestation.clone(),
+            })
+            .send()
+            .expect("send runtime appraisal result export request");
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let exported: SignedRuntimeAttestationAppraisalResult =
+            response.json().expect("parse signed appraisal result");
+        assert!(exported
+            .verify_signature()
+            .expect("verify signed appraisal result"));
+        assert_eq!(exported.body.issuer, issuer);
+        assert_eq!(
+            exported.body.appraisal.verifier.verifier_family,
+            provider.expected_family
+        );
+        assert!(
+            exported
+                .body
+                .appraisal
+                .claims
+                .normalized_claims
+                .iter()
+                .any(|claim| claim.code == provider.required_claim.0),
+            "provider {} should project required normalized claim",
+            provider.name
+        );
+
+        let import_policy = RuntimeAttestationImportedAppraisalPolicy {
+            trusted_issuers: vec![exported.body.issuer.clone()],
+            trusted_signer_keys: vec![exported.signer_key.to_hex()],
+            allowed_verifier_families: vec![provider.expected_family],
+            max_result_age_seconds: Some(300),
+            max_evidence_age_seconds: Some(300),
+            maximum_effective_tier: None,
+            required_claims: BTreeMap::from([(
+                provider.required_claim.0,
+                provider.required_claim.1.to_string(),
+            )]),
+        };
+        let import_response = client
+            .post(format!(
+                "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+            ))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {service_token}"),
+            )
+            .json(&serde_json::json!({
+                "signedResult": exported,
+                "localPolicy": import_policy,
+            }))
+            .send()
+            .expect("send runtime appraisal import request");
+        assert_eq!(import_response.status(), reqwest::StatusCode::OK);
+        let import_report: RuntimeAttestationAppraisalImportReport =
+            import_response.json().expect("parse import report");
+        assert_eq!(
+            import_report.local_policy_outcome.disposition,
+            RuntimeAttestationImportDisposition::Allow,
+            "provider {} should import cleanly",
+            provider.name
+        );
+        assert_eq!(
+            import_report.local_policy_outcome.effective_tier,
+            RuntimeAssuranceTier::Attested
+        );
+    }
+
+    let google_export = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal-result"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&RuntimeAttestationAppraisalResultExportRequest {
+            issuer: "did:arc:test:google-negative-exporter".to_string(),
+            runtime_attestation: sample_google_runtime_attestation(),
+        })
+        .send()
+        .expect("export google result for negative paths");
+    assert_eq!(google_export.status(), reqwest::StatusCode::OK);
+    let exported_google: SignedRuntimeAttestationAppraisalResult =
+        google_export.json().expect("parse exported google result");
+
+    let contradictory_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec![exported_google.body.issuer.clone()],
+        trusted_signer_keys: vec![exported_google.signer_key.to_hex()],
+        allowed_verifier_families: vec![
+            arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+        ],
+        max_result_age_seconds: Some(300),
+        max_evidence_age_seconds: Some(300),
+        maximum_effective_tier: None,
+        required_claims: BTreeMap::from([(
+            RuntimeAttestationNormalizedClaimCode::HardwareModel,
+            "GCP_INTEL_TDX".to_string(),
+        )]),
+    };
+    let contradictory_response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "signedResult": exported_google.clone(),
+            "localPolicy": contradictory_policy,
+        }))
+        .send()
+        .expect("import contradictory google result");
+    assert_eq!(contradictory_response.status(), reqwest::StatusCode::OK);
+    let contradictory_report: RuntimeAttestationAppraisalImportReport = contradictory_response
+        .json()
+        .expect("parse contradictory import report");
+    assert_eq!(
+        contradictory_report.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert!(contradictory_report
+        .local_policy_outcome
+        .reason_codes
+        .contains(&RuntimeAttestationImportReasonCode::ClaimMismatch));
+
+    let unsupported_family_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec![exported_google.body.issuer.clone()],
+        trusted_signer_keys: vec![exported_google.signer_key.to_hex()],
+        allowed_verifier_families: vec![arc_core::appraisal::AttestationVerifierFamily::AzureMaa],
+        max_result_age_seconds: Some(300),
+        max_evidence_age_seconds: Some(300),
+        maximum_effective_tier: None,
+        required_claims: BTreeMap::new(),
+    };
+    let unsupported_family_response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "signedResult": exported_google.clone(),
+            "localPolicy": unsupported_family_policy,
+        }))
+        .send()
+        .expect("import unsupported-family google result");
+    assert_eq!(
+        unsupported_family_response.status(),
+        reqwest::StatusCode::OK
+    );
+    let unsupported_family_report: RuntimeAttestationAppraisalImportReport =
+        unsupported_family_response
+            .json()
+            .expect("parse unsupported-family import report");
+    assert_eq!(
+        unsupported_family_report.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert!(unsupported_family_report
+        .local_policy_outcome
+        .reason_codes
+        .contains(&RuntimeAttestationImportReasonCode::UnsupportedVerifierFamily));
+
+    let stale_evidence_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec![exported_google.body.issuer.clone()],
+        trusted_signer_keys: vec![exported_google.signer_key.to_hex()],
+        allowed_verifier_families: vec![
+            arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+        ],
+        max_result_age_seconds: Some(300),
+        max_evidence_age_seconds: Some(1),
+        maximum_effective_tier: None,
+        required_claims: BTreeMap::new(),
+    };
+    let stale_evidence_response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "signedResult": exported_google.clone(),
+            "localPolicy": stale_evidence_policy,
+        }))
+        .send()
+        .expect("import stale-evidence google result");
+    assert_eq!(stale_evidence_response.status(), reqwest::StatusCode::OK);
+    let stale_evidence_report: RuntimeAttestationAppraisalImportReport = stale_evidence_response
+        .json()
+        .expect("parse stale-evidence import report");
+    assert_eq!(
+        stale_evidence_report.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert!(stale_evidence_report
+        .local_policy_outcome
+        .reason_codes
+        .contains(&RuntimeAttestationImportReasonCode::EvidenceStale));
+
+    let replay_attestation = sample_google_runtime_attestation();
+    let replay_appraisal = derive_runtime_attestation_appraisal(&replay_attestation)
+        .expect("derive appraisal for stale replay test");
+    let stale_replay_report = RuntimeAttestationAppraisalReport {
+        schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
+        generated_at: unix_now_secs().saturating_sub(600),
+        appraisal: replay_appraisal,
+        policy_outcome: RuntimeAttestationPolicyOutcome {
+            trust_policy_configured: false,
+            accepted: true,
+            effective_tier: RuntimeAssuranceTier::Attested,
+            reason: None,
+        },
+    };
+    let stale_replay_result = RuntimeAttestationAppraisalResult::from_report(
+        "did:arc:test:stale-replay-exporter",
+        &stale_replay_report,
+    )
+    .expect("build stale replay result");
+    let stale_replay_signer = Keypair::generate();
+    let signed_stale_replay =
+        SignedRuntimeAttestationAppraisalResult::sign(stale_replay_result, &stale_replay_signer)
+            .expect("sign stale replay result");
+    let stale_replay_policy = RuntimeAttestationImportedAppraisalPolicy {
+        trusted_issuers: vec!["did:arc:test:stale-replay-exporter".to_string()],
+        trusted_signer_keys: vec![stale_replay_signer.public_key().to_hex()],
+        allowed_verifier_families: vec![
+            arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation,
+        ],
+        max_result_age_seconds: Some(120),
+        max_evidence_age_seconds: Some(300),
+        maximum_effective_tier: None,
+        required_claims: BTreeMap::new(),
+    };
+    let stale_replay_response = client
+        .post(format!(
+            "{base_url}/v1/reports/runtime-attestation-appraisal/import"
+        ))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "signedResult": signed_stale_replay,
+            "localPolicy": stale_replay_policy,
+        }))
+        .send()
+        .expect("import stale replay result");
+    assert_eq!(stale_replay_response.status(), reqwest::StatusCode::OK);
+    let stale_replay_import: RuntimeAttestationAppraisalImportReport = stale_replay_response
+        .json()
+        .expect("parse stale replay import report");
+    assert_eq!(
+        stale_replay_import.local_policy_outcome.disposition,
+        RuntimeAttestationImportDisposition::Reject
+    );
+    assert!(stale_replay_import
+        .local_policy_outcome
+        .reason_codes
+        .contains(&RuntimeAttestationImportReasonCode::ResultStale));
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -5527,7 +6403,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
                     issuer_key,
                     "ledger",
                     "transfer",
-                    now.saturating_sub(day * 86_400),
+                    now.saturating_sub((day + 2) * 86_400),
                     SettlementStatus::Settled,
                     "USD",
                     5_000,
@@ -5811,7 +6687,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
                     now.saturating_sub(day * 86_400),
                     SettlementStatus::Settled,
                     "USD",
-                    4_000,
+                    5_000,
                     "USD",
                     false,
                     false,
@@ -5828,7 +6704,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
                     now.saturating_sub((day + 15) * 86_400),
                     SettlementStatus::Settled,
                     "EUR",
-                    4_000,
+                    5_000,
                     "EUR",
                     false,
                     false,
@@ -5876,6 +6752,104 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
     assert!(report.scorecard.mixed_currency_book);
     assert!(report.findings.iter().any(|finding| {
         finding.code == arc_core::credit::CreditFacilityReasonCode::MixedCurrencyBook
+    }));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provenance() {
+    let dir = unique_dir("arc-credit-facility-mixed-runtime-provenance");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-facility-mixed-runtime-1";
+    let issuer_key = "issuer-facility-mixed-runtime-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..30_u64 {
+            let (schema, family, verifier, evidence_sha) = if day % 2 == 0 {
+                (
+                    AZURE_MAA_ATTESTATION_SCHEMA,
+                    Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa),
+                    "https://maa.arc.example",
+                    "sha256-mixed-runtime-azure",
+                )
+            } else {
+                (
+                    GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
+                    Some(arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation),
+                    "https://confidentialcomputing.googleapis.com",
+                    "sha256-mixed-runtime-google",
+                )
+            };
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_runtime_profile(
+                    &format!("rc-facility-mixed-runtime-{day}"),
+                    &format!("cap-facility-mixed-runtime-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub(day * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    4_500,
+                    "USD",
+                    false,
+                    false,
+                    schema,
+                    family,
+                    RuntimeAssuranceTier::Verified,
+                    verifier,
+                    evidence_sha,
+                ))
+                .expect("append mixed runtime provenance receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "credit-facility-mixed-runtime-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/reports/facility-policy"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "100"),
+            ("decisionLimit", "50"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send mixed-runtime-provenance facility request");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let report: CreditFacilityReport = response
+        .json()
+        .expect("parse mixed-runtime-provenance facility report");
+    assert_eq!(
+        report.disposition,
+        arc_core::credit::CreditFacilityDisposition::ManualReview
+    );
+    assert!(report.terms.is_none());
+    assert!(report.findings.iter().any(|finding| {
+        finding.code == arc_core::credit::CreditFacilityReasonCode::MixedRuntimeAssuranceProvenance
     }));
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -6345,7 +7319,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
                     now.saturating_sub((day + 2) * 86_400),
                     SettlementStatus::Settled,
                     "USD",
-                    4_000,
+                    5_000,
                     "USD",
                     false,
                     false,
@@ -6362,7 +7336,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
                     now.saturating_sub((day + 2) * 86_400),
                     SettlementStatus::Settled,
                     "USD",
-                    4_000,
+                    5_000,
                     "USD",
                     false,
                     false,
@@ -6500,7 +7474,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
                     now.saturating_sub((day + 2) * 86_400),
                     SettlementStatus::Settled,
                     "USD",
-                    4_000,
+                    5_000,
                     "USD",
                     false,
                     false,
@@ -6865,6 +7839,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
     let cli_report: CreditLossLifecycleListReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse credit loss lifecycle CLI list");
     assert_eq!(cli_report.summary.matching_events, 1);
+    assert_eq!(cli_report.summary.reserve_slash_events, 0);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -6952,6 +7927,14 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
     let bond: SignedCreditBond = bond_issue.json().expect("parse release bond");
     let bond_id = bond.body.bond_id.clone();
+    let reserve_amount = bond
+        .body
+        .report
+        .terms
+        .as_ref()
+        .expect("release bond terms")
+        .reserve_requirement_amount
+        .clone();
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
@@ -7097,6 +8080,60 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
             }
         }))
         .send()
+        .expect("issue reserve release event without execution metadata");
+    assert_eq!(release_issue.status(), reqwest::StatusCode::BAD_REQUEST);
+    let release_issue_body: serde_json::Value = release_issue
+        .json()
+        .expect("parse reserve release metadata error");
+    assert!(release_issue_body["error"]
+        .as_str()
+        .expect("reserve release metadata error")
+        .contains("requires executionWindow"));
+
+    let release_issue = client
+        .post(format!("{base_url}/v1/bond-losses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "bondId": bond_id.as_str(),
+                "eventKind": "reserve_release"
+            },
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "reserve-release-manual-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "reserve-book-main"
+            },
+            "observedExecution": {
+                "observedAt": now,
+                "externalReferenceId": "reserve-release-wire-1",
+                "amount": reserve_amount.clone()
+            },
+            "appealWindowEndsAt": now.saturating_add(1_800),
+            "description": "operator reserve release after cleared delinquency"
+        }))
+        .send()
         .expect("issue reserve release event");
     assert_eq!(release_issue.status(), reqwest::StatusCode::OK);
     let release_event: SignedCreditLossLifecycle =
@@ -7108,6 +8145,39 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     assert_eq!(
         release_event.body.projected_bond_lifecycle_state,
         arc_core::credit::CreditBondLifecycleState::Released
+    );
+    assert_eq!(
+        release_event.body.reserve_control_source_id.as_deref(),
+        Some(format!("capital-source:bond:{bond_id}").as_str())
+    );
+    assert_eq!(
+        release_event.body.execution_state,
+        Some(arc_core::credit::CreditReserveControlExecutionState::Executed)
+    );
+    assert_eq!(
+        release_event.body.reconciled_state,
+        Some(CapitalExecutionReconciledState::Matched)
+    );
+    assert_eq!(
+        release_event.body.appeal_state,
+        Some(arc_core::credit::CreditReserveControlAppealState::Open)
+    );
+    assert_eq!(
+        release_event.body.appeal_window_ends_at,
+        Some(now.saturating_add(1_800))
+    );
+    assert_eq!(release_event.body.authority_chain.len(), 2);
+    assert_eq!(
+        release_event
+            .body
+            .rail
+            .as_ref()
+            .map(|rail| rail.custody_provider_id.as_str()),
+        Some("custodian-1")
+    );
+    assert_eq!(
+        release_event.body.description.as_deref(),
+        Some("operator reserve release after cleared delinquency")
     );
 
     let list_response = client
@@ -7127,6 +8197,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
     assert_eq!(list_report.summary.recovery_events, 1);
     assert_eq!(list_report.summary.write_off_events, 1);
     assert_eq!(list_report.summary.reserve_release_events, 1);
+    assert_eq!(list_report.summary.reserve_slash_events, 0);
 
     let bond_list = client
         .get(format!("{base_url}/v1/reports/bonds"))
@@ -7143,6 +8214,301 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
         bond_report.bonds[0].lifecycle_state,
         arc_core::credit::CreditBondLifecycleState::Released
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() {
+    let dir = unique_dir("arc-credit-loss-lifecycle-slash");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-credit-loss-slash-1";
+    let issuer_key = "issuer-credit-loss-slash-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-loss-slash-good-{day}"),
+                    &format!("cap-loss-slash-good-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append good slash history");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "credit-loss-slash-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue slash backing facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+
+    let bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue slash bond");
+    assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
+    let bond: SignedCreditBond = bond_issue.json().expect("parse slash bond");
+    let bond_id = bond.body.bond_id.clone();
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_credit_history_receipt(
+                "rc-loss-slash-failed-1",
+                "cap-loss-slash-failed-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(60),
+                SettlementStatus::Failed,
+                "USD",
+                8_500,
+                "USD",
+                true,
+            ))
+            .expect("append failed slash receipt");
+    }
+
+    let delinquency_issue = client
+        .post(format!("{base_url}/v1/bond-losses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "bondId": bond_id.as_str(),
+                "eventKind": "delinquency"
+            }
+        }))
+        .send()
+        .expect("issue slash delinquency");
+    assert_eq!(delinquency_issue.status(), reqwest::StatusCode::OK);
+
+    let missing_metadata = client
+        .post(format!("{base_url}/v1/bond-losses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "bondId": bond_id.as_str(),
+                "eventKind": "reserve_slash"
+            }
+        }))
+        .send()
+        .expect("issue reserve slash without metadata");
+    assert_eq!(missing_metadata.status(), reqwest::StatusCode::BAD_REQUEST);
+    let missing_metadata_body: serde_json::Value = missing_metadata
+        .json()
+        .expect("parse reserve slash metadata error");
+    assert!(missing_metadata_body["error"]
+        .as_str()
+        .expect("reserve slash metadata error")
+        .contains("requires executionWindow"));
+
+    let stale_authority = client
+        .post(format!("{base_url}/v1/bond-losses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "bondId": bond_id.as_str(),
+                "eventKind": "reserve_slash"
+            },
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(100),
+                    "expiresAt": now.saturating_sub(10)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(100),
+                    "expiresAt": now.saturating_sub(10)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "reserve-slash-manual-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "reserve-book-main"
+            }
+        }))
+        .send()
+        .expect("issue reserve slash with stale authority");
+    assert_eq!(stale_authority.status(), reqwest::StatusCode::CONFLICT);
+    let stale_authority_body: serde_json::Value = stale_authority
+        .json()
+        .expect("parse stale reserve slash response");
+    assert!(stale_authority_body["error"]
+        .as_str()
+        .expect("stale reserve slash error")
+        .contains("stale"));
+
+    let slash_issue = client
+        .post(format!("{base_url}/v1/bond-losses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "bondId": bond_id.as_str(),
+                "eventKind": "reserve_slash",
+                "amount": {
+                    "units": 500,
+                    "currency": "USD"
+                }
+            },
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "reserve-slash-manual-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "reserve-book-main"
+            },
+            "appealWindowEndsAt": now.saturating_add(1_800),
+            "description": "operator reserve slash against outstanding delinquency"
+        }))
+        .send()
+        .expect("issue reserve slash event");
+    assert_eq!(slash_issue.status(), reqwest::StatusCode::OK);
+    let slash_event: SignedCreditLossLifecycle =
+        slash_issue.json().expect("parse reserve slash event");
+    assert_eq!(
+        slash_event.body.event_kind,
+        arc_core::credit::CreditLossLifecycleEventKind::ReserveSlash
+    );
+    assert_eq!(
+        slash_event
+            .body
+            .report
+            .summary
+            .event_amount
+            .as_ref()
+            .expect("slash amount")
+            .units,
+        500
+    );
+    assert_eq!(
+        slash_event.body.execution_state,
+        Some(arc_core::credit::CreditReserveControlExecutionState::PendingExecution)
+    );
+    assert_eq!(
+        slash_event.body.reconciled_state,
+        Some(CapitalExecutionReconciledState::NotObserved)
+    );
+    assert_eq!(
+        slash_event.body.appeal_state,
+        Some(arc_core::credit::CreditReserveControlAppealState::Open)
+    );
+    assert_eq!(
+        slash_event.body.reserve_control_source_id.as_deref(),
+        Some(format!("capital-source:bond:{bond_id}").as_str())
+    );
+    assert_eq!(slash_event.body.authority_chain.len(), 2);
+    assert_eq!(
+        slash_event.body.description.as_deref(),
+        Some("operator reserve slash against outstanding delinquency")
+    );
+
+    let list_response = client
+        .get(format!("{base_url}/v1/reports/bond-losses"))
+        .query(&[("bondId", bond_id.as_str()), ("limit", "10")])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("list slash lifecycle events");
+    assert_eq!(list_response.status(), reqwest::StatusCode::OK);
+    let list_report: CreditLossLifecycleListReport =
+        list_response.json().expect("parse slash lifecycle list");
+    assert_eq!(list_report.summary.matching_events, 2);
+    assert_eq!(list_report.summary.delinquency_events, 1);
+    assert_eq!(list_report.summary.reserve_slash_events, 1);
+    assert_eq!(list_report.summary.reserve_release_events, 0);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -7459,7 +8825,7 @@ fn test_provider_risk_package_export_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..200_u64 {
+        for day in 0..1_000_u64 {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-risk-good-{day}"),
@@ -7502,7 +8868,7 @@ fn test_provider_risk_package_export_surfaces() {
         .json(&serde_json::json!({
             "query": {
                 "agentSubject": subject_key,
-                "receiptLimit": 200,
+                "receiptLimit": 1000,
                 "decisionLimit": 50
             }
         }))
@@ -7628,6 +8994,1444 @@ fn test_provider_risk_package_export_surfaces() {
             .returned_loss_events
             >= 1
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_book_report_export_surfaces() {
+    let dir = unique_dir("arc-capital-book");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-capital-book-1";
+    let issuer_key = "issuer-capital-book-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-good-{day}"),
+                    &format!("cap-capital-good-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub(day * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append capital history receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-book-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 1000,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue capital facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+    let issued_facility: SignedCreditFacility = facility_issue
+        .json()
+        .expect("parse issued capital facility");
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_credit_history_receipt(
+                "rc-capital-pending-1",
+                "cap-capital-pending-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                8_000,
+                "USD",
+                true,
+            ))
+            .expect("append pending capital receipt");
+    }
+
+    let bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 1000,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue capital bond");
+    assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
+    let issued_bond: SignedCreditBond = bond_issue.json().expect("parse issued capital bond");
+    assert_eq!(
+        issued_bond.body.report.disposition,
+        arc_core::credit::CreditBondDisposition::Lock
+    );
+
+    let delinquency = record_test_credit_loss_event_with_kind(
+        &receipt_db_path,
+        &issued_bond,
+        "cll-capital-delinquency-1",
+        CreditLossLifecycleEventKind::Delinquency,
+        500,
+        CreditBondLifecycleState::Impaired,
+        CreditLossLifecycleReasonCode::DelinquencyRecorded,
+        "capital delinquency event",
+    );
+    let recovery = record_test_credit_loss_event_with_kind(
+        &receipt_db_path,
+        &issued_bond,
+        "cll-capital-recovery-1",
+        CreditLossLifecycleEventKind::Recovery,
+        200,
+        CreditBondLifecycleState::Impaired,
+        CreditLossLifecycleReasonCode::RecoveryRecorded,
+        "capital recovery event",
+    );
+    let reserve_release = record_test_credit_loss_event_with_kind(
+        &receipt_db_path,
+        &issued_bond,
+        "cll-capital-release-1",
+        CreditLossLifecycleEventKind::ReserveRelease,
+        50,
+        CreditBondLifecycleState::Released,
+        CreditLossLifecycleReasonCode::ReserveReleased,
+        "capital reserve release event",
+    );
+
+    let response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send capital book request");
+    let status = response.status();
+    let response_body = response.text().expect("read capital book response body");
+    assert_eq!(
+        status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {response_body}"
+    );
+    let report: SignedCapitalBookReport =
+        serde_json::from_str(&response_body).expect("parse signed capital book");
+    assert!(report
+        .verify_signature()
+        .expect("verify capital book signature"));
+    assert_eq!(report.body.schema, "arc.credit.capital-book.v1");
+    assert_eq!(report.body.subject_key, subject_key);
+    assert_eq!(report.body.summary.funding_sources, 2);
+    assert_eq!(report.body.summary.matching_loss_events, 3);
+    assert_eq!(report.body.summary.currencies, vec!["USD".to_string()]);
+
+    let facility_source = report
+        .body
+        .sources
+        .iter()
+        .find(|source| {
+            source.facility_id.as_deref() == Some(issued_facility.body.facility_id.as_str())
+        })
+        .expect("facility source");
+    assert_eq!(
+        facility_source.kind,
+        arc_core::credit::CapitalBookSourceKind::FacilityCommitment
+    );
+    assert_eq!(
+        facility_source.owner_role,
+        arc_core::credit::CapitalBookRole::OperatorTreasury
+    );
+    assert!(facility_source
+        .committed_amount
+        .as_ref()
+        .is_some_and(|amount| amount.units > 0));
+    assert!(facility_source
+        .drawn_amount
+        .as_ref()
+        .is_some_and(|amount| amount.units > 0));
+    assert!(facility_source
+        .disbursed_amount
+        .as_ref()
+        .is_some_and(|amount| amount.units > 0));
+
+    let reserve_source = report
+        .body
+        .sources
+        .iter()
+        .find(|source| {
+            source.kind == arc_core::credit::CapitalBookSourceKind::ReserveBook
+                && source.bond_id.as_deref() == Some(issued_bond.body.bond_id.as_str())
+        })
+        .expect("reserve source");
+    assert_eq!(
+        reserve_source.kind,
+        arc_core::credit::CapitalBookSourceKind::ReserveBook
+    );
+    assert!(reserve_source
+        .held_amount
+        .as_ref()
+        .is_some_and(|amount| amount.units > 0));
+    assert_eq!(
+        reserve_source
+            .released_amount
+            .as_ref()
+            .expect("released amount")
+            .units,
+        50
+    );
+    assert_eq!(
+        reserve_source
+            .repaid_amount
+            .as_ref()
+            .expect("repaid amount")
+            .units,
+        200
+    );
+    assert_eq!(
+        reserve_source
+            .impaired_amount
+            .as_ref()
+            .expect("impaired amount")
+            .units,
+        300
+    );
+
+    let event_kinds = report
+        .body
+        .events
+        .iter()
+        .map(|event| event.kind)
+        .collect::<Vec<_>>();
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Commit));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Hold));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Draw));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Disburse));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Impair));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Repay));
+    assert!(event_kinds.contains(&arc_core::credit::CapitalBookEventKind::Release));
+    assert!(report
+        .body
+        .events
+        .iter()
+        .any(|event| event.loss_event_id.as_deref() == Some(delinquency.body.event_id.as_str())));
+    assert!(report
+        .body
+        .events
+        .iter()
+        .any(|event| event.loss_event_id.as_deref() == Some(recovery.body.event_id.as_str())));
+    assert!(report.body.events.iter().any(
+        |event| event.loss_event_id.as_deref() == Some(reserve_release.body.event_id.as_str())
+    ));
+
+    let cli_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "capital-book",
+            "export",
+            "--agent-subject",
+            subject_key,
+            "--receipt-limit",
+            "200",
+            "--facility-limit",
+            "10",
+            "--bond-limit",
+            "10",
+            "--loss-event-limit",
+            "10",
+        ])
+        .output()
+        .expect("run capital book CLI");
+    assert!(
+        cli_output.status.success(),
+        "capital book CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&cli_output.stdout),
+        String::from_utf8_lossy(&cli_output.stderr)
+    );
+    let cli_report: SignedCapitalBookReport =
+        serde_json::from_slice(&cli_output.stdout).expect("parse capital book CLI");
+    assert!(cli_report
+        .verify_signature()
+        .expect("verify capital book CLI signature"));
+    assert_eq!(cli_report.body.summary.funding_sources, 2);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
+    let dir = unique_dir("arc-capital-book-negative");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-capital-book-negative-1";
+    let issuer_key = "issuer-capital-book-negative-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..15_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-negative-usd-{day}"),
+                    &format!("cap-capital-negative-usd-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub(day * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    4_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append usd negative capital receipt");
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-negative-eur-{day}"),
+                    &format!("cap-capital-negative-eur-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 20) * 86_400),
+                    SettlementStatus::Settled,
+                    "EUR",
+                    4_000,
+                    "EUR",
+                    false,
+                    false,
+                ))
+                .expect("append eur negative capital receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-book-negative-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let mixed_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "100"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send mixed-currency capital book request");
+    assert_eq!(mixed_response.status(), reqwest::StatusCode::CONFLICT);
+    let mixed_body: serde_json::Value = mixed_response
+        .json()
+        .expect("parse mixed-currency capital book response");
+    assert!(mixed_body["error"]
+        .as_str()
+        .expect("mixed-currency error")
+        .contains("one coherent currency"));
+
+    let missing_counterparty = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[("receiptLimit", "100")])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send missing-counterparty capital book request");
+    assert_eq!(
+        missing_counterparty.status(),
+        reqwest::StatusCode::BAD_REQUEST
+    );
+    let missing_body: serde_json::Value = missing_counterparty
+        .json()
+        .expect("parse missing-counterparty capital book response");
+    assert!(missing_body["error"]
+        .as_str()
+        .expect("missing-counterparty error")
+        .contains("--agent-subject"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_instruction_issue_surfaces() {
+    let dir = unique_dir("arc-capital-instruction");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+    let input_file = dir.join("capital-instruction.json");
+
+    let subject_key = "subject-capital-instruction-1";
+    let issuer_key = "issuer-capital-instruction-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-instruction-good-{day}"),
+                    &format!("cap-capital-instruction-good-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append capital instruction history receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-instruction-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_credit_history_receipt(
+                "rc-capital-instruction-pending-1",
+                "cap-capital-instruction-pending-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                8_000,
+                "USD",
+                true,
+            ))
+            .expect("append pending capital receipt");
+    }
+
+    let bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue bond");
+    assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
+    let issued_bond: SignedCreditBond = bond_issue.json().expect("parse issued bond");
+    let reserve_amount = issued_bond
+        .body
+        .report
+        .terms
+        .as_ref()
+        .expect("bond terms")
+        .reserve_requirement_amount
+        .clone();
+
+    let request_json = serde_json::json!({
+        "query": {
+            "agentSubject": subject_key,
+            "receiptLimit": 200,
+            "facilityLimit": 10,
+            "bondLimit": 10,
+            "lossEventLimit": 10
+        },
+        "sourceKind": "reserve_book",
+        "action": "lock_reserve",
+        "amount": reserve_amount.clone(),
+        "authorityChain": [
+            {
+                "role": "operator_treasury",
+                "principalId": "treasury-1",
+                "approvedAt": now.saturating_sub(30),
+                "expiresAt": now.saturating_add(3_600)
+            },
+            {
+                "role": "custodian",
+                "principalId": "custodian-1",
+                "approvedAt": now.saturating_sub(20),
+                "expiresAt": now.saturating_add(3_600)
+            }
+        ],
+        "executionWindow": {
+            "notBefore": now.saturating_sub(60),
+            "notAfter": now.saturating_add(3_600)
+        },
+        "rail": {
+            "kind": "manual",
+            "railId": "reserve-manual-1",
+            "custodyProviderId": "custodian-1",
+            "sourceAccountRef": "reserve-book-main"
+        },
+        "observedExecution": {
+            "observedAt": now,
+            "externalReferenceId": "wire-1",
+            "amount": reserve_amount.clone()
+        }
+    });
+
+    let response = client
+        .post(format!("{base_url}/v1/capital/instructions/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&request_json)
+        .send()
+        .expect("issue capital instruction");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let instruction: SignedCapitalExecutionInstruction =
+        response.json().expect("parse capital instruction");
+    assert!(instruction
+        .verify_signature()
+        .expect("verify capital instruction signature"));
+    assert_eq!(instruction.body.schema, "arc.credit.capital-instruction.v1");
+    assert_eq!(instruction.body.subject_key, subject_key);
+    assert_eq!(
+        instruction.body.action,
+        CapitalExecutionInstructionAction::LockReserve
+    );
+    assert_eq!(
+        instruction.body.source_kind,
+        arc_core::credit::CapitalBookSourceKind::ReserveBook
+    );
+    assert_eq!(
+        instruction.body.intended_state,
+        CapitalExecutionIntendedState::PendingExecution
+    );
+    assert_eq!(
+        instruction.body.reconciled_state,
+        CapitalExecutionReconciledState::Matched
+    );
+    assert_eq!(instruction.body.authority_chain.len(), 2);
+    assert!(instruction
+        .body
+        .evidence_refs
+        .iter()
+        .any(|evidence| evidence.reference_id == issued_bond.body.bond_id));
+
+    std::fs::write(
+        &input_file,
+        serde_json::to_vec_pretty(&request_json).expect("serialize capital instruction request"),
+    )
+    .expect("write capital instruction request");
+    let cli_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "capital-instruction",
+            "issue",
+            "--input-file",
+            input_file.to_str().expect("capital instruction input file"),
+        ])
+        .output()
+        .expect("run capital instruction CLI");
+    assert!(
+        cli_output.status.success(),
+        "capital instruction CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&cli_output.stdout),
+        String::from_utf8_lossy(&cli_output.stderr)
+    );
+    let cli_instruction: SignedCapitalExecutionInstruction =
+        serde_json::from_slice(&cli_output.stdout).expect("parse capital instruction CLI");
+    assert!(cli_instruction
+        .verify_signature()
+        .expect("verify capital instruction CLI signature"));
+    assert_eq!(
+        cli_instruction.body.action,
+        CapitalExecutionInstructionAction::LockReserve
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
+    let dir = unique_dir("arc-capital-instruction-negative");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-capital-instruction-negative-1";
+    let issuer_key = "issuer-capital-instruction-negative-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-instruction-negative-{day}"),
+                    &format!("cap-capital-instruction-negative-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append negative capital instruction history receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-instruction-negative-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_credit_history_receipt(
+                "rc-capital-instruction-negative-pending-1",
+                "cap-capital-instruction-negative-pending-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                8_000,
+                "USD",
+                true,
+            ))
+            .expect("append pending negative capital receipt");
+    }
+
+    let bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue bond");
+    assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
+    let issued_bond: SignedCreditBond = bond_issue.json().expect("parse issued bond");
+    let reserve_amount = issued_bond
+        .body
+        .report
+        .terms
+        .as_ref()
+        .expect("bond terms")
+        .reserve_requirement_amount
+        .clone();
+
+    let stale_response = client
+        .post(format!("{base_url}/v1/capital/instructions/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "sourceKind": "reserve_book",
+            "action": "release_reserve",
+            "amount": reserve_amount.clone(),
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(100),
+                    "expiresAt": now.saturating_sub(10)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(100),
+                    "expiresAt": now.saturating_sub(10)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "reserve-manual-1",
+                "custodyProviderId": "custodian-1"
+            }
+        }))
+        .send()
+        .expect("send stale capital instruction");
+    assert_eq!(stale_response.status(), reqwest::StatusCode::CONFLICT);
+    let stale_body: serde_json::Value = stale_response
+        .json()
+        .expect("parse stale capital instruction response");
+    assert!(stale_body["error"]
+        .as_str()
+        .expect("stale capital instruction error")
+        .contains("stale"));
+
+    let mismatch_response = client
+        .post(format!("{base_url}/v1/capital/instructions/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "sourceKind": "reserve_book",
+            "action": "lock_reserve",
+            "amount": reserve_amount.clone(),
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "reserve-manual-1",
+                "custodyProviderId": "custodian-1"
+            },
+            "observedExecution": {
+                "observedAt": now,
+                "externalReferenceId": "wire-mismatch-1",
+                "amount": {
+                    "units": reserve_amount.units + 1,
+                    "currency": reserve_amount.currency.clone()
+                }
+            }
+        }))
+        .send()
+        .expect("send mismatched capital instruction");
+    assert_eq!(mismatch_response.status(), reqwest::StatusCode::CONFLICT);
+    let mismatch_body: serde_json::Value = mismatch_response
+        .json()
+        .expect("parse mismatched capital instruction response");
+    assert!(mismatch_body["error"]
+        .as_str()
+        .expect("mismatched capital instruction error")
+        .contains("does not match intended amount"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_allocation_issue_surfaces() {
+    let dir = unique_dir("arc-capital-allocation");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+    let input_file = dir.join("capital-allocation.json");
+
+    let subject_key = "subject-capital-allocation-1";
+    let issuer_key = "issuer-capital-allocation-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-allocation-good-{day}"),
+                    &format!("cap-capital-allocation-good-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append capital allocation history receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-allocation-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+    let issued_facility: SignedCreditFacility = facility_issue
+        .json()
+        .expect("parse issued capital allocation facility");
+
+    let governed_receipt_id = "rc-capital-allocation-pending-1";
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                governed_receipt_id,
+                "cap-capital-allocation-pending-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                30_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append governed pending receipt");
+    }
+
+    let bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue bond");
+    assert_eq!(bond_issue.status(), reqwest::StatusCode::OK);
+    let issued_bond: SignedCreditBond = bond_issue.json().expect("parse issued bond");
+
+    let request_json = serde_json::json!({
+        "query": {
+            "agentSubject": subject_key,
+            "receiptLimit": 200,
+            "facilityLimit": 10,
+            "bondLimit": 10,
+            "lossEventLimit": 10
+        },
+        "receiptId": governed_receipt_id,
+        "authorityChain": [
+            {
+                "role": "operator_treasury",
+                "principalId": "treasury-1",
+                "approvedAt": now.saturating_sub(30),
+                "expiresAt": now.saturating_add(3_600)
+            },
+            {
+                "role": "custodian",
+                "principalId": "custodian-1",
+                "approvedAt": now.saturating_sub(20),
+                "expiresAt": now.saturating_add(3_600)
+            }
+        ],
+        "executionWindow": {
+            "notBefore": now.saturating_sub(60),
+            "notAfter": now.saturating_add(3_600)
+        },
+        "rail": {
+            "kind": "manual",
+            "railId": "capital-allocation-manual-1",
+            "custodyProviderId": "custodian-1",
+            "sourceAccountRef": "operator-capital-main"
+        },
+        "description": "allocate governed capital for the selected receipt"
+    });
+
+    let response = client
+        .post(format!("{base_url}/v1/capital/allocations/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&request_json)
+        .send()
+        .expect("issue capital allocation");
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let allocation: SignedCapitalAllocationDecision =
+        response.json().expect("parse capital allocation");
+    assert!(allocation
+        .verify_signature()
+        .expect("verify capital allocation signature"));
+    assert_eq!(allocation.body.schema, "arc.credit.capital-allocation.v1");
+    assert_eq!(allocation.body.subject_key, subject_key);
+    assert_eq!(allocation.body.governed_receipt_id, governed_receipt_id);
+    assert_eq!(
+        allocation.body.outcome,
+        CapitalAllocationDecisionOutcome::Allocate
+    );
+    assert_eq!(
+        allocation.body.source_kind,
+        Some(CapitalBookSourceKind::FacilityCommitment)
+    );
+    assert_eq!(
+        allocation.body.facility_id.as_deref(),
+        Some(issued_facility.body.facility_id.as_str())
+    );
+    assert_eq!(
+        allocation.body.bond_id.as_deref(),
+        Some(issued_bond.body.bond_id.as_str())
+    );
+    assert!(allocation.body.source_id.is_some());
+    assert!(allocation.body.reserve_source_id.is_some());
+    assert!(allocation.body.findings.is_empty());
+    assert!(allocation.body.instruction_drafts.iter().any(|draft| {
+        draft.action == CapitalExecutionInstructionAction::TransferFunds
+            && draft.amount.units == 30_000
+            && draft.amount.currency == "USD"
+    }));
+
+    std::fs::write(
+        &input_file,
+        serde_json::to_vec_pretty(&request_json).expect("serialize capital allocation request"),
+    )
+    .expect("write capital allocation request");
+    let cli_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--budget-db",
+            budget_db_path.to_str().expect("budget db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "capital-allocation",
+            "issue",
+            "--input-file",
+            input_file.to_str().expect("capital allocation input file"),
+        ])
+        .output()
+        .expect("run capital allocation CLI");
+    assert!(
+        cli_output.status.success(),
+        "capital allocation CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&cli_output.stdout),
+        String::from_utf8_lossy(&cli_output.stderr)
+    );
+    let cli_allocation: SignedCapitalAllocationDecision =
+        serde_json::from_slice(&cli_output.stdout).expect("parse capital allocation CLI");
+    assert!(cli_allocation
+        .verify_signature()
+        .expect("verify capital allocation CLI signature"));
+    assert_eq!(
+        cli_allocation.body.outcome,
+        CapitalAllocationDecisionOutcome::Allocate
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
+    let dir = unique_dir("arc-capital-allocation-boundaries");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let manual_subject = "subject-capital-allocation-manual-1";
+    let queue_subject = "subject-capital-allocation-queue-1";
+    let issuer_key = "issuer-capital-allocation-boundaries-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-allocation-manual-good-{day}"),
+                    &format!("cap-capital-allocation-manual-good-{day}"),
+                    manual_subject,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append manual allocation history");
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-capital-allocation-queue-good-{day}"),
+                    &format!("cap-capital-allocation-queue-good-{day}"),
+                    queue_subject,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    100,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append queue allocation history");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "capital-allocation-boundaries-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    for subject_key in [manual_subject, queue_subject] {
+        let facility_issue = client
+            .post(format!("{base_url}/v1/facilities/issue"))
+            .header(
+                reqwest::header::AUTHORIZATION,
+                format!("Bearer {service_token}"),
+            )
+            .json(&serde_json::json!({
+                "query": {
+                    "agentSubject": subject_key,
+                    "receiptLimit": 200,
+                    "decisionLimit": 50
+                }
+            }))
+            .send()
+            .expect("issue facility for subject");
+        assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+    }
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                "rc-capital-allocation-manual-pending-1",
+                "cap-capital-allocation-manual-pending-1",
+                manual_subject,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                30_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append manual pending governed receipt");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                "rc-capital-allocation-queue-pending-1",
+                "cap-capital-allocation-queue-pending-1",
+                queue_subject,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(120),
+                SettlementStatus::Pending,
+                "USD",
+                50_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append first queue pending receipt");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                "rc-capital-allocation-queue-pending-2",
+                "cap-capital-allocation-queue-pending-2",
+                queue_subject,
+                issuer_key,
+                "ledger",
+                "transfer",
+                now.saturating_sub(60),
+                SettlementStatus::Pending,
+                "USD",
+                5_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append second queue pending receipt");
+    }
+
+    let queue_bond_issue = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": queue_subject,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue queue bond");
+    assert_eq!(queue_bond_issue.status(), reqwest::StatusCode::OK);
+
+    let manual_review_response = client
+        .post(format!("{base_url}/v1/capital/allocations/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": manual_subject,
+                "receiptLimit": 200,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "receiptId": "rc-capital-allocation-manual-pending-1",
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "capital-allocation-manual-boundary-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "operator-capital-main"
+            }
+        }))
+        .send()
+        .expect("issue manual-review capital allocation");
+    assert_eq!(manual_review_response.status(), reqwest::StatusCode::OK);
+    let manual_review: SignedCapitalAllocationDecision = manual_review_response
+        .json()
+        .expect("parse manual-review capital allocation");
+    assert_eq!(
+        manual_review.body.outcome,
+        CapitalAllocationDecisionOutcome::ManualReview
+    );
+    assert!(manual_review.body.instruction_drafts.is_empty());
+    assert!(manual_review.body.findings.iter().any(|finding| {
+        finding.code == CapitalAllocationDecisionReasonCode::ReserveBookMissing
+    }));
+
+    let ambiguous_response = client
+        .post(format!("{base_url}/v1/capital/allocations/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": queue_subject,
+                "receiptLimit": 200,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "capital-allocation-queue-boundary-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "operator-capital-main"
+            }
+        }))
+        .send()
+        .expect("issue ambiguous capital allocation");
+    assert_eq!(ambiguous_response.status(), reqwest::StatusCode::CONFLICT);
+    let ambiguous_body: serde_json::Value = ambiguous_response
+        .json()
+        .expect("parse ambiguous capital allocation body");
+    assert!(ambiguous_body["error"]
+        .as_str()
+        .expect("ambiguous capital allocation error")
+        .contains("multiple approved actionable governed receipts"));
+
+    let queue_response = client
+        .post(format!("{base_url}/v1/capital/allocations/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": queue_subject,
+                "receiptLimit": 200,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "receiptId": "rc-capital-allocation-queue-pending-2",
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-1",
+                    "approvedAt": now.saturating_sub(30),
+                    "expiresAt": now.saturating_add(3_600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-1",
+                    "approvedAt": now.saturating_sub(20),
+                    "expiresAt": now.saturating_add(3_600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": now.saturating_sub(60),
+                "notAfter": now.saturating_add(3_600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "capital-allocation-queue-boundary-1",
+                "custodyProviderId": "custodian-1",
+                "sourceAccountRef": "operator-capital-main"
+            }
+        }))
+        .send()
+        .expect("issue queued capital allocation");
+    assert_eq!(queue_response.status(), reqwest::StatusCode::OK);
+    let queued: SignedCapitalAllocationDecision = queue_response
+        .json()
+        .expect("parse queued capital allocation");
+    assert_eq!(queued.body.outcome, CapitalAllocationDecisionOutcome::Queue);
+    assert!(queued.body.instruction_drafts.is_empty());
+    assert!(queued.body.findings.iter().any(|finding| {
+        finding.code == CapitalAllocationDecisionReasonCode::UtilizationCeilingExceeded
+    }));
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -7901,7 +10705,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..120_u64 {
+        for day in 0..1_000_u64 {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-market-{day}"),
@@ -7971,6 +10775,31 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
     let risk_package: SignedCreditProviderRiskPackage = risk_package_response
         .json()
         .expect("parse provider risk package");
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book report");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_json = capital_book_response
+        .text()
+        .expect("read capital book report body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {capital_book_json}"
+    );
 
     let provider_issue = client
         .post(format!("{base_url}/v1/liability/providers/issue"))
@@ -8057,15 +10886,22 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 25000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 1200, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(3600)
+                "expiresAt": unix_now_secs().saturating_add(1800)
             }
         }))
         .send()
         .expect("issue liability quote response");
-    assert_eq!(quote_response_response.status(), reqwest::StatusCode::OK);
-    let quote_response: SignedLiabilityQuoteResponse = quote_response_response
-        .json()
-        .expect("parse quote response");
+    let quote_response_status = quote_response_response.status();
+    let quote_response_body = quote_response_response
+        .text()
+        .expect("read quote response body");
+    assert_eq!(
+        quote_response_status,
+        reqwest::StatusCode::OK,
+        "quote response request failed with body: {quote_response_body}"
+    );
+    let quote_response: SignedLiabilityQuoteResponse =
+        serde_json::from_str(&quote_response_body).expect("parse quote response");
     assert!(quote_response
         .verify_signature()
         .expect("verify quote response signature"));
@@ -8164,6 +11000,871 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
 }
 
 #[test]
+fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
+    let dir = unique_dir("arc-liability-market-auto-bind");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-liability-market-auto-bind-1";
+    let issuer_key = "issuer-liability-market-auto-bind-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-liability-autobind-{day}"),
+                    &format!("cap-liability-autobind-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    5_000,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append liability auto-bind receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "liability-market-auto-bind-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+    let facility: SignedCreditFacility = facility_issue.json().expect("parse issued facility");
+    assert_eq!(
+        facility.body.report.disposition,
+        arc_core::credit::CreditFacilityDisposition::Grant,
+        "unexpected facility report: {:?}",
+        facility.body.report
+    );
+    assert!(
+        facility.body.report.terms.is_some(),
+        "facility grant missing terms: {:?}",
+        facility.body.report
+    );
+
+    let underwriting_issue = client
+        .post(format!("{base_url}/v1/underwriting/decisions/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200
+            }
+        }))
+        .send()
+        .expect("issue underwriting decision");
+    assert_eq!(underwriting_issue.status(), reqwest::StatusCode::OK);
+    let underwriting_decision: SignedUnderwritingDecision = underwriting_issue
+        .json()
+        .expect("parse underwriting decision");
+    let authority_max_premium = underwriting_decision
+        .body
+        .premium
+        .quoted_amount
+        .clone()
+        .unwrap_or_else(|| MonetaryAmount {
+            units: 25_000,
+            currency: "USD".to_string(),
+        });
+    let quoted_premium_units = authority_max_premium.units.min(1_200);
+    assert!(quoted_premium_units > 1);
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "20"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_body = capital_book_response
+        .text()
+        .expect("read capital book response body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book request failed with body: {capital_book_body}"
+    );
+    let capital_book: SignedCapitalBookReport =
+        serde_json::from_str(&capital_book_body).expect("parse capital book");
+    let facility_source = capital_book
+        .body
+        .sources
+        .iter()
+        .find(|source| source.facility_id.as_deref() == Some(facility.body.facility_id.as_str()))
+        .expect("capital book facility source");
+    let available_coverage_units = facility_source
+        .committed_amount
+        .as_ref()
+        .expect("capital book committed amount")
+        .units
+        .saturating_sub(
+            facility_source
+                .disbursed_amount
+                .as_ref()
+                .map_or(0, |amount| amount.units),
+        )
+        .saturating_sub(
+            facility_source
+                .impaired_amount
+                .as_ref()
+                .map_or(0, |amount| amount.units),
+        );
+    let requested_coverage_units = available_coverage_units.min(25_000);
+    assert!(requested_coverage_units > 0);
+
+    let risk_package_response = client
+        .get(format!("{base_url}/v1/reports/provider-risk-package"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "200"),
+            ("decisionLimit", "50"),
+            ("recentLossLimit", "5"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request provider risk package");
+    assert_eq!(risk_package_response.status(), reqwest::StatusCode::OK);
+    let risk_package: SignedCreditProviderRiskPackage = risk_package_response
+        .json()
+        .expect("parse provider risk package");
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book report");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_json = capital_book_response
+        .text()
+        .expect("read capital book report body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {capital_book_json}"
+    );
+
+    let provider_issue = client
+        .post(format!("{base_url}/v1/liability/providers/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "report": {
+                "schema": "arc.market.provider.v1",
+                "providerId": "carrier-theta",
+                "displayName": "Carrier Theta",
+                "providerType": "admitted_carrier",
+                "providerUrl": "https://carrier-theta.example.com",
+                "lifecycleState": "active",
+                "supportBoundary": {
+                    "curatedRegistryOnly": true,
+                    "automaticTrustAdmission": false,
+                    "permissionlessFederationSupported": false,
+                    "boundCoverageSupported": true
+                },
+                "policies": [
+                    {
+                        "jurisdiction": "us-ny",
+                        "coverageClasses": ["tool_execution"],
+                        "supportedCurrencies": ["USD"],
+                        "requiredEvidence": ["credit_provider_risk_package"],
+                        "maxCoverageAmount": { "units": 50000, "currency": "USD" },
+                        "claimsSupported": true,
+                        "quoteTtlSeconds": 3600
+                    }
+                ],
+                "provenance": {
+                    "configuredBy": "operator@example.com",
+                    "configuredAt": unix_now_secs(),
+                    "sourceRef": "liability-market-runbook",
+                    "changeReason": "phase 114 auto-bind qualification"
+                }
+            }
+        }))
+        .send()
+        .expect("issue liability provider");
+    assert_eq!(provider_issue.status(), reqwest::StatusCode::OK);
+    let _: SignedLiabilityProvider = provider_issue
+        .json()
+        .expect("parse issued liability provider");
+
+    let requested_effective_from = unix_now_secs().saturating_add(7_200);
+    let requested_effective_until = requested_effective_from.saturating_add(30 * 86_400);
+    let quote_request_response = client
+        .post(format!("{base_url}/v1/liability/quote-requests/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "providerId": "carrier-theta",
+            "jurisdiction": "us-ny",
+            "coverageClass": "tool_execution",
+            "requestedCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+            "requestedEffectiveFrom": requested_effective_from,
+            "requestedEffectiveUntil": requested_effective_until,
+            "riskPackage": risk_package
+        }))
+        .send()
+        .expect("issue liability quote request");
+    assert_eq!(quote_request_response.status(), reqwest::StatusCode::OK);
+    let quote_request: SignedLiabilityQuoteRequest =
+        quote_request_response.json().expect("parse quote request");
+
+    let pricing_authority_response = client
+        .post(format!("{base_url}/v1/liability/pricing-authorities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "quoteRequest": quote_request,
+            "facility": facility,
+            "underwritingDecision": underwriting_decision,
+            "capitalBook": capital_book,
+            "envelope": {
+                "kind": "provider_delegate",
+                "delegateId": "carrier-theta-underwriter"
+            },
+            "maxCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+            "maxPremiumAmount": authority_max_premium,
+            "expiresAt": unix_now_secs().saturating_add(3000),
+            "autoBindEnabled": true
+        }))
+        .send()
+        .expect("issue pricing authority");
+    assert_eq!(pricing_authority_response.status(), reqwest::StatusCode::OK);
+    let pricing_authority: SignedLiabilityPricingAuthority = pricing_authority_response
+        .json()
+        .expect("parse pricing authority");
+    assert!(pricing_authority
+        .verify_signature()
+        .expect("verify pricing authority signature"));
+
+    let quote_response_response = client
+        .post(format!("{base_url}/v1/liability/quote-responses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "quoteRequest": pricing_authority.body.quote_request.clone(),
+            "providerQuoteRef": "carrier-theta-quote-1",
+            "disposition": "quoted",
+            "quotedTerms": {
+                "quotedCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+                "quotedPremiumAmount": { "units": quoted_premium_units, "currency": "USD" },
+                "expiresAt": unix_now_secs().saturating_add(1800)
+            }
+        }))
+        .send()
+        .expect("issue liability quote response");
+    let quote_response_status = quote_response_response.status();
+    let quote_response_body = quote_response_response
+        .text()
+        .expect("read quote response body");
+    assert_eq!(
+        quote_response_status,
+        reqwest::StatusCode::OK,
+        "quote response request failed with body: {quote_response_body}"
+    );
+    let quote_response: SignedLiabilityQuoteResponse =
+        serde_json::from_str(&quote_response_body).expect("parse quote response");
+
+    let auto_bind_response = client
+        .post(format!("{base_url}/v1/liability/auto-bind/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "authority": pricing_authority.clone(),
+            "quoteResponse": quote_response.clone(),
+            "policyNumber": "POL-THETA-1",
+            "carrierReference": "bind-theta-1",
+            "placementRef": "placement-theta-auto-1"
+        }))
+        .send()
+        .expect("issue liability auto-bind");
+    let auto_bind_status = auto_bind_response.status();
+    let auto_bind_body = auto_bind_response
+        .text()
+        .expect("read auto-bind response body");
+    assert_eq!(
+        auto_bind_status,
+        reqwest::StatusCode::OK,
+        "auto-bind request failed with body: {auto_bind_body}"
+    );
+    let auto_bind: SignedLiabilityAutoBindDecision =
+        serde_json::from_str(&auto_bind_body).expect("parse auto-bind decision");
+    assert!(auto_bind
+        .verify_signature()
+        .expect("verify auto-bind signature"));
+    assert_eq!(
+        auto_bind.body.disposition,
+        arc_kernel::LiabilityAutoBindDisposition::AutoBound
+    );
+    assert!(auto_bind.body.placement.is_some());
+    assert!(auto_bind.body.bound_coverage.is_some());
+
+    let workflow_response = client
+        .get(format!("{base_url}/v1/reports/liability-market"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("coverageClass", "tool_execution"),
+            ("currency", "USD"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("query liability market workflows");
+    let workflow_status = workflow_response.status();
+    let workflow_body = workflow_response
+        .text()
+        .expect("read workflow response body");
+    assert_eq!(
+        workflow_status,
+        reqwest::StatusCode::OK,
+        "workflow report request failed with body: {workflow_body}"
+    );
+    let workflow_report: serde_json::Value =
+        serde_json::from_str(&workflow_body).expect("parse workflow report");
+    assert_eq!(workflow_report["summary"]["matchingRequests"], 1);
+    assert_eq!(workflow_report["summary"]["pricingAuthorities"], 1);
+    assert_eq!(workflow_report["summary"]["autoBindDecisions"], 1);
+    assert_eq!(workflow_report["summary"]["autoBoundDecisions"], 1);
+    assert_eq!(workflow_report["summary"]["placements"], 1);
+    assert_eq!(workflow_report["summary"]["boundCoverages"], 1);
+    let row = workflow_report["workflows"]
+        .as_array()
+        .and_then(|rows| rows.first())
+        .expect("workflow row");
+    assert!(row["pricingAuthority"].is_object());
+    assert!(row["latestAutoBindDecision"].is_object());
+    assert_eq!(row["boundCoverage"]["body"]["policyNumber"], "POL-THETA-1");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes() {
+    let dir = unique_dir("arc-liability-market-auto-bind-negative");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_key = "subject-liability-market-auto-bind-negative-1";
+    let issuer_key = "issuer-liability-market-auto-bind-negative-1";
+    let now = unix_now_secs();
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        for day in 0..1_000_u64 {
+            let exposure_units = if day < 10 { 100 } else { 5_000 };
+            store
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                    &format!("rc-liability-autobind-negative-{day}"),
+                    &format!("cap-liability-autobind-negative-{day}"),
+                    subject_key,
+                    issuer_key,
+                    "ledger",
+                    "transfer",
+                    now.saturating_sub((day + 2) * 86_400),
+                    SettlementStatus::Settled,
+                    "USD",
+                    exposure_units,
+                    "USD",
+                    false,
+                    false,
+                ))
+                .expect("append liability auto-bind negative receipt");
+        }
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "liability-market-auto-bind-negative-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_issue = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200,
+                "decisionLimit": 50
+            }
+        }))
+        .send()
+        .expect("issue facility");
+    assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
+    let initial_facility: SignedCreditFacility = facility_issue.json().expect("parse facility");
+    let facility = {
+        let issued_at = unix_now_secs();
+        let mut report = initial_facility.body.report.clone();
+        report.disposition = arc_core::credit::CreditFacilityDisposition::Grant;
+        report.prerequisites.manual_review_required = false;
+        report.terms = Some(arc_core::credit::CreditFacilityTerms {
+            credit_limit: MonetaryAmount {
+                units: 1_000_000,
+                currency: "USD".to_string(),
+            },
+            utilization_ceiling_bps: 8_000,
+            reserve_ratio_bps: 1_500,
+            concentration_cap_bps: 3_000,
+            ttl_seconds: 14 * 86_400,
+            capital_source: arc_core::credit::CreditFacilityCapitalSource::OperatorInternal,
+        });
+        let artifact = arc_core::credit::CreditFacilityArtifact {
+            schema: arc_core::credit::CREDIT_FACILITY_ARTIFACT_SCHEMA.to_string(),
+            facility_id: format!("cfd-phase114-negative-{issued_at}"),
+            issued_at,
+            expires_at: issued_at.saturating_add(14 * 86_400),
+            lifecycle_state: arc_core::credit::CreditFacilityLifecycleState::Active,
+            supersedes_facility_id: Some(initial_facility.body.facility_id.clone()),
+            report,
+        };
+        let signed = SignedCreditFacility::sign(artifact, &Keypair::generate())
+            .expect("sign controlled grant facility");
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .record_credit_facility(&signed)
+            .expect("record controlled grant facility");
+        signed
+    };
+
+    let underwriting_issue = client
+        .post(format!("{base_url}/v1/underwriting/decisions/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 200
+            }
+        }))
+        .send()
+        .expect("issue underwriting decision");
+    assert_eq!(underwriting_issue.status(), reqwest::StatusCode::OK);
+    let underwriting_decision: SignedUnderwritingDecision = underwriting_issue
+        .json()
+        .expect("parse underwriting decision");
+    let authority_max_premium = underwriting_decision
+        .body
+        .premium
+        .quoted_amount
+        .clone()
+        .unwrap_or_else(|| MonetaryAmount {
+            units: 25_000,
+            currency: "USD".to_string(),
+        });
+    let quoted_premium_units = authority_max_premium.units.min(1_200);
+    assert!(quoted_premium_units > 1);
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_body = capital_book_response
+        .text()
+        .expect("read capital book response body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book request failed with body: {capital_book_body}"
+    );
+    let capital_book: SignedCapitalBookReport =
+        serde_json::from_str(&capital_book_body).expect("parse capital book");
+    let facility_source = capital_book
+        .body
+        .sources
+        .iter()
+        .find(|source| source.facility_id.as_deref() == Some(facility.body.facility_id.as_str()))
+        .expect("capital book facility source");
+    let available_coverage_units = facility_source
+        .committed_amount
+        .as_ref()
+        .expect("capital book committed amount")
+        .units
+        .saturating_sub(
+            facility_source
+                .disbursed_amount
+                .as_ref()
+                .map_or(0, |amount| amount.units),
+        )
+        .saturating_sub(
+            facility_source
+                .impaired_amount
+                .as_ref()
+                .map_or(0, |amount| amount.units),
+        );
+    let requested_coverage_units = available_coverage_units.min(20_000);
+    assert!(requested_coverage_units > 0);
+
+    let risk_package_response = client
+        .get(format!("{base_url}/v1/reports/provider-risk-package"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "200"),
+            ("decisionLimit", "50"),
+            ("recentLossLimit", "5"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request provider risk package");
+    assert_eq!(risk_package_response.status(), reqwest::StatusCode::OK);
+    let risk_package: SignedCreditProviderRiskPackage = risk_package_response
+        .json()
+        .expect("parse provider risk package");
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book report");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_json = capital_book_response
+        .text()
+        .expect("read capital book report body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {capital_book_json}"
+    );
+
+    let provider_issue = client
+        .post(format!("{base_url}/v1/liability/providers/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "report": {
+                "schema": "arc.market.provider.v1",
+                "providerId": "carrier-iota",
+                "displayName": "Carrier Iota",
+                "providerType": "admitted_carrier",
+                "providerUrl": "https://carrier-iota.example.com",
+                "lifecycleState": "active",
+                "supportBoundary": {
+                    "curatedRegistryOnly": true,
+                    "automaticTrustAdmission": false,
+                    "permissionlessFederationSupported": false,
+                    "boundCoverageSupported": true
+                },
+                "policies": [
+                    {
+                        "jurisdiction": "us-ny",
+                        "coverageClasses": ["tool_execution"],
+                        "supportedCurrencies": ["USD"],
+                        "requiredEvidence": ["credit_provider_risk_package"],
+                        "maxCoverageAmount": { "units": 50000, "currency": "USD" },
+                        "claimsSupported": true,
+                        "quoteTtlSeconds": 3600
+                    }
+                ],
+                "provenance": {
+                    "configuredBy": "operator@example.com",
+                    "configuredAt": unix_now_secs(),
+                    "sourceRef": "liability-market-runbook",
+                    "changeReason": "phase 114 auto-bind negative qualification"
+                }
+            }
+        }))
+        .send()
+        .expect("issue liability provider");
+    assert_eq!(provider_issue.status(), reqwest::StatusCode::OK);
+    let initial_provider: SignedLiabilityProvider =
+        provider_issue.json().expect("parse initial provider");
+
+    let requested_effective_from = unix_now_secs().saturating_add(3_600);
+    let requested_effective_until = requested_effective_from.saturating_add(14 * 86_400);
+    let quote_request_response = client
+        .post(format!("{base_url}/v1/liability/quote-requests/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "providerId": "carrier-iota",
+            "jurisdiction": "us-ny",
+            "coverageClass": "tool_execution",
+            "requestedCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+            "requestedEffectiveFrom": requested_effective_from,
+            "requestedEffectiveUntil": requested_effective_until,
+            "riskPackage": risk_package
+        }))
+        .send()
+        .expect("issue liability quote request");
+    assert_eq!(quote_request_response.status(), reqwest::StatusCode::OK);
+    let quote_request: SignedLiabilityQuoteRequest =
+        quote_request_response.json().expect("parse quote request");
+
+    let pricing_authority_response = client
+        .post(format!("{base_url}/v1/liability/pricing-authorities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "quoteRequest": quote_request,
+            "facility": facility,
+            "underwritingDecision": underwriting_decision,
+            "capitalBook": capital_book,
+            "envelope": {
+                "kind": "provider_delegate",
+                "delegateId": "carrier-iota-underwriter"
+            },
+            "maxCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+            "maxPremiumAmount": { "units": quoted_premium_units - 1, "currency": "USD" },
+            "expiresAt": unix_now_secs().saturating_add(3000),
+            "autoBindEnabled": true
+        }))
+        .send()
+        .expect("issue pricing authority");
+    assert_eq!(pricing_authority_response.status(), reqwest::StatusCode::OK);
+    let pricing_authority: SignedLiabilityPricingAuthority = pricing_authority_response
+        .json()
+        .expect("parse pricing authority");
+
+    let quote_response_response = client
+        .post(format!("{base_url}/v1/liability/quote-responses/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "quoteRequest": pricing_authority.body.quote_request.clone(),
+            "providerQuoteRef": "carrier-iota-quote-1",
+            "disposition": "quoted",
+            "quotedTerms": {
+                "quotedCoverageAmount": { "units": requested_coverage_units, "currency": "USD" },
+                "quotedPremiumAmount": { "units": quoted_premium_units, "currency": "USD" },
+                "expiresAt": unix_now_secs().saturating_add(1800)
+            }
+        }))
+        .send()
+        .expect("issue liability quote response");
+    assert_eq!(quote_response_response.status(), reqwest::StatusCode::OK);
+    let quote_response: SignedLiabilityQuoteResponse = quote_response_response
+        .json()
+        .expect("parse quote response");
+
+    let excessive_auto_bind = client
+        .post(format!("{base_url}/v1/liability/auto-bind/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "authority": pricing_authority.clone(),
+            "quoteResponse": quote_response.clone(),
+            "policyNumber": "POL-IOTA-1"
+        }))
+        .send()
+        .expect("issue excessive auto-bind");
+    assert_eq!(excessive_auto_bind.status(), reqwest::StatusCode::CONFLICT);
+    let excessive_body: serde_json::Value = excessive_auto_bind
+        .json()
+        .expect("parse excessive auto-bind body");
+    assert!(excessive_body["error"]
+        .as_str()
+        .expect("excessive auto-bind error")
+        .contains("pricing authority ceiling"));
+
+    let superseding_provider_issue = client
+        .post(format!("{base_url}/v1/liability/providers/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "report": {
+                "schema": "arc.market.provider.v1",
+                "providerId": "carrier-iota",
+                "displayName": "Carrier Iota",
+                "providerType": "admitted_carrier",
+                "providerUrl": "https://carrier-iota.example.com/v2",
+                "lifecycleState": "active",
+                "supportBoundary": {
+                    "curatedRegistryOnly": true,
+                    "automaticTrustAdmission": false,
+                    "permissionlessFederationSupported": false,
+                    "boundCoverageSupported": true
+                },
+                "policies": [
+                    {
+                        "jurisdiction": "us-ny",
+                        "coverageClasses": ["tool_execution"],
+                        "supportedCurrencies": ["USD"],
+                        "requiredEvidence": ["credit_provider_risk_package"],
+                        "maxCoverageAmount": { "units": 50000, "currency": "USD" },
+                        "claimsSupported": true,
+                        "quoteTtlSeconds": 3600
+                    }
+                ],
+                "provenance": {
+                    "configuredBy": "operator@example.com",
+                    "configuredAt": unix_now_secs(),
+                    "sourceRef": "liability-market-runbook",
+                    "changeReason": "superseding provider record"
+                }
+            },
+            "supersedesProviderRecordId": initial_provider.body.provider_record_id
+        }))
+        .send()
+        .expect("issue superseding provider");
+    assert_eq!(superseding_provider_issue.status(), reqwest::StatusCode::OK);
+
+    let stale_input_path = dir.join("stale-auto-bind.json");
+    std::fs::write(
+        &stale_input_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "authority": pricing_authority,
+            "quoteResponse": quote_response,
+            "policyNumber": "POL-IOTA-STALE-1"
+        }))
+        .expect("serialize stale auto-bind input"),
+    )
+    .expect("write stale auto-bind input");
+    let stale_auto_bind = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--budget-db",
+            budget_db_path.to_str().expect("budget db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "auto-bind-issue",
+            "--input-file",
+            stale_input_path.to_str().expect("stale input path"),
+        ])
+        .output()
+        .expect("run stale auto-bind CLI");
+    assert!(
+        !stale_auto_bind.status.success(),
+        "stale auto-bind CLI unexpectedly succeeded\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stale_auto_bind.stdout),
+        String::from_utf8_lossy(&stale_auto_bind.stderr)
+    );
+    let stale_stdout = String::from_utf8_lossy(&stale_auto_bind.stdout);
+    let stale_stderr = String::from_utf8_lossy(&stale_auto_bind.stderr);
+    assert!(
+        stale_stderr.contains("stale provider record"),
+        "unexpected stale auto-bind CLI failure\nstdout:\n{stale_stdout}\nstderr:\n{stale_stderr}"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch() {
     let dir = unique_dir("arc-liability-market-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
@@ -8177,7 +11878,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..90_u64 {
+        for day in 0..1_000_u64 {
             store
                 .append_arc_receipt(&make_credit_history_receipt(
                     &format!("rc-liability-negative-{day}"),
@@ -8189,7 +11890,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
                     now.saturating_sub((day + 2) * 86_400),
                     SettlementStatus::Settled,
                     "USD",
-                    4_000,
+                    5_000,
                     "USD",
                     true,
                 ))
@@ -8246,6 +11947,31 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
     let risk_package: SignedCreditProviderRiskPackage = risk_package_response
         .json()
         .expect("parse provider risk package");
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book report");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_json = capital_book_response
+        .text()
+        .expect("read capital book report body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {capital_book_json}"
+    );
 
     let provider_issue = client
         .post(format!("{base_url}/v1/liability/providers/issue"))
@@ -8377,7 +12103,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 20000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 900, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(3600)
+                "expiresAt": unix_now_secs().saturating_add(1800)
             }
         }))
         .send()
@@ -8510,7 +12236,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 23000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 975, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(3600)
+                "expiresAt": unix_now_secs().saturating_add(1800)
             }
         }))
         .send()
@@ -8550,6 +12276,16 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
 
 #[test]
 fn test_liability_claim_workflow_surfaces() {
+    std::thread::Builder::new()
+        .name("test_liability_claim_workflow_surfaces".to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(test_liability_claim_workflow_surfaces_inner)
+        .expect("spawn liability claim workflow test thread")
+        .join()
+        .expect("join liability claim workflow test thread");
+}
+
+fn test_liability_claim_workflow_surfaces_inner() {
     let dir = unique_dir("arc-liability-claims-workflow");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -8562,9 +12298,9 @@ fn test_liability_claim_workflow_surfaces() {
     let now = unix_now_secs();
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
-        for day in 0..120_u64 {
+        for day in 0..1_000_u64 {
             store
-                .append_arc_receipt(&make_credit_history_receipt(
+                .append_arc_receipt(&make_governed_authorization_receipt_with_options(
                     &format!("rc-liability-claims-{day}"),
                     &format!("cap-liability-claims-{day}"),
                     subject_key,
@@ -8576,7 +12312,8 @@ fn test_liability_claim_workflow_surfaces() {
                     "USD",
                     4_000,
                     "USD",
-                    true,
+                    false,
+                    false,
                 ))
                 .expect("append liability claim receipt");
         }
@@ -8584,7 +12321,7 @@ fn test_liability_claim_workflow_surfaces() {
 
     let listen = reserve_listen_addr();
     let service_token = "liability-claims-token";
-    let service = spawn_trust_service(
+    let mut service = spawn_trust_service(
         listen,
         service_token,
         &receipt_db_path,
@@ -8605,14 +12342,25 @@ fn test_liability_claim_workflow_surfaces() {
         .json(&serde_json::json!({
             "query": {
                 "agentSubject": subject_key,
-                "receiptLimit": 120,
+                "receiptLimit": 1000,
                 "decisionLimit": 50
             }
         }))
         .send()
         .expect("issue claim backing facility");
     assert_eq!(facility_issue.status(), reqwest::StatusCode::OK);
-    let _: SignedCreditFacility = facility_issue.json().expect("parse issued facility");
+    let facility: SignedCreditFacility = facility_issue.json().expect("parse issued facility");
+    assert_eq!(
+        facility.body.report.disposition,
+        arc_core::credit::CreditFacilityDisposition::Grant,
+        "unexpected claim workflow facility report: {:?}",
+        facility.body.report
+    );
+    assert!(
+        facility.body.report.terms.is_some(),
+        "claim workflow facility grant missing terms: {:?}",
+        facility.body.report
+    );
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
@@ -8661,7 +12409,7 @@ fn test_liability_claim_workflow_surfaces() {
         .json(&serde_json::json!({
             "query": {
                 "agentSubject": subject_key,
-                "receiptLimit": 120,
+                "receiptLimit": 1000,
                 "decisionLimit": 50
             }
         }))
@@ -8711,6 +12459,31 @@ fn test_liability_claim_workflow_surfaces() {
     let risk_package: SignedCreditProviderRiskPackage = risk_package_response
         .json()
         .expect("parse provider risk package");
+
+    let capital_book_response = client
+        .get(format!("{base_url}/v1/reports/capital-book"))
+        .query(&[
+            ("agentSubject", subject_key),
+            ("receiptLimit", "10"),
+            ("facilityLimit", "10"),
+            ("bondLimit", "10"),
+            ("lossEventLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("request capital book report");
+    let capital_book_status = capital_book_response.status();
+    let capital_book_json = capital_book_response
+        .text()
+        .expect("read capital book report body");
+    assert_eq!(
+        capital_book_status,
+        reqwest::StatusCode::OK,
+        "capital book export failed with body: {capital_book_json}"
+    );
 
     let provider_issue = client
         .post(format!("{base_url}/v1/liability/providers/issue"))
@@ -8794,7 +12567,7 @@ fn test_liability_claim_workflow_surfaces() {
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 25000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 1200, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(3600)
+                "expiresAt": unix_now_secs().saturating_add(1800)
             }
         }))
         .send()
@@ -8891,7 +12664,7 @@ fn test_liability_claim_workflow_surfaces() {
         .verify_signature()
         .expect("verify claim response signature"));
 
-    let dispute_issue = client
+    let dispute_issue = match client
         .post(format!("{base_url}/v1/liability/disputes/issue"))
         .header(
             reqwest::header::AUTHORIZATION,
@@ -8904,7 +12677,19 @@ fn test_liability_claim_workflow_surfaces() {
             "note": "requesting neutral review"
         }))
         .send()
-        .expect("issue claim dispute");
+    {
+        Ok(response) => response,
+        Err(error) => {
+            let status = service
+                .child
+                .try_wait()
+                .expect("poll trust service after dispute failure");
+            let stderr = read_child_stderr(&mut service.child);
+            panic!(
+                "issue claim dispute: {error:?}\nservice_status: {status:?}\nservice_stderr:\n{stderr}"
+            );
+        }
+    };
     assert_eq!(dispute_issue.status(), reqwest::StatusCode::OK);
     let dispute: SignedLiabilityClaimDispute = dispute_issue.json().expect("parse claim dispute");
     assert!(dispute
@@ -8930,6 +12715,7 @@ fn test_liability_claim_workflow_surfaces() {
     let adjudication_output = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
         .args([
+            "--json",
             "--receipt-db",
             receipt_db_path.to_str().expect("receipt db path"),
             "--authority-db",
@@ -8950,9 +12736,354 @@ fn test_liability_claim_workflow_surfaces() {
         String::from_utf8_lossy(&adjudication_output.stdout),
         String::from_utf8_lossy(&adjudication_output.stderr)
     );
-    let adjudication_stdout = String::from_utf8_lossy(&adjudication_output.stdout);
-    assert!(adjudication_stdout.contains("adjudication_id:"));
-    assert!(adjudication_stdout.contains("outcome:"));
+    let adjudication_json =
+        String::from_utf8(adjudication_output.stdout).expect("adjudication CLI json");
+    assert!(adjudication_json.contains("\"adjudicationId\""));
+
+    let capital_instruction_input_path = dir.join("liability-payout-capital-instruction.json");
+    std::fs::write(
+        &capital_instruction_input_path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "query": {
+                "agentSubject": subject_key,
+                "receiptLimit": 1000,
+                "facilityLimit": 10,
+                "bondLimit": 10,
+                "lossEventLimit": 10
+            },
+            "sourceKind": "facility_commitment",
+            "action": "transfer_funds",
+            "amount": { "units": 18000, "currency": "USD" },
+            "authorityChain": [
+                {
+                    "role": "operator_treasury",
+                    "principalId": "treasury-claims-1",
+                    "approvedAt": unix_now_secs().saturating_sub(30),
+                    "expiresAt": unix_now_secs().saturating_add(3600)
+                },
+                {
+                    "role": "custodian",
+                    "principalId": "custodian-claims-1",
+                    "approvedAt": unix_now_secs().saturating_sub(20),
+                    "expiresAt": unix_now_secs().saturating_add(3600)
+                }
+            ],
+            "executionWindow": {
+                "notBefore": unix_now_secs().saturating_sub(60),
+                "notAfter": unix_now_secs().saturating_add(3600)
+            },
+            "rail": {
+                "kind": "manual",
+                "railId": "claim-payout-manual-1",
+                "custodyProviderId": "custodian-claims-1",
+                "sourceAccountRef": "facility-claims-main"
+            },
+            "description": "automatic claim payout transfer"
+        }))
+        .expect("serialize payout capital instruction"),
+    )
+    .expect("write payout capital instruction");
+
+    let capital_instruction_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "capital-instruction",
+            "issue",
+            "--input-file",
+            capital_instruction_input_path
+                .to_str()
+                .expect("payout capital instruction path"),
+        ])
+        .output()
+        .expect("run payout capital instruction CLI");
+    assert!(
+        capital_instruction_output.status.success(),
+        "payout capital instruction CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&capital_instruction_output.stdout),
+        String::from_utf8_lossy(&capital_instruction_output.stderr)
+    );
+    let capital_instruction_json =
+        String::from_utf8(capital_instruction_output.stdout).expect("capital instruction json");
+    assert!(capital_instruction_json.contains("\"instructionId\""));
+    assert!(capital_instruction_json.contains("\"transfer_funds\""));
+    assert!(capital_instruction_json.contains("\"facility_commitment\""));
+
+    let payout_instruction_input_path = dir.join("liability-payout-instruction.json");
+    std::fs::write(
+        &payout_instruction_input_path,
+        format!(
+            "{{\n  \"adjudication\": {adjudication_json},\n  \"capitalInstruction\": {capital_instruction_json},\n  \"note\": \"execute the adjudicated automatic payout\"\n}}\n"
+        ),
+    )
+    .expect("write payout instruction input");
+
+    let payout_instruction_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-payout-instruction-issue",
+            "--input-file",
+            payout_instruction_input_path
+                .to_str()
+                .expect("payout instruction input path"),
+        ])
+        .output()
+        .expect("run payout instruction CLI");
+    assert!(
+        payout_instruction_output.status.success(),
+        "payout instruction CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&payout_instruction_output.stdout),
+        String::from_utf8_lossy(&payout_instruction_output.stderr)
+    );
+    let payout_instruction_json =
+        String::from_utf8(payout_instruction_output.stdout).expect("payout instruction json");
+    assert!(payout_instruction_json.contains("\"payoutInstructionId\""));
+
+    let payout_receipt_input_path = dir.join("liability-payout-receipt.json");
+    std::fs::write(
+        &payout_receipt_input_path,
+        format!(
+            "{{\n  \"payoutInstruction\": {payout_instruction_json},\n  \"payoutReceiptRef\": \"claim-payout-confirmation-1\",\n  \"reconciliationState\": \"matched\",\n  \"observedExecution\": {{\n    \"observedAt\": {},\n    \"externalReferenceId\": \"claim-payout-wire-1\",\n    \"amount\": {{ \"units\": 18000, \"currency\": \"USD\" }}\n  }},\n  \"note\": \"custodian matched the payout transfer\"\n}}\n",
+            unix_now_secs()
+        ),
+    )
+    .expect("write payout receipt input");
+
+    let payout_receipt_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-payout-receipt-issue",
+            "--input-file",
+            payout_receipt_input_path
+                .to_str()
+                .expect("payout receipt input path"),
+        ])
+        .output()
+        .expect("run payout receipt CLI");
+    assert!(
+        payout_receipt_output.status.success(),
+        "payout receipt CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&payout_receipt_output.stdout),
+        String::from_utf8_lossy(&payout_receipt_output.stderr)
+    );
+    let payout_receipt_json =
+        String::from_utf8(payout_receipt_output.stdout).expect("payout receipt json");
+    assert!(payout_receipt_json.contains("\"payoutReceiptId\""));
+    assert!(payout_receipt_json.contains("\"matched\""));
+
+    let stale_settlement_instruction_input_path =
+        dir.join("liability-stale-settlement-instruction.json");
+    std::fs::write(
+        &stale_settlement_instruction_input_path,
+        format!(
+            "{{\n  \"payoutReceipt\": {payout_receipt_json},\n  \"capitalBook\": {capital_book_json},\n  \"settlementKind\": \"facility_reimbursement\",\n  \"settlementAmount\": {{ \"units\": 18000, \"currency\": \"USD\" }},\n  \"topology\": {{\n    \"payer\": {{ \"role\": \"facility_provider\", \"partyId\": \"facility-provider-claims-1\" }},\n    \"payee\": {{ \"role\": \"operator_treasury\", \"partyId\": \"operator-treasury-claims-1\" }},\n    \"beneficiary\": {{ \"role\": \"agent_counterparty\", \"partyId\": \"acme@example.com\" }}\n  }},\n  \"authorityChain\": [\n    {{\n      \"role\": \"facility_provider\",\n      \"principalId\": \"facility-provider-claims-1\",\n      \"approvedAt\": {},\n      \"expiresAt\": {}\n    }},\n    {{\n      \"role\": \"custodian\",\n      \"principalId\": \"custodian-claims-1\",\n      \"approvedAt\": {},\n      \"expiresAt\": {}\n    }}\n  ],\n  \"executionWindow\": {{\n    \"notBefore\": {},\n    \"notAfter\": {}\n  }},\n  \"rail\": {{\n    \"kind\": \"wire\",\n    \"railId\": \"claims-settlement-wire-1\",\n    \"custodyProviderId\": \"custodian-claims-1\",\n    \"sourceAccountRef\": \"facility-provider-recovery-1\"\n  }},\n  \"settlementReference\": \"facility-recovery-reference-1\",\n  \"note\": \"reimburse the operator treasury after claim payout\"\n}}\n",
+            unix_now_secs().saturating_sub(600),
+            unix_now_secs().saturating_sub(10),
+            unix_now_secs().saturating_sub(60),
+            unix_now_secs().saturating_add(3600),
+            unix_now_secs().saturating_sub(120),
+            unix_now_secs().saturating_add(3600)
+        ),
+    )
+    .expect("write stale settlement instruction input");
+
+    let stale_settlement_instruction_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-settlement-instruction-issue",
+            "--input-file",
+            stale_settlement_instruction_input_path
+                .to_str()
+                .expect("stale settlement instruction input path"),
+        ])
+        .output()
+        .expect("run stale settlement instruction CLI");
+    assert!(
+        !stale_settlement_instruction_output.status.success(),
+        "stale settlement instruction CLI unexpectedly succeeded\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stale_settlement_instruction_output.stdout),
+        String::from_utf8_lossy(&stale_settlement_instruction_output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&stale_settlement_instruction_output.stderr).contains("stale"),
+        "unexpected stale settlement instruction stderr\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&stale_settlement_instruction_output.stdout),
+        String::from_utf8_lossy(&stale_settlement_instruction_output.stderr)
+    );
+
+    let settlement_instruction_input_path = dir.join("liability-settlement-instruction.json");
+    std::fs::write(
+        &settlement_instruction_input_path,
+        format!(
+            "{{\n  \"payoutReceipt\": {payout_receipt_json},\n  \"capitalBook\": {capital_book_json},\n  \"settlementKind\": \"facility_reimbursement\",\n  \"settlementAmount\": {{ \"units\": 18000, \"currency\": \"USD\" }},\n  \"topology\": {{\n    \"payer\": {{ \"role\": \"facility_provider\", \"partyId\": \"facility-provider-claims-1\" }},\n    \"payee\": {{ \"role\": \"operator_treasury\", \"partyId\": \"operator-treasury-claims-1\" }},\n    \"beneficiary\": {{ \"role\": \"agent_counterparty\", \"partyId\": \"acme@example.com\" }}\n  }},\n  \"authorityChain\": [\n    {{\n      \"role\": \"facility_provider\",\n      \"principalId\": \"facility-provider-claims-1\",\n      \"approvedAt\": {},\n      \"expiresAt\": {}\n    }},\n    {{\n      \"role\": \"custodian\",\n      \"principalId\": \"custodian-claims-1\",\n      \"approvedAt\": {},\n      \"expiresAt\": {}\n    }}\n  ],\n  \"executionWindow\": {{\n    \"notBefore\": {},\n    \"notAfter\": {}\n  }},\n  \"rail\": {{\n    \"kind\": \"wire\",\n    \"railId\": \"claims-settlement-wire-1\",\n    \"custodyProviderId\": \"custodian-claims-1\",\n    \"sourceAccountRef\": \"facility-provider-recovery-1\"\n  }},\n  \"settlementReference\": \"facility-recovery-reference-1\",\n  \"note\": \"reimburse the operator treasury after claim payout\"\n}}\n",
+            unix_now_secs().saturating_sub(30),
+            unix_now_secs().saturating_add(3600),
+            unix_now_secs().saturating_sub(20),
+            unix_now_secs().saturating_add(3600),
+            unix_now_secs().saturating_sub(120),
+            unix_now_secs().saturating_add(3600)
+        ),
+    )
+    .expect("write settlement instruction input");
+
+    let settlement_instruction_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-settlement-instruction-issue",
+            "--input-file",
+            settlement_instruction_input_path
+                .to_str()
+                .expect("settlement instruction input path"),
+        ])
+        .output()
+        .expect("run settlement instruction CLI");
+    assert!(
+        settlement_instruction_output.status.success(),
+        "settlement instruction CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&settlement_instruction_output.stdout),
+        String::from_utf8_lossy(&settlement_instruction_output.stderr)
+    );
+    let settlement_instruction_json = String::from_utf8(settlement_instruction_output.stdout)
+        .expect("settlement instruction json");
+    assert!(settlement_instruction_json.contains("\"settlementInstructionId\""));
+    assert!(settlement_instruction_json.contains("\"facility_reimbursement\""));
+
+    let mismatched_settlement_receipt_input_path =
+        dir.join("liability-settlement-receipt-mismatched.json");
+    std::fs::write(
+        &mismatched_settlement_receipt_input_path,
+        format!(
+            "{{\n  \"settlementInstruction\": {settlement_instruction_json},\n  \"settlementReceiptRef\": \"claim-settlement-confirmation-bad-1\",\n  \"reconciliationState\": \"matched\",\n  \"observedExecution\": {{\n    \"observedAt\": {},\n    \"externalReferenceId\": \"claim-settlement-wire-bad-1\",\n    \"amount\": {{ \"units\": 18000, \"currency\": \"USD\" }}\n  }},\n  \"observedPayerId\": \"unexpected-facility-provider\",\n  \"observedPayeeId\": \"operator-treasury-claims-1\",\n  \"note\": \"this should fail closed because the observed payer does not match\"\n}}\n",
+            unix_now_secs()
+        ),
+    )
+    .expect("write mismatched settlement receipt input");
+
+    let mismatched_settlement_receipt_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-settlement-receipt-issue",
+            "--input-file",
+            mismatched_settlement_receipt_input_path
+                .to_str()
+                .expect("mismatched settlement receipt input path"),
+        ])
+        .output()
+        .expect("run mismatched settlement receipt CLI");
+    assert!(
+        !mismatched_settlement_receipt_output.status.success(),
+        "mismatched settlement receipt CLI unexpectedly succeeded\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&mismatched_settlement_receipt_output.stdout),
+        String::from_utf8_lossy(&mismatched_settlement_receipt_output.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&mismatched_settlement_receipt_output.stderr)
+            .contains("payer/payee"),
+        "unexpected mismatched settlement receipt stderr\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&mismatched_settlement_receipt_output.stdout),
+        String::from_utf8_lossy(&mismatched_settlement_receipt_output.stderr)
+    );
+
+    let settlement_receipt_input_path = dir.join("liability-settlement-receipt.json");
+    std::fs::write(
+        &settlement_receipt_input_path,
+        format!(
+            "{{\n  \"settlementInstruction\": {settlement_instruction_json},\n  \"settlementReceiptRef\": \"claim-settlement-confirmation-1\",\n  \"reconciliationState\": \"matched\",\n  \"observedExecution\": {{\n    \"observedAt\": {},\n    \"externalReferenceId\": \"claim-settlement-wire-1\",\n    \"amount\": {{ \"units\": 18000, \"currency\": \"USD\" }}\n  }},\n  \"observedPayerId\": \"facility-provider-claims-1\",\n  \"observedPayeeId\": \"operator-treasury-claims-1\",\n  \"note\": \"facility reimbursement matched the settlement topology\"\n}}\n",
+            unix_now_secs()
+        ),
+    )
+    .expect("write settlement receipt input");
+
+    let settlement_receipt_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--json",
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-settlement-receipt-issue",
+            "--input-file",
+            settlement_receipt_input_path
+                .to_str()
+                .expect("settlement receipt input path"),
+        ])
+        .output()
+        .expect("run settlement receipt CLI");
+    assert!(
+        settlement_receipt_output.status.success(),
+        "settlement receipt CLI failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&settlement_receipt_output.stdout),
+        String::from_utf8_lossy(&settlement_receipt_output.stderr)
+    );
+    let settlement_receipt_json =
+        String::from_utf8(settlement_receipt_output.stdout).expect("settlement receipt json");
+    assert!(settlement_receipt_json.contains("\"settlementReceiptId\""));
+    assert!(settlement_receipt_json.contains("\"matched\""));
+
+    let duplicate_payout_receipt_output = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "trust",
+            "liability-market",
+            "claim-payout-receipt-issue",
+            "--input-file",
+            payout_receipt_input_path
+                .to_str()
+                .expect("payout receipt input path"),
+        ])
+        .output()
+        .expect("run duplicate payout receipt CLI");
+    assert!(
+        !duplicate_payout_receipt_output.status.success(),
+        "duplicate payout receipt CLI unexpectedly succeeded\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&duplicate_payout_receipt_output.stdout),
+        String::from_utf8_lossy(&duplicate_payout_receipt_output.stderr)
+    );
 
     let cli_output = Command::new(env!("CARGO_BIN_EXE_arc"))
         .current_dir(workspace_root())
@@ -8978,7 +13109,18 @@ fn test_liability_claim_workflow_surfaces() {
     assert!(claims_stdout.contains("provider_responses:    1"));
     assert!(claims_stdout.contains("disputes:              1"));
     assert!(claims_stdout.contains("adjudications:         1"));
+    assert!(claims_stdout.contains("payout_instructions:   1"));
+    assert!(claims_stdout.contains("payout_receipts:       1"));
+    assert!(claims_stdout.contains("matched_payouts:       1"));
+    assert!(claims_stdout.contains("settlement_instructions:1"));
+    assert!(claims_stdout.contains("settlement_receipts:   1"));
+    assert!(claims_stdout.contains("matched_settlements:   1"));
+    assert!(claims_stdout.contains("counterparty_mismatch_settlements:0"));
     assert!(claims_stdout.contains("policy=POL-CLAIMS-1"));
+    assert!(claims_stdout.contains("payout_instruction="));
+    assert!(claims_stdout.contains("payout_receipt="));
+    assert!(claims_stdout.contains("settlement_instruction="));
+    assert!(claims_stdout.contains("settlement_receipt="));
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -9230,7 +13372,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
             "quotedTerms": {
                 "quotedCoverageAmount": { "units": 20000, "currency": "USD" },
                 "quotedPremiumAmount": { "units": 1000, "currency": "USD" },
-                "expiresAt": unix_now_secs().saturating_add(3600)
+                "expiresAt": unix_now_secs().saturating_add(1800)
             }
         }))
         .send()

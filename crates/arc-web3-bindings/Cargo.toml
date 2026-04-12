@@ -1,0 +1,23 @@
+[package]
+name = "arc-web3-bindings"
+description = "Alloy bindings and packaged artifacts for the official ARC web3 contract family"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_web3_bindings"
+
+[dependencies]
+alloy = { version = "1.8.3", default-features = false, features = ["json", "json-abi", "sol-types", "std"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+arc-core = { path = "../arc-core" }
+arc-link = { path = "../arc-link" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

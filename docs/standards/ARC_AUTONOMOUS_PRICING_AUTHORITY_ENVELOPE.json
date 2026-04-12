@@ -1,0 +1,45 @@
+{
+  "schema": "arc.autonomous-pricing-authority-envelope.v1",
+  "envelope_id": "ape-1",
+  "issued_at": 1743379200,
+  "subject_key": "subject-1",
+  "provider_id": "carrier-1",
+  "currency": "USD",
+  "kind": "delegated_market_authority",
+  "automation_mode": "active",
+  "permitted_actions": [
+    "reprice",
+    "renew",
+    "decline",
+    "bind"
+  ],
+  "authority_chain_refs": [
+    "underwriting-committee-approval",
+    "operator-treasury-approval"
+  ],
+  "max_coverage_amount": {
+    "units": 150000,
+    "currency": "USD"
+  },
+  "max_premium_amount": {
+    "units": 6000,
+    "currency": "USD"
+  },
+  "max_rate_change_bps": 750,
+  "max_daily_decisions": 20,
+  "requires_human_review_for_bind": false,
+  "requires_human_review_above_premium": {
+    "units": 5000,
+    "currency": "USD"
+  },
+  "delegated_authority_reference": "lpa-1",
+  "not_before": 1743379200,
+  "not_after": 1743465600,
+  "support_boundary": {
+    "delegated_authority_required": true,
+    "live_bind_supported": true,
+    "reserve_optimization_required": true,
+    "operator_override_supported": true
+  },
+  "note": "Binds automation to one delegated pricing authority envelope."
+}

@@ -1,0 +1,618 @@
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { ethers } from "ethers";
+import ganache from "ganache";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const contractsDir = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(contractsDir, "..");
+const artifactsDir = path.join(contractsDir, "artifacts");
+
+const LOCAL_PORT = Number(process.env.ARC_PROMOTION_DEVNET_PORT ?? "8551");
+const LOCAL_RPC_URL = `http://127.0.0.1:${LOCAL_PORT}`;
+const LOCAL_CHAIN_ID = 31337;
+const USDC_UNITS = 10n ** 6n;
+const DEFAULT_EXPIRY_SECONDS = 3600;
+
+const ACCOUNT_CONFIG = [
+  { name: "admin", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000001" },
+  { name: "operator", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000002" },
+  { name: "delegate", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000003" },
+  { name: "beneficiary", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000004" },
+  { name: "depositor", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000005" },
+  { name: "principal", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000006" },
+  { name: "outsider", privateKey: "0x1000000000000000000000000000000000000000000000000000000000000007" }
+];
+
+function parseArgs(argv) {
+  const args = {};
+  for (let index = 2; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (!token.startsWith("--")) {
+      continue;
+    }
+    const key = token.slice(2);
+    const next = argv[index + 1];
+    if (!next || next.startsWith("--")) {
+      args[key] = true;
+      continue;
+    }
+    args[key] = next;
+    index += 1;
+  }
+  return args;
+}
+
+function ensureDir(dirPath) {
+  fs.mkdirSync(dirPath, { recursive: true });
+}
+
+function readJson(jsonPath) {
+  return JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+}
+
+function writeJson(jsonPath, value) {
+  ensureDir(path.dirname(jsonPath));
+  fs.writeFileSync(jsonPath, `${JSON.stringify(normalize(value), null, 2)}\n`);
+}
+
+function normalize(value) {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => normalize(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, normalize(nested)]));
+  }
+  return value;
+}
+
+function sha256File(filePath) {
+  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+}
+
+function sha256Object(value) {
+  return crypto.createHash("sha256").update(JSON.stringify(normalize(value))).digest("hex");
+}
+
+function repoRelative(filePath) {
+  return path.relative(repoRoot, filePath).replaceAll(path.sep, "/");
+}
+
+function artifactPath(ref) {
+  return path.isAbsolute(ref) ? ref : path.join(repoRoot, ref);
+}
+
+function readArtifact(ref) {
+  return readJson(artifactPath(ref));
+}
+
+function toHexBalance(amount) {
+  return ethers.toBeHex(amount);
+}
+
+function toSalt(namespace, localSalt) {
+  return ethers.keccak256(ethers.toUtf8Bytes(`${namespace}:${localSalt}`));
+}
+
+function labelHash(label) {
+  return ethers.keccak256(ethers.toUtf8Bytes(label));
+}
+
+function splitPair(pair) {
+  const [base, quote] = pair.split("/");
+  if (!base || !quote) {
+    throw new Error(`invalid oracle pair ${pair}`);
+  }
+  return [base.trim(), quote.trim()];
+}
+
+async function waitForCode(provider, address) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const code = await provider.getCode(address);
+    if (code && code !== "0x") {
+      return code;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`no deployed code found at ${address}`);
+}
+
+async function deployContract(name, signer, ...args) {
+  const artifact = readArtifact(`contracts/artifacts/${name}.json`);
+  const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode, signer);
+  const contract = await factory.deploy(...args);
+  await contract.waitForDeployment();
+  return contract;
+}
+
+async function startLocalDevnet() {
+  const server = ganache.server({
+    logging: { quiet: true },
+    chain: { chainId: LOCAL_CHAIN_ID, hardfork: "shanghai" },
+    wallet: {
+      accounts: ACCOUNT_CONFIG.map((account) => ({
+        secretKey: account.privateKey,
+        balance: toHexBalance(ethers.parseEther("1000"))
+      }))
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.listen(LOCAL_PORT, (error) => (error ? reject(error) : resolve()));
+  });
+
+  const provider = new ethers.JsonRpcProvider(LOCAL_RPC_URL);
+  const wallets = Object.fromEntries(
+    ACCOUNT_CONFIG.map((account) => {
+      const rawWallet = new ethers.Wallet(account.privateKey, provider);
+      const signer = new ethers.NonceManager(rawWallet);
+      signer.address = rawWallet.address;
+      signer.privateKey = account.privateKey;
+      return [account.name, signer];
+    })
+  );
+
+  return { server, provider, wallets };
+}
+
+function createSigner(privateKey, provider) {
+  const rawWallet = new ethers.Wallet(privateKey, provider);
+  const signer = new ethers.NonceManager(rawWallet);
+  signer.address = rawWallet.address;
+  signer.privateKey = privateKey;
+  return signer;
+}
+
+function requireRoleSigner(roleName, expectedAddress, args, provider, fallbackSigner) {
+  if (fallbackSigner && fallbackSigner.address.toLowerCase() === expectedAddress.toLowerCase()) {
+    return fallbackSigner;
+  }
+
+  const roleKeyArg = `${roleName}-key`;
+  const privateKey = args[roleKeyArg];
+  if (!privateKey) {
+    throw new Error(
+      `non-local promotion requires --${roleKeyArg} when ${roleName.replaceAll("-", " ")} address ${expectedAddress} differs from the deployer signer`
+    );
+  }
+
+  const signer = createSigner(privateKey, provider);
+  if (signer.address.toLowerCase() !== expectedAddress.toLowerCase()) {
+    throw new Error(
+      `--${roleKeyArg} signer ${signer.address} does not match reviewed manifest ${roleName.replaceAll("-", " ")} address ${expectedAddress}`
+    );
+  }
+  return signer;
+}
+
+async function setupLocalDependencies(wallets) {
+  const sequencerFeed = await deployContract("mocks/MockAggregatorV3", wallets.admin, 0, "Local Sequencer Uptime", 0);
+  const ethUsdFeed = await deployContract(
+    "mocks/MockAggregatorV3",
+    wallets.admin,
+    8,
+    "ETH / USD",
+    3000n * 10n ** 8n
+  );
+  const mockUsdc = await deployContract("mocks/MockERC20", wallets.admin, "Mock USD Coin", "mUSDC", 6);
+  await (await mockUsdc.mint(wallets.depositor.address, 5_000_000n * USDC_UNITS)).wait();
+  await (await mockUsdc.mint(wallets.principal.address, 5_000_000n * USDC_UNITS)).wait();
+  return {
+    local_mock_usdc_address: await mockUsdc.getAddress(),
+    local_sequencer_uptime_feed: await sequencerFeed.getAddress(),
+    local_eth_usd_feed: await ethUsdFeed.getAddress()
+  };
+}
+
+function resolveValue(token, state) {
+  if (typeof token !== "string") {
+    return token;
+  }
+  if (!(token.startsWith("<") && token.endsWith(">"))) {
+    return token;
+  }
+
+  const key = token.slice(1, -1);
+  if (key in state.placeholders) {
+    return state.placeholders[key];
+  }
+  if (key in state.contractAddresses) {
+    return state.contractAddresses[key];
+  }
+  throw new Error(`unresolved placeholder ${token}`);
+}
+
+function deploymentReportSkeleton({ manifest, manifestHash, approval, approvalHash, environment }) {
+  return {
+    report_id: `arc.web3-deployment-promotion.${environment}.v1`,
+    generated_at: new Date().toISOString(),
+    environment,
+    status: "pending",
+    manifest_id: manifest.manifest_id,
+    manifest_sha256: manifestHash,
+    approval_id: approval.approval_id,
+    approval_sha256: approvalHash,
+    candidate_release_id: approval.candidate_release_id,
+    deployment_policy_id: approval.deployment_policy_id,
+    checks: []
+  };
+}
+
+function rollbackPlanSkeleton({ manifest, approval, environment }) {
+  return {
+    plan_id: `arc.web3-rollback-plan.${environment}.v1`,
+    generated_at: new Date().toISOString(),
+    environment,
+    manifest_id: manifest.manifest_id,
+    approval_id: approval.approval_id,
+    rollback_mode: approval.failure_policy?.rollback_mode ?? "manual-replacement-deployment",
+    stop_on_error: approval.failure_policy?.stop_on_error ?? true,
+    require_manual_retry_after_failure: approval.failure_policy?.require_manual_retry_after_failure ?? true,
+    rollback_executed: false,
+    failure_stage: null,
+    notes: []
+  };
+}
+
+function validateApproval({ manifest, manifestHash, approval, contractRelease, deploymentPolicy, manifestPath, isLocal }) {
+  if (approval.status !== "approved") {
+    throw new Error("deployment approval is not approved");
+  }
+  if (approval.reviewed_manifest_sha256 !== manifestHash) {
+    throw new Error("deployment approval manifest hash does not match the reviewed manifest");
+  }
+  const expectedManifestPath = repoRelative(manifestPath);
+  if (approval.reviewed_manifest_path !== expectedManifestPath) {
+    throw new Error(`deployment approval reviewed_manifest_path mismatch: expected ${expectedManifestPath}`);
+  }
+  if (approval.candidate_release_id !== contractRelease.release_id) {
+    throw new Error("deployment approval candidate release does not match the shipped contract release");
+  }
+  if (approval.deployment_policy_id !== deploymentPolicy.policyId) {
+    throw new Error("deployment approval policy does not match the shipped deployment policy");
+  }
+  if (approval.create2?.salt_namespace !== manifest.salt_namespace) {
+    throw new Error("deployment approval salt namespace does not match the reviewed manifest");
+  }
+
+  const factoryMode = approval.create2?.factory_mode;
+  if (isLocal) {
+    if (factoryMode !== "runner-managed-local") {
+      throw new Error("local promotion qualification requires factory_mode runner-managed-local");
+    }
+    return;
+  }
+
+  if (factoryMode !== "predeployed" || !approval.create2?.factory_address) {
+    throw new Error("non-local promotion requires a predeployed create2 factory address in the approval artifact");
+  }
+}
+
+async function main() {
+  const args = parseArgs(process.argv);
+  const manifestPath = args.manifest ? path.resolve(repoRoot, args.manifest) : null;
+  const approvalPath = args.approval ? path.resolve(repoRoot, args.approval) : null;
+  const outputDir = args["output-dir"] ? path.resolve(repoRoot, args["output-dir"]) : null;
+  const localDevnet = Boolean(args["local-devnet"]);
+  const rollbackOnFailure = Boolean(args["rollback-on-failure"]);
+
+  if (!manifestPath || !approvalPath || !outputDir) {
+    throw new Error("usage: node contracts/scripts/promote-deployment.mjs --manifest <path> --approval <path> --output-dir <path> [--local-devnet] [--rollback-on-failure] [--rpc-url <url>] [--deployer-key <hex>] [--registry-admin-key <hex>] [--operator-key <hex>] [--price-admin-key <hex>]");
+  }
+
+  ensureDir(outputDir);
+  const manifest = readJson(manifestPath);
+  const approval = readJson(approvalPath);
+  const contractRelease = readJson(path.join(contractsDir, "release", "ARC_WEB3_CONTRACT_RELEASE.json"));
+  const deploymentPolicy = readJson(path.join(repoRoot, "docs", "standards", "ARC_WEB3_DEPLOYMENT_POLICY.json"));
+  const manifestHash = sha256File(manifestPath);
+  const approvalHash = sha256File(approvalPath);
+  const environment = localDevnet ? "local-devnet" : approval.environment ?? "operator-rollout";
+
+  const reportPath = path.join(outputDir, "promotion-report.json");
+  const rollbackPath = path.join(outputDir, "rollback-plan.json");
+  const deploymentPath = path.join(outputDir, "deployment.json");
+
+  let report = deploymentReportSkeleton({ manifest, manifestHash, approval, approvalHash, environment });
+  let rollbackPlan = rollbackPlanSkeleton({ manifest, approval, environment });
+
+  let server;
+  let provider;
+  let wallets;
+  let snapshotId = null;
+
+  try {
+    validateApproval({ manifest, manifestHash, approval, contractRelease, deploymentPolicy, manifestPath, isLocal: localDevnet });
+    report.checks.push({
+      id: "approval.validation",
+      outcome: "pass",
+      note: "Reviewed manifest hash, release id, deployment policy, and create2 salt namespace matched the approved promotion artifact."
+    });
+
+    const state = {
+      placeholders: {},
+      contractAddresses: {},
+      deploymentPlan: []
+    };
+
+    if (localDevnet) {
+      ({ server, provider, wallets } = await startLocalDevnet());
+      state.placeholders = await setupLocalDependencies(wallets);
+    } else {
+      const rpcUrl = args["rpc-url"];
+      const deployerKey = args["deployer-key"];
+      if (!rpcUrl || !deployerKey) {
+        throw new Error("non-local promotion requires --rpc-url and --deployer-key");
+      }
+      provider = new ethers.JsonRpcProvider(rpcUrl);
+      const deployerSigner = createSigner(deployerKey, provider);
+      wallets = {
+        deployer: deployerSigner,
+        admin: requireRoleSigner(
+          "registry-admin",
+          manifest.operator_configuration?.registry_admin_address,
+          args,
+          provider,
+          deployerSigner
+        ),
+        operator: requireRoleSigner(
+          "operator",
+          manifest.operator_configuration?.operator_address,
+          args,
+          provider,
+          deployerSigner
+        ),
+        priceAdmin: requireRoleSigner(
+          "price-admin",
+          manifest.operator_configuration?.price_admin_address,
+          args,
+          provider,
+          deployerSigner
+        )
+      };
+    }
+
+    if (localDevnet) {
+      wallets.deployer = wallets.admin;
+      wallets.priceAdmin = wallets.admin;
+    }
+
+    const network = await provider.getNetwork();
+    if (manifest.chain_id !== `eip155:${network.chainId}`) {
+      throw new Error(`manifest chain id ${manifest.chain_id} does not match target chain eip155:${network.chainId}`);
+    }
+
+    const factoryArtifact = readArtifact("contracts/artifacts/mocks/ArcCreate2Factory.json");
+    let create2FactoryAddress = approval.create2?.factory_address ?? null;
+    let create2Factory;
+
+    if (!create2FactoryAddress) {
+      const factory = new ethers.ContractFactory(
+        factoryArtifact.abi,
+        factoryArtifact.bytecode,
+        wallets.deployer
+      );
+      const deployed = await factory.deploy();
+      await deployed.waitForDeployment();
+      create2FactoryAddress = await deployed.getAddress();
+      report.checks.push({
+        id: "create2.factory_bootstrap",
+        outcome: "pass",
+        note: "Runner bootstrapped the bounded local CREATE2 factory for promotion rehearsal."
+      });
+    } else {
+      report.checks.push({
+        id: "create2.factory_predeployed",
+        outcome: "pass",
+        note: `Runner used the preapproved CREATE2 factory ${create2FactoryAddress}.`
+      });
+    }
+
+    create2Factory = new ethers.Contract(create2FactoryAddress, factoryArtifact.abi, wallets.deployer);
+
+    if (localDevnet && rollbackOnFailure) {
+      snapshotId = await provider.send("evm_snapshot", []);
+      rollbackPlan.snapshot_id = snapshotId;
+      rollbackPlan.notes.push("Snapshot captured after local dependencies and CREATE2 factory bootstrap.");
+    }
+
+    for (const contract of manifest.contracts ?? []) {
+      const artifact = readArtifact(contract.artifact);
+      const constructorArgs = (contract.constructor_args ?? []).map((arg) => resolveValue(arg, state));
+      const deployFactory = new ethers.ContractFactory(
+        artifact.abi,
+        artifact.bytecode,
+        wallets.deployer
+      );
+      const deployTx = await deployFactory.getDeployTransaction(...constructorArgs);
+      const initCode = deployTx.data;
+      const salt = toSalt(manifest.salt_namespace, contract.create2_salt);
+      const plannedAddress = ethers.getCreate2Address(create2FactoryAddress, salt, ethers.keccak256(initCode));
+      state.deploymentPlan.push({
+        contract_id: contract.contract_id,
+        artifact: contract.artifact,
+        source: contract.source,
+        constructor_args: constructorArgs,
+        init_code_hash: ethers.keccak256(initCode),
+        create2_salt: contract.create2_salt,
+        create2_salt_hash: salt,
+        planned_address: plannedAddress,
+        init_code: initCode
+      });
+
+      const placeholderKey = contract.contract_id.replace("arc.", "").replaceAll("-", "_");
+      state.contractAddresses[`${placeholderKey}_address`] = plannedAddress;
+      state.contractAddresses[`${placeholderKey}`] = plannedAddress;
+    }
+
+    report.planned_contract_addresses = Object.fromEntries(
+      state.deploymentPlan.map((plan) => [plan.contract_id, plan.planned_address])
+    );
+
+    const deploymentTransactions = {};
+    for (const plan of state.deploymentPlan) {
+      const tx = await create2Factory.deploy(plan.create2_salt_hash, plan.init_code);
+      const receipt = await tx.wait();
+      await waitForCode(provider, plan.planned_address);
+      deploymentTransactions[plan.contract_id] = {
+        tx_hash: tx.hash,
+        gas_used: receipt.gasUsed
+      };
+    }
+
+    report.checks.push({
+      id: "deployment.create2_rollout",
+      outcome: "pass",
+      note: "Reviewed manifest deployed the full bounded contract family through CREATE2 and every actual address matched the planned address."
+    });
+
+    const deployedContracts = Object.fromEntries(
+      state.deploymentPlan.map((plan) => [plan.contract_id, plan.planned_address])
+    );
+
+    const identityRegistryArtifact = readArtifact("contracts/artifacts/ArcIdentityRegistry.json");
+    const rootRegistryArtifact = readArtifact("contracts/artifacts/ArcRootRegistry.json");
+    const priceResolverArtifact = readArtifact("contracts/artifacts/ArcPriceResolver.json");
+
+    const identityRegistry = new ethers.Contract(
+      deployedContracts["arc.identity-registry"],
+      identityRegistryArtifact.abi,
+      wallets.admin
+    );
+    const rootRegistry = new ethers.Contract(
+      deployedContracts["arc.root-registry"],
+      rootRegistryArtifact.abi,
+      wallets.operator
+    );
+    const priceResolver = new ethers.Contract(
+      deployedContracts["arc.price-resolver"],
+      priceResolverArtifact.abi,
+      wallets.priceAdmin
+    );
+
+    const operatorConfig = manifest.operator_configuration ?? {};
+    const operatorLabel = operatorConfig.operator_ed_key_label ?? "arc-operator-ed25519-key";
+    const operatorTx = await identityRegistry.registerOperator(
+      operatorConfig.operator_address,
+      labelHash(operatorLabel),
+      operatorConfig.operator_address,
+      ethers.toUtf8Bytes("deployment-runner:operator")
+    );
+    await operatorTx.wait();
+
+    const latestBlock = await provider.getBlock("latest");
+    const delegateExpiry = BigInt(Number(latestBlock.timestamp) + (operatorConfig.delegate_expiry_seconds ?? DEFAULT_EXPIRY_SECONDS));
+    const delegateTx = await rootRegistry.registerDelegate(
+      operatorConfig.delegate_address,
+      delegateExpiry
+    );
+    await delegateTx.wait();
+
+    const feedTransactions = [];
+    for (const feed of manifest.oracle_configuration?.feeds ?? []) {
+      const [base, quote] = splitPair(feed.pair);
+      const tx = await priceResolver.registerFeed(
+        labelHash(base),
+        labelHash(quote),
+        resolveValue(feed.address, state),
+        BigInt(feed.heartbeat_seconds ?? 3600)
+      );
+      await tx.wait();
+      feedTransactions.push({
+        pair: feed.pair,
+        tx_hash: tx.hash,
+        feed_address: resolveValue(feed.address, state)
+      });
+    }
+
+    report.checks.push({
+      id: "deployment.post_config",
+      outcome: "pass",
+      note: "Operator binding, delegate registration, and oracle feed configuration were applied from the reviewed manifest and chain config."
+    });
+
+    const deploymentRecord = {
+      deployment_id: `arc.web3-reviewed-rollout.${environment}.v1`,
+      generated_at: new Date().toISOString(),
+      environment,
+      manifest_id: manifest.manifest_id,
+      manifest_sha256: manifestHash,
+      approval_id: approval.approval_id,
+      approval_sha256: approvalHash,
+      create2_factory_address: create2FactoryAddress,
+      chain_id: `eip155:${network.chainId}`,
+      rpc_url: localDevnet ? LOCAL_RPC_URL : args["rpc-url"],
+      settlement_token: {
+        symbol: manifest.settlement_token?.symbol,
+        address: resolveValue(manifest.settlement_token?.address, state)
+      },
+      planned_contract_addresses: report.planned_contract_addresses,
+      deployed_contract_addresses: Object.fromEntries(
+        state.deploymentPlan.map((plan) => [plan.contract_id, plan.planned_address])
+      ),
+      deployment_transactions: deploymentTransactions,
+      configuration_transactions: {
+        operator_registration: operatorTx.hash,
+        delegate_registration: delegateTx.hash,
+        feed_registrations: feedTransactions
+      },
+      local_dependencies: localDevnet ? state.placeholders : {}
+    };
+
+    rollbackPlan.notes.push(
+      localDevnet
+        ? "Local rehearsal can revert to the captured snapshot on failure; successful promotion remains reproducible by rerunning against a fresh devnet with the same reviewed manifest and approval."
+        : "Live rollback is replacement-oriented: stop broader promotion, retain the reviewed manifest and approval artifact, and cut a superseding reviewed manifest if remediation is required."
+    );
+
+    report.status = "promoted";
+    report.create2_factory_address = create2FactoryAddress;
+    report.deployment_path = repoRelative(deploymentPath);
+    report.rollback_plan_path = repoRelative(rollbackPath);
+    report.deployed_contract_addresses = deploymentRecord.deployed_contract_addresses;
+
+    writeJson(deploymentPath, deploymentRecord);
+    writeJson(rollbackPath, rollbackPlan);
+    writeJson(reportPath, report);
+  } catch (error) {
+    rollbackPlan.failure_stage = report.checks.at(-1)?.id ?? "deployment.error";
+    rollbackPlan.notes.push(error?.message ?? String(error));
+    report.status = "failed";
+    report.error = error?.message ?? String(error);
+    report.checks.push({
+      id: "deployment.failure",
+      outcome: "fail",
+      note: report.error
+    });
+
+    if (localDevnet && rollbackOnFailure && provider && snapshotId !== null) {
+      const reverted = await provider.send("evm_revert", [snapshotId]);
+      rollbackPlan.rollback_executed = Boolean(reverted);
+      rollbackPlan.notes.push(
+        reverted
+          ? "Local snapshot rollback executed after failed promotion."
+          : "Local snapshot rollback was attempted but the provider did not confirm it."
+      );
+    }
+
+    writeJson(rollbackPath, rollbackPlan);
+    writeJson(reportPath, report);
+    throw error;
+  } finally {
+    const destroyResult = provider?.destroy?.();
+    if (destroyResult && typeof destroyResult.then === "function") {
+      await destroyResult;
+    }
+    if (server) {
+      server.close();
+    }
+  }
+}
+
+await main();

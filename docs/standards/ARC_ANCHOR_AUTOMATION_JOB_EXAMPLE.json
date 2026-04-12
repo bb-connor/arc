@@ -1,0 +1,40 @@
+{
+  "schema": "arc.anchor-automation-job.v1",
+  "job_id": "arc-anchor-eip155-8453-1042",
+  "trigger_kind": "cron",
+  "chain_id": "eip155:8453",
+  "cron_expression": "0 */6 * * *",
+  "checkpoint_seq": 1042,
+  "contract_address": "0x1000000000000000000000000000000000000001",
+  "state_fingerprint": "0x8888888888888888888888888888888888888888888888888888888888888888",
+  "replay_window_secs": 900,
+  "operator_override_required": true,
+  "delegate_forwarder": {
+    "delegate_address": "0x1000000000000000000000000000000000000002",
+    "delegate_expires_at": 1744086400,
+    "registration": {
+      "chain_id": "eip155:8453",
+      "rpc_url": "https://base-mainnet.example.invalid",
+      "contract_address": "0x1000000000000000000000000000000000000001",
+      "operator_address": "0x1111111111111111111111111111111111111111",
+      "delegate_address": "0x1000000000000000000000000000000000000002",
+      "expires_at": 1744086400,
+      "call_data": "0x6b1f5a7c0000000000000000000000001000000000000000000000000000000000000002"
+    }
+  },
+  "publication": {
+    "chain_id": "eip155:8453",
+    "rpc_url": "https://base-mainnet.example.invalid",
+    "contract_address": "0x1000000000000000000000000000000000000001",
+    "operator_address": "0x1111111111111111111111111111111111111111",
+    "publisher_address": "0x1000000000000000000000000000000000000002",
+    "checkpoint_seq": 1042,
+    "batch_start_seq": 104101,
+    "batch_end_seq": 104200,
+    "tree_size": 1,
+    "merkle_root": "0xfdfec88997674fb776d72f55b7f0a6679524f730d2cdc418d4c691dca05167ea",
+    "operator_key_hash": "0x9999999999999999999999999999999999999999999999999999999999999999",
+    "call_data": "0xaabbccdd",
+    "requires_delegate_authorization": true
+  }
+}

@@ -9,9 +9,12 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::appraisal::{
-    derive_runtime_attestation_appraisal, RuntimeAttestationAppraisalReport,
-    RuntimeAttestationAppraisalRequest, RuntimeAttestationPolicyOutcome,
-    SignedRuntimeAttestationAppraisalReport, RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
+    derive_runtime_attestation_appraisal, evaluate_imported_runtime_attestation_appraisal,
+    RuntimeAttestationAppraisalImportReport, RuntimeAttestationAppraisalImportRequest,
+    RuntimeAttestationAppraisalReport, RuntimeAttestationAppraisalRequest,
+    RuntimeAttestationAppraisalResult, RuntimeAttestationAppraisalResultExportRequest,
+    RuntimeAttestationPolicyOutcome, SignedRuntimeAttestationAppraisalReport,
+    SignedRuntimeAttestationAppraisalResult, RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA,
 };
 use arc_core::capability::{
     ArcScope, CapabilityToken, MonetaryAmount, RuntimeAssuranceTier, RuntimeAttestationEvidence,
@@ -22,12 +25,15 @@ use arc_core::session::{ArcIdentityAssertion, EnterpriseIdentityContext, Operati
 use arc_core::{canonical_json_bytes, sha256_hex, Signature};
 use arc_credentials::{
     build_arc_passport_jwt_vc_json_type_metadata, build_arc_passport_sd_jwt_type_metadata,
-    build_oid4vp_request_transport, build_portable_jwks,
-    build_wallet_exchange_descriptor_for_oid4vp,
+    build_oid4vp_request_transport, build_portable_jwks, build_portable_negative_event_artifact,
+    build_portable_reputation_summary_artifact, build_wallet_exchange_descriptor_for_oid4vp,
     create_passport_presentation_challenge_with_reference,
+    create_signed_public_discovery_transparency, create_signed_public_issuer_discovery,
+    create_signed_public_verifier_discovery,
     default_oid4vci_passport_issuer_metadata_with_signing_key,
-    ensure_signed_passport_verifier_policy_active, inspect_arc_passport_sd_jwt_vc_unverified,
-    inspect_oid4vp_direct_post_response, verify_oid4vp_direct_post_response_with_any_issuer_key,
+    ensure_signed_passport_verifier_policy_active, evaluate_portable_reputation,
+    inspect_arc_passport_sd_jwt_vc_unverified, inspect_oid4vp_direct_post_response,
+    verify_oid4vp_direct_post_response_with_any_issuer_key,
     verify_passport_presentation_response_with_policy,
     verify_signed_oid4vp_request_object_with_any_key, verify_signed_passport_verifier_policy,
     AgentPassport, EnterpriseIdentityProvenance, Oid4vciCredentialIssuerMetadata,
@@ -36,7 +42,12 @@ use arc_credentials::{
     Oid4vpVerifierMetadata, PassportLifecycleRecord, PassportLifecycleResolution,
     PassportLifecycleState, PassportPresentationChallenge, PassportPresentationResponse,
     PassportPresentationVerification, PassportStatusDistribution, PassportVerifierPolicy,
-    PassportVerifierPolicyReference, PortableJwkSet, SignedPassportVerifierPolicy,
+    PassportVerifierPolicyReference, PortableJwkSet, PortableNegativeEventIssueRequest,
+    PortableReputationEvaluation, PortableReputationEvaluationRequest,
+    PortableReputationSummaryIssueRequest, PublicDiscoveryEntryKind,
+    PublicDiscoveryImportGuardrails, PublicDiscoveryTransparencyEntry,
+    SignedPassportVerifierPolicy, SignedPortableNegativeEvent, SignedPortableReputationSummary,
+    SignedPublicDiscoveryTransparency, SignedPublicIssuerDiscovery, SignedPublicVerifierDiscovery,
     WalletExchangeDescriptor, WalletExchangeTransactionState,
     ARC_PASSPORT_JWT_VC_JSON_TYPE_METADATA_PATH, ARC_PASSPORT_SD_JWT_VC_FORMAT,
     ARC_PASSPORT_SD_JWT_VC_TYPE, ARC_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH,
@@ -48,16 +59,47 @@ use arc_credentials::{
 };
 use arc_did::DidArc;
 use arc_kernel::{
+    build_generic_governance_case_artifact, build_generic_governance_charter_artifact,
+    build_generic_trust_activation_artifact, build_open_market_fee_schedule_artifact,
+    build_open_market_penalty_artifact, ensure_generic_listing_namespace_consistency,
+    evaluate_generic_governance_case, evaluate_generic_trust_activation,
+    evaluate_open_market_penalty, normalize_namespace, GenericGovernanceCaseEvaluation,
+    GenericGovernanceCaseEvaluationRequest, GenericGovernanceCaseIssueRequest,
+    GenericGovernanceCharterIssueRequest, GenericListingActorKind, GenericListingArtifact,
+    GenericListingBoundary, GenericListingCompatibilityReference, GenericListingFreshnessWindow,
+    GenericListingQuery, GenericListingReport, GenericListingSearchPolicy, GenericListingStatus,
+    GenericListingSubject, GenericListingSummary, GenericNamespaceArtifact,
+    GenericNamespaceLifecycleState, GenericNamespaceOwnership, GenericRegistryPublisher,
+    GenericRegistryPublisherRole, GenericTrustActivationEvaluation,
+    GenericTrustActivationEvaluationRequest, GenericTrustActivationIssueRequest,
+    OpenMarketFeeScheduleIssueRequest, OpenMarketPenaltyEvaluation,
+    OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyIssueRequest, SignedGenericGovernanceCase,
+    SignedGenericGovernanceCharter, SignedGenericListing, SignedGenericNamespace,
+    SignedGenericTrustActivation, SignedOpenMarketFeeSchedule, SignedOpenMarketPenalty,
+    DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS, GENERIC_LISTING_ARTIFACT_SCHEMA,
+    GENERIC_LISTING_REPORT_SCHEMA, GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
+};
+use arc_kernel::{
     ArcOAuthAuthorizationMetadataReport, ArcOAuthAuthorizationReviewPack, AuthoritySnapshot,
     AuthorityStatus, AuthorizationContextReport, BehavioralFeedDecisionSummary,
-    BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReport,
-    BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore, BudgetStoreError, BudgetUsageRecord,
-    BudgetUtilizationReport, BudgetUtilizationRow, BudgetUtilizationSummary, CapabilityAuthority,
-    CapabilitySnapshot, CostAttributionQuery, CostAttributionReport, CreditBacktestQuery,
-    CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary, CreditBacktestWindow,
-    CreditBondArtifact, CreditBondDisposition, CreditBondFinding, CreditBondLifecycleState,
-    CreditBondListQuery, CreditBondListReport, CreditBondPrerequisites, CreditBondReasonCode,
-    CreditBondReport, CreditBondSupportBoundary, CreditBondTerms,
+    BehavioralFeedPrivacyBoundary, BehavioralFeedQuery, BehavioralFeedReceiptRow,
+    BehavioralFeedReport, BudgetDimensionProfile, BudgetDimensionUsage, BudgetStore,
+    BudgetStoreError, BudgetUsageRecord, BudgetUtilizationReport, BudgetUtilizationRow,
+    BudgetUtilizationSummary, CapabilityAuthority, CapabilitySnapshot,
+    CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
+    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
+    CapitalAllocationDecisionSupportBoundary, CapitalAllocationInstructionDraft, CapitalBookEvent,
+    CapitalBookEventKind, CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
+    CapitalBookReport, CapitalBookRole, CapitalBookSource, CapitalBookSourceKind,
+    CapitalBookSummary, CapitalBookSupportBoundary, CapitalExecutionAuthorityStep,
+    CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
+    CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
+    CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionReconciledState,
+    CapitalExecutionRole, CapitalExecutionWindow, CostAttributionQuery, CostAttributionReport,
+    CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
+    CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition, CreditBondFinding,
+    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondPrerequisites,
+    CreditBondReasonCode, CreditBondReport, CreditBondSupportBoundary, CreditBondTerms,
     CreditBondedExecutionControlPolicy, CreditBondedExecutionDecision,
     CreditBondedExecutionEvaluation, CreditBondedExecutionFinding,
     CreditBondedExecutionFindingCode, CreditBondedExecutionSimulationDelta,
@@ -72,53 +114,71 @@ use arc_kernel::{
     CreditLossLifecycleReport, CreditLossLifecycleSupportBoundary, CreditProviderFacilitySnapshot,
     CreditProviderRiskPackage, CreditProviderRiskPackageQuery,
     CreditProviderRiskPackageSupportBoundary, CreditRecentLossEntry, CreditRecentLossHistory,
-    CreditRecentLossSummary, CreditRuntimeAssuranceState, CreditScorecardAnomaly,
-    CreditScorecardAnomalySeverity, CreditScorecardBand, CreditScorecardConfidence,
-    CreditScorecardDimension, CreditScorecardDimensionKind, CreditScorecardEvidenceKind,
-    CreditScorecardEvidenceReference, CreditScorecardProbationStatus, CreditScorecardReasonCode,
-    CreditScorecardReport, CreditScorecardReputationContext, CreditScorecardSummary,
-    CreditScorecardSupportBoundary, ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry,
-    ExposureLedgerEvidenceKind, ExposureLedgerEvidenceReference, ExposureLedgerQuery,
-    ExposureLedgerReceiptEntry, ExposureLedgerReport, ExposureLedgerSummary,
-    ExposureLedgerSupportBoundary, LiabilityBoundCoverageArtifact,
-    LiabilityClaimAdjudicationArtifact, LiabilityClaimAdjudicationOutcome,
-    LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind, LiabilityClaimEvidenceReference,
-    LiabilityClaimPackageArtifact, LiabilityClaimResponseArtifact,
-    LiabilityClaimResponseDisposition, LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport,
-    LiabilityCoverageClass, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
-    LiabilityPlacementArtifact, LiabilityProviderArtifact, LiabilityProviderListQuery,
-    LiabilityProviderListReport, LiabilityProviderPolicyReference, LiabilityProviderReport,
-    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityQuoteDisposition,
-    LiabilityQuoteRequestArtifact, LiabilityQuoteResponseArtifact, LiabilityQuoteTerms,
-    LocalCapabilityAuthority, MeteredBillingEvidenceRecord, MeteredBillingReconciliationReport,
+    CreditRecentLossSummary, CreditReserveControlAppealState, CreditReserveControlExecutionState,
+    CreditRuntimeAssuranceState, CreditScorecardAnomaly, CreditScorecardAnomalySeverity,
+    CreditScorecardBand, CreditScorecardConfidence, CreditScorecardDimension,
+    CreditScorecardDimensionKind, CreditScorecardEvidenceKind, CreditScorecardEvidenceReference,
+    CreditScorecardProbationStatus, CreditScorecardReasonCode, CreditScorecardReport,
+    CreditScorecardReputationContext, CreditScorecardSummary, CreditScorecardSupportBoundary,
+    ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind,
+    ExposureLedgerEvidenceReference, ExposureLedgerQuery, ExposureLedgerReceiptEntry,
+    ExposureLedgerReport, ExposureLedgerSummary, ExposureLedgerSupportBoundary,
+    LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
+    LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
+    LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
+    LiabilityClaimEvidenceReference, LiabilityClaimPackageArtifact,
+    LiabilityClaimPayoutInstructionArtifact, LiabilityClaimPayoutReceiptArtifact,
+    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseArtifact,
+    LiabilityClaimResponseDisposition, LiabilityClaimSettlementInstructionArtifact,
+    LiabilityClaimSettlementKind, LiabilityClaimSettlementReceiptArtifact,
+    LiabilityClaimSettlementReconciliationState, LiabilityClaimSettlementRoleTopology,
+    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityCoverageClass,
+    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityPlacementArtifact,
+    LiabilityPricingAuthorityArtifact, LiabilityPricingAuthorityEnvelope,
+    LiabilityProviderArtifact, LiabilityProviderListQuery, LiabilityProviderListReport,
+    LiabilityProviderPolicyReference, LiabilityProviderReport, LiabilityProviderResolutionQuery,
+    LiabilityProviderResolutionReport, LiabilityQuoteDisposition, LiabilityQuoteRequestArtifact,
+    LiabilityQuoteResponseArtifact, LiabilityQuoteTerms, LocalCapabilityAuthority,
+    MeteredBillingEvidenceRecord, MeteredBillingReconciliationReport,
     MeteredBillingReconciliationState, OperatorReport, OperatorReportQuery, ReceiptAnalyticsQuery,
     ReceiptAnalyticsResponse, ReceiptQuery, ReceiptStore, ReceiptStoreError, RevocationRecord,
     RevocationStore, RevocationStoreError, SettlementReconciliationReport,
     SettlementReconciliationState, SharedEvidenceQuery, SharedEvidenceReferenceReport,
-    SignedBehavioralFeed, SignedCreditBond, SignedCreditFacility, SignedCreditLossLifecycle,
-    SignedCreditProviderRiskPackage, SignedCreditScorecardReport, SignedExposureLedgerReport,
-    SignedLiabilityBoundCoverage, SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute,
-    SignedLiabilityClaimPackage, SignedLiabilityClaimResponse, SignedLiabilityPlacement,
-    SignedLiabilityProvider, SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse,
-    SignedUnderwritingDecision, SignedUnderwritingPolicyInput, StoredCapabilitySnapshot,
-    StoredChildReceipt, StoredToolReceipt, UnderwritingAppealCreateRequest,
-    UnderwritingAppealRecord, UnderwritingAppealResolveRequest, UnderwritingCertificationEvidence,
-    UnderwritingCertificationState, UnderwritingDecisionListReport, UnderwritingDecisionPolicy,
-    UnderwritingDecisionQuery, UnderwritingDecisionReport, UnderwritingEvidenceKind,
-    UnderwritingEvidenceReference, UnderwritingPolicyInput, UnderwritingPolicyInputQuery,
-    UnderwritingReasonCode, UnderwritingReceiptEvidence, UnderwritingReputationEvidence,
-    UnderwritingRiskClass, UnderwritingRiskTaxonomy, UnderwritingRuntimeAssuranceEvidence,
-    UnderwritingSignal, UnderwritingSimulationDelta, UnderwritingSimulationReport,
-    UnderwritingSimulationRequest, BEHAVIORAL_FEED_SCHEMA, CREDIT_BACKTEST_REPORT_SCHEMA,
-    CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA, CREDIT_BOND_ARTIFACT_SCHEMA,
-    CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
-    CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA, CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
-    CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA, CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA,
+    SignedBehavioralFeed, SignedCapitalAllocationDecision, SignedCapitalBookReport,
+    SignedCapitalExecutionInstruction, SignedCreditBond, SignedCreditFacility,
+    SignedCreditLossLifecycle, SignedCreditProviderRiskPackage, SignedCreditScorecardReport,
+    SignedExposureLedgerReport, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
+    SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
+    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
+    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
+    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
+    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
+    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, SignedUnderwritingPolicyInput,
+    StoredCapabilitySnapshot, StoredChildReceipt, StoredToolReceipt,
+    UnderwritingAppealCreateRequest, UnderwritingAppealRecord, UnderwritingAppealResolveRequest,
+    UnderwritingCertificationEvidence, UnderwritingCertificationState,
+    UnderwritingDecisionListReport, UnderwritingDecisionPolicy, UnderwritingDecisionQuery,
+    UnderwritingDecisionReport, UnderwritingEvidenceKind, UnderwritingEvidenceReference,
+    UnderwritingPolicyInput, UnderwritingPolicyInputQuery, UnderwritingReasonCode,
+    UnderwritingReceiptEvidence, UnderwritingReputationEvidence, UnderwritingRiskClass,
+    UnderwritingRiskTaxonomy, UnderwritingRuntimeAssuranceEvidence, UnderwritingSignal,
+    UnderwritingSimulationDelta, UnderwritingSimulationReport, UnderwritingSimulationRequest,
+    BEHAVIORAL_FEED_SCHEMA, CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA,
+    CAPITAL_BOOK_REPORT_SCHEMA, CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
+    CREDIT_BACKTEST_REPORT_SCHEMA, CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA,
+    CREDIT_FACILITY_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
+    CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA, CREDIT_PROVIDER_RISK_PACKAGE_SCHEMA,
+    CREDIT_SCORECARD_SCHEMA, EXPOSURE_LEDGER_SCHEMA, LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA,
     LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA,
     LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA, LIABILITY_PLACEMENT_ARTIFACT_SCHEMA,
-    LIABILITY_PROVIDER_ARTIFACT_SCHEMA, LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA,
-    LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA, MAX_CREDIT_FACILITY_LIST_LIMIT,
+    LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_PLACEMENT_ARTIFACT_SCHEMA,
+    LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA, LIABILITY_PROVIDER_ARTIFACT_SCHEMA,
+    LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA, LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA,
+    MAX_CREDIT_BOND_LIST_LIMIT, MAX_CREDIT_FACILITY_LIST_LIMIT,
     MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, UNDERWRITING_POLICY_INPUT_SCHEMA,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
@@ -140,6 +200,9 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
 use ureq::Agent;
 use url::form_urlencoded::Serializer as UrlFormSerializer;
+
+#[path = "trust_control/health.rs"]
+mod trust_control_health;
 
 use crate::{
     authority_public_key_from_seed_file,
@@ -195,6 +258,16 @@ const PUBLIC_CERTIFICATION_RESOLVE_PATH: &str =
     "/v1/public/certifications/resolve/{tool_server_id}";
 const PUBLIC_CERTIFICATION_SEARCH_PATH: &str = "/v1/public/certifications/search";
 const PUBLIC_CERTIFICATION_TRANSPARENCY_PATH: &str = "/v1/public/certifications/transparency";
+const PUBLIC_GENERIC_NAMESPACE_PATH: &str = "/v1/public/registry/namespace";
+const PUBLIC_GENERIC_LISTINGS_PATH: &str = "/v1/public/registry/listings/search";
+const GENERIC_TRUST_ACTIVATION_ISSUE_PATH: &str = "/v1/registry/trust-activations/issue";
+const GENERIC_TRUST_ACTIVATION_EVALUATE_PATH: &str = "/v1/registry/trust-activations/evaluate";
+const GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH: &str = "/v1/registry/governance/charters/issue";
+const GENERIC_GOVERNANCE_CASE_ISSUE_PATH: &str = "/v1/registry/governance/cases/issue";
+const GENERIC_GOVERNANCE_CASE_EVALUATE_PATH: &str = "/v1/registry/governance/cases/evaluate";
+const OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH: &str = "/v1/registry/market/fees/issue";
+const OPEN_MARKET_PENALTY_ISSUE_PATH: &str = "/v1/registry/market/penalties/issue";
+const OPEN_MARKET_PENALTY_EVALUATE_PATH: &str = "/v1/registry/market/penalties/evaluate";
 const PASSPORT_ISSUER_METADATA_PATH: &str = OID4VCI_ISSUER_METADATA_PATH;
 const PASSPORT_ISSUER_JWKS_PATH: &str = OID4VCI_JWKS_PATH;
 const PASSPORT_SD_JWT_TYPE_METADATA_PATH: &str = ARC_PASSPORT_SD_JWT_VC_TYPE_METADATA_PATH;
@@ -206,6 +279,10 @@ const PASSPORT_STATUS_PATH: &str = "/v1/passport/statuses/{passport_id}";
 const PASSPORT_STATUS_RESOLVE_PATH: &str = "/v1/passport/statuses/resolve/{passport_id}";
 const PUBLIC_PASSPORT_STATUS_RESOLVE_PATH: &str =
     "/v1/public/passport/statuses/resolve/{passport_id}";
+const PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH: &str = "/v1/public/passport/discovery/issuer";
+const PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH: &str = "/v1/public/passport/discovery/verifier";
+const PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH: &str =
+    "/v1/public/passport/discovery/transparency";
 const PASSPORT_STATUS_REVOKE_PATH: &str = "/v1/passport/statuses/{passport_id}/revoke";
 const PASSPORT_VERIFIER_POLICIES_PATH: &str = "/v1/passport/verifier-policies";
 const PASSPORT_VERIFIER_POLICY_PATH: &str = "/v1/passport/verifier-policies/{policy_id}";
@@ -220,6 +297,7 @@ const PUBLIC_PASSPORT_OID4VP_REQUEST_PATH: &str =
     "/v1/public/passport/oid4vp/requests/{request_id}";
 const PUBLIC_PASSPORT_OID4VP_LAUNCH_PATH: &str = "/v1/public/passport/oid4vp/launch/{request_id}";
 const PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH: &str = "/v1/public/passport/oid4vp/direct-post";
+const PUBLIC_DISCOVERY_TTL_SECS: u64 = 300;
 pub const FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "arc.federated-delegation-policy.v1";
 const LEGACY_FEDERATED_DELEGATION_POLICY_SCHEMA: &str = "arc.federated-delegation-policy.v1";
 const REVOCATIONS_PATH: &str = "/v1/revocations";
@@ -245,9 +323,16 @@ const FEDERATION_EVIDENCE_SHARES_PATH: &str = "/v1/federation/evidence-shares";
 const COST_ATTRIBUTION_PATH: &str = "/v1/reports/cost-attribution";
 const OPERATOR_REPORT_PATH: &str = "/v1/reports/operator";
 const RUNTIME_ATTESTATION_APPRAISAL_PATH: &str = "/v1/reports/runtime-attestation-appraisal";
+const RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH: &str =
+    "/v1/reports/runtime-attestation-appraisal-result";
+const RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH: &str =
+    "/v1/reports/runtime-attestation-appraisal/import";
 const BEHAVIORAL_FEED_PATH: &str = "/v1/reports/behavioral-feed";
 const EXPOSURE_LEDGER_PATH: &str = "/v1/reports/exposure-ledger";
 const CREDIT_SCORECARD_PATH: &str = "/v1/reports/credit-scorecard";
+const CAPITAL_BOOK_PATH: &str = "/v1/reports/capital-book";
+const CAPITAL_INSTRUCTION_ISSUE_PATH: &str = "/v1/capital/instructions/issue";
+const CAPITAL_ALLOCATION_ISSUE_PATH: &str = "/v1/capital/allocations/issue";
 const CREDIT_FACILITY_REPORT_PATH: &str = "/v1/reports/facility-policy";
 const CREDIT_FACILITY_ISSUE_PATH: &str = "/v1/facilities/issue";
 const CREDIT_FACILITIES_REPORT_PATH: &str = "/v1/reports/facilities";
@@ -265,13 +350,23 @@ const LIABILITY_PROVIDERS_REPORT_PATH: &str = "/v1/reports/liability-providers";
 const LIABILITY_PROVIDER_RESOLVE_PATH: &str = "/v1/liability/providers/resolve";
 const LIABILITY_QUOTE_REQUEST_ISSUE_PATH: &str = "/v1/liability/quote-requests/issue";
 const LIABILITY_QUOTE_RESPONSE_ISSUE_PATH: &str = "/v1/liability/quote-responses/issue";
+const LIABILITY_PRICING_AUTHORITY_ISSUE_PATH: &str = "/v1/liability/pricing-authorities/issue";
 const LIABILITY_PLACEMENT_ISSUE_PATH: &str = "/v1/liability/placements/issue";
 const LIABILITY_BOUND_COVERAGE_ISSUE_PATH: &str = "/v1/liability/bound-coverages/issue";
+const LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH: &str = "/v1/liability/auto-bind/issue";
 const LIABILITY_MARKET_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-market";
 const LIABILITY_CLAIM_PACKAGE_ISSUE_PATH: &str = "/v1/liability/claims/issue";
 const LIABILITY_CLAIM_RESPONSE_ISSUE_PATH: &str = "/v1/liability/claim-responses/issue";
 const LIABILITY_CLAIM_DISPUTE_ISSUE_PATH: &str = "/v1/liability/disputes/issue";
 const LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH: &str = "/v1/liability/adjudications/issue";
+const LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH: &str =
+    "/v1/liability/claim-payouts/instructions/issue";
+const LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH: &str =
+    "/v1/liability/claim-payouts/receipts/issue";
+const LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH: &str =
+    "/v1/liability/claim-settlements/instructions/issue";
+const LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH: &str =
+    "/v1/liability/claim-settlements/receipts/issue";
 const LIABILITY_CLAIM_WORKFLOW_REPORT_PATH: &str = "/v1/reports/liability-claims";
 const SETTLEMENT_REPORT_PATH: &str = "/v1/reports/settlements";
 const SETTLEMENT_RECONCILE_PATH: &str = "/v1/settlements/reconcile";
@@ -289,6 +384,9 @@ const UNDERWRITING_APPEALS_PATH: &str = "/v1/underwriting/appeals";
 const UNDERWRITING_APPEAL_RESOLVE_PATH: &str = "/v1/underwriting/appeals/resolve";
 const LOCAL_REPUTATION_PATH: &str = "/v1/reputation/local/{subject_key}";
 const REPUTATION_COMPARE_PATH: &str = "/v1/reputation/compare/{subject_key}";
+const PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH: &str = "/v1/reputation/portable/summaries/issue";
+const PORTABLE_NEGATIVE_EVENT_ISSUE_PATH: &str = "/v1/reputation/portable/events/issue";
+const PORTABLE_REPUTATION_EVALUATE_PATH: &str = "/v1/reputation/portable/evaluate";
 const LINEAGE_RECORD_PATH: &str = "/v1/lineage";
 const LINEAGE_PATH: &str = "/v1/lineage/{capability_id}";
 const LINEAGE_CHAIN_PATH: &str = "/v1/lineage/{capability_id}/chain";
@@ -874,7 +972,7 @@ pub struct ToolReceiptQuery {
 }
 
 /// HTTP query parameters for the GET /v1/receipts/query endpoint.
-/// Supports all 8 filter dimensions plus cursor pagination.
+/// Supports receipt filters and cursor pagination.
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceiptQueryHttpQuery {
@@ -1014,8 +1112,52 @@ pub struct CreditBondIssueRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct CapitalExecutionInstructionRequest {
+    pub query: CapitalBookQuery,
+    pub source_kind: CapitalBookSourceKind,
+    pub action: CapitalExecutionInstructionAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amount: Option<MonetaryAmount>,
+    pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
+    pub execution_window: CapitalExecutionWindow,
+    pub rail: CapitalExecutionRail,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_instruction_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_execution: Option<CapitalExecutionObservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CapitalAllocationDecisionRequest {
+    pub query: CapitalBookQuery,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_id: Option<String>,
+    pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
+    pub execution_window: CapitalExecutionWindow,
+    pub rail: CapitalExecutionRail,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct CreditLossLifecycleIssueRequest {
     pub query: CreditLossLifecycleQuery,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_window: Option<CapitalExecutionWindow>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rail: Option<CapitalExecutionRail>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observed_execution: Option<CapitalExecutionObservation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub appeal_window_ends_at: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1056,6 +1198,22 @@ pub struct LiabilityQuoteResponseIssueRequest {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct LiabilityPricingAuthorityIssueRequest {
+    pub quote_request: SignedLiabilityQuoteRequest,
+    pub facility: SignedCreditFacility,
+    pub underwriting_decision: SignedUnderwritingDecision,
+    pub capital_book: SignedCapitalBookReport,
+    pub envelope: LiabilityPricingAuthorityEnvelope,
+    pub max_coverage_amount: MonetaryAmount,
+    pub max_premium_amount: MonetaryAmount,
+    pub expires_at: u64,
+    pub auto_bind_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LiabilityPlacementIssueRequest {
     pub quote_response: SignedLiabilityQuoteResponse,
     pub selected_coverage_amount: MonetaryAmount,
@@ -1081,6 +1239,20 @@ pub struct LiabilityBoundCoverageIssueRequest {
     pub effective_until: u64,
     pub coverage_amount: MonetaryAmount,
     pub premium_amount: MonetaryAmount,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiabilityAutoBindIssueRequest {
+    pub authority: SignedLiabilityPricingAuthority,
+    pub quote_response: SignedLiabilityQuoteResponse,
+    pub policy_number: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carrier_reference: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placement_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1132,6 +1304,56 @@ pub struct LiabilityClaimAdjudicationIssueRequest {
     pub outcome: LiabilityClaimAdjudicationOutcome,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub awarded_amount: Option<MonetaryAmount>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiabilityClaimPayoutInstructionIssueRequest {
+    pub adjudication: SignedLiabilityClaimAdjudication,
+    pub capital_instruction: SignedCapitalExecutionInstruction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiabilityClaimPayoutReceiptIssueRequest {
+    pub payout_instruction: SignedLiabilityClaimPayoutInstruction,
+    pub payout_receipt_ref: String,
+    pub reconciliation_state: LiabilityClaimPayoutReconciliationState,
+    pub observed_execution: CapitalExecutionObservation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiabilityClaimSettlementInstructionIssueRequest {
+    pub payout_receipt: SignedLiabilityClaimPayoutReceipt,
+    pub capital_book: SignedCapitalBookReport,
+    pub settlement_kind: LiabilityClaimSettlementKind,
+    pub settlement_amount: MonetaryAmount,
+    pub topology: LiabilityClaimSettlementRoleTopology,
+    pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
+    pub execution_window: CapitalExecutionWindow,
+    pub rail: CapitalExecutionRail,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_reference: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct LiabilityClaimSettlementReceiptIssueRequest {
+    pub settlement_instruction: SignedLiabilityClaimSettlementInstruction,
+    pub settlement_receipt_ref: String,
+    pub reconciliation_state: LiabilityClaimSettlementReconciliationState,
+    pub observed_execution: CapitalExecutionObservation,
+    pub observed_payer_id: String,
+    pub observed_payee_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
@@ -1542,7 +1764,12 @@ pub struct RevokeCapabilityResponse {
 }
 
 pub fn serve(config: TrustServiceConfig) -> Result<(), CliError> {
-    let runtime = tokio::runtime::Runtime::new()
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        // Liability, credential, and attestation artifacts can be deeply nested
+        // during request validation and response serialization.
+        .thread_stack_size(8 * 1024 * 1024)
+        .build()
         .map_err(|error| CliError::Other(format!("failed to start async runtime: {error}")))?;
     runtime.block_on(async move { serve_async(config).await })
 }
@@ -1720,6 +1947,478 @@ fn configured_public_certification_metadata(
             evidence_profile: "conformance-report-bundle-v1".to_string(),
         }],
         discovery_informational_only: true,
+    })
+}
+
+fn public_generic_listing_boundary() -> GenericListingBoundary {
+    GenericListingBoundary::default()
+}
+
+fn public_generic_registry_publisher(
+    config: &TrustServiceConfig,
+) -> Result<GenericRegistryPublisher, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::Other(
+            "generic registry listings require --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    let registry_url = normalize_namespace(advertise_url);
+    if registry_url.is_empty() {
+        return Err(CliError::Other(
+            "generic registry listings require a non-empty advertise_url".to_string(),
+        ));
+    }
+    let publisher = GenericRegistryPublisher {
+        role: GenericRegistryPublisherRole::Origin,
+        operator_id: registry_url.clone(),
+        operator_name: None,
+        registry_url,
+        upstream_registry_urls: Vec::new(),
+    };
+    publisher.validate().map_err(CliError::Other)?;
+    Ok(publisher)
+}
+
+fn public_generic_listing_freshness_window(generated_at: u64) -> GenericListingFreshnessWindow {
+    GenericListingFreshnessWindow {
+        max_age_secs: DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS,
+        valid_until: generated_at.saturating_add(DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS),
+    }
+}
+
+fn public_generic_listing_search_policy() -> GenericListingSearchPolicy {
+    GenericListingSearchPolicy::default()
+}
+
+fn configured_generic_namespace_ownership(
+    config: &TrustServiceConfig,
+    signer_public_key: PublicKey,
+    registered_at: u64,
+) -> Result<GenericNamespaceOwnership, CliError> {
+    let advertise_url = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::Other(
+            "generic registry listings require --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    let namespace = normalize_namespace(advertise_url);
+    if namespace.is_empty() {
+        return Err(CliError::Other(
+            "generic registry listings require a non-empty advertise_url".to_string(),
+        ));
+    }
+    let ownership = GenericNamespaceOwnership {
+        namespace: namespace.clone(),
+        owner_id: namespace.clone(),
+        owner_name: None,
+        registry_url: namespace,
+        signer_public_key,
+        registered_at,
+        transferred_from_owner_id: None,
+    };
+    ownership.validate().map_err(CliError::Other)?;
+    Ok(ownership)
+}
+
+fn build_signed_generic_namespace(
+    config: &TrustServiceConfig,
+) -> Result<SignedGenericNamespace, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let registered_at = now_unix_secs()?;
+    let ownership =
+        configured_generic_namespace_ownership(config, signer_keypair.public_key(), registered_at)?;
+    let namespace_id_input = canonical_json_bytes(&(
+        GENERIC_NAMESPACE_ARTIFACT_SCHEMA,
+        &ownership.namespace,
+        &ownership.owner_id,
+        &ownership.registry_url,
+        &ownership.signer_public_key,
+    ))
+    .map_err(|error| CliError::Other(error.to_string()))?;
+    let artifact = GenericNamespaceArtifact {
+        schema: GENERIC_NAMESPACE_ARTIFACT_SCHEMA.to_string(),
+        namespace_id: format!("ns-{}", sha256_hex(&namespace_id_input)),
+        lifecycle_state: GenericNamespaceLifecycleState::Active,
+        ownership,
+        boundary: public_generic_listing_boundary(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    SignedGenericNamespace::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign generic namespace artifact: {error}"
+        ))
+    })
+}
+
+fn generic_listing_id(
+    namespace: &str,
+    actor_kind: GenericListingActorKind,
+    actor_id: &str,
+    source_artifact_id: &str,
+) -> Result<String, CliError> {
+    let listing_id_input = canonical_json_bytes(&(
+        GENERIC_LISTING_ARTIFACT_SCHEMA,
+        namespace,
+        actor_kind,
+        actor_id,
+        source_artifact_id,
+    ))
+    .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(format!("gl-{}", sha256_hex(&listing_id_input)))
+}
+
+fn generic_listing_status_from_certification(
+    status: crate::certify::CertificationRegistryState,
+) -> GenericListingStatus {
+    match status {
+        crate::certify::CertificationRegistryState::Active => GenericListingStatus::Active,
+        crate::certify::CertificationRegistryState::Superseded => GenericListingStatus::Superseded,
+        crate::certify::CertificationRegistryState::Revoked => GenericListingStatus::Revoked,
+    }
+}
+
+fn generic_listing_status_from_provider(
+    status: arc_kernel::LiabilityProviderLifecycleState,
+) -> GenericListingStatus {
+    match status {
+        arc_kernel::LiabilityProviderLifecycleState::Active => GenericListingStatus::Active,
+        arc_kernel::LiabilityProviderLifecycleState::Suspended => GenericListingStatus::Suspended,
+        arc_kernel::LiabilityProviderLifecycleState::Superseded => GenericListingStatus::Superseded,
+        arc_kernel::LiabilityProviderLifecycleState::Retired => GenericListingStatus::Retired,
+    }
+}
+
+fn build_signed_generic_listing_from_certification_entry(
+    entry: &crate::certify::CertificationRegistryEntry,
+    metadata: &CertificationPublicMetadata,
+    ownership: &GenericNamespaceOwnership,
+    signer_keypair: &Keypair,
+) -> Result<SignedGenericListing, CliError> {
+    let listing_id = generic_listing_id(
+        &ownership.namespace,
+        GenericListingActorKind::ToolServer,
+        &entry.tool_server_id,
+        &entry.artifact_id,
+    )?;
+    let artifact = GenericListingArtifact {
+        schema: GENERIC_LISTING_ARTIFACT_SCHEMA.to_string(),
+        listing_id,
+        namespace: ownership.namespace.clone(),
+        published_at: entry.published_at,
+        expires_at: Some(metadata.expires_at),
+        status: generic_listing_status_from_certification(entry.status),
+        namespace_ownership: ownership.clone(),
+        subject: GenericListingSubject {
+            actor_kind: GenericListingActorKind::ToolServer,
+            actor_id: entry.tool_server_id.clone(),
+            display_name: entry.tool_server_name.clone(),
+            metadata_url: Some(metadata.public_search_path.clone()),
+            resolution_url: Some(
+                metadata
+                    .public_resolve_path_template
+                    .replace("{tool_server_id}", &entry.tool_server_id),
+            ),
+            homepage_url: None,
+        },
+        compatibility: GenericListingCompatibilityReference {
+            source_schema: "arc.certify.check.v1".to_string(),
+            source_artifact_id: entry.artifact_id.clone(),
+            source_artifact_sha256: entry.artifact_sha256.clone(),
+        },
+        boundary: public_generic_listing_boundary(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    SignedGenericListing::sign(artifact, signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign generic listing projection for certification `{}`: {error}",
+            entry.artifact_id
+        ))
+    })
+}
+
+fn build_signed_generic_listing_from_public_issuer(
+    document: &SignedPublicIssuerDiscovery,
+    ownership: &GenericNamespaceOwnership,
+    signer_keypair: &Keypair,
+) -> Result<SignedGenericListing, CliError> {
+    let source_sha256 = sha256_hex(
+        &canonical_json_bytes(document).map_err(|error| CliError::Other(error.to_string()))?,
+    );
+    let listing_id = generic_listing_id(
+        &ownership.namespace,
+        GenericListingActorKind::CredentialIssuer,
+        &document.body.issuer,
+        &document.body.discovery_id,
+    )?;
+    let artifact = GenericListingArtifact {
+        schema: GENERIC_LISTING_ARTIFACT_SCHEMA.to_string(),
+        listing_id,
+        namespace: ownership.namespace.clone(),
+        published_at: document.body.published_at,
+        expires_at: Some(document.body.expires_at),
+        status: GenericListingStatus::Active,
+        namespace_ownership: ownership.clone(),
+        subject: GenericListingSubject {
+            actor_kind: GenericListingActorKind::CredentialIssuer,
+            actor_id: document.body.issuer.clone(),
+            display_name: None,
+            metadata_url: Some(document.body.metadata_url.clone()),
+            resolution_url: document
+                .body
+                .passport_status_distribution
+                .resolve_urls
+                .first()
+                .cloned(),
+            homepage_url: Some(document.body.issuer.clone()),
+        },
+        compatibility: GenericListingCompatibilityReference {
+            source_schema: document.body.schema.clone(),
+            source_artifact_id: document.body.discovery_id.clone(),
+            source_artifact_sha256: source_sha256,
+        },
+        boundary: public_generic_listing_boundary(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    SignedGenericListing::sign(artifact, signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign generic listing projection for issuer `{}`: {error}",
+            document.body.discovery_id
+        ))
+    })
+}
+
+fn build_signed_generic_listing_from_public_verifier(
+    document: &SignedPublicVerifierDiscovery,
+    ownership: &GenericNamespaceOwnership,
+    signer_keypair: &Keypair,
+) -> Result<SignedGenericListing, CliError> {
+    let source_sha256 = sha256_hex(
+        &canonical_json_bytes(document).map_err(|error| CliError::Other(error.to_string()))?,
+    );
+    let listing_id = generic_listing_id(
+        &ownership.namespace,
+        GenericListingActorKind::CredentialVerifier,
+        &document.body.verifier,
+        &document.body.discovery_id,
+    )?;
+    let artifact = GenericListingArtifact {
+        schema: GENERIC_LISTING_ARTIFACT_SCHEMA.to_string(),
+        listing_id,
+        namespace: ownership.namespace.clone(),
+        published_at: document.body.published_at,
+        expires_at: Some(document.body.expires_at),
+        status: GenericListingStatus::Active,
+        namespace_ownership: ownership.clone(),
+        subject: GenericListingSubject {
+            actor_kind: GenericListingActorKind::CredentialVerifier,
+            actor_id: document.body.verifier.clone(),
+            display_name: None,
+            metadata_url: Some(document.body.metadata_url.clone()),
+            resolution_url: None,
+            homepage_url: Some(document.body.verifier.clone()),
+        },
+        compatibility: GenericListingCompatibilityReference {
+            source_schema: document.body.schema.clone(),
+            source_artifact_id: document.body.discovery_id.clone(),
+            source_artifact_sha256: source_sha256,
+        },
+        boundary: public_generic_listing_boundary(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    SignedGenericListing::sign(artifact, signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign generic listing projection for verifier `{}`: {error}",
+            document.body.discovery_id
+        ))
+    })
+}
+
+fn build_signed_generic_listing_from_liability_provider(
+    row: &arc_kernel::LiabilityProviderRow,
+    ownership: &GenericNamespaceOwnership,
+    signer_keypair: &Keypair,
+) -> Result<SignedGenericListing, CliError> {
+    let source_sha256 = sha256_hex(
+        &canonical_json_bytes(&row.provider).map_err(|error| CliError::Other(error.to_string()))?,
+    );
+    let provider = &row.provider.body;
+    let listing_id = generic_listing_id(
+        &ownership.namespace,
+        GenericListingActorKind::LiabilityProvider,
+        &provider.report.provider_id,
+        &provider.provider_record_id,
+    )?;
+    let artifact = GenericListingArtifact {
+        schema: GENERIC_LISTING_ARTIFACT_SCHEMA.to_string(),
+        listing_id,
+        namespace: ownership.namespace.clone(),
+        published_at: provider.issued_at,
+        expires_at: None,
+        status: generic_listing_status_from_provider(row.lifecycle_state),
+        namespace_ownership: ownership.clone(),
+        subject: GenericListingSubject {
+            actor_kind: GenericListingActorKind::LiabilityProvider,
+            actor_id: provider.report.provider_id.clone(),
+            display_name: Some(provider.report.display_name.clone()),
+            metadata_url: None,
+            resolution_url: None,
+            homepage_url: provider.report.provider_url.clone(),
+        },
+        compatibility: GenericListingCompatibilityReference {
+            source_schema: provider.schema.clone(),
+            source_artifact_id: provider.provider_record_id.clone(),
+            source_artifact_sha256: source_sha256,
+        },
+        boundary: public_generic_listing_boundary(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    SignedGenericListing::sign(artifact, signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign generic listing projection for provider `{}`: {error}",
+            provider.provider_record_id
+        ))
+    })
+}
+
+fn build_public_generic_listing_report(
+    config: &TrustServiceConfig,
+    query: &GenericListingQuery,
+) -> Result<GenericListingReport, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let generated_at = now_unix_secs()?;
+    let namespace =
+        configured_generic_namespace_ownership(config, signer_keypair.public_key(), generated_at)?;
+    let publisher = public_generic_registry_publisher(config)?;
+    let normalized_query = query.normalized();
+
+    let mut listings = Vec::<SignedGenericListing>::new();
+    if config.certification_registry_file.is_some() {
+        let metadata = configured_public_certification_metadata(config)?;
+        let (_, registry) = load_certification_registry_for_admin(config)?;
+        let public = registry.search_public(
+            &metadata.publisher,
+            metadata.expires_at,
+            &crate::certify::CertificationPublicSearchQuery::default(),
+        );
+        for result in public.results {
+            listings.push(build_signed_generic_listing_from_certification_entry(
+                &result.entry,
+                &metadata,
+                &namespace,
+                &signer_keypair,
+            )?);
+        }
+    }
+
+    listings.push(build_signed_generic_listing_from_public_issuer(
+        &build_public_issuer_discovery(config)?,
+        &namespace,
+        &signer_keypair,
+    )?);
+    listings.push(build_signed_generic_listing_from_public_verifier(
+        &build_public_verifier_discovery(config)?,
+        &namespace,
+        &signer_keypair,
+    )?);
+
+    if let Some(receipt_db_path) = config.receipt_db_path.as_deref() {
+        let provider_report =
+            list_liability_providers(receipt_db_path, &LiabilityProviderListQuery::default())?;
+        for row in &provider_report.providers {
+            listings.push(build_signed_generic_listing_from_liability_provider(
+                row,
+                &namespace,
+                &signer_keypair,
+            )?);
+        }
+    }
+
+    ensure_generic_listing_namespace_consistency(listings.iter().map(|listing| &listing.body))
+        .map_err(CliError::Other)?;
+
+    listings.sort_by(|left, right| {
+        left.body
+            .subject
+            .actor_kind
+            .cmp(&right.body.subject.actor_kind)
+            .then(left.body.subject.actor_id.cmp(&right.body.subject.actor_id))
+            .then(right.body.published_at.cmp(&left.body.published_at))
+            .then(left.body.listing_id.cmp(&right.body.listing_id))
+    });
+
+    let filtered = listings
+        .into_iter()
+        .filter(|listing| {
+            normalized_query
+                .namespace
+                .as_deref()
+                .is_none_or(|query_namespace| {
+                    normalize_namespace(&listing.body.namespace) == query_namespace
+                })
+        })
+        .filter(|listing| {
+            normalized_query
+                .actor_kind
+                .is_none_or(|actor_kind| listing.body.subject.actor_kind == actor_kind)
+        })
+        .filter(|listing| {
+            normalized_query
+                .actor_id
+                .as_deref()
+                .is_none_or(|actor_id| listing.body.subject.actor_id == actor_id)
+        })
+        .filter(|listing| {
+            normalized_query
+                .status
+                .is_none_or(|status| listing.body.status == status)
+        })
+        .collect::<Vec<_>>();
+
+    let summary = GenericListingSummary {
+        matching_listings: filtered.len() as u64,
+        returned_listings: filtered.len().min(normalized_query.limit_or_default()) as u64,
+        active_listings: filtered
+            .iter()
+            .filter(|listing| listing.body.status == GenericListingStatus::Active)
+            .count() as u64,
+        suspended_listings: filtered
+            .iter()
+            .filter(|listing| listing.body.status == GenericListingStatus::Suspended)
+            .count() as u64,
+        superseded_listings: filtered
+            .iter()
+            .filter(|listing| listing.body.status == GenericListingStatus::Superseded)
+            .count() as u64,
+        revoked_listings: filtered
+            .iter()
+            .filter(|listing| listing.body.status == GenericListingStatus::Revoked)
+            .count() as u64,
+        retired_listings: filtered
+            .iter()
+            .filter(|listing| listing.body.status == GenericListingStatus::Retired)
+            .count() as u64,
+    };
+
+    Ok(GenericListingReport {
+        schema: GENERIC_LISTING_REPORT_SCHEMA.to_string(),
+        generated_at,
+        query: normalized_query.clone(),
+        namespace,
+        publisher,
+        freshness: public_generic_listing_freshness_window(generated_at),
+        search_policy: public_generic_listing_search_policy(),
+        summary,
+        listings: filtered
+            .into_iter()
+            .take(normalized_query.limit_or_default())
+            .collect(),
     })
 }
 
@@ -2117,6 +2816,128 @@ fn build_oid4vp_verifier_jwks(config: &TrustServiceConfig) -> Result<PortableJwk
         .map_err(|error| CliError::Other(error.to_string()))
 }
 
+fn now_unix_secs() -> Result<u64, CliError> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| CliError::Other(format!("system clock error: {error}")))
+        .map(|duration| duration.as_secs())
+}
+
+fn public_discovery_version(config: &TrustServiceConfig) -> Result<u64, CliError> {
+    Ok(authority_status_for_config(config)?
+        .generation
+        .unwrap_or(1)
+        .max(1))
+}
+
+fn public_discovery_guardrails() -> PublicDiscoveryImportGuardrails {
+    PublicDiscoveryImportGuardrails::default()
+}
+
+fn build_public_issuer_discovery(
+    config: &TrustServiceConfig,
+) -> Result<SignedPublicIssuerDiscovery, CliError> {
+    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
+    let metadata = configured_passport_credential_issuer(config)?;
+    let now = now_unix_secs()?;
+    let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
+    let credential_configuration_ids = metadata
+        .credential_configurations_supported
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    let passport_status_distribution = metadata
+        .arc_profile
+        .as_ref()
+        .map(|profile| profile.passport_status_distribution.clone())
+        .unwrap_or_default();
+    create_signed_public_issuer_discovery(
+        &signing_key,
+        format!("issuer-discovery:{}", metadata.credential_issuer),
+        metadata.credential_issuer.clone(),
+        public_discovery_version(config)?,
+        now,
+        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+        format!(
+            "{}{OID4VCI_ISSUER_METADATA_PATH}",
+            metadata.credential_issuer
+        ),
+        metadata_sha256,
+        metadata.jwks_uri.clone(),
+        credential_configuration_ids,
+        passport_status_distribution,
+        public_discovery_guardrails(),
+    )
+    .map_err(CliError::from)
+}
+
+fn build_public_verifier_discovery(
+    config: &TrustServiceConfig,
+) -> Result<SignedPublicVerifierDiscovery, CliError> {
+    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
+    let metadata = build_oid4vp_verifier_metadata(config)?;
+    let now = now_unix_secs()?;
+    let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
+    create_signed_public_verifier_discovery(
+        &signing_key,
+        format!("verifier-discovery:{}", metadata.verifier_id),
+        metadata.verifier_id.clone(),
+        public_discovery_version(config)?,
+        now,
+        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+        format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
+        metadata_sha256,
+        metadata.jwks_uri.clone(),
+        metadata.request_uri_prefix.clone(),
+        public_discovery_guardrails(),
+    )
+    .map_err(CliError::from)
+}
+
+fn build_public_discovery_transparency(
+    config: &TrustServiceConfig,
+) -> Result<SignedPublicDiscoveryTransparency, CliError> {
+    let signing_key = resolve_oid4vp_verifier_signing_key(config)?;
+    let issuer = build_public_issuer_discovery(config)?;
+    let verifier = build_public_verifier_discovery(config)?;
+    let now = now_unix_secs()?;
+    let publisher = config.advertise_url.as_deref().ok_or_else(|| {
+        CliError::Other(
+            "public discovery transparency requires --advertise-url on the trust-control service"
+                .to_string(),
+        )
+    })?;
+    let entries = vec![
+        PublicDiscoveryTransparencyEntry {
+            kind: PublicDiscoveryEntryKind::Issuer,
+            discovery_id: issuer.body.discovery_id.clone(),
+            metadata_url: issuer.body.metadata_url.clone(),
+            document_sha256: sha256_hex(&canonical_json_bytes(&issuer)?),
+            published_at: issuer.body.published_at,
+            expires_at: issuer.body.expires_at,
+        },
+        PublicDiscoveryTransparencyEntry {
+            kind: PublicDiscoveryEntryKind::Verifier,
+            discovery_id: verifier.body.discovery_id.clone(),
+            metadata_url: verifier.body.metadata_url.clone(),
+            document_sha256: sha256_hex(&canonical_json_bytes(&verifier)?),
+            published_at: verifier.body.published_at,
+            expires_at: verifier.body.expires_at,
+        },
+    ];
+    create_signed_public_discovery_transparency(
+        &signing_key,
+        format!("public-discovery-transparency:{publisher}"),
+        publisher,
+        public_discovery_version(config)?,
+        now,
+        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+        entries,
+        public_discovery_guardrails(),
+    )
+    .map_err(CliError::from)
+}
+
 fn build_oid4vp_request_for_service(
     config: &TrustServiceConfig,
     payload: &CreateOid4vpRequest,
@@ -2439,8 +3260,7 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
     if state.cluster.is_some() {
         tokio::spawn(run_cluster_sync_loop(state.clone()));
     }
-    let router = Router::new()
-        .route(HEALTH_PATH, get(handle_health))
+    let router = trust_control_health::install_health_routes(Router::new())
         .route(
             AUTHORITY_PATH,
             get(handle_authority_status).post(handle_rotate_authority),
@@ -2508,8 +3328,60 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             get(handle_public_certification_transparency),
         )
         .route(
+            PUBLIC_GENERIC_NAMESPACE_PATH,
+            get(handle_public_generic_namespace),
+        )
+        .route(
+            PUBLIC_GENERIC_LISTINGS_PATH,
+            get(handle_public_generic_listings),
+        )
+        .route(
+            GENERIC_TRUST_ACTIVATION_ISSUE_PATH,
+            post(handle_issue_generic_trust_activation),
+        )
+        .route(
+            GENERIC_TRUST_ACTIVATION_EVALUATE_PATH,
+            post(handle_evaluate_generic_trust_activation),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH,
+            post(handle_issue_generic_governance_charter),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CASE_ISSUE_PATH,
+            post(handle_issue_generic_governance_case),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CASE_EVALUATE_PATH,
+            post(handle_evaluate_generic_governance_case),
+        )
+        .route(
+            OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH,
+            post(handle_issue_open_market_fee_schedule),
+        )
+        .route(
+            OPEN_MARKET_PENALTY_ISSUE_PATH,
+            post(handle_issue_open_market_penalty),
+        )
+        .route(
+            OPEN_MARKET_PENALTY_EVALUATE_PATH,
+            post(handle_evaluate_open_market_penalty),
+        )
+        .route(
             PASSPORT_ISSUER_METADATA_PATH,
             get(handle_passport_issuer_metadata),
+        )
+        .route(
+            PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH,
+            get(handle_public_passport_issuer_discovery),
+        )
+        .route(
+            PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH,
+            get(handle_public_passport_verifier_discovery),
+        )
+        .route(
+            PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH,
+            get(handle_public_passport_discovery_transparency),
         )
         .route(PASSPORT_ISSUER_JWKS_PATH, get(handle_passport_issuer_jwks))
         .route(
@@ -2658,9 +3530,26 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             RUNTIME_ATTESTATION_APPRAISAL_PATH,
             post(handle_runtime_attestation_appraisal_report),
         )
+        .route(
+            RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH,
+            post(handle_runtime_attestation_appraisal_result_export),
+        )
+        .route(
+            RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH,
+            post(handle_runtime_attestation_appraisal_import),
+        )
         .route(BEHAVIORAL_FEED_PATH, get(handle_behavioral_feed_report))
         .route(EXPOSURE_LEDGER_PATH, get(handle_exposure_ledger_report))
         .route(CREDIT_SCORECARD_PATH, get(handle_credit_scorecard_report))
+        .route(CAPITAL_BOOK_PATH, get(handle_capital_book_report))
+        .route(
+            CAPITAL_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_capital_execution_instruction),
+        )
+        .route(
+            CAPITAL_ALLOCATION_ISSUE_PATH,
+            post(handle_issue_capital_allocation_decision),
+        )
         .route(
             CREDIT_FACILITY_REPORT_PATH,
             get(handle_credit_facility_report),
@@ -2718,12 +3607,20 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             post(handle_issue_liability_quote_response),
         )
         .route(
+            LIABILITY_PRICING_AUTHORITY_ISSUE_PATH,
+            post(handle_issue_liability_pricing_authority),
+        )
+        .route(
             LIABILITY_PLACEMENT_ISSUE_PATH,
             post(handle_issue_liability_placement),
         )
         .route(
             LIABILITY_BOUND_COVERAGE_ISSUE_PATH,
             post(handle_issue_liability_bound_coverage),
+        )
+        .route(
+            LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH,
+            post(handle_issue_liability_auto_bind),
         )
         .route(
             LIABILITY_MARKET_WORKFLOW_REPORT_PATH,
@@ -2744,6 +3641,22 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
         .route(
             LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH,
             post(handle_issue_liability_claim_adjudication),
+        )
+        .route(
+            LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_liability_claim_payout_instruction),
+        )
+        .route(
+            LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH,
+            post(handle_issue_liability_claim_payout_receipt),
+        )
+        .route(
+            LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_liability_claim_settlement_instruction),
+        )
+        .route(
+            LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH,
+            post(handle_issue_liability_claim_settlement_receipt),
         )
         .route(
             LIABILITY_CLAIM_WORKFLOW_REPORT_PATH,
@@ -2804,6 +3717,18 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
         )
         .route(LOCAL_REPUTATION_PATH, get(handle_local_reputation))
         .route(REPUTATION_COMPARE_PATH, post(handle_reputation_compare))
+        .route(
+            PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH,
+            post(handle_issue_portable_reputation_summary),
+        )
+        .route(
+            PORTABLE_NEGATIVE_EVENT_ISSUE_PATH,
+            post(handle_issue_portable_negative_event),
+        )
+        .route(
+            PORTABLE_REPUTATION_EVALUATE_PATH,
+            post(handle_evaluate_portable_reputation),
+        )
         .route(LINEAGE_RECORD_PATH, post(handle_record_lineage_snapshot))
         .route(LINEAGE_PATH, get(handle_get_lineage))
         .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
@@ -2919,6 +3844,232 @@ pub fn resolve_public_certification_metadata(
     public_certification_get_json(registry_url, PUBLIC_CERTIFICATION_METADATA_PATH)
 }
 
+pub fn resolve_public_generic_namespace(
+    registry_url: &str,
+) -> Result<SignedGenericNamespace, CliError> {
+    public_registry_get_json(registry_url, PUBLIC_GENERIC_NAMESPACE_PATH)
+}
+
+pub fn search_public_generic_listings(
+    registry_url: &str,
+    query: &GenericListingQuery,
+) -> Result<GenericListingReport, CliError> {
+    public_registry_get_json_with_query(registry_url, PUBLIC_GENERIC_LISTINGS_PATH, query)
+}
+
+pub fn issue_signed_generic_trust_activation(
+    config: &TrustServiceConfig,
+    request: &GenericTrustActivationIssueRequest,
+) -> Result<SignedGenericTrustActivation, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.requested_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_generic_trust_activation_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedGenericTrustActivation::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!("failed to sign trust activation artifact: {error}"))
+    })
+}
+
+pub fn evaluate_generic_trust_activation_request(
+    request: &GenericTrustActivationEvaluationRequest,
+) -> Result<GenericTrustActivationEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_generic_trust_activation(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_generic_governance_charter(
+    config: &TrustServiceConfig,
+    request: &GenericGovernanceCharterIssueRequest,
+) -> Result<SignedGenericGovernanceCharter, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_generic_governance_charter_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedGenericGovernanceCharter::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign governance charter artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_generic_governance_case(
+    config: &TrustServiceConfig,
+    request: &GenericGovernanceCaseIssueRequest,
+) -> Result<SignedGenericGovernanceCase, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.opened_at.unwrap_or(now_unix_secs()?);
+    let artifact =
+        build_generic_governance_case_artifact(&local_operator.operator_id, request, issued_at)
+            .map_err(CliError::Other)?;
+    SignedGenericGovernanceCase::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!("failed to sign governance case artifact: {error}"))
+    })
+}
+
+pub fn evaluate_generic_governance_case_request(
+    request: &GenericGovernanceCaseEvaluationRequest,
+) -> Result<GenericGovernanceCaseEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_generic_governance_case(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_open_market_fee_schedule(
+    config: &TrustServiceConfig,
+    request: &OpenMarketFeeScheduleIssueRequest,
+) -> Result<SignedOpenMarketFeeSchedule, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_open_market_fee_schedule_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedOpenMarketFeeSchedule::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign open-market fee schedule artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_open_market_penalty(
+    config: &TrustServiceConfig,
+    request: &OpenMarketPenaltyIssueRequest,
+) -> Result<SignedOpenMarketPenalty, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.opened_at.unwrap_or(now_unix_secs()?);
+    let artifact =
+        build_open_market_penalty_artifact(&local_operator.operator_id, request, issued_at)
+            .map_err(CliError::Other)?;
+    SignedOpenMarketPenalty::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign open-market penalty artifact: {error}"
+        ))
+    })
+}
+
+pub fn evaluate_open_market_penalty_request(
+    request: &OpenMarketPenaltyEvaluationRequest,
+) -> Result<OpenMarketPenaltyEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_open_market_penalty(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_portable_reputation_summary(
+    config: &TrustServiceConfig,
+    request: &PortableReputationSummaryIssueRequest,
+) -> Result<SignedPortableReputationSummary, CliError> {
+    if config.receipt_db_path.is_none() {
+        return Err(CliError::Other(
+            "trust service is missing receipt_db_path for portable reputation summary issuance"
+                .to_string(),
+        ));
+    }
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let inspection = issuance::inspect_local_reputation(
+        &request.subject_key,
+        config.receipt_db_path.as_deref(),
+        config.budget_db_path.as_deref(),
+        request.since,
+        request.until,
+        config.issuance_policy.as_ref(),
+    )
+    .map_err(|error| CliError::Other(error.to_string()))?;
+    let imported_trust = reputation::build_imported_trust_report(
+        config
+            .receipt_db_path
+            .as_deref()
+            .expect("checked receipt db path"),
+        &inspection.subject_key,
+        inspection.since,
+        inspection.until,
+        issued_at,
+        &inspection.scoring,
+    )?;
+    let artifact = build_portable_reputation_summary_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        &inspection.scorecard,
+        inspection.effective_score,
+        inspection.probationary,
+        Some(imported_trust.signal_count),
+        Some(imported_trust.accepted_count),
+        issued_at,
+    )?;
+    SignedPortableReputationSummary::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign portable reputation summary artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_portable_negative_event(
+    config: &TrustServiceConfig,
+    request: &PortableNegativeEventIssueRequest,
+) -> Result<SignedPortableNegativeEvent, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.published_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_portable_negative_event_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )?;
+    SignedPortableNegativeEvent::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign portable negative event artifact: {error}"
+        ))
+    })
+}
+
+pub fn evaluate_portable_reputation_request(
+    request: &PortableReputationEvaluationRequest,
+) -> Result<PortableReputationEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_portable_reputation(request, now).map_err(|error| CliError::Other(error.to_string()))
+}
+
 pub fn search_public_certifications(
     registry_url: &str,
     query: &CertificationPublicSearchQuery,
@@ -2961,6 +4112,68 @@ fn public_certification_get_json<T: for<'de> Deserialize<'de>>(
     response.into_json().map_err(|error| {
         CliError::Other(format!(
             "failed to parse public certification response from {endpoint}: {error}"
+        ))
+    })
+}
+
+fn public_registry_get_json<T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public registry URL must not be empty".to_string(),
+        ));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent
+        .get(&format!("{endpoint}{path}"))
+        .call()
+        .map_err(|error| {
+            CliError::Other(format!(
+                "failed to query public registry {endpoint}: {error}"
+            ))
+        })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public registry response from {endpoint}: {error}"
+        ))
+    })
+}
+
+fn public_registry_get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+    query: &Q,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public registry URL must not be empty".to_string(),
+        ));
+    }
+    let encoded_query = serde_urlencoded::to_string(query).map_err(|error| {
+        CliError::Other(format!("failed to encode public registry query: {error}"))
+    })?;
+    let url = if encoded_query.is_empty() {
+        format!("{endpoint}{path}")
+    } else {
+        format!("{endpoint}{path}?{encoded_query}")
+    };
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent.get(&url).call().map_err(|error| {
+        CliError::Other(format!(
+            "failed to query public registry {endpoint}: {error}"
+        ))
+    })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public registry response from {endpoint}: {error}"
         ))
     })
 }
@@ -3120,6 +4333,62 @@ impl TrustControlClient {
             "provider_id",
             provider_id,
         ))
+    }
+
+    pub fn issue_generic_trust_activation(
+        &self,
+        request: &GenericTrustActivationIssueRequest,
+    ) -> Result<SignedGenericTrustActivation, CliError> {
+        self.post_json(GENERIC_TRUST_ACTIVATION_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_generic_trust_activation(
+        &self,
+        request: &GenericTrustActivationEvaluationRequest,
+    ) -> Result<GenericTrustActivationEvaluation, CliError> {
+        self.post_json(GENERIC_TRUST_ACTIVATION_EVALUATE_PATH, request)
+    }
+
+    pub fn issue_generic_governance_charter(
+        &self,
+        request: &GenericGovernanceCharterIssueRequest,
+    ) -> Result<SignedGenericGovernanceCharter, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH, request)
+    }
+
+    pub fn issue_generic_governance_case(
+        &self,
+        request: &GenericGovernanceCaseIssueRequest,
+    ) -> Result<SignedGenericGovernanceCase, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CASE_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_generic_governance_case(
+        &self,
+        request: &GenericGovernanceCaseEvaluationRequest,
+    ) -> Result<GenericGovernanceCaseEvaluation, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CASE_EVALUATE_PATH, request)
+    }
+
+    pub fn issue_open_market_fee_schedule(
+        &self,
+        request: &OpenMarketFeeScheduleIssueRequest,
+    ) -> Result<SignedOpenMarketFeeSchedule, CliError> {
+        self.post_json(OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_open_market_penalty(
+        &self,
+        request: &OpenMarketPenaltyIssueRequest,
+    ) -> Result<SignedOpenMarketPenalty, CliError> {
+        self.post_json(OPEN_MARKET_PENALTY_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_open_market_penalty(
+        &self,
+        request: &OpenMarketPenaltyEvaluationRequest,
+    ) -> Result<OpenMarketPenaltyEvaluation, CliError> {
+        self.post_json(OPEN_MARKET_PENALTY_EVALUATE_PATH, request)
     }
 
     pub fn list_certifications(&self) -> Result<CertificationRegistryListResponse, CliError> {
@@ -3497,6 +4766,27 @@ impl TrustControlClient {
         self.get_json_with_query(CREDIT_SCORECARD_PATH, query)
     }
 
+    pub fn capital_book(
+        &self,
+        query: &CapitalBookQuery,
+    ) -> Result<SignedCapitalBookReport, CliError> {
+        self.get_json_with_query(CAPITAL_BOOK_PATH, query)
+    }
+
+    pub fn issue_capital_execution_instruction(
+        &self,
+        request: &CapitalExecutionInstructionRequest,
+    ) -> Result<SignedCapitalExecutionInstruction, CliError> {
+        self.post_json(CAPITAL_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_capital_allocation_decision(
+        &self,
+        request: &CapitalAllocationDecisionRequest,
+    ) -> Result<SignedCapitalAllocationDecision, CliError> {
+        self.post_json(CAPITAL_ALLOCATION_ISSUE_PATH, request)
+    }
+
     pub fn credit_facility_report(
         &self,
         query: &ExposureLedgerQuery,
@@ -3616,6 +4906,13 @@ impl TrustControlClient {
         self.post_json(LIABILITY_QUOTE_RESPONSE_ISSUE_PATH, request)
     }
 
+    pub fn issue_liability_pricing_authority(
+        &self,
+        request: &LiabilityPricingAuthorityIssueRequest,
+    ) -> Result<SignedLiabilityPricingAuthority, CliError> {
+        self.post_json(LIABILITY_PRICING_AUTHORITY_ISSUE_PATH, request)
+    }
+
     pub fn issue_liability_placement(
         &self,
         request: &LiabilityPlacementIssueRequest,
@@ -3628,6 +4925,13 @@ impl TrustControlClient {
         request: &LiabilityBoundCoverageIssueRequest,
     ) -> Result<SignedLiabilityBoundCoverage, CliError> {
         self.post_json(LIABILITY_BOUND_COVERAGE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_auto_bind(
+        &self,
+        request: &LiabilityAutoBindIssueRequest,
+    ) -> Result<SignedLiabilityAutoBindDecision, CliError> {
+        self.post_json(LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH, request)
     }
 
     pub fn liability_market_workflows(
@@ -3665,6 +4969,34 @@ impl TrustControlClient {
         self.post_json(LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH, request)
     }
 
+    pub fn issue_liability_claim_payout_instruction(
+        &self,
+        request: &LiabilityClaimPayoutInstructionIssueRequest,
+    ) -> Result<SignedLiabilityClaimPayoutInstruction, CliError> {
+        self.post_json(LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_payout_receipt(
+        &self,
+        request: &LiabilityClaimPayoutReceiptIssueRequest,
+    ) -> Result<SignedLiabilityClaimPayoutReceipt, CliError> {
+        self.post_json(LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_settlement_instruction(
+        &self,
+        request: &LiabilityClaimSettlementInstructionIssueRequest,
+    ) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
+        self.post_json(LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_settlement_receipt(
+        &self,
+        request: &LiabilityClaimSettlementReceiptIssueRequest,
+    ) -> Result<SignedLiabilityClaimSettlementReceipt, CliError> {
+        self.post_json(LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH, request)
+    }
+
     pub fn liability_claim_workflows(
         &self,
         query: &LiabilityClaimWorkflowQuery,
@@ -3677,6 +5009,20 @@ impl TrustControlClient {
         request: &RuntimeAttestationAppraisalRequest,
     ) -> Result<SignedRuntimeAttestationAppraisalReport, CliError> {
         self.post_json(RUNTIME_ATTESTATION_APPRAISAL_PATH, request)
+    }
+
+    pub fn runtime_attestation_appraisal_result(
+        &self,
+        request: &RuntimeAttestationAppraisalResultExportRequest,
+    ) -> Result<SignedRuntimeAttestationAppraisalResult, CliError> {
+        self.post_json(RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH, request)
+    }
+
+    pub fn import_runtime_attestation_appraisal(
+        &self,
+        request: &RuntimeAttestationAppraisalImportRequest,
+    ) -> Result<RuntimeAttestationAppraisalImportReport, CliError> {
+        self.post_json(RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH, request)
     }
 
     pub fn metered_billing_report(
@@ -3782,6 +5128,27 @@ impl TrustControlClient {
             &path_with_encoded_param(REPUTATION_COMPARE_PATH, "subject_key", subject_key),
             request,
         )
+    }
+
+    pub fn issue_portable_reputation_summary(
+        &self,
+        request: &PortableReputationSummaryIssueRequest,
+    ) -> Result<SignedPortableReputationSummary, CliError> {
+        self.post_json(PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH, request)
+    }
+
+    pub fn issue_portable_negative_event(
+        &self,
+        request: &PortableNegativeEventIssueRequest,
+    ) -> Result<SignedPortableNegativeEvent, CliError> {
+        self.post_json(PORTABLE_NEGATIVE_EVENT_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_portable_reputation(
+        &self,
+        request: &PortableReputationEvaluationRequest,
+    ) -> Result<PortableReputationEvaluation, CliError> {
+        self.post_json(PORTABLE_REPUTATION_EVALUATE_PATH, request)
     }
 
     pub fn append_tool_receipt(&self, receipt: &ArcReceipt) -> Result<(), CliError> {
@@ -4569,349 +5936,6 @@ fn into_budget_store_error(error: CliError) -> BudgetStoreError {
     BudgetStoreError::Io(std::io::Error::other(error.to_string()))
 }
 
-async fn handle_health(State(state): State<TrustServiceState>) -> Response {
-    let leader_url = current_leader_url(&state);
-    let self_url = cluster_self_url(&state);
-    Json(json!({
-        "ok": true,
-        "leaderUrl": leader_url.clone(),
-        "selfUrl": self_url.clone(),
-        "clustered": state.cluster.is_some(),
-        "authority": trust_authority_health_snapshot(&state.config),
-        "stores": trust_store_health_snapshot(&state.config),
-        "federation": trust_federation_health_snapshot(&state),
-        "cluster": trust_cluster_health_snapshot(&state, leader_url, self_url),
-    }))
-    .into_response()
-}
-
-fn trust_authority_health_snapshot(config: &TrustServiceConfig) -> Value {
-    let backend_hint = if config.authority_db_path.is_some() {
-        Some("sqlite")
-    } else if config.authority_seed_path.is_some() {
-        Some("seed_file")
-    } else {
-        None
-    };
-    match load_authority_status(config) {
-        Ok(status) => json!({
-            "configured": status.configured,
-            "available": true,
-            "backend": status.backend,
-            "publicKey": status.public_key,
-            "generation": status.generation,
-            "rotatedAt": status.rotated_at,
-            "appliesToFutureSessionsOnly": status.applies_to_future_sessions_only,
-            "trustedKeyCount": status.trusted_public_keys.len(),
-        }),
-        Err(_) => json!({
-            "configured": backend_hint.is_some(),
-            "available": false,
-            "backend": backend_hint,
-            "publicKey": Value::Null,
-            "generation": Value::Null,
-            "rotatedAt": Value::Null,
-            "appliesToFutureSessionsOnly": true,
-            "trustedKeyCount": 0,
-        }),
-    }
-}
-
-fn trust_store_health_snapshot(config: &TrustServiceConfig) -> Value {
-    json!({
-        "receiptsConfigured": config.receipt_db_path.is_some(),
-        "revocationsConfigured": config.revocation_db_path.is_some(),
-        "budgetsConfigured": config.budget_db_path.is_some(),
-        "verifierChallengesConfigured": config.verifier_challenge_db_path.is_some(),
-    })
-}
-
-fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
-    let loaded_enterprise_provider_summary = state
-        .enterprise_provider_registry()
-        .map(|registry| {
-            let enabled_count = registry
-                .providers
-                .values()
-                .filter(|record| record.enabled)
-                .count();
-            let validated_count = registry
-                .providers
-                .values()
-                .filter(|record| record.is_validated_enabled())
-                .count();
-            let invalid_count = registry
-                .providers
-                .values()
-                .filter(|record| !record.validation_errors.is_empty())
-                .count();
-            (
-                registry.providers.len(),
-                enabled_count,
-                validated_count,
-                invalid_count,
-            )
-        })
-        .unwrap_or((0, 0, 0, 0));
-
-    let enterprise_provider_summary =
-        if let Some(path) = state.config.enterprise_providers_file.as_deref() {
-            match EnterpriseProviderRegistry::load(path) {
-                Ok(registry) => {
-                    let enabled_count = registry
-                        .providers
-                        .values()
-                        .filter(|record| record.enabled)
-                        .count();
-                    let validated_count = registry
-                        .providers
-                        .values()
-                        .filter(|record| record.is_validated_enabled())
-                        .count();
-                    let invalid_count = registry
-                        .providers
-                        .values()
-                        .filter(|record| !record.validation_errors.is_empty())
-                        .count();
-                    json!({
-                        "configured": true,
-                        "available": true,
-                        "count": registry.providers.len(),
-                        "enabledCount": enabled_count,
-                        "validatedCount": validated_count,
-                        "invalidCount": invalid_count,
-                        "loadedCount": loaded_enterprise_provider_summary.0,
-                        "loadedValidatedCount": loaded_enterprise_provider_summary.2,
-                    })
-                }
-                Err(_) => json!({
-                    "configured": true,
-                    "available": false,
-                    "count": 0,
-                    "enabledCount": 0,
-                    "validatedCount": 0,
-                    "invalidCount": 0,
-                    "loadedCount": loaded_enterprise_provider_summary.0,
-                    "loadedValidatedCount": loaded_enterprise_provider_summary.2,
-                }),
-            }
-        } else {
-            json!({
-                "configured": false,
-                "available": false,
-                "count": 0,
-                "enabledCount": 0,
-                "validatedCount": 0,
-                "invalidCount": 0,
-                "loadedCount": 0,
-                "loadedValidatedCount": 0,
-            })
-        };
-
-    let loaded_verifier_policy_summary = state
-        .verifier_policy_registry()
-        .map(|registry| {
-            let now = unix_timestamp_now();
-            let active_count = registry
-                .policies
-                .values()
-                .filter(|document| {
-                    ensure_signed_passport_verifier_policy_active(document, now).is_ok()
-                })
-                .count();
-            (registry.policies.len(), active_count)
-        })
-        .unwrap_or((0, 0));
-
-    let verifier_policy_summary = if let Some(path) = state.config.verifier_policies_file.as_deref()
-    {
-        match VerifierPolicyRegistry::load(path) {
-            Ok(registry) => {
-                let now = unix_timestamp_now();
-                let active_count = registry
-                    .policies
-                    .values()
-                    .filter(|document| {
-                        ensure_signed_passport_verifier_policy_active(document, now).is_ok()
-                    })
-                    .count();
-                json!({
-                    "configured": true,
-                    "available": true,
-                    "count": registry.policies.len(),
-                    "activeCount": active_count,
-                    "loadedCount": loaded_verifier_policy_summary.0,
-                    "loadedActiveCount": loaded_verifier_policy_summary.1,
-                })
-            }
-            Err(_) => json!({
-                "configured": true,
-                "available": false,
-                "count": 0,
-                "activeCount": 0,
-                "loadedCount": loaded_verifier_policy_summary.0,
-                "loadedActiveCount": loaded_verifier_policy_summary.1,
-            }),
-        }
-    } else {
-        json!({
-            "configured": false,
-            "available": false,
-            "count": 0,
-            "activeCount": 0,
-            "loadedCount": 0,
-            "loadedActiveCount": 0,
-        })
-    };
-
-    let certification_summary =
-        if let Some(path) = state.config.certification_registry_file.as_deref() {
-            match CertificationRegistry::load(path) {
-                Ok(registry) => {
-                    let active_count = registry
-                        .artifacts
-                        .values()
-                        .filter(|entry| entry.status == CertificationRegistryState::Active)
-                        .count();
-                    let superseded_count = registry
-                        .artifacts
-                        .values()
-                        .filter(|entry| entry.status == CertificationRegistryState::Superseded)
-                        .count();
-                    let revoked_count = registry
-                        .artifacts
-                        .values()
-                        .filter(|entry| entry.status == CertificationRegistryState::Revoked)
-                        .count();
-                    json!({
-                        "configured": true,
-                        "available": true,
-                        "count": registry.artifacts.len(),
-                        "activeCount": active_count,
-                        "supersededCount": superseded_count,
-                        "revokedCount": revoked_count,
-                    })
-                }
-                Err(_) => json!({
-                    "configured": true,
-                    "available": false,
-                    "count": 0,
-                    "activeCount": 0,
-                    "supersededCount": 0,
-                    "revokedCount": 0,
-                }),
-            }
-        } else {
-            json!({
-                "configured": false,
-                "available": false,
-                "count": 0,
-                "activeCount": 0,
-                "supersededCount": 0,
-                "revokedCount": 0,
-            })
-        };
-
-    let certification_discovery_summary =
-        if let Some(path) = state.config.certification_discovery_file.as_deref() {
-            match CertificationDiscoveryNetwork::load(path) {
-                Ok(network) => {
-                    let validated_count = network
-                        .operators
-                        .values()
-                        .filter(|operator| operator.validation_errors.is_empty())
-                        .count();
-                    let publish_enabled_count = network
-                        .operators
-                        .values()
-                        .filter(|operator| {
-                            operator.validation_errors.is_empty() && operator.allow_publish
-                        })
-                        .count();
-                    json!({
-                        "configured": true,
-                        "available": true,
-                        "count": network.operators.len(),
-                        "validatedCount": validated_count,
-                        "publishEnabledCount": publish_enabled_count,
-                    })
-                }
-                Err(_) => json!({
-                    "configured": true,
-                    "available": false,
-                    "count": 0,
-                    "validatedCount": 0,
-                    "publishEnabledCount": 0,
-                }),
-            }
-        } else {
-            json!({
-                "configured": false,
-                "available": false,
-                "count": 0,
-                "validatedCount": 0,
-                "publishEnabledCount": 0,
-            })
-        };
-
-    json!({
-        "enterpriseProviders": enterprise_provider_summary,
-        "verifierPolicies": verifier_policy_summary,
-        "certifications": certification_summary,
-        "certificationDiscovery": certification_discovery_summary,
-        "issuancePolicyConfigured": state.config.issuance_policy.is_some(),
-        "runtimeAssurancePolicyConfigured": state.config.runtime_assurance_policy.is_some(),
-    })
-}
-
-fn trust_cluster_health_snapshot(
-    state: &TrustServiceState,
-    leader_url: Option<String>,
-    self_url: Option<String>,
-) -> Value {
-    let Some(cluster) = state.cluster.as_ref() else {
-        return json!({
-            "peerCount": 0,
-            "healthyPeers": 0,
-            "unhealthyPeers": 0,
-            "unknownPeers": 0,
-            "lastErrorCount": 0,
-            "leaderUrl": leader_url,
-            "selfUrl": self_url,
-        });
-    };
-
-    let peers = match cluster.lock() {
-        Ok(guard) => guard.peers.clone(),
-        Err(poisoned) => poisoned.into_inner().peers.clone(),
-    };
-
-    let mut healthy = 0usize;
-    let mut unhealthy = 0usize;
-    let mut unknown = 0usize;
-    let mut last_error_count = 0usize;
-    for peer in peers.values() {
-        match peer.health {
-            PeerHealth::Healthy => healthy += 1,
-            PeerHealth::Unhealthy(_) => unhealthy += 1,
-            PeerHealth::Unknown => unknown += 1,
-        }
-        if peer.last_error.is_some() {
-            last_error_count += 1;
-        }
-    }
-
-    json!({
-        "peerCount": peers.len(),
-        "healthyPeers": healthy,
-        "unhealthyPeers": unhealthy,
-        "unknownPeers": unknown,
-        "lastErrorCount": last_error_count,
-        "leaderUrl": leader_url,
-        "selfUrl": self_url,
-    })
-}
-
 async fn handle_authority_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
@@ -5215,10 +6239,166 @@ async fn handle_public_certification_transparency(
     Json(registry.transparency(&metadata.publisher, &query)).into_response()
 }
 
+async fn handle_public_generic_namespace(State(state): State<TrustServiceState>) -> Response {
+    match build_signed_generic_namespace(&state.config) {
+        Ok(namespace) => Json(namespace).into_response(),
+        Err(error) => public_discovery_error_response(&error),
+    }
+}
+
+async fn handle_public_generic_listings(
+    State(state): State<TrustServiceState>,
+    Query(query): Query<GenericListingQuery>,
+) -> Response {
+    match build_public_generic_listing_report(&state.config, &query) {
+        Ok(report) => Json(report).into_response(),
+        Err(error) => public_discovery_error_response(&error),
+    }
+}
+
+async fn handle_issue_generic_trust_activation(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<GenericTrustActivationIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_generic_trust_activation(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_evaluate_generic_trust_activation(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<GenericTrustActivationEvaluationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match evaluate_generic_trust_activation_request(&request) {
+        Ok(report) => Json(report).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_issue_generic_governance_charter(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<GenericGovernanceCharterIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_generic_governance_charter(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_issue_generic_governance_case(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<GenericGovernanceCaseIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_generic_governance_case(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_evaluate_generic_governance_case(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<GenericGovernanceCaseEvaluationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match evaluate_generic_governance_case_request(&request) {
+        Ok(report) => Json(report).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_issue_open_market_fee_schedule(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<OpenMarketFeeScheduleIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_open_market_fee_schedule(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_issue_open_market_penalty(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<OpenMarketPenaltyIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_open_market_penalty(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
+async fn handle_evaluate_open_market_penalty(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<OpenMarketPenaltyEvaluationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match evaluate_open_market_penalty_request(&request) {
+        Ok(report) => Json(report).into_response(),
+        Err(error) => plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
+    }
+}
+
 async fn handle_passport_issuer_metadata(State(state): State<TrustServiceState>) -> Response {
     match configured_passport_credential_issuer(&state.config) {
         Ok(metadata) => Json(metadata).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    }
+}
+
+async fn handle_public_passport_issuer_discovery(
+    State(state): State<TrustServiceState>,
+) -> Response {
+    match build_public_issuer_discovery(&state.config) {
+        Ok(document) => Json(document).into_response(),
+        Err(error) => public_discovery_error_response(&error),
+    }
+}
+
+async fn handle_public_passport_verifier_discovery(
+    State(state): State<TrustServiceState>,
+) -> Response {
+    match build_public_verifier_discovery(&state.config) {
+        Ok(document) => Json(document).into_response(),
+        Err(error) => public_discovery_error_response(&error),
+    }
+}
+
+async fn handle_public_passport_discovery_transparency(
+    State(state): State<TrustServiceState>,
+) -> Response {
+    match build_public_discovery_transparency(&state.config) {
+        Ok(document) => Json(document).into_response(),
+        Err(error) => public_discovery_error_response(&error),
     }
 }
 
@@ -5245,6 +6425,19 @@ async fn handle_passport_issuer_jwks(State(state): State<TrustServiceState>) -> 
             plain_http_error(status, &error.to_string())
         }
     }
+}
+
+fn public_discovery_error_response(error: &CliError) -> Response {
+    let message = error.to_string();
+    let status = if message.contains("configured authority")
+        || message.contains("authority signing seed")
+        || message.contains("did not publish any signing keys")
+    {
+        StatusCode::NOT_FOUND
+    } else {
+        StatusCode::CONFLICT
+    };
+    plain_http_error(status, &message)
 }
 
 async fn handle_passport_sd_jwt_type_metadata(State(state): State<TrustServiceState>) -> Response {
@@ -7224,6 +8417,100 @@ async fn handle_credit_scorecard_report(
     }
 }
 
+async fn handle_capital_book_report(
+    State(state): State<TrustServiceState>,
+    Query(query): Query<CapitalBookQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_store = match open_receipt_store(&state.config) {
+        Ok(store) => store,
+        Err(response) => return response,
+    };
+    let keypair = match load_behavioral_feed_signing_keypair(
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+    ) {
+        Ok(keypair) => keypair,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
+
+    match build_capital_book_report_from_store(&receipt_store, &query) {
+        Ok(report) => match SignedCapitalBookReport::sign(report, &keypair) {
+            Ok(signed) => Json::<SignedCapitalBookReport>(signed).into_response(),
+            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        },
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn handle_issue_capital_execution_instruction(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<CapitalExecutionInstructionRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "capital instruction issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_capital_execution_instruction_detailed(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(signed) => Json::<SignedCapitalExecutionInstruction>(signed).into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn handle_issue_capital_allocation_decision(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<CapitalAllocationDecisionRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "capital allocation issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_capital_allocation_decision_detailed(
+        receipt_db_path,
+        state.config.budget_db_path.as_deref(),
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        state.config.certification_registry_file.as_deref(),
+        &request,
+    ) {
+        Ok(signed) => Json::<SignedCapitalAllocationDecision>(signed).into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
 async fn handle_credit_facility_report(
     State(state): State<TrustServiceState>,
     Query(query): Query<ExposureLedgerQuery>,
@@ -7467,7 +8754,7 @@ async fn handle_issue_credit_loss_lifecycle(
         receipt_db_path,
         state.config.authority_seed_path.as_deref(),
         state.config.authority_db_path.as_deref(),
-        &request.query,
+        &request,
     ) {
         Ok(event) => Json::<SignedCreditLossLifecycle>(event).into_response(),
         Err(error) => error.into_response(),
@@ -7742,6 +9029,37 @@ async fn handle_issue_liability_placement(
     }
 }
 
+async fn handle_issue_liability_pricing_authority(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityPricingAuthorityIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability pricing authority issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_pricing_authority(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityPricingAuthority>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
 async fn handle_issue_liability_bound_coverage(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
@@ -7768,6 +9086,37 @@ async fn handle_issue_liability_bound_coverage(
         &request,
     ) {
         Ok(artifact) => Json::<SignedLiabilityBoundCoverage>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_liability_auto_bind(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityAutoBindIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability auto-bind issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_auto_bind(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityAutoBindDecision>(artifact).into_response(),
         Err(CliError::Other(message)) => liability_market_http_error(&message),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
@@ -7916,6 +9265,130 @@ async fn handle_issue_liability_claim_adjudication(
     }
 }
 
+async fn handle_issue_liability_claim_payout_instruction(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityClaimPayoutInstructionIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability claim payout instruction issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_claim_payout_instruction(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityClaimPayoutInstruction>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_liability_claim_payout_receipt(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityClaimPayoutReceiptIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability claim payout receipt issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_claim_payout_receipt(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityClaimPayoutReceipt>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_liability_claim_settlement_instruction(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityClaimSettlementInstructionIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability claim settlement instruction issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_claim_settlement_instruction(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityClaimSettlementInstruction>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_liability_claim_settlement_receipt(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<LiabilityClaimSettlementReceiptIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    let receipt_db_path = match state.config.receipt_db_path.as_deref() {
+        Some(path) => path,
+        None => {
+            return plain_http_error(
+                StatusCode::CONFLICT,
+                "liability claim settlement receipt issuance requires --receipt-db on the trust-control service",
+            );
+        }
+    };
+
+    match issue_signed_liability_claim_settlement_receipt(
+        receipt_db_path,
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        &request,
+    ) {
+        Ok(artifact) => Json::<SignedLiabilityClaimSettlementReceipt>(artifact).into_response(),
+        Err(CliError::Other(message)) => liability_market_http_error(&message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
 async fn handle_query_liability_claim_workflows(
     State(state): State<TrustServiceState>,
     Query(query): Query<LiabilityClaimWorkflowQuery>,
@@ -7954,6 +9427,42 @@ async fn handle_runtime_attestation_appraisal_report(
         Err(CliError::Other(message)) => plain_http_error(StatusCode::BAD_REQUEST, &message),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
+}
+
+async fn handle_runtime_attestation_appraisal_result_export(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<RuntimeAttestationAppraisalResultExportRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    match build_signed_runtime_attestation_appraisal_result(
+        state.config.authority_seed_path.as_deref(),
+        state.config.authority_db_path.as_deref(),
+        state.config.runtime_assurance_policy.as_ref(),
+        &request,
+    ) {
+        Ok(result) => Json::<SignedRuntimeAttestationAppraisalResult>(result).into_response(),
+        Err(CliError::Other(message)) => plain_http_error(StatusCode::BAD_REQUEST, &message),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_runtime_attestation_appraisal_import(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<RuntimeAttestationAppraisalImportRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+
+    Json::<RuntimeAttestationAppraisalImportReport>(
+        build_runtime_attestation_appraisal_import_report(&request, unix_timestamp_now()),
+    )
+    .into_response()
 }
 
 async fn handle_settlement_report(
@@ -8484,6 +9993,48 @@ async fn handle_reputation_compare(
         Ok(comparison) => {
             Json::<reputation::PortableReputationComparison>(comparison).into_response()
         }
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_portable_reputation_summary(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<PortableReputationSummaryIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_portable_reputation_summary(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_issue_portable_negative_event(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<PortableNegativeEventIssueRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match issue_signed_portable_negative_event(&state.config, &request) {
+        Ok(artifact) => Json(artifact).into_response(),
+        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
+async fn handle_evaluate_portable_reputation(
+    State(state): State<TrustServiceState>,
+    headers: HeaderMap,
+    Json(request): Json<PortableReputationEvaluationRequest>,
+) -> Response {
+    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+        return response;
+    }
+    match evaluate_portable_reputation_request(&request) {
+        Ok(report) => Json(report).into_response(),
         Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
@@ -10120,6 +11671,18 @@ pub fn build_signed_runtime_attestation_appraisal_report(
     SignedRuntimeAttestationAppraisalReport::sign(report, &keypair).map_err(Into::into)
 }
 
+pub fn build_signed_runtime_attestation_appraisal_result(
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    runtime_assurance_policy: Option<&crate::policy::RuntimeAssuranceIssuancePolicy>,
+    request: &RuntimeAttestationAppraisalResultExportRequest,
+) -> Result<SignedRuntimeAttestationAppraisalResult, CliError> {
+    let result = build_runtime_attestation_appraisal_result(runtime_assurance_policy, request)
+        .map_err(|response| CliError::Other(response_status_text(&response)))?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    SignedRuntimeAttestationAppraisalResult::sign(result, &keypair).map_err(Into::into)
+}
+
 fn build_runtime_attestation_appraisal_report(
     runtime_assurance_policy: Option<&crate::policy::RuntimeAssuranceIssuancePolicy>,
     evidence: &RuntimeAttestationEvidence,
@@ -10160,6 +11723,25 @@ fn build_runtime_attestation_appraisal_report(
         appraisal,
         policy_outcome,
     })
+}
+
+fn build_runtime_attestation_appraisal_result(
+    runtime_assurance_policy: Option<&crate::policy::RuntimeAssuranceIssuancePolicy>,
+    request: &RuntimeAttestationAppraisalResultExportRequest,
+) -> Result<RuntimeAttestationAppraisalResult, Response> {
+    let report = build_runtime_attestation_appraisal_report(
+        runtime_assurance_policy,
+        &request.runtime_attestation,
+    )?;
+    RuntimeAttestationAppraisalResult::from_report(&request.issuer, &report)
+        .map_err(|error| plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()))
+}
+
+pub fn build_runtime_attestation_appraisal_import_report(
+    request: &RuntimeAttestationAppraisalImportRequest,
+    now: u64,
+) -> RuntimeAttestationAppraisalImportReport {
+    evaluate_imported_runtime_attestation_appraisal(request, now)
 }
 
 fn build_behavioral_feed_report(
@@ -10404,6 +11986,1498 @@ pub fn build_signed_credit_scorecard_report(
     SignedCreditScorecardReport::sign(report, &keypair).map_err(Into::into)
 }
 
+pub fn build_signed_capital_book_report(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    query: &CapitalBookQuery,
+) -> Result<SignedCapitalBookReport, CliError> {
+    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let report =
+        build_capital_book_report_from_store(&receipt_store, query).map_err(CliError::from)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    SignedCapitalBookReport::sign(report, &keypair).map_err(Into::into)
+}
+
+pub fn issue_signed_capital_execution_instruction(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &CapitalExecutionInstructionRequest,
+) -> Result<SignedCapitalExecutionInstruction, CliError> {
+    issue_signed_capital_execution_instruction_detailed(
+        receipt_db_path,
+        authority_seed_path,
+        authority_db_path,
+        request,
+    )
+    .map_err(CliError::from)
+}
+
+fn issue_signed_capital_execution_instruction_detailed(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &CapitalExecutionInstructionRequest,
+) -> Result<SignedCapitalExecutionInstruction, TrustHttpError> {
+    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let artifact =
+        build_capital_execution_instruction_artifact_from_store(&receipt_store, request)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    SignedCapitalExecutionInstruction::sign(artifact, &keypair)
+        .map_err(|error| TrustHttpError::internal(error.to_string()))
+}
+
+pub fn issue_signed_capital_allocation_decision(
+    receipt_db_path: &Path,
+    budget_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    certification_registry_file: Option<&Path>,
+    request: &CapitalAllocationDecisionRequest,
+) -> Result<SignedCapitalAllocationDecision, CliError> {
+    issue_signed_capital_allocation_decision_detailed(
+        receipt_db_path,
+        budget_db_path,
+        authority_seed_path,
+        authority_db_path,
+        certification_registry_file,
+        request,
+    )
+    .map_err(CliError::from)
+}
+
+fn issue_signed_capital_allocation_decision_detailed(
+    receipt_db_path: &Path,
+    budget_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    certification_registry_file: Option<&Path>,
+    request: &CapitalAllocationDecisionRequest,
+) -> Result<SignedCapitalAllocationDecision, TrustHttpError> {
+    let receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let artifact = build_capital_allocation_decision_artifact_from_store(
+        &receipt_store,
+        receipt_db_path,
+        budget_db_path,
+        certification_registry_file,
+        request,
+    )?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    SignedCapitalAllocationDecision::sign(artifact, &keypair)
+        .map_err(|error| TrustHttpError::internal(error.to_string()))
+}
+
+#[allow(clippy::too_many_lines)]
+fn build_capital_allocation_decision_artifact_from_store(
+    receipt_store: &SqliteReceiptStore,
+    receipt_db_path: &Path,
+    budget_db_path: Option<&Path>,
+    certification_registry_file: Option<&Path>,
+    request: &CapitalAllocationDecisionRequest,
+) -> Result<CapitalAllocationDecisionArtifact, TrustHttpError> {
+    let issued_at = unix_timestamp_now();
+    let normalized_query = request.query.normalized();
+    normalized_query
+        .validate()
+        .map_err(TrustHttpError::bad_request)?;
+    validate_capital_execution_envelope(
+        &request.authority_chain,
+        &request.execution_window,
+        &request.rail,
+        issued_at,
+    )?;
+
+    let behavioral_query = BehavioralFeedQuery {
+        capability_id: normalized_query.capability_id.clone(),
+        agent_subject: normalized_query.agent_subject.clone(),
+        tool_server: normalized_query.tool_server.clone(),
+        tool_name: normalized_query.tool_name.clone(),
+        since: normalized_query.since,
+        until: normalized_query.until,
+        receipt_limit: normalized_query.receipt_limit,
+    };
+    let (_, _, _, selection) = receipt_store
+        .query_behavioral_feed_receipts(&behavioral_query)
+        .map_err(|error| TrustHttpError::internal(error.to_string()))?;
+    let governed_receipt =
+        select_capital_allocation_receipt(&selection.receipts, request.receipt_id.as_deref())?;
+    let governed_metadata = governed_receipt.governed.as_ref().ok_or_else(|| {
+        TrustHttpError::new(
+            StatusCode::CONFLICT,
+            format!(
+                "capital allocation receipt `{}` is missing governed metadata",
+                governed_receipt.receipt_id
+            ),
+        )
+    })?;
+    let requested_amount = governed_metadata.max_amount.clone().ok_or_else(|| {
+        TrustHttpError::new(
+            StatusCode::CONFLICT,
+            format!(
+                "capital allocation receipt `{}` is missing governed max_amount",
+                governed_receipt.receipt_id
+            ),
+        )
+    })?;
+    let exposure_receipt = build_exposure_ledger_receipt_entry(governed_receipt)?;
+    let exposure = build_exposure_ledger_report(receipt_store, &normalized_query.exposure_query())?;
+    let capital_book = build_capital_book_report_from_store(receipt_store, &normalized_query)?;
+    let active_facility = latest_active_granted_credit_facility(
+        receipt_store,
+        normalized_query.capability_id.as_deref(),
+        normalized_query.agent_subject.as_deref(),
+        normalized_query.tool_server.as_deref(),
+        normalized_query.tool_name.as_deref(),
+    )?;
+    let fallback_facility_report = if active_facility.is_none() {
+        Some(build_credit_facility_report_from_store(
+            receipt_store,
+            receipt_db_path,
+            budget_db_path,
+            certification_registry_file,
+            None,
+            &normalized_query.exposure_query(),
+        )?)
+    } else {
+        None
+    };
+    let facility_disposition = active_facility.as_ref().map_or_else(
+        || {
+            fallback_facility_report
+                .as_ref()
+                .map(|report| report.disposition)
+                .unwrap_or(CreditFacilityDisposition::ManualReview)
+        },
+        |_| CreditFacilityDisposition::Grant,
+    );
+    let facility_source = capital_book
+        .sources
+        .iter()
+        .find(|source| source.kind == CapitalBookSourceKind::FacilityCommitment);
+    let reserve_source = capital_book
+        .sources
+        .iter()
+        .find(|source| source.kind == CapitalBookSourceKind::ReserveBook);
+
+    ensure_capital_execution_custodian_authority(&request.authority_chain, &request.rail)?;
+    if let Some(source) = facility_source {
+        ensure_capital_execution_owner_authority(
+            &request.authority_chain,
+            capital_execution_role_from_book_role(source.owner_role),
+        )?;
+    }
+
+    let position = exposure
+        .positions
+        .iter()
+        .find(|position| position.currency == requested_amount.currency);
+    let current_outstanding_units = position.map(credit_bond_outstanding_units).unwrap_or(0);
+    let current_outstanding_amount =
+        amount_if_nonzero(current_outstanding_units, &requested_amount.currency);
+
+    let facility_terms = active_facility
+        .as_ref()
+        .and_then(|facility| facility.body.report.terms.as_ref())
+        .or_else(|| {
+            fallback_facility_report
+                .as_ref()
+                .and_then(|report| report.terms.as_ref())
+        });
+    let utilization_ceiling_units = facility_terms
+        .map(|terms| {
+            capital_allocation_ceiling_units(
+                terms.credit_limit.units,
+                terms.utilization_ceiling_bps,
+            )
+        })
+        .unwrap_or(0);
+    let concentration_cap_units = facility_terms
+        .map(|terms| {
+            capital_allocation_ceiling_units(terms.credit_limit.units, terms.concentration_cap_bps)
+        })
+        .unwrap_or(0);
+    let current_reserve_units = reserve_source
+        .and_then(|source| source.held_amount.as_ref().map(|amount| amount.units))
+        .unwrap_or(0);
+    let required_reserve_units = facility_terms
+        .map(|terms| credit_bond_reserve_units(current_outstanding_units, terms.reserve_ratio_bps))
+        .unwrap_or(0);
+    let reserve_delta_units = required_reserve_units.saturating_sub(current_reserve_units);
+
+    let mut evidence_refs =
+        capital_book_evidence_from_exposure_refs(&exposure_receipt.evidence_refs);
+    if let Some(source) = facility_source {
+        if let Some(facility_id) = source.facility_id.as_ref() {
+            push_unique_capital_book_evidence(
+                &mut evidence_refs,
+                CapitalBookEvidenceReference {
+                    kind: CapitalBookEvidenceKind::CreditFacility,
+                    reference_id: facility_id.clone(),
+                    observed_at: Some(issued_at),
+                    locator: Some(format!("credit-facility:{facility_id}")),
+                },
+            );
+        }
+    }
+    if let Some(source) = reserve_source {
+        if let Some(bond_id) = source.bond_id.as_ref() {
+            push_unique_capital_book_evidence(
+                &mut evidence_refs,
+                CapitalBookEvidenceReference {
+                    kind: CapitalBookEvidenceKind::CreditBond,
+                    reference_id: bond_id.clone(),
+                    observed_at: Some(issued_at),
+                    locator: Some(format!("credit-bond:{bond_id}")),
+                },
+            );
+        }
+    }
+
+    let mut findings = Vec::new();
+    let mut instruction_drafts = Vec::new();
+    let outcome = match facility_disposition {
+        CreditFacilityDisposition::Deny => {
+            findings.push(CapitalAllocationDecisionFinding {
+                code: CapitalAllocationDecisionReasonCode::FacilityDenied,
+                description:
+                    "facility policy denied live capital allocation for the governed action"
+                        .to_string(),
+                evidence_refs: evidence_refs.clone(),
+            });
+            CapitalAllocationDecisionOutcome::Deny
+        }
+        CreditFacilityDisposition::ManualReview => {
+            findings.push(CapitalAllocationDecisionFinding {
+                code: CapitalAllocationDecisionReasonCode::FacilityManualReview,
+                description:
+                    "facility policy requires manual review before ARC can allocate live capital"
+                        .to_string(),
+                evidence_refs: evidence_refs.clone(),
+            });
+            CapitalAllocationDecisionOutcome::ManualReview
+        }
+        CreditFacilityDisposition::Grant => {
+            let facility_terms = facility_terms.ok_or_else(|| {
+                TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    "capital allocation requires facility grant terms when disposition is grant",
+                )
+            })?;
+            if facility_terms.credit_limit.currency != requested_amount.currency {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "capital allocation facility currency `{}` does not match requested currency `{}`",
+                        facility_terms.credit_limit.currency, requested_amount.currency
+                    ),
+                ));
+            }
+            if facility_terms.capital_source == CreditFacilityCapitalSource::ManualProviderReview {
+                findings.push(CapitalAllocationDecisionFinding {
+                    code: CapitalAllocationDecisionReasonCode::ManualCapitalSource,
+                    description:
+                        "the granted facility still resolves to manual provider review rather than operator-internal live allocation"
+                            .to_string(),
+                    evidence_refs: evidence_refs.clone(),
+                });
+                CapitalAllocationDecisionOutcome::ManualReview
+            } else if requested_amount.units > concentration_cap_units {
+                findings.push(CapitalAllocationDecisionFinding {
+                    code: CapitalAllocationDecisionReasonCode::ConcentrationCapExceeded,
+                    description: format!(
+                        "requested governed amount {} exceeds the single-allocation concentration cap {}",
+                        requested_amount.units, concentration_cap_units
+                    ),
+                    evidence_refs: evidence_refs.clone(),
+                });
+                CapitalAllocationDecisionOutcome::Deny
+            } else if current_outstanding_units > utilization_ceiling_units {
+                findings.push(CapitalAllocationDecisionFinding {
+                    code: CapitalAllocationDecisionReasonCode::UtilizationCeilingExceeded,
+                    description: format!(
+                        "current outstanding exposure {} exceeds the live utilization ceiling {}",
+                        current_outstanding_units, utilization_ceiling_units
+                    ),
+                    evidence_refs: evidence_refs.clone(),
+                });
+                CapitalAllocationDecisionOutcome::Queue
+            } else if reserve_delta_units > 0 && reserve_source.is_none() {
+                findings.push(CapitalAllocationDecisionFinding {
+                    code: CapitalAllocationDecisionReasonCode::ReserveBookMissing,
+                    description:
+                        "allocation would require additional reserve backing, but no current reserve book is available for custody-neutral execution"
+                            .to_string(),
+                    evidence_refs: evidence_refs.clone(),
+                });
+                CapitalAllocationDecisionOutcome::ManualReview
+            } else {
+                let facility_source = facility_source.ok_or_else(|| {
+                    TrustHttpError::new(
+                        StatusCode::CONFLICT,
+                        "capital allocation requires a current facility source after facility grant",
+                    )
+                })?;
+                instruction_drafts.push(CapitalAllocationInstructionDraft {
+                    source_id: facility_source.source_id.clone(),
+                    source_kind: CapitalBookSourceKind::FacilityCommitment,
+                    action: CapitalExecutionInstructionAction::TransferFunds,
+                    amount: requested_amount.clone(),
+                    description:
+                        "transfer the governed amount from the selected committed capital source"
+                            .to_string(),
+                });
+                if reserve_delta_units > 0 {
+                    let reserve_source = reserve_source.ok_or_else(|| {
+                        TrustHttpError::new(
+                            StatusCode::CONFLICT,
+                            "capital allocation requires a current reserve source for additional reserve movement",
+                        )
+                    })?;
+                    instruction_drafts.push(CapitalAllocationInstructionDraft {
+                        source_id: reserve_source.source_id.clone(),
+                        source_kind: CapitalBookSourceKind::ReserveBook,
+                        action: CapitalExecutionInstructionAction::LockReserve,
+                        amount: MonetaryAmount {
+                            units: reserve_delta_units,
+                            currency: requested_amount.currency.clone(),
+                        },
+                        description:
+                            "lock incremental reserve required by the selected governed action"
+                                .to_string(),
+                    });
+                }
+                CapitalAllocationDecisionOutcome::Allocate
+            }
+        }
+    };
+
+    let description = request.description.clone().unwrap_or_else(|| {
+        format!(
+            "{:?} live capital allocation for governed receipt `{}`",
+            outcome, governed_receipt.receipt_id
+        )
+    });
+    let allocation_id_input = canonical_json_bytes(&(
+        CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA,
+        &normalized_query,
+        &governed_receipt.receipt_id,
+        &requested_amount,
+        &request.authority_chain,
+        &request.execution_window,
+        &request.rail,
+        &outcome,
+        &instruction_drafts,
+        &description,
+    ))
+    .map_err(|error| TrustHttpError::internal(error.to_string()))?;
+    let allocation_id = format!("cad-{}", sha256_hex(&allocation_id_input));
+
+    Ok(CapitalAllocationDecisionArtifact {
+        schema: CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA.to_string(),
+        allocation_id,
+        issued_at,
+        query: normalized_query,
+        subject_key: governed_receipt
+            .subject_key
+            .clone()
+            .or_else(|| request.query.agent_subject.clone())
+            .ok_or_else(|| {
+                TrustHttpError::bad_request(
+                    "capital allocation requires --agent-subject for subject-scoped capital truth",
+                )
+            })?,
+        governed_receipt_id: governed_receipt.receipt_id.clone(),
+        intent_id: governed_metadata.intent_id.clone(),
+        approval_token_id: governed_metadata
+            .approval
+            .as_ref()
+            .map(|approval| approval.token_id.clone()),
+        capability_id: governed_receipt.capability_id.clone(),
+        tool_server: governed_receipt.tool_server.clone(),
+        tool_name: governed_receipt.tool_name.clone(),
+        requested_amount: requested_amount.clone(),
+        facility_id: facility_source.and_then(|source| source.facility_id.clone()),
+        bond_id: reserve_source
+            .and_then(|source| source.bond_id.clone())
+            .or_else(|| facility_source.and_then(|source| source.bond_id.clone())),
+        source_id: facility_source.map(|source| source.source_id.clone()),
+        source_kind: facility_source.map(|source| source.kind),
+        reserve_source_id: reserve_source.map(|source| source.source_id.clone()),
+        outcome,
+        authority_chain: request.authority_chain.clone(),
+        execution_window: request.execution_window.clone(),
+        rail: request.rail.clone(),
+        current_outstanding_amount: current_outstanding_amount.clone(),
+        projected_outstanding_amount: current_outstanding_amount,
+        current_reserve_amount: amount_if_nonzero(
+            current_reserve_units,
+            &requested_amount.currency,
+        ),
+        required_reserve_amount: amount_if_nonzero(
+            required_reserve_units,
+            &requested_amount.currency,
+        ),
+        reserve_delta_amount: amount_if_nonzero(reserve_delta_units, &requested_amount.currency),
+        utilization_ceiling_amount: amount_if_nonzero(
+            utilization_ceiling_units,
+            &requested_amount.currency,
+        ),
+        concentration_cap_amount: amount_if_nonzero(
+            concentration_cap_units,
+            &requested_amount.currency,
+        ),
+        instruction_drafts,
+        support_boundary: CapitalAllocationDecisionSupportBoundary::default(),
+        findings,
+        evidence_refs,
+        description,
+    })
+}
+
+fn build_capital_book_report_from_store(
+    receipt_store: &SqliteReceiptStore,
+    query: &CapitalBookQuery,
+) -> Result<CapitalBookReport, TrustHttpError> {
+    let normalized = query.normalized();
+    normalized.validate().map_err(TrustHttpError::bad_request)?;
+    let subject_key = normalized
+        .agent_subject
+        .clone()
+        .ok_or_else(|| TrustHttpError::bad_request("capital book requires --agent-subject"))?;
+
+    let exposure = build_exposure_ledger_report(receipt_store, &normalized.exposure_query())?;
+    for receipt in &exposure.receipts {
+        let carries_monetary_state = receipt.governed_max_amount.is_some()
+            || receipt.financial_amount.is_some()
+            || receipt.reserve_required_amount.is_some()
+            || receipt.provisional_loss_amount.is_some()
+            || receipt.recovered_amount.is_some();
+        if !carries_monetary_state {
+            continue;
+        }
+        let Some(receipt_subject) = receipt.subject_key.as_deref() else {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book receipt `{}` is missing counterparty subject attribution",
+                    receipt.receipt_id
+                ),
+            ));
+        };
+        if receipt_subject != subject_key {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book receipt `{}` resolved subject `{}` but query subject is `{}`",
+                    receipt.receipt_id, receipt_subject, subject_key
+                ),
+            ));
+        }
+    }
+
+    let facility_report = receipt_store
+        .query_credit_facilities(&normalized.facility_query())
+        .map_err(trust_http_error_from_receipt_store)?;
+    let current_facility_rows = facility_report
+        .facilities
+        .iter()
+        .filter(|row| row.superseded_by_facility_id.is_none())
+        .collect::<Vec<_>>();
+    let active_granted_facilities = current_facility_rows
+        .iter()
+        .copied()
+        .filter(|row| {
+            row.lifecycle_state == CreditFacilityLifecycleState::Active
+                && row.facility.body.report.disposition == CreditFacilityDisposition::Grant
+        })
+        .collect::<Vec<_>>();
+    if active_granted_facilities.len() > 1 {
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital book requires one current granted facility because ARC will not blend live source-of-funds attribution across multiple active facilities",
+        ));
+    }
+    let current_facility_row = active_granted_facilities.into_iter().next();
+    let current_facility_terms = current_facility_row.and_then(|row| {
+        row.facility
+            .body
+            .report
+            .terms
+            .as_ref()
+            .map(|terms| (row, terms))
+    });
+
+    let bond_report = receipt_store
+        .query_credit_bonds(&normalized.bond_query())
+        .map_err(trust_http_error_from_receipt_store)?;
+    let current_bond_rows = bond_report
+        .bonds
+        .iter()
+        .filter(|row| row.superseded_by_bond_id.is_none())
+        .collect::<Vec<_>>();
+    if current_bond_rows.len() > 1 {
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital book requires one current bond posture because ARC will not blend multiple live reserve books into one deterministic capital source",
+        ));
+    }
+    let current_bond_row = current_bond_rows.into_iter().next();
+    let current_bond_terms = current_bond_row.and_then(|row| {
+        row.bond
+            .body
+            .report
+            .terms
+            .as_ref()
+            .map(|terms| (row, terms))
+    });
+
+    let loss_history = if let Some((bond_row, _)) = current_bond_terms {
+        receipt_store
+            .query_credit_loss_lifecycle(&CreditLossLifecycleListQuery {
+                event_id: None,
+                bond_id: Some(bond_row.bond.body.bond_id.clone()),
+                facility_id: bond_row.bond.body.report.latest_facility_id.clone(),
+                capability_id: normalized.capability_id.clone(),
+                agent_subject: normalized.agent_subject.clone(),
+                tool_server: normalized.tool_server.clone(),
+                tool_name: normalized.tool_name.clone(),
+                event_kind: None,
+                limit: normalized.loss_event_limit,
+            })
+            .map_err(trust_http_error_from_receipt_store)?
+    } else {
+        CreditLossLifecycleListReport {
+            schema: arc_kernel::CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA.to_string(),
+            generated_at: unix_timestamp_now(),
+            query: CreditLossLifecycleListQuery {
+                event_id: None,
+                bond_id: None,
+                facility_id: None,
+                capability_id: normalized.capability_id.clone(),
+                agent_subject: normalized.agent_subject.clone(),
+                tool_server: normalized.tool_server.clone(),
+                tool_name: normalized.tool_name.clone(),
+                event_kind: None,
+                limit: normalized.loss_event_limit,
+            },
+            summary: arc_kernel::CreditLossLifecycleListSummary {
+                matching_events: 0,
+                returned_events: 0,
+                delinquency_events: 0,
+                recovery_events: 0,
+                reserve_release_events: 0,
+                reserve_slash_events: 0,
+                write_off_events: 0,
+            },
+            events: Vec::new(),
+        }
+    };
+
+    let mut currencies = BTreeSet::new();
+    for position in &exposure.positions {
+        currencies.insert(position.currency.clone());
+    }
+    if let Some((_, terms)) = current_facility_terms {
+        currencies.insert(terms.credit_limit.currency.clone());
+    }
+    if let Some((_, terms)) = current_bond_terms {
+        currencies.insert(terms.credit_limit.currency.clone());
+        currencies.insert(terms.collateral_amount.currency.clone());
+        currencies.insert(terms.reserve_requirement_amount.currency.clone());
+        currencies.insert(terms.outstanding_exposure_amount.currency.clone());
+    }
+    for row in &loss_history.events {
+        if let Some(amount) = row.event.body.report.summary.event_amount.as_ref() {
+            currencies.insert(amount.currency.clone());
+        }
+    }
+    if currencies.len() > 1 {
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital book requires one coherent currency because ARC does not auto-net live capital across currencies",
+        ));
+    }
+    let currency = currencies.into_iter().next();
+
+    let has_monetary_activity = exposure.positions.iter().any(|position| {
+        position.governed_max_exposure_units > 0
+            || position.reserved_units > 0
+            || position.settled_units > 0
+            || position.pending_units > 0
+            || position.failed_units > 0
+            || position.provisional_loss_units > 0
+            || position.recovered_units > 0
+    });
+    if has_monetary_activity && current_facility_terms.is_none() {
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital book requires one active granted facility with terms to attribute committed and disbursed funds",
+        ));
+    }
+
+    let exposure_position =
+        match (&currency, exposure.positions.as_slice()) {
+            (Some(_), [position]) => Some(position),
+            (Some(_), []) => None,
+            (Some(_), _) => return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                "capital book requires one coherent exposure position after currency resolution",
+            )),
+            (None, _) => None,
+        };
+
+    if let (Some(book_currency), Some((_, terms))) = (&currency, current_facility_terms) {
+        if &terms.credit_limit.currency != book_currency {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital book facility currency `{}` does not match book currency `{}`",
+                    terms.credit_limit.currency, book_currency
+                ),
+            ));
+        }
+    }
+    if let (Some(book_currency), Some((bond_row, terms))) = (&currency, current_bond_terms) {
+        for amount in [
+            &terms.credit_limit,
+            &terms.collateral_amount,
+            &terms.reserve_requirement_amount,
+            &terms.outstanding_exposure_amount,
+        ] {
+            if &amount.currency != book_currency {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "capital book bond `{}` mixes currency `{}` with book currency `{}`",
+                        bond_row.bond.body.bond_id, amount.currency, book_currency
+                    ),
+                ));
+            }
+        }
+        if let Some((facility_row, _)) = current_facility_terms {
+            if bond_row.bond.body.report.latest_facility_id.as_deref()
+                != Some(facility_row.facility.body.facility_id.as_str())
+            {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "capital book bond `{}` does not resolve to current facility `{}`",
+                        bond_row.bond.body.bond_id, facility_row.facility.body.facility_id
+                    ),
+                ));
+            }
+        }
+    }
+
+    let accounting = if let Some(book_currency) = currency.as_deref() {
+        compute_credit_loss_lifecycle_accounting(book_currency, &loss_history)
+            .map_err(|message| TrustHttpError::new(StatusCode::CONFLICT, message))?
+    } else {
+        CreditLossLifecycleAccountingState {
+            currency: String::new(),
+            delinquent_units: 0,
+            recovered_units: 0,
+            reserve_released_units: 0,
+            reserve_slashed_units: 0,
+            written_off_units: 0,
+        }
+    };
+
+    let mut sources = Vec::new();
+    let mut events = Vec::new();
+    let live_outstanding_units = exposure_position
+        .map(credit_bond_outstanding_units)
+        .unwrap_or(0);
+    let live_reserve_units = current_bond_terms
+        .map(|(_, terms)| {
+            credit_bond_reserve_units(live_outstanding_units, terms.reserve_ratio_bps)
+        })
+        .or_else(|| {
+            current_facility_terms.map(|(_, terms)| {
+                credit_bond_reserve_units(live_outstanding_units, terms.reserve_ratio_bps)
+            })
+        })
+        .unwrap_or(0);
+    if let (Some(book_currency), Some((facility_row, facility_terms))) =
+        (currency.as_deref(), current_facility_terms)
+    {
+        let source_id = capital_book_facility_source_id(&facility_row.facility.body.facility_id);
+        let owner_role = capital_book_owner_role(facility_terms.capital_source);
+        let drawn_units = current_bond_terms
+            .map(|(_, terms)| terms.outstanding_exposure_amount.units)
+            .unwrap_or(0)
+            .max(live_outstanding_units);
+        let disbursed_units = exposure_position.map_or(0, |position| position.settled_units);
+        sources.push(CapitalBookSource {
+            source_id: source_id.clone(),
+            kind: CapitalBookSourceKind::FacilityCommitment,
+            owner_role,
+            counterparty_role: CapitalBookRole::AgentCounterparty,
+            counterparty_id: subject_key.clone(),
+            currency: book_currency.to_string(),
+            jurisdiction: None,
+            capital_source: Some(facility_terms.capital_source),
+            facility_id: Some(facility_row.facility.body.facility_id.clone()),
+            bond_id: current_bond_row.map(|row| row.bond.body.bond_id.clone()),
+            committed_amount: amount_if_nonzero(facility_terms.credit_limit.units, book_currency),
+            held_amount: None,
+            drawn_amount: amount_if_nonzero(drawn_units, book_currency),
+            disbursed_amount: amount_if_nonzero(disbursed_units, book_currency),
+            released_amount: None,
+            repaid_amount: None,
+            impaired_amount: None,
+            description: format!(
+                "current facility `{}` defines the committed source of funds for the subject-scoped capital book",
+                facility_row.facility.body.facility_id
+            ),
+        });
+        events.push(CapitalBookEvent {
+            event_id: format!("commit:{}", facility_row.facility.body.facility_id),
+            kind: CapitalBookEventKind::Commit,
+            occurred_at: facility_row.facility.body.issued_at,
+            source_id: source_id.clone(),
+            owner_role,
+            counterparty_role: CapitalBookRole::AgentCounterparty,
+            counterparty_id: subject_key.clone(),
+            amount: facility_terms.credit_limit.clone(),
+            facility_id: Some(facility_row.facility.body.facility_id.clone()),
+            bond_id: None,
+            loss_event_id: None,
+            receipt_id: None,
+            description: "facility grant committed capital into the live capital book".to_string(),
+            evidence_refs: vec![capital_book_facility_evidence(&facility_row.facility)],
+        });
+        for receipt in &exposure.receipts {
+            let Some(amount) = receipt.financial_amount.as_ref() else {
+                continue;
+            };
+            if amount.currency != book_currency
+                || amount.units == 0
+                || receipt.settlement_status != SettlementStatus::Settled
+            {
+                continue;
+            }
+            events.push(CapitalBookEvent {
+                event_id: format!("disburse:{}", receipt.receipt_id),
+                kind: CapitalBookEventKind::Disburse,
+                occurred_at: receipt.timestamp,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: amount.clone(),
+                facility_id: Some(facility_row.facility.body.facility_id.clone()),
+                bond_id: current_bond_row.map(|row| row.bond.body.bond_id.clone()),
+                loss_event_id: None,
+                receipt_id: Some(receipt.receipt_id.clone()),
+                description:
+                    "settled governed receipt disbursed capital against the committed source"
+                        .to_string(),
+                evidence_refs: capital_book_receipt_evidence(receipt),
+            });
+        }
+    }
+
+    if let (Some(book_currency), Some((bond_row, bond_terms))) =
+        (currency.as_deref(), current_bond_terms)
+    {
+        let owner_role = current_facility_terms
+            .map(|(_, terms)| capital_book_owner_role(terms.capital_source))
+            .unwrap_or_else(|| capital_book_owner_role(bond_terms.capital_source));
+        let source_id = capital_book_bond_source_id(&bond_row.bond.body.bond_id);
+        let drawn_units = bond_terms
+            .outstanding_exposure_amount
+            .units
+            .max(live_outstanding_units);
+        let held_units = match bond_row.bond.body.report.disposition {
+            CreditBondDisposition::Lock | CreditBondDisposition::Hold => bond_terms
+                .reserve_requirement_amount
+                .units
+                .max(live_reserve_units),
+            CreditBondDisposition::Release | CreditBondDisposition::Impair => 0,
+        };
+        let released_units = if accounting.reserve_released_units > 0 {
+            accounting.reserve_released_units
+        } else if bond_row.bond.body.report.disposition == CreditBondDisposition::Release {
+            bond_terms.reserve_requirement_amount.units
+        } else {
+            0
+        };
+        let repaid_units = accounting.recovered_units;
+        let impaired_units = if accounting.delinquent_units > 0 {
+            accounting
+                .delinquent_units
+                .saturating_sub(accounting.recovered_units)
+        } else if bond_row.bond.body.report.disposition == CreditBondDisposition::Impair {
+            bond_terms
+                .outstanding_exposure_amount
+                .units
+                .max(exposure_position.map_or(0, |position| {
+                    position
+                        .provisional_loss_units
+                        .saturating_sub(position.recovered_units)
+                }))
+        } else {
+            0
+        };
+        sources.push(CapitalBookSource {
+            source_id: source_id.clone(),
+            kind: CapitalBookSourceKind::ReserveBook,
+            owner_role,
+            counterparty_role: CapitalBookRole::AgentCounterparty,
+            counterparty_id: subject_key.clone(),
+            currency: book_currency.to_string(),
+            jurisdiction: None,
+            capital_source: Some(bond_terms.capital_source),
+            facility_id: Some(bond_terms.facility_id.clone()),
+            bond_id: Some(bond_row.bond.body.bond_id.clone()),
+            committed_amount: None,
+            held_amount: amount_if_nonzero(held_units, book_currency),
+            drawn_amount: None,
+            disbursed_amount: None,
+            released_amount: amount_if_nonzero(released_units, book_currency),
+            repaid_amount: amount_if_nonzero(repaid_units, book_currency),
+            impaired_amount: amount_if_nonzero(impaired_units, book_currency),
+            description: format!(
+                "bond `{}` preserves reserve and impairment state over the current source of funds",
+                bond_row.bond.body.bond_id
+            ),
+        });
+        if held_units > 0 {
+            events.push(CapitalBookEvent {
+                event_id: format!("hold:{}", bond_row.bond.body.bond_id),
+                kind: CapitalBookEventKind::Hold,
+                occurred_at: bond_row.bond.body.issued_at,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: MonetaryAmount {
+                    units: held_units,
+                    currency: book_currency.to_string(),
+                },
+                facility_id: Some(bond_terms.facility_id.clone()),
+                bond_id: Some(bond_row.bond.body.bond_id.clone()),
+                loss_event_id: None,
+                receipt_id: None,
+                description: "bond posture held reserve against the committed capital source"
+                    .to_string(),
+                evidence_refs: vec![capital_book_bond_evidence(&bond_row.bond)],
+            });
+        }
+        if drawn_units > 0 {
+            events.push(CapitalBookEvent {
+                event_id: format!("draw:{}", bond_row.bond.body.bond_id),
+                kind: CapitalBookEventKind::Draw,
+                occurred_at: bond_row.bond.body.issued_at,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: MonetaryAmount {
+                    units: drawn_units,
+                    currency: book_currency.to_string(),
+                },
+                facility_id: Some(bond_terms.facility_id.clone()),
+                bond_id: Some(bond_row.bond.body.bond_id.clone()),
+                loss_event_id: None,
+                receipt_id: None,
+                description: "bond posture drew against the live facility commitment".to_string(),
+                evidence_refs: vec![capital_book_bond_evidence(&bond_row.bond)],
+            });
+        }
+        let lifecycle_has_release = loss_history
+            .events
+            .iter()
+            .any(|row| row.event.body.event_kind == CreditLossLifecycleEventKind::ReserveRelease);
+        let lifecycle_has_impairment = loss_history.events.iter().any(|row| {
+            matches!(
+                row.event.body.event_kind,
+                CreditLossLifecycleEventKind::Delinquency
+                    | CreditLossLifecycleEventKind::ReserveSlash
+                    | CreditLossLifecycleEventKind::WriteOff
+            )
+        });
+        if released_units > 0 && !lifecycle_has_release {
+            events.push(CapitalBookEvent {
+                event_id: format!("release:{}", bond_row.bond.body.bond_id),
+                kind: CapitalBookEventKind::Release,
+                occurred_at: bond_row.bond.body.issued_at,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: MonetaryAmount {
+                    units: released_units,
+                    currency: book_currency.to_string(),
+                },
+                facility_id: Some(bond_terms.facility_id.clone()),
+                bond_id: Some(bond_row.bond.body.bond_id.clone()),
+                loss_event_id: None,
+                receipt_id: None,
+                description: "bond posture released previously held reserve state".to_string(),
+                evidence_refs: vec![capital_book_bond_evidence(&bond_row.bond)],
+            });
+        }
+        if impaired_units > 0 && !lifecycle_has_impairment {
+            events.push(CapitalBookEvent {
+                event_id: format!("impair:{}", bond_row.bond.body.bond_id),
+                kind: CapitalBookEventKind::Impair,
+                occurred_at: bond_row.bond.body.issued_at,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: MonetaryAmount {
+                    units: impaired_units,
+                    currency: book_currency.to_string(),
+                },
+                facility_id: Some(bond_terms.facility_id.clone()),
+                bond_id: Some(bond_row.bond.body.bond_id.clone()),
+                loss_event_id: None,
+                receipt_id: None,
+                description: "bond posture impaired capital against outstanding loss state"
+                    .to_string(),
+                evidence_refs: vec![capital_book_bond_evidence(&bond_row.bond)],
+            });
+        }
+        for row in &loss_history.events {
+            let Some(amount) = row.event.body.report.summary.event_amount.as_ref() else {
+                continue;
+            };
+            if amount.currency != book_currency || amount.units == 0 {
+                continue;
+            }
+            let (kind, description) = match row.event.body.event_kind {
+                CreditLossLifecycleEventKind::Delinquency => (
+                    CapitalBookEventKind::Impair,
+                    "loss lifecycle recorded delinquent impairment against the reserve book",
+                ),
+                CreditLossLifecycleEventKind::Recovery => (
+                    CapitalBookEventKind::Repay,
+                    "loss lifecycle recorded repayment against previously impaired capital",
+                ),
+                CreditLossLifecycleEventKind::ReserveRelease => (
+                    CapitalBookEventKind::Release,
+                    "loss lifecycle released held reserve after delinquency cleared",
+                ),
+                CreditLossLifecycleEventKind::ReserveSlash => (
+                    CapitalBookEventKind::Disburse,
+                    "loss lifecycle slashed reserve against outstanding delinquent exposure",
+                ),
+                CreditLossLifecycleEventKind::WriteOff => (
+                    CapitalBookEventKind::Impair,
+                    "loss lifecycle wrote off impaired capital against the reserve book",
+                ),
+            };
+            events.push(CapitalBookEvent {
+                event_id: format!("capital-event:{}", row.event.body.event_id),
+                kind,
+                occurred_at: row.event.body.issued_at,
+                source_id: source_id.clone(),
+                owner_role,
+                counterparty_role: CapitalBookRole::AgentCounterparty,
+                counterparty_id: subject_key.clone(),
+                amount: amount.clone(),
+                facility_id: row.event.body.report.summary.facility_id.clone(),
+                bond_id: Some(row.event.body.bond_id.clone()),
+                loss_event_id: Some(row.event.body.event_id.clone()),
+                receipt_id: None,
+                description: description.to_string(),
+                evidence_refs: vec![
+                    capital_book_loss_event_evidence(&row.event),
+                    capital_book_bond_evidence(&bond_row.bond),
+                ],
+            });
+        }
+    }
+
+    events.sort_by(|left, right| {
+        left.occurred_at
+            .cmp(&right.occurred_at)
+            .then_with(|| left.event_id.cmp(&right.event_id))
+    });
+
+    let summary_currencies = currency.into_iter().collect::<Vec<_>>();
+    Ok(CapitalBookReport {
+        schema: CAPITAL_BOOK_REPORT_SCHEMA.to_string(),
+        generated_at: unix_timestamp_now(),
+        query: normalized,
+        subject_key,
+        support_boundary: CapitalBookSupportBoundary::default(),
+        summary: CapitalBookSummary {
+            matching_receipts: exposure.summary.matching_receipts,
+            returned_receipts: exposure.receipts.len() as u64,
+            matching_facilities: facility_report.summary.matching_facilities,
+            returned_facilities: facility_report.facilities.len() as u64,
+            matching_bonds: bond_report.summary.matching_bonds,
+            returned_bonds: bond_report.bonds.len() as u64,
+            matching_loss_events: loss_history.summary.matching_events,
+            returned_loss_events: loss_history.events.len() as u64,
+            currencies: summary_currencies.clone(),
+            mixed_currency_book: summary_currencies.len() > 1,
+            funding_sources: sources.len() as u64,
+            ledger_events: events.len() as u64,
+            truncated_receipts: exposure.summary.truncated_receipts,
+            truncated_facilities: facility_report.summary.matching_facilities
+                > facility_report.facilities.len() as u64,
+            truncated_bonds: bond_report.summary.matching_bonds > bond_report.bonds.len() as u64,
+            truncated_loss_events: loss_history.summary.matching_events
+                > loss_history.events.len() as u64,
+        },
+        sources,
+        events,
+    })
+}
+
+fn build_capital_execution_instruction_artifact_from_store(
+    receipt_store: &SqliteReceiptStore,
+    request: &CapitalExecutionInstructionRequest,
+) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
+    let issued_at = unix_timestamp_now();
+    validate_capital_execution_instruction_request(request, issued_at)?;
+
+    let capital_book = build_capital_book_report_from_store(receipt_store, &request.query)?;
+    let source = capital_book
+        .sources
+        .iter()
+        .find(|source| source.kind == request.source_kind)
+        .ok_or_else(|| {
+            TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital instruction requires a current {:?} source in the capital book",
+                    request.source_kind
+                ),
+            )
+        })?;
+
+    match request.action {
+        CapitalExecutionInstructionAction::TransferFunds
+            if request.source_kind != CapitalBookSourceKind::FacilityCommitment =>
+        {
+            return Err(TrustHttpError::bad_request(
+                "transfer_funds instructions require sourceKind=facility_commitment",
+            ));
+        }
+        CapitalExecutionInstructionAction::LockReserve
+        | CapitalExecutionInstructionAction::HoldReserve
+        | CapitalExecutionInstructionAction::ReleaseReserve
+            if request.source_kind != CapitalBookSourceKind::ReserveBook =>
+        {
+            return Err(TrustHttpError::bad_request(
+                "reserve instructions require sourceKind=reserve_book",
+            ));
+        }
+        _ => {}
+    }
+
+    let amount = match request.action {
+        CapitalExecutionInstructionAction::CancelInstruction => {
+            if request.amount.is_some() {
+                return Err(TrustHttpError::bad_request(
+                    "cancel_instruction does not accept an amount",
+                ));
+            }
+            if request.related_instruction_id.is_none() {
+                return Err(TrustHttpError::bad_request(
+                    "cancel_instruction requires relatedInstructionId",
+                ));
+            }
+            if request.observed_execution.is_some() {
+                return Err(TrustHttpError::bad_request(
+                    "cancel_instruction cannot carry observedExecution movement data",
+                ));
+            }
+            None
+        }
+        _ => {
+            let amount = request.amount.clone().ok_or_else(|| {
+                TrustHttpError::bad_request(
+                    "capital instructions require amount for non-cancel actions",
+                )
+            })?;
+            if amount.units == 0 {
+                return Err(TrustHttpError::bad_request(
+                    "capital instruction amount must be greater than zero",
+                ));
+            }
+            if amount.currency != source.currency {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "capital instruction amount currency `{}` does not match source currency `{}`",
+                        amount.currency, source.currency
+                    ),
+                ));
+            }
+            let available_amount = capital_instruction_available_amount(source, request.action)?;
+            if amount.units > available_amount.units {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "capital instruction amount {} exceeds available source amount {}",
+                        amount.units, available_amount.units
+                    ),
+                ));
+            }
+            Some(amount)
+        }
+    };
+
+    let owner_role = capital_execution_role_from_book_role(source.owner_role);
+    let counterparty_role = capital_execution_role_from_book_role(source.counterparty_role);
+    ensure_capital_execution_owner_authority(&request.authority_chain, owner_role)?;
+
+    let reconciled_state = if let Some(observed_execution) = &request.observed_execution {
+        let intended_amount = amount.as_ref().ok_or_else(|| {
+            TrustHttpError::bad_request(
+                "observedExecution is only valid when the instruction carries an intended amount",
+            )
+        })?;
+        if &observed_execution.amount != intended_amount {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                "capital instruction observedExecution amount does not match intended amount",
+            ));
+        }
+        if observed_execution.observed_at < request.execution_window.not_before
+            || observed_execution.observed_at > request.execution_window.not_after
+        {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                "capital instruction observedExecution timestamp falls outside the execution window",
+            ));
+        }
+        CapitalExecutionReconciledState::Matched
+    } else {
+        CapitalExecutionReconciledState::NotObserved
+    };
+
+    let intended_state = if request.action == CapitalExecutionInstructionAction::CancelInstruction {
+        CapitalExecutionIntendedState::CancellationPending
+    } else {
+        CapitalExecutionIntendedState::PendingExecution
+    };
+
+    let mut evidence_refs = Vec::new();
+    if let Some(facility_id) = source.facility_id.as_ref() {
+        push_unique_capital_book_evidence(
+            &mut evidence_refs,
+            CapitalBookEvidenceReference {
+                kind: CapitalBookEvidenceKind::CreditFacility,
+                reference_id: facility_id.clone(),
+                observed_at: Some(capital_book.generated_at),
+                locator: Some(format!("credit-facility:{facility_id}")),
+            },
+        );
+    }
+    if let Some(bond_id) = source.bond_id.as_ref() {
+        push_unique_capital_book_evidence(
+            &mut evidence_refs,
+            CapitalBookEvidenceReference {
+                kind: CapitalBookEvidenceKind::CreditBond,
+                reference_id: bond_id.clone(),
+                observed_at: Some(capital_book.generated_at),
+                locator: Some(format!("credit-bond:{bond_id}")),
+            },
+        );
+    }
+    for event in capital_book
+        .events
+        .iter()
+        .filter(|event| event.source_id == source.source_id)
+    {
+        for evidence in &event.evidence_refs {
+            push_unique_capital_book_evidence(&mut evidence_refs, evidence.clone());
+        }
+    }
+
+    let instruction_id_input = canonical_json_bytes(&(
+        CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
+        &capital_book.query,
+        &capital_book.subject_key,
+        &source.source_id,
+        request.source_kind,
+        request.action,
+        &amount,
+        &request.authority_chain,
+        &request.execution_window,
+        &request.rail,
+        &request.related_instruction_id,
+        &request.observed_execution,
+        &request.description,
+    ))
+    .map_err(|error| TrustHttpError::internal(error.to_string()))?;
+    let instruction_id = format!("cei-{}", sha256_hex(&instruction_id_input));
+
+    let description = request.description.clone().unwrap_or_else(|| {
+        format!(
+            "{:?} instruction over source `{}` for subject `{}`",
+            request.action, source.source_id, capital_book.subject_key
+        )
+    });
+
+    Ok(CapitalExecutionInstructionArtifact {
+        schema: CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
+        instruction_id,
+        issued_at,
+        query: capital_book.query,
+        subject_key: capital_book.subject_key,
+        source_id: source.source_id.clone(),
+        source_kind: source.kind,
+        action: request.action,
+        owner_role,
+        counterparty_role,
+        counterparty_id: source.counterparty_id.clone(),
+        amount,
+        authority_chain: request.authority_chain.clone(),
+        execution_window: request.execution_window.clone(),
+        rail: request.rail.clone(),
+        intended_state,
+        reconciled_state,
+        related_instruction_id: request.related_instruction_id.clone(),
+        observed_execution: request.observed_execution.clone(),
+        support_boundary: CapitalExecutionInstructionSupportBoundary::default(),
+        evidence_refs,
+        description,
+    })
+}
+
+fn validate_capital_execution_instruction_request(
+    request: &CapitalExecutionInstructionRequest,
+    issued_at: u64,
+) -> Result<(), TrustHttpError> {
+    request
+        .query
+        .validate()
+        .map_err(TrustHttpError::bad_request)?;
+    validate_capital_execution_envelope(
+        &request.authority_chain,
+        &request.execution_window,
+        &request.rail,
+        issued_at,
+    )
+}
+
+fn validate_capital_execution_envelope(
+    authority_chain: &[CapitalExecutionAuthorityStep],
+    execution_window: &CapitalExecutionWindow,
+    rail: &CapitalExecutionRail,
+    issued_at: u64,
+) -> Result<(), TrustHttpError> {
+    if authority_chain.is_empty() {
+        return Err(TrustHttpError::bad_request(
+            "capital execution requires at least one authorityChain step",
+        ));
+    }
+    if rail.rail_id.trim().is_empty() {
+        return Err(TrustHttpError::bad_request(
+            "capital execution requires rail.railId",
+        ));
+    }
+    if rail.custody_provider_id.trim().is_empty() {
+        return Err(TrustHttpError::bad_request(
+            "capital execution requires rail.custodyProviderId",
+        ));
+    }
+    if execution_window.not_before > execution_window.not_after {
+        return Err(TrustHttpError::bad_request(
+            "capital execution executionWindow requires notBefore <= notAfter",
+        ));
+    }
+    if execution_window.not_after < issued_at {
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital execution executionWindow is already expired",
+        ));
+    }
+    for step in authority_chain {
+        if step.principal_id.trim().is_empty() {
+            return Err(TrustHttpError::bad_request(
+                "capital execution authorityChain principalId cannot be empty",
+            ));
+        }
+        if step.approved_at > step.expires_at {
+            return Err(TrustHttpError::bad_request(
+                "capital execution authorityChain requires approvedAt <= expiresAt",
+            ));
+        }
+        if step.expires_at < issued_at {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital execution authority step `{}` is stale at issuance time",
+                    step.principal_id
+                ),
+            ));
+        }
+        if step.expires_at < execution_window.not_after {
+            return Err(TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "capital execution authority step `{}` expires before the execution window closes",
+                    step.principal_id
+                ),
+            ));
+        }
+    }
+    ensure_capital_execution_custodian_authority(authority_chain, rail)?;
+    Ok(())
+}
+
+fn ensure_capital_execution_owner_authority(
+    authority_chain: &[CapitalExecutionAuthorityStep],
+    owner_role: CapitalExecutionRole,
+) -> Result<(), TrustHttpError> {
+    if authority_chain.iter().any(|step| step.role == owner_role) {
+        Ok(())
+    } else {
+        Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital execution authorityChain is missing source-owner approval",
+        ))
+    }
+}
+
+fn ensure_capital_execution_custodian_authority(
+    authority_chain: &[CapitalExecutionAuthorityStep],
+    rail: &CapitalExecutionRail,
+) -> Result<(), TrustHttpError> {
+    if authority_chain.iter().any(|step| {
+        step.role == CapitalExecutionRole::Custodian
+            && step.principal_id == rail.custody_provider_id
+    }) {
+        Ok(())
+    } else {
+        Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital execution authorityChain is missing the custody-provider execution step",
+        ))
+    }
+}
+
+fn select_capital_allocation_receipt<'a>(
+    receipts: &'a [BehavioralFeedReceiptRow],
+    receipt_id: Option<&str>,
+) -> Result<&'a BehavioralFeedReceiptRow, TrustHttpError> {
+    let actionable = |row: &&BehavioralFeedReceiptRow| {
+        row.action_required
+            && matches!(row.decision, Decision::Allow)
+            && row
+                .governed
+                .as_ref()
+                .and_then(|governed| governed.max_amount.as_ref())
+                .is_some()
+    };
+
+    if let Some(receipt_id) = receipt_id {
+        let row = receipts
+            .iter()
+            .find(|row| row.receipt_id == receipt_id)
+            .ok_or_else(|| {
+                TrustHttpError::new(
+                    StatusCode::NOT_FOUND,
+                    format!("capital allocation receipt `{receipt_id}` not found"),
+                )
+            })?;
+        if actionable(&row) {
+            return Ok(row);
+        }
+        return Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            format!(
+                "capital allocation receipt `{receipt_id}` is not an approved actionable governed receipt with max_amount"
+            ),
+        ));
+    }
+
+    let actionable_rows = receipts.iter().filter(actionable).collect::<Vec<_>>();
+    match actionable_rows.as_slice() {
+        [] => Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital allocation requires one approved actionable governed receipt with max_amount",
+        )),
+        [row] => Ok(*row),
+        _ => Err(TrustHttpError::new(
+            StatusCode::CONFLICT,
+            "capital allocation matched multiple approved actionable governed receipts; narrow the query or set receiptId",
+        )),
+    }
+}
+
+fn capital_allocation_ceiling_units(units: u64, ceiling_bps: u16) -> u64 {
+    if units == 0 || ceiling_bps == 0 {
+        0
+    } else {
+        (((units as u128) * (ceiling_bps as u128)) / 10_000_u128).min(u64::MAX as u128) as u64
+    }
+}
+
+fn capital_book_evidence_from_exposure_refs(
+    refs: &[ExposureLedgerEvidenceReference],
+) -> Vec<CapitalBookEvidenceReference> {
+    refs.iter()
+        .filter_map(|reference| {
+            let kind = match reference.kind {
+                ExposureLedgerEvidenceKind::Receipt => CapitalBookEvidenceKind::Receipt,
+                ExposureLedgerEvidenceKind::SettlementReconciliation => {
+                    CapitalBookEvidenceKind::SettlementReconciliation
+                }
+                ExposureLedgerEvidenceKind::MeteredBillingReconciliation
+                | ExposureLedgerEvidenceKind::UnderwritingDecision => return None,
+            };
+            Some(CapitalBookEvidenceReference {
+                kind,
+                reference_id: reference.reference_id.clone(),
+                observed_at: reference.observed_at,
+                locator: reference.locator.clone(),
+            })
+        })
+        .collect()
+}
+
+fn capital_instruction_available_amount(
+    source: &CapitalBookSource,
+    action: CapitalExecutionInstructionAction,
+) -> Result<MonetaryAmount, TrustHttpError> {
+    let amount = match action {
+        CapitalExecutionInstructionAction::TransferFunds => source.committed_amount.clone(),
+        CapitalExecutionInstructionAction::LockReserve
+        | CapitalExecutionInstructionAction::HoldReserve
+        | CapitalExecutionInstructionAction::ReleaseReserve => source.held_amount.clone(),
+        CapitalExecutionInstructionAction::CancelInstruction => None,
+    }
+    .ok_or_else(|| {
+        TrustHttpError::new(
+            StatusCode::CONFLICT,
+            format!(
+                "capital instruction action {:?} does not have a live source amount to bind against",
+                action
+            ),
+        )
+    })?;
+    Ok(amount)
+}
+
+fn capital_execution_role_from_book_role(role: CapitalBookRole) -> CapitalExecutionRole {
+    match role {
+        CapitalBookRole::OperatorTreasury => CapitalExecutionRole::OperatorTreasury,
+        CapitalBookRole::ExternalCapitalProvider => CapitalExecutionRole::ExternalCapitalProvider,
+        CapitalBookRole::AgentCounterparty => CapitalExecutionRole::AgentCounterparty,
+    }
+}
+
+fn push_unique_capital_book_evidence(
+    refs: &mut Vec<CapitalBookEvidenceReference>,
+    evidence: CapitalBookEvidenceReference,
+) {
+    if !refs.contains(&evidence) {
+        refs.push(evidence);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn build_credit_facility_report(
     receipt_db_path: &Path,
@@ -10533,13 +13607,13 @@ pub fn issue_signed_credit_loss_lifecycle(
     receipt_db_path: &Path,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
-    query: &CreditLossLifecycleQuery,
+    request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, CliError> {
     issue_signed_credit_loss_lifecycle_detailed(
         receipt_db_path,
         authority_seed_path,
         authority_db_path,
-        query,
+        request,
     )
     .map_err(CliError::from)
 }
@@ -10839,6 +13913,62 @@ pub fn issue_signed_liability_placement(
     Ok(signed)
 }
 
+pub fn issue_signed_liability_pricing_authority(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityPricingAuthorityIssueRequest,
+) -> Result<SignedLiabilityPricingAuthority, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let resolution = receipt_store
+        .resolve_liability_provider(&LiabilityProviderResolutionQuery {
+            provider_id: request
+                .quote_request
+                .body
+                .provider_policy
+                .provider_id
+                .clone(),
+            jurisdiction: request
+                .quote_request
+                .body
+                .provider_policy
+                .jurisdiction
+                .clone(),
+            coverage_class: request.quote_request.body.provider_policy.coverage_class,
+            currency: request.quote_request.body.provider_policy.currency.clone(),
+        })
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    if resolution.provider.body.provider_record_id
+        != request
+            .quote_request
+            .body
+            .provider_policy
+            .provider_record_id
+    {
+        return Err(CliError::Other(format!(
+            "liability quote request `{}` references stale provider record `{}`",
+            request.quote_request.body.quote_request_id,
+            request
+                .quote_request
+                .body
+                .provider_policy
+                .provider_record_id
+        )));
+    }
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let artifact = build_liability_pricing_authority_artifact(request, issued_at)?;
+    let signed = SignedLiabilityPricingAuthority::sign(artifact, &keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign liability pricing authority artifact: {error}"
+        ))
+    })?;
+    receipt_store
+        .record_liability_pricing_authority(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
 pub fn issue_signed_liability_bound_coverage(
     receipt_db_path: &Path,
     authority_seed_path: Option<&Path>,
@@ -10935,6 +14065,199 @@ pub fn issue_signed_liability_bound_coverage(
     Ok(signed)
 }
 
+pub fn issue_signed_liability_auto_bind(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityAutoBindIssueRequest,
+) -> Result<SignedLiabilityAutoBindDecision, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let resolution = receipt_store
+        .resolve_liability_provider(&LiabilityProviderResolutionQuery {
+            provider_id: request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .provider_policy
+                .provider_id
+                .clone(),
+            jurisdiction: request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .provider_policy
+                .jurisdiction
+                .clone(),
+            coverage_class: request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .provider_policy
+                .coverage_class,
+            currency: request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .provider_policy
+                .currency
+                .clone(),
+        })
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    if resolution.provider.body.provider_record_id
+        != request
+            .quote_response
+            .body
+            .quote_request
+            .body
+            .provider_policy
+            .provider_record_id
+    {
+        return Err(CliError::Other(format!(
+            "liability quote request `{}` references stale provider record `{}`",
+            request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .quote_request_id,
+            request
+                .quote_response
+                .body
+                .quote_request
+                .body
+                .provider_policy
+                .provider_record_id
+        )));
+    }
+    if request.authority.body.expires_at <= unix_timestamp_now() {
+        return Err(CliError::Other(format!(
+            "liability pricing authority `{}` is stale",
+            request.authority.body.authority_id
+        )));
+    }
+    let quoted_terms = request
+        .quote_response
+        .body
+        .quoted_terms
+        .as_ref()
+        .ok_or_else(|| {
+            CliError::Other("liability auto-bind requires a quoted quote response".to_string())
+        })?;
+    if quoted_terms.expires_at <= unix_timestamp_now() {
+        return Err(CliError::Other(format!(
+            "liability quote response `{}` is stale",
+            request.quote_response.body.quote_response_id
+        )));
+    }
+    if !request.authority.body.auto_bind_enabled {
+        return Err(CliError::Other(format!(
+            "liability pricing authority `{}` does not permit automatic binding",
+            request.authority.body.authority_id
+        )));
+    }
+    if request
+        .quote_response
+        .body
+        .quote_request
+        .body
+        .quote_request_id
+        != request.authority.body.quote_request.body.quote_request_id
+    {
+        return Err(CliError::Other(
+            "liability auto-bind quote response must match the delegated pricing authority"
+                .to_string(),
+        ));
+    }
+    if quoted_terms.quoted_coverage_amount.units > request.authority.body.max_coverage_amount.units
+    {
+        return Err(CliError::Other(
+            "liability auto-bind cannot be issued because quoted coverage exceeds pricing authority ceiling"
+                .to_string(),
+        ));
+    }
+    if quoted_terms.quoted_premium_amount.units > request.authority.body.max_premium_amount.units {
+        return Err(CliError::Other(
+            "liability auto-bind cannot be issued because quoted premium exceeds pricing authority ceiling"
+                .to_string(),
+        ));
+    }
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let placement_request = LiabilityPlacementIssueRequest {
+        quote_response: request.quote_response.clone(),
+        selected_coverage_amount: quoted_terms.quoted_coverage_amount.clone(),
+        selected_premium_amount: quoted_terms.quoted_premium_amount.clone(),
+        effective_from: request
+            .quote_response
+            .body
+            .quote_request
+            .body
+            .requested_effective_from,
+        effective_until: request
+            .quote_response
+            .body
+            .quote_request
+            .body
+            .requested_effective_until,
+        placement_ref: request.placement_ref.clone(),
+        notes: request.notes.clone(),
+    };
+    let placement_artifact = build_liability_placement_artifact(&placement_request, issued_at)?;
+    let signed_placement =
+        SignedLiabilityPlacement::sign(placement_artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability placement artifact: {error}"
+            ))
+        })?;
+    let bound_request = LiabilityBoundCoverageIssueRequest {
+        placement: signed_placement.clone(),
+        policy_number: request.policy_number.clone(),
+        carrier_reference: request.carrier_reference.clone(),
+        bound_at: Some(issued_at),
+        effective_from: request
+            .quote_response
+            .body
+            .quote_request
+            .body
+            .requested_effective_from,
+        effective_until: request
+            .quote_response
+            .body
+            .quote_request
+            .body
+            .requested_effective_until,
+        coverage_amount: quoted_terms.quoted_coverage_amount.clone(),
+        premium_amount: quoted_terms.quoted_premium_amount.clone(),
+    };
+    let bound_artifact = build_liability_bound_coverage_artifact(&bound_request, issued_at)?;
+    let signed_bound =
+        SignedLiabilityBoundCoverage::sign(bound_artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability bound coverage artifact: {error}"
+            ))
+        })?;
+    let decision_artifact = build_liability_auto_bind_decision_artifact(
+        request,
+        issued_at,
+        signed_placement,
+        signed_bound,
+    )?;
+    let signed =
+        SignedLiabilityAutoBindDecision::sign(decision_artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability auto-bind decision artifact: {error}"
+            ))
+        })?;
+    receipt_store
+        .record_liability_auto_bind_decision(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
 pub fn list_liability_market_workflows(
     receipt_db_path: &Path,
     query: &LiabilityMarketWorkflowQuery,
@@ -11025,6 +14348,93 @@ pub fn issue_signed_liability_claim_adjudication(
     })?;
     receipt_store
         .record_liability_claim_adjudication(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
+pub fn issue_signed_liability_claim_payout_instruction(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityClaimPayoutInstructionIssueRequest,
+) -> Result<SignedLiabilityClaimPayoutInstruction, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let artifact = build_liability_claim_payout_instruction_artifact(request, issued_at)?;
+    let signed =
+        SignedLiabilityClaimPayoutInstruction::sign(artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability claim payout instruction artifact: {error}"
+            ))
+        })?;
+    receipt_store
+        .record_liability_claim_payout_instruction(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
+pub fn issue_signed_liability_claim_payout_receipt(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityClaimPayoutReceiptIssueRequest,
+) -> Result<SignedLiabilityClaimPayoutReceipt, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let artifact = build_liability_claim_payout_receipt_artifact(request, issued_at)?;
+    let signed = SignedLiabilityClaimPayoutReceipt::sign(artifact, &keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign liability claim payout receipt artifact: {error}"
+        ))
+    })?;
+    receipt_store
+        .record_liability_claim_payout_receipt(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
+pub fn issue_signed_liability_claim_settlement_instruction(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityClaimSettlementInstructionIssueRequest,
+) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let artifact = build_liability_claim_settlement_instruction_artifact(request, issued_at)?;
+    let signed =
+        SignedLiabilityClaimSettlementInstruction::sign(artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability claim settlement instruction artifact: {error}"
+            ))
+        })?;
+    receipt_store
+        .record_liability_claim_settlement_instruction(&signed)
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    Ok(signed)
+}
+
+pub fn issue_signed_liability_claim_settlement_receipt(
+    receipt_db_path: &Path,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    request: &LiabilityClaimSettlementReceiptIssueRequest,
+) -> Result<SignedLiabilityClaimSettlementReceipt, CliError> {
+    let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
+    let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
+    let issued_at = unix_timestamp_now();
+    let artifact = build_liability_claim_settlement_receipt_artifact(request, issued_at)?;
+    let signed =
+        SignedLiabilityClaimSettlementReceipt::sign(artifact, &keypair).map_err(|error| {
+            CliError::Other(format!(
+                "failed to sign liability claim settlement receipt artifact: {error}"
+            ))
+        })?;
+    receipt_store
+        .record_liability_claim_settlement_receipt(&signed)
         .map_err(|error| CliError::Other(error.to_string()))?;
     Ok(signed)
 }
@@ -11128,6 +14538,47 @@ fn build_liability_quote_response_artifact(
     Ok(artifact)
 }
 
+fn build_liability_pricing_authority_artifact(
+    request: &LiabilityPricingAuthorityIssueRequest,
+    issued_at: u64,
+) -> Result<LiabilityPricingAuthorityArtifact, CliError> {
+    let artifact = LiabilityPricingAuthorityArtifact {
+        schema: LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA.to_string(),
+        authority_id: format!(
+            "lqpa-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request.quote_request.body.quote_request_id,
+                    &request.facility.body.facility_id,
+                    &request.underwriting_decision.body.decision_id,
+                    &request.envelope,
+                    &request.max_coverage_amount,
+                    &request.max_premium_amount,
+                    request.expires_at,
+                    request.auto_bind_enabled,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        quote_request: request.quote_request.clone(),
+        provider_policy: request.quote_request.body.provider_policy.clone(),
+        facility: request.facility.clone(),
+        underwriting_decision: request.underwriting_decision.clone(),
+        capital_book: request.capital_book.clone(),
+        envelope: request.envelope.clone(),
+        max_coverage_amount: request.max_coverage_amount.clone(),
+        max_premium_amount: request.max_premium_amount.clone(),
+        expires_at: request.expires_at,
+        auto_bind_enabled: request.auto_bind_enabled,
+        notes: request.notes.clone(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
 fn build_liability_placement_artifact(
     request: &LiabilityPlacementIssueRequest,
     issued_at: u64,
@@ -11197,6 +14648,42 @@ fn build_liability_bound_coverage_artifact(
         effective_until: request.effective_until,
         coverage_amount: request.coverage_amount.clone(),
         premium_amount: request.premium_amount.clone(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
+fn build_liability_auto_bind_decision_artifact(
+    request: &LiabilityAutoBindIssueRequest,
+    issued_at: u64,
+    placement: SignedLiabilityPlacement,
+    bound_coverage: SignedLiabilityBoundCoverage,
+) -> Result<LiabilityAutoBindDecisionArtifact, CliError> {
+    let artifact = LiabilityAutoBindDecisionArtifact {
+        schema: LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA.to_string(),
+        decision_id: format!(
+            "lqab-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request.authority.body.authority_id,
+                    &request.quote_response.body.quote_response_id,
+                    &request.policy_number,
+                    &request.carrier_reference,
+                    &placement.body.placement_id,
+                    &bound_coverage.body.bound_coverage_id,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        authority: request.authority.clone(),
+        quote_response: request.quote_response.clone(),
+        disposition: LiabilityAutoBindDisposition::AutoBound,
+        findings: Vec::new(),
+        placement: Some(placement),
+        bound_coverage: Some(bound_coverage),
     };
     artifact.validate().map_err(CliError::Other)?;
     Ok(artifact)
@@ -11418,6 +14905,176 @@ fn build_liability_claim_adjudication_artifact(
         awarded_amount: request.awarded_amount.clone(),
         note: request.note.clone(),
         evidence_refs,
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
+fn liability_claim_adjudication_awarded_amount(
+    adjudication: &SignedLiabilityClaimAdjudication,
+) -> Result<MonetaryAmount, CliError> {
+    match adjudication.body.outcome {
+        LiabilityClaimAdjudicationOutcome::ClaimUpheld
+        | LiabilityClaimAdjudicationOutcome::PartialSettlement => {
+            adjudication.body.awarded_amount.clone().ok_or_else(|| {
+                CliError::Other(
+                    "claim payout instructions require adjudications with awarded_amount"
+                        .to_string(),
+                )
+            })
+        }
+        LiabilityClaimAdjudicationOutcome::ProviderUpheld => Err(CliError::Other(
+            "claim payout instructions require a payable adjudication outcome".to_string(),
+        )),
+    }
+}
+
+fn build_liability_claim_payout_instruction_artifact(
+    request: &LiabilityClaimPayoutInstructionIssueRequest,
+    issued_at: u64,
+) -> Result<LiabilityClaimPayoutInstructionArtifact, CliError> {
+    let payout_amount = liability_claim_adjudication_awarded_amount(&request.adjudication)?;
+    let artifact = LiabilityClaimPayoutInstructionArtifact {
+        schema: LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
+        payout_instruction_id: format!(
+            "lpi-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request.adjudication.body.adjudication_id,
+                    &request.capital_instruction.body.instruction_id,
+                    &payout_amount,
+                    &request.note,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        adjudication: request.adjudication.clone(),
+        capital_instruction: request.capital_instruction.clone(),
+        payout_amount,
+        note: request.note.clone(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
+fn build_liability_claim_payout_receipt_artifact(
+    request: &LiabilityClaimPayoutReceiptIssueRequest,
+    issued_at: u64,
+) -> Result<LiabilityClaimPayoutReceiptArtifact, CliError> {
+    let artifact = LiabilityClaimPayoutReceiptArtifact {
+        schema: LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA.to_string(),
+        payout_receipt_id: format!(
+            "lprc-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request.payout_instruction.body.payout_instruction_id,
+                    &request.payout_receipt_ref,
+                    request.reconciliation_state,
+                    &request.observed_execution,
+                    &request.note,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        payout_instruction: request.payout_instruction.clone(),
+        payout_receipt_ref: request.payout_receipt_ref.clone(),
+        reconciliation_state: request.reconciliation_state,
+        observed_execution: request.observed_execution.clone(),
+        note: request.note.clone(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
+fn build_liability_claim_settlement_instruction_artifact(
+    request: &LiabilityClaimSettlementInstructionIssueRequest,
+    issued_at: u64,
+) -> Result<LiabilityClaimSettlementInstructionArtifact, CliError> {
+    validate_capital_execution_envelope(
+        &request.authority_chain,
+        &request.execution_window,
+        &request.rail,
+        issued_at,
+    )
+    .map_err(CliError::from)?;
+    let artifact = LiabilityClaimSettlementInstructionArtifact {
+        schema: LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA.to_string(),
+        settlement_instruction_id: format!(
+            "lcsi-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request.payout_receipt.body.payout_receipt_id,
+                    &request.capital_book.body.subject_key,
+                    request.settlement_kind,
+                    &request.settlement_amount,
+                    &request.topology,
+                    &request.authority_chain,
+                    &request.execution_window,
+                    &request.rail,
+                    &request.settlement_reference,
+                    &request.note,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        payout_receipt: request.payout_receipt.clone(),
+        capital_book: request.capital_book.clone(),
+        settlement_kind: request.settlement_kind,
+        settlement_amount: request.settlement_amount.clone(),
+        topology: request.topology.clone(),
+        authority_chain: request.authority_chain.clone(),
+        execution_window: request.execution_window.clone(),
+        rail: request.rail.clone(),
+        settlement_reference: request.settlement_reference.clone(),
+        note: request.note.clone(),
+    };
+    artifact.validate().map_err(CliError::Other)?;
+    Ok(artifact)
+}
+
+fn build_liability_claim_settlement_receipt_artifact(
+    request: &LiabilityClaimSettlementReceiptIssueRequest,
+    issued_at: u64,
+) -> Result<LiabilityClaimSettlementReceiptArtifact, CliError> {
+    let artifact = LiabilityClaimSettlementReceiptArtifact {
+        schema: LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA.to_string(),
+        settlement_receipt_id: format!(
+            "lcsr-{}",
+            sha256_hex(
+                &canonical_json_bytes(&(
+                    LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA,
+                    issued_at,
+                    &request
+                        .settlement_instruction
+                        .body
+                        .settlement_instruction_id,
+                    &request.settlement_receipt_ref,
+                    request.reconciliation_state,
+                    &request.observed_execution,
+                    &request.observed_payer_id,
+                    &request.observed_payee_id,
+                    &request.note,
+                ))
+                .map_err(|error| CliError::Other(error.to_string()))?
+            )
+        ),
+        issued_at,
+        settlement_instruction: request.settlement_instruction.clone(),
+        settlement_receipt_ref: request.settlement_receipt_ref.clone(),
+        reconciliation_state: request.reconciliation_state,
+        observed_execution: request.observed_execution.clone(),
+        observed_payer_id: request.observed_payer_id.clone(),
+        observed_payee_id: request.observed_payee_id.clone(),
+        note: request.note.clone(),
     };
     artifact.validate().map_err(CliError::Other)?;
     Ok(artifact)
@@ -11701,6 +15358,11 @@ fn build_credit_provider_risk_package_from_store(
                 governed_receipts: runtime.governed_receipts,
                 runtime_assurance_receipts: runtime.runtime_assurance_receipts,
                 highest_tier: runtime.highest_tier,
+                latest_schema: runtime.latest_schema.clone(),
+                latest_verifier_family: runtime.latest_verifier_family,
+                latest_verifier: runtime.latest_verifier.clone(),
+                latest_evidence_sha256: runtime.latest_evidence_sha256.clone(),
+                observed_verifier_families: runtime.observed_verifier_families.clone(),
                 stale: stale_runtime_evidence,
             }),
         certification: CreditCertificationState {
@@ -11867,11 +15529,12 @@ fn build_credit_facility_report_from_store(
     )?;
     let minimum_runtime_assurance_tier =
         credit_facility_minimum_runtime_assurance_tier(scorecard.summary.band);
-    let runtime_assurance_met = underwriting_input
-        .runtime_assurance
-        .as_ref()
+    let runtime_assurance = underwriting_input.runtime_assurance.as_ref();
+    let runtime_assurance_met = runtime_assurance
         .and_then(|runtime| runtime.highest_tier)
         .is_some_and(|tier| tier >= minimum_runtime_assurance_tier);
+    let mixed_runtime_assurance_provenance =
+        runtime_assurance.is_some_and(|runtime| runtime.observed_verifier_families.len() > 1);
     let certification_required = scorecard.filters.tool_server.is_some();
     let certification_met = !certification_required
         || underwriting_input
@@ -11895,7 +15558,12 @@ fn build_credit_facility_report_from_store(
     let disposition =
         if restricted || !runtime_assurance_met || (certification_required && !certification_met) {
             CreditFacilityDisposition::Deny
-        } else if mixed_currency_book || failed_backlog || probationary || pending_backlog {
+        } else if mixed_currency_book
+            || failed_backlog
+            || probationary
+            || pending_backlog
+            || mixed_runtime_assurance_provenance
+        {
             CreditFacilityDisposition::ManualReview
         } else {
             CreditFacilityDisposition::Grant
@@ -12616,14 +16284,73 @@ struct CreditLossLifecycleAccountingState {
     delinquent_units: u64,
     recovered_units: u64,
     reserve_released_units: u64,
+    reserve_slashed_units: u64,
     written_off_units: u64,
 }
 
 impl CreditLossLifecycleAccountingState {
     fn outstanding_delinquent_units(&self) -> u64 {
-        self.delinquent_units
-            .saturating_sub(self.recovered_units.saturating_add(self.written_off_units))
+        self.delinquent_units.saturating_sub(
+            self.recovered_units
+                .saturating_add(self.written_off_units)
+                .saturating_add(self.reserve_slashed_units),
+        )
     }
+
+    fn remaining_reserve_units(&self, total_reserve_units: u64) -> u64 {
+        total_reserve_units.saturating_sub(
+            self.reserve_released_units
+                .saturating_add(self.reserve_slashed_units),
+        )
+    }
+}
+
+fn credit_loss_lifecycle_control_supported(kind: CreditLossLifecycleEventKind) -> bool {
+    matches!(
+        kind,
+        CreditLossLifecycleEventKind::ReserveRelease | CreditLossLifecycleEventKind::ReserveSlash
+    )
+}
+
+fn credit_loss_lifecycle_reserve_source_query(bond: &SignedCreditBond) -> CapitalBookQuery {
+    CapitalBookQuery {
+        capability_id: bond.body.report.filters.capability_id.clone(),
+        agent_subject: bond.body.report.filters.agent_subject.clone(),
+        tool_server: bond.body.report.filters.tool_server.clone(),
+        tool_name: bond.body.report.filters.tool_name.clone(),
+        since: bond.body.report.filters.since,
+        until: bond.body.report.filters.until,
+        receipt_limit: Some(arc_kernel::MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT),
+        facility_limit: Some(MAX_CREDIT_FACILITY_LIST_LIMIT),
+        bond_limit: Some(MAX_CREDIT_BOND_LIST_LIMIT),
+        loss_event_limit: Some(MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT),
+    }
+}
+
+fn resolve_credit_loss_lifecycle_reserve_source(
+    receipt_store: &SqliteReceiptStore,
+    bond: &SignedCreditBond,
+) -> Result<CapitalBookSource, TrustHttpError> {
+    let capital_book = build_capital_book_report_from_store(
+        receipt_store,
+        &credit_loss_lifecycle_reserve_source_query(bond),
+    )?;
+    capital_book
+        .sources
+        .into_iter()
+        .find(|source| {
+            source.kind == CapitalBookSourceKind::ReserveBook
+                && source.bond_id.as_deref() == Some(bond.body.bond_id.as_str())
+        })
+        .ok_or_else(|| {
+            TrustHttpError::new(
+                StatusCode::CONFLICT,
+                format!(
+                    "credit reserve control requires one reserve-book source for bond `{}`",
+                    bond.body.bond_id
+                ),
+            )
+        })
 }
 
 fn build_credit_loss_lifecycle_report_from_store(
@@ -12701,10 +16428,8 @@ fn build_credit_loss_lifecycle_report_from_store(
         .cloned()
         .unwrap_or_else(|| empty_exposure_position(&currency));
     let outstanding_delinquent_units = accounting.outstanding_delinquent_units();
-    let releaseable_reserve_units = terms
-        .reserve_requirement_amount
-        .units
-        .saturating_sub(accounting.reserve_released_units);
+    let releaseable_reserve_units =
+        accounting.remaining_reserve_units(terms.reserve_requirement_amount.units);
     let current_outstanding_exposure_units =
         credit_bond_outstanding_units(&position).max(current_outstanding_loss_units);
     let recordable_delinquency_units =
@@ -12857,6 +16582,56 @@ fn build_credit_loss_lifecycle_report_from_store(
                 }],
             )
         }
+        CreditLossLifecycleEventKind::ReserveSlash => {
+            if outstanding_delinquent_units == 0 {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    "credit reserve slash requires outstanding delinquent amount".to_string(),
+                ));
+            }
+            if releaseable_reserve_units == 0 {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    "credit reserve slash is unavailable because the reserve is fully exhausted or released"
+                        .to_string(),
+                ));
+            }
+            let max_slash_units = releaseable_reserve_units.min(outstanding_delinquent_units);
+            let event_amount = match query.amount.as_ref() {
+                Some(amount) => {
+                    ensure_credit_loss_lifecycle_currency(amount, &currency)?;
+                    if amount.units > max_slash_units {
+                        return Err(TrustHttpError::new(
+                            StatusCode::CONFLICT,
+                            format!(
+                                "credit reserve slash amount {} exceeds slashable reserve {}",
+                                amount.units, max_slash_units
+                            ),
+                        ));
+                    }
+                    amount.clone()
+                }
+                None => MonetaryAmount {
+                    units: max_slash_units,
+                    currency: currency.clone(),
+                },
+            };
+            (
+                Some(event_amount),
+                CreditBondLifecycleState::Impaired,
+                vec![CreditLossLifecycleFinding {
+                    code: CreditLossLifecycleReasonCode::ReserveSlashed,
+                    description:
+                        "reserve backing has been explicitly slashed against outstanding delinquent exposure"
+                            .to_string(),
+                    evidence_refs: credit_loss_lifecycle_transition_evidence(
+                        bond,
+                        &lifecycle_history,
+                        CreditLossLifecycleEventKind::Delinquency,
+                    ),
+                }],
+            )
+        }
         CreditLossLifecycleEventKind::WriteOff => {
             if outstanding_delinquent_units == 0 {
                 return Err(TrustHttpError::new(
@@ -12916,11 +16691,19 @@ fn build_credit_loss_lifecycle_report_from_store(
                 accounting.reserve_released_units,
                 &currency,
             ),
+            current_slashed_reserve_amount: amount_if_nonzero(
+                accounting.reserve_slashed_units,
+                &currency,
+            ),
             outstanding_delinquent_amount: amount_if_nonzero(
                 outstanding_delinquent_units,
                 &currency,
             ),
             releaseable_reserve_amount: amount_if_nonzero(releaseable_reserve_units, &currency),
+            reserve_control_source_id: None,
+            execution_state: None,
+            appeal_state: None,
+            appeal_window_ends_at: None,
             event_amount,
         },
         support_boundary: CreditLossLifecycleSupportBoundary::default(),
@@ -12932,14 +16715,152 @@ fn issue_signed_credit_loss_lifecycle_detailed(
     receipt_db_path: &Path,
     authority_seed_path: Option<&Path>,
     authority_db_path: Option<&Path>,
-    query: &CreditLossLifecycleQuery,
+    request: &CreditLossLifecycleIssueRequest,
 ) -> Result<SignedCreditLossLifecycle, TrustHttpError> {
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
-    let report = build_credit_loss_lifecycle_report_from_store(&receipt_store, query)?;
+    let mut report = build_credit_loss_lifecycle_report_from_store(&receipt_store, &request.query)?;
     let issued_at = unix_timestamp_now();
-    let event_id_input =
-        canonical_json_bytes(&(CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA, issued_at, &report))
-            .map_err(|error| TrustHttpError::internal(error.to_string()))?;
+    let (
+        reserve_control_source_id,
+        authority_chain,
+        execution_window,
+        rail,
+        observed_execution,
+        reconciled_state,
+        execution_state,
+        appeal_state,
+        appeal_window_ends_at,
+        description,
+    ) = if credit_loss_lifecycle_control_supported(request.query.event_kind) {
+        let execution_window = request.execution_window.clone().ok_or_else(|| {
+            TrustHttpError::bad_request("credit reserve control issuance requires executionWindow")
+        })?;
+        let rail = request.rail.clone().ok_or_else(|| {
+            TrustHttpError::bad_request("credit reserve control issuance requires rail")
+        })?;
+        validate_capital_execution_envelope(
+            &request.authority_chain,
+            &execution_window,
+            &rail,
+            issued_at,
+        )?;
+        let bond_row = receipt_store
+            .resolve_credit_bond(&request.query.bond_id)
+            .map_err(trust_http_error_from_receipt_store)?
+            .ok_or_else(|| {
+                TrustHttpError::new(
+                    StatusCode::NOT_FOUND,
+                    format!("credit bond `{}` not found", request.query.bond_id),
+                )
+            })?;
+        let reserve_source =
+            resolve_credit_loss_lifecycle_reserve_source(&receipt_store, &bond_row.bond)?;
+        let owner_role = capital_execution_role_from_book_role(reserve_source.owner_role);
+        ensure_capital_execution_owner_authority(&request.authority_chain, owner_role)?;
+        let event_amount = report.summary.event_amount.as_ref().ok_or_else(|| {
+            TrustHttpError::new(
+                StatusCode::CONFLICT,
+                "credit reserve control requires a computed event amount".to_string(),
+            )
+        })?;
+        let reconciled_state = if let Some(observed_execution) = &request.observed_execution {
+            if &observed_execution.amount != event_amount {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    "credit reserve control observedExecution amount does not match event amount",
+                ));
+            }
+            if observed_execution.observed_at < execution_window.not_before
+                || observed_execution.observed_at > execution_window.not_after
+            {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    "credit reserve control observedExecution timestamp falls outside the execution window",
+                ));
+            }
+            Some(CapitalExecutionReconciledState::Matched)
+        } else {
+            Some(CapitalExecutionReconciledState::NotObserved)
+        };
+        let execution_state = Some(if request.observed_execution.is_some() {
+            CreditReserveControlExecutionState::Executed
+        } else {
+            CreditReserveControlExecutionState::PendingExecution
+        });
+        let appeal_state = Some(match request.appeal_window_ends_at {
+            Some(ends_at) => {
+                if ends_at < issued_at {
+                    return Err(TrustHttpError::bad_request(
+                        "credit reserve control appealWindowEndsAt must be >= issuance time",
+                    ));
+                }
+                if ends_at > issued_at {
+                    CreditReserveControlAppealState::Open
+                } else {
+                    CreditReserveControlAppealState::Closed
+                }
+            }
+            None => CreditReserveControlAppealState::Unsupported,
+        });
+        report.summary.reserve_control_source_id = Some(reserve_source.source_id.clone());
+        report.summary.execution_state = execution_state;
+        report.summary.appeal_state = appeal_state;
+        report.summary.appeal_window_ends_at = request.appeal_window_ends_at;
+        (
+            Some(reserve_source.source_id),
+            request.authority_chain.clone(),
+            Some(execution_window),
+            Some(rail),
+            request.observed_execution.clone(),
+            reconciled_state,
+            execution_state,
+            appeal_state,
+            request.appeal_window_ends_at,
+            Some(request.description.clone().unwrap_or_else(|| {
+                format!(
+                    "{:?} reserve control for bond `{}`",
+                    request.query.event_kind, request.query.bond_id
+                )
+            })),
+        )
+    } else {
+        if !request.authority_chain.is_empty()
+            || request.execution_window.is_some()
+            || request.rail.is_some()
+            || request.observed_execution.is_some()
+            || request.appeal_window_ends_at.is_some()
+            || request.description.is_some()
+        {
+            return Err(TrustHttpError::bad_request(
+                "execution metadata is only valid for reserve release and reserve slash lifecycle issuance",
+            ));
+        }
+        (
+            None,
+            Vec::new(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    };
+    let event_id_input = canonical_json_bytes(&(
+        CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA,
+        issued_at,
+        &report,
+        &reserve_control_source_id,
+        &authority_chain,
+        &execution_window,
+        &rail,
+        &observed_execution,
+        &appeal_window_ends_at,
+        &description,
+    ))
+    .map_err(|error| TrustHttpError::internal(error.to_string()))?;
     let event = CreditLossLifecycleArtifact {
         schema: CREDIT_LOSS_LIFECYCLE_ARTIFACT_SCHEMA.to_string(),
         event_id: format!("cll-{}", sha256_hex(&event_id_input)),
@@ -12947,6 +16868,16 @@ fn issue_signed_credit_loss_lifecycle_detailed(
         bond_id: report.query.bond_id.clone(),
         event_kind: report.query.event_kind,
         projected_bond_lifecycle_state: report.summary.projected_bond_lifecycle_state,
+        reserve_control_source_id,
+        authority_chain,
+        execution_window,
+        rail,
+        observed_execution,
+        reconciled_state,
+        execution_state,
+        appeal_state,
+        appeal_window_ends_at,
+        description,
         report,
     };
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
@@ -13148,6 +17079,19 @@ fn build_credit_facility_findings(
                 scorecard,
                 CreditScorecardReasonCode::MixedCurrencyBook,
             ),
+        });
+    }
+    if underwriting_input
+        .runtime_assurance
+        .as_ref()
+        .is_some_and(|runtime| runtime.observed_verifier_families.len() > 1)
+    {
+        findings.push(CreditFacilityFinding {
+            code: CreditFacilityReasonCode::MixedRuntimeAssuranceProvenance,
+            description:
+                "runtime assurance history spans multiple verifier families, so ARC requires manual provider review before auto-allocation"
+                    .to_string(),
+            evidence_refs: credit_facility_receipt_refs_from_underwriting(underwriting_input),
         });
     }
     if !prerequisites.runtime_assurance_met {
@@ -13588,6 +17532,7 @@ fn compute_credit_loss_lifecycle_accounting(
         delinquent_units: 0,
         recovered_units: 0,
         reserve_released_units: 0,
+        reserve_slashed_units: 0,
         written_off_units: 0,
     };
 
@@ -13611,6 +17556,10 @@ fn compute_credit_loss_lifecycle_accounting(
             CreditLossLifecycleEventKind::ReserveRelease => {
                 state.reserve_released_units =
                     state.reserve_released_units.saturating_add(amount.units);
+            }
+            CreditLossLifecycleEventKind::ReserveSlash => {
+                state.reserve_slashed_units =
+                    state.reserve_slashed_units.saturating_add(amount.units);
             }
             CreditLossLifecycleEventKind::WriteOff => {
                 state.written_off_units = state.written_off_units.saturating_add(amount.units);
@@ -13834,6 +17783,86 @@ fn collect_credit_provider_risk_evidence(
         push_ref(reference);
     }
     refs
+}
+
+fn capital_book_owner_role(capital_source: CreditFacilityCapitalSource) -> CapitalBookRole {
+    match capital_source {
+        CreditFacilityCapitalSource::OperatorInternal => CapitalBookRole::OperatorTreasury,
+        CreditFacilityCapitalSource::ManualProviderReview => {
+            CapitalBookRole::ExternalCapitalProvider
+        }
+    }
+}
+
+fn capital_book_facility_source_id(facility_id: &str) -> String {
+    format!("capital-source:facility:{facility_id}")
+}
+
+fn capital_book_bond_source_id(bond_id: &str) -> String {
+    format!("capital-source:bond:{bond_id}")
+}
+
+fn capital_book_facility_evidence(facility: &SignedCreditFacility) -> CapitalBookEvidenceReference {
+    CapitalBookEvidenceReference {
+        kind: CapitalBookEvidenceKind::CreditFacility,
+        reference_id: facility.body.facility_id.clone(),
+        observed_at: Some(facility.body.issued_at),
+        locator: Some(format!("credit-facility:{}", facility.body.facility_id)),
+    }
+}
+
+fn capital_book_bond_evidence(bond: &SignedCreditBond) -> CapitalBookEvidenceReference {
+    CapitalBookEvidenceReference {
+        kind: CapitalBookEvidenceKind::CreditBond,
+        reference_id: bond.body.bond_id.clone(),
+        observed_at: Some(bond.body.issued_at),
+        locator: Some(format!("credit-bond:{}", bond.body.bond_id)),
+    }
+}
+
+fn capital_book_loss_event_evidence(
+    event: &SignedCreditLossLifecycle,
+) -> CapitalBookEvidenceReference {
+    CapitalBookEvidenceReference {
+        kind: CapitalBookEvidenceKind::CreditLossLifecycle,
+        reference_id: event.body.event_id.clone(),
+        observed_at: Some(event.body.issued_at),
+        locator: Some(format!("credit-loss-lifecycle:{}", event.body.event_id)),
+    }
+}
+
+fn capital_book_receipt_evidence(
+    receipt: &ExposureLedgerReceiptEntry,
+) -> Vec<CapitalBookEvidenceReference> {
+    let mut evidence_refs = receipt
+        .evidence_refs
+        .iter()
+        .filter_map(|reference| {
+            let kind = match reference.kind {
+                ExposureLedgerEvidenceKind::Receipt => CapitalBookEvidenceKind::Receipt,
+                ExposureLedgerEvidenceKind::SettlementReconciliation => {
+                    CapitalBookEvidenceKind::SettlementReconciliation
+                }
+                ExposureLedgerEvidenceKind::MeteredBillingReconciliation
+                | ExposureLedgerEvidenceKind::UnderwritingDecision => return None,
+            };
+            Some(CapitalBookEvidenceReference {
+                kind,
+                reference_id: reference.reference_id.clone(),
+                observed_at: reference.observed_at,
+                locator: reference.locator.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    if evidence_refs.is_empty() {
+        evidence_refs.push(CapitalBookEvidenceReference {
+            kind: CapitalBookEvidenceKind::Receipt,
+            reference_id: receipt.receipt_id.clone(),
+            observed_at: Some(receipt.timestamp),
+            locator: Some(format!("receipt:{}", receipt.receipt_id)),
+        });
+    }
+    evidence_refs
 }
 
 fn build_credit_scorecard_dimensions(
@@ -14621,6 +18650,7 @@ fn underwriting_runtime_family_label(
         arc_core::appraisal::AttestationVerifierFamily::AzureMaa => "azure_maa",
         arc_core::appraisal::AttestationVerifierFamily::AwsNitro => "aws_nitro",
         arc_core::appraisal::AttestationVerifierFamily::GoogleAttestation => "google_attestation",
+        arc_core::appraisal::AttestationVerifierFamily::EnterpriseVerifier => "enterprise_verifier",
     }
 }
 
@@ -14844,6 +18874,7 @@ fn build_underwriting_runtime_assurance_evidence(
     selection: &arc_kernel::BehavioralFeedReceiptSelection,
     governed_receipts: u64,
 ) -> Option<UnderwritingRuntimeAssuranceEvidence> {
+    let mut observed_verifier_families = BTreeSet::new();
     let mut highest_tier: Option<RuntimeAssuranceTier> = None;
     let mut latest_observed = None;
     let mut runtime_assurance_receipts = 0_u64;
@@ -14857,6 +18888,9 @@ fn build_underwriting_runtime_assurance_evidence(
             continue;
         };
         runtime_assurance_receipts += 1;
+        if let Some(verifier_family) = runtime_assurance.verifier_family {
+            observed_verifier_families.insert(verifier_family);
+        }
         highest_tier = Some(match highest_tier {
             Some(current) => current.max(runtime_assurance.tier),
             None => runtime_assurance.tier,
@@ -14882,6 +18916,7 @@ fn build_underwriting_runtime_assurance_evidence(
         latest_verifier_family: latest.as_ref().and_then(|value| value.verifier_family),
         latest_verifier: latest.as_ref().map(|value| value.verifier.clone()),
         latest_evidence_sha256: latest.as_ref().map(|value| value.evidence_sha256.clone()),
+        observed_verifier_families: observed_verifier_families.into_iter().collect(),
     })
 }
 

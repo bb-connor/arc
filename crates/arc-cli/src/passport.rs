@@ -5,22 +5,22 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::{Keypair, PublicKey};
 use arc_credentials::{
-    default_oid4vci_passport_issuer_metadata_with_status_distribution,
-    default_oid4vci_passport_issuer_metadata_with_signing_key,
     build_agent_passport, create_passport_presentation_challenge_with_reference,
-    create_signed_passport_verifier_policy, ensure_signed_passport_verifier_policy_active,
-    evaluate_agent_passport, issue_reputation_credential_with_enterprise_identity,
-    passport_artifact_id, respond_to_oid4vp_request,
-    verify_passport_presentation_response_with_policy, verify_signed_oid4vp_request_object_with_any_key,
-    verify_signed_passport_verifier_policy, AgentPassport, AttestationWindow,
-    ArcCredentialEvidence, EnterpriseIdentityProvenance, Oid4vciCredentialOffer,
-    Oid4vciCredentialRequest, Oid4vciTokenRequest, Oid4vciTokenResponse,
+    create_signed_passport_verifier_policy,
+    default_oid4vci_passport_issuer_metadata_with_signing_key,
+    default_oid4vci_passport_issuer_metadata_with_status_distribution,
+    ensure_signed_passport_verifier_policy_active, evaluate_agent_passport,
+    issue_reputation_credential_with_enterprise_identity, passport_artifact_id,
+    present_agent_passport, respond_to_oid4vp_request, respond_to_passport_presentation_challenge,
+    verify_agent_passport, verify_passport_presentation_response_with_policy,
+    verify_signed_oid4vp_request_object_with_any_key, verify_signed_passport_verifier_policy,
+    AgentPassport, ArcCredentialEvidence, AttestationWindow, EnterpriseIdentityProvenance,
+    Oid4vciCredentialOffer, Oid4vciCredentialRequest, Oid4vciTokenRequest, Oid4vciTokenResponse,
     Oid4vpPresentationVerification, Oid4vpRequestObject, Oid4vpVerifierMetadata,
     PassportLifecycleResolution, PassportLifecycleState, PassportPresentationChallenge,
     PassportPresentationOptions, PassportPresentationResponse, PassportStatusDistribution,
     PassportVerifierPolicy, PassportVerifierPolicyReference, PortableJwkSet,
     SignedPassportVerifierPolicy, OID4VP_VERIFIER_METADATA_PATH,
-    present_agent_passport, respond_to_passport_presentation_challenge, verify_agent_passport,
 };
 use arc_did::DidArc;
 use arc_kernel::EvidenceExportQuery;
@@ -31,8 +31,8 @@ use url::Url;
 use crate::issuance::build_local_reputation_corpus;
 use crate::passport_verifier::{
     PassportIssuanceOfferRegistry, PassportStatusListResponse, PassportStatusRegistry,
-    PassportStatusRevocationRequest, PassportVerifierChallengeStore,
-    PublishPassportStatusRequest, VerifierPolicyRegistry,
+    PassportStatusRevocationRequest, PassportVerifierChallengeStore, PublishPassportStatusRequest,
+    VerifierPolicyRegistry,
 };
 use crate::trust_control::{
     CreateIdentityAssertionRequest, CreateOid4vpRequest, CreatePassportChallengeRequest,
@@ -100,7 +100,9 @@ fn load_verifier_policy_registry_for_admin(
     }
 }
 
-fn load_passport_status_registry_for_admin(path: &Path) -> Result<PassportStatusRegistry, CliError> {
+fn load_passport_status_registry_for_admin(
+    path: &Path,
+) -> Result<PassportStatusRegistry, CliError> {
     if path.exists() {
         PassportStatusRegistry::load(path)
     } else {
@@ -215,8 +217,9 @@ fn post_form_url<T: for<'de> serde::Deserialize<'de>>(
 
 fn load_text_file(path: &Path) -> Result<String, CliError> {
     let bytes = fs::read(path)?;
-    let value = String::from_utf8(bytes)
-        .map_err(|error| CliError::Other(format!("{} is not valid UTF-8: {error}", path.display())))?;
+    let value = String::from_utf8(bytes).map_err(|error| {
+        CliError::Other(format!("{} is not valid UTF-8: {error}", path.display()))
+    })?;
     Ok(value.trim().to_string())
 }
 
@@ -237,7 +240,9 @@ fn oid4vp_request_url_from_launch_url(url: &str) -> Result<String, CliError> {
 
 fn oid4vp_verifier_metadata_url(request_url: &str) -> Result<String, CliError> {
     let parsed = Url::parse(request_url).map_err(|error| {
-        CliError::Other(format!("invalid OID4VP request URL `{request_url}`: {error}"))
+        CliError::Other(format!(
+            "invalid OID4VP request URL `{request_url}`: {error}"
+        ))
     })?;
     let scheme = parsed.scheme();
     if scheme != "http" && scheme != "https" {
@@ -245,11 +250,13 @@ fn oid4vp_verifier_metadata_url(request_url: &str) -> Result<String, CliError> {
             "OID4VP request URL must use http or https".to_string(),
         ));
     }
-    let host = parsed.host_str().ok_or_else(|| {
-        CliError::Other("OID4VP request URL must include a host".to_string())
-    })?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| CliError::Other("OID4VP request URL must include a host".to_string()))?;
     let mut metadata = Url::parse(&format!("{scheme}://{host}")).map_err(|error| {
-        CliError::Other(format!("failed to construct verifier metadata URL: {error}"))
+        CliError::Other(format!(
+            "failed to construct verifier metadata URL: {error}"
+        ))
     })?;
     if let Some(port) = parsed.port() {
         metadata
@@ -353,7 +360,9 @@ fn passport_lifecycle_reason(lifecycle: &PassportLifecycleResolution) -> String 
         PassportLifecycleState::Active => "passport lifecycle state is active".to_string(),
         PassportLifecycleState::Stale => lifecycle
             .updated_at
-            .map(|updated_at| format!("passport lifecycle state is stale: last updated at {updated_at}"))
+            .map(|updated_at| {
+                format!("passport lifecycle state is stale: last updated at {updated_at}")
+            })
             .unwrap_or_else(|| "passport lifecycle state is stale".to_string()),
         PassportLifecycleState::Superseded => lifecycle
             .superseded_by
@@ -365,9 +374,7 @@ fn passport_lifecycle_reason(lifecycle: &PassportLifecycleResolution) -> String 
             .as_deref()
             .map(|reason| format!("passport lifecycle state is revoked: {reason}"))
             .unwrap_or_else(|| "passport lifecycle state is revoked".to_string()),
-        PassportLifecycleState::NotFound => {
-            "passport lifecycle record was not found".to_string()
-        }
+        PassportLifecycleState::NotFound => "passport lifecycle record was not found".to_string(),
     }
 }
 
@@ -399,7 +406,9 @@ fn resolve_passport_lifecycle(
         lifecycle
             .validate()
             .map_err(|error| CliError::Other(error.to_string()))?;
-        lifecycle.source.get_or_insert_with(|| format!("remote:{url}"));
+        lifecycle
+            .source
+            .get_or_insert_with(|| format!("remote:{url}"));
         return Ok(Some(lifecycle));
     }
 
@@ -459,7 +468,11 @@ fn apply_passport_lifecycle_to_evaluation(
     evaluation.accepted = false;
     evaluation.matched_credential_indexes.clear();
     evaluation.matched_issuers.clear();
-    if !evaluation.passport_reasons.iter().any(|existing| existing == &reason) {
+    if !evaluation
+        .passport_reasons
+        .iter()
+        .any(|existing| existing == &reason)
+    {
         evaluation.passport_reasons.push(reason);
     }
 }
@@ -638,7 +651,10 @@ pub(crate) fn cmd_passport_create(
         println!("merkle_roots:     {}", passport.merkle_roots.len());
         println!("enterprise_provenance: {}", enterprise_provenance_count);
         if !enterprise_provider_ids.is_empty() {
-            println!("enterprise_providers: {}", enterprise_provider_ids.join(", "));
+            println!(
+                "enterprise_providers: {}",
+                enterprise_provider_ids.join(", ")
+            );
         }
         println!("valid_until:      {}", passport.valid_until);
     }
@@ -655,8 +671,8 @@ pub(crate) fn cmd_passport_verify(
 ) -> Result<(), CliError> {
     let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
     let now = at.unwrap_or_else(unix_now);
-    let mut verification =
-        verify_agent_passport(&passport, now).map_err(|error| CliError::Other(error.to_string()))?;
+    let mut verification = verify_agent_passport(&passport, now)
+        .map_err(|error| CliError::Other(error.to_string()))?;
     verification.passport_lifecycle = resolve_passport_lifecycle(
         &passport,
         now,
@@ -684,7 +700,10 @@ pub(crate) fn cmd_passport_verify(
         println!("merkle_roots:     {}", verification.merkle_root_count);
         println!("enterprise_provenance: {}", enterprise_provenance_count);
         if !enterprise_provider_ids.is_empty() {
-            println!("enterprise_providers: {}", enterprise_provider_ids.join(", "));
+            println!(
+                "enterprise_providers: {}",
+                enterprise_provider_ids.join(", ")
+            );
         }
         if let Some(lifecycle) = verification.passport_lifecycle.as_ref() {
             println!("lifecycle_state:  {}", lifecycle.state.label());
@@ -723,8 +742,8 @@ pub(crate) fn cmd_passport_evaluate(
         passport_statuses_file,
         control_url,
     )?;
-    let mut evaluation =
-        evaluate_agent_passport(&passport, now, &policy).map_err(|error| CliError::Other(error.to_string()))?;
+    let mut evaluation = evaluate_agent_passport(&passport, now, &policy)
+        .map_err(|error| CliError::Other(error.to_string()))?;
     let lifecycle = resolve_passport_lifecycle(
         &passport,
         now,
@@ -739,7 +758,9 @@ pub(crate) fn cmd_passport_evaluate(
         println!("{}", serde_json::to_string_pretty(&evaluation)?);
     } else {
         let (enterprise_provenance_count, enterprise_provider_ids) =
-            summarize_enterprise_provenance(&evaluation.verification.enterprise_identity_provenance);
+            summarize_enterprise_provenance(
+                &evaluation.verification.enterprise_identity_provenance,
+            );
         println!("passport evaluated");
         println!("subject:             {}", evaluation.verification.subject);
         println!(
@@ -775,7 +796,10 @@ pub(crate) fn cmd_passport_evaluate(
         );
         println!("enterprise_provenance: {}", enterprise_provenance_count);
         if !enterprise_provider_ids.is_empty() {
-            println!("enterprise_providers: {}", enterprise_provider_ids.join(", "));
+            println!(
+                "enterprise_providers: {}",
+                enterprise_provider_ids.join(", ")
+            );
         }
         if let Some(lifecycle) = evaluation.verification.passport_lifecycle.as_ref() {
             println!("lifecycle_state:     {}", lifecycle.state.label());
@@ -909,8 +933,7 @@ pub(crate) fn cmd_passport_issuance_offer_create(
             &crate::trust_control::CreatePassportIssuanceOfferRequest {
                 passport,
                 ttl_seconds: ttl_secs,
-                credential_configuration_id: credential_configuration_id
-                    .map(str::to_string),
+                credential_configuration_id: credential_configuration_id.map(str::to_string),
             },
         )?
     } else {
@@ -1031,12 +1054,14 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
         .map(str::to_string)
         .or_else(|| offer.primary_configuration_id().ok().map(str::to_string));
     let resolved_format = format.map(str::to_string).or_else(|| {
-        resolved_credential_configuration_id.as_deref().and_then(|configuration_id| {
-            metadata
-                .credential_configuration(configuration_id)
-                .ok()
-                .map(|configuration| configuration.format.clone())
-        })
+        resolved_credential_configuration_id
+            .as_deref()
+            .and_then(|configuration_id| {
+                metadata
+                    .credential_configuration(configuration_id)
+                    .ok()
+                    .map(|configuration| configuration.format.clone())
+            })
     });
     let request = Oid4vciCredentialRequest {
         credential_configuration_id: resolved_credential_configuration_id,
@@ -1452,22 +1477,21 @@ pub(crate) fn cmd_passport_challenge_respond(
     json_output: bool,
 ) -> Result<(), CliError> {
     let passport: AgentPassport = serde_json::from_slice(&fs::read(input)?)?;
-    let challenge: PassportPresentationChallenge = match (challenge_path, challenge_url) {
-        (Some(path), None) => serde_json::from_slice(&fs::read(path)?)?,
-        (None, Some(url)) => fetch_json_url(url)?,
-        (Some(_), Some(_)) => {
-            return Err(CliError::Other(
-                "challenge response accepts either --challenge or --challenge-url, not both"
-                    .to_string(),
-            ))
-        }
-        (None, None) => {
-            return Err(CliError::Other(
+    let challenge: PassportPresentationChallenge =
+        match (challenge_path, challenge_url) {
+            (Some(path), None) => serde_json::from_slice(&fs::read(path)?)?,
+            (None, Some(url)) => fetch_json_url(url)?,
+            (Some(_), Some(_)) => {
+                return Err(CliError::Other(
+                    "challenge response accepts either --challenge or --challenge-url, not both"
+                        .to_string(),
+                ))
+            }
+            (None, None) => return Err(CliError::Other(
                 "challenge response requires either --challenge <path> or --challenge-url <url>"
                     .to_string(),
-            ))
-        }
-    };
+            )),
+        };
     let holder_keypair = load_existing_keypair(holder_seed_file)?;
     let response = respond_to_passport_presentation_challenge(
         &holder_keypair,
@@ -1506,14 +1530,13 @@ pub(crate) fn cmd_passport_challenge_submit(
     json_output: bool,
 ) -> Result<(), CliError> {
     let presentation: PassportPresentationResponse = serde_json::from_slice(&fs::read(input)?)?;
-    let verification: arc_credentials::PassportPresentationVerification =
-        post_json_url(
-            submit_url,
-            &VerifyPassportChallengeRequest {
-                presentation,
-                expected_challenge: None,
-            },
-        )?;
+    let verification: arc_credentials::PassportPresentationVerification = post_json_url(
+        submit_url,
+        &VerifyPassportChallengeRequest {
+            presentation,
+            expected_challenge: None,
+        },
+    )?;
 
     if json_output {
         println!("{}", serde_json::to_string_pretty(&verification)?);
@@ -1624,7 +1647,10 @@ pub(crate) fn cmd_passport_challenge_verify(
         );
         println!("enterprise_provenance: {}", enterprise_provenance_count);
         if !enterprise_provider_ids.is_empty() {
-            println!("enterprise_providers: {}", enterprise_provider_ids.join(", "));
+            println!(
+                "enterprise_providers: {}",
+                enterprise_provider_ids.join(", ")
+            );
         }
         if let Some(lifecycle) = verification.passport_lifecycle.as_ref() {
             println!("lifecycle_state:      {}", lifecycle.state.label());
@@ -1800,9 +1826,13 @@ pub(crate) fn cmd_passport_oid4vp_respond(
         fs::write(path, response_jwt.as_bytes())?;
     }
 
-    let submit_target = submit.then_some(request.response_uri.as_str()).or(submit_url);
+    let submit_target = submit
+        .then_some(request.response_uri.as_str())
+        .or(submit_url);
     let verification = submit_target
-        .map(|url| post_form_url::<Oid4vpPresentationVerification>(url, &[("response", &response_jwt)]))
+        .map(|url| {
+            post_form_url::<Oid4vpPresentationVerification>(url, &[("response", &response_jwt)])
+        })
         .transpose()?;
 
     if json_output {

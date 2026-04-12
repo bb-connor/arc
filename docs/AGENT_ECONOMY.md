@@ -1,8 +1,8 @@
 # ARC Agent Economy: Technical Design
 
-Status: Phase 1 shipped in v2.0; governed transaction controls shipped in v2.6; later extensions planned
+Status: Phase 1 shipped in v2.0; governed transaction controls shipped in v2.6; bounded payment interop shipped through v2.38
 Authors: Engineering
-Date: 2026-03-21 (updated 2026-03-25)
+Date: 2026-03-21 (updated 2026-04-02)
 
 ---
 
@@ -19,6 +19,13 @@ Three observations anchor the design:
 3. **The receipt log is a billing ledger.** Every `ArcReceipt` is a signed, tamper-evident record of a decision. The existing `metadata: Option<serde_json::Value>` field is the natural insertion point for structured financial data. Receipts are already persisted in `SqliteReceiptStore` with indexed queries by capability, tool, and timestamp.
 
 The strategy is not to bolt a payment system onto ARC. It is to recognize that ARC is already 80% of a payment authorization system and close the remaining gaps with minimal, backward-compatible extensions.
+
+As of `v2.38`, the shipped payment-facing overlay is explicit and bounded:
+ARC can now project governed settlement into x402 requirements, prepare
+EIP-3009 authorization digests, evaluate Circle-managed-custody nanopayments,
+and assess ERC-4337/paymaster compatibility. Those surfaces remain
+interoperability adapters over canonical ARC approval, receipt, and settlement
+truth; they do not become a second ledger.
 
 ---
 
@@ -900,6 +907,40 @@ Spending analytics and anomaly detection.
   signed exposure and scorecard truth together with current facility posture,
   runtime-assurance or certification state, and recent-loss rows sourced from
   the newest matching loss evidence rather than from a truncated ledger page.
+- The capital book is now explicit instead of implied. ARC can export one
+  signed live capital book that ties the current facility commitment and
+  reserve book to one subject-scoped source-of-funds view with explicit
+  committed, held, drawn, disbursed, released, repaid, and impaired state over
+  canonical receipt, facility, bond, and loss-lifecycle evidence.
+- Capital attribution remains conservative and fail closed. ARC refuses to
+  auto-blend multiple live facilities or reserve books, mixed-currency
+  positions, missing counterparty attribution, or books with no active granted
+  facility that can explain the committed source of funds honestly.
+- Capital instructions are now explicit instead of inferred. ARC can issue one
+  signed custody-neutral instruction artifact for reserve locks, reserve
+  holds, reserve releases, fund transfers, or instruction cancellation over
+  one subject-scoped live capital source.
+- Capital execution remains evidence-linked and fail closed. Each instruction
+  carries one explicit authority chain, execution window, rail descriptor,
+  intended versus reconciled state, and bounded evidence set, and ARC rejects
+  stale authority, mismatched custody steps, expired windows, mixed-currency
+  amounts, or observed execution that does not match the intended movement.
+- Capital allocation decisions are now explicit instead of ambient. ARC can
+  issue one signed simulation-first allocation artifact for one governed
+  receipt, one active facility-backed capital source, one optional reserve
+  source, and one bounded execution envelope.
+- Allocation remains deterministic and fail closed. ARC requires one approved
+  actionable governed receipt, binds allocation against the currently active
+  facility/book state when it exists, and emits typed `allocate`, `queue`,
+  `manual_review`, or `deny` posture instead of blending sources or implying
+  that capital already moved.
+- Regulated roles are now explicit instead of ambient. Live-capital
+  instructions and allocations require one named source-owner approval, one
+  named custody-provider execution step, and one bounded execution window
+  rather than relying on implicit operator authority.
+- The regulated-role baseline remains intentionally bounded. ARC now emits
+  auditable live-capital contracts, but it still does not claim ARC itself is
+  the regulated custodian, settlement rail, or insurer of record.
 - Bond policy is now explicit instead of implicit. ARC can evaluate reserve
   posture into one typed `lock`, `hold`, `release`, or `impair` report over
   canonical exposure plus the latest active granted facility, then persist the
@@ -916,18 +957,24 @@ Spending analytics and anomaly detection.
   assurance, call-chain binding, and tool-server scope all still match the
   current invocation.
 - Bond-loss lifecycle is now explicit instead of implicit. ARC can evaluate
-  one delinquency, recovery, reserve-release, or write-off step over a signed
-  bond, then persist that step as a separate signed artifact without mutating
-  the bond body or the original execution receipt.
+  one delinquency, recovery, reserve-release, reserve-slash, or write-off step
+  over a signed bond, then persist that step as a separate signed artifact
+  without mutating the bond body or the original execution receipt.
 - Delinquency booking uses recent failed-loss evidence rather than whichever
   receipts happen to fit inside the generic exposure page. That keeps
   loss-lifecycle accounting aligned with the newest actionable settlement
   backlog instead of silently aging it out of view.
-- Recovery, write-off, and reserve release remain bounded by explicit
-  accounting rules. Recovery and write-off cannot exceed outstanding
-  delinquency, reserve release cannot happen while delinquency remains open,
-  and mixed-currency adjustments fail closed instead of inventing blended
+- Recovery, write-off, reserve release, and reserve slash remain bounded by
+  explicit accounting and execution rules. Recovery and write-off cannot
+  exceed outstanding delinquency, reserve release cannot happen while
+  delinquency remains open, reserve slash cannot exceed slashable reserve, and
+  mixed-currency adjustments fail closed instead of inventing blended
   lifecycle math.
+- Reserve release and reserve slash are now explicit control artifacts rather
+  than inferred accounting consequences. They require one valid authority
+  chain, one bounded execution window, one custody rail, optional observed
+  execution that reconciles to the computed event amount, and an optional
+  machine-readable appeal window.
 - Liability-provider admission is now explicit rather than ad hoc. ARC can
   publish one curated signed provider artifact with bounded jurisdiction,
   coverage-class, currency, and evidence requirements, then fail closed
@@ -951,26 +998,74 @@ Spending analytics and anomaly detection.
   artifact. Summary premium totals are partitioned by currency so cross-currency
   reports do not collapse into one raw unit count.
 - Claim workflows are explicit instead of implied. ARC now issues immutable
-  claim packages, provider responses, disputes, and adjudications linked back
-  to bound coverage, exposure, bond, loss-lifecycle, and receipt evidence
-  instead of expecting operators to reconstruct that state from quote or bond
-  artifacts alone.
+  claim packages, provider responses, disputes, adjudications, payout
+  instructions, payout receipts, settlement instructions, and settlement
+  receipts linked back to bound coverage, exposure, bond, loss-lifecycle,
+  capital-execution, and receipt evidence instead of expecting operators to
+  reconstruct that state from quote, bond, or payment side effects alone.
 - The liability-market posture is now locally qualified end to end across
-  curated provider admission, quote/bind, and claim/dispute workflow evidence.
-  ARC can now prove the marketplace orchestration layer it claims without
-  implying automatic claims payment, autonomous insurer pricing, or
-  permissionless market trust.
+  curated provider admission, quote/bind, claim/dispute workflow evidence, and
+  one bounded payout-and-settlement lane. ARC can now prove the marketplace
+  orchestration layer it claims without implying autonomous insurer pricing,
+  open-ended payment rails, cross-network clearing, or permissionless market
+  trust.
+- Delegated pricing authority is now explicit instead of implied. ARC issues a
+  signed provider- or regulated-role-bounded authority artifact linked to one
+  quote request, one facility, one underwriting decision, and one capital-book
+  snapshot, and automatic binding fails closed on stale authority, stale
+  provider state, or out-of-envelope coverage or premium requests.
+- Bounded autonomous pricing is now explicit instead of implied. ARC issues one
+  signed pricing-input, authority-envelope, pricing-decision, capital-pool,
+  execution, rollback, comparison, drift, and qualification family that keeps
+  automated reprice, renew, decline, and bind behavior subordinate to explicit
+  evidence provenance, reserve strategy, human-interrupt contacts, and
+  fail-safe rollback posture.
 - Recovery and claims-network semantics remain intentionally bounded. ARC now
-  records claim and dispute state, but it still does not claim insurer-network
-  messaging, automatic claims payment, or cross-organization recovery clearing
-  in the signed export.
+  records claim, payout, settlement, and dispute state, but it still does not
+  claim insurer-network messaging or open-ended cross-organization recovery
+  clearing in the signed export.
+- Open-market economics are now explicit instead of informal. ARC issues one
+  signed fee-schedule artifact over bounded namespace, actor-kind,
+  publisher-operator, and admission-class scope plus one signed penalty
+  artifact over matched listing, activation, governance sanction, abuse class,
+  and bond class, then evaluates those artifacts fail closed on stale
+  authority, scope mismatch, unsupported bond requirements, non-slashable
+  bonds, and currency or amount mismatch instead of treating market discipline
+  as ambient operator discretion.
+- Federated trust is now explicit instead of implied. ARC issues one signed
+  federation-activation exchange, one quorum report, one federated open-
+  admission policy, one shared reputation-clearing artifact, and one
+  qualification matrix so cross-operator visibility can be shared without
+  turning mirrors, indexers, or imported trust into ambient runtime
+  admission.
+- Public identity and wallet interoperability are now explicit instead of
+  implied. ARC issues one public identity profile, one verifier-bound wallet-
+  directory entry, one replay-safe wallet-routing manifest, and one
+  qualification matrix over `did:arc` plus bounded `did:web`, `did:key`, and
+  `did:jwk` compatibility inputs without turning public routing or directory
+  visibility into ambient trust or admission.
+- Shared reputation remains locally weighted. Independent issuers, per-issuer
+  caps, oracle-weight ceilings, and corroborated blocking negative events keep
+  the federation lane from collapsing into a universal trust score or
+  permissionless trust network.
+- Adversarial multi-operator market proof is now explicit instead of assumed.
+  ARC can preserve public visibility of conflicting or invalid registry
+  replicas while refusing to treat them as runtime trust, can keep imported
+  reputation locally weighted under hostile operator input, and can reject
+  governance or market-penalty artifacts that depend on trust activations not
+  issued by the governing local operator.
 - Score confidence and probation are explicit instead of implied. Sparse
   history can still produce a scorecard, but ARC marks it low-confidence and
   probationary rather than letting later facility policy treat it as a mature
   credit book.
-- Capital allocation remains intentionally bounded. ARC issues reviewable
-  facility terms, not escrowed capital, reserve locks, slashing, or external
-  bond execution in this phase.
+- Live capital execution remains intentionally bounded. ARC now issues
+  reviewable capital-book, capital-instruction, capital-allocation,
+  reserve-control, payout, and settlement artifacts, plus one official web3
+  dispatch and settlement lane with anchored reconciliation, plus one bounded
+  `arc-settle` runtime over explicit escrow, refund, and bond-lifecycle flows,
+  plus one bounded autonomous pricing and capital-pool lane over that
+  substrate, but it still does not claim permissionless external dispatch or
+  open-ended insurer automation outside the documented bounded envelope.
 - Anomaly detection: spending velocity exceeding historical baselines, unusual tool-server cost reports, delegation depth anomalies, or growing `pending`/`failed` settlement backlogs.
 - Webhook integration: notify when budget utilization exceeds configurable thresholds (50%, 80%, 95%).
 - Dashboard queries against the indexed receipt store.

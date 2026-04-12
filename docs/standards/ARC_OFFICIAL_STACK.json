@@ -1,0 +1,151 @@
+{
+  "schema": "arc.official-stack.v1",
+  "package_id": "arc.official-stack",
+  "version": "0.1.0",
+  "arc_contract_version": "2.0",
+  "components": [
+    {
+      "id": "arc.local-capability-authority",
+      "name": "Local capability authority",
+      "extension_point_ids": [
+        "arc.kernel.capability_authority"
+      ],
+      "crate_path": "crates/arc-kernel/src/authority.rs::LocalCapabilityAuthority",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.remote-capability-authority",
+      "name": "Remote capability authority",
+      "extension_point_ids": [
+        "arc.kernel.capability_authority"
+      ],
+      "crate_path": "crates/arc-cli/src/trust_control.rs::RemoteCapabilityAuthority",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.sqlite-receipt-store",
+      "name": "SQLite receipt store",
+      "extension_point_ids": [
+        "arc.kernel.receipt_store"
+      ],
+      "crate_path": "crates/arc-store-sqlite/src/receipt_store.rs::SqliteReceiptStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.remote-receipt-store",
+      "name": "Remote receipt store",
+      "extension_point_ids": [
+        "arc.kernel.receipt_store"
+      ],
+      "crate_path": "crates/arc-cli/src/trust_control.rs::RemoteReceiptStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.sqlite-revocation-store",
+      "name": "SQLite revocation store",
+      "extension_point_ids": [
+        "arc.kernel.revocation_store"
+      ],
+      "crate_path": "crates/arc-store-sqlite/src/revocation_store.rs::SqliteRevocationStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.remote-revocation-store",
+      "name": "Remote revocation store",
+      "extension_point_ids": [
+        "arc.kernel.revocation_store"
+      ],
+      "crate_path": "crates/arc-cli/src/trust_control.rs::RemoteRevocationStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.sqlite-budget-store",
+      "name": "SQLite budget store",
+      "extension_point_ids": [
+        "arc.kernel.budget_store"
+      ],
+      "crate_path": "crates/arc-store-sqlite/src/budget_store.rs::SqliteBudgetStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.remote-budget-store",
+      "name": "Remote budget store",
+      "extension_point_ids": [
+        "arc.kernel.budget_store"
+      ],
+      "crate_path": "crates/arc-cli/src/trust_control.rs::RemoteBudgetStore",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.native-arc-service",
+      "name": "Native ARC service",
+      "extension_point_ids": [
+        "arc.kernel.tool_server_connection",
+        "arc.kernel.resource_provider",
+        "arc.kernel.prompt_provider"
+      ],
+      "crate_path": "crates/arc-mcp-adapter/src/native.rs::NativeArcService",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.mcp-adapter",
+      "name": "MCP adapter",
+      "extension_point_ids": [
+        "arc.kernel.tool_server_connection",
+        "arc.kernel.resource_provider",
+        "arc.kernel.prompt_provider",
+        "arc.adapter.mcp"
+      ],
+      "crate_path": "crates/arc-mcp-adapter/src/lib.rs::McpAdapter",
+      "implementation_source": "first_party"
+    },
+    {
+      "id": "arc.a2a-adapter",
+      "name": "A2A adapter",
+      "extension_point_ids": [
+        "arc.kernel.tool_server_connection",
+        "arc.adapter.a2a"
+      ],
+      "crate_path": "crates/arc-a2a-adapter/src/invoke.rs::A2aAdapter",
+      "implementation_source": "first_party"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "local_default",
+      "name": "Local default",
+      "description": "Local authority and SQLite-backed stores with native ARC services.",
+      "component_ids": [
+        "arc.local-capability-authority",
+        "arc.sqlite-receipt-store",
+        "arc.sqlite-revocation-store",
+        "arc.sqlite-budget-store",
+        "arc.native-arc-service"
+      ]
+    },
+    {
+      "id": "shared_control_plane",
+      "name": "Shared control plane",
+      "description": "Remote authority and store components behind the first-party trust-control service with the first-party MCP adapter.",
+      "component_ids": [
+        "arc.remote-capability-authority",
+        "arc.remote-receipt-store",
+        "arc.remote-revocation-store",
+        "arc.remote-budget-store",
+        "arc.mcp-adapter"
+      ]
+    },
+    {
+      "id": "a2a_gateway",
+      "name": "A2A gateway",
+      "description": "Remote authority and store components paired with the first-party A2A bridge for external agent execution.",
+      "component_ids": [
+        "arc.remote-capability-authority",
+        "arc.remote-receipt-store",
+        "arc.remote-revocation-store",
+        "arc.remote-budget-store",
+        "arc.a2a-adapter"
+      ]
+    }
+  ]
+}

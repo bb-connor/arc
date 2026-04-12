@@ -1,5 +1,9 @@
 # Release Audit
 
+**Prepared:** 2026-04-02
+**Role:** authoritative repo-local release-go record for the current ARC
+production candidate
+
 ## Scope
 
 This audit tracks the current ARC production-candidate surface described in
@@ -8,38 +12,51 @@ This audit tracks the current ARC production-candidate surface described in
 It is a repo-local go/no-go record, not a substitute for observing hosted CI
 and release-qualification workflows after merge.
 
+Use the release documents this way:
+
+- [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md) defines the supported candidate
+  surface and support boundary
+- [QUALIFICATION.md](QUALIFICATION.md) defines the required evidence lanes and
+  commands
+- this audit is the authoritative repo-local release-go or hold decision
+- [GA_CHECKLIST.md](GA_CHECKLIST.md) is the operator-facing pre-publication
+  checklist
+- [PARTNER_PROOF.md](PARTNER_PROOF.md) and
+  [ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md) are reviewer-facing
+  packages, not the release decision record
+
+The web3-runtime ladder now also has focused audit and reviewer material in
+[ARC_WEB3_READINESS_AUDIT.md](ARC_WEB3_READINESS_AUDIT.md) and
+[ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md).
+
 ## Decision
 
-**Decision:** Local go, external release hold for the current ARC candidate,
-with `v2.9` economic-interop, `v2.10` underwriting, `v2.11` portable
-credential interop, `v2.12` workload-identity/attestation, and `v2.13`
-portable-credential lifecycle additions, plus the `v2.14` verifier-side
-OID4VP surface, plus `v2.15` multi-cloud attestation appraisal additions and
-`v2.16` enterprise-IAM profile additions, locally verified and non-blocking to
-the existing publication hold, plus the `v2.17` governed public
-certification-marketplace surface, plus the `v2.18` credit, exposure, and
-capital-policy surface, plus the `v2.19` bonded-execution simulation and
-operator-control surface, plus the `v2.20` liability-market and claims-network
-surface, plus the `v2.21` standards-native authorization and
-credential-fabric surface, plus the `v2.22` wallet exchange, identity
-continuity, and bounded sender-constrained authorization surface.
+**Decision:** Local go, external release hold for the current post-`v2.41`
+ARC production candidate defined in
+[RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md).
+
+That current candidate includes the bounded web3 runtime realized in `v2.34`
+through `v2.39` and hardened in `v2.40` through `v2.41`, including
+concurrency-safe settlement identity, mandatory checkpoint evidence gates,
+artifact-derived contract/runtime parity, hosted qualification, reviewed-
+manifest promotion, exercised operator controls, and the generated end-to-end
+settlement proof bundle.
 
 Meaning:
 
 - release inputs, workspace correctness, dashboard packaging, SDK packaging,
-  live conformance, and repeat-run clustered trust qualification are green
+  live conformance, repeat-run clustered trust qualification, and the bounded
+  web3 runtime qualification lanes are green locally
 - operator deployment, backup/restore, upgrade/rollback, and observability
   contracts are documented explicitly
-- protocol documentation now describes the shipped `v2` surface instead of an
-  aspirational draft
-- ARC is now the primary package, CLI, SDK, schema, and operator identity
-  where the rename contract says it should be
-- standards and launch artifacts exist for receipts and portable trust, plus a
-  GA checklist, partner proof package, and explicit risk register
+- release-governance documents now separate scope, evidence, decision, and
+  reviewer-package roles explicitly
+- standards and launch artifacts exist for receipts, portable trust, the
+  bounded web3 ladder, and the final release decision package
 - hosted `CI` and `Release Qualification` workflows are still required before
   tagging a release from `main`
 
-**Local qualification date:** 2026-03-30
+**Local qualification date:** 2026-04-02
 
 ## Evidence
 
@@ -47,11 +64,23 @@ Primary local qualification commands:
 
 - `./scripts/ci-workspace.sh`
 - `./scripts/check-sdk-parity.sh`
+- `./scripts/check-web3-contract-parity.sh`
 - `./scripts/qualify-release.sh`
+- `./scripts/qualify-web3-runtime.sh`
+- `./scripts/qualify-web3-e2e.sh`
+- `./scripts/qualify-web3-ops-controls.sh`
+- `./scripts/qualify-web3-promotion.sh`
 - `cargo clippy -p arc-cli -- -D warnings`
 - `cargo test -p arc-cli --test provider_admin trust_service_health_reports_enterprise_and_verifier_policy_state -- --nocapture`
 - `cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_admin_health_reports_runtime_state -- --nocapture`
 - `cargo test -p arc-cli --test certify certify_registry_remote_publish_list_get_resolve_and_revoke_work -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_public_generic_registry_namespace_and_listings_project_current_actor_families -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_generic_registry_trust_activation_requires_explicit_local_activation_and_fails_closed -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-core open_market -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_open_market_fee_schedules_and_slashing_require_explicit_bounded_authority -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib generic_listing_search_rejects_reports_with_invalid_listing_signatures -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib non_local_activation_authority -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_adversarial_multi_operator_open_market_preserves_visibility_without_trust -- --exact --nocapture`
 - `cargo test -p arc-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact`
 - `cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact`
 - `cargo test -p arc-core underwriting -- --nocapture`
@@ -66,10 +95,20 @@ Primary local qualification commands:
 - `cargo test -p arc-core credit -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query test_credit_backtest_report_surfaces_drift_and_failure_modes -- --exact --nocapture`
 - `cargo test -p arc-cli --test receipt_query test_provider_risk_package_export_surfaces -- --exact --nocapture`
+- `cargo test -p arc-core capital_book -- --nocapture`
+- `cargo test -p arc-core capital_execution_instruction -- --nocapture`
+- `cargo test -p arc-core capital_allocation_decision -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query capital_book -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query capital_instruction -- --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_capital_allocation -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query credit_bonded_execution -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query liability_provider -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query liability_market -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query liability_claim -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_rejects_oversized_claims_and_invalid_disputes -- --exact --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-credentials portable_reputation -- --nocapture`
+- `CARGO_INCREMENTAL=0 cargo test -p arc-cli --test local_reputation trust_service_portable_reputation_issue_and_evaluate_respects_local_weighting -- --exact --nocapture`
 - `cargo test -p arc-cli --test passport passport_public_holder_transport_fetch_submit_and_fail_closed_on_replay -- --nocapture`
 - `cargo test -p arc-cli --test passport passport_external_http_issuance_and_verifier_roundtrip_is_interop_qualified -- --nocapture`
 - `cargo test -p arc-cli --test passport passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe -- --nocapture`
@@ -79,6 +118,9 @@ Primary local qualification commands:
 - `cargo test -p arc-cli --test passport passport_issuance_metadata_rejects_public_status_distribution_without_cache_ttl -- --nocapture`
 - `cargo test -p arc-cli --test passport passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_resolution -- --nocapture`
 - `cargo test -p arc-cli --test passport passport_portable_metadata_endpoints_require_signing_key_configuration -- --nocapture`
+- `CARGO_TARGET_DIR=target/identity-check CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo check -p arc-core --lib`
+- `CARGO_TARGET_DIR=target/identity-test CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p arc-core --lib identity_network -- --nocapture`
+- `for f in docs/standards/ARC_PUBLIC_IDENTITY_PROFILE.json docs/standards/ARC_PUBLIC_WALLET_DIRECTORY_ENTRY_EXAMPLE.json docs/standards/ARC_PUBLIC_WALLET_ROUTING_EXAMPLE.json docs/standards/ARC_PUBLIC_IDENTITY_QUALIFICATION_MATRIX.json; do jq empty "$f"; done`
 - `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
 - `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture`
 - `cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime -- --exact --nocapture --test-threads=1`
@@ -95,6 +137,10 @@ Primary local qualification commands:
 - `cargo test -p arc-kernel governed_monetary_allow_rebinds_trusted_attestation_to_verified -- --nocapture`
 - `cargo test -p arc-kernel governed_monetary_allow_rebinds_google_attestation_to_verified -- --nocapture`
 - `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_export_surfaces -- --exact --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_import_export_surfaces -- --exact --nocapture`
+- `cargo test -p arc-cli --test receipt_query test_runtime_attestation_appraisal_result_qualification_covers_mixed_providers_and_fail_closed_imports -- --exact --nocapture`
+- `cargo test -p arc-credentials signed_public_ -- --nocapture`
+- `cargo test -p arc-cli --test passport public_discovery -- --nocapture`
 - `cargo test -p arc-cli --test certify certify_check_emits_signed_pass_artifact_and_report -- --exact --nocapture`
 - `cargo test -p arc-cli --test certify certify_registry_discover_fails_closed_on_stale_and_mismatched_public_metadata -- --exact --nocapture`
 - `cargo test -p arc-cli --test certify certify_marketplace_search_transparency_consume_and_dispute_work -- --exact --nocapture`
@@ -107,6 +153,18 @@ Primary release artifacts:
 - `target/release-qualification/conformance/wave4/report.md`
 - `target/release-qualification/conformance/wave5/report.md`
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
+- `target/release-qualification/web3-runtime/artifact-manifest.json`
+- `target/release-qualification/web3-runtime/logs/qualification.log`
+- `target/release-qualification/web3-runtime/logs/e2e-qualification.log`
+- `target/release-qualification/web3-runtime/logs/promotion-qualification.log`
+- `target/release-qualification/web3-runtime/e2e/partner-qualification.json`
+- `target/release-qualification/web3-runtime/e2e/scenarios/reorg-recovery.json`
+- `target/release-qualification/web3-runtime/promotion/promotion-qualification.json`
+- `target/release-qualification/web3-runtime/promotion/run-a/promotion-report.json`
+- `target/release-qualification/web3-runtime/promotion/negative-rollback/rollback-plan.json`
+- `target/release-qualification/web3-runtime/contracts/reports/local-devnet-qualification.json`
+- `target/release-qualification/web3-runtime/contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md`
+- `target/release-qualification/web3-runtime/contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md`
 
 Primary release docs:
 
@@ -116,6 +174,8 @@ Primary release docs:
 - [OBSERVABILITY.md](OBSERVABILITY.md)
 - [GA_CHECKLIST.md](GA_CHECKLIST.md)
 - [PARTNER_PROOF.md](PARTNER_PROOF.md)
+- [ARC_WEB3_READINESS_AUDIT.md](ARC_WEB3_READINESS_AUDIT.md)
+- [ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md)
 - [ECONOMIC_INTEROP_GUIDE.md](../ECONOMIC_INTEROP_GUIDE.md)
 - [CREDENTIAL_INTEROP_GUIDE.md](../CREDENTIAL_INTEROP_GUIDE.md)
 - [WORKLOAD_IDENTITY_RUNBOOK.md](../WORKLOAD_IDENTITY_RUNBOOK.md)
@@ -143,10 +203,21 @@ Primary release docs:
 | portable credential lifecycle, type metadata, and verifier-facing status semantics remained only partially explicit | closed for the shipped local surface through projected SD-JWT VC metadata, portable issuer `JWKS`, TTL-backed lifecycle distribution and public resolution, explicit `stale` fail-closed semantics, and focused qualification coverage over `active`, `stale`, `superseded`, and `revoked` states |
 | verifier portability still lacked one supported OID4VP bridge and public verifier trust bootstrap | closed for the shipped local surface through signed `request_uri` requests, same-device and cross-device launch artifacts, ARC verifier metadata, trusted-key `JWKS` rotation semantics, and focused passport regressions |
 | workload identity and verifier-backed attestation trust remained normalized evidence only, without explicit rebinding and operator failure guidance | closed for the shipped local surface through SPIFFE workload mapping, the Azure MAA bridge, trusted-verifier rebinding policy, fail-closed governed-runtime enforcement, and the workload-identity runbook |
-| the verifier boundary remained Azure-shaped and lacked one signed operator-facing appraisal artifact | closed for the shipped local surface through the canonical appraisal contract, Azure/AWS Nitro/Google verifier bridges, policy-aware rebinding, and the signed runtime-attestation appraisal export surface |
+| the verifier boundary remained Azure-shaped and lacked one signed operator-facing appraisal artifact | closed for the shipped local surface through the canonical appraisal contract, Azure/AWS Nitro/Google/enterprise-verifier bridges, policy-aware rebinding, and the signed runtime-attestation appraisal export surface |
+| portable appraisal-result interop remained underqualified across provider families and negative-path import behavior | closed for the shipped local surface through signed appraisal-result import/export, explicit local import-policy mapping, mixed-provider Azure/AWS Nitro/Google/enterprise-verifier qualification, and fail-closed stale, unsupported-family, and contradictory-claim regressions |
+| assurance-aware auth and economic policy still lacked explicit runtime provenance narrowing | closed for the shipped local surface through transaction-context projection of runtime-assurance schema and verifier family, fail-closed export on incomplete assurance projection, and manual facility review when verifier-family provenance is heterogeneous |
+| verifier identity, signer material, and reference-value distribution were still local-only and under-specified | closed for the shipped local surface through signed verifier descriptors, signed reference-value sets, one versioned trust-bundle contract, and fail-closed rejection of stale, ambiguous, or contract-mismatched bundle contents |
+| public issuer or verifier discovery still depended on implicit metadata fetch and lacked explicit transparency plus local-import guardrails | closed for the shipped local surface through signed issuer-discovery and verifier-discovery documents, one signed transparency snapshot, explicit informational-only/manual-review import guardrails, and fail-closed rejection of missing authority material or incomplete discovery objects |
 | certification discovery remained operator-scoped and under-documented relative to the research marketplace direction | closed for the shipped local surface through versioned evidence profiles, public publisher metadata, public search and transparency feeds, explicit dispute semantics, and policy-bound consume flows with stale or mismatched metadata failing closed |
+| open registry semantics still stopped at one local publication view without explicit replication, freshness, and ranking behavior | closed for the shipped local surface through origin/mirror/indexer publisher roles, freshness windows, deterministic search-policy metadata, replica-collapse rules, and fail-closed stale or divergent aggregation semantics |
+| open registry still lacked a portable governance and sanction layer over listings and local trust activation | closed for the shipped local surface through signed governance-charter and governance-case artifacts, explicit namespace/listing/operator scope, cross-operator escalation counterparties, activation-bound freeze or sanction evaluation, and fail-closed rejection of expired, unsupported, or unauthorized governance actions |
 | underwriting still stopped short of replayable credit qualification and one provider-facing capital review package | closed for the shipped local surface through signed exposure and scorecard artifacts, bounded facility policy, deterministic backtests, and a signed provider-risk package with honest recent-loss history |
-| ARC still stopped short of a bounded liability-market proof over provider policy, quote/bind, and claims workflow state | closed for the shipped local surface through curated provider-registry artifacts, provider-neutral quote/bind state, immutable claim/dispute/adjudication artifacts, focused marketplace qualification coverage, and updated partner/release boundary docs |
+| ARC still stopped short of an honest live-capital execution claim with explicit regulated-role boundaries | closed for the shipped local surface through the signed capital book, custody-neutral capital instructions, simulation-first capital-allocation artifacts, the combined qualification matrix, and explicit release/partner/protocol language that keeps ARC from implicitly claiming regulated-custodian or insurer-of-record status |
+| reserve control still stopped short of executable authority, reconciliation, and appeal semantics | closed for the shipped local surface through signed reserve-release and reserve-slash lifecycle artifacts, explicit execution-window and custody-rail validation, observed-execution reconciliation, machine-readable appeal state, and focused loss-lifecycle regression coverage |
+| ARC still stopped short of a bounded liability-market proof over provider policy, delegated pricing authority, quote/bind, and claims workflow state | closed for the shipped local surface through curated provider-registry artifacts, signed delegated pricing-authority and auto-bind artifacts, provider-neutral quote/bind state, immutable claim/dispute/adjudication artifacts, focused marketplace qualification coverage, and updated partner/release boundary docs |
+| the endgame market claim still lacked adversarial proof across hostile mirrors, divergent registry views, imported reputation, and forged remote activation authority | closed for the shipped local surface through adversarial multi-operator qualification that preserves visibility without trust, rejects invalid mirrored listing signatures, blocks divergent freshness from admission, keeps imported reputation locally weighted, and fails closed when governance or market-penalty artifacts rely on non-local activation authority |
+| the shipped identity surface still stopped short of broader DID/VC compatibility and public wallet-routing semantics | closed for the shipped local surface through one bounded public identity-profile, wallet-directory, routing-manifest, and qualification-matrix family that preserves `did:arc` provenance, verifier-bound routing, replay anchors, and fail-closed mismatch handling |
+| the public release, partner, protocol, and planning boundary still stopped short of the strongest honest maximal-endgame claim | closed for the shipped local surface through the final `v2.33` boundary rewrite across release candidate, qualification, partner proof, protocol, standards, and planning docs with residual non-goals kept explicit |
 
 ## Phase 43 Formal/Spec Closure Inventory
 
@@ -164,7 +235,7 @@ phase 44 is allowed to rely on.
 
 ### Accepted Launch Evidence Boundary
 
-For the current launch candidate, ARC claims:
+For the current production candidate, ARC claims:
 
 - executable reference/spec alignment for scope attenuation semantics
 - empirical verification for fail-closed kernel and trust-control behavior
@@ -177,15 +248,16 @@ ARC does not currently claim:
 - that standalone Lean proof files are part of the release gate while they
   remain outside the root import surface or contain `sorry`
 
-## Phase 44 Launch Decision
+## Current Release Decision Contract
 
-The launch decision is now explicit rather than implied:
+The release decision for the current production candidate is explicit rather
+than implied:
 
 | Gate class | Requirement | Status |
 | --- | --- | --- |
-| local qualification | `./scripts/ci-workspace.sh`, `./scripts/check-sdk-parity.sh`, and `./scripts/qualify-release.sh` green | satisfied |
+| local qualification | `./scripts/ci-workspace.sh`, `./scripts/check-sdk-parity.sh`, `./scripts/check-web3-contract-parity.sh`, and `./scripts/qualify-release.sh` green, with the bounded web3 runtime lanes green locally | satisfied |
 | launch materials | release, partner, operational, and standards-facing docs updated to the current ARC surface | satisfied |
-| hosted publication | hosted `CI` and `Release Qualification` observed green on the candidate commit | pending external observation |
+| hosted publication | hosted `CI` and `Release Qualification` observed green on the candidate commit, including the staged runtime, `e2e`, `ops`, and promotion bundles under `target/release-qualification/web3-runtime/` | pending external observation |
 
 The resulting decision is:
 
@@ -198,8 +270,17 @@ These are intentionally not blockers for the current ARC production candidate:
 
 - multi-region or consensus trust replication
 - permissionless or auto-trusting certification marketplace semantics
+- portable reputation as a universal trust oracle or automatic cross-issuer
+  trust score
+- permissionless mirror/indexer publication as automatic trust, sanction, or
+  market-penalty authority
+- permissionless or ambient open-market penalties, slashing, or trust
+  widening outside ARC's documented fee-schedule, trust-activation, and
+  governance-case surfaces
 - automatic SCIM lifecycle management
 - synthetic cross-issuer passport trust aggregation
+- public identity, issuer, verifier, or wallet discovery that auto-admits
+  visible trust material
 - theorem-prover completion for every protocol claim
 - performance-first rewrite work
 

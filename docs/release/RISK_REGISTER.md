@@ -1,7 +1,7 @@
 # Risk Register
 
 This register tracks the known non-blocking risks that remain after the local
-`v2.8` launch-candidate closeout.
+post-`v2.41` production-candidate closeout.
 
 | Risk | Current posture | Mitigation |
 | --- | --- | --- |
@@ -10,4 +10,4 @@ This register tracks the known non-blocking risks that remain after the local
 | Enterprise federation does not yet provide automatic SCIM lifecycle management | acceptable for current provider-admin and observability scope | keep provider-admin records explicit and fail closed when incomplete |
 | Portable trust does not synthesize cross-issuer reputation | intentional design choice, not a regression | document per-credential evaluation semantics and avoid broader claims |
 | A2A still lacks custom auth beyond the shipped matrix | known boundary for partner integrations | keep unsupported schemes explicit and fail closed during discovery/invocation |
-| Full theorem-prover coverage is incomplete | acceptable for the current launch candidate because the evidence boundary is explicit | keep protocol, partner, and release claims tied to executable tests and qualification artifacts |
+| Full theorem-prover coverage is incomplete | acceptable for the current production candidate because the evidence boundary is explicit | keep protocol, partner, and release claims tied to executable tests and qualification artifacts |

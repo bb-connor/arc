@@ -35,9 +35,7 @@ fn load_enterprise_provider_registry_local(
     }
 }
 
-pub(crate) fn load_admission_policy(
-    path: &Path,
-) -> Result<Option<arc_policy::HushSpec>, CliError> {
+pub(crate) fn load_admission_policy(path: &Path) -> Result<Option<arc_policy::HushSpec>, CliError> {
     let contents = fs::read_to_string(path)?;
     if arc_policy::is_hushspec_format(&contents) {
         return arc_policy::resolve_from_path(path)

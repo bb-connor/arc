@@ -4,12 +4,15 @@ use std::time::Duration;
 
 use arc_core::appraisal::{
     derive_runtime_attestation_appraisal, AttestationVerifierFamily, RuntimeAttestationAppraisal,
-    RuntimeAttestationAppraisalReasonCode, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
+    RuntimeAttestationAppraisalReasonCode, ENTERPRISE_VERIFIER_ADAPTER,
+    ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA, GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
     GOOGLE_CONFIDENTIAL_VM_VERIFIER_ADAPTER,
 };
 use arc_core::capability::{
     RuntimeAssuranceTier, RuntimeAttestationEvidence, WorkloadCredentialKind, WorkloadIdentity,
 };
+use arc_core::crypto::PublicKey;
+use arc_core::receipt::SignedExportEnvelope;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine as _;
 use ciborium::de::from_reader as cbor_from_reader;
@@ -255,6 +258,151 @@ impl RuntimeAttestationVerifierAdapter for GoogleConfidentialVmVerifierAdapter {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct EnterpriseVerifierVerificationPolicy {
+    pub verifier: String,
+    #[serde(default)]
+    pub trusted_signer_keys: Vec<String>,
+    pub max_evidence_age_seconds: u64,
+    #[serde(default = "default_enterprise_verifier_runtime_tier")]
+    pub tier: RuntimeAssuranceTier,
+}
+
+impl EnterpriseVerifierVerificationPolicy {
+    pub fn validate(&self) -> Result<(), EnterpriseVerifierVerificationError> {
+        if self.verifier.trim().is_empty() {
+            return Err(EnterpriseVerifierVerificationError::InvalidPolicy(
+                "verifier must not be empty".to_string(),
+            ));
+        }
+        if self.trusted_signer_keys.is_empty() {
+            return Err(EnterpriseVerifierVerificationError::InvalidPolicy(
+                "trusted_signer_keys must not be empty".to_string(),
+            ));
+        }
+        if self.max_evidence_age_seconds == 0 {
+            return Err(EnterpriseVerifierVerificationError::InvalidPolicy(
+                "max_evidence_age_seconds must be >= 1".to_string(),
+            ));
+        }
+        if self.tier > RuntimeAssuranceTier::Attested {
+            return Err(EnterpriseVerifierVerificationError::InvalidPolicy(
+                "phase-108 verifier adapters must not widen runtime assurance above `attested` before trust-policy rebinding".to_string(),
+            ));
+        }
+        for (index, signer_key) in self.trusted_signer_keys.iter().enumerate() {
+            if signer_key.trim().is_empty() {
+                return Err(EnterpriseVerifierVerificationError::InvalidPolicy(format!(
+                    "trusted_signer_keys[{index}] must not be empty"
+                )));
+            }
+            PublicKey::from_hex(signer_key).map_err(|error| {
+                EnterpriseVerifierVerificationError::InvalidPolicy(format!(
+                    "trusted_signer_keys[{index}] must be valid ed25519 public keys: {error}"
+                ))
+            })?;
+        }
+        Ok(())
+    }
+}
+
+fn default_enterprise_verifier_runtime_tier() -> RuntimeAssuranceTier {
+    RuntimeAssuranceTier::Attested
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnterpriseVerifierAdapter {
+    pub policy: EnterpriseVerifierVerificationPolicy,
+}
+
+impl EnterpriseVerifierAdapter {
+    pub fn new(
+        policy: EnterpriseVerifierVerificationPolicy,
+    ) -> Result<Self, EnterpriseVerifierVerificationError> {
+        policy.validate()?;
+        Ok(Self { policy })
+    }
+}
+
+impl RuntimeAttestationVerifierAdapter for EnterpriseVerifierAdapter {
+    type Error = EnterpriseVerifierVerificationError;
+
+    fn adapter_name(&self) -> &'static str {
+        ENTERPRISE_VERIFIER_ADAPTER
+    }
+
+    fn verifier_family(&self) -> AttestationVerifierFamily {
+        AttestationVerifierFamily::EnterpriseVerifier
+    }
+
+    fn verify_and_appraise(
+        &self,
+        evidence: &str,
+        now: u64,
+    ) -> Result<VerifiedRuntimeAttestation, Self::Error> {
+        let signed_evidence: SignedExportEnvelope<RuntimeAttestationEvidence> =
+            serde_json::from_str(evidence).map_err(|error| {
+                EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
+            })?;
+        if !signed_evidence.verify_signature().map_err(|error| {
+            EnterpriseVerifierVerificationError::InvalidEnvelope(error.to_string())
+        })? {
+            return Err(EnterpriseVerifierVerificationError::InvalidSignature);
+        }
+        let signer_key_hex = signed_evidence.signer_key.to_hex();
+        if !self
+            .policy
+            .trusted_signer_keys
+            .iter()
+            .any(|allowed| allowed == &signer_key_hex)
+        {
+            return Err(EnterpriseVerifierVerificationError::UntrustedSigner {
+                signer_key: signer_key_hex,
+            });
+        }
+
+        let verified_evidence = signed_evidence.body;
+        if verified_evidence.schema != ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA {
+            return Err(EnterpriseVerifierVerificationError::UnsupportedSchema {
+                actual: verified_evidence.schema.clone(),
+            });
+        }
+        if verified_evidence.verifier != self.policy.verifier {
+            return Err(EnterpriseVerifierVerificationError::VerifierMismatch {
+                expected: self.policy.verifier.clone(),
+                actual: verified_evidence.verifier.clone(),
+            });
+        }
+        if !verified_evidence.is_valid_at(now) {
+            return Err(EnterpriseVerifierVerificationError::EvidenceNotValid { now });
+        }
+        let age = now.saturating_sub(verified_evidence.issued_at);
+        if age > self.policy.max_evidence_age_seconds {
+            return Err(EnterpriseVerifierVerificationError::EvidenceTooOld {
+                max_evidence_age_seconds: self.policy.max_evidence_age_seconds,
+                actual_age_seconds: age,
+            });
+        }
+        if verified_evidence.tier > self.policy.tier {
+            return Err(EnterpriseVerifierVerificationError::TierTooHigh {
+                actual: verified_evidence.tier,
+                maximum: self.policy.tier,
+            });
+        }
+
+        let appraisal =
+            derive_runtime_attestation_appraisal(&verified_evidence).map_err(|error| {
+                EnterpriseVerifierVerificationError::InvalidEvidence(error.to_string())
+            })?;
+        Ok(VerifiedRuntimeAttestation {
+            evidence: verified_evidence,
+            appraisal,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AzureMaaVerificationPolicy {
     pub issuer: String,
     #[serde(default)]
@@ -444,6 +592,47 @@ pub enum AzureMaaVerificationError {
 
     #[error("failed to parse Azure MAA metadata `{url}`: {error}")]
     MetadataParse { url: String, error: String },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EnterpriseVerifierVerificationError {
+    #[error("enterprise verifier policy is invalid: {0}")]
+    InvalidPolicy(String),
+
+    #[error("enterprise verifier evidence envelope is invalid: {0}")]
+    InvalidEnvelope(String),
+
+    #[error("enterprise verifier evidence signature is invalid")]
+    InvalidSignature,
+
+    #[error("enterprise verifier signer `{signer_key}` is not trusted")]
+    UntrustedSigner { signer_key: String },
+
+    #[error("enterprise verifier evidence schema `{actual}` is unsupported")]
+    UnsupportedSchema { actual: String },
+
+    #[error("enterprise verifier mismatch: expected `{expected}`, got `{actual}`")]
+    VerifierMismatch { expected: String, actual: String },
+
+    #[error("enterprise verifier evidence is not valid at {now}")]
+    EvidenceNotValid { now: u64 },
+
+    #[error("enterprise verifier evidence age {actual_age_seconds}s exceeds {max_evidence_age_seconds}s")]
+    EvidenceTooOld {
+        max_evidence_age_seconds: u64,
+        actual_age_seconds: u64,
+    },
+
+    #[error("enterprise verifier evidence tier {actual:?} exceeds configured maximum {maximum:?}")]
+    TierTooHigh {
+        actual: RuntimeAssuranceTier,
+        maximum: RuntimeAssuranceTier,
+    },
+
+    #[error(
+        "enterprise verifier evidence could not be appraised on the shared ARC substrate: {0}"
+    )]
+    InvalidEvidence(String),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -2429,5 +2618,107 @@ mod tests {
             verify_aws_nitro_attestation_document(b"not-cbor", &policy, current_unix_time())
                 .expect_err("malformed COSE should fail");
         assert!(matches!(error, AwsNitroVerificationError::InvalidCose(_)));
+    }
+
+    #[test]
+    fn enterprise_verifier_adapter_verifies_signed_envelope_and_derives_portable_appraisal() {
+        let signer = arc_core::crypto::Keypair::generate();
+        let now = current_unix_time();
+        let evidence = RuntimeAttestationEvidence {
+            schema: ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA.to_string(),
+            verifier: "https://attest.contoso.example".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: now.saturating_sub(30),
+            expires_at: now.saturating_add(300),
+            evidence_sha256: "sha256-enterprise-attestation".to_string(),
+            runtime_identity: Some("spiffe://arc.example/workloads/enterprise".to_string()),
+            workload_identity: Some(
+                WorkloadIdentity::parse_spiffe_uri("spiffe://arc.example/workloads/enterprise")
+                    .expect("parse workload identity"),
+            ),
+            claims: Some(json!({
+                "enterpriseVerifier": {
+                    "attestationType": "enterprise_confidential_vm",
+                    "hardwareModel": "AMD_SEV_SNP",
+                    "secureBoot": "enabled",
+                    "digest": "sha384:enterprise-measurement",
+                    "pcrs": {
+                        "0": "8f7f1be8"
+                    }
+                }
+            })),
+        };
+        let signed = SignedExportEnvelope::sign(evidence.clone(), &signer).expect("sign evidence");
+        let adapter = EnterpriseVerifierAdapter::new(EnterpriseVerifierVerificationPolicy {
+            verifier: "https://attest.contoso.example".to_string(),
+            trusted_signer_keys: vec![signer.public_key().to_hex()],
+            max_evidence_age_seconds: 120,
+            tier: RuntimeAssuranceTier::Attested,
+        })
+        .expect("create enterprise adapter");
+
+        let verified = adapter
+            .verify_and_appraise(
+                &serde_json::to_string(&signed).expect("serialize signed evidence"),
+                now,
+            )
+            .expect("verify enterprise evidence");
+        assert_eq!(verified.evidence, evidence);
+        assert_eq!(
+            verified.appraisal.verifier_family,
+            AttestationVerifierFamily::EnterpriseVerifier
+        );
+        assert_eq!(
+            verified.appraisal.normalized_assertions["secureBoot"],
+            json!("enabled")
+        );
+        assert_eq!(
+            verified.appraisal.normalized_assertions["digest"],
+            json!("sha384:enterprise-measurement")
+        );
+    }
+
+    #[test]
+    fn enterprise_verifier_adapter_rejects_untrusted_signer() {
+        let trusted_signer = arc_core::crypto::Keypair::generate();
+        let actual_signer = arc_core::crypto::Keypair::generate();
+        let now = current_unix_time();
+        let signed = SignedExportEnvelope::sign(
+            RuntimeAttestationEvidence {
+                schema: ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA.to_string(),
+                verifier: "https://attest.contoso.example".to_string(),
+                tier: RuntimeAssuranceTier::Attested,
+                issued_at: now.saturating_sub(30),
+                expires_at: now.saturating_add(300),
+                evidence_sha256: "sha256-enterprise-attestation".to_string(),
+                runtime_identity: None,
+                workload_identity: None,
+                claims: Some(json!({
+                    "enterpriseVerifier": {
+                        "attestationType": "enterprise_confidential_vm"
+                    }
+                })),
+            },
+            &actual_signer,
+        )
+        .expect("sign enterprise evidence");
+        let adapter = EnterpriseVerifierAdapter::new(EnterpriseVerifierVerificationPolicy {
+            verifier: "https://attest.contoso.example".to_string(),
+            trusted_signer_keys: vec![trusted_signer.public_key().to_hex()],
+            max_evidence_age_seconds: 120,
+            tier: RuntimeAssuranceTier::Attested,
+        })
+        .expect("create enterprise adapter");
+
+        let error = adapter
+            .verify_and_appraise(
+                &serde_json::to_string(&signed).expect("serialize signed evidence"),
+                now,
+            )
+            .expect_err("untrusted signer should fail");
+        assert!(matches!(
+            error,
+            EnterpriseVerifierVerificationError::UntrustedSigner { .. }
+        ));
     }
 }

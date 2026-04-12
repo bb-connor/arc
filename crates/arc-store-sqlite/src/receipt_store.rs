@@ -52,20 +52,25 @@ use arc_kernel::{
     CreditFacilityListSummary, CreditFacilityRow, CreditLossLifecycleEventKind,
     CreditLossLifecycleListQuery, CreditLossLifecycleListReport, CreditLossLifecycleListSummary,
     CreditLossLifecycleRow, EvidenceChildReceiptScope, EvidenceExportQuery,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityClaimResponseDisposition,
-    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
-    LiabilityClaimWorkflowSummary, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
-    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState,
-    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
-    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
-    LiabilityQuoteDisposition, ReceiptStore, ReceiptStoreError, RetentionConfig, SignedCreditBond,
-    SignedCreditFacility, SignedCreditLossLifecycle, SignedLiabilityBoundCoverage,
+    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityAutoBindDisposition,
+    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
+    LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
+    LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary,
+    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow,
+    LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
+    LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
+    LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
+    ReceiptStore, ReceiptStoreError, RetentionConfig, SignedCreditBond, SignedCreditFacility,
+    SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
     SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
-    SignedLiabilityClaimResponse, SignedLiabilityPlacement, SignedLiabilityProvider,
-    SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse, SignedUnderwritingDecision,
-    StoredChildReceipt, StoredToolReceipt, UnderwritingAppealCreateRequest,
-    UnderwritingAppealRecord, UnderwritingAppealResolution, UnderwritingAppealResolveRequest,
-    UnderwritingAppealStatus, UnderwritingDecisionLifecycleState, UnderwritingDecisionListReport,
+    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
+    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
+    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
+    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
+    SignedLiabilityQuoteResponse, SignedUnderwritingDecision, StoredChildReceipt,
+    StoredToolReceipt, UnderwritingAppealCreateRequest, UnderwritingAppealRecord,
+    UnderwritingAppealResolution, UnderwritingAppealResolveRequest, UnderwritingAppealStatus,
+    UnderwritingDecisionLifecycleState, UnderwritingDecisionListReport,
     UnderwritingDecisionOutcome, UnderwritingDecisionQuery, UnderwritingDecisionRow,
     UnderwritingDecisionSummary, CREDIT_BOND_LIST_REPORT_SCHEMA,
     CREDIT_FACILITY_LIST_REPORT_SCHEMA, CREDIT_LOSS_LIFECYCLE_LIST_REPORT_SCHEMA,
@@ -325,6 +330,25 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_liability_quote_responses_provider
                 ON liability_quote_responses(provider_id);
 
+            CREATE TABLE IF NOT EXISTS liability_pricing_authorities (
+                authority_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                quote_request_id TEXT NOT NULL REFERENCES liability_quote_requests(quote_request_id),
+                provider_id TEXT NOT NULL,
+                facility_id TEXT NOT NULL,
+                underwriting_decision_id TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_liability_pricing_authorities_request
+                ON liability_pricing_authorities(quote_request_id);
+            CREATE INDEX IF NOT EXISTS idx_liability_pricing_authorities_provider
+                ON liability_pricing_authorities(provider_id);
+            CREATE INDEX IF NOT EXISTS idx_liability_pricing_authorities_facility
+                ON liability_pricing_authorities(facility_id);
+
             CREATE TABLE IF NOT EXISTS liability_placements (
                 placement_id TEXT PRIMARY KEY,
                 issued_at INTEGER NOT NULL,
@@ -361,6 +385,25 @@ impl SqliteReceiptStore {
                 ON liability_bound_coverages(placement_id);
             CREATE INDEX IF NOT EXISTS idx_liability_bound_coverages_provider
                 ON liability_bound_coverages(provider_id);
+
+            CREATE TABLE IF NOT EXISTS liability_auto_bind_decisions (
+                decision_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                quote_request_id TEXT NOT NULL REFERENCES liability_quote_requests(quote_request_id),
+                quote_response_id TEXT NOT NULL REFERENCES liability_quote_responses(quote_response_id),
+                authority_id TEXT NOT NULL REFERENCES liability_pricing_authorities(authority_id),
+                provider_id TEXT NOT NULL,
+                disposition TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_liability_auto_bind_decisions_response
+                ON liability_auto_bind_decisions(quote_response_id);
+            CREATE INDEX IF NOT EXISTS idx_liability_auto_bind_decisions_request
+                ON liability_auto_bind_decisions(quote_request_id);
+            CREATE INDEX IF NOT EXISTS idx_liability_auto_bind_decisions_authority
+                ON liability_auto_bind_decisions(authority_id);
 
             CREATE TABLE IF NOT EXISTS liability_claim_packages (
                 claim_id TEXT PRIMARY KEY,
@@ -425,6 +468,65 @@ impl SqliteReceiptStore {
             );
             CREATE INDEX IF NOT EXISTS idx_liability_claim_adjudications_issued_at
                 ON liability_claim_adjudications(issued_at);
+
+            CREATE TABLE IF NOT EXISTS liability_claim_payout_instructions (
+                payout_instruction_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                claim_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_packages(claim_id),
+                adjudication_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_adjudications(adjudication_id),
+                payout_amount_units INTEGER NOT NULL,
+                payout_amount_currency TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_liability_claim_payout_instructions_issued_at
+                ON liability_claim_payout_instructions(issued_at);
+
+            CREATE TABLE IF NOT EXISTS liability_claim_payout_receipts (
+                payout_receipt_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                claim_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_packages(claim_id),
+                payout_instruction_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_payout_instructions(payout_instruction_id),
+                reconciliation_state TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_liability_claim_payout_receipts_issued_at
+                ON liability_claim_payout_receipts(issued_at);
+
+            CREATE TABLE IF NOT EXISTS liability_claim_settlement_instructions (
+                settlement_instruction_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                claim_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_packages(claim_id),
+                payout_receipt_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_payout_receipts(payout_receipt_id),
+                settlement_kind TEXT NOT NULL,
+                payer_role TEXT NOT NULL,
+                payer_id TEXT NOT NULL,
+                payee_role TEXT NOT NULL,
+                payee_id TEXT NOT NULL,
+                settlement_amount_units INTEGER NOT NULL,
+                settlement_amount_currency TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_liability_claim_settlement_instructions_issued_at
+                ON liability_claim_settlement_instructions(issued_at);
+
+            CREATE TABLE IF NOT EXISTS liability_claim_settlement_receipts (
+                settlement_receipt_id TEXT PRIMARY KEY,
+                issued_at INTEGER NOT NULL,
+                claim_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_packages(claim_id),
+                settlement_instruction_id TEXT NOT NULL UNIQUE REFERENCES liability_claim_settlement_instructions(settlement_instruction_id),
+                reconciliation_state TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                signer_key TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_liability_claim_settlement_receipts_issued_at
+                ON liability_claim_settlement_receipts(issued_at);
 
             CREATE TABLE IF NOT EXISTS credit_loss_lifecycle (
                 event_id TEXT PRIMARY KEY,
@@ -2004,6 +2106,102 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
+    pub fn record_liability_pricing_authority(
+        &mut self,
+        authority: &SignedLiabilityPricingAuthority,
+    ) -> Result<(), ReceiptStoreError> {
+        if !authority
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability pricing authority signature verification failed".to_string(),
+            ));
+        }
+        authority
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &authority.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT authority_id FROM liability_pricing_authorities WHERE authority_id = ?1",
+                params![artifact.authority_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability pricing authority `{}` already exists",
+                artifact.authority_id
+            )));
+        }
+
+        let stored_request_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_quote_requests
+                 WHERE quote_request_id = ?1",
+                params![artifact.quote_request.body.quote_request_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability quote request `{}` not found",
+                    artifact.quote_request.body.quote_request_id
+                ))
+            })?;
+        let stored_request: SignedLiabilityQuoteRequest =
+            serde_json::from_str(&stored_request_raw_json)?;
+        if stored_request.body != artifact.quote_request.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability pricing authority quote_request does not match the persisted request"
+                    .to_string(),
+            ));
+        }
+
+        let existing_request_authority = tx
+            .query_row(
+                "SELECT authority_id
+                 FROM liability_pricing_authorities
+                 WHERE quote_request_id = ?1",
+                params![artifact.quote_request.body.quote_request_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(existing_request_authority) = existing_request_authority {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability quote request `{}` already has pricing authority `{existing_request_authority}`",
+                artifact.quote_request.body.quote_request_id
+            )));
+        }
+
+        tx.execute(
+            "INSERT INTO liability_pricing_authorities (
+                authority_id, issued_at, quote_request_id, provider_id, facility_id,
+                underwriting_decision_id, expires_at, raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                artifact.authority_id,
+                artifact.issued_at as i64,
+                artifact.quote_request.body.quote_request_id,
+                artifact.provider_policy.provider_id,
+                artifact.facility.body.facility_id,
+                artifact.underwriting_decision.body.decision_id,
+                artifact.expires_at as i64,
+                serde_json::to_string(authority)?,
+                authority.signer_key.to_hex(),
+                authority.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn record_liability_bound_coverage(
         &mut self,
         coverage: &SignedLiabilityBoundCoverage,
@@ -2119,6 +2317,279 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
+    pub fn record_liability_auto_bind_decision(
+        &mut self,
+        decision: &SignedLiabilityAutoBindDecision,
+    ) -> Result<(), ReceiptStoreError> {
+        if !decision
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability auto-bind decision signature verification failed".to_string(),
+            ));
+        }
+        decision
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &decision.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT decision_id FROM liability_auto_bind_decisions WHERE decision_id = ?1",
+                params![artifact.decision_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability auto-bind decision `{}` already exists",
+                artifact.decision_id
+            )));
+        }
+
+        let stored_authority_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_pricing_authorities
+                 WHERE authority_id = ?1",
+                params![artifact.authority.body.authority_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability pricing authority `{}` not found",
+                    artifact.authority.body.authority_id
+                ))
+            })?;
+        let stored_authority: SignedLiabilityPricingAuthority =
+            serde_json::from_str(&stored_authority_raw_json)?;
+        if stored_authority.body != artifact.authority.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability auto-bind authority does not match the persisted authority".to_string(),
+            ));
+        }
+
+        let (stored_response_raw_json, superseded_by_quote_response_id) = tx
+            .query_row(
+                "SELECT raw_json, superseded_by_quote_response_id
+                 FROM liability_quote_responses
+                 WHERE quote_response_id = ?1",
+                params![artifact.quote_response.body.quote_response_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability quote response `{}` not found",
+                    artifact.quote_response.body.quote_response_id
+                ))
+            })?;
+        if superseded_by_quote_response_id.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability quote response `{}` is superseded",
+                artifact.quote_response.body.quote_response_id
+            )));
+        }
+        let stored_response: SignedLiabilityQuoteResponse =
+            serde_json::from_str(&stored_response_raw_json)?;
+        if stored_response.body != artifact.quote_response.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability auto-bind quote_response does not match the persisted response"
+                    .to_string(),
+            ));
+        }
+
+        let existing_response_decision = tx
+            .query_row(
+                "SELECT decision_id
+                 FROM liability_auto_bind_decisions
+                 WHERE quote_response_id = ?1",
+                params![artifact.quote_response.body.quote_response_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(existing_response_decision) = existing_response_decision {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability quote response `{}` already has auto-bind decision `{existing_response_decision}`",
+                artifact.quote_response.body.quote_response_id
+            )));
+        }
+
+        if let Some(placement) = artifact.placement.as_ref() {
+            let placement_artifact = &placement.body;
+            let existing_placement = tx
+                .query_row(
+                    "SELECT placement_id FROM liability_placements WHERE placement_id = ?1",
+                    params![placement_artifact.placement_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?;
+            if existing_placement.is_some() {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "liability placement `{}` already exists",
+                    placement_artifact.placement_id
+                )));
+            }
+            let existing_request_placement = tx
+                .query_row(
+                    "SELECT placement_id
+                     FROM liability_placements
+                     WHERE quote_request_id = ?1",
+                    params![
+                        artifact
+                            .quote_response
+                            .body
+                            .quote_request
+                            .body
+                            .quote_request_id
+                    ],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?;
+            if let Some(existing_request_placement) = existing_request_placement {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "liability quote request `{}` already has placement `{existing_request_placement}`",
+                    artifact.quote_response.body.quote_request.body.quote_request_id
+                )));
+            }
+            tx.execute(
+                "INSERT INTO liability_placements (
+                    placement_id, issued_at, quote_request_id, quote_response_id, provider_id,
+                    raw_json, signer_key, signature
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                params![
+                    placement_artifact.placement_id,
+                    placement_artifact.issued_at as i64,
+                    placement_artifact
+                        .quote_response
+                        .body
+                        .quote_request
+                        .body
+                        .quote_request_id,
+                    placement_artifact.quote_response.body.quote_response_id,
+                    placement_artifact
+                        .quote_response
+                        .body
+                        .quote_request
+                        .body
+                        .provider_policy
+                        .provider_id,
+                    serde_json::to_string(placement)?,
+                    placement.signer_key.to_hex(),
+                    placement.signature.to_hex(),
+                ],
+            )?;
+        }
+
+        if let Some(bound_coverage) = artifact.bound_coverage.as_ref() {
+            let bound_artifact = &bound_coverage.body;
+            let existing_bound = tx
+                .query_row(
+                    "SELECT bound_coverage_id
+                     FROM liability_bound_coverages
+                     WHERE bound_coverage_id = ?1",
+                    params![bound_artifact.bound_coverage_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?;
+            if existing_bound.is_some() {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "liability bound coverage `{}` already exists",
+                    bound_artifact.bound_coverage_id
+                )));
+            }
+            let existing_placement_bound = tx
+                .query_row(
+                    "SELECT bound_coverage_id
+                     FROM liability_bound_coverages
+                     WHERE placement_id = ?1",
+                    params![bound_artifact.placement.body.placement_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?;
+            if let Some(existing_placement_bound) = existing_placement_bound {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "liability placement `{}` already has bound coverage `{existing_placement_bound}`",
+                    bound_artifact.placement.body.placement_id
+                )));
+            }
+            tx.execute(
+                "INSERT INTO liability_bound_coverages (
+                    bound_coverage_id, issued_at, quote_request_id, quote_response_id, placement_id,
+                    provider_id, raw_json, signer_key, signature
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                params![
+                    bound_artifact.bound_coverage_id,
+                    bound_artifact.issued_at as i64,
+                    bound_artifact
+                        .placement
+                        .body
+                        .quote_response
+                        .body
+                        .quote_request
+                        .body
+                        .quote_request_id,
+                    bound_artifact
+                        .placement
+                        .body
+                        .quote_response
+                        .body
+                        .quote_response_id,
+                    bound_artifact.placement.body.placement_id,
+                    bound_artifact
+                        .placement
+                        .body
+                        .quote_response
+                        .body
+                        .quote_request
+                        .body
+                        .provider_policy
+                        .provider_id,
+                    serde_json::to_string(bound_coverage)?,
+                    bound_coverage.signer_key.to_hex(),
+                    bound_coverage.signature.to_hex(),
+                ],
+            )?;
+        }
+
+        tx.execute(
+            "INSERT INTO liability_auto_bind_decisions (
+                decision_id, issued_at, quote_request_id, quote_response_id, authority_id,
+                provider_id, disposition, raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                artifact.decision_id,
+                artifact.issued_at as i64,
+                artifact
+                    .quote_response
+                    .body
+                    .quote_request
+                    .body
+                    .quote_request_id,
+                artifact.quote_response.body.quote_response_id,
+                artifact.authority.body.authority_id,
+                artifact
+                    .quote_response
+                    .body
+                    .quote_request
+                    .body
+                    .provider_policy
+                    .provider_id,
+                liability_auto_bind_disposition_label(&artifact.disposition),
+                serde_json::to_string(decision)?,
+                decision.signer_key.to_hex(),
+                decision.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn query_liability_market_workflows(
         &self,
         query: &LiabilityMarketWorkflowQuery,
@@ -2135,6 +2606,11 @@ impl SqliteReceiptStore {
         let mut quote_responses = 0_u64;
         let mut quoted_responses = 0_u64;
         let mut declined_responses = 0_u64;
+        let mut pricing_authorities = 0_u64;
+        let mut auto_bind_decisions = 0_u64;
+        let mut auto_bound_decisions = 0_u64;
+        let mut manual_review_decisions = 0_u64;
+        let mut denied_decisions = 0_u64;
         let mut placements = 0_u64;
         let mut bound_coverages = 0_u64;
         let mut workflows = Vec::new();
@@ -2166,6 +2642,47 @@ impl SqliteReceiptStore {
                 match response.body.disposition {
                     LiabilityQuoteDisposition::Quoted => quoted_responses += 1,
                     LiabilityQuoteDisposition::Declined => declined_responses += 1,
+                }
+            }
+
+            let pricing_authority = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_pricing_authorities
+                     WHERE quote_request_id = ?1
+                     ORDER BY issued_at DESC, authority_id DESC
+                     LIMIT 1",
+                    params![quote_request.body.quote_request_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| serde_json::from_str::<SignedLiabilityPricingAuthority>(&raw_json))
+                .transpose()?;
+            if pricing_authority.is_some() {
+                pricing_authorities += 1;
+            }
+
+            let latest_auto_bind_decision = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_auto_bind_decisions
+                     WHERE quote_request_id = ?1
+                     ORDER BY issued_at DESC, decision_id DESC
+                     LIMIT 1",
+                    params![quote_request.body.quote_request_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| serde_json::from_str::<SignedLiabilityAutoBindDecision>(&raw_json))
+                .transpose()?;
+            if let Some(decision) = latest_auto_bind_decision.as_ref() {
+                auto_bind_decisions += 1;
+                match decision.body.disposition {
+                    LiabilityAutoBindDisposition::AutoBound => auto_bound_decisions += 1,
+                    LiabilityAutoBindDisposition::ManualReview => manual_review_decisions += 1,
+                    LiabilityAutoBindDisposition::Denied => denied_decisions += 1,
                 }
             }
 
@@ -2209,6 +2726,8 @@ impl SqliteReceiptStore {
                 workflows.push(LiabilityMarketWorkflowRow {
                     quote_request,
                     latest_quote_response,
+                    pricing_authority,
+                    latest_auto_bind_decision,
                     placement,
                     bound_coverage,
                 });
@@ -2225,6 +2744,11 @@ impl SqliteReceiptStore {
                 quote_responses,
                 quoted_responses,
                 declined_responses,
+                pricing_authorities,
+                auto_bind_decisions,
+                auto_bound_decisions,
+                manual_review_decisions,
+                denied_decisions,
                 placements,
                 bound_coverages,
             },
@@ -2671,6 +3195,407 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
+    pub fn record_liability_claim_payout_instruction(
+        &mut self,
+        payout_instruction: &SignedLiabilityClaimPayoutInstruction,
+    ) -> Result<(), ReceiptStoreError> {
+        if !payout_instruction
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim payout instruction signature verification failed".to_string(),
+            ));
+        }
+        payout_instruction
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &payout_instruction.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT payout_instruction_id
+                 FROM liability_claim_payout_instructions
+                 WHERE payout_instruction_id = ?1",
+                params![artifact.payout_instruction_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability claim payout instruction `{}` already exists",
+                artifact.payout_instruction_id
+            )));
+        }
+
+        let stored_adjudication_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_claim_adjudications
+                 WHERE adjudication_id = ?1",
+                params![artifact.adjudication.body.adjudication_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability claim adjudication `{}` not found",
+                    artifact.adjudication.body.adjudication_id
+                ))
+            })?;
+        let stored_adjudication: SignedLiabilityClaimAdjudication =
+            serde_json::from_str(&stored_adjudication_raw_json)?;
+        if stored_adjudication.body != artifact.adjudication.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim payout instruction adjudication does not match the persisted adjudication"
+                    .to_string(),
+            ));
+        }
+
+        let claim_id = artifact
+            .adjudication
+            .body
+            .dispute
+            .body
+            .provider_response
+            .body
+            .claim
+            .body
+            .claim_id
+            .clone();
+
+        tx.execute(
+            "INSERT INTO liability_claim_payout_instructions (
+                payout_instruction_id, issued_at, claim_id, adjudication_id,
+                payout_amount_units, payout_amount_currency,
+                raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                artifact.payout_instruction_id,
+                artifact.issued_at as i64,
+                claim_id,
+                artifact.adjudication.body.adjudication_id,
+                artifact.payout_amount.units as i64,
+                artifact.payout_amount.currency,
+                serde_json::to_string(payout_instruction)?,
+                payout_instruction.signer_key.to_hex(),
+                payout_instruction.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn record_liability_claim_payout_receipt(
+        &mut self,
+        payout_receipt: &SignedLiabilityClaimPayoutReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        if !payout_receipt
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim payout receipt signature verification failed".to_string(),
+            ));
+        }
+        payout_receipt
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &payout_receipt.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT payout_receipt_id
+                 FROM liability_claim_payout_receipts
+                 WHERE payout_receipt_id = ?1",
+                params![artifact.payout_receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability claim payout receipt `{}` already exists",
+                artifact.payout_receipt_id
+            )));
+        }
+
+        let stored_instruction_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_claim_payout_instructions
+                 WHERE payout_instruction_id = ?1",
+                params![artifact.payout_instruction.body.payout_instruction_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability claim payout instruction `{}` not found",
+                    artifact.payout_instruction.body.payout_instruction_id
+                ))
+            })?;
+        let stored_instruction: SignedLiabilityClaimPayoutInstruction =
+            serde_json::from_str(&stored_instruction_raw_json)?;
+        if stored_instruction.body != artifact.payout_instruction.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim payout receipt payout_instruction does not match the persisted payout instruction"
+                    .to_string(),
+            ));
+        }
+
+        let claim_id = artifact
+            .payout_instruction
+            .body
+            .adjudication
+            .body
+            .dispute
+            .body
+            .provider_response
+            .body
+            .claim
+            .body
+            .claim_id
+            .clone();
+
+        tx.execute(
+            "INSERT INTO liability_claim_payout_receipts (
+                payout_receipt_id, issued_at, claim_id, payout_instruction_id,
+                reconciliation_state, raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                artifact.payout_receipt_id,
+                artifact.issued_at as i64,
+                claim_id,
+                artifact.payout_instruction.body.payout_instruction_id,
+                serde_json::to_string(&artifact.reconciliation_state)?,
+                serde_json::to_string(payout_receipt)?,
+                payout_receipt.signer_key.to_hex(),
+                payout_receipt.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn record_liability_claim_settlement_instruction(
+        &mut self,
+        settlement_instruction: &SignedLiabilityClaimSettlementInstruction,
+    ) -> Result<(), ReceiptStoreError> {
+        if !settlement_instruction
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim settlement instruction signature verification failed".to_string(),
+            ));
+        }
+        settlement_instruction
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &settlement_instruction.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT settlement_instruction_id
+                 FROM liability_claim_settlement_instructions
+                 WHERE settlement_instruction_id = ?1",
+                params![artifact.settlement_instruction_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability claim settlement instruction `{}` already exists",
+                artifact.settlement_instruction_id
+            )));
+        }
+
+        let stored_payout_receipt_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_claim_payout_receipts
+                 WHERE payout_receipt_id = ?1",
+                params![artifact.payout_receipt.body.payout_receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability claim payout receipt `{}` not found",
+                    artifact.payout_receipt.body.payout_receipt_id
+                ))
+            })?;
+        let stored_payout_receipt: SignedLiabilityClaimPayoutReceipt =
+            serde_json::from_str(&stored_payout_receipt_raw_json)?;
+        if stored_payout_receipt.body != artifact.payout_receipt.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim settlement instruction payout_receipt does not match the persisted payout receipt"
+                    .to_string(),
+            ));
+        }
+
+        let claim_id = artifact
+            .payout_receipt
+            .body
+            .payout_instruction
+            .body
+            .adjudication
+            .body
+            .dispute
+            .body
+            .provider_response
+            .body
+            .claim
+            .body
+            .claim_id
+            .clone();
+
+        tx.execute(
+            "INSERT INTO liability_claim_settlement_instructions (
+                settlement_instruction_id, issued_at, claim_id, payout_receipt_id,
+                settlement_kind, payer_role, payer_id, payee_role, payee_id,
+                settlement_amount_units, settlement_amount_currency,
+                raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            params![
+                artifact.settlement_instruction_id,
+                artifact.issued_at as i64,
+                claim_id,
+                artifact.payout_receipt.body.payout_receipt_id,
+                serde_json::to_string(&artifact.settlement_kind)?,
+                serde_json::to_string(&artifact.topology.payer.role)?,
+                artifact.topology.payer.party_id,
+                serde_json::to_string(&artifact.topology.payee.role)?,
+                artifact.topology.payee.party_id,
+                artifact.settlement_amount.units as i64,
+                artifact.settlement_amount.currency,
+                serde_json::to_string(settlement_instruction)?,
+                settlement_instruction.signer_key.to_hex(),
+                settlement_instruction.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn record_liability_claim_settlement_receipt(
+        &mut self,
+        settlement_receipt: &SignedLiabilityClaimSettlementReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        if !settlement_receipt
+            .verify_signature()
+            .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?
+        {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim settlement receipt signature verification failed".to_string(),
+            ));
+        }
+        settlement_receipt
+            .body
+            .validate()
+            .map_err(ReceiptStoreError::Conflict)?;
+
+        let artifact = &settlement_receipt.body;
+        let tx = self.connection.transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT settlement_receipt_id
+                 FROM liability_claim_settlement_receipts
+                 WHERE settlement_receipt_id = ?1",
+                params![artifact.settlement_receipt_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing.is_some() {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "liability claim settlement receipt `{}` already exists",
+                artifact.settlement_receipt_id
+            )));
+        }
+
+        let stored_instruction_raw_json = tx
+            .query_row(
+                "SELECT raw_json
+                 FROM liability_claim_settlement_instructions
+                 WHERE settlement_instruction_id = ?1",
+                params![
+                    artifact
+                        .settlement_instruction
+                        .body
+                        .settlement_instruction_id
+                ],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "liability claim settlement instruction `{}` not found",
+                    artifact
+                        .settlement_instruction
+                        .body
+                        .settlement_instruction_id
+                ))
+            })?;
+        let stored_instruction: SignedLiabilityClaimSettlementInstruction =
+            serde_json::from_str(&stored_instruction_raw_json)?;
+        if stored_instruction.body != artifact.settlement_instruction.body {
+            return Err(ReceiptStoreError::Conflict(
+                "liability claim settlement receipt settlement_instruction does not match the persisted settlement instruction"
+                    .to_string(),
+            ));
+        }
+
+        let claim_id = artifact
+            .settlement_instruction
+            .body
+            .payout_receipt
+            .body
+            .payout_instruction
+            .body
+            .adjudication
+            .body
+            .dispute
+            .body
+            .provider_response
+            .body
+            .claim
+            .body
+            .claim_id
+            .clone();
+
+        tx.execute(
+            "INSERT INTO liability_claim_settlement_receipts (
+                settlement_receipt_id, issued_at, claim_id, settlement_instruction_id,
+                reconciliation_state, raw_json, signer_key, signature
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                artifact.settlement_receipt_id,
+                artifact.issued_at as i64,
+                claim_id,
+                artifact
+                    .settlement_instruction
+                    .body
+                    .settlement_instruction_id,
+                serde_json::to_string(&artifact.reconciliation_state)?,
+                serde_json::to_string(settlement_receipt)?,
+                settlement_receipt.signer_key.to_hex(),
+                settlement_receipt.signature.to_hex(),
+            ],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn query_liability_claim_workflows(
         &self,
         query: &LiabilityClaimWorkflowQuery,
@@ -2689,6 +3614,15 @@ impl SqliteReceiptStore {
         let mut denied_responses = 0_u64;
         let mut disputes = 0_u64;
         let mut adjudications = 0_u64;
+        let mut payout_instructions = 0_u64;
+        let mut payout_receipts = 0_u64;
+        let mut matched_payout_receipts = 0_u64;
+        let mut mismatched_payout_receipts = 0_u64;
+        let mut settlement_instructions = 0_u64;
+        let mut settlement_receipts = 0_u64;
+        let mut matched_settlement_receipts = 0_u64;
+        let mut mismatched_settlement_receipts = 0_u64;
+        let mut counterparty_mismatch_settlement_receipts = 0_u64;
         let mut claims = Vec::new();
 
         for row in rows {
@@ -2758,12 +3692,115 @@ impl SqliteReceiptStore {
                 adjudications += 1;
             }
 
+            let payout_instruction = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_claim_payout_instructions
+                     WHERE claim_id = ?1
+                     ORDER BY issued_at DESC, payout_instruction_id DESC
+                     LIMIT 1",
+                    params![claim.body.claim_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| {
+                    serde_json::from_str::<SignedLiabilityClaimPayoutInstruction>(&raw_json)
+                })
+                .transpose()?;
+            if payout_instruction.is_some() {
+                payout_instructions += 1;
+            }
+
+            let payout_receipt = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_claim_payout_receipts
+                     WHERE claim_id = ?1
+                     ORDER BY issued_at DESC, payout_receipt_id DESC
+                     LIMIT 1",
+                    params![claim.body.claim_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| {
+                    serde_json::from_str::<SignedLiabilityClaimPayoutReceipt>(&raw_json)
+                })
+                .transpose()?;
+            if let Some(receipt) = payout_receipt.as_ref() {
+                payout_receipts += 1;
+                match receipt.body.reconciliation_state {
+                    LiabilityClaimPayoutReconciliationState::Matched => {
+                        matched_payout_receipts += 1;
+                    }
+                    LiabilityClaimPayoutReconciliationState::AmountMismatch => {
+                        mismatched_payout_receipts += 1;
+                    }
+                }
+            }
+
+            let settlement_instruction = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_claim_settlement_instructions
+                     WHERE claim_id = ?1
+                     ORDER BY issued_at DESC, settlement_instruction_id DESC
+                     LIMIT 1",
+                    params![claim.body.claim_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| {
+                    serde_json::from_str::<SignedLiabilityClaimSettlementInstruction>(&raw_json)
+                })
+                .transpose()?;
+            if settlement_instruction.is_some() {
+                settlement_instructions += 1;
+            }
+
+            let settlement_receipt = self
+                .connection
+                .query_row(
+                    "SELECT raw_json
+                     FROM liability_claim_settlement_receipts
+                     WHERE claim_id = ?1
+                     ORDER BY issued_at DESC, settlement_receipt_id DESC
+                     LIMIT 1",
+                    params![claim.body.claim_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|raw_json| {
+                    serde_json::from_str::<SignedLiabilityClaimSettlementReceipt>(&raw_json)
+                })
+                .transpose()?;
+            if let Some(receipt) = settlement_receipt.as_ref() {
+                settlement_receipts += 1;
+                match receipt.body.reconciliation_state {
+                    LiabilityClaimSettlementReconciliationState::Matched => {
+                        matched_settlement_receipts += 1;
+                    }
+                    LiabilityClaimSettlementReconciliationState::AmountMismatch => {
+                        mismatched_settlement_receipts += 1;
+                    }
+                    LiabilityClaimSettlementReconciliationState::CounterpartyMismatch => {
+                        counterparty_mismatch_settlement_receipts += 1;
+                    }
+                }
+            }
+
             if claims.len() < normalized.limit_or_default() {
                 claims.push(LiabilityClaimWorkflowRow {
                     claim,
                     provider_response,
                     dispute,
                     adjudication,
+                    payout_instruction,
+                    payout_receipt,
+                    settlement_instruction,
+                    settlement_receipt,
                 });
             }
         }
@@ -2780,6 +3817,15 @@ impl SqliteReceiptStore {
                 denied_responses,
                 disputes,
                 adjudications,
+                payout_instructions,
+                payout_receipts,
+                matched_payout_receipts,
+                mismatched_payout_receipts,
+                settlement_instructions,
+                settlement_receipts,
+                matched_settlement_receipts,
+                mismatched_settlement_receipts,
+                counterparty_mismatch_settlement_receipts,
             },
             claims,
         })
@@ -2881,6 +3927,7 @@ impl SqliteReceiptStore {
         let mut delinquency_events = 0_u64;
         let mut recovery_events = 0_u64;
         let mut reserve_release_events = 0_u64;
+        let mut reserve_slash_events = 0_u64;
         let mut write_off_events = 0_u64;
         let mut events = Vec::new();
 
@@ -2956,6 +4003,9 @@ impl SqliteReceiptStore {
                 CreditLossLifecycleEventKind::ReserveRelease => {
                     reserve_release_events = reserve_release_events.saturating_add(1);
                 }
+                CreditLossLifecycleEventKind::ReserveSlash => {
+                    reserve_slash_events = reserve_slash_events.saturating_add(1);
+                }
                 CreditLossLifecycleEventKind::WriteOff => {
                     write_off_events = write_off_events.saturating_add(1);
                 }
@@ -2976,6 +4026,7 @@ impl SqliteReceiptStore {
                 delinquency_events,
                 recovery_events,
                 reserve_release_events,
+                reserve_slash_events,
                 write_off_events,
             },
             events,
@@ -3608,7 +4659,8 @@ impl SqliteReceiptStore {
     ) -> Result<u64, ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
-        self.connection.execute(
+        let tx = self.connection.transaction()?;
+        let inserted = tx.execute(
             r#"
             INSERT INTO arc_tool_receipts (
                 receipt_id,
@@ -3641,7 +4693,12 @@ impl SqliteReceiptStore {
                 raw_json,
             ],
         )?;
-        let seq = self.connection.last_insert_rowid().max(0) as u64;
+        if inserted == 0 {
+            tx.commit()?;
+            return Ok(0);
+        }
+        let seq = tx.last_insert_rowid().max(0) as u64;
+        tx.commit()?;
         Ok(seq)
     }
 
@@ -3999,7 +5056,6 @@ impl SqliteReceiptStore {
         //   ?7  min_cost (json_extract cost_charged >=)
         //   ?8  max_cost (json_extract cost_charged <=)
         //   ?9  agent_subject (receipt subject_key, falling back to capability_lineage)
-        //
         // Data query also uses:
         //   ?10 cursor (seq >, exclusive)
         //   ?11 limit
@@ -5902,10 +6958,65 @@ impl SqliteReceiptStore {
         )?;
         let metered_billing = self.query_metered_billing_summary(&operator_query)?;
 
-        let result = self.query_receipts(&query.to_receipt_query())?;
-        let mut receipts = Vec::with_capacity(result.receipts.len());
-        for stored in result.receipts {
-            receipts.push(self.behavioral_feed_receipt_row_from_receipt(stored.receipt)?);
+        let row_limit = query.receipt_limit_or_default();
+        let count_sql = r#"
+            SELECT COUNT(*)
+            FROM arc_tool_receipts r
+            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+            WHERE (?1 IS NULL OR r.capability_id = ?1)
+              AND (?2 IS NULL OR r.tool_server = ?2)
+              AND (?3 IS NULL OR r.tool_name = ?3)
+              AND (?4 IS NULL OR r.timestamp >= ?4)
+              AND (?5 IS NULL OR r.timestamp <= ?5)
+              AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)
+        "#;
+        let matching_receipts = self
+            .connection
+            .query_row(
+                count_sql,
+                params![
+                    capability_id,
+                    tool_server,
+                    tool_name,
+                    since,
+                    until,
+                    agent_subject
+                ],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|value| value.max(0) as u64)?;
+
+        let rows_sql = r#"
+            SELECT r.raw_json
+            FROM arc_tool_receipts r
+            LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+            WHERE (?1 IS NULL OR r.capability_id = ?1)
+              AND (?2 IS NULL OR r.tool_server = ?2)
+              AND (?3 IS NULL OR r.tool_name = ?3)
+              AND (?4 IS NULL OR r.timestamp >= ?4)
+              AND (?5 IS NULL OR r.timestamp <= ?5)
+              AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)
+            ORDER BY r.timestamp DESC, r.seq DESC
+            LIMIT ?7
+        "#;
+        let mut stmt = self.connection.prepare(rows_sql)?;
+        let rows = stmt.query_map(
+            params![
+                capability_id,
+                tool_server,
+                tool_name,
+                since,
+                until,
+                agent_subject,
+                row_limit as i64,
+            ],
+            |row| row.get::<_, String>(0),
+        )?;
+        let mut receipts = Vec::with_capacity(row_limit);
+        for row in rows {
+            let raw_json = row?;
+            let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
+            receipts.push(self.behavioral_feed_receipt_row_from_receipt(receipt)?);
         }
 
         Ok((
@@ -5913,7 +7024,7 @@ impl SqliteReceiptStore {
             governed_actions,
             metered_billing,
             BehavioralFeedReceiptSelection {
-                matching_receipts: result.total_count,
+                matching_receipts,
                 receipts,
             },
         ))
@@ -6458,6 +7569,7 @@ fn credit_loss_lifecycle_event_kind_label(kind: CreditLossLifecycleEventKind) ->
         CreditLossLifecycleEventKind::Delinquency => "delinquency",
         CreditLossLifecycleEventKind::Recovery => "recovery",
         CreditLossLifecycleEventKind::ReserveRelease => "reserve_release",
+        CreditLossLifecycleEventKind::ReserveSlash => "reserve_slash",
         CreditLossLifecycleEventKind::WriteOff => "write_off",
     }
 }
@@ -6490,6 +7602,16 @@ fn liability_quote_disposition_label(disposition: &LiabilityQuoteDisposition) ->
     match disposition {
         LiabilityQuoteDisposition::Quoted => "quoted",
         LiabilityQuoteDisposition::Declined => "declined",
+    }
+}
+
+fn liability_auto_bind_disposition_label(
+    disposition: &LiabilityAutoBindDisposition,
+) -> &'static str {
+    match disposition {
+        LiabilityAutoBindDisposition::AutoBound => "auto_bound",
+        LiabilityAutoBindDisposition::ManualReview => "manual_review",
+        LiabilityAutoBindDisposition::Denied => "denied",
     }
 }
 
@@ -7179,6 +8301,14 @@ fn authorization_transaction_context_from_governed_metadata(
             .as_ref()
             .map(|value| value.approver_key.clone()),
         runtime_assurance_tier: governed.runtime_assurance.as_ref().map(|value| value.tier),
+        runtime_assurance_schema: governed
+            .runtime_assurance
+            .as_ref()
+            .map(|value| value.schema.clone()),
+        runtime_assurance_verifier_family: governed
+            .runtime_assurance
+            .as_ref()
+            .and_then(|value| value.verifier_family),
         runtime_assurance_verifier: governed
             .runtime_assurance
             .as_ref()
@@ -7575,6 +8705,29 @@ fn validate_arc_oauth_authorization_row(
     }
 
     if row.transaction_context.runtime_assurance_tier.is_some() {
+        let runtime_assurance_schema = row
+            .transaction_context
+            .runtime_assurance_schema
+            .as_deref()
+            .ok_or_else(|| {
+                invalid_arc_oauth_authorization_profile(
+                    &row.receipt_id,
+                    "runtimeAssuranceTier requires runtimeAssuranceSchema",
+                )
+            })?;
+        ensure_non_empty_profile_value(
+            &row.receipt_id,
+            "transactionContext.runtimeAssuranceSchema",
+            runtime_assurance_schema,
+        )?;
+        row.transaction_context
+            .runtime_assurance_verifier_family
+            .ok_or_else(|| {
+                invalid_arc_oauth_authorization_profile(
+                    &row.receipt_id,
+                    "runtimeAssuranceTier requires runtimeAssuranceVerifierFamily",
+                )
+            })?;
         let runtime_assurance_verifier = row
             .transaction_context
             .runtime_assurance_verifier
@@ -7804,42 +8957,7 @@ fn backfill_tool_receipt_attribution_columns(
 
 impl ReceiptStore for SqliteReceiptStore {
     fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
-        let raw_json = serde_json::to_string(receipt)?;
-        let attribution = extract_receipt_attribution(receipt);
-        self.connection.execute(
-            r#"
-            INSERT INTO arc_tool_receipts (
-                receipt_id,
-                timestamp,
-                capability_id,
-                subject_key,
-                issuer_key,
-                grant_index,
-                tool_server,
-                tool_name,
-                decision_kind,
-                policy_hash,
-                content_hash,
-                raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(receipt_id) DO NOTHING
-            "#,
-            params![
-                receipt.id,
-                receipt.timestamp,
-                receipt.capability_id,
-                attribution.subject_key,
-                attribution.issuer_key,
-                attribution.grant_index.map(i64::from),
-                receipt.tool_server,
-                receipt.tool_name,
-                decision_kind(&receipt.decision),
-                receipt.policy_hash,
-                receipt.content_hash,
-                raw_json,
-            ],
-        )?;
-        Ok(())
+        SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt).map(|_| ())
     }
 
     fn append_arc_receipt_returning_seq(
@@ -7861,6 +8979,10 @@ impl ReceiptStore for SqliteReceiptStore {
 
     fn store_checkpoint(&mut self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::store_checkpoint(self, checkpoint)
+    }
+
+    fn supports_kernel_signed_checkpoints(&self) -> bool {
+        true
     }
 
     fn record_capability_snapshot(
@@ -8251,6 +9373,7 @@ mod tests {
                         SettlementStatus::Settled
                     },
                     cost_breakdown: None,
+                    oracle_evidence: None,
                     attempted_cost,
                 })
             } else {
@@ -8453,6 +9576,7 @@ mod tests {
                             SettlementStatus::Settled
                         },
                         cost_breakdown: None,
+                        oracle_evidence: None,
                         attempted_cost,
                     }
                 });
@@ -8646,6 +9770,7 @@ mod tests {
                     payment_reference: None,
                     settlement_status,
                     cost_breakdown: None,
+                    oracle_evidence: None,
                     attempted_cost,
                 }
             });

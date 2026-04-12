@@ -1,0 +1,649 @@
+use std::fs;
+use std::path::Path;
+
+use arc_control_plane::{evidence_export, CliError};
+use arc_core::capability::{ArcScope, CapabilityToken, CapabilityTokenBody, Operation, ToolGrant};
+use arc_core::crypto::Keypair;
+use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
+use arc_core::{canonical_json_bytes, sha256_hex};
+use arc_guards::mcp_tool::{McpDefaultAction, McpToolConfig};
+use arc_guards::McpToolGuard;
+use arc_kernel::build_checkpoint;
+use arc_store_sqlite::SqliteReceiptStore;
+use arc_wall_core::{
+    ArcWallArtifact, ArcWallArtifactKind, ArcWallAuthorizationContext, ArcWallBuyerMotion,
+    ArcWallBuyerReviewPackage, ArcWallControlPackage, ArcWallControlProfile, ArcWallControlSurface,
+    ArcWallDeniedAccessRecord, ArcWallGuardDecision, ArcWallGuardOutcome, ArcWallInformationDomain,
+    ArcWallPolicySnapshot, ARC_WALL_AUTHORIZATION_CONTEXT_SCHEMA,
+    ARC_WALL_BUYER_REVIEW_PACKAGE_SCHEMA, ARC_WALL_CONTROL_PACKAGE_SCHEMA,
+    ARC_WALL_CONTROL_PROFILE_SCHEMA, ARC_WALL_DENIED_ACCESS_RECORD_SCHEMA,
+    ARC_WALL_GUARD_OUTCOME_SCHEMA, ARC_WALL_POLICY_SNAPSHOT_SCHEMA,
+};
+use chrono::Utc;
+use serde::Serialize;
+
+const ARC_WALL_WORKFLOW_ID: &str = "workflow-information-domain-barrier";
+const ARC_WALL_WORKFLOW_BOUNDARY: &str =
+    "Information-domain tool access evidence for one bounded barrier-control workflow.";
+const ARC_WALL_DECISION: &str = "proceed_arc_wall_only";
+const ARC_WALL_CONTROL_OWNER: &str = "barrier-control-room";
+const ARC_WALL_SUPPORT_OWNER: &str = "arc-wall-ops";
+const ARC_WALL_POLICY_ID: &str = "arc.wall.research_execution_barrier.v1";
+const ARC_WALL_ACTOR_LABEL: &str = "research-agent-alpha";
+const ARC_WALL_REQUESTED_TOOL: &str = "execution_oms.submit_order";
+const ARC_WALL_ALLOWED_TOOLS: &[&str] = &[
+    "research_news.read",
+    "research_model.run",
+    "research_review.export",
+];
+
+fn current_utc_date() -> String {
+    Utc::now().format("%Y-%m-%d").to_string()
+}
+
+fn arc_wall_request_id() -> String {
+    format!("arc-wall-request-{}-01", current_utc_date())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArcWallExportSummary {
+    workflow_id: String,
+    buyer_motion: String,
+    control_surface: String,
+    source_domain: String,
+    requested_domain: String,
+    control_owner: String,
+    support_owner: String,
+    control_profile_file: String,
+    policy_snapshot_file: String,
+    authorization_context_file: String,
+    guard_outcome_file: String,
+    denied_access_record_file: String,
+    buyer_review_package_file: String,
+    control_package_file: String,
+    arc_evidence_dir: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArcWallDocRefs {
+    brief_file: String,
+    readme_file: String,
+    control_path_file: String,
+    operations_file: String,
+    validation_package_file: String,
+    decision_record_file: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArcWallValidationReport {
+    workflow_id: String,
+    decision: String,
+    buyer_motion: String,
+    control_surface: String,
+    source_domain: String,
+    requested_domain: String,
+    control_path: ArcWallExportSummary,
+    docs: ArcWallDocRefs,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArcWallDecisionRecord {
+    decision: String,
+    selected_buyer_motion: String,
+    selected_control_surface: String,
+    selected_source_domain: String,
+    selected_requested_domain: String,
+    control_owner: String,
+    support_owner: String,
+    deferred_scope: Vec<String>,
+}
+
+fn write_json_file<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, serde_json::to_vec_pretty(value)?)?;
+    Ok(())
+}
+
+fn ensure_empty_directory(path: &Path) -> Result<(), CliError> {
+    if path.exists() {
+        if !path.is_dir() {
+            return Err(CliError::Other(format!(
+                "output path must be a directory: {}",
+                path.display()
+            )));
+        }
+        if fs::read_dir(path)?.next().is_some() {
+            return Err(CliError::Other(format!(
+                "output directory must be empty: {}",
+                path.display()
+            )));
+        }
+    } else {
+        fs::create_dir_all(path)?;
+    }
+    Ok(())
+}
+
+fn relative_display(root: &Path, path: &Path) -> Result<String, CliError> {
+    path.strip_prefix(root)
+        .map(|relative| relative.display().to_string())
+        .map_err(|error| CliError::Other(error.to_string()))
+}
+
+fn arc_wall_doc_refs() -> ArcWallDocRefs {
+    ArcWallDocRefs {
+        brief_file: "docs/mercury/ARC_WALL_BRIEF.md".to_string(),
+        readme_file: "docs/arc-wall/README.md".to_string(),
+        control_path_file: "docs/arc-wall/CONTROL_PATH.md".to_string(),
+        operations_file: "docs/arc-wall/OPERATIONS.md".to_string(),
+        validation_package_file: "docs/arc-wall/VALIDATION_PACKAGE.md".to_string(),
+        decision_record_file: "docs/arc-wall/DECISION_RECORD.md".to_string(),
+    }
+}
+
+fn build_control_profile() -> ArcWallControlProfile {
+    ArcWallControlProfile {
+        schema: ARC_WALL_CONTROL_PROFILE_SCHEMA.to_string(),
+        profile_id: format!("arc-wall-control-profile-{}", current_utc_date()),
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+        source_domain: ArcWallInformationDomain::Research,
+        protected_domain: ArcWallInformationDomain::Execution,
+        retained_artifact_policy:
+            "retain_authorization_context_guard_outcome_and_denied_access_records".to_string(),
+        intended_use:
+            "Barrier review for denied cross-domain tool access over one bounded control path."
+                .to_string(),
+        fail_closed: true,
+    }
+}
+
+fn build_policy_snapshot() -> ArcWallPolicySnapshot {
+    ArcWallPolicySnapshot {
+        schema: ARC_WALL_POLICY_SNAPSHOT_SCHEMA.to_string(),
+        policy_id: ARC_WALL_POLICY_ID.to_string(),
+        source_domain: ArcWallInformationDomain::Research,
+        allowed_tools: ARC_WALL_ALLOWED_TOOLS
+            .iter()
+            .map(|tool| (*tool).to_string())
+            .collect(),
+        fail_closed: true,
+        note: "The initial ARC-Wall lane reuses ARC tool-guard mechanics through one fail-closed allowlist for the research domain."
+            .to_string(),
+    }
+}
+
+fn build_authorization_context() -> ArcWallAuthorizationContext {
+    ArcWallAuthorizationContext {
+        schema: ARC_WALL_AUTHORIZATION_CONTEXT_SCHEMA.to_string(),
+        request_id: arc_wall_request_id(),
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        actor_label: ARC_WALL_ACTOR_LABEL.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+        source_domain: ArcWallInformationDomain::Research,
+        requested_domain: ArcWallInformationDomain::Execution,
+        tool_name: ARC_WALL_REQUESTED_TOOL.to_string(),
+        policy_reference: ARC_WALL_POLICY_ID.to_string(),
+    }
+}
+
+fn build_guard_outcome(
+    context: &ArcWallAuthorizationContext,
+    policy: &ArcWallPolicySnapshot,
+) -> ArcWallGuardOutcome {
+    let guard = McpToolGuard::with_config(McpToolConfig {
+        enabled: true,
+        allow: policy.allowed_tools.clone(),
+        block: vec![],
+        default_action: McpDefaultAction::Block,
+        max_args_size: Some(1024),
+    });
+    let tool_allowed = matches!(
+        guard.is_allowed(&context.tool_name),
+        arc_guards::mcp_tool::ToolDecision::Allow
+    );
+    ArcWallGuardOutcome {
+        schema: ARC_WALL_GUARD_OUTCOME_SCHEMA.to_string(),
+        request_id: context.request_id.clone(),
+        workflow_id: context.workflow_id.clone(),
+        decision: if tool_allowed {
+            ArcWallGuardDecision::Allow
+        } else {
+            ArcWallGuardDecision::Deny
+        },
+        guard_name: "mcp-tool".to_string(),
+        pipeline_name: "guard-pipeline".to_string(),
+        matched_policy: context.policy_reference.clone(),
+        evaluated_tool: context.tool_name.clone(),
+        allowed_tools: policy.allowed_tools.clone(),
+        reason: if tool_allowed {
+            format!(
+                "tool `{}` is allowed for the `{}` domain under `{}`",
+                context.tool_name,
+                context.source_domain.as_str(),
+                context.policy_reference
+            )
+        } else {
+            format!(
+                "tool `{}` is outside the allowlist for the `{}` domain and is denied fail-closed before `{}` access can cross into `{}`",
+                context.tool_name,
+                context.source_domain.as_str(),
+                context.source_domain.as_str(),
+                context.requested_domain.as_str()
+            )
+        },
+        fail_closed: true,
+    }
+}
+
+fn build_denied_access_record(
+    context: &ArcWallAuthorizationContext,
+    outcome: &ArcWallGuardOutcome,
+) -> Result<ArcWallDeniedAccessRecord, CliError> {
+    if outcome.decision != ArcWallGuardDecision::Deny {
+        return Err(CliError::Other(
+            "ARC-Wall export expects the bounded control-path scenario to deny cross-domain access"
+                .to_string(),
+        ));
+    }
+    Ok(ArcWallDeniedAccessRecord {
+        schema: ARC_WALL_DENIED_ACCESS_RECORD_SCHEMA.to_string(),
+        request_id: context.request_id.clone(),
+        workflow_id: context.workflow_id.clone(),
+        source_domain: context.source_domain,
+        requested_domain: context.requested_domain,
+        tool_name: context.tool_name.clone(),
+        escalation_owner: ARC_WALL_CONTROL_OWNER.to_string(),
+        support_owner: ARC_WALL_SUPPORT_OWNER.to_string(),
+        note: "ARC-Wall records one denied cross-domain tool-access event and routes follow-up through the barrier control-room owner."
+            .to_string(),
+    })
+}
+
+fn arc_wall_capability_with_id(
+    id: &str,
+    subject: &Keypair,
+    issuer: &Keypair,
+) -> Result<CapabilityToken, CliError> {
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "arc-wall".to_string(),
+                    tool_name: ARC_WALL_REQUESTED_TOOL.to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+            issued_at: 100,
+            expires_at: 10_000,
+            delegation_chain: vec![],
+        },
+        issuer,
+    )
+    .map_err(CliError::from)
+}
+
+fn arc_wall_receipt(
+    authorization_context: &ArcWallAuthorizationContext,
+    guard_outcome: &ArcWallGuardOutcome,
+    denied_access_record: &ArcWallDeniedAccessRecord,
+    policy_snapshot: &ArcWallPolicySnapshot,
+    capability_id: &str,
+    kernel_keypair: &Keypair,
+) -> Result<ArcReceipt, CliError> {
+    let metadata = serde_json::json!({
+        "schema": "arc.wall.receipt_metadata.v1",
+        "authorizationContext": authorization_context,
+        "guardOutcome": guard_outcome,
+        "deniedAccessRecord": denied_access_record,
+        "policySnapshot": policy_snapshot,
+    });
+    let content_hash = sha256_hex(&canonical_json_bytes(&metadata)?);
+    let policy_hash = sha256_hex(&canonical_json_bytes(policy_snapshot)?);
+    let action = ToolCallAction::from_parameters(serde_json::json!({
+        "workflowId": authorization_context.workflow_id,
+        "requestId": authorization_context.request_id,
+        "actor": authorization_context.actor_label,
+        "sourceDomain": authorization_context.source_domain.as_str(),
+        "requestedDomain": authorization_context.requested_domain.as_str(),
+        "toolName": authorization_context.tool_name,
+        "policyReference": authorization_context.policy_reference,
+        "guardDecision": guard_outcome.decision.as_str(),
+    }))?;
+    ArcReceipt::sign(
+        ArcReceiptBody {
+            id: "rcpt-arc-wall-control-path-1".to_string(),
+            timestamp: 1_712_104_800,
+            capability_id: capability_id.to_string(),
+            tool_server: "arc-wall".to_string(),
+            tool_name: authorization_context.tool_name.clone(),
+            action,
+            decision: Decision::Deny {
+                reason: guard_outcome.reason.clone(),
+                guard: guard_outcome.guard_name.clone(),
+            },
+            content_hash,
+            policy_hash,
+            evidence: Vec::new(),
+            metadata: Some(metadata),
+            kernel_key: kernel_keypair.public_key(),
+        },
+        kernel_keypair,
+    )
+    .map_err(CliError::from)
+}
+
+fn write_arc_evidence_package(
+    output: &Path,
+    authorization_context: &ArcWallAuthorizationContext,
+    guard_outcome: &ArcWallGuardOutcome,
+    denied_access_record: &ArcWallDeniedAccessRecord,
+    policy_snapshot: &ArcWallPolicySnapshot,
+) -> Result<(), CliError> {
+    let receipt_db_path = output.join(".arc-wall-receipts.sqlite3");
+    let arc_evidence_dir = output.join("arc-evidence");
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path)?;
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let kernel = Keypair::generate();
+        let capability = arc_wall_capability_with_id("cap-arc-wall-1", &subject, &issuer)?;
+        let receipt = arc_wall_receipt(
+            authorization_context,
+            guard_outcome,
+            denied_access_record,
+            policy_snapshot,
+            &capability.body().id,
+            &kernel,
+        )?;
+        let seq = store.append_arc_receipt_returning_seq(&receipt)?;
+        let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
+        let checkpoint = build_checkpoint(
+            1,
+            seq,
+            seq,
+            &canonical
+                .into_iter()
+                .map(|(_, bytes)| bytes)
+                .collect::<Vec<_>>(),
+            &issuer,
+        )?;
+        store.store_checkpoint(&checkpoint)?;
+    }
+
+    evidence_export::cmd_evidence_export(
+        &arc_evidence_dir,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        false,
+        Some(&receipt_db_path),
+        None,
+        None,
+    )?;
+
+    let _ = fs::remove_file(receipt_db_path);
+    Ok(())
+}
+
+fn export_control_path(output: &Path) -> Result<ArcWallExportSummary, CliError> {
+    ensure_empty_directory(output)?;
+
+    let control_profile = build_control_profile();
+    let policy_snapshot = build_policy_snapshot();
+    let authorization_context = build_authorization_context();
+    let guard_outcome = build_guard_outcome(&authorization_context, &policy_snapshot);
+    let denied_access_record = build_denied_access_record(&authorization_context, &guard_outcome)?;
+
+    control_profile
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    policy_snapshot
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    authorization_context
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    guard_outcome
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    denied_access_record
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+
+    let control_profile_path = output.join("control-profile.json");
+    let policy_snapshot_path = output.join("policy-snapshot.json");
+    let authorization_context_path = output.join("authorization-context.json");
+    let guard_outcome_path = output.join("guard-outcome.json");
+    let denied_access_record_path = output.join("denied-access-record.json");
+
+    write_json_file(&control_profile_path, &control_profile)?;
+    write_json_file(&policy_snapshot_path, &policy_snapshot)?;
+    write_json_file(&authorization_context_path, &authorization_context)?;
+    write_json_file(&guard_outcome_path, &guard_outcome)?;
+    write_json_file(&denied_access_record_path, &denied_access_record)?;
+
+    write_arc_evidence_package(
+        output,
+        &authorization_context,
+        &guard_outcome,
+        &denied_access_record,
+        &policy_snapshot,
+    )?;
+
+    let control_package_path = output.join("control-package.json");
+    let buyer_review_package_path = output.join("buyer-review-package.json");
+
+    let buyer_review_package = ArcWallBuyerReviewPackage {
+        schema: ARC_WALL_BUYER_REVIEW_PACKAGE_SCHEMA.to_string(),
+        package_id: format!("arc-wall-buyer-review-{}", current_utc_date()),
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+        control_owner: ARC_WALL_CONTROL_OWNER.to_string(),
+        support_owner: ARC_WALL_SUPPORT_OWNER.to_string(),
+        fail_closed: true,
+        control_package_file: relative_display(output, &control_package_path)?,
+        authorization_context_file: relative_display(output, &authorization_context_path)?,
+        policy_snapshot_file: relative_display(output, &policy_snapshot_path)?,
+        guard_outcome_file: relative_display(output, &guard_outcome_path)?,
+        denied_access_record_file: relative_display(output, &denied_access_record_path)?,
+        arc_evidence_dir: "arc-evidence".to_string(),
+        note: "ARC-Wall stays bounded to one denied cross-domain tool-access scenario for one control-room barrier-review buyer motion."
+            .to_string(),
+    };
+    buyer_review_package
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    write_json_file(&buyer_review_package_path, &buyer_review_package)?;
+
+    let control_package = ArcWallControlPackage {
+        schema: ARC_WALL_CONTROL_PACKAGE_SCHEMA.to_string(),
+        package_id: format!("arc-wall-control-package-{}", current_utc_date()),
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        same_system_boundary: ARC_WALL_WORKFLOW_BOUNDARY.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+        control_owner: ARC_WALL_CONTROL_OWNER.to_string(),
+        support_owner: ARC_WALL_SUPPORT_OWNER.to_string(),
+        fail_closed: true,
+        profile_file: relative_display(output, &control_profile_path)?,
+        buyer_review_package_file: relative_display(output, &buyer_review_package_path)?,
+        arc_evidence_dir: "arc-evidence".to_string(),
+        artifacts: vec![
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::ControlProfile,
+                relative_path: relative_display(output, &control_profile_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::PolicySnapshot,
+                relative_path: relative_display(output, &policy_snapshot_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::AuthorizationContext,
+                relative_path: relative_display(output, &authorization_context_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::GuardOutcome,
+                relative_path: relative_display(output, &guard_outcome_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::DeniedAccessRecord,
+                relative_path: relative_display(output, &denied_access_record_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::BuyerReviewPackage,
+                relative_path: relative_display(output, &buyer_review_package_path)?,
+            },
+            ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::ArcEvidenceExport,
+                relative_path: "arc-evidence".to_string(),
+            },
+        ],
+    };
+    control_package
+        .validate()
+        .map_err(|error| CliError::Other(error.to_string()))?;
+    write_json_file(&control_package_path, &control_package)?;
+
+    let summary = ArcWallExportSummary {
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview
+            .as_str()
+            .to_string(),
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary
+            .as_str()
+            .to_string(),
+        source_domain: ArcWallInformationDomain::Research.as_str().to_string(),
+        requested_domain: ArcWallInformationDomain::Execution.as_str().to_string(),
+        control_owner: ARC_WALL_CONTROL_OWNER.to_string(),
+        support_owner: ARC_WALL_SUPPORT_OWNER.to_string(),
+        control_profile_file: control_profile_path.display().to_string(),
+        policy_snapshot_file: policy_snapshot_path.display().to_string(),
+        authorization_context_file: authorization_context_path.display().to_string(),
+        guard_outcome_file: guard_outcome_path.display().to_string(),
+        denied_access_record_file: denied_access_record_path.display().to_string(),
+        buyer_review_package_file: buyer_review_package_path.display().to_string(),
+        control_package_file: control_package_path.display().to_string(),
+        arc_evidence_dir: output.join("arc-evidence").display().to_string(),
+    };
+    write_json_file(&output.join("control-path-summary.json"), &summary)?;
+
+    Ok(summary)
+}
+
+pub fn cmd_arc_wall_control_path_export(output: &Path, json: bool) -> Result<(), CliError> {
+    let summary = export_control_path(output)?;
+    if json {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+    } else {
+        println!("workflow_id:           {}", summary.workflow_id);
+        println!("buyer_motion:          {}", summary.buyer_motion);
+        println!("control_surface:       {}", summary.control_surface);
+        println!("control_profile:       {}", summary.control_profile_file);
+        println!("policy_snapshot:       {}", summary.policy_snapshot_file);
+        println!(
+            "authorization_context: {}",
+            summary.authorization_context_file
+        );
+        println!("guard_outcome:         {}", summary.guard_outcome_file);
+        println!(
+            "denied_access_record:  {}",
+            summary.denied_access_record_file
+        );
+        println!(
+            "buyer_review_package:  {}",
+            summary.buyer_review_package_file
+        );
+        println!("control_package:       {}", summary.control_package_file);
+        println!("arc_evidence:          {}", summary.arc_evidence_dir);
+    }
+    Ok(())
+}
+
+pub fn cmd_arc_wall_control_path_validate(output: &Path, json: bool) -> Result<(), CliError> {
+    ensure_empty_directory(output)?;
+    let control_path_dir = output.join("control-path");
+    let summary = export_control_path(&control_path_dir)?;
+    let docs = arc_wall_doc_refs();
+
+    let report = ArcWallValidationReport {
+        workflow_id: ARC_WALL_WORKFLOW_ID.to_string(),
+        decision: ARC_WALL_DECISION.to_string(),
+        buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview
+            .as_str()
+            .to_string(),
+        control_surface: ArcWallControlSurface::ToolAccessDomainBoundary
+            .as_str()
+            .to_string(),
+        source_domain: ArcWallInformationDomain::Research.as_str().to_string(),
+        requested_domain: ArcWallInformationDomain::Execution.as_str().to_string(),
+        control_path: summary,
+        docs: docs.clone(),
+    };
+    write_json_file(&output.join("validation-report.json"), &report)?;
+
+    let decision_record = ArcWallDecisionRecord {
+        decision: ARC_WALL_DECISION.to_string(),
+        selected_buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview
+            .as_str()
+            .to_string(),
+        selected_control_surface: ArcWallControlSurface::ToolAccessDomainBoundary
+            .as_str()
+            .to_string(),
+        selected_source_domain: ArcWallInformationDomain::Research.as_str().to_string(),
+        selected_requested_domain: ArcWallInformationDomain::Execution.as_str().to_string(),
+        control_owner: ARC_WALL_CONTROL_OWNER.to_string(),
+        support_owner: ARC_WALL_SUPPORT_OWNER.to_string(),
+        deferred_scope: vec![
+            "additional buyer motions".to_string(),
+            "generic barrier-platform breadth".to_string(),
+            "folding ARC-Wall into MERCURY".to_string(),
+            "multi-product platform hardening".to_string(),
+        ],
+    };
+    write_json_file(&output.join("expansion-decision.json"), &decision_record)?;
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("workflow_id:      {}", report.workflow_id);
+        println!("decision:         {}", report.decision);
+        println!("buyer_motion:     {}", report.buyer_motion);
+        println!("control_surface:  {}", report.control_surface);
+        println!(
+            "control_path_dir: {}",
+            output.join("control-path").display()
+        );
+        println!(
+            "validation_report: {}",
+            output.join("validation-report.json").display()
+        );
+        println!(
+            "expansion_decision: {}",
+            output.join("expansion-decision.json").display()
+        );
+    }
+    Ok(())
+}

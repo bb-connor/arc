@@ -1,0 +1,35 @@
+[package]
+name = "arc-settle"
+description = "Settlement runtime for ARC web3 escrow and bond execution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_settle"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-web3-bindings = { package = "arc-web3-bindings", path = "../arc-web3-bindings" }
+alloy-primitives = { version = "1.4.1", default-features = false, features = ["std"] }
+alloy-sol-types = { version = "1.4.1", default-features = false, features = ["std"] }
+bs58 = { workspace = true }
+hex = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+secp256k1 = { version = "0.31", features = ["recovery", "global-context"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+
+[dev-dependencies]
+arc-anchor = { package = "arc-anchor", path = "../arc-anchor" }
+arc-link = { package = "arc-link", path = "../arc-link" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

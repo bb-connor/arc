@@ -1,0 +1,10 @@
+{
+  "dispatch_id": "dispatch-web3-1",
+  "chain_id": "eip155:8453",
+  "entry_point": "0x1000000000000000000000000000000000000100",
+  "paymaster_address": "0x1000000000000000000000000000000000000101",
+  "user_operation_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "sponsor_gas_limit": 250000,
+  "estimated_reimbursement_minor_units": 5,
+  "allowed": true
+}

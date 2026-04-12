@@ -13,6 +13,7 @@ use crate::capability::{
 use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
 use crate::error::Result;
 use crate::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+use crate::web3::OracleConversionEvidence;
 
 /// A ARC receipt. Signed proof that a tool call was evaluated by the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,6 +361,9 @@ pub struct FinancialReceiptMetadata {
     /// Optional itemized cost breakdown for audit purposes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_breakdown: Option<serde_json::Value>,
+    /// Oracle price evidence used for cross-currency conversion, if applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_evidence: Option<OracleConversionEvidence>,
     /// Cost that was attempted but denied (populated only on denial receipts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempted_cost: Option<u64>,
@@ -773,6 +777,7 @@ mod tests {
             payment_reference: Some("ref-abc123".to_string()),
             settlement_status: SettlementStatus::Pending,
             cost_breakdown: Some(serde_json::json!({"compute": 100, "io": 50})),
+            oracle_evidence: None,
             attempted_cost: None,
         };
 
@@ -804,6 +809,7 @@ mod tests {
             payment_reference: None,
             settlement_status: SettlementStatus::Settled,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: None,
         };
 
@@ -828,6 +834,7 @@ mod tests {
             payment_reference: None,
             settlement_status: SettlementStatus::NotApplicable,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: Some(500),
         };
         let json_with = serde_json::to_string(&meta_with).unwrap();

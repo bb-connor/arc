@@ -9,6 +9,13 @@ use arc_core::crypto::Keypair;
 use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, Decision, ReceiptAttributionMetadata, ToolCallAction,
 };
+use arc_credentials::{
+    PortableNegativeEventEvidenceKind, PortableNegativeEventEvidenceReference,
+    PortableNegativeEventIssueRequest, PortableNegativeEventKind, PortableReputationEvaluation,
+    PortableReputationEvaluationRequest, PortableReputationFindingCode,
+    PortableReputationSummaryIssueRequest, PortableReputationWeightingProfile,
+    SignedPortableNegativeEvent, SignedPortableReputationSummary,
+};
 use arc_kernel::{
     BudgetStore, CapabilityAuthority, CapabilitySnapshot, FederatedEvidenceShareImport,
     LocalCapabilityAuthority, ReceiptStore, StoredToolReceipt,
@@ -85,6 +92,8 @@ fn spawn_trust_service(
             "serve",
             "--listen",
             &listen.to_string(),
+            "--advertise-url",
+            &format!("http://{listen}"),
             "--service-token",
             service_token,
             "--policy",
@@ -882,5 +891,149 @@ fn trust_service_reputation_views_include_imported_trust_provenance() {
             .as_f64()
             .expect("attenuated imported score")
             > 0.0
+    );
+}
+
+#[test]
+fn trust_service_portable_reputation_issue_and_evaluate_respects_local_weighting() {
+    let dir = unique_dir("arc-cli-portable-reputation-http");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+    let policy_path = fixture_path("hushspec-reputation.yaml");
+
+    let subject_kp = Keypair::generate();
+    let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
+    let now = current_unix_secs();
+
+    let listen = reserve_listen_addr();
+    let service_token = "portable-reputation-token";
+    let base_url = format!("http://{listen}");
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &policy_path,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+
+    let client = Client::builder().build().expect("build reqwest client");
+    wait_for_trust_service(&client, &base_url);
+
+    let summary: SignedPortableReputationSummary = client
+        .post(format!("{base_url}/v1/reputation/portable/summaries/issue"))
+        .header("Authorization", format!("Bearer {service_token}"))
+        .json(&PortableReputationSummaryIssueRequest {
+            subject_key: subject_hex.clone(),
+            since: Some(now.saturating_sub(3_600)),
+            until: Some(now),
+            issued_at: Some(now),
+            expires_at: Some(now.saturating_add(3_600)),
+            note: None,
+        })
+        .send()
+        .expect("issue portable reputation summary")
+        .json()
+        .expect("parse portable reputation summary");
+    let issuer_operator_id = summary.body.issuer_operator_id.as_str();
+    let issuer_weight_key = issuer_operator_id.to_string();
+    let imported_positive = summary.body.effective_score;
+
+    let event: SignedPortableNegativeEvent = client
+        .post(format!("{base_url}/v1/reputation/portable/events/issue"))
+        .header("Authorization", format!("Bearer {service_token}"))
+        .json(&PortableNegativeEventIssueRequest {
+            subject_key: subject_hex.clone(),
+            kind: PortableNegativeEventKind::PolicyViolation,
+            severity: 0.4,
+            observed_at: now.saturating_sub(120),
+            published_at: Some(now.saturating_sub(60)),
+            expires_at: Some(now.saturating_add(3_600)),
+            evidence_refs: vec![PortableNegativeEventEvidenceReference {
+                kind: PortableNegativeEventEvidenceKind::External,
+                reference_id: "case-1".to_string(),
+                uri: Some("https://issuer.example/cases/1".to_string()),
+                sha256: None,
+            }],
+            note: None,
+        })
+        .send()
+        .expect("issue portable negative event")
+        .json()
+        .expect("parse portable negative event");
+    let issuer_weights = serde_json::json!({
+        issuer_weight_key: 0.75
+    });
+
+    let evaluation: PortableReputationEvaluation = client
+        .post(format!("{base_url}/v1/reputation/portable/evaluate"))
+        .header("Authorization", format!("Bearer {service_token}"))
+        .json(&PortableReputationEvaluationRequest {
+            subject_key: subject_hex.clone(),
+            summaries: vec![summary.clone()],
+            negative_events: vec![event],
+            weighting_profile: PortableReputationWeightingProfile {
+                profile_id: "local-profile".to_string(),
+                allowed_issuer_operator_ids: vec![issuer_operator_id.to_string()],
+                issuer_weights: serde_json::from_value(issuer_weights).expect("issuer weights"),
+                max_summary_age_secs: 3600,
+                max_event_age_secs: 3600,
+                reject_probationary: false,
+                negative_event_weight: 0.5,
+                blocking_event_kinds: vec![PortableNegativeEventKind::FraudSignal],
+            },
+            evaluated_at: Some(now),
+        })
+        .send()
+        .expect("evaluate portable reputation")
+        .json()
+        .expect("parse portable reputation evaluation");
+    assert_eq!(evaluation.accepted_summary_count, 1);
+    assert_eq!(evaluation.accepted_negative_event_count, 1);
+    assert_eq!(evaluation.rejected_summary_count, 0);
+    assert_eq!(evaluation.rejected_negative_event_count, 0);
+    assert_eq!(evaluation.imported_positive_score, Some(imported_positive));
+    assert!(evaluation.negative_event_penalty > 0.0);
+    assert!(
+        evaluation
+            .effective_score
+            .expect("effective score should be present")
+            < imported_positive
+    );
+    assert!(!evaluation.blocked);
+
+    let rejected: PortableReputationEvaluation = client
+        .post(format!("{base_url}/v1/reputation/portable/evaluate"))
+        .header("Authorization", format!("Bearer {service_token}"))
+        .json(&PortableReputationEvaluationRequest {
+            subject_key: subject_hex,
+            summaries: vec![summary],
+            negative_events: Vec::new(),
+            weighting_profile: PortableReputationWeightingProfile {
+                profile_id: "reject-issuer".to_string(),
+                allowed_issuer_operator_ids: vec!["https://other.example".to_string()],
+                issuer_weights: Default::default(),
+                max_summary_age_secs: 3600,
+                max_event_age_secs: 3600,
+                reject_probationary: false,
+                negative_event_weight: 0.5,
+                blocking_event_kinds: Vec::new(),
+            },
+            evaluated_at: Some(now),
+        })
+        .send()
+        .expect("evaluate rejected portable reputation")
+        .json()
+        .expect("parse rejected portable reputation evaluation");
+    assert_eq!(rejected.accepted_summary_count, 0);
+    assert_eq!(rejected.rejected_summary_count, 1);
+    assert!(rejected.effective_score.is_none());
+    assert_eq!(
+        rejected.findings[0].code,
+        PortableReputationFindingCode::IssuerNotAllowed
     );
 }

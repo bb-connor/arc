@@ -1,0 +1,110 @@
+{
+  "schema": "arc.settle.qualification-matrix.v1",
+  "profileId": "arc.settle.profile",
+  "cases": [
+    {
+      "id": "evm-merkle-release",
+      "name": "Anchored EVM Merkle release settles against the official escrow lane",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-02",
+        "SETTLEX-05"
+      ],
+      "scenario": "runtime_devnet_merkle_release",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The runtime devnet test creates escrow, publishes the checkpoint root, verifies inclusion, and releases funds through the Merkle-proof path."
+    },
+    {
+      "id": "timeout-refund",
+      "name": "Expired escrows refund deterministically and project timeout state back into ARC truth",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-02",
+        "SETTLEX-05"
+      ],
+      "scenario": "runtime_devnet_timeout_refund",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Timeout recovery remains explicit and fail closed rather than leaving funds locked without ARC-side lifecycle projection."
+    },
+    {
+      "id": "dual-sign-release",
+      "name": "Dual-signature settlement remains operator-bound and statically verifiable",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-03"
+      ],
+      "scenario": "runtime_devnet_dual_signature_validation",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The runtime derives the contract digest, signs with the registered settlement key, and validates the release path before submission."
+    },
+    {
+      "id": "bond-lifecycle",
+      "name": "Bond lock, release, impairment, expiry, and observation remain explicit",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-02",
+        "SETTLEX-04"
+      ],
+      "scenario": "bond_runtime_and_observation_contract",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The runtime exposes bounded bond transaction builders plus lifecycle observation instead of hiding reserve posture in off-chain bookkeeping."
+    },
+    {
+      "id": "solana-parity",
+      "name": "Solana-native Ed25519 settlement preparation preserves commitment parity with the EVM lane",
+      "requirementIds": [
+        "SETTLEX-03",
+        "SETTLEX-04"
+      ],
+      "scenario": "solana_preparation_and_commitment_comparison",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The Solana lane verifies ARC receipt signatures and compares settlement commitments instead of claiming unaudited cross-chain equivalence."
+    },
+    {
+      "id": "finality-recovery",
+      "name": "Confirmation, dispute-window, and reorg recovery remain visible and bounded",
+      "requirementIds": [
+        "SETTLEX-02",
+        "SETTLEX-04",
+        "SETTLEX-05"
+      ],
+      "scenario": "tiered_finality_and_recovery_actions",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The observer emits explicit finality state plus recovery actions for wait, retry, refund, or manual review."
+    },
+    {
+      "id": "evidence-substrate-required",
+      "name": "Merkle and Solana settlement lanes require durable receipts plus kernel-signed checkpoints",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-03",
+        "SETTLEX-05"
+      ],
+      "scenario": "evidence_substrate_rejects_uncheckpointed_or_remote_append_only_inputs",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The direct runtime rejects disabled checkpoint statements, mismatched signer assumptions, and non-durable evidence inputs instead of attempting release from incomplete receipt truth."
+    },
+    {
+      "id": "partner-e2e-recovery",
+      "name": "Generated E2E qualification proves FX-backed dual-sign settlement plus recovery posture for refund, reorg, impair, and expiry",
+      "requirementIds": [
+        "SETTLEX-01",
+        "SETTLEX-02",
+        "SETTLEX-03",
+        "SETTLEX-04",
+        "SETTLEX-05"
+      ],
+      "scenario": "web3_partner_qualification_emits_integrated_recovery_bundle",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The dedicated `./scripts/qualify-web3-e2e.sh` lane writes `target/web3-e2e-qualification/partner-qualification.json` plus per-scenario reports so hosted reviewers can inspect one bounded settlement proof package instead of inferring it from separate devnet tests."
+    }
+  ]
+}

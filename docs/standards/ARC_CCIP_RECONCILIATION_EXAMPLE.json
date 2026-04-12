@@ -1,0 +1,6 @@
+{
+  "message_id": "arc-ccip-eip155-42161-2b4d6f8091a3c5e7",
+  "status": "reconciled",
+  "canonical_receipt_id": "receipt-web3-1",
+  "note": "Cross-chain coordination reconciled back to the canonical ARC execution receipt."
+}

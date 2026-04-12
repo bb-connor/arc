@@ -36,7 +36,11 @@ use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use tracing::{debug, error, info, warn};
 
-use arc_core::appraisal::RuntimeAttestationAppraisalRequest;
+use arc_core::appraisal::{
+    RuntimeAttestationAppraisalImportRequest, RuntimeAttestationAppraisalRequest,
+    RuntimeAttestationAppraisalResultExportRequest, RuntimeAttestationImportedAppraisalPolicy,
+    SignedRuntimeAttestationAppraisalResult,
+};
 use arc_core::capability::{
     ArcScope, GovernedAutonomyTier, MonetaryAmount, RuntimeAssuranceTier,
     RuntimeAttestationEvidence,
@@ -52,7 +56,7 @@ use arc_kernel::{
     ArcKernel, RevocationStore, SessionOperationResponse, ToolCallOutput,
     ToolCallRequest as KernelToolCallRequest, ToolCallStream,
 };
-use arc_mcp_adapter::{AdaptedMcpServer, McpAdapterConfig, McpEdgeConfig, ArcMcpEdge};
+use arc_mcp_adapter::{AdaptedMcpServer, ArcMcpEdge, McpAdapterConfig, McpEdgeConfig};
 
 use crate::policy::load_policy;
 
@@ -460,6 +464,24 @@ enum TrustCommands {
         command: TrustCreditScorecardCommands,
     },
 
+    /// Export a signed live capital book with explicit source-of-funds attribution.
+    CapitalBook {
+        #[command(subcommand)]
+        command: TrustCapitalBookCommands,
+    },
+
+    /// Issue one custody-neutral escrow or reserve instruction artifact.
+    CapitalInstruction {
+        #[command(subcommand)]
+        command: TrustCapitalInstructionCommands,
+    },
+
+    /// Issue one simulation-first capital-allocation decision for a governed action.
+    CapitalAllocation {
+        #[command(subcommand)]
+        command: TrustCapitalAllocationCommands,
+    },
+
     /// Evaluate, issue, and list bounded credit facilities from subject-scoped evidence.
     Facility {
         #[command(subcommand)]
@@ -746,6 +768,30 @@ enum TrustRuntimeAttestationAppraisalCommands {
         #[arg(long)]
         policy_file: Option<PathBuf>,
     },
+    /// Export a signed portable runtime-attestation appraisal result artifact.
+    ExportResult {
+        /// Issuer identifier recorded in the exported result.
+        #[arg(long)]
+        issuer: String,
+
+        /// Input JSON or YAML file containing a RuntimeAttestationEvidence payload.
+        #[arg(long)]
+        input: PathBuf,
+
+        /// Optional HushSpec policy used to evaluate exporter-visible outcomes locally.
+        #[arg(long)]
+        policy_file: Option<PathBuf>,
+    },
+    /// Evaluate a signed external runtime-attestation appraisal result against local import policy.
+    Import {
+        /// Input JSON or YAML file containing a signed appraisal result envelope.
+        #[arg(long)]
+        input: PathBuf,
+
+        /// JSON or YAML file containing a RuntimeAttestationImportedAppraisalPolicy payload.
+        #[arg(long)]
+        policy_file: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -835,6 +881,66 @@ enum TrustCreditScorecardCommands {
         /// Maximum number of underwriting decision rows to evaluate.
         #[arg(long, default_value_t = 50)]
         decision_limit: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrustCapitalBookCommands {
+    /// Export a signed live capital book from canonical facility, bond, and loss posture.
+    Export {
+        /// Subject public key to evaluate.
+        #[arg(long)]
+        agent_subject: String,
+        /// Optional filter by capability ID.
+        #[arg(long)]
+        capability: Option<String>,
+        /// Optional filter by tool server.
+        #[arg(long)]
+        tool_server: Option<String>,
+        /// Optional filter by tool name.
+        #[arg(long)]
+        tool_name: Option<String>,
+        /// Include receipts with timestamp >= this Unix seconds value.
+        #[arg(long)]
+        since: Option<u64>,
+        /// Include receipts with timestamp <= this Unix seconds value.
+        #[arg(long)]
+        until: Option<u64>,
+        /// Maximum number of receipt rows to inspect for disbursement provenance.
+        #[arg(long, default_value_t = 100)]
+        receipt_limit: usize,
+        /// Maximum number of facility rows to inspect.
+        #[arg(long, default_value_t = 10)]
+        facility_limit: usize,
+        /// Maximum number of bond rows to inspect.
+        #[arg(long, default_value_t = 10)]
+        bond_limit: usize,
+        /// Maximum number of loss-lifecycle rows to inspect.
+        #[arg(long, default_value_t = 25)]
+        loss_event_limit: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrustCapitalInstructionCommands {
+    /// Issue one custody-neutral escrow or reserve instruction artifact from JSON or YAML input.
+    Issue {
+        /// JSON or YAML capital-instruction input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+enum TrustCapitalAllocationCommands {
+    /// Issue one live capital-allocation decision artifact from JSON or YAML input.
+    Issue {
+        /// JSON or YAML capital-allocation input file.
+        #[arg(long)]
+        input_file: PathBuf,
+        /// Optional local certification registry file used when not using --control-url.
+        #[arg(long)]
+        certification_registry_file: Option<PathBuf>,
     },
 }
 
@@ -1059,7 +1165,7 @@ enum TrustCreditLossLifecycleCommands {
         /// Bond ID to evaluate against.
         #[arg(long)]
         bond_id: String,
-        /// Event kind (`delinquency`, `recovery`, `reserve_release`, `write_off`).
+        /// Event kind (`delinquency`, `recovery`, `reserve_release`, `reserve_slash`, `write_off`).
         #[arg(long)]
         event_kind: String,
         /// Optional explicit amount in minor units.
@@ -1075,7 +1181,7 @@ enum TrustCreditLossLifecycleCommands {
         /// Bond ID to evaluate against.
         #[arg(long)]
         bond_id: String,
-        /// Event kind (`delinquency`, `recovery`, `reserve_release`, `write_off`).
+        /// Event kind (`delinquency`, `recovery`, `reserve_release`, `reserve_slash`, `write_off`).
         #[arg(long)]
         event_kind: String,
         /// Optional explicit amount in minor units.
@@ -1084,6 +1190,24 @@ enum TrustCreditLossLifecycleCommands {
         /// Optional explicit amount currency.
         #[arg(long)]
         amount_currency: Option<String>,
+        /// Optional JSON/YAML file containing Vec<CapitalExecutionAuthorityStep>.
+        #[arg(long)]
+        authority_chain_file: Option<PathBuf>,
+        /// Optional JSON/YAML file containing CapitalExecutionWindow.
+        #[arg(long)]
+        execution_window_file: Option<PathBuf>,
+        /// Optional JSON/YAML file containing CapitalExecutionRail.
+        #[arg(long)]
+        rail_file: Option<PathBuf>,
+        /// Optional JSON/YAML file containing CapitalExecutionObservation.
+        #[arg(long)]
+        observed_execution_file: Option<PathBuf>,
+        /// Optional reserve-control appeal window close timestamp.
+        #[arg(long)]
+        appeal_window_ends_at: Option<u64>,
+        /// Optional reserve-control description recorded on the lifecycle artifact.
+        #[arg(long)]
+        description: Option<String>,
     },
 
     /// List persisted bond loss-lifecycle artifacts.
@@ -1109,7 +1233,7 @@ enum TrustCreditLossLifecycleCommands {
         /// Filter by tool name.
         #[arg(long)]
         tool_name: Option<String>,
-        /// Filter by event kind (`delinquency`, `recovery`, `reserve_release`, `write_off`).
+        /// Filter by event kind (`delinquency`, `recovery`, `reserve_release`, `reserve_slash`, `write_off`).
         #[arg(long)]
         event_kind: Option<String>,
         /// Maximum number of event rows to embed.
@@ -1265,6 +1389,13 @@ enum TrustLiabilityMarketCommands {
         input_file: PathBuf,
     },
 
+    /// Issue and persist a signed delegated pricing-authority artifact.
+    PricingAuthorityIssue {
+        /// JSON or YAML pricing-authority input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
     /// Issue and persist a signed liability placement from JSON or YAML input.
     PlacementIssue {
         /// JSON or YAML placement input file.
@@ -1275,6 +1406,13 @@ enum TrustLiabilityMarketCommands {
     /// Issue and persist a signed bound-coverage artifact from JSON or YAML input.
     BoundCoverageIssue {
         /// JSON or YAML bound-coverage input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
+    /// Evaluate and persist one automatic bind decision plus issued placement/bound coverage.
+    AutoBindIssue {
+        /// JSON or YAML auto-bind input file.
         #[arg(long)]
         input_file: PathBuf,
     },
@@ -1303,6 +1441,34 @@ enum TrustLiabilityMarketCommands {
     /// Issue and persist a signed liability claim adjudication from JSON or YAML input.
     AdjudicationIssue {
         /// JSON or YAML adjudication input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
+    /// Issue and persist a signed liability claim payout instruction from JSON or YAML input.
+    ClaimPayoutInstructionIssue {
+        /// JSON or YAML claim payout instruction input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
+    /// Issue and persist a signed liability claim payout receipt from JSON or YAML input.
+    ClaimPayoutReceiptIssue {
+        /// JSON or YAML claim payout receipt input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
+    /// Issue and persist a signed liability claim settlement instruction from JSON or YAML input.
+    ClaimSettlementInstructionIssue {
+        /// JSON or YAML claim settlement instruction input file.
+        #[arg(long)]
+        input_file: PathBuf,
+    },
+
+    /// Issue and persist a signed liability claim settlement receipt from JSON or YAML input.
+    ClaimSettlementReceiptIssue {
+        /// JSON or YAML claim settlement receipt input file.
         #[arg(long)]
         input_file: PathBuf,
     },
@@ -2698,12 +2864,14 @@ fn main() {
                 ),
             },
             TrustCommands::AuthorizationContext { command } => match command {
-                TrustAuthorizationContextCommands::Metadata => cmd_trust_authorization_context_metadata(
-                    cli.json,
-                    receipt_db.as_deref(),
-                    control_url.as_deref(),
-                    control_token.as_deref(),
-                ),
+                TrustAuthorizationContextCommands::Metadata => {
+                    cmd_trust_authorization_context_metadata(
+                        cli.json,
+                        receipt_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
                 TrustAuthorizationContextCommands::List {
                     capability,
                     agent_subject,
@@ -2755,6 +2923,29 @@ fn main() {
                         cli.json,
                         authority_seed_file.as_deref(),
                         authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustRuntimeAttestationAppraisalCommands::ExportResult {
+                    issuer,
+                    input,
+                    policy_file,
+                } => cmd_trust_runtime_attestation_appraisal_result_export(
+                    issuer.as_str(),
+                    &input,
+                    policy_file.as_deref(),
+                    cli.json,
+                    authority_seed_file.as_deref(),
+                    authority_db.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+                TrustRuntimeAttestationAppraisalCommands::Import { input, policy_file } => {
+                    cmd_trust_runtime_attestation_appraisal_import(
+                        &input,
+                        &policy_file,
+                        cli.json,
                         control_url.as_deref(),
                         control_token.as_deref(),
                     )
@@ -2837,6 +3028,66 @@ fn main() {
                     budget_db.as_deref(),
                     authority_seed_file.as_deref(),
                     authority_db.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+            TrustCommands::CapitalBook { command } => match command {
+                TrustCapitalBookCommands::Export {
+                    agent_subject,
+                    capability,
+                    tool_server,
+                    tool_name,
+                    since,
+                    until,
+                    receipt_limit,
+                    facility_limit,
+                    bond_limit,
+                    loss_event_limit,
+                } => cmd_trust_capital_book_export(
+                    &agent_subject,
+                    capability.as_deref(),
+                    tool_server.as_deref(),
+                    tool_name.as_deref(),
+                    since,
+                    until,
+                    receipt_limit,
+                    facility_limit,
+                    bond_limit,
+                    loss_event_limit,
+                    cli.json,
+                    receipt_db.as_deref(),
+                    authority_seed_file.as_deref(),
+                    authority_db.as_deref(),
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
+            },
+            TrustCommands::CapitalInstruction { command } => match command {
+                TrustCapitalInstructionCommands::Issue { input_file } => {
+                    cmd_trust_capital_instruction_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+            },
+            TrustCommands::CapitalAllocation { command } => match command {
+                TrustCapitalAllocationCommands::Issue {
+                    input_file,
+                    certification_registry_file,
+                } => cmd_trust_capital_allocation_issue(
+                    &input_file,
+                    cli.json,
+                    receipt_db.as_deref(),
+                    budget_db.as_deref(),
+                    authority_seed_file.as_deref(),
+                    authority_db.as_deref(),
+                    certification_registry_file.as_deref(),
                     control_url.as_deref(),
                     control_token.as_deref(),
                 ),
@@ -3043,11 +3294,23 @@ fn main() {
                     event_kind,
                     amount_units,
                     amount_currency,
+                    authority_chain_file,
+                    execution_window_file,
+                    rail_file,
+                    observed_execution_file,
+                    appeal_window_ends_at,
+                    description,
                 } => cmd_trust_credit_loss_lifecycle_issue(
                     &bond_id,
                     &event_kind,
                     amount_units,
                     amount_currency.as_deref(),
+                    authority_chain_file.as_deref(),
+                    execution_window_file.as_deref(),
+                    rail_file.as_deref(),
+                    observed_execution_file.as_deref(),
+                    appeal_window_ends_at,
+                    description.as_deref(),
                     cli.json,
                     receipt_db.as_deref(),
                     authority_seed_file.as_deref(),
@@ -3219,6 +3482,17 @@ fn main() {
                         control_token.as_deref(),
                     )
                 }
+                TrustLiabilityMarketCommands::PricingAuthorityIssue { input_file } => {
+                    cmd_trust_liability_pricing_authority_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
                 TrustLiabilityMarketCommands::PlacementIssue { input_file } => {
                     cmd_trust_liability_placement_issue(
                         &input_file,
@@ -3232,6 +3506,17 @@ fn main() {
                 }
                 TrustLiabilityMarketCommands::BoundCoverageIssue { input_file } => {
                     cmd_trust_liability_bound_coverage_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustLiabilityMarketCommands::AutoBindIssue { input_file } => {
+                    cmd_trust_liability_auto_bind_issue(
                         &input_file,
                         cli.json,
                         receipt_db.as_deref(),
@@ -3276,6 +3561,50 @@ fn main() {
                 }
                 TrustLiabilityMarketCommands::AdjudicationIssue { input_file } => {
                     cmd_trust_liability_claim_adjudication_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustLiabilityMarketCommands::ClaimPayoutInstructionIssue { input_file } => {
+                    cmd_trust_liability_claim_payout_instruction_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustLiabilityMarketCommands::ClaimPayoutReceiptIssue { input_file } => {
+                    cmd_trust_liability_claim_payout_receipt_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustLiabilityMarketCommands::ClaimSettlementInstructionIssue { input_file } => {
+                    cmd_trust_liability_claim_settlement_instruction_issue(
+                        &input_file,
+                        cli.json,
+                        receipt_db.as_deref(),
+                        authority_seed_file.as_deref(),
+                        authority_db.as_deref(),
+                        control_url.as_deref(),
+                        control_token.as_deref(),
+                    )
+                }
+                TrustLiabilityMarketCommands::ClaimSettlementReceiptIssue { input_file } => {
+                    cmd_trust_liability_claim_settlement_receipt_issue(
                         &input_file,
                         cli.json,
                         receipt_db.as_deref(),
@@ -4062,17 +4391,15 @@ fn main() {
                     signing_seed_file,
                     passport_status_url,
                     passport_status_cache_ttl_secs,
-                } => {
-                    passport::cmd_passport_issuance_metadata(
-                        issuer_url.as_deref(),
-                        signing_seed_file.as_deref(),
-                        passport_status_url.as_deref(),
-                        passport_status_cache_ttl_secs,
-                        cli.json,
-                        control_url.as_deref(),
-                        control_token.as_deref(),
-                    )
-                }
+                } => passport::cmd_passport_issuance_metadata(
+                    issuer_url.as_deref(),
+                    signing_seed_file.as_deref(),
+                    passport_status_url.as_deref(),
+                    passport_status_cache_ttl_secs,
+                    cli.json,
+                    control_url.as_deref(),
+                    control_token.as_deref(),
+                ),
                 PassportIssuanceCommands::Offer {
                     input,
                     output,
@@ -4779,12 +5106,7 @@ fn cmd_trust_serve(
     let (issuance_policy, runtime_assurance_policy) = policy_path
         .map(load_policy)
         .transpose()?
-        .map(|loaded| {
-            (
-                loaded.issuance_policy,
-                loaded.runtime_assurance_policy,
-            )
-        })
+        .map(|loaded| (loaded.issuance_policy, loaded.runtime_assurance_policy))
         .unwrap_or((None, None));
     trust_control::serve(trust_control::TrustServiceConfig {
         listen,
@@ -5264,7 +5586,10 @@ fn cmd_trust_behavioral_feed_export(
             "returned_receipts:      {}",
             feed.body.privacy.returned_receipts
         );
-        println!("allow_count:            {}", feed.body.decisions.allow_count);
+        println!(
+            "allow_count:            {}",
+            feed.body.decisions.allow_count
+        );
         println!("deny_count:             {}", feed.body.decisions.deny_count);
         println!(
             "governed_receipts:      {}",
@@ -5433,10 +5758,19 @@ fn cmd_trust_credit_scorecard_export(
         println!("generated_at:           {}", report.body.generated_at);
         println!("signer_key:             {}", report.signer_key.to_hex());
         println!("subject_key:            {}", agent_subject);
-        println!("overall_score:          {:.4}", report.body.summary.overall_score);
-        println!("confidence:             {:?}", report.body.summary.confidence);
+        println!(
+            "overall_score:          {:.4}",
+            report.body.summary.overall_score
+        );
+        println!(
+            "confidence:             {:?}",
+            report.body.summary.confidence
+        );
         println!("band:                   {:?}", report.body.summary.band);
-        println!("probationary:           {}", report.body.summary.probationary);
+        println!(
+            "probationary:           {}",
+            report.body.summary.probationary
+        );
         println!(
             "matching_receipts:      {}",
             report.body.summary.matching_receipts
@@ -5445,7 +5779,217 @@ fn cmd_trust_credit_scorecard_export(
             "matching_decisions:     {}",
             report.body.summary.matching_decisions
         );
-        println!("anomaly_count:          {}", report.body.summary.anomaly_count);
+        println!(
+            "anomaly_count:          {}",
+            report.body.summary.anomaly_count
+        );
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_trust_capital_book_export(
+    agent_subject: &str,
+    capability_id: Option<&str>,
+    tool_server: Option<&str>,
+    tool_name: Option<&str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    facility_limit: usize,
+    bond_limit: usize,
+    loss_event_limit: usize,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let query = arc_kernel::CapitalBookQuery {
+        capability_id: capability_id.map(ToOwned::to_owned),
+        agent_subject: Some(agent_subject.to_string()),
+        tool_server: tool_server.map(ToOwned::to_owned),
+        tool_name: tool_name.map(ToOwned::to_owned),
+        since,
+        until,
+        receipt_limit: Some(receipt_limit),
+        facility_limit: Some(facility_limit),
+        bond_limit: Some(bond_limit),
+        loss_event_limit: Some(loss_event_limit),
+    };
+
+    let report = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.capital_book(&query)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "capital book export requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::build_signed_capital_book_report(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &query,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("schema:                 {}", report.body.schema);
+        println!("generated_at:           {}", report.body.generated_at);
+        println!("subject_key:            {}", report.body.subject_key);
+        println!("signer_key:             {}", report.signer_key.to_hex());
+        println!(
+            "funding_sources:        {}",
+            report.body.summary.funding_sources
+        );
+        println!(
+            "ledger_events:          {}",
+            report.body.summary.ledger_events
+        );
+        println!(
+            "currencies:             {}",
+            if report.body.summary.currencies.is_empty() {
+                "none".to_string()
+            } else {
+                report.body.summary.currencies.join(", ")
+            }
+        );
+        for source in &report.body.sources {
+            println!(
+                "- {} kind={:?} owner={:?} committed={} held={} drawn={} disbursed={} released={} repaid={} impaired={}",
+                source.source_id,
+                source.kind,
+                source.owner_role,
+                source.committed_amount.as_ref().map_or(0, |amount| amount.units),
+                source.held_amount.as_ref().map_or(0, |amount| amount.units),
+                source.drawn_amount.as_ref().map_or(0, |amount| amount.units),
+                source.disbursed_amount.as_ref().map_or(0, |amount| amount.units),
+                source.released_amount.as_ref().map_or(0, |amount| amount.units),
+                source.repaid_amount.as_ref().map_or(0, |amount| amount.units),
+                source.impaired_amount.as_ref().map_or(0, |amount| amount.units),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_capital_instruction_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request: trust_control::CapitalExecutionInstructionRequest = load_json_or_yaml(input_file)?;
+
+    let instruction = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.issue_capital_execution_instruction(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "capital instruction issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_capital_execution_instruction(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&instruction)?);
+    } else {
+        println!("schema:                 {}", instruction.body.schema);
+        println!(
+            "instruction_id:         {}",
+            instruction.body.instruction_id
+        );
+        println!("issued_at:              {}", instruction.body.issued_at);
+        println!("subject_key:            {}", instruction.body.subject_key);
+        println!("source_id:              {}", instruction.body.source_id);
+        println!("action:                 {:?}", instruction.body.action);
+        println!(
+            "reconciled_state:       {:?}",
+            instruction.body.reconciled_state
+        );
+        println!(
+            "signer_key:             {}",
+            instruction.signer_key.to_hex()
+        );
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cmd_trust_capital_allocation_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    budget_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    certification_registry_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request: trust_control::CapitalAllocationDecisionRequest = load_json_or_yaml(input_file)?;
+
+    let allocation = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.issue_capital_allocation_decision(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "capital allocation issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_capital_allocation_decision(
+            receipt_db_path,
+            budget_db_path,
+            authority_seed_path,
+            authority_db_path,
+            certification_registry_file,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&allocation)?);
+    } else {
+        println!("schema:                 {}", allocation.body.schema);
+        println!("allocation_id:          {}", allocation.body.allocation_id);
+        println!("issued_at:              {}", allocation.body.issued_at);
+        println!("subject_key:            {}", allocation.body.subject_key);
+        println!(
+            "governed_receipt_id:    {}",
+            allocation.body.governed_receipt_id
+        );
+        println!("outcome:                {:?}", allocation.body.outcome);
+        println!(
+            "facility_id:            {}",
+            allocation.body.facility_id.as_deref().unwrap_or("<none>")
+        );
+        println!(
+            "source_id:              {}",
+            allocation.body.source_id.as_deref().unwrap_or("<none>")
+        );
+        println!("signer_key:             {}", allocation.signer_key.to_hex());
     }
 
     Ok(())
@@ -5506,7 +6050,10 @@ fn cmd_trust_credit_facility_evaluate(
         println!("subject_key:            {}", agent_subject);
         println!("disposition:            {:?}", report.disposition);
         println!("score_band:             {:?}", report.scorecard.band);
-        println!("overall_score:          {:.4}", report.scorecard.overall_score);
+        println!(
+            "overall_score:          {:.4}",
+            report.scorecard.overall_score
+        );
         println!(
             "runtime_prerequisite:   {:?}",
             report.prerequisites.minimum_runtime_assurance_tier
@@ -5623,7 +6170,9 @@ fn cmd_trust_credit_facility_list(
         agent_subject: agent_subject.map(ToOwned::to_owned),
         tool_server: tool_server.map(ToOwned::to_owned),
         tool_name: tool_name.map(ToOwned::to_owned),
-        disposition: disposition.map(parse_credit_facility_disposition).transpose()?,
+        disposition: disposition
+            .map(parse_credit_facility_disposition)
+            .transpose()?,
         lifecycle_state: lifecycle_state
             .map(parse_credit_facility_lifecycle_state)
             .transpose()?,
@@ -5654,7 +6203,10 @@ fn cmd_trust_credit_facility_list(
             "returned_facilities:    {}",
             report.summary.returned_facilities
         );
-        println!("active_facilities:      {}", report.summary.active_facilities);
+        println!(
+            "active_facilities:      {}",
+            report.summary.active_facilities
+        );
         println!(
             "manual_review_rows:     {}",
             report.summary.manual_review_facilities
@@ -5662,7 +6214,9 @@ fn cmd_trust_credit_facility_list(
         for row in report.facilities {
             println!(
                 "- {} disposition={:?} lifecycle={:?}",
-                row.facility.body.facility_id, row.facility.body.report.disposition, row.lifecycle_state
+                row.facility.body.facility_id,
+                row.facility.body.report.disposition,
+                row.lifecycle_state
             );
         }
     }
@@ -5866,10 +6420,7 @@ fn cmd_trust_credit_bond_simulate(
             "simulated_decision:     {:?}",
             report.simulated_evaluation.decision
         );
-        println!(
-            "decision_changed:       {}",
-            report.delta.decision_changed
-        );
+        println!("decision_changed:       {}", report.delta.decision_changed);
         println!(
             "sandbox_ready:          {}",
             report.simulated_evaluation.sandbox_integration_ready
@@ -5951,19 +6502,18 @@ fn build_credit_loss_lifecycle_query(
     amount_units: Option<u64>,
     amount_currency: Option<&str>,
 ) -> Result<arc_kernel::CreditLossLifecycleQuery, CliError> {
-    let amount = match (amount_units, amount_currency) {
-        (Some(units), Some(currency)) => Some(MonetaryAmount {
-            units,
-            currency: currency.to_string(),
-        }),
-        (None, None) => None,
-        _ => {
-            return Err(CliError::Other(
+    let amount =
+        match (amount_units, amount_currency) {
+            (Some(units), Some(currency)) => Some(MonetaryAmount {
+                units,
+                currency: currency.to_string(),
+            }),
+            (None, None) => None,
+            _ => return Err(CliError::Other(
                 "credit loss lifecycle amount requires both --amount-units and --amount-currency"
                     .to_string(),
-            ))
-        }
-    };
+            )),
+        };
 
     Ok(arc_kernel::CreditLossLifecycleQuery {
         bond_id: bond_id.to_string(),
@@ -6004,7 +6554,10 @@ fn cmd_trust_credit_loss_lifecycle_evaluate(
         println!("schema:                       {}", report.schema);
         println!("generated_at:                 {}", report.generated_at);
         println!("bond_id:                      {}", report.summary.bond_id);
-        println!("event_kind:                   {:?}", report.query.event_kind);
+        println!(
+            "event_kind:                   {:?}",
+            report.query.event_kind
+        );
         println!(
             "current_bond_lifecycle:       {:?}",
             report.summary.current_bond_lifecycle_state
@@ -6032,6 +6585,12 @@ fn cmd_trust_credit_loss_lifecycle_issue(
     event_kind: &str,
     amount_units: Option<u64>,
     amount_currency: Option<&str>,
+    authority_chain_file: Option<&Path>,
+    execution_window_file: Option<&Path>,
+    rail_file: Option<&Path>,
+    observed_execution_file: Option<&Path>,
+    appeal_window_ends_at: Option<u64>,
+    description: Option<&str>,
     json_output: bool,
     receipt_db_path: Option<&Path>,
     authority_seed_path: Option<&Path>,
@@ -6046,6 +6605,21 @@ fn cmd_trust_credit_loss_lifecycle_issue(
             amount_units,
             amount_currency,
         )?,
+        authority_chain: authority_chain_file
+            .map(load_json_or_yaml::<Vec<arc_kernel::CapitalExecutionAuthorityStep>>)
+            .transpose()?
+            .unwrap_or_default(),
+        execution_window: execution_window_file
+            .map(load_json_or_yaml::<arc_kernel::CapitalExecutionWindow>)
+            .transpose()?,
+        rail: rail_file
+            .map(load_json_or_yaml::<arc_kernel::CapitalExecutionRail>)
+            .transpose()?,
+        observed_execution: observed_execution_file
+            .map(load_json_or_yaml::<arc_kernel::CapitalExecutionObservation>)
+            .transpose()?,
+        appeal_window_ends_at,
+        description: description.map(ToOwned::to_owned),
     };
 
     let event = if let Some(url) = control_url {
@@ -6062,7 +6636,7 @@ fn cmd_trust_credit_loss_lifecycle_issue(
             receipt_db_path,
             authority_seed_path,
             authority_db_path,
-            &request.query,
+            &request,
         )?
     };
 
@@ -6129,18 +6703,34 @@ fn cmd_trust_credit_loss_lifecycle_list(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("matching_events:              {}", report.summary.matching_events);
-        println!("returned_events:              {}", report.summary.returned_events);
+        println!(
+            "matching_events:              {}",
+            report.summary.matching_events
+        );
+        println!(
+            "returned_events:              {}",
+            report.summary.returned_events
+        );
         println!(
             "delinquency_events:           {}",
             report.summary.delinquency_events
         );
-        println!("recovery_events:              {}", report.summary.recovery_events);
+        println!(
+            "recovery_events:              {}",
+            report.summary.recovery_events
+        );
         println!(
             "reserve_release_events:       {}",
             report.summary.reserve_release_events
         );
-        println!("write_off_events:             {}", report.summary.write_off_events);
+        println!(
+            "reserve_slash_events:         {}",
+            report.summary.reserve_slash_events
+        );
+        println!(
+            "write_off_events:             {}",
+            report.summary.write_off_events
+        );
         for row in report.events {
             println!(
                 "- {} kind={:?} bond={} projected={:?}",
@@ -6214,9 +6804,15 @@ fn cmd_trust_credit_backtest_export(
         println!("schema:                 {}", report.schema);
         println!("generated_at:           {}", report.generated_at);
         println!("subject_key:            {}", agent_subject);
-        println!("windows_evaluated:      {}", report.summary.windows_evaluated);
+        println!(
+            "windows_evaluated:      {}",
+            report.summary.windows_evaluated
+        );
         println!("drift_windows:          {}", report.summary.drift_windows);
-        println!("manual_review_windows:  {}", report.summary.manual_review_windows);
+        println!(
+            "manual_review_windows:  {}",
+            report.summary.manual_review_windows
+        );
         println!("denied_windows:         {}", report.summary.denied_windows);
         println!(
             "over_utilized_windows:  {}",
@@ -6438,8 +7034,14 @@ fn cmd_trust_liability_provider_resolve(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("provider_id:        {}", report.provider.body.report.provider_id);
-        println!("display_name:       {}", report.provider.body.report.display_name);
+        println!(
+            "provider_id:        {}",
+            report.provider.body.report.provider_id
+        );
+        println!(
+            "display_name:       {}",
+            report.provider.body.report.display_name
+        );
         println!("jurisdiction:       {}", report.matched_policy.jurisdiction);
         println!(
             "coverage_classes:   {}",
@@ -6485,7 +7087,10 @@ fn cmd_trust_liability_quote_request_issue(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&quote_request)?);
     } else {
-        println!("quote_request_id:      {}", quote_request.body.quote_request_id);
+        println!(
+            "quote_request_id:      {}",
+            quote_request.body.quote_request_id
+        );
         println!(
             "provider_id:           {}",
             quote_request.body.provider_policy.provider_id
@@ -6534,12 +7139,64 @@ fn cmd_trust_liability_quote_response_issue(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&quote_response)?);
     } else {
-        println!("quote_response_id:     {}", quote_response.body.quote_response_id);
+        println!(
+            "quote_response_id:     {}",
+            quote_response.body.quote_response_id
+        );
         println!(
             "quote_request_id:      {}",
             quote_response.body.quote_request.body.quote_request_id
         );
-        println!("disposition:           {:?}", quote_response.body.disposition);
+        println!(
+            "disposition:           {:?}",
+            quote_response.body.disposition
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_pricing_authority_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_pricing_authority_issue_request(input_file)?;
+    let authority = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.issue_liability_pricing_authority(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability pricing authority issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_pricing_authority(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&authority)?);
+    } else {
+        println!("authority_id:          {}", authority.body.authority_id);
+        println!(
+            "quote_request_id:      {}",
+            authority.body.quote_request.body.quote_request_id
+        );
+        println!("expires_at:            {}", authority.body.expires_at);
+        println!(
+            "auto_bind_enabled:     {}",
+            authority.body.auto_bind_enabled
+        );
     }
 
     Ok(())
@@ -6620,8 +7277,71 @@ fn cmd_trust_liability_bound_coverage_issue(
         println!("{}", serde_json::to_string_pretty(&bound)?);
     } else {
         println!("bound_coverage_id:     {}", bound.body.bound_coverage_id);
-        println!("placement_id:          {}", bound.body.placement.body.placement_id);
+        println!(
+            "placement_id:          {}",
+            bound.body.placement.body.placement_id
+        );
         println!("policy_number:         {}", bound.body.policy_number);
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_auto_bind_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_auto_bind_issue_request(input_file)?;
+    let decision = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.issue_liability_auto_bind(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability auto-bind issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_auto_bind(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&decision)?);
+    } else {
+        println!("decision_id:           {}", decision.body.decision_id);
+        println!("disposition:           {:?}", decision.body.disposition);
+        println!(
+            "authority_id:          {}",
+            decision.body.authority.body.authority_id
+        );
+        println!(
+            "placement_id:          {}",
+            decision
+                .body
+                .placement
+                .as_ref()
+                .map(|placement| placement.body.placement_id.as_str())
+                .unwrap_or("-"),
+        );
+        println!(
+            "bound_coverage_id:     {}",
+            decision
+                .body
+                .bound_coverage
+                .as_ref()
+                .map(|bound| bound.body.bound_coverage_id.as_str())
+                .unwrap_or("-"),
+        );
     }
 
     Ok(())
@@ -6701,7 +7421,10 @@ fn cmd_trust_liability_claim_response_issue(
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else {
         println!("claim_response_id:     {}", response.body.claim_response_id);
-        println!("claim_id:              {}", response.body.claim.body.claim_id);
+        println!(
+            "claim_id:              {}",
+            response.body.claim.body.claim_id
+        );
         println!("disposition:           {:?}", response.body.disposition);
     }
 
@@ -6781,9 +7504,226 @@ fn cmd_trust_liability_claim_adjudication_issue(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&adjudication)?);
     } else {
-        println!("adjudication_id:       {}", adjudication.body.adjudication_id);
-        println!("dispute_id:            {}", adjudication.body.dispute.body.dispute_id);
+        println!(
+            "adjudication_id:       {}",
+            adjudication.body.adjudication_id
+        );
+        println!(
+            "dispute_id:            {}",
+            adjudication.body.dispute.body.dispute_id
+        );
         println!("outcome:               {:?}", adjudication.body.outcome);
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_claim_payout_instruction_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_claim_payout_instruction_issue_request(input_file)?;
+    let payout_instruction = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?
+            .issue_liability_claim_payout_instruction(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability claim payout instruction issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_claim_payout_instruction(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&payout_instruction)?);
+    } else {
+        println!(
+            "payout_instruction_id: {}",
+            payout_instruction.body.payout_instruction_id
+        );
+        println!(
+            "adjudication_id:       {}",
+            payout_instruction.body.adjudication.body.adjudication_id
+        );
+        println!(
+            "capital_instruction_id:{}",
+            payout_instruction
+                .body
+                .capital_instruction
+                .body
+                .instruction_id
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_claim_payout_receipt_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_claim_payout_receipt_issue_request(input_file)?;
+    let payout_receipt = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.issue_liability_claim_payout_receipt(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability claim payout receipt issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_claim_payout_receipt(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&payout_receipt)?);
+    } else {
+        println!(
+            "payout_receipt_id:     {}",
+            payout_receipt.body.payout_receipt_id
+        );
+        println!(
+            "payout_instruction_id: {}",
+            payout_receipt
+                .body
+                .payout_instruction
+                .body
+                .payout_instruction_id
+        );
+        println!(
+            "reconciliation_state:  {:?}",
+            payout_receipt.body.reconciliation_state
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_claim_settlement_instruction_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_claim_settlement_instruction_issue_request(input_file)?;
+    let settlement_instruction = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?
+            .issue_liability_claim_settlement_instruction(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability claim settlement instruction issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_claim_settlement_instruction(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&settlement_instruction)?);
+    } else {
+        println!(
+            "settlement_instruction_id: {}",
+            settlement_instruction.body.settlement_instruction_id
+        );
+        println!(
+            "payout_receipt_id:        {}",
+            settlement_instruction
+                .body
+                .payout_receipt
+                .body
+                .payout_receipt_id
+        );
+        println!(
+            "settlement_kind:          {:?}",
+            settlement_instruction.body.settlement_kind
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_liability_claim_settlement_receipt_issue(
+    input_file: &Path,
+    json_output: bool,
+    receipt_db_path: Option<&Path>,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = load_liability_claim_settlement_receipt_issue_request(input_file)?;
+    let settlement_receipt = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?
+            .issue_liability_claim_settlement_receipt(&request)?
+    } else {
+        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+            CliError::Other(
+                "liability claim settlement receipt issuance requires --receipt-db <path> when --control-url is not set"
+                    .to_string(),
+            )
+        })?;
+        trust_control::issue_signed_liability_claim_settlement_receipt(
+            receipt_db_path,
+            authority_seed_path,
+            authority_db_path,
+            &request,
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&settlement_receipt)?);
+    } else {
+        println!(
+            "settlement_receipt_id:    {}",
+            settlement_receipt.body.settlement_receipt_id
+        );
+        println!(
+            "settlement_instruction_id:{}",
+            settlement_receipt
+                .body
+                .settlement_instruction
+                .body
+                .settlement_instruction_id
+        );
+        println!(
+            "reconciliation_state:     {:?}",
+            settlement_receipt.body.reconciliation_state
+        );
     }
 
     Ok(())
@@ -6831,20 +7771,48 @@ fn cmd_trust_liability_market_list(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
-        println!("matching_requests:     {}", report.summary.matching_requests);
-        println!("returned_requests:     {}", report.summary.returned_requests);
+        println!(
+            "matching_requests:     {}",
+            report.summary.matching_requests
+        );
+        println!(
+            "returned_requests:     {}",
+            report.summary.returned_requests
+        );
         println!("quote_responses:       {}", report.summary.quote_responses);
+        println!(
+            "pricing_authorities:   {}",
+            report.summary.pricing_authorities
+        );
+        println!(
+            "auto_bind_decisions:   {}",
+            report.summary.auto_bind_decisions
+        );
+        println!(
+            "auto_bound_decisions:  {}",
+            report.summary.auto_bound_decisions
+        );
         println!("placements:            {}", report.summary.placements);
         println!("bound_coverages:       {}", report.summary.bound_coverages);
         for workflow in report.workflows {
             println!(
-                "- {} provider={} response={} placement={} bound={}",
+                "- {} provider={} response={} authority={} auto_bind={} placement={} bound={}",
                 workflow.quote_request.body.quote_request_id,
                 workflow.quote_request.body.provider_policy.provider_id,
                 workflow
                     .latest_quote_response
                     .as_ref()
                     .map(|response| response.body.quote_response_id.as_str())
+                    .unwrap_or("-"),
+                workflow
+                    .pricing_authority
+                    .as_ref()
+                    .map(|authority| authority.body.authority_id.as_str())
+                    .unwrap_or("-"),
+                workflow
+                    .latest_auto_bind_decision
+                    .as_ref()
+                    .map(|decision| decision.body.decision_id.as_str())
                     .unwrap_or("-"),
                 workflow
                     .placement
@@ -6903,12 +7871,53 @@ fn cmd_trust_liability_claims_list(
     } else {
         println!("matching_claims:       {}", report.summary.matching_claims);
         println!("returned_claims:       {}", report.summary.returned_claims);
-        println!("provider_responses:    {}", report.summary.provider_responses);
+        println!(
+            "provider_responses:    {}",
+            report.summary.provider_responses
+        );
+        println!(
+            "accepted_responses:    {}",
+            report.summary.accepted_responses
+        );
+        println!("denied_responses:      {}", report.summary.denied_responses);
         println!("disputes:              {}", report.summary.disputes);
         println!("adjudications:         {}", report.summary.adjudications);
+        println!(
+            "payout_instructions:   {}",
+            report.summary.payout_instructions
+        );
+        println!("payout_receipts:       {}", report.summary.payout_receipts);
+        println!(
+            "matched_payouts:       {}",
+            report.summary.matched_payout_receipts
+        );
+        println!(
+            "mismatched_payouts:    {}",
+            report.summary.mismatched_payout_receipts
+        );
+        println!(
+            "settlement_instructions:{}",
+            report.summary.settlement_instructions
+        );
+        println!(
+            "settlement_receipts:   {}",
+            report.summary.settlement_receipts
+        );
+        println!(
+            "matched_settlements:   {}",
+            report.summary.matched_settlement_receipts
+        );
+        println!(
+            "mismatched_settlements:{}",
+            report.summary.mismatched_settlement_receipts
+        );
+        println!(
+            "counterparty_mismatch_settlements:{}",
+            report.summary.counterparty_mismatch_settlement_receipts
+        );
         for claim in report.claims {
             println!(
-                "- {} policy={} response={} dispute={} adjudication={}",
+                "- {} policy={} response={} dispute={} adjudication={} payout_instruction={} payout_receipt={} settlement_instruction={} settlement_receipt={}",
                 claim.claim.body.claim_id,
                 claim.claim.body.bound_coverage.body.policy_number,
                 claim.provider_response
@@ -6922,6 +7931,22 @@ fn cmd_trust_liability_claims_list(
                 claim.adjudication
                     .as_ref()
                     .map(|adjudication| adjudication.body.adjudication_id.as_str())
+                    .unwrap_or("-"),
+                claim.payout_instruction
+                    .as_ref()
+                    .map(|instruction| instruction.body.payout_instruction_id.as_str())
+                    .unwrap_or("-"),
+                claim.payout_receipt
+                    .as_ref()
+                    .map(|receipt| receipt.body.payout_receipt_id.as_str())
+                    .unwrap_or("-"),
+                claim.settlement_instruction
+                    .as_ref()
+                    .map(|instruction| instruction.body.settlement_instruction_id.as_str())
+                    .unwrap_or("-"),
+                claim.settlement_receipt
+                    .as_ref()
+                    .map(|receipt| receipt.body.settlement_receipt_id.as_str())
                     .unwrap_or("-"),
             );
         }
@@ -6992,7 +8017,10 @@ fn cmd_trust_underwriting_input_export(
             "returned_receipts:      {}",
             input.body.receipts.returned_receipts
         );
-        println!("governed_receipts:      {}", input.body.receipts.governed_receipts);
+        println!(
+            "governed_receipts:      {}",
+            input.body.receipts.governed_receipts
+        );
         println!(
             "runtime_assurance:      {}",
             input.body.receipts.runtime_assurance_receipts
@@ -7004,10 +8032,7 @@ fn cmd_trust_underwriting_input_export(
             println!("probationary:           {}", reputation.probationary);
         }
         if let Some(certification) = input.body.certification.as_ref() {
-            println!(
-                "certification_state:    {:?}",
-                certification.state
-            );
+            println!("certification_state:    {:?}", certification.state);
         }
         for signal in &input.body.signals {
             println!(
@@ -7152,10 +8177,7 @@ fn cmd_trust_underwriting_decision_simulate(
             "simulated_outcome:      {:?}",
             report.simulated_evaluation.outcome
         );
-        println!(
-            "outcome_changed:        {}",
-            report.delta.outcome_changed
-        );
+        println!("outcome_changed:        {}", report.delta.outcome_changed);
         println!(
             "risk_class_changed:     {}",
             report.delta.risk_class_changed
@@ -7194,9 +8216,8 @@ fn parse_credit_facility_disposition(
 fn parse_credit_facility_lifecycle_state(
     value: &str,
 ) -> Result<arc_kernel::CreditFacilityLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
-        CliError::Other(format!("invalid credit facility lifecycle state `{value}`"))
-    })
+    serde_json::from_str(&format!("\"{value}\""))
+        .map_err(|_| CliError::Other(format!("invalid credit facility lifecycle state `{value}`")))
 }
 
 fn parse_credit_bond_disposition(
@@ -7217,7 +8238,9 @@ fn parse_credit_loss_lifecycle_event_kind(
     value: &str,
 ) -> Result<arc_kernel::CreditLossLifecycleEventKind, CliError> {
     serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
-        CliError::Other(format!("invalid credit loss lifecycle event kind `{value}`"))
+        CliError::Other(format!(
+            "invalid credit loss lifecycle event kind `{value}`"
+        ))
     })
 }
 
@@ -7309,6 +8332,12 @@ fn load_liability_quote_response_issue_request(
     load_json_or_yaml(path)
 }
 
+fn load_liability_pricing_authority_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityPricingAuthorityIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
 fn load_liability_placement_issue_request(
     path: &Path,
 ) -> Result<trust_control::LiabilityPlacementIssueRequest, CliError> {
@@ -7318,6 +8347,12 @@ fn load_liability_placement_issue_request(
 fn load_liability_bound_coverage_issue_request(
     path: &Path,
 ) -> Result<trust_control::LiabilityBoundCoverageIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
+fn load_liability_auto_bind_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityAutoBindIssueRequest, CliError> {
     load_json_or_yaml(path)
 }
 
@@ -7345,6 +8380,30 @@ fn load_liability_claim_adjudication_issue_request(
     load_json_or_yaml(path)
 }
 
+fn load_liability_claim_payout_instruction_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityClaimPayoutInstructionIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
+fn load_liability_claim_payout_receipt_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityClaimPayoutReceiptIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
+fn load_liability_claim_settlement_instruction_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityClaimSettlementInstructionIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
+fn load_liability_claim_settlement_receipt_issue_request(
+    path: &Path,
+) -> Result<trust_control::LiabilityClaimSettlementReceiptIssueRequest, CliError> {
+    load_json_or_yaml(path)
+}
+
 fn parse_liability_coverage_class(
     value: &str,
 ) -> Result<arc_kernel::LiabilityCoverageClass, CliError> {
@@ -7355,8 +8414,11 @@ fn parse_liability_coverage_class(
 fn parse_liability_provider_lifecycle_state(
     value: &str,
 ) -> Result<arc_kernel::LiabilityProviderLifecycleState, CliError> {
-    serde_json::from_str(&format!("\"{value}\""))
-        .map_err(|_| CliError::Other(format!("invalid liability provider lifecycle state `{value}`")))
+    serde_json::from_str(&format!("\"{value}\"")).map_err(|_| {
+        CliError::Other(format!(
+            "invalid liability provider lifecycle state `{value}`"
+        ))
+    })
 }
 
 fn parse_governed_autonomy_tier(value: &str) -> Result<GovernedAutonomyTier, CliError> {
@@ -7382,6 +8444,18 @@ fn load_runtime_attestation_evidence(path: &Path) -> Result<RuntimeAttestationEv
     } else {
         Ok(serde_yaml::from_str(&contents)?)
     }
+}
+
+fn load_signed_runtime_attestation_appraisal_result(
+    path: &Path,
+) -> Result<SignedRuntimeAttestationAppraisalResult, CliError> {
+    load_json_or_yaml(path)
+}
+
+fn load_runtime_attestation_import_policy(
+    path: &Path,
+) -> Result<RuntimeAttestationImportedAppraisalPolicy, CliError> {
+    load_json_or_yaml(path)
 }
 
 fn cmd_trust_runtime_attestation_appraisal_export(
@@ -7420,10 +8494,22 @@ fn cmd_trust_runtime_attestation_appraisal_export(
         println!("schema:                 {}", report.body.schema);
         println!("generated_at:           {}", report.body.generated_at);
         println!("signer_key:             {}", report.signer_key.to_hex());
-        println!("evidence_schema:        {}", report.body.appraisal.evidence.schema);
-        println!("verifier:               {}", report.body.appraisal.evidence.verifier);
-        println!("verifier_family:        {:?}", report.body.appraisal.verifier_family);
-        println!("verdict:                {:?}", report.body.appraisal.verdict);
+        println!(
+            "evidence_schema:        {}",
+            report.body.appraisal.evidence.schema
+        );
+        println!(
+            "verifier:               {}",
+            report.body.appraisal.evidence.verifier
+        );
+        println!(
+            "verifier_family:        {:?}",
+            report.body.appraisal.verifier_family
+        );
+        println!(
+            "verdict:                {:?}",
+            report.body.appraisal.verdict
+        );
         println!(
             "policy_configured:      {}",
             report.body.policy_outcome.trust_policy_configured
@@ -7438,6 +8524,115 @@ fn cmd_trust_runtime_attestation_appraisal_export(
         );
         if let Some(reason) = report.body.policy_outcome.reason.as_deref() {
             println!("policy_reason:          {reason}");
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_runtime_attestation_appraisal_result_export(
+    issuer: &str,
+    input_path: &Path,
+    policy_file: Option<&Path>,
+    json_output: bool,
+    authority_seed_path: Option<&Path>,
+    authority_db_path: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let evidence = load_runtime_attestation_evidence(input_path)?;
+    let result = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.runtime_attestation_appraisal_result(
+            &RuntimeAttestationAppraisalResultExportRequest {
+                issuer: issuer.to_string(),
+                runtime_attestation: evidence,
+            },
+        )?
+    } else {
+        let runtime_assurance_policy = policy_file
+            .map(load_policy)
+            .transpose()?
+            .and_then(|loaded| loaded.runtime_assurance_policy);
+        trust_control::build_signed_runtime_attestation_appraisal_result(
+            authority_seed_path,
+            authority_db_path,
+            runtime_assurance_policy.as_ref(),
+            &RuntimeAttestationAppraisalResultExportRequest {
+                issuer: issuer.to_string(),
+                runtime_attestation: evidence,
+            },
+        )?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        println!("schema:                 {}", result.body.schema);
+        println!("result_id:              {}", result.body.result_id);
+        println!("exported_at:            {}", result.body.exported_at);
+        println!("issuer:                 {}", result.body.issuer);
+        println!("signer_key:             {}", result.signer_key.to_hex());
+        println!(
+            "verifier_family:        {:?}",
+            result.body.appraisal.verifier.verifier_family
+        );
+        println!(
+            "exporter_accepted:      {}",
+            result.body.exporter_policy_outcome.accepted
+        );
+        println!(
+            "effective_tier:         {:?}",
+            result.body.exporter_policy_outcome.effective_tier
+        );
+    }
+
+    Ok(())
+}
+
+fn cmd_trust_runtime_attestation_appraisal_import(
+    input_path: &Path,
+    policy_path: &Path,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let request = RuntimeAttestationAppraisalImportRequest {
+        signed_result: load_signed_runtime_attestation_appraisal_result(input_path)?,
+        local_policy: load_runtime_attestation_import_policy(policy_path)?,
+    };
+
+    let report = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.import_runtime_attestation_appraisal(&request)?
+    } else {
+        trust_control::build_runtime_attestation_appraisal_import_report(
+            &request,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|error| CliError::Other(error.to_string()))?
+                .as_secs(),
+        )
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("schema:                 {}", report.schema);
+        println!("evaluated_at:           {}", report.evaluated_at);
+        println!("result_id:              {}", report.result.result_id);
+        println!("issuer:                 {}", report.result.issuer);
+        println!("signer_key:             {}", report.signer_key_hex);
+        println!(
+            "disposition:            {:?}",
+            report.local_policy_outcome.disposition
+        );
+        println!(
+            "effective_tier:         {:?}",
+            report.local_policy_outcome.effective_tier
+        );
+        for reason in &report.local_policy_outcome.reasons {
+            println!("- {:?}: {}", reason.code, reason.description);
         }
     }
 
@@ -7538,7 +8733,9 @@ fn cmd_trust_underwriting_decision_list(
         agent_subject: agent_subject.map(ToOwned::to_owned),
         tool_server: tool_server.map(ToOwned::to_owned),
         tool_name: tool_name.map(ToOwned::to_owned),
-        outcome: outcome.map(parse_underwriting_decision_outcome).transpose()?,
+        outcome: outcome
+            .map(parse_underwriting_decision_outcome)
+            .transpose()?,
         lifecycle_state: lifecycle_state
             .map(parse_underwriting_lifecycle_state)
             .transpose()?,
@@ -7823,8 +9020,8 @@ fn handle_agent_message(
                     agent_id: session_agent_id.to_string(),
                     arguments: tool_call.arguments,
                     dpop_proof: None,
-            governed_intent: None,
-            approval_token: None,
+                    governed_intent: None,
+                    approval_token: None,
                 };
 
                 match make_error_receipt(kernel, &request) {

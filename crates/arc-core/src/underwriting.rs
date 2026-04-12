@@ -196,6 +196,8 @@ pub struct UnderwritingRuntimeAssuranceEvidence {
     pub latest_verifier: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub latest_evidence_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub observed_verifier_families: Vec<AttestationVerifierFamily>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -1241,6 +1243,7 @@ mod tests {
                 latest_verifier_family: Some(AttestationVerifierFamily::AzureMaa),
                 latest_verifier: Some("verifier.arc".to_string()),
                 latest_evidence_sha256: Some("sha256-runtime".to_string()),
+                observed_verifier_families: vec![AttestationVerifierFamily::AzureMaa],
             }),
             signals: Vec::new(),
         }

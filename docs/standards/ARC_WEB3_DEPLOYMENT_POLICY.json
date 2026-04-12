@@ -1,0 +1,53 @@
+{
+  "policyId": "arc.web3-deployment-promotion.v1",
+  "generatedAt": "2026-04-02T09:00:00Z",
+  "environments": [
+    "local-devnet",
+    "runtime-devnet",
+    "base-mainnet-template",
+    "arbitrum-one-template"
+  ],
+  "gasBudgets": {
+    "registerOperator": 80000,
+    "registerDelegate": 80000,
+    "publishRoot": 190000,
+    "registerFeed": 140000,
+    "getPrice": 70000,
+    "createEscrow": 330000,
+    "merklePartialRelease": 120000,
+    "dualSignRelease": 90000,
+    "lockBond": 320000,
+    "releaseBond": 90000
+  },
+  "latencyBudgets": {
+    "oracleRefreshIntervalSeconds": 60,
+    "oracleMaxAgeSeconds": 600,
+    "sequencerGracePeriodSeconds": 300,
+    "anchorIndexerDriftThresholdCheckpoints": 3,
+    "settlementIndexerDriftThresholdBlocks": 12,
+    "ccipValidityWindowMultiplier": 2
+  },
+  "requiredEvidence": [
+    "./scripts/qualify-web3-runtime.sh",
+    "./scripts/qualify-web3-promotion.sh",
+    "contracts/reports/local-devnet-qualification.json",
+    "contracts/deployments/local-devnet.reviewed.json",
+    "contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md",
+    "contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md",
+    "docs/standards/ARC_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json",
+    "docs/standards/ARC_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json",
+    "docs/standards/ARC_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json",
+    "docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md",
+    "docs/release/ARC_WEB3_READINESS_AUDIT.md",
+    "target/web3-promotion-qualification/promotion-qualification.json"
+  ],
+  "promotionGates": [
+    "No unreviewed critical findings may remain in the web3 readiness audit.",
+    "Measured local-devnet gas must stay within the budget table.",
+    "Runtime qualification must be green on the candidate revision.",
+    "Reviewed promotion manifests must bind one exact manifest hash, release id, deployment policy id, CREATE2 salt namespace, and environment-specific approval artifact before any rollout begins.",
+    "Deployment manifests must remain deterministic templates with operator-filled addresses reviewed before any live promotion.",
+    "Promotion qualification must prove reproducible CREATE2 rollout across fresh local devnets and emit explicit rollback plans on failure.",
+    "External publication still requires hosted workflow observation and operator approval."
+  ]
+}

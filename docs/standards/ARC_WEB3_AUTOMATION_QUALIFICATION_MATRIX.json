@@ -1,0 +1,77 @@
+{
+  "schema": "arc.web3-automation-qualification-matrix.v1",
+  "profileId": "arc.web3.automation-and-interop.profile",
+  "cases": [
+    {
+      "id": "functions-bounded-audit",
+      "name": "Functions fallback remains audit-only and bounded",
+      "requirementIds": [
+        "WEBAUTO-01",
+        "WEBAUTO-05"
+      ],
+      "scenario": "receipt_batch_audit_with_verified_response",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "ARC prepares bounded requests and rejects any attempt to treat the fallback as direct fund-release authority."
+    },
+    {
+      "id": "functions-unsupported-mode",
+      "name": "Unsupported or mismatched DON responses fail closed",
+      "requirementIds": [
+        "WEBAUTO-01",
+        "WEBAUTO-05"
+      ],
+      "scenario": "functions_response_rejected_or_root_mismatch",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Batch root, request id, chain id, and return-size mismatches are rejected deterministically."
+    },
+    {
+      "id": "automation-replay-guard",
+      "name": "Anchor and watchdog jobs remain replay-safe and operator-controlled",
+      "requirementIds": [
+        "WEBAUTO-02",
+        "WEBAUTO-05"
+      ],
+      "scenario": "state_fingerprint_and_replay_window_validation",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Duplicate suppression, delayed-safe execution, and operator override are all explicit checks."
+    },
+    {
+      "id": "ccip-reconciliation",
+      "name": "CCIP coordination reconciles back to canonical ARC receipts",
+      "requirementIds": [
+        "WEBAUTO-03"
+      ],
+      "scenario": "bounded_cross_chain_settlement_message_delivery",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "The shipped lane transports one settlement-coordination message family and records the canonical execution receipt id."
+    },
+    {
+      "id": "ccip-failure-modes",
+      "name": "Duplicate, delayed, and unsupported-chain CCIP deliveries fail closed",
+      "requirementIds": [
+        "WEBAUTO-03",
+        "WEBAUTO-05"
+      ],
+      "scenario": "duplicate_or_late_delivery",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "Duplicate deliveries are suppressed and late or wrong-chain deliveries remain explicit degraded outcomes."
+    },
+    {
+      "id": "payment-interop-explicit",
+      "name": "Machine-payment and paymaster compatibility remain explicit overlays",
+      "requirementIds": [
+        "WEBAUTO-04",
+        "WEBAUTO-05"
+      ],
+      "scenario": "x402_circle_4337_policy_evaluation",
+      "expectedOutcome": "pass",
+      "observedOutcome": "pass",
+      "notes": "x402, Circle, EIP-3009, and ERC-4337 hooks stay subordinate to governed dispatch truth and explicit custody or reimbursement policy."
+    }
+  ]
+}

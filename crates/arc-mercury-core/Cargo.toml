@@ -1,0 +1,22 @@
+[package]
+name = "arc-mercury-core"
+description = "Typed MERCURY evidence contracts layered on ARC receipt truth"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_mercury_core"
+
+[dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

@@ -1,0 +1,47 @@
+{
+  "request_id": "arc.functions.eip155-8453.4b1c7d22f0a6b913",
+  "target": {
+    "chain_id": "eip155:8453",
+    "router_address": "0x1000000000000000000000000000000000000008",
+    "consumer_address": "0x1000000000000000000000000000000000000009",
+    "don_id": "fun-base-mainnet",
+    "subscription_id": 42,
+    "callback_gas_limit": 250000
+  },
+  "purpose": "anchor_audit_batch",
+  "receipt_count": 2,
+  "request_size_bytes": 1812,
+  "source_code_sha256": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "receipt_batch_root": "0x4b1c7d22f0a6b9138cdb95b29c2f9dfc3220e5f4e5b7708b0cbb1f7fbfc8ef49",
+  "batch_items": [
+    {
+      "receipt_id": "rcpt-web3-1",
+      "receipt_body_hex": "7b226964223a22726370742d776562332d31222c2274696d657374616d70223a313734333239323830307d",
+      "receipt_body_sha256": "0x2222222222222222222222222222222222222222222222222222222222222222",
+      "receipt_leaf_hash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+      "signature_hex": "d761a0b24a676d0abe74e0d44a1dd55e5f72ad80f8187e99303a50eb48803e8f6796db338b43e367df2ae8083a2b48ac2bde18c7cd29cff5ea9940fe91c40707",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+    },
+    {
+      "receipt_id": "rcpt-web3-2",
+      "receipt_body_hex": "7b226964223a22726370742d776562332d32222c2274696d657374616d70223a313734333239323833307d",
+      "receipt_body_sha256": "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "receipt_leaf_hash": "0x5555555555555555555555555555555555555555555555555555555555555555",
+      "signature_hex": "69aadce95f4d6e54c0ac59fcccc47870ff85a1e5dfba74726dc95f7ef1f3b6256b98e8400a983e24a1411a4cb170c04eb9036d33ba29a4217752298122076a07",
+      "public_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c"
+    }
+  ],
+  "request_payload_sha256": "0x6666666666666666666666666666666666666666666666666666666666666666",
+  "max_notional_value_usd_cents": 50000,
+  "policy": {
+    "max_batch_receipts": 25,
+    "max_request_size_bytes": 30000,
+    "max_callback_gas_limit": 300000,
+    "max_return_bytes": 256,
+    "max_notional_value_usd_cents": 1000000,
+    "allow_direct_fund_release": false,
+    "require_receipt_event_log": true,
+    "challenge_window_secs": 3600
+  },
+  "note": "Illustrative batch audit request over the bounded Base Functions fallback."
+}

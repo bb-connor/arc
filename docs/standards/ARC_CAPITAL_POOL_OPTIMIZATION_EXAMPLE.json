@@ -1,0 +1,48 @@
+{
+  "schema": "arc.capital-pool-optimization.v1",
+  "optimization_id": "cpo-1",
+  "issued_at": 1743379320,
+  "subject_key": "subject-1",
+  "currency": "USD",
+  "pricing_decision_ref": "apd-1",
+  "capital_book_ref": "cb-1",
+  "facility_refs": [
+    "facility-1",
+    "facility-2"
+  ],
+  "pending_claim_refs": [
+    "claim-1"
+  ],
+  "target_reserve_ratio_bps": 3500,
+  "max_facility_utilization_bps": 7000,
+  "max_bind_capacity_units": 250000,
+  "recommendations": [
+    {
+      "action": "increase_reserve",
+      "source_ref": "pool:primary",
+      "amount": {
+        "units": 25000,
+        "currency": "USD"
+      },
+      "rationale": "Raise reserve coverage before new autonomous binds."
+    },
+    {
+      "action": "shift_capacity",
+      "source_ref": "facility-2",
+      "destination_ref": "facility-1",
+      "amount": {
+        "units": 15000,
+        "currency": "USD"
+      },
+      "rationale": "Move capacity toward the lower-loss facility."
+    }
+  ],
+  "support_boundary": {
+    "live_mutation_supported": false,
+    "scenario_comparison_supported": true,
+    "cross_currency_optimization_supported": false,
+    "web3_reconciliation_required": true,
+    "operator_override_required": true
+  },
+  "note": "Keeps optimization bounded and override-ready."
+}

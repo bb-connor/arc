@@ -1,0 +1,104 @@
+{
+  "matrixId": "arc.web3-external-qualification.v1",
+  "generatedAt": "2026-04-02T23:15:00Z",
+  "lanes": [
+    {
+      "id": "contracts.local-devnet",
+      "scope": "official contract family",
+      "status": "qualified_locally",
+      "evidence": [
+        "contracts/reports/local-devnet-qualification.json",
+        "contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md",
+        "contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md"
+      ]
+    },
+    {
+      "id": "oracle.runtime",
+      "scope": "arc-link plus kernel cross-currency enforcement",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/ARC_LINK_PROFILE.md",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/arc-link-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/arc-link-control-state.json",
+        "docs/standards/ARC_LINK_KERNEL_RECEIPT_POLICY.md"
+      ]
+    },
+    {
+      "id": "anchor.runtime",
+      "scope": "arc-anchor publication, discovery, proof bundles, and ops controls",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/ARC_ANCHOR_PROFILE.md",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/arc-anchor-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/arc-anchor-control-state.json",
+        "docs/standards/ARC_WEB3_OPERATIONS_PROFILE.md"
+      ]
+    },
+    {
+      "id": "settlement.runtime",
+      "scope": "arc-settle dispatch, observation, reorg recovery, and ops controls",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/ARC_SETTLE_PROFILE.md",
+        "target/release-qualification/web3-runtime/e2e/partner-qualification.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/fx-dual-sign-settlement.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/reorg-recovery.json",
+        "target/release-qualification/web3-runtime/ops/runtime-reports/arc-settle-runtime-report.json",
+        "target/release-qualification/web3-runtime/ops/control-state/arc-settle-control-state.json",
+        "crates/arc-settle/tests/runtime_devnet.rs"
+      ]
+    },
+    {
+      "id": "interop.overlays",
+      "scope": "Functions fallback, automation, CCIP coordination, and payment interop",
+      "status": "qualified_locally",
+      "evidence": [
+        "docs/standards/ARC_FUNCTIONS_FALLBACK_PROFILE.md",
+        "docs/standards/ARC_AUTOMATION_PROFILE.md",
+        "docs/standards/ARC_CCIP_PROFILE.md",
+        "docs/standards/ARC_PAYMENT_INTEROP_PROFILE.md"
+      ]
+    },
+    {
+      "id": "promotion.and.ops",
+      "scope": "web3 qualification script, readiness audit, and promotion gates",
+      "status": "partner_visible",
+      "evidence": [
+        "scripts/qualify-web3-runtime.sh",
+        "scripts/qualify-web3-e2e.sh",
+        "scripts/qualify-web3-ops-controls.sh",
+        "scripts/qualify-web3-promotion.sh",
+        ".github/workflows/release-qualification.yml",
+        "scripts/stage-web3-release-artifacts.sh",
+        "target/release-qualification/web3-runtime/artifact-manifest.json",
+        "target/release-qualification/web3-runtime/logs/qualification.log",
+        "target/release-qualification/web3-runtime/logs/e2e-qualification.log",
+        "target/release-qualification/web3-runtime/logs/ops-qualification.log",
+        "target/release-qualification/web3-runtime/logs/promotion-qualification.log",
+        "target/release-qualification/web3-runtime/e2e/partner-qualification.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/timeout-refund-recovery.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/bond-impair-recovery.json",
+        "target/release-qualification/web3-runtime/e2e/scenarios/bond-expiry-recovery.json",
+        "target/release-qualification/web3-runtime/ops/incident-audit.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/arc-link-control-trace.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/arc-anchor-control-trace.json",
+        "target/release-qualification/web3-runtime/ops/control-traces/arc-settle-control-trace.json",
+        "target/release-qualification/web3-runtime/promotion/promotion-qualification.json",
+        "contracts/deployments/local-devnet.reviewed.json",
+        "docs/standards/ARC_WEB3_DEPLOYMENT_APPROVAL_EXAMPLE.json",
+        "docs/standards/ARC_WEB3_DEPLOYMENT_PROMOTION_REPORT_EXAMPLE.json",
+        "docs/standards/ARC_WEB3_DEPLOYMENT_ROLLBACK_PLAN_EXAMPLE.json",
+        "docs/standards/ARC_WEB3_OPERATIONS_QUALIFICATION_MATRIX.json",
+        "docs/release/ARC_WEB3_READINESS_AUDIT.md",
+        "docs/release/ARC_WEB3_OPERATIONS_RUNBOOK.md",
+        "docs/release/ARC_WEB3_PARTNER_PROOF.md",
+        "docs/release/ARC_WEB3_DEPLOYMENT_PROMOTION.md"
+      ]
+    }
+  ],
+  "remainingExternalDependencies": [
+    "hosted CI and release-qualification observation on the candidate revision",
+    "operator-filled reviewed chain manifests and approval records for the target environment",
+    "operator-owned RPC, deployer key material, and predeployed CREATE2 factory for the target chain"
+  ]
+}

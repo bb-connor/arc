@@ -40,31 +40,16 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
     }
 
-    /// Build a receipt with given fields. cost populates financial metadata.
-    fn make_receipt(
+    fn make_receipt_with_metadata(
         id: &str,
         capability_id: &str,
         tool_server: &str,
         tool_name: &str,
         decision: Decision,
         timestamp: u64,
-        cost: Option<u64>,
+        metadata: Option<serde_json::Value>,
     ) -> ArcReceipt {
         let keypair = Keypair::generate();
-        let metadata = cost.map(|c| {
-            serde_json::json!({
-                "financial": {
-                    "grant_index": 0u32,
-                    "cost_charged": c,
-                    "currency": "USD",
-                    "budget_remaining": 1000u64,
-                    "budget_total": 2000u64,
-                    "delegation_depth": 0u32,
-                    "root_budget_holder": "root-agent",
-                    "settlement_status": "pending"
-                }
-            })
-        });
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -86,6 +71,41 @@ mod tests {
             &keypair,
         )
         .unwrap()
+    }
+
+    /// Build a receipt with given fields. cost populates financial metadata.
+    fn make_receipt(
+        id: &str,
+        capability_id: &str,
+        tool_server: &str,
+        tool_name: &str,
+        decision: Decision,
+        timestamp: u64,
+        cost: Option<u64>,
+    ) -> ArcReceipt {
+        let metadata = cost.map(|c| {
+            serde_json::json!({
+                "financial": {
+                    "grant_index": 0u32,
+                    "cost_charged": c,
+                    "currency": "USD",
+                    "budget_remaining": 1000u64,
+                    "budget_total": 2000u64,
+                    "delegation_depth": 0u32,
+                    "root_budget_holder": "root-agent",
+                    "settlement_status": "pending"
+                }
+            })
+        });
+        make_receipt_with_metadata(
+            id,
+            capability_id,
+            tool_server,
+            tool_name,
+            decision,
+            timestamp,
+            metadata,
+        )
     }
 
     #[test]

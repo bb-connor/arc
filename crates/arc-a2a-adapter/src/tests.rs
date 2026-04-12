@@ -1727,6 +1727,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -1813,6 +1814,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -1872,6 +1874,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -1939,6 +1942,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -1998,6 +2002,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2112,6 +2117,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2172,6 +2178,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2229,6 +2236,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2289,6 +2297,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2345,6 +2354,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2408,6 +2418,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });
@@ -2464,6 +2475,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         });

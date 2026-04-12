@@ -1,0 +1,37 @@
+{
+  "release_id": "arc.web3-contract-package.release.v0.1.0",
+  "package_name": "@arc/web3-contracts",
+  "version": "0.1.0",
+  "source_roots": [
+    "contracts/src/ArcIdentityRegistry.sol",
+    "contracts/src/ArcRootRegistry.sol",
+    "contracts/src/ArcEscrow.sol",
+    "contracts/src/ArcBondVault.sol",
+    "contracts/src/ArcPriceResolver.sol"
+  ],
+  "artifacts": [
+    "contracts/artifacts/ArcIdentityRegistry.json",
+    "contracts/artifacts/ArcRootRegistry.json",
+    "contracts/artifacts/ArcEscrow.json",
+    "contracts/artifacts/ArcBondVault.json",
+    "contracts/artifacts/ArcPriceResolver.json"
+  ],
+  "bindings": [
+    "crates/arc-web3-bindings/src/interfaces.rs",
+    "crates/arc-web3-bindings/src/lib.rs"
+  ],
+  "deployment_manifests": [
+    "contracts/deployments/base-mainnet.template.json",
+    "contracts/deployments/arbitrum-one.template.json",
+    "contracts/deployments/local-devnet.json"
+  ],
+  "qualification_reports": [
+    "contracts/reports/local-devnet-qualification.json",
+    "contracts/reports/ARC_WEB3_CONTRACT_GAS_AND_STORAGE.md",
+    "contracts/reports/ARC_WEB3_CONTRACT_SECURITY_REVIEW.md"
+  ],
+  "notes": [
+    "The local-devnet qualification path validates the dual-sign settlement lane via static-call plus gas estimate because Ganache on Node 25 hangs while mining that exact path; the Merkle-proof lane is executed end to end on-chain.",
+    "Base remains the primary deployment target and Arbitrum remains the bounded secondary target."
+  ]
+}

@@ -26,6 +26,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: contracts/pnpm-lock.yaml
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install web3 contract dependencies
+        run: pnpm --dir contracts install --frozen-lockfile
 
       - uses: actions/setup-python@v5
         with:
@@ -43,6 +51,16 @@ jobs:
       - name: Release qualification
         run: ./scripts/qualify-release.sh
 
+      - name: Hosted web3 runtime qualification
+        run: ./scripts/qualify-web3-runtime.sh
+
+      - name: Hosted web3 promotion qualification
+        run: ./scripts/qualify-web3-promotion.sh
+
+      - name: Stage hosted web3 qualification artifacts
+        if: always()
+        run: ./scripts/stage-web3-release-artifacts.sh
+
       - name: MSRV workspace lane
         run: cargo +1.93.0 build --workspace && cargo +1.93.0 test --workspace
 
@@ -52,3 +70,4 @@ jobs:
         with:
           name: release-qualification
           path: target/release-qualification
+          retention-days: 21

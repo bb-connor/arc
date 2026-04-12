@@ -152,6 +152,14 @@ pub struct RemoteEvidenceImportResponse {
 }
 
 #[derive(Debug, Clone)]
+pub struct VerifiedEvidencePackage {
+    pub bundle: EvidenceExportBundle,
+    pub manifest_schema: String,
+    pub exported_at: u64,
+    pub manifest_hash: String,
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct PreparedEvidenceExport {
     pub query: EvidenceExportQuery,
     pub require_proofs: bool,
@@ -1099,6 +1107,19 @@ fn load_verified_evidence_package(input: &Path) -> Result<EvidenceImportPackage,
     };
     validate_import_package_data(&package)?;
     Ok(package)
+}
+
+pub fn load_verified_evidence_package_summary(
+    input: &Path,
+) -> Result<VerifiedEvidencePackage, CliError> {
+    let package = load_verified_evidence_package(input)?;
+    let manifest_hash = sha256_hex(&canonical_json_bytes(&package.manifest)?);
+    Ok(VerifiedEvidencePackage {
+        bundle: package.bundle,
+        manifest_schema: package.manifest.schema,
+        exported_at: package.manifest.exported_at,
+        manifest_hash,
+    })
 }
 
 pub(crate) fn build_federated_share_import(

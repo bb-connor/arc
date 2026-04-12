@@ -169,6 +169,15 @@ pub struct KernelPolicyConfig {
     /// Whether nested elicitation requests may be issued through the client.
     #[serde(default)]
     pub allow_elicitation: bool,
+
+    /// Whether durable receipts plus kernel-signed checkpoints are mandatory
+    /// prerequisites for this deployment.
+    #[serde(default)]
+    pub require_web3_evidence: bool,
+
+    /// Number of receipts between Merkle checkpoint snapshots.
+    #[serde(default = "default_checkpoint_batch_size")]
+    pub checkpoint_batch_size: u64,
 }
 
 impl Default for KernelPolicyConfig {
@@ -179,6 +188,8 @@ impl Default for KernelPolicyConfig {
             allow_sampling: false,
             allow_sampling_tool_use: false,
             allow_elicitation: false,
+            require_web3_evidence: false,
+            checkpoint_batch_size: default_checkpoint_batch_size(),
         }
     }
 }
@@ -189,6 +200,10 @@ fn default_max_capability_ttl() -> u64 {
 
 fn default_delegation_depth_limit() -> u32 {
     5
+}
+
+fn default_checkpoint_batch_size() -> u64 {
+    arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE
 }
 
 /// Guard configuration from the policy.
@@ -1218,10 +1233,28 @@ guards:
         assert!(!policy.kernel.allow_sampling);
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
+        assert!(!policy.kernel.require_web3_evidence);
+        assert_eq!(
+            policy.kernel.checkpoint_batch_size,
+            arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE
+        );
         assert!(policy.guards.forbidden_path.is_some());
         assert!(policy.guards.path_allowlist.is_some());
         assert!(policy.guards.shell_command.is_some());
         assert!(policy.guards.egress_allowlist.is_some());
+    }
+
+    #[test]
+    fn parse_policy_web3_evidence_gate_fields() {
+        let yaml = r#"
+kernel:
+  require_web3_evidence: true
+  checkpoint_batch_size: 32
+"#;
+
+        let policy = parse_policy(yaml).unwrap();
+        assert!(policy.kernel.require_web3_evidence);
+        assert_eq!(policy.kernel.checkpoint_batch_size, 32);
     }
 
     #[test]

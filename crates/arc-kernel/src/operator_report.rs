@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use arc_core::appraisal::AttestationVerifierFamily;
 use arc_core::capability::{
     GovernedCallChainContext, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
 };
@@ -284,6 +285,7 @@ impl BehavioralFeedQuery {
             cursor: None,
             limit: self.receipt_limit_or_default(),
             agent_subject: self.agent_subject.clone(),
+            ..ReceiptQuery::default()
         }
     }
 }
@@ -618,6 +620,10 @@ pub struct GovernedAuthorizationTransactionContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance_tier: Option<RuntimeAssuranceTier>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_assurance_schema: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_assurance_verifier_family: Option<AttestationVerifierFamily>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance_verifier: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance_evidence_sha256: Option<String>,
@@ -760,6 +766,8 @@ impl Default for ArcOAuthSenderConstraintProfile {
             proof_required_when: "matchedGrant.dpopRequired == true".to_string(),
             runtime_assurance_binding_fields: vec![
                 "runtimeAssuranceTier".to_string(),
+                "runtimeAssuranceSchema".to_string(),
+                "runtimeAssuranceVerifierFamily".to_string(),
                 "runtimeAssuranceVerifier".to_string(),
                 "runtimeAssuranceEvidenceSha256".to_string(),
             ],
@@ -787,6 +795,8 @@ impl Default for ArcOAuthAuthorizationProfile {
                 "approvalApproved".to_string(),
                 "approverKey".to_string(),
                 "runtimeAssuranceTier".to_string(),
+                "runtimeAssuranceSchema".to_string(),
+                "runtimeAssuranceVerifierFamily".to_string(),
                 "runtimeAssuranceVerifier".to_string(),
                 "runtimeAssuranceEvidenceSha256".to_string(),
                 "callChain".to_string(),

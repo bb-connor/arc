@@ -1,0 +1,31 @@
+{
+  "manifest_id": "arc.web3-deployment.runtime-devnet.v1",
+  "network_name": "Ganache Runtime Devnet",
+  "chain_id": "eip155:31337",
+  "rpc_url": "http://127.0.0.1:8547",
+  "deployed_at": "2026-04-02T19:32:36.798Z",
+  "operator_address": "0x8d6d63c22D114C18C2a0dA6Db0A8972Ed9C40343",
+  "delegate_address": "0x9567397B445998E7E405D5Fc3d239391bf5d0200",
+  "settlement_token_symbol": "mUSDC",
+  "settlement_token_address": "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8",
+  "contracts": {
+    "identity_registry": "0x0eAFb60DD4F4b3863eb5490752238aC37A625dc6",
+    "root_registry": "0x3a167ACFC3348a8f8df11BF383aF3cA86a8A2B42",
+    "escrow": "0x69011eD3D9792Ea93595EeBd919EE621764B19e0",
+    "bond_vault": "0x621c302d6EC93b7186bEF18dF5D6436C6ea30125",
+    "price_resolver": "0xb79C8945Ee0Fa7DCdC355150FB5C8aEB24bF8Aa8"
+  },
+  "mocks": {
+    "eth_usd_feed": "0xb0F71e4a65baeF5ceC68184EFBDeD5e4FBaBF21B",
+    "sequencer_uptime_feed": "0xcDD7064BD7e09f8a8d46A67b9C0AfC0Ca7b2c16c"
+  },
+  "accounts": {
+    "admin": "0x9C7BC14e8a4B054e98C6DB99B9f1Ea2797BAee7B",
+    "operator": "0x8d6d63c22D114C18C2a0dA6Db0A8972Ed9C40343",
+    "delegate": "0x9567397B445998E7E405D5Fc3d239391bf5d0200",
+    "beneficiary": "0x5d2fca837fdFDDCb034555D8E79CA76A54038e16",
+    "depositor": "0xd3b6B8528841C1c9a63FFA38D96785C32E004fA5",
+    "principal": "0xa83202b9346d9Fa846f1B0b3BB0AaDAbEa88908E",
+    "outsider": "0xd9BbEdA239CF85ED4157ae333073597c8ee206BF"
+  }
+}

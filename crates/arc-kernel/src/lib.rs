@@ -33,6 +33,8 @@ pub mod payment;
 pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
+mod receipt_support;
+mod request_matching;
 pub mod revocation_runtime;
 pub mod revocation_store;
 pub mod runtime;
@@ -40,6 +42,7 @@ pub mod session;
 pub mod transport;
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::appraisal::verifier_family_for_attestation_schema;
@@ -65,11 +68,34 @@ use arc_core::session::{
     ResourceDefinition, ResourceTemplateDefinition, ResourceUriClassification, RootDefinition,
     SessionAuthContext, SessionId, SessionOperation, ToolCallOperation,
 };
-use regex::Regex;
+use arc_link::convert::convert_supported_units;
+use arc_link::{PriceOracle, PriceOracleError};
 use tracing::{debug, info, warn};
-use uuid::Uuid;
+
+use receipt_support::*;
+use request_matching::{
+    begin_child_request_in_sessions, begin_session_request_in_sessions, check_subject_binding,
+    check_time_bounds, complete_session_request_with_terminal_state_in_sessions,
+    nested_child_request_id, resolve_matching_grants, session_from_map, session_mut_from_map,
+    validate_elicitation_request_in_sessions, validate_sampling_request_in_sessions,
+};
+pub use request_matching::{
+    capability_matches_prompt_request, capability_matches_request,
+    capability_matches_resource_pattern, capability_matches_resource_request,
+    capability_matches_resource_subscription,
+};
 
 pub use arc_core::credit::{
+    CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
+    CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
+    CapitalAllocationDecisionSupportBoundary, CapitalAllocationInstructionDraft, CapitalBookEvent,
+    CapitalBookEventKind, CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
+    CapitalBookReport, CapitalBookRole, CapitalBookSource, CapitalBookSourceKind,
+    CapitalBookSummary, CapitalBookSupportBoundary, CapitalExecutionAuthorityStep,
+    CapitalExecutionInstructionAction, CapitalExecutionInstructionArtifact,
+    CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
+    CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionRailKind,
+    CapitalExecutionReconciledState, CapitalExecutionRole, CapitalExecutionWindow,
     CreditBacktestQuery, CreditBacktestReasonCode, CreditBacktestReport, CreditBacktestSummary,
     CreditBacktestWindow, CreditBondArtifact, CreditBondDisposition, CreditBondFinding,
     CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondListSummary,
@@ -90,17 +116,20 @@ pub use arc_core::credit::{
     CreditLossLifecycleSummary, CreditLossLifecycleSupportBoundary, CreditProviderFacilitySnapshot,
     CreditProviderRiskPackage, CreditProviderRiskPackageQuery,
     CreditProviderRiskPackageSupportBoundary, CreditRecentLossEntry, CreditRecentLossHistory,
-    CreditRecentLossSummary, CreditRuntimeAssuranceState, CreditScorecardAnomaly,
-    CreditScorecardAnomalySeverity, CreditScorecardBand, CreditScorecardConfidence,
-    CreditScorecardDimension, CreditScorecardDimensionKind, CreditScorecardEvidenceKind,
-    CreditScorecardEvidenceReference, CreditScorecardProbationStatus, CreditScorecardReasonCode,
-    CreditScorecardReport, CreditScorecardReputationContext, CreditScorecardSummary,
-    CreditScorecardSupportBoundary, ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry,
-    ExposureLedgerEvidenceKind, ExposureLedgerEvidenceReference, ExposureLedgerQuery,
-    ExposureLedgerReceiptEntry, ExposureLedgerReport, ExposureLedgerSummary,
-    ExposureLedgerSupportBoundary, SignedCreditBond, SignedCreditFacility,
-    SignedCreditLossLifecycle, SignedCreditProviderRiskPackage, SignedCreditScorecardReport,
-    SignedExposureLedgerReport, CREDIT_BACKTEST_REPORT_SCHEMA,
+    CreditRecentLossSummary, CreditReserveControlAppealState, CreditReserveControlExecutionState,
+    CreditRuntimeAssuranceState, CreditScorecardAnomaly, CreditScorecardAnomalySeverity,
+    CreditScorecardBand, CreditScorecardConfidence, CreditScorecardDimension,
+    CreditScorecardDimensionKind, CreditScorecardEvidenceKind, CreditScorecardEvidenceReference,
+    CreditScorecardProbationStatus, CreditScorecardReasonCode, CreditScorecardReport,
+    CreditScorecardReputationContext, CreditScorecardSummary, CreditScorecardSupportBoundary,
+    ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind,
+    ExposureLedgerEvidenceReference, ExposureLedgerQuery, ExposureLedgerReceiptEntry,
+    ExposureLedgerReport, ExposureLedgerSummary, ExposureLedgerSupportBoundary,
+    SignedCapitalAllocationDecision, SignedCapitalBookReport, SignedCapitalExecutionInstruction,
+    SignedCreditBond, SignedCreditFacility, SignedCreditLossLifecycle,
+    SignedCreditProviderRiskPackage, SignedCreditScorecardReport, SignedExposureLedgerReport,
+    CAPITAL_ALLOCATION_DECISION_ARTIFACT_SCHEMA, CAPITAL_BOOK_REPORT_SCHEMA,
+    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CREDIT_BACKTEST_REPORT_SCHEMA,
     CREDIT_BONDED_EXECUTION_SIMULATION_REPORT_SCHEMA, CREDIT_BOND_ARTIFACT_SCHEMA,
     CREDIT_BOND_LIST_REPORT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CREDIT_FACILITY_ARTIFACT_SCHEMA,
     CREDIT_FACILITY_LIST_REPORT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
@@ -111,31 +140,91 @@ pub use arc_core::credit::{
     MAX_CREDIT_LOSS_LIFECYCLE_LIST_LIMIT, MAX_CREDIT_PROVIDER_LOSS_LIMIT,
     MAX_EXPOSURE_LEDGER_DECISION_LIMIT, MAX_EXPOSURE_LEDGER_RECEIPT_LIMIT,
 };
+pub use arc_core::governance::{
+    build_generic_governance_case_artifact, build_generic_governance_charter_artifact,
+    evaluate_generic_governance_case, GenericGovernanceAuthorityScope,
+    GenericGovernanceCaseArtifact, GenericGovernanceCaseEvaluation,
+    GenericGovernanceCaseEvaluationRequest, GenericGovernanceCaseIssueRequest,
+    GenericGovernanceCaseKind, GenericGovernanceCaseState, GenericGovernanceCharterArtifact,
+    GenericGovernanceCharterIssueRequest, GenericGovernanceEffectiveState,
+    GenericGovernanceEvidenceKind, GenericGovernanceEvidenceReference, GenericGovernanceFinding,
+    GenericGovernanceFindingCode, SignedGenericGovernanceCase, SignedGenericGovernanceCharter,
+    GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA, GENERIC_GOVERNANCE_CHARTER_ARTIFACT_SCHEMA,
+};
+pub use arc_core::listing::{
+    aggregate_generic_listing_reports, build_generic_trust_activation_artifact,
+    ensure_generic_listing_namespace_consistency, evaluate_generic_trust_activation,
+    normalize_namespace, GenericListingActorKind, GenericListingArtifact, GenericListingBoundary,
+    GenericListingCompatibilityReference, GenericListingDivergence, GenericListingFreshnessState,
+    GenericListingFreshnessWindow, GenericListingQuery, GenericListingReplicaFreshness,
+    GenericListingReport, GenericListingSearchError, GenericListingSearchPolicy,
+    GenericListingSearchResponse, GenericListingSearchResult, GenericListingStatus,
+    GenericListingSubject, GenericListingSummary, GenericNamespaceArtifact,
+    GenericNamespaceLifecycleState, GenericNamespaceOwnership, GenericRegistryPublisher,
+    GenericRegistryPublisherRole, GenericTrustActivationArtifact,
+    GenericTrustActivationDisposition, GenericTrustActivationEligibility,
+    GenericTrustActivationEvaluation, GenericTrustActivationEvaluationRequest,
+    GenericTrustActivationFinding, GenericTrustActivationFindingCode,
+    GenericTrustActivationIssueRequest, GenericTrustActivationReviewContext,
+    GenericTrustAdmissionClass, SignedGenericListing, SignedGenericNamespace,
+    SignedGenericTrustActivation, DEFAULT_GENERIC_LISTING_REPORT_MAX_AGE_SECS,
+    GENERIC_LISTING_ARTIFACT_SCHEMA, GENERIC_LISTING_NETWORK_SEARCH_SCHEMA,
+    GENERIC_LISTING_REPORT_SCHEMA, GENERIC_LISTING_SEARCH_ALGORITHM_V1,
+    GENERIC_NAMESPACE_ARTIFACT_SCHEMA, GENERIC_TRUST_ACTIVATION_ARTIFACT_SCHEMA,
+    MAX_GENERIC_LISTING_LIMIT,
+};
 pub use arc_core::market::{
-    LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
-    LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
-    LiabilityClaimEvidenceReference, LiabilityClaimPackageArtifact, LiabilityClaimResponseArtifact,
-    LiabilityClaimResponseDisposition, LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport,
-    LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary, LiabilityCoverageClass,
-    LiabilityEvidenceRequirement, LiabilityJurisdictionPolicy, LiabilityMarketWorkflowQuery,
-    LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary,
-    LiabilityPlacementArtifact, LiabilityProviderArtifact, LiabilityProviderLifecycleState,
-    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
-    LiabilityProviderPolicyReference, LiabilityProviderProvenance, LiabilityProviderReport,
-    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
-    LiabilityProviderSupportBoundary, LiabilityProviderType, LiabilityQuoteDisposition,
-    LiabilityQuoteRequestArtifact, LiabilityQuoteResponseArtifact, LiabilityQuoteTerms,
-    SignedLiabilityBoundCoverage, SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute,
-    SignedLiabilityClaimPackage, SignedLiabilityClaimResponse, SignedLiabilityPlacement,
-    SignedLiabilityProvider, SignedLiabilityQuoteRequest, SignedLiabilityQuoteResponse,
+    LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition, LiabilityAutoBindFinding,
+    LiabilityAutoBindReasonCode, LiabilityBoundCoverageArtifact,
+    LiabilityClaimAdjudicationArtifact, LiabilityClaimAdjudicationOutcome,
+    LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind, LiabilityClaimEvidenceReference,
+    LiabilityClaimPackageArtifact, LiabilityClaimPayoutInstructionArtifact,
+    LiabilityClaimPayoutReceiptArtifact, LiabilityClaimPayoutReconciliationState,
+    LiabilityClaimResponseArtifact, LiabilityClaimResponseDisposition,
+    LiabilityClaimSettlementInstructionArtifact, LiabilityClaimSettlementKind,
+    LiabilityClaimSettlementReceiptArtifact, LiabilityClaimSettlementReconciliationState,
+    LiabilityClaimSettlementRoleBinding, LiabilityClaimSettlementRoleTopology,
+    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
+    LiabilityClaimWorkflowSummary, LiabilityCoverageClass, LiabilityEvidenceRequirement,
+    LiabilityJurisdictionPolicy, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
+    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityPlacementArtifact,
+    LiabilityPricingAuthorityArtifact, LiabilityPricingAuthorityEnvelope,
+    LiabilityPricingAuthorityEnvelopeKind, LiabilityProviderArtifact,
+    LiabilityProviderLifecycleState, LiabilityProviderListQuery, LiabilityProviderListReport,
+    LiabilityProviderListSummary, LiabilityProviderPolicyReference, LiabilityProviderProvenance,
+    LiabilityProviderReport, LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport,
+    LiabilityProviderRow, LiabilityProviderSupportBoundary, LiabilityProviderType,
+    LiabilityQuoteDisposition, LiabilityQuoteRequestArtifact, LiabilityQuoteResponseArtifact,
+    LiabilityQuoteTerms, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
+    SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
+    SignedLiabilityClaimPayoutInstruction, SignedLiabilityClaimPayoutReceipt,
+    SignedLiabilityClaimResponse, SignedLiabilityClaimSettlementInstruction,
+    SignedLiabilityClaimSettlementReceipt, SignedLiabilityPlacement,
+    SignedLiabilityPricingAuthority, SignedLiabilityProvider, SignedLiabilityQuoteRequest,
+    SignedLiabilityQuoteResponse, LIABILITY_AUTO_BIND_DECISION_ARTIFACT_SCHEMA,
     LIABILITY_BOUND_COVERAGE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_ADJUDICATION_ARTIFACT_SCHEMA,
     LIABILITY_CLAIM_DISPUTE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_PACKAGE_ARTIFACT_SCHEMA,
-    LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA, LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA,
+    LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_PAYOUT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_CLAIM_RESPONSE_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ARTIFACT_SCHEMA,
+    LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ARTIFACT_SCHEMA, LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA, LIABILITY_PLACEMENT_ARTIFACT_SCHEMA,
-    LIABILITY_PROVIDER_ARTIFACT_SCHEMA, LIABILITY_PROVIDER_LIST_REPORT_SCHEMA,
-    LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA, LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA,
-    LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA, MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT,
-    MAX_LIABILITY_MARKET_WORKFLOW_LIMIT, MAX_LIABILITY_PROVIDER_LIST_LIMIT,
+    LIABILITY_PRICING_AUTHORITY_ARTIFACT_SCHEMA, LIABILITY_PROVIDER_ARTIFACT_SCHEMA,
+    LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
+    LIABILITY_QUOTE_REQUEST_ARTIFACT_SCHEMA, LIABILITY_QUOTE_RESPONSE_ARTIFACT_SCHEMA,
+    MAX_LIABILITY_CLAIM_WORKFLOW_LIMIT, MAX_LIABILITY_MARKET_WORKFLOW_LIMIT,
+    MAX_LIABILITY_PROVIDER_LIST_LIMIT,
+};
+pub use arc_core::open_market::{
+    build_open_market_fee_schedule_artifact, build_open_market_penalty_artifact,
+    evaluate_open_market_penalty, OpenMarketAbuseClass, OpenMarketBondClass,
+    OpenMarketBondRequirement, OpenMarketCollateralReferenceKind, OpenMarketEconomicsScope,
+    OpenMarketEvidenceKind, OpenMarketEvidenceReference, OpenMarketFeeScheduleArtifact,
+    OpenMarketFeeScheduleIssueRequest, OpenMarketFinding, OpenMarketFindingCode,
+    OpenMarketPenaltyAction, OpenMarketPenaltyArtifact, OpenMarketPenaltyEffectiveState,
+    OpenMarketPenaltyEvaluation, OpenMarketPenaltyEvaluationRequest, OpenMarketPenaltyIssueRequest,
+    OpenMarketPenaltyState, SignedOpenMarketFeeSchedule, SignedOpenMarketPenalty,
+    OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA, OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA,
 };
 pub use arc_core::underwriting::{
     build_underwriting_decision_artifact, evaluate_underwriting_policy_input,
@@ -394,6 +483,17 @@ pub enum KernelError {
     #[error("budget store error: {0}")]
     BudgetStore(#[from] BudgetStoreError),
 
+    #[error(
+        "cross-currency budget enforcement failed: no price oracle configured for {base}/{quote}"
+    )]
+    NoCrossCurrencyOracle { base: String, quote: String },
+
+    #[error("cross-currency budget enforcement failed: {0}")]
+    CrossCurrencyOracle(String),
+
+    #[error("web3 evidence prerequisites unavailable: {0}")]
+    Web3EvidenceUnavailable(String),
+
     #[error("internal error: {0}")]
     Internal(String),
 
@@ -580,9 +680,14 @@ pub struct KernelConfig {
     /// Maximum total canonical payload size permitted for one streamed tool result.
     pub max_stream_total_bytes: u64,
 
+    /// Whether durable receipts and kernel-signed checkpoints are mandatory
+    /// prerequisites for this deployment.
+    pub require_web3_evidence: bool,
+
     /// Number of receipts between Merkle checkpoint snapshots. Default: 100.
     ///
-    /// Set to 0 to disable automatic checkpointing.
+    /// Set to 0 to disable automatic checkpointing for deployments that do not
+    /// require web3 evidence.
     pub checkpoint_batch_size: u64,
 
     /// Optional receipt retention configuration.
@@ -620,6 +725,7 @@ pub struct ArcKernel {
     child_receipt_log: ChildReceiptLog,
     receipt_store: Option<Box<dyn ReceiptStore>>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
+    price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
     session_counter: u64,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
@@ -876,6 +982,7 @@ impl ArcKernel {
             child_receipt_log: ChildReceiptLog::new(),
             receipt_store: None,
             payment_adapter: None,
+            price_oracle: None,
             attestation_trust_policy: None,
             session_counter: 0,
             checkpoint_batch_size,
@@ -892,6 +999,10 @@ impl ArcKernel {
 
     pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
         self.payment_adapter = Some(payment_adapter);
+    }
+
+    pub fn set_price_oracle(&mut self, price_oracle: Box<dyn PriceOracle>) {
+        self.price_oracle = Some(price_oracle);
     }
 
     pub fn set_attestation_trust_policy(
@@ -921,6 +1032,36 @@ impl ArcKernel {
     pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
         self.dpop_nonce_store = Some(nonce_store);
         self.dpop_config = Some(config);
+    }
+
+    pub fn requires_web3_evidence(&self) -> bool {
+        self.config.require_web3_evidence
+    }
+
+    pub fn validate_web3_evidence_prerequisites(&self) -> Result<(), KernelError> {
+        if !self.requires_web3_evidence() {
+            return Ok(());
+        }
+
+        let Some(store) = self.receipt_store.as_deref() else {
+            return Err(KernelError::Web3EvidenceUnavailable(
+                "web3-enabled deployments require a durable receipt store".to_string(),
+            ));
+        };
+
+        if self.checkpoint_batch_size == 0 {
+            return Err(KernelError::Web3EvidenceUnavailable(
+                "web3-enabled deployments require checkpoint_batch_size > 0".to_string(),
+            ));
+        }
+
+        if !store.supports_kernel_signed_checkpoints() {
+            return Err(KernelError::Web3EvidenceUnavailable(
+                "web3-enabled deployments require local receipt persistence with kernel-signed checkpoint support; append-only remote receipt mirrors are unsupported".to_string(),
+            ));
+        }
+
+        Ok(())
     }
 
     /// Register a policy guard. Guards are evaluated in registration order.
@@ -969,6 +1110,7 @@ impl ArcKernel {
 
     /// Transition a session into the `ready` state once setup is complete.
     pub fn activate_session(&mut self, session_id: &SessionId) -> Result<(), KernelError> {
+        self.validate_web3_evidence_prerequisites()?;
         self.session_mut(session_id)?.activate()?;
         Ok(())
     }
@@ -1328,6 +1470,7 @@ impl ArcKernel {
         operation: &ToolCallOperation,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.validate_web3_evidence_prerequisites()?;
         self.begin_session_request(context, OperationKind::ToolCall, true)?;
 
         let request = ToolCallRequest {
@@ -1374,6 +1517,7 @@ impl ArcKernel {
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();
         let should_track_inflight = matches!(
             operation,
@@ -1708,6 +1852,7 @@ impl ArcKernel {
         request: &ToolCallRequest,
         session_filesystem_roots: Option<&[String]>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.validate_web3_evidence_prerequisites()?;
         let now = current_unix_timestamp();
 
         debug!(
@@ -1976,6 +2121,7 @@ impl ArcKernel {
         request: &ToolCallRequest,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.validate_web3_evidence_prerequisites()?;
         let now = current_unix_timestamp();
 
         debug!(
@@ -2591,6 +2737,70 @@ impl ArcKernel {
             .get_usage(capability_id, charge.grant_index)?
             .map(|record| record.total_cost_charged)
             .unwrap_or(actual_cost_units))
+    }
+
+    fn block_on_price_oracle<T>(
+        &self,
+        future: impl Future<Output = Result<T, PriceOracleError>>,
+    ) -> Result<T, KernelError> {
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => match handle.runtime_flavor() {
+                tokio::runtime::RuntimeFlavor::MultiThread => tokio::task::block_in_place(|| {
+                    handle
+                        .block_on(future)
+                        .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))
+                }),
+                tokio::runtime::RuntimeFlavor::CurrentThread => {
+                    Err(KernelError::CrossCurrencyOracle(
+                        "current-thread tokio runtime cannot synchronously resolve price oracles"
+                            .to_string(),
+                    ))
+                }
+                flavor => Err(KernelError::CrossCurrencyOracle(format!(
+                    "unsupported tokio runtime flavor for synchronous oracle resolution: {flavor:?}"
+                ))),
+            },
+            Err(_) => tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|error| {
+                    KernelError::CrossCurrencyOracle(format!(
+                        "failed to build synchronous oracle runtime: {error}"
+                    ))
+                })?
+                .block_on(future)
+                .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string())),
+        }
+    }
+
+    fn resolve_cross_currency_cost(
+        &self,
+        reported_cost: &ToolInvocationCost,
+        grant_currency: &str,
+        timestamp: u64,
+    ) -> Result<(u64, arc_core::web3::OracleConversionEvidence), KernelError> {
+        let oracle =
+            self.price_oracle
+                .as_ref()
+                .ok_or_else(|| KernelError::NoCrossCurrencyOracle {
+                    base: reported_cost.currency.clone(),
+                    quote: grant_currency.to_string(),
+                })?;
+        let rate =
+            self.block_on_price_oracle(oracle.get_rate(&reported_cost.currency, grant_currency))?;
+        let converted_units =
+            convert_supported_units(reported_cost.units, &rate, rate.conversion_margin_bps)
+                .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;
+        let evidence = rate
+            .to_conversion_evidence(
+                reported_cost.units,
+                reported_cost.currency.clone(),
+                grant_currency.to_string(),
+                converted_units,
+                timestamp,
+            )
+            .map_err(|error| KernelError::CrossCurrencyOracle(error.to_string()))?;
+        Ok((converted_units, evidence))
     }
 
     fn ensure_registered_tool_target(&self, request: &ToolCallRequest) -> Result<(), KernelError> {
@@ -3495,6 +3705,7 @@ impl ArcKernel {
                 payment_reference,
                 settlement_status,
                 cost_breakdown: None,
+                oracle_evidence: None,
                 attempted_cost: Some(attempted_cost),
             };
 
@@ -3574,6 +3785,7 @@ impl ArcKernel {
             payment_reference,
             settlement_status,
             cost_breakdown: None,
+            oracle_evidence: None,
             attempted_cost: Some(charge.cost_charged),
         };
 
@@ -3677,30 +3889,57 @@ impl ArcKernel {
         };
 
         let reported_cost_ref = reported_cost.as_ref();
-        let currency_mismatch = reported_cost_ref
-            .map(|cost| cost.currency != charge.currency)
-            .unwrap_or(false);
-
-        if let Some(cost) = reported_cost_ref.filter(|cost| cost.currency != charge.currency) {
-            warn!(
-                request_id = %request.request_id,
-                reported_currency = %cost.currency,
-                charged_currency = %charge.currency,
-                "tool server reported cost in a different currency; keeping provisional charge"
-            );
-        }
-
-        let actual_cost = if currency_mismatch {
-            charge.cost_charged
-        } else {
-            reported_cost_ref
-                .map(|cost| cost.units)
-                .unwrap_or(charge.cost_charged)
-        };
-        let keep_provisional_charge =
-            matches!(payment_authorization.as_ref(), Some(authorization) if authorization.settled);
+        let mut oracle_evidence = None;
+        let mut cross_currency_note = None;
+        let (actual_cost, cross_currency_failed) =
+            if let Some(cost) = reported_cost_ref.filter(|cost| cost.currency != charge.currency) {
+                match self.resolve_cross_currency_cost(cost, &charge.currency, timestamp) {
+                    Ok((converted_units, evidence)) => {
+                        oracle_evidence = Some(evidence);
+                        cross_currency_note = Some(serde_json::json!({
+                            "oracle_conversion": {
+                                "status": "applied",
+                                "reported_currency": cost.currency,
+                                "grant_currency": charge.currency,
+                                "reported_units": cost.units,
+                                "converted_units": converted_units
+                            }
+                        }));
+                        (converted_units, false)
+                    }
+                    Err(error) => {
+                        warn!(
+                            request_id = %request.request_id,
+                            reported_currency = %cost.currency,
+                            charged_currency = %charge.currency,
+                            reason = %error,
+                            "cross-currency reconciliation failed; keeping provisional charge"
+                        );
+                        cross_currency_note = Some(serde_json::json!({
+                            "oracle_conversion": {
+                                "status": "failed",
+                                "reported_currency": cost.currency,
+                                "grant_currency": charge.currency,
+                                "reported_units": cost.units,
+                                "provisional_units": charge.cost_charged,
+                                "reason": error.to_string()
+                            }
+                        }));
+                        (charge.cost_charged, true)
+                    }
+                }
+            } else {
+                (
+                    reported_cost_ref
+                        .map(|cost| cost.units)
+                        .unwrap_or(charge.cost_charged),
+                    false,
+                )
+            };
+        let keep_provisional_charge = cross_currency_failed
+            || matches!(payment_authorization.as_ref(), Some(authorization) if authorization.settled);
         let cost_overrun =
-            !currency_mismatch && actual_cost > charge.cost_charged && charge.cost_charged > 0;
+            !cross_currency_failed && actual_cost > charge.cost_charged && charge.cost_charged > 0;
 
         if cost_overrun {
             warn!(
@@ -3711,15 +3950,14 @@ impl ArcKernel {
             );
         }
 
-        let running_total_cost_charged =
-            if keep_provisional_charge || currency_mismatch || cost_overrun {
-                charge.new_total_cost_charged
-            } else {
-                self.reduce_budget_charge_to_actual(&cap.id, &charge, actual_cost)?
-            };
+        let running_total_cost_charged = if keep_provisional_charge || cost_overrun {
+            charge.new_total_cost_charged
+        } else {
+            self.reduce_budget_charge_to_actual(&cap.id, &charge, actual_cost)?
+        };
 
         let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
-            if authorization.settled || currency_mismatch || cost_overrun {
+            if authorization.settled || cross_currency_failed || cost_overrun {
                 None
             } else {
                 let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
@@ -3742,7 +3980,7 @@ impl ArcKernel {
             None
         };
 
-        let settlement = if currency_mismatch || cost_overrun {
+        let settlement = if cross_currency_failed || cost_overrun {
             ReceiptSettlement {
                 payment_reference: payment_authorization
                     .as_ref()
@@ -3781,7 +4019,7 @@ impl ArcKernel {
         } else {
             ReceiptSettlement::settled()
         };
-        let recorded_cost = if keep_provisional_charge && !currency_mismatch && !cost_overrun {
+        let recorded_cost = if keep_provisional_charge && !cross_currency_failed && !cost_overrun {
             charge.cost_charged
         } else {
             actual_cost
@@ -3817,9 +4055,13 @@ impl ArcKernel {
             payment_reference,
             settlement_status,
             cost_breakdown: merge_metadata_objects(
-                reported_cost_ref.and_then(|cost| cost.breakdown.clone()),
-                payment_breakdown,
+                merge_metadata_objects(
+                    reported_cost_ref.and_then(|cost| cost.breakdown.clone()),
+                    payment_breakdown,
+                ),
+                cross_currency_note,
             ),
+            oracle_evidence,
             attempted_cost: None,
         };
 
@@ -4300,842 +4542,6 @@ struct ReceiptParams<'a> {
     timestamp: u64,
 }
 
-fn build_child_request_receipt(
-    policy_hash: &str,
-    keypair: &Keypair,
-    context: &OperationContext,
-    operation_kind: OperationKind,
-    terminal_state: OperationTerminalState,
-    outcome_payload: serde_json::Value,
-) -> Result<ChildRequestReceipt, KernelError> {
-    let outcome_hash = canonical_json_bytes(&outcome_payload)
-        .map(|bytes| sha256_hex(&bytes))
-        .map_err(|error| {
-            KernelError::ReceiptSigningFailed(format!("failed to hash child outcome: {error}"))
-        })?;
-    let metadata = child_receipt_metadata(&outcome_payload);
-    let parent_request_id = context.parent_request_id.clone().ok_or_else(|| {
-        KernelError::ReceiptSigningFailed("child receipt requires parent request lineage".into())
-    })?;
-
-    let body = ChildRequestReceiptBody {
-        id: next_receipt_id("child-rcpt"),
-        timestamp: current_unix_timestamp(),
-        session_id: context.session_id.clone(),
-        parent_request_id,
-        request_id: context.request_id.clone(),
-        operation_kind,
-        terminal_state,
-        outcome_hash,
-        policy_hash: policy_hash.to_string(),
-        metadata,
-        kernel_key: keypair.public_key(),
-    };
-
-    ChildRequestReceipt::sign(body, keypair)
-        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
-}
-
-fn next_receipt_id(prefix: &str) -> String {
-    format!("{prefix}-{}", Uuid::now_v7())
-}
-
-fn merge_metadata_objects(
-    base: Option<serde_json::Value>,
-    extra: Option<serde_json::Value>,
-) -> Option<serde_json::Value> {
-    match (base, extra) {
-        (None, extra) => extra,
-        (Some(base), None) => Some(base),
-        (Some(mut base), Some(extra)) => {
-            if let (Some(base_obj), Some(extra_obj)) = (base.as_object_mut(), extra.as_object()) {
-                for (key, value) in extra_obj {
-                    base_obj.insert(key.clone(), value.clone());
-                }
-            }
-            Some(base)
-        }
-    }
-}
-
-fn governed_request_metadata(
-    request: &ToolCallRequest,
-    attestation_trust_policy: Option<&AttestationTrustPolicy>,
-    now: u64,
-) -> Result<Option<serde_json::Value>, KernelError> {
-    let Some(intent) = request.governed_intent.as_ref() else {
-        return Ok(None);
-    };
-
-    let approval =
-        request
-            .approval_token
-            .as_ref()
-            .map(|approval_token| GovernedApprovalReceiptMetadata {
-                token_id: approval_token.id.clone(),
-                approver_key: approval_token.approver.to_hex(),
-                approved: approval_token.decision == GovernedApprovalDecision::Approved,
-            });
-    let commerce = intent
-        .commerce
-        .as_ref()
-        .map(|commerce| GovernedCommerceReceiptMetadata {
-            seller: commerce.seller.clone(),
-            shared_payment_token_id: commerce.shared_payment_token_id.clone(),
-        });
-    let metered_billing =
-        intent
-            .metered_billing
-            .as_ref()
-            .map(|metered| MeteredBillingReceiptMetadata {
-                settlement_mode: metered.settlement_mode,
-                quote: metered.quote.clone(),
-                max_billed_units: metered.max_billed_units,
-                usage_evidence: None,
-            });
-    let runtime_assurance = match intent.runtime_attestation.as_ref() {
-        Some(attestation) => Some(RuntimeAssuranceReceiptMetadata {
-            schema: attestation.schema.clone(),
-            verifier_family: verifier_family_for_attestation_schema(&attestation.schema),
-            tier: attestation
-                .resolve_effective_runtime_assurance(attestation_trust_policy, now)
-                .map(|resolved| resolved.effective_tier)
-                .unwrap_or(attestation.tier),
-            verifier: attestation.verifier.clone(),
-            evidence_sha256: attestation.evidence_sha256.clone(),
-            workload_identity: attestation.normalized_workload_identity().ok().flatten(),
-        }),
-        None => None,
-    };
-    let autonomy = intent
-        .autonomy
-        .as_ref()
-        .map(|autonomy| GovernedAutonomyReceiptMetadata {
-            tier: autonomy.tier,
-            delegation_bond_id: autonomy.delegation_bond_id.clone(),
-        });
-    let metadata = GovernedTransactionReceiptMetadata {
-        intent_id: intent.id.clone(),
-        intent_hash: intent.binding_hash().map_err(|error| {
-            KernelError::ReceiptSigningFailed(format!(
-                "failed to hash governed transaction intent for receipt metadata: {error}"
-            ))
-        })?,
-        purpose: intent.purpose.clone(),
-        server_id: intent.server_id.clone(),
-        tool_name: intent.tool_name.clone(),
-        max_amount: intent.max_amount.clone(),
-        commerce,
-        metered_billing,
-        approval,
-        runtime_assurance,
-        call_chain: intent.call_chain.clone(),
-        autonomy,
-    };
-
-    Ok(Some(serde_json::json!({
-        "governed_transaction": metadata
-    })))
-}
-
-fn receipt_attribution_metadata(
-    capability: &CapabilityToken,
-    matched_grant_index: Option<usize>,
-) -> Option<serde_json::Value> {
-    Some(serde_json::json!({
-        "attribution": ReceiptAttributionMetadata {
-            subject_key: capability.subject.to_hex(),
-            issuer_key: capability.issuer.to_hex(),
-            delegation_depth: capability.delegation_chain.len() as u32,
-            grant_index: matched_grant_index.map(|index| index as u32),
-        }
-    }))
-}
-
-fn child_receipt_metadata(outcome_payload: &serde_json::Value) -> Option<serde_json::Value> {
-    outcome_payload
-        .get("outcome")
-        .and_then(serde_json::Value::as_str)
-        .map(|outcome| {
-            let mut metadata = serde_json::Map::new();
-            metadata.insert(
-                "outcome".to_string(),
-                serde_json::Value::String(outcome.to_string()),
-            );
-            if let Some(message) = outcome_payload
-                .get("message")
-                .and_then(serde_json::Value::as_str)
-            {
-                metadata.insert(
-                    "message".to_string(),
-                    serde_json::Value::String(message.to_string()),
-                );
-            }
-            serde_json::Value::Object(metadata)
-        })
-}
-
-fn child_terminal_state<T>(
-    request_id: &RequestId,
-    result: &Result<T, KernelError>,
-) -> OperationTerminalState {
-    match result {
-        Ok(_) => OperationTerminalState::Completed,
-        Err(KernelError::RequestCancelled {
-            request_id: cancelled_request_id,
-            reason,
-        }) if cancelled_request_id == request_id => OperationTerminalState::Cancelled {
-            reason: reason.clone(),
-        },
-        Err(KernelError::RequestIncomplete(reason)) => OperationTerminalState::Incomplete {
-            reason: reason.clone(),
-        },
-        Err(_) => OperationTerminalState::Completed,
-    }
-}
-
-fn child_outcome_payload<T: serde::Serialize>(
-    result: &Result<T, KernelError>,
-) -> Result<serde_json::Value, KernelError> {
-    match result {
-        Ok(value) => {
-            let mut payload = serde_json::Map::new();
-            payload.insert(
-                "outcome".to_string(),
-                serde_json::Value::String("result".into()),
-            );
-            payload.insert(
-                "result".to_string(),
-                serde_json::to_value(value).map_err(|error| {
-                    KernelError::ReceiptSigningFailed(format!(
-                        "failed to serialize child result: {error}"
-                    ))
-                })?,
-            );
-            Ok(serde_json::Value::Object(payload))
-        }
-        Err(error) => Ok(serde_json::json!({
-            "outcome": "error",
-            "message": error.to_string(),
-        })),
-    }
-}
-
-fn receipt_content_for_output(
-    output: Option<&ToolCallOutput>,
-    stream_chunks_expected: Option<u64>,
-) -> Result<ReceiptContent, KernelError> {
-    match output {
-        Some(ToolCallOutput::Value(value)) => {
-            let bytes = canonical_json_bytes(value).map_err(|e| {
-                KernelError::ReceiptSigningFailed(format!("failed to hash tool output: {e}"))
-            })?;
-            Ok(ReceiptContent {
-                content_hash: sha256_hex(&bytes),
-                metadata: None,
-            })
-        }
-        Some(ToolCallOutput::Stream(stream)) => {
-            stream_receipt_content(stream, stream_chunks_expected)
-        }
-        None => Ok(ReceiptContent {
-            content_hash: sha256_hex(b"null"),
-            metadata: None,
-        }),
-    }
-}
-
-fn stream_receipt_content(
-    stream: &ToolCallStream,
-    chunks_expected: Option<u64>,
-) -> Result<ReceiptContent, KernelError> {
-    let mut chunk_hashes = Vec::with_capacity(stream.chunks.len());
-    let mut combined = Vec::new();
-    let mut total_bytes = 0u64;
-
-    for chunk in &stream.chunks {
-        let bytes = canonical_json_bytes(&chunk.data).map_err(|e| {
-            KernelError::ReceiptSigningFailed(format!("failed to hash stream chunk: {e}"))
-        })?;
-        total_bytes += bytes.len() as u64;
-        let chunk_hash = sha256_hex(&bytes);
-        combined.extend_from_slice(chunk_hash.as_bytes());
-        chunk_hashes.push(chunk_hash);
-    }
-
-    Ok(ReceiptContent {
-        content_hash: sha256_hex(&combined),
-        metadata: Some(serde_json::json!({
-            "stream": {
-                "chunks_expected": chunks_expected,
-                "chunks_received": stream.chunk_count(),
-                "total_bytes": total_bytes,
-                "chunk_hashes": chunk_hashes,
-            }
-        })),
-    })
-}
-
-fn truncate_stream_to_byte_limit(
-    stream: &ToolCallStream,
-    max_stream_total_bytes: u64,
-) -> Result<(ToolCallStream, u64, bool), KernelError> {
-    let mut accepted = Vec::new();
-    let mut total_bytes = 0u64;
-    let mut truncated = false;
-
-    for chunk in &stream.chunks {
-        let bytes = canonical_json_bytes(&chunk.data).map_err(|e| {
-            KernelError::ReceiptSigningFailed(format!("failed to size stream chunk: {e}"))
-        })?;
-        let chunk_bytes = bytes.len() as u64;
-        if max_stream_total_bytes > 0
-            && total_bytes.saturating_add(chunk_bytes) > max_stream_total_bytes
-        {
-            truncated = true;
-            break;
-        }
-        total_bytes += chunk_bytes;
-        accepted.push(chunk.clone());
-    }
-
-    Ok((ToolCallStream { chunks: accepted }, total_bytes, truncated))
-}
-
-fn session_from_map<'a>(
-    sessions: &'a HashMap<SessionId, Session>,
-    session_id: &SessionId,
-) -> Result<&'a Session, KernelError> {
-    sessions
-        .get(session_id)
-        .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))
-}
-
-fn session_mut_from_map<'a>(
-    sessions: &'a mut HashMap<SessionId, Session>,
-    session_id: &SessionId,
-) -> Result<&'a mut Session, KernelError> {
-    sessions
-        .get_mut(session_id)
-        .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))
-}
-
-fn begin_session_request_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
-    context: &OperationContext,
-    operation_kind: OperationKind,
-    cancellable: bool,
-) -> Result<(), KernelError> {
-    let session = session_mut_from_map(sessions, &context.session_id)?;
-    session.validate_context(context)?;
-    session.ensure_operation_allowed(operation_kind)?;
-    session.track_request(context, operation_kind, cancellable)?;
-    Ok(())
-}
-
-fn begin_child_request_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
-    parent_context: &OperationContext,
-    request_id: RequestId,
-    operation_kind: OperationKind,
-    progress_token: Option<ProgressToken>,
-    cancellable: bool,
-) -> Result<OperationContext, KernelError> {
-    let child_context = OperationContext {
-        session_id: parent_context.session_id.clone(),
-        request_id,
-        agent_id: parent_context.agent_id.clone(),
-        parent_request_id: Some(parent_context.request_id.clone()),
-        progress_token,
-    };
-    begin_session_request_in_sessions(sessions, &child_context, operation_kind, cancellable)?;
-    Ok(child_context)
-}
-
-fn complete_session_request_with_terminal_state_in_sessions(
-    sessions: &mut HashMap<SessionId, Session>,
-    session_id: &SessionId,
-    request_id: &RequestId,
-    terminal_state: OperationTerminalState,
-) -> Result<(), KernelError> {
-    session_mut_from_map(sessions, session_id)?
-        .complete_request_with_terminal_state(request_id, terminal_state)?;
-    Ok(())
-}
-
-fn validate_sampling_request_in_sessions(
-    sessions: &HashMap<SessionId, Session>,
-    allow_sampling: bool,
-    allow_sampling_tool_use: bool,
-    context: &OperationContext,
-    operation: &CreateMessageOperation,
-) -> Result<(), KernelError> {
-    let session = session_from_map(sessions, &context.session_id)?;
-    session.validate_context(context)?;
-    session.ensure_operation_allowed(OperationKind::CreateMessage)?;
-
-    if context.parent_request_id.is_none() {
-        return Err(KernelError::InvalidChildRequestParent);
-    }
-
-    if !allow_sampling {
-        return Err(KernelError::SamplingNotAllowedByPolicy);
-    }
-
-    let peer_capabilities = session.peer_capabilities();
-    if !peer_capabilities.supports_sampling {
-        return Err(KernelError::SamplingNotNegotiated);
-    }
-
-    if matches!(
-        operation.include_context.as_deref(),
-        Some("thisServer") | Some("allServers")
-    ) && !peer_capabilities.sampling_context
-    {
-        return Err(KernelError::SamplingContextNotSupported);
-    }
-
-    let requests_tool_use = !operation.tools.is_empty()
-        || operation
-            .tool_choice
-            .as_ref()
-            .is_some_and(|choice| choice.mode != "none");
-    if requests_tool_use {
-        if !allow_sampling_tool_use {
-            return Err(KernelError::SamplingToolUseNotAllowedByPolicy);
-        }
-        if !peer_capabilities.sampling_tools {
-            return Err(KernelError::SamplingToolUseNotNegotiated);
-        }
-    }
-
-    Ok(())
-}
-
-fn validate_elicitation_request_in_sessions(
-    sessions: &HashMap<SessionId, Session>,
-    allow_elicitation: bool,
-    context: &OperationContext,
-    operation: &CreateElicitationOperation,
-) -> Result<(), KernelError> {
-    let session = session_from_map(sessions, &context.session_id)?;
-    session.validate_context(context)?;
-    session.ensure_operation_allowed(OperationKind::CreateElicitation)?;
-
-    if context.parent_request_id.is_none() {
-        return Err(KernelError::InvalidChildRequestParent);
-    }
-
-    if !allow_elicitation {
-        return Err(KernelError::ElicitationNotAllowedByPolicy);
-    }
-
-    let peer_capabilities = session.peer_capabilities();
-    if !peer_capabilities.supports_elicitation {
-        return Err(KernelError::ElicitationNotNegotiated);
-    }
-
-    match operation {
-        CreateElicitationOperation::Form { .. } => {
-            if !peer_capabilities.elicitation_form {
-                return Err(KernelError::ElicitationFormNotSupported);
-            }
-        }
-        CreateElicitationOperation::Url { .. } => {
-            if !peer_capabilities.elicitation_url {
-                return Err(KernelError::ElicitationUrlNotSupported);
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn nested_child_request_id(parent_request_id: &RequestId, suffix: &str) -> RequestId {
-    let nonce = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos();
-    RequestId::new(format!("{parent_request_id}-{suffix}-{nonce}"))
-}
-
-/// Check time bounds on a capability (u64 unix timestamps).
-fn check_time_bounds(cap: &CapabilityToken, now: u64) -> Result<(), KernelError> {
-    if now >= cap.expires_at {
-        return Err(KernelError::CapabilityExpired);
-    }
-    if now < cap.issued_at {
-        return Err(KernelError::CapabilityNotYetValid);
-    }
-    Ok(())
-}
-
-fn check_subject_binding(cap: &CapabilityToken, agent_id: &str) -> Result<(), KernelError> {
-    let expected = cap.subject.to_hex();
-    if expected == agent_id {
-        Ok(())
-    } else {
-        Err(KernelError::SubjectMismatch {
-            expected,
-            actual: agent_id.to_string(),
-        })
-    }
-}
-
-pub fn capability_matches_request(
-    cap: &CapabilityToken,
-    tool_name: &str,
-    server_id: &str,
-    arguments: &serde_json::Value,
-) -> Result<bool, KernelError> {
-    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments)?.is_empty())
-}
-
-pub fn capability_matches_resource_request(
-    cap: &CapabilityToken,
-    uri: &str,
-) -> Result<bool, KernelError> {
-    Ok(cap
-        .scope
-        .resource_grants
-        .iter()
-        .any(|grant| resource_grant_matches_request(grant, uri)))
-}
-
-pub fn capability_matches_resource_subscription(
-    cap: &CapabilityToken,
-    uri: &str,
-) -> Result<bool, KernelError> {
-    Ok(cap
-        .scope
-        .resource_grants
-        .iter()
-        .any(|grant| resource_grant_matches_subscription(grant, uri)))
-}
-
-pub fn capability_matches_resource_pattern(
-    cap: &CapabilityToken,
-    pattern: &str,
-) -> Result<bool, KernelError> {
-    Ok(cap.scope.resource_grants.iter().any(|grant| {
-        resource_pattern_matches(&grant.uri_pattern, pattern)
-            && grant.operations.contains(&Operation::Read)
-    }))
-}
-
-pub fn capability_matches_prompt_request(
-    cap: &CapabilityToken,
-    prompt_name: &str,
-) -> Result<bool, KernelError> {
-    Ok(cap
-        .scope
-        .prompt_grants
-        .iter()
-        .any(|grant| prompt_grant_matches_request(grant, prompt_name)))
-}
-
-fn resolve_matching_grants<'a>(
-    cap: &'a CapabilityToken,
-    tool_name: &str,
-    server_id: &str,
-    arguments: &serde_json::Value,
-) -> Result<Vec<MatchingGrant<'a>>, KernelError> {
-    let mut matches = Vec::new();
-
-    for (index, grant) in cap.scope.grants.iter().enumerate() {
-        if !grant_matches_request(grant, tool_name, server_id, arguments)? {
-            continue;
-        }
-
-        matches.push(MatchingGrant {
-            index,
-            grant,
-            specificity: (
-                u8::from(grant.server_id == server_id),
-                u8::from(grant.tool_name == tool_name),
-                grant.constraints.len(),
-            ),
-        });
-    }
-
-    matches.sort_by(|left, right| {
-        right
-            .specificity
-            .cmp(&left.specificity)
-            .then_with(|| left.index.cmp(&right.index))
-    });
-
-    Ok(matches)
-}
-
-fn grant_matches_request(
-    grant: &ToolGrant,
-    tool_name: &str,
-    server_id: &str,
-    arguments: &serde_json::Value,
-) -> Result<bool, KernelError> {
-    Ok(matches_server(&grant.server_id, server_id)
-        && matches_name(&grant.tool_name, tool_name)
-        && grant.operations.contains(&Operation::Invoke)
-        && constraints_match(&grant.constraints, arguments)?)
-}
-
-fn matches_server(pattern: &str, server_id: &str) -> bool {
-    pattern == "*" || pattern == server_id
-}
-
-fn matches_name(pattern: &str, name: &str) -> bool {
-    pattern == "*" || pattern == name
-}
-
-fn constraints_match(
-    constraints: &[Constraint],
-    arguments: &serde_json::Value,
-) -> Result<bool, KernelError> {
-    for constraint in constraints {
-        if !constraint_matches(constraint, arguments)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-fn constraint_matches(
-    constraint: &Constraint,
-    arguments: &serde_json::Value,
-) -> Result<bool, KernelError> {
-    let string_leaves = collect_string_leaves(arguments);
-
-    match constraint {
-        Constraint::PathPrefix(prefix) => {
-            let candidates: Vec<&str> = string_leaves
-                .iter()
-                .filter(|leaf| {
-                    leaf.key.as_deref().is_some_and(is_path_key) || looks_like_path(&leaf.value)
-                })
-                .map(|leaf| leaf.value.as_str())
-                .collect();
-            Ok(!candidates.is_empty()
-                && candidates.into_iter().all(|path| path.starts_with(prefix)))
-        }
-        Constraint::DomainExact(expected) => {
-            let expected = normalize_domain(expected);
-            let domains = collect_domain_candidates(&string_leaves);
-            Ok(!domains.is_empty() && domains.into_iter().all(|domain| domain == expected))
-        }
-        Constraint::DomainGlob(pattern) => {
-            let pattern = pattern.to_ascii_lowercase();
-            let domains = collect_domain_candidates(&string_leaves);
-            Ok(!domains.is_empty()
-                && domains
-                    .into_iter()
-                    .all(|domain| wildcard_matches(&pattern, &domain)))
-        }
-        Constraint::RegexMatch(pattern) => {
-            let regex = Regex::new(pattern).map_err(|error| {
-                KernelError::InvalidConstraint(format!(
-                    "regex \"{pattern}\" failed to compile: {error}"
-                ))
-            })?;
-            Ok(string_leaves.iter().any(|leaf| regex.is_match(&leaf.value)))
-        }
-        Constraint::MaxLength(max) => Ok(string_leaves.iter().all(|leaf| leaf.value.len() <= *max)),
-        // Governed transaction constraints are enforced against request metadata
-        // and approval artifacts in the dedicated governed validation path.
-        Constraint::GovernedIntentRequired
-        | Constraint::RequireApprovalAbove { .. }
-        | Constraint::SellerExact(_)
-        | Constraint::MinimumRuntimeAssurance(_)
-        | Constraint::MinimumAutonomyTier(_) => Ok(true),
-        Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
-    }
-}
-
-fn resource_grant_matches_request(grant: &ResourceGrant, uri: &str) -> bool {
-    resource_pattern_matches(&grant.uri_pattern, uri) && grant.operations.contains(&Operation::Read)
-}
-
-fn resource_grant_matches_subscription(grant: &ResourceGrant, uri: &str) -> bool {
-    resource_pattern_matches(&grant.uri_pattern, uri)
-        && grant.operations.contains(&Operation::Subscribe)
-}
-
-fn prompt_grant_matches_request(grant: &PromptGrant, prompt_name: &str) -> bool {
-    matches_pattern(&grant.prompt_name, prompt_name) && grant.operations.contains(&Operation::Get)
-}
-
-fn resource_pattern_matches(pattern: &str, uri: &str) -> bool {
-    matches_pattern(pattern, uri)
-}
-
-fn matches_pattern(pattern: &str, value: &str) -> bool {
-    if pattern == "*" {
-        return true;
-    }
-
-    if let Some(prefix) = pattern.strip_suffix('*') {
-        return value.starts_with(prefix);
-    }
-
-    pattern == value
-}
-
-#[derive(Clone)]
-struct StringLeaf {
-    key: Option<String>,
-    value: String,
-}
-
-fn collect_string_leaves(arguments: &serde_json::Value) -> Vec<StringLeaf> {
-    let mut leaves = Vec::new();
-    collect_string_leaves_inner(arguments, None, &mut leaves);
-    leaves
-}
-
-fn collect_string_leaves_inner(
-    arguments: &serde_json::Value,
-    current_key: Option<&str>,
-    leaves: &mut Vec<StringLeaf>,
-) {
-    match arguments {
-        serde_json::Value::String(value) => leaves.push(StringLeaf {
-            key: current_key.map(str::to_string),
-            value: value.clone(),
-        }),
-        serde_json::Value::Array(values) => {
-            for value in values {
-                collect_string_leaves_inner(value, current_key, leaves);
-            }
-        }
-        serde_json::Value::Object(map) => {
-            for (key, value) in map {
-                collect_string_leaves_inner(value, Some(key), leaves);
-            }
-        }
-        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
-    }
-}
-
-fn is_path_key(key: &str) -> bool {
-    let key = key.to_ascii_lowercase();
-    key.contains("path")
-        || matches!(
-            key.as_str(),
-            "file" | "filepath" | "dir" | "directory" | "root" | "cwd"
-        )
-}
-
-fn looks_like_path(value: &str) -> bool {
-    !value.contains("://")
-        && (value.starts_with('/')
-            || value.starts_with("./")
-            || value.starts_with("../")
-            || value.starts_with("~/")
-            || value.contains('/')
-            || value.contains('\\'))
-}
-
-fn collect_domain_candidates(string_leaves: &[StringLeaf]) -> Vec<String> {
-    string_leaves
-        .iter()
-        .filter_map(|leaf| parse_domain(&leaf.value))
-        .collect()
-}
-
-fn parse_domain(value: &str) -> Option<String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-
-    let host_port = if let Some((_, rest)) = trimmed.split_once("://") {
-        rest
-    } else {
-        trimmed
-    };
-
-    let authority = host_port
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or(host_port)
-        .rsplit('@')
-        .next()
-        .unwrap_or(host_port);
-    let host = authority
-        .split(':')
-        .next()
-        .unwrap_or(authority)
-        .trim_matches('.');
-    let normalized = normalize_domain(host);
-
-    if normalized == "localhost"
-        || (!normalized.is_empty()
-            && normalized.contains('.')
-            && normalized.chars().all(|character| {
-                character.is_ascii_alphanumeric() || character == '-' || character == '.'
-            }))
-    {
-        Some(normalized)
-    } else {
-        None
-    }
-}
-
-fn normalize_domain(value: &str) -> String {
-    value.trim().trim_matches('.').to_ascii_lowercase()
-}
-
-fn wildcard_matches(pattern: &str, candidate: &str) -> bool {
-    let pattern_chars: Vec<char> = pattern.chars().collect();
-    let candidate_chars: Vec<char> = candidate.chars().collect();
-    let (mut pattern_idx, mut candidate_idx) = (0usize, 0usize);
-    let (mut star_idx, mut match_idx) = (None, 0usize);
-
-    while candidate_idx < candidate_chars.len() {
-        if pattern_idx < pattern_chars.len()
-            && (pattern_chars[pattern_idx] == candidate_chars[candidate_idx]
-                || pattern_chars[pattern_idx] == '*')
-        {
-            if pattern_chars[pattern_idx] == '*' {
-                star_idx = Some(pattern_idx);
-                match_idx = candidate_idx;
-                pattern_idx += 1;
-            } else {
-                pattern_idx += 1;
-                candidate_idx += 1;
-            }
-        } else if let Some(star_position) = star_idx {
-            pattern_idx = star_position + 1;
-            match_idx += 1;
-            candidate_idx = match_idx;
-        } else {
-            return false;
-        }
-    }
-
-    while pattern_idx < pattern_chars.len() && pattern_chars[pattern_idx] == '*' {
-        pattern_idx += 1;
-    }
-
-    pattern_idx == pattern_chars.len()
-}
-
-fn argument_contains_custom(arguments: &serde_json::Value, key: &str, expected: &str) -> bool {
-    match arguments {
-        serde_json::Value::Object(map) => map.iter().any(|(entry_key, value)| {
-            (entry_key == key && value.as_str() == Some(expected))
-                || argument_contains_custom(value, key, expected)
-        }),
-        serde_json::Value::Array(values) => values
-            .iter()
-            .any(|value| argument_contains_custom(value, key, expected)),
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => false,
-    }
-}
-
 fn current_unix_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -5149,6 +4555,7 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::path::{Path, PathBuf};
+    use std::pin::Pin;
     use std::sync::mpsc;
     use std::thread;
 
@@ -5176,6 +4583,7 @@ mod tests {
         PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
         ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
     };
+    use arc_link::{ExchangeRate, PriceOracle, PriceOracleError};
     use rusqlite::{params, Connection, OptionalExtension, Row};
 
     struct SqliteReceiptStore {
@@ -5341,6 +4749,10 @@ mod tests {
         fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
             self.append_arc_receipt_returning_seq(receipt)?;
             Ok(())
+        }
+
+        fn supports_kernel_signed_checkpoints(&self) -> bool {
+            true
         }
 
         fn append_arc_receipt_returning_seq(
@@ -5611,6 +5023,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         }
@@ -6232,6 +5645,22 @@ mod tests {
             }
 
             Ok(None)
+        }
+    }
+
+    #[derive(Default)]
+    struct AppendOnlyReceiptStore;
+
+    impl ReceiptStore for AppendOnlyReceiptStore {
+        fn append_arc_receipt(&mut self, _receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &mut self,
+            _receipt: &ChildRequestReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            Ok(())
         }
     }
 
@@ -7067,6 +6496,68 @@ mod tests {
             kernel.session(&session_id).map(Session::state),
             Some(SessionState::Closed)
         );
+    }
+
+    #[test]
+    fn web3_evidence_required_activation_rejects_missing_receipt_store() {
+        let mut config = make_config();
+        config.require_web3_evidence = true;
+        let mut kernel = ArcKernel::new(config);
+        let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
+
+        let error = kernel.activate_session(&session_id).unwrap_err();
+        assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
+        assert!(error.to_string().contains("durable receipt store"));
+    }
+
+    #[test]
+    fn web3_evidence_required_activation_rejects_checkpoint_disabled() {
+        let path = unique_receipt_db_path("web3-evidence-disabled");
+        let mut config = make_config();
+        config.require_web3_evidence = true;
+        config.checkpoint_batch_size = 0;
+        let mut kernel = ArcKernel::new(config);
+        kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+        let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
+
+        let error = kernel.activate_session(&session_id).unwrap_err();
+        assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
+        assert!(error.to_string().contains("checkpoint_batch_size > 0"));
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn web3_evidence_required_activation_rejects_append_only_receipt_store() {
+        let mut config = make_config();
+        config.require_web3_evidence = true;
+        let mut kernel = ArcKernel::new(config);
+        kernel.set_receipt_store(Box::new(AppendOnlyReceiptStore));
+        let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
+
+        let error = kernel.activate_session(&session_id).unwrap_err();
+        assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
+        assert!(error
+            .to_string()
+            .contains("append-only remote receipt mirrors are unsupported"));
+    }
+
+    #[test]
+    fn web3_evidence_required_activation_allows_checkpoint_capable_store() {
+        let path = unique_receipt_db_path("web3-evidence-capable");
+        let mut config = make_config();
+        config.require_web3_evidence = true;
+        let mut kernel = ArcKernel::new(config);
+        kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+        let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
+
+        kernel.activate_session(&session_id).unwrap();
+        assert_eq!(
+            kernel.session(&session_id).map(Session::state),
+            Some(SessionState::Ready)
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
@@ -8836,6 +8327,53 @@ mod tests {
         invocations: std::sync::Arc<std::sync::atomic::AtomicUsize>,
     }
 
+    struct StaticPriceOracle {
+        rates: std::collections::BTreeMap<(String, String), Result<ExchangeRate, PriceOracleError>>,
+    }
+
+    impl StaticPriceOracle {
+        fn new(
+            rates: impl IntoIterator<Item = ((String, String), Result<ExchangeRate, PriceOracleError>)>,
+        ) -> Self {
+            Self {
+                rates: rates.into_iter().collect(),
+            }
+        }
+    }
+
+    impl PriceOracle for StaticPriceOracle {
+        fn get_rate<'a>(
+            &'a self,
+            base: &'a str,
+            quote: &'a str,
+        ) -> Pin<
+            Box<
+                dyn std::future::Future<Output = Result<ExchangeRate, PriceOracleError>>
+                    + Send
+                    + 'a,
+            >,
+        > {
+            let response = self
+                .rates
+                .get(&(base.to_ascii_uppercase(), quote.to_ascii_uppercase()))
+                .cloned()
+                .unwrap_or_else(|| {
+                    Err(PriceOracleError::NoPairAvailable {
+                        base: base.to_ascii_uppercase(),
+                        quote: quote.to_ascii_uppercase(),
+                    })
+                });
+            Box::pin(async move { response })
+        }
+
+        fn supported_pairs(&self) -> Vec<String> {
+            self.rates
+                .keys()
+                .map(|(base, quote)| format!("{base}/{quote}"))
+                .collect()
+        }
+    }
+
     impl MonetaryCostServer {
         fn new(id: &str, cost_units: u64, currency: &str) -> Self {
             Self {
@@ -8986,6 +8524,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         }
@@ -11885,6 +11424,116 @@ mod tests {
     }
 
     #[test]
+    fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time")
+            .as_secs();
+        let mut kernel = ArcKernel::new(make_monetary_config());
+        kernel.set_price_oracle(Box::new(StaticPriceOracle::new([(
+            ("ETH".to_string(), "USD".to_string()),
+            Ok(ExchangeRate {
+                base: "ETH".to_string(),
+                quote: "USD".to_string(),
+                rate_numerator: 300_000,
+                rate_denominator: 100,
+                updated_at: now.saturating_sub(45),
+                fetched_at: now,
+                source: "chainlink".to_string(),
+                feed_reference: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70".to_string(),
+                max_age_seconds: 600,
+                conversion_margin_bps: 200,
+                confidence_numerator: None,
+                confidence_denominator: None,
+            }),
+        )])));
+        kernel.register_tool_server(Box::new(MonetaryCostServer::new(
+            "cost-srv",
+            1_000_000_000_000_000,
+            "ETH",
+        )));
+
+        let agent_kp = Keypair::generate();
+        let grant = make_monetary_grant("cost-srv", "compute", 400, 1_000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-cross-currency-ok".to_string(),
+                capability: cap,
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Allow);
+        let metadata = response.receipt.metadata.as_ref().expect("metadata");
+        let financial = metadata.get("financial").expect("financial");
+        assert_eq!(financial["cost_charged"].as_u64(), Some(306));
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(694));
+        assert_eq!(financial["settlement_status"], "settled");
+        assert_eq!(financial["oracle_evidence"]["base"], "ETH");
+        assert_eq!(financial["oracle_evidence"]["quote"], "USD");
+        assert_eq!(
+            financial["oracle_evidence"]["converted_cost_units"].as_u64(),
+            Some(306)
+        );
+        assert_eq!(
+            financial["cost_breakdown"]["oracle_conversion"]["status"],
+            "applied"
+        );
+    }
+
+    #[test]
+    fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settlement() {
+        let mut kernel = ArcKernel::new(make_monetary_config());
+        kernel.register_tool_server(Box::new(MonetaryCostServer::new(
+            "cost-srv",
+            1_000_000_000_000_000,
+            "ETH",
+        )));
+
+        let agent_kp = Keypair::generate();
+        let grant = make_monetary_grant("cost-srv", "compute", 400, 1_000, "USD");
+        let cap = kernel
+            .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+            .unwrap();
+
+        let response = kernel
+            .evaluate_tool_call(&ToolCallRequest {
+                request_id: "req-cross-currency-failed".to_string(),
+                capability: cap,
+                tool_name: "compute".to_string(),
+                server_id: "cost-srv".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({}),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+            })
+            .unwrap();
+
+        assert_eq!(response.verdict, Verdict::Allow);
+        let metadata = response.receipt.metadata.as_ref().expect("metadata");
+        let financial = metadata.get("financial").expect("financial");
+        assert_eq!(financial["cost_charged"].as_u64(), Some(400));
+        assert_eq!(financial["budget_remaining"].as_u64(), Some(600));
+        assert_eq!(financial["settlement_status"], "failed");
+        assert!(financial.get("oracle_evidence").is_none());
+        assert_eq!(
+            financial["cost_breakdown"]["oracle_conversion"]["status"],
+            "failed"
+        );
+    }
+
+    #[test]
     fn echo_server_invoke_with_cost_returns_none() {
         let server = EchoServer::new("srv-a", vec!["echo"]);
         let args = serde_json::json!({"msg": "hello"});
@@ -11928,6 +11577,7 @@ mod tests {
             allow_elicitation: false,
             max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
             max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
             checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
             retention_config: None,
         };

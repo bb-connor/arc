@@ -35,6 +35,7 @@ fn make_kernel() -> (ArcKernel, Keypair) {
         allow_elicitation: false,
         max_stream_duration_secs: arc_kernel::DEFAULT_MAX_STREAM_DURATION_SECS,
         max_stream_total_bytes: arc_kernel::DEFAULT_MAX_STREAM_TOTAL_BYTES,
+        require_web3_evidence: false,
         checkpoint_batch_size: arc_kernel::DEFAULT_CHECKPOINT_BATCH_SIZE,
         retention_config: None,
     };
