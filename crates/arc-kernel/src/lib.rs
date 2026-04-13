@@ -5124,6 +5124,88 @@ mod tests {
         )
     }
 
+    fn session_tool_call(response: SessionOperationResponse) -> Option<ToolCallResponse> {
+        if let SessionOperationResponse::ToolCall(response) = response {
+            Some(response)
+        } else {
+            None
+        }
+    }
+
+    fn session_capability_list(response: SessionOperationResponse) -> Option<Vec<CapabilityToken>> {
+        if let SessionOperationResponse::CapabilityList { capabilities } = response {
+            Some(capabilities)
+        } else {
+            None
+        }
+    }
+
+    fn session_root_list(response: SessionOperationResponse) -> Option<Vec<RootDefinition>> {
+        if let SessionOperationResponse::RootList { roots } = response {
+            Some(roots)
+        } else {
+            None
+        }
+    }
+
+    fn session_resource_list(
+        response: SessionOperationResponse,
+    ) -> Option<Vec<ResourceDefinition>> {
+        if let SessionOperationResponse::ResourceList { resources } = response {
+            Some(resources)
+        } else {
+            None
+        }
+    }
+
+    fn session_resource_read(response: SessionOperationResponse) -> Option<Vec<ResourceContent>> {
+        if let SessionOperationResponse::ResourceRead { contents } = response {
+            Some(contents)
+        } else {
+            None
+        }
+    }
+
+    fn session_prompt_list(response: SessionOperationResponse) -> Option<Vec<PromptDefinition>> {
+        if let SessionOperationResponse::PromptList { prompts } = response {
+            Some(prompts)
+        } else {
+            None
+        }
+    }
+
+    fn session_prompt_get(response: SessionOperationResponse) -> Option<PromptResult> {
+        if let SessionOperationResponse::PromptGet { prompt } = response {
+            Some(prompt)
+        } else {
+            None
+        }
+    }
+
+    fn session_completion(response: SessionOperationResponse) -> Option<CompletionResult> {
+        if let SessionOperationResponse::Completion { completion } = response {
+            Some(completion)
+        } else {
+            None
+        }
+    }
+
+    fn tool_call_value_output(output: Option<ToolCallOutput>) -> Option<serde_json::Value> {
+        if let Some(ToolCallOutput::Value(value)) = output {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn tool_call_stream_output(output: Option<ToolCallOutput>) -> Option<ToolCallStream> {
+        if let Some(ToolCallOutput::Stream(stream)) = output {
+            Some(stream)
+        } else {
+            None
+        }
+    }
+
     fn make_delegation_link(
         capability_id: &str,
         delegator_kp: &Keypair,
@@ -6580,15 +6662,13 @@ mod tests {
             arguments: serde_json::json!({"path": "/app/src/main.rs"}),
         });
 
-        let response = kernel
-            .evaluate_session_operation(&context, &operation)
-            .unwrap();
-        match response {
-            SessionOperationResponse::ToolCall(response) => {
-                assert_eq!(response.verdict, Verdict::Allow);
-            }
-            _ => panic!("expected tool call response"),
-        }
+        let response = session_tool_call(
+            kernel
+                .evaluate_session_operation(&context, &operation)
+                .unwrap(),
+        )
+        .expect("expected tool call response");
+        assert_eq!(response.verdict, Verdict::Allow);
 
         assert!(kernel.session(&session_id).unwrap().inflight().is_empty());
     }
@@ -6608,12 +6688,9 @@ mod tests {
             .evaluate_session_operation(&context, &SessionOperation::ListCapabilities)
             .unwrap();
 
-        match response {
-            SessionOperationResponse::CapabilityList { capabilities } => {
-                assert_eq!(capabilities.len(), 1);
-            }
-            _ => panic!("expected capability list response"),
-        }
+        let capabilities =
+            session_capability_list(response).expect("expected capability list response");
+        assert_eq!(capabilities.len(), 1);
     }
 
     #[test]
@@ -6657,13 +6734,9 @@ mod tests {
             .evaluate_session_operation(&context, &SessionOperation::ListRoots)
             .unwrap();
 
-        match response {
-            SessionOperationResponse::RootList { roots } => {
-                assert_eq!(roots.len(), 1);
-                assert_eq!(roots[0].uri, "file:///workspace/project");
-            }
-            _ => panic!("expected root list response"),
-        }
+        let roots = session_root_list(response).expect("expected root list response");
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].uri, "file:///workspace/project");
     }
 
     #[test]
@@ -7066,12 +7139,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.verdict, Verdict::Allow);
-        match response.output {
-            Some(ToolCallOutput::Value(value)) => {
-                assert_eq!(value["model"], "gpt-test");
-            }
-            other => panic!("unexpected output: {other:?}"),
-        }
+        let value = tool_call_value_output(response.output).expect("expected value output");
+        assert_eq!(value["model"], "gpt-test");
         assert!(kernel.session(&session_id).unwrap().inflight().is_empty());
         assert_eq!(kernel.child_receipt_log().len(), 1);
         let child_receipt = kernel.child_receipt_log().get(0).unwrap();
@@ -7263,13 +7332,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.verdict, Verdict::Allow);
-        match response.output {
-            Some(ToolCallOutput::Value(value)) => {
-                assert_eq!(value["action"], "accept");
-                assert_eq!(value["content"]["environment"], "staging");
-            }
-            other => panic!("unexpected output: {other:?}"),
-        }
+        let value = tool_call_value_output(response.output).expect("expected value output");
+        assert_eq!(value["action"], "accept");
+        assert_eq!(value["content"]["environment"], "staging");
         assert!(kernel.session(&session_id).unwrap().inflight().is_empty());
     }
 
@@ -7593,13 +7658,12 @@ mod tests {
             arguments: serde_json::json!({}),
         });
 
-        let response = match kernel
-            .evaluate_session_operation(&context, &operation)
-            .unwrap()
-        {
-            SessionOperationResponse::ToolCall(response) => response,
-            other => panic!("unexpected response: {other:?}"),
-        };
+        let response = session_tool_call(
+            kernel
+                .evaluate_session_operation(&context, &operation)
+                .unwrap(),
+        )
+        .expect("expected tool call response");
 
         let expected_reason = "upstream stream closed before tool response completed".to_string();
         assert_eq!(response.verdict, Verdict::Deny);
@@ -7724,10 +7788,8 @@ mod tests {
             .unwrap_or("")
             .contains("max total bytes"));
 
-        let output_stream = match response.output {
-            Some(ToolCallOutput::Stream(stream)) => stream,
-            other => panic!("unexpected output: {other:?}"),
-        };
+        let output_stream =
+            tool_call_stream_output(response.output).expect("expected stream output");
         assert_eq!(output_stream.chunk_count(), 1);
         assert_eq!(output_stream.chunks[0].data, first_chunk);
 
@@ -7756,13 +7818,15 @@ mod tests {
             .apply_stream_limits(output, std::time::Duration::from_secs(2))
             .unwrap();
 
-        match limited {
+        let (stream, reason) = match limited {
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
-                assert_eq!(stream.chunk_count(), 1);
-                assert!(reason.contains("max duration of 1s"));
+                Some((stream, reason))
             }
-            other => panic!("unexpected limited output: {other:?}"),
+            _ => None,
         }
+        .expect("expected limited incomplete stream");
+        assert_eq!(stream.chunk_count(), 1);
+        assert!(reason.contains("max duration of 1s"));
     }
 
     #[test]
@@ -7872,13 +7936,9 @@ mod tests {
             .evaluate_session_operation(&context, &SessionOperation::ListResources)
             .unwrap();
 
-        match response {
-            SessionOperationResponse::ResourceList { resources } => {
-                assert_eq!(resources.len(), 1);
-                assert_eq!(resources[0].uri, "repo://docs/roadmap");
-            }
-            _ => panic!("expected resource list response"),
-        }
+        let resources = session_resource_list(response).expect("expected resource list response");
+        assert_eq!(resources.len(), 1);
+        assert_eq!(resources[0].uri, "repo://docs/roadmap");
     }
 
     #[test]
@@ -7913,12 +7973,8 @@ mod tests {
                 }),
             )
             .unwrap();
-        match allowed {
-            SessionOperationResponse::ResourceRead { contents } => {
-                assert_eq!(contents[0].text.as_deref(), Some("# Roadmap"));
-            }
-            _ => panic!("expected resource read response"),
-        }
+        let contents = session_resource_read(allowed).expect("expected resource read response");
+        assert_eq!(contents[0].text.as_deref(), Some("# Roadmap"));
 
         let denied_context = make_operation_context(
             &session_id,
@@ -7979,12 +8035,8 @@ mod tests {
                 }),
             )
             .unwrap();
-        match allowed {
-            SessionOperationResponse::ResourceRead { contents } => {
-                assert_eq!(contents[0].text.as_deref(), Some("# Filesystem Roadmap"));
-            }
-            _ => panic!("expected resource read response"),
-        }
+        let contents = session_resource_read(allowed).expect("expected resource read response");
+        assert_eq!(contents[0].text.as_deref(), Some("# Filesystem Roadmap"));
 
         let denied_context = make_operation_context(
             &session_id,
@@ -7998,24 +8050,24 @@ mod tests {
                 uri: "file:///workspace/private/ops.md".to_string(),
             }),
         );
-        match denied {
-            Ok(SessionOperationResponse::ResourceReadDenied { receipt }) => {
-                assert!(receipt.verify_signature().unwrap());
-                assert!(receipt.is_denied());
-                assert_eq!(receipt.tool_name, "resources/read");
-                assert_eq!(receipt.tool_server, "session");
-                assert_eq!(
-                    receipt.decision,
-                    Decision::Deny {
-                        reason:
-                            "filesystem-backed resource path /workspace/private/ops.md is outside the negotiated roots"
-                                .to_string(),
-                        guard: "session_roots".to_string(),
-                    }
-                );
-            }
-            other => panic!("expected signed resource read denial, got {other:?}"),
+        let receipt = match denied {
+            Ok(SessionOperationResponse::ResourceReadDenied { receipt }) => Some(receipt),
+            _ => None,
         }
+        .expect("expected signed resource read denial");
+        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.is_denied());
+        assert_eq!(receipt.tool_name, "resources/read");
+        assert_eq!(receipt.tool_server, "session");
+        assert_eq!(
+            receipt.decision,
+            Decision::Deny {
+                reason:
+                    "filesystem-backed resource path /workspace/private/ops.md is outside the negotiated roots"
+                        .to_string(),
+                guard: "session_roots".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -8048,21 +8100,21 @@ mod tests {
                 uri: "file:///workspace/project/docs/roadmap.md".to_string(),
             }),
         );
-        match denied {
-            Ok(SessionOperationResponse::ResourceReadDenied { receipt }) => {
-                assert!(receipt.verify_signature().unwrap());
-                assert!(receipt.is_denied());
-                assert_eq!(
-                    receipt.decision,
-                    Decision::Deny {
-                        reason: "no enforceable filesystem roots are available for this session"
-                            .to_string(),
-                        guard: "session_roots".to_string(),
-                    }
-                );
-            }
-            other => panic!("expected signed resource read denial, got {other:?}"),
+        let receipt = match denied {
+            Ok(SessionOperationResponse::ResourceReadDenied { receipt }) => Some(receipt),
+            _ => None,
         }
+        .expect("expected signed resource read denial");
+        assert!(receipt.verify_signature().unwrap());
+        assert!(receipt.is_denied());
+        assert_eq!(
+            receipt.decision,
+            Decision::Deny {
+                reason: "no enforceable filesystem roots are available for this session"
+                    .to_string(),
+                guard: "session_roots".to_string(),
+            }
+        );
     }
 
     #[test]
@@ -8178,13 +8230,9 @@ mod tests {
         let list_response = kernel
             .evaluate_session_operation(&list_context, &SessionOperation::ListPrompts)
             .unwrap();
-        match list_response {
-            SessionOperationResponse::PromptList { prompts } => {
-                assert_eq!(prompts.len(), 1);
-                assert_eq!(prompts[0].name, "summarize_docs");
-            }
-            _ => panic!("expected prompt list response"),
-        }
+        let prompts = session_prompt_list(list_response).expect("expected prompt list response");
+        assert_eq!(prompts.len(), 1);
+        assert_eq!(prompts[0].name, "summarize_docs");
 
         let get_context =
             make_operation_context(&session_id, "prompts-2", &agent_kp.public_key().to_hex());
@@ -8198,12 +8246,8 @@ mod tests {
                 }),
             )
             .unwrap();
-        match get_response {
-            SessionOperationResponse::PromptGet { prompt } => {
-                assert_eq!(prompt.messages[0].content["text"], "Summarize roadmap");
-            }
-            _ => panic!("expected prompt get response"),
-        }
+        let prompt = session_prompt_get(get_response).expect("expected prompt get response");
+        assert_eq!(prompt.messages[0].content["text"], "Summarize roadmap");
 
         let denied_context =
             make_operation_context(&session_id, "prompts-3", &agent_kp.public_key().to_hex());
@@ -8259,13 +8303,10 @@ mod tests {
                 }),
             )
             .unwrap();
-        match prompt_completion {
-            SessionOperationResponse::Completion { completion } => {
-                assert_eq!(completion.total, Some(2));
-                assert_eq!(completion.values, vec!["roadmap", "release-plan"]);
-            }
-            _ => panic!("expected completion response"),
-        }
+        let completion =
+            session_completion(prompt_completion).expect("expected completion response");
+        assert_eq!(completion.total, Some(2));
+        assert_eq!(completion.values, vec!["roadmap", "release-plan"]);
 
         let resource_context =
             make_operation_context(&session_id, "complete-2", &agent_kp.public_key().to_hex());
@@ -8285,13 +8326,10 @@ mod tests {
                 }),
             )
             .unwrap();
-        match resource_completion {
-            SessionOperationResponse::Completion { completion } => {
-                assert_eq!(completion.total, Some(2));
-                assert_eq!(completion.values, vec!["architecture", "api"]);
-            }
-            _ => panic!("expected completion response"),
-        }
+        let completion =
+            session_completion(resource_completion).expect("expected completion response");
+        assert_eq!(completion.total, Some(2));
+        assert_eq!(completion.values, vec!["architecture", "api"]);
 
         let denied_context =
             make_operation_context(&session_id, "complete-3", &agent_kp.public_key().to_hex());
@@ -10485,16 +10523,18 @@ mod tests {
         assert_eq!(financial["cost_charged"].as_u64(), Some(100));
         assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
 
-        match response
+        let stream = match response
             .output
             .expect("partial stream output should be preserved")
         {
-            ToolCallOutput::Stream(stream) => assert!(
-                stream.chunks.is_empty(),
-                "truncated stream should drop chunks once byte limit is exceeded"
-            ),
-            ToolCallOutput::Value(_) => panic!("expected streamed partial output"),
+            ToolCallOutput::Stream(stream) => Some(stream),
+            ToolCallOutput::Value(_) => None,
         }
+        .expect("expected streamed partial output");
+        assert!(
+            stream.chunks.is_empty(),
+            "truncated stream should drop chunks once byte limit is exceeded"
+        );
     }
 
     #[test]

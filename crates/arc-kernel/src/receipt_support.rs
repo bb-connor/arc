@@ -94,20 +94,21 @@ pub(super) fn governed_request_metadata(
                 max_billed_units: metered.max_billed_units,
                 usage_evidence: None,
             });
-    let runtime_assurance = match intent.runtime_attestation.as_ref() {
-        Some(attestation) => Some(RuntimeAssuranceReceiptMetadata {
-            schema: attestation.schema.clone(),
-            verifier_family: verifier_family_for_attestation_schema(&attestation.schema),
-            tier: attestation
-                .resolve_effective_runtime_assurance(attestation_trust_policy, now)
-                .map(|resolved| resolved.effective_tier)
-                .unwrap_or(attestation.tier),
-            verifier: attestation.verifier.clone(),
-            evidence_sha256: attestation.evidence_sha256.clone(),
-            workload_identity: attestation.normalized_workload_identity().ok().flatten(),
-        }),
-        None => None,
-    };
+    let runtime_assurance =
+        intent
+            .runtime_attestation
+            .as_ref()
+            .map(|attestation| RuntimeAssuranceReceiptMetadata {
+                schema: attestation.schema.clone(),
+                verifier_family: verifier_family_for_attestation_schema(&attestation.schema),
+                tier: attestation
+                    .resolve_effective_runtime_assurance(attestation_trust_policy, now)
+                    .map(|resolved| resolved.effective_tier)
+                    .unwrap_or(attestation.tier),
+                verifier: attestation.verifier.clone(),
+                evidence_sha256: attestation.evidence_sha256.clone(),
+                workload_identity: attestation.normalized_workload_identity().ok().flatten(),
+            });
     let autonomy = intent
         .autonomy
         .as_ref()

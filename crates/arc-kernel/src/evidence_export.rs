@@ -117,7 +117,6 @@ impl EvidenceExportQuery {
             cursor,
             limit: crate::MAX_QUERY_LIMIT,
             agent_subject: self.agent_subject.clone(),
-            ..ReceiptQuery::default()
         }
     }
 

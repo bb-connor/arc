@@ -285,7 +285,6 @@ impl BehavioralFeedQuery {
             cursor: None,
             limit: self.receipt_limit_or_default(),
             agent_subject: self.agent_subject.clone(),
-            ..ReceiptQuery::default()
         }
     }
 }

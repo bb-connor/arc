@@ -94,7 +94,13 @@ pub fn read_frame<R: Read>(reader: &mut R) -> Result<Vec<u8>, TransportError> {
     }
 
     let mut buf = vec![0u8; len as usize];
-    reader.read_exact(&mut buf)?;
+    match reader.read_exact(&mut buf) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Err(TransportError::ConnectionClosed);
+        }
+        Err(e) => return Err(TransportError::Io(e)),
+    }
     Ok(buf)
 }
 
@@ -216,19 +222,19 @@ mod tests {
         let frame = read_frame(&mut cursor).unwrap();
         let recovered: AgentMessage = serde_json::from_slice(&frame).unwrap();
 
-        match recovered {
+        let (id, server_id, tool) = match recovered {
             AgentMessage::ToolCallRequest {
                 id,
                 server_id,
                 tool,
                 ..
-            } => {
-                assert_eq!(id, "req-001");
-                assert_eq!(server_id, "srv");
-                assert_eq!(tool, "echo");
-            }
-            _ => panic!("wrong variant"),
+            } => Some((id, server_id, tool)),
+            _ => None,
         }
+        .expect("wrong variant");
+        assert_eq!(id, "req-001");
+        assert_eq!(server_id, "srv");
+        assert_eq!(tool, "echo");
     }
 
     #[test]
@@ -254,21 +260,21 @@ mod tests {
         let frame = read_frame(&mut cursor).unwrap();
         let recovered: KernelMessage = serde_json::from_slice(&frame).unwrap();
 
-        match recovered {
+        let (id, result, receipt) = match recovered {
             KernelMessage::ToolCallResponse {
                 id,
                 result,
                 receipt,
-            } => {
-                assert_eq!(id, "req-001");
-                assert!(matches!(
-                    result,
-                    arc_core::message::ToolCallResult::Ok { .. }
-                ));
-                assert!(receipt.verify_signature().unwrap());
-            }
-            _ => panic!("wrong variant"),
+            } => Some((id, result, receipt)),
+            _ => None,
         }
+        .expect("wrong variant");
+        assert_eq!(id, "req-001");
+        assert!(matches!(
+            result,
+            arc_core::message::ToolCallResult::Ok { .. }
+        ));
+        assert!(receipt.verify_signature().unwrap());
     }
 
     #[test]
@@ -289,18 +295,18 @@ mod tests {
         let frame = read_frame(&mut cursor).unwrap();
         let recovered: KernelMessage = serde_json::from_slice(&frame).unwrap();
 
-        match recovered {
+        let (id, chunk_index, data) = match recovered {
             KernelMessage::ToolCallChunk {
                 id,
                 chunk_index,
                 data,
-            } => {
-                assert_eq!(id, "req-stream-1");
-                assert_eq!(chunk_index, 1);
-                assert_eq!(data["delta"], "world");
-            }
-            _ => panic!("wrong variant"),
+            } => Some((id, chunk_index, data)),
+            _ => None,
         }
+        .expect("wrong variant");
+        assert_eq!(id, "req-stream-1");
+        assert_eq!(chunk_index, 1);
+        assert_eq!(data["delta"], "world");
     }
 
     #[test]

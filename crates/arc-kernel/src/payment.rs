@@ -735,10 +735,7 @@ mod tests {
             })
             .expect_err("authorization should fail");
 
-        match error {
-            PaymentError::InsufficientFunds => {}
-            other => panic!("expected insufficient funds error, got {other:?}"),
-        }
+        assert!(matches!(error, PaymentError::InsufficientFunds));
 
         handle.join().expect("server thread should exit cleanly");
     }
