@@ -13,6 +13,7 @@ name = "arc_anchor"
 [dependencies]
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-web3 = { package = "arc-web3", path = "../arc-web3" }
 arc-web3-bindings = { package = "arc-web3-bindings", path = "../arc-web3-bindings" }
 alloy-primitives = { version = "1.4.1", default-features = false, features = ["std"] }
 alloy-sol-types = { version = "1.4.1", default-features = false, features = ["std"] }

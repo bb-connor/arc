@@ -11,9 +11,15 @@ repository.workspace = true
 name = "arc_kernel"
 
 [dependencies]
+arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
+arc-credit = { package = "arc-credit", path = "../arc-credit" }
+arc-governance = { package = "arc-governance", path = "../arc-governance" }
 arc-link = { package = "arc-link", path = "../arc-link" }
 lru = "0.16.3"
+arc-listing = { package = "arc-listing", path = "../arc-listing" }
+arc-market = { package = "arc-market", path = "../arc-market" }
+arc-open-market = { package = "arc-open-market", path = "../arc-open-market" }
 regex = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,8 +27,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }
+arc-underwriting = { package = "arc-underwriting", path = "../arc-underwriting" }
 uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
+arc-web3 = { package = "arc-web3", path = "../arc-web3" }
 
 [dev-dependencies]
 arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }

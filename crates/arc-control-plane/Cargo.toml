@@ -11,6 +11,7 @@ repository.workspace = true
 name = "arc_control_plane"
 
 [dependencies]
+arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
 arc-did = { package = "arc-did", path = "../arc-did" }

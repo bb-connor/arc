@@ -12,6 +12,7 @@ name = "arc_link"
 
 [dependencies]
 arc-core = { package = "arc-core", path = "../arc-core" }
+arc-web3 = { package = "arc-web3", path = "../arc-web3" }
 alloy-contract = { version = "1.7.3", default-features = false }
 alloy-primitives = { version = "1.4.1", default-features = false, features = ["std"] }
 alloy-provider = { version = "1.7.3", default-features = false, features = ["reqwest", "reqwest-rustls-tls"] }

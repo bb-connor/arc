@@ -17,6 +17,7 @@ serde_json = { workspace = true }
 [dev-dependencies]
 arc-core = { path = "../arc-core" }
 arc-link = { path = "../arc-link" }
+arc-web3 = { path = "../arc-web3" }
 
 [lints.clippy]
 unwrap_used = "deny"

@@ -14,13 +14,16 @@ name = "arc"
 path = "src/bin/arc.rs"
 
 [dependencies]
+arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plane" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
 arc-did = { package = "arc-did", path = "../arc-did" }
+arc-federation = { package = "arc-federation", path = "../arc-federation" }
 arc-hosted-mcp = { package = "arc-hosted-mcp", path = "../arc-hosted-mcp" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
+arc-listing = { package = "arc-listing", path = "../arc-listing" }
 arc-policy = { package = "arc-policy", path = "../arc-policy" }
 arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../arc-mcp-adapter" }
 arc-conformance = { package = "arc-conformance", path = "../arc-conformance" }
@@ -51,6 +54,11 @@ chrono = { version = "0.4", features = ["clock"] }
 rsa = { version = "0.9", features = ["sha2"] }
 p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["ecdsa"] }
+
+[dev-dependencies]
+arc-credit = { package = "arc-credit", path = "../arc-credit" }
+arc-open-market = { package = "arc-open-market", path = "../arc-open-market" }
+arc-underwriting = { package = "arc-underwriting", path = "../arc-underwriting" }
 
 [features]
 siem = ["arc-siem"]

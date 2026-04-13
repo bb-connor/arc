@@ -11,6 +11,7 @@ repository.workspace = true
 name = "arc_policy"
 
 [dependencies]
+arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
