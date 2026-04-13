@@ -10,6 +10,10 @@ repository.workspace = true
 [lib]
 name = "arc_core"
 
+[[bench]]
+name = "core_primitives"
+harness = false
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -24,6 +28,8 @@ url = "2"
 
 [dev-dependencies]
 serde_json = { workspace = true }
+proptest = { workspace = true }
+criterion = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"

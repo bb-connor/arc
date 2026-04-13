@@ -26,6 +26,7 @@ ureq = { version = "2.10", features = ["json"] }
 
 [dev-dependencies]
 arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
+proptest = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"

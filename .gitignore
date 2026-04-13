@@ -36,3 +36,7 @@ packages/sdk/arc-ts/dist/
 # Dashboard node_modules and build output
 crates/arc-cli/dashboard/node_modules/
 crates/arc-cli/dashboard/dist/
+
+# Generated coverage artifacts
+/coverage/*
+!/coverage/README.md

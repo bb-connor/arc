@@ -56,3 +56,5 @@ sha2 = "0.10"
 rusqlite = { version = "0.37", features = ["bundled"] }
 uuid = "1"
 url = "2"
+proptest = "1.10"
+criterion = "0.5"
