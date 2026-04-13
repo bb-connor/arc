@@ -350,6 +350,42 @@ fn arc_wall_receipt(
     .map_err(CliError::from)
 }
 
+fn create_arc_wall_receipt_db(
+    receipt_db_path: &Path,
+    authorization_context: &ArcWallAuthorizationContext,
+    guard_outcome: &ArcWallGuardOutcome,
+    denied_access_record: &ArcWallDeniedAccessRecord,
+    policy_snapshot: &ArcWallPolicySnapshot,
+) -> Result<(), CliError> {
+    let mut store = SqliteReceiptStore::open(receipt_db_path)?;
+    let issuer = Keypair::generate();
+    let subject = Keypair::generate();
+    let kernel = Keypair::generate();
+    let capability = arc_wall_capability_with_id("cap-arc-wall-1", &subject, &issuer)?;
+    let receipt = arc_wall_receipt(
+        authorization_context,
+        guard_outcome,
+        denied_access_record,
+        policy_snapshot,
+        &capability.body().id,
+        &kernel,
+    )?;
+    let seq = store.append_arc_receipt_returning_seq(&receipt)?;
+    let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
+    let checkpoint = build_checkpoint(
+        1,
+        seq,
+        seq,
+        &canonical
+            .into_iter()
+            .map(|(_, bytes)| bytes)
+            .collect::<Vec<_>>(),
+        &issuer,
+    )?;
+    store.store_checkpoint(&checkpoint)?;
+    Ok(())
+}
+
 fn write_arc_evidence_package(
     output: &Path,
     authorization_context: &ArcWallAuthorizationContext,
@@ -360,34 +396,13 @@ fn write_arc_evidence_package(
     let receipt_db_path = output.join(".arc-wall-receipts.sqlite3");
     let arc_evidence_dir = output.join("arc-evidence");
 
-    {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path)?;
-        let issuer = Keypair::generate();
-        let subject = Keypair::generate();
-        let kernel = Keypair::generate();
-        let capability = arc_wall_capability_with_id("cap-arc-wall-1", &subject, &issuer)?;
-        let receipt = arc_wall_receipt(
-            authorization_context,
-            guard_outcome,
-            denied_access_record,
-            policy_snapshot,
-            &capability.body().id,
-            &kernel,
-        )?;
-        let seq = store.append_arc_receipt_returning_seq(&receipt)?;
-        let canonical = store.receipts_canonical_bytes_range(seq, seq)?;
-        let checkpoint = build_checkpoint(
-            1,
-            seq,
-            seq,
-            &canonical
-                .into_iter()
-                .map(|(_, bytes)| bytes)
-                .collect::<Vec<_>>(),
-            &issuer,
-        )?;
-        store.store_checkpoint(&checkpoint)?;
-    }
+    create_arc_wall_receipt_db(
+        &receipt_db_path,
+        authorization_context,
+        guard_outcome,
+        denied_access_record,
+        policy_snapshot,
+    )?;
 
     evidence_export::cmd_evidence_export(
         &arc_evidence_dir,
@@ -646,4 +661,187 @@ pub fn cmd_arc_wall_control_path_validate(output: &Path, json: bool) -> Result<(
         );
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use arc_core::receipt::Decision;
+    use arc_siem::event::SiemEvent;
+    use arc_siem::exporter::ExportFuture;
+    use arc_siem::{Exporter, ExporterManager, SiemConfig};
+    use tokio::sync::watch;
+
+    fn unique_test_dir(prefix: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}"))
+    }
+
+    #[derive(Clone, Default)]
+    struct CapturingExporter {
+        events: Arc<Mutex<Vec<SiemEvent>>>,
+    }
+
+    impl CapturingExporter {
+        fn events(&self) -> Vec<SiemEvent> {
+            self.events.lock().expect("events lock").clone()
+        }
+    }
+
+    impl Exporter for CapturingExporter {
+        fn name(&self) -> &str {
+            "arc-wall-capturing-exporter"
+        }
+
+        fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
+            let sink = self.events.clone();
+            let owned = events.to_vec();
+            Box::pin(async move {
+                sink.lock().expect("events lock").extend(owned.clone());
+                Ok(owned.len())
+            })
+        }
+    }
+
+    #[test]
+    fn build_guard_outcome_allows_research_tool_when_present_in_policy() {
+        let mut context = build_authorization_context();
+        context.tool_name = ARC_WALL_ALLOWED_TOOLS[0].to_string();
+        let policy = build_policy_snapshot();
+
+        let outcome = build_guard_outcome(&context, &policy);
+        assert_eq!(outcome.decision, ArcWallGuardDecision::Allow);
+        assert_eq!(outcome.evaluated_tool, ARC_WALL_ALLOWED_TOOLS[0]);
+        assert!(outcome.reason.contains("is allowed"));
+        outcome.validate().expect("allow outcome validates");
+    }
+
+    #[test]
+    fn build_denied_access_record_rejects_allow_outcome() {
+        let mut context = build_authorization_context();
+        context.tool_name = ARC_WALL_ALLOWED_TOOLS[0].to_string();
+        let policy = build_policy_snapshot();
+        let outcome = build_guard_outcome(&context, &policy);
+
+        let error = build_denied_access_record(&context, &outcome)
+            .expect_err("allow outcome should not generate denied-access record");
+        assert!(error
+            .to_string()
+            .contains("expects the bounded control-path scenario to deny"));
+    }
+
+    #[test]
+    fn ensure_empty_directory_rejects_non_empty_dir() {
+        let dir = unique_test_dir("arc-wall-non-empty");
+        fs::create_dir_all(&dir).expect("create temp dir");
+        fs::write(dir.join("sentinel.txt"), b"occupied").expect("write sentinel");
+
+        let error = ensure_empty_directory(&dir).expect_err("non-empty dir should fail");
+        assert!(error.to_string().contains("output directory must be empty"));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn validate_pipeline_emits_bounded_control_room_decision() {
+        let output = unique_test_dir("arc-wall-validate-unit");
+
+        cmd_arc_wall_control_path_validate(&output, false).expect("validate pipeline succeeds");
+
+        let report: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join("validation-report.json")).expect("read"))
+                .expect("parse validation report");
+        assert_eq!(report["decision"].as_str(), Some(ARC_WALL_DECISION));
+        assert_eq!(
+            report["buyerMotion"].as_str(),
+            Some(ArcWallBuyerMotion::ControlRoomBarrierReview.as_str())
+        );
+        assert_eq!(
+            report["controlSurface"].as_str(),
+            Some(ArcWallControlSurface::ToolAccessDomainBoundary.as_str())
+        );
+
+        let decision: serde_json::Value = serde_json::from_slice(
+            &fs::read(output.join("expansion-decision.json")).expect("read decision"),
+        )
+        .expect("parse decision record");
+        assert_eq!(decision["decision"].as_str(), Some(ARC_WALL_DECISION));
+        assert_eq!(
+            decision["selectedBuyerMotion"].as_str(),
+            Some(ArcWallBuyerMotion::ControlRoomBarrierReview.as_str())
+        );
+        assert!(decision["deferredScope"]
+            .as_array()
+            .expect("deferred scope")
+            .iter()
+            .any(|item| item.as_str() == Some("generic barrier-platform breadth")));
+
+        let _ = fs::remove_dir_all(output);
+    }
+
+    #[tokio::test]
+    async fn arc_wall_denied_receipt_exports_through_arc_siem() {
+        let output = unique_test_dir("arc-wall-siem");
+        fs::create_dir_all(&output).expect("create temp dir");
+
+        let authorization_context = build_authorization_context();
+        let policy_snapshot = build_policy_snapshot();
+        let guard_outcome = build_guard_outcome(&authorization_context, &policy_snapshot);
+        assert_eq!(guard_outcome.decision, ArcWallGuardDecision::Deny);
+
+        let denied_access_record =
+            build_denied_access_record(&authorization_context, &guard_outcome)
+                .expect("deny outcome should build record");
+        let receipt_db_path = output.join("arc-wall-integration.sqlite3");
+        create_arc_wall_receipt_db(
+            &receipt_db_path,
+            &authorization_context,
+            &guard_outcome,
+            &denied_access_record,
+            &policy_snapshot,
+        )
+        .expect("create ARC-Wall receipt db");
+
+        let exporter = CapturingExporter::default();
+        let mut manager = ExporterManager::new(SiemConfig {
+            db_path: receipt_db_path.clone(),
+            poll_interval: std::time::Duration::from_millis(25),
+            batch_size: 10,
+            max_retries: 0,
+            base_backoff_ms: 0,
+            dlq_capacity: 100,
+            rate_limit: None,
+        })
+        .expect("open ExporterManager");
+        manager.add_exporter(Box::new(exporter.clone()));
+
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let run_handle = tokio::spawn(async move {
+            manager.run(cancel_rx).await;
+            manager
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        cancel_tx.send(true).expect("cancel signal sends");
+        let manager = run_handle.await.expect("manager task completes");
+
+        let events = exporter.events();
+        assert_eq!(events.len(), 1, "one ARC-Wall receipt should be exported");
+        assert_eq!(events[0].receipt.tool_server, "arc-wall");
+        assert_eq!(events[0].receipt.tool_name, ARC_WALL_REQUESTED_TOOL);
+        match &events[0].receipt.decision {
+            Decision::Deny { guard, .. } => assert_eq!(guard, "mcp-tool"),
+            other => panic!("expected denied ARC-Wall receipt, got {other:?}"),
+        }
+        assert_eq!(manager.dlq_len(), 0, "successful export should not DLQ");
+
+        let _ = fs::remove_dir_all(output);
+    }
 }

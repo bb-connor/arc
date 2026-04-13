@@ -19,6 +19,7 @@ pub mod event;
 pub mod exporter;
 pub mod exporters;
 pub mod manager;
+pub mod ratelimit;
 
 pub use dlq::{DeadLetterQueue, FailedEvent};
 pub use event::SiemEvent;
@@ -26,3 +27,4 @@ pub use exporter::{ExportError, ExportFuture, Exporter};
 pub use exporters::elastic::{ElasticAuthConfig, ElasticConfig, ElasticsearchExporter};
 pub use exporters::splunk::{SplunkConfig, SplunkHecExporter};
 pub use manager::{ExporterManager, SiemConfig, SiemError};
+pub use ratelimit::{ExportRateLimiter, RateLimitConfig, RateLimitConfigError};

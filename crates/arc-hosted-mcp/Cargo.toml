@@ -32,6 +32,9 @@ p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["ecdsa"] }
 sha2 = { workspace = true }
 
+[dev-dependencies]
+arc-siem = { package = "arc-siem", path = "../arc-siem" }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

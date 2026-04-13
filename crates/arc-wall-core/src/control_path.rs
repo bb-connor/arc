@@ -508,31 +508,34 @@ mod tests {
         }
     }
 
-    #[test]
-    fn control_profile_validates() {
-        sample_profile().validate().expect("profile validates");
-    }
-
-    #[test]
-    fn policy_snapshot_rejects_duplicate_allowed_tools() {
-        let snapshot = ArcWallPolicySnapshot {
+    fn sample_policy_snapshot() -> ArcWallPolicySnapshot {
+        ArcWallPolicySnapshot {
             schema: ARC_WALL_POLICY_SNAPSHOT_SCHEMA.to_string(),
             policy_id: "arc.wall.policy".to_string(),
             source_domain: ArcWallInformationDomain::Research,
-            allowed_tools: vec![
-                "research_news.read".to_string(),
-                "research_news.read".to_string(),
-            ],
+            allowed_tools: vec!["research_news.read".to_string()],
             fail_closed: true,
-            note: "duplicate tool".to_string(),
-        };
-        let error = snapshot.validate().expect_err("duplicate tool rejected");
-        assert!(error.to_string().contains("duplicate tool name"));
+            note: "bounded allowlist".to_string(),
+        }
     }
 
-    #[test]
-    fn guard_outcome_rejects_denied_tool_in_allowlist() {
-        let outcome = ArcWallGuardOutcome {
+    fn sample_authorization_context() -> ArcWallAuthorizationContext {
+        ArcWallAuthorizationContext {
+            schema: ARC_WALL_AUTHORIZATION_CONTEXT_SCHEMA.to_string(),
+            request_id: "req-1".to_string(),
+            workflow_id: "workflow-information-domain-barrier".to_string(),
+            actor_label: "research-agent-alpha".to_string(),
+            buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+            control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+            source_domain: ArcWallInformationDomain::Research,
+            requested_domain: ArcWallInformationDomain::Execution,
+            tool_name: "execution_oms.submit_order".to_string(),
+            policy_reference: "arc.wall.policy".to_string(),
+        }
+    }
+
+    fn sample_denied_outcome() -> ArcWallGuardOutcome {
+        ArcWallGuardOutcome {
             schema: ARC_WALL_GUARD_OUTCOME_SCHEMA.to_string(),
             request_id: "req-1".to_string(),
             workflow_id: "workflow-information-domain-barrier".to_string(),
@@ -541,20 +544,48 @@ mod tests {
             pipeline_name: "guard-pipeline".to_string(),
             matched_policy: "arc.wall.policy".to_string(),
             evaluated_tool: "execution_oms.submit_order".to_string(),
-            allowed_tools: vec![
-                "research_news.read".to_string(),
-                "execution_oms.submit_order".to_string(),
-            ],
+            allowed_tools: vec!["research_news.read".to_string()],
             reason: "tool denied".to_string(),
             fail_closed: true,
-        };
-        let error = outcome.validate().expect_err("invalid denial rejected");
-        assert!(error.to_string().contains("cannot deny"));
+        }
     }
 
-    #[test]
-    fn control_package_rejects_duplicate_artifacts() {
-        let package = ArcWallControlPackage {
+    fn sample_denied_access_record() -> ArcWallDeniedAccessRecord {
+        ArcWallDeniedAccessRecord {
+            schema: ARC_WALL_DENIED_ACCESS_RECORD_SCHEMA.to_string(),
+            request_id: "req-1".to_string(),
+            workflow_id: "workflow-information-domain-barrier".to_string(),
+            source_domain: ArcWallInformationDomain::Research,
+            requested_domain: ArcWallInformationDomain::Execution,
+            tool_name: "execution_oms.submit_order".to_string(),
+            escalation_owner: "barrier-control-room".to_string(),
+            support_owner: "arc-wall-ops".to_string(),
+            note: "denied cross-domain tool access".to_string(),
+        }
+    }
+
+    fn sample_buyer_review_package() -> ArcWallBuyerReviewPackage {
+        ArcWallBuyerReviewPackage {
+            schema: ARC_WALL_BUYER_REVIEW_PACKAGE_SCHEMA.to_string(),
+            package_id: "arc-wall-review".to_string(),
+            workflow_id: "workflow-information-domain-barrier".to_string(),
+            buyer_motion: ArcWallBuyerMotion::ControlRoomBarrierReview,
+            control_surface: ArcWallControlSurface::ToolAccessDomainBoundary,
+            control_owner: "barrier-control-room".to_string(),
+            support_owner: "arc-wall-ops".to_string(),
+            fail_closed: true,
+            control_package_file: "control-package.json".to_string(),
+            authorization_context_file: "authorization-context.json".to_string(),
+            policy_snapshot_file: "policy-snapshot.json".to_string(),
+            guard_outcome_file: "guard-outcome.json".to_string(),
+            denied_access_record_file: "denied-access-record.json".to_string(),
+            arc_evidence_dir: "arc-evidence".to_string(),
+            note: "bounded buyer review".to_string(),
+        }
+    }
+
+    fn sample_control_package() -> ArcWallControlPackage {
+        ArcWallControlPackage {
             schema: ARC_WALL_CONTROL_PACKAGE_SCHEMA.to_string(),
             package_id: "arc-wall-package".to_string(),
             workflow_id: "workflow-information-domain-barrier".to_string(),
@@ -569,18 +600,124 @@ mod tests {
             profile_file: "control-profile.json".to_string(),
             buyer_review_package_file: "buyer-review-package.json".to_string(),
             arc_evidence_dir: "arc-evidence".to_string(),
-            artifacts: vec![
-                ArcWallArtifact {
-                    artifact_kind: ArcWallArtifactKind::ControlProfile,
-                    relative_path: "control-profile.json".to_string(),
-                },
-                ArcWallArtifact {
-                    artifact_kind: ArcWallArtifactKind::ControlProfile,
-                    relative_path: "control-profile-copy.json".to_string(),
-                },
-            ],
-        };
+            artifacts: vec![ArcWallArtifact {
+                artifact_kind: ArcWallArtifactKind::ControlProfile,
+                relative_path: "control-profile.json".to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn control_profile_validates() {
+        sample_profile().validate().expect("profile validates");
+    }
+
+    #[test]
+    fn control_profile_rejects_same_domain_boundary() {
+        let mut profile = sample_profile();
+        profile.protected_domain = ArcWallInformationDomain::Research;
+        let error = profile
+            .validate()
+            .expect_err("same source/protected domain rejected");
+        assert!(error.to_string().contains("must differ"));
+    }
+
+    #[test]
+    fn policy_snapshot_rejects_duplicate_allowed_tools() {
+        let mut snapshot = sample_policy_snapshot();
+        snapshot.allowed_tools = vec![
+            "research_news.read".to_string(),
+            "research_news.read".to_string(),
+        ];
+        let error = snapshot.validate().expect_err("duplicate tool rejected");
+        assert!(error.to_string().contains("duplicate tool name"));
+    }
+
+    #[test]
+    fn policy_snapshot_rejects_empty_allowed_tool_entries() {
+        let mut snapshot = sample_policy_snapshot();
+        snapshot.allowed_tools = vec!["research_news.read".to_string(), "   ".to_string()];
+        let error = snapshot
+            .validate()
+            .expect_err("empty allowlist entry rejected");
+        assert!(error.to_string().contains("must not contain empty values"));
+    }
+
+    #[test]
+    fn authorization_context_rejects_same_domain_request() {
+        let mut context = sample_authorization_context();
+        context.requested_domain = ArcWallInformationDomain::Research;
+        let error = context
+            .validate()
+            .expect_err("same-domain request rejected");
+        assert!(error.to_string().contains("must differ"));
+    }
+
+    #[test]
+    fn guard_outcome_rejects_denied_tool_in_allowlist() {
+        let mut outcome = sample_denied_outcome();
+        outcome
+            .allowed_tools
+            .push("execution_oms.submit_order".to_string());
+        let error = outcome.validate().expect_err("invalid denial rejected");
+        assert!(error.to_string().contains("cannot deny"));
+    }
+
+    #[test]
+    fn guard_outcome_allows_tool_not_present_in_allowlist() {
+        let mut outcome = sample_denied_outcome();
+        outcome.decision = ArcWallGuardDecision::Allow;
+        outcome.reason = "operator explicitly allowed bounded workflow".to_string();
+        outcome
+            .validate()
+            .expect("allow outcome remains structurally valid");
+    }
+
+    #[test]
+    fn denied_access_record_rejects_same_domain_request() {
+        let mut record = sample_denied_access_record();
+        record.requested_domain = ArcWallInformationDomain::Research;
+        let error = record
+            .validate()
+            .expect_err("same-domain denied access rejected");
+        assert!(error.to_string().contains("must differ"));
+    }
+
+    #[test]
+    fn buyer_review_package_requires_fail_closed_and_non_empty_files() {
+        let mut review = sample_buyer_review_package();
+        review.control_package_file = " ".to_string();
+        let error = review
+            .validate()
+            .expect_err("empty file path should fail validation");
+        assert!(error.to_string().contains("control_package_file"));
+
+        let mut review = sample_buyer_review_package();
+        review.fail_closed = false;
+        let error = review
+            .validate()
+            .expect_err("fail_closed=false should fail validation");
+        assert!(error.to_string().contains("must remain true"));
+    }
+
+    #[test]
+    fn control_package_rejects_duplicate_artifacts() {
+        let mut package = sample_control_package();
+        package.artifacts.push(ArcWallArtifact {
+            artifact_kind: ArcWallArtifactKind::ControlProfile,
+            relative_path: "control-profile-copy.json".to_string(),
+        });
         let error = package.validate().expect_err("duplicate artifact rejected");
         assert!(error.to_string().contains("duplicate artifact kind"));
+    }
+
+    #[test]
+    fn control_package_requires_non_empty_artifact_paths() {
+        let mut package = sample_control_package();
+        package.artifacts[0].relative_path = " ".to_string();
+        let error = package
+            .validate()
+            .expect_err("empty artifact path should fail validation");
+        assert!(error.to_string().contains("relative_path"));
     }
 }

@@ -206,6 +206,82 @@ async fn splunk_hec_returns_error_on_401() {
     }
 }
 
+/// SplunkHecExporter returns ExportError::HttpError when the server responds 400.
+#[tokio::test]
+async fn splunk_hec_returns_error_on_400() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/services/collector/event"))
+        .respond_with(
+            ResponseTemplate::new(400)
+                .set_body_raw(r#"{"text":"Bad request","code":6}"#, "application/json"),
+        )
+        .mount(&server)
+        .await;
+
+    let config = SplunkConfig {
+        endpoint: server.uri(),
+        hec_token: "test-token".to_string(),
+        sourcetype: "arc:receipt".to_string(),
+        index: None,
+        host: None,
+    };
+    let exporter = SplunkHecExporter::new_plaintext_for_tests(config).expect("exporter builds");
+
+    let events = vec![SiemEvent::from_receipt(sample_receipt("splunk-rcpt-400"))];
+    let result = exporter.export_batch(&events).await;
+
+    assert!(result.is_err(), "export_batch should return Err for 400");
+    match result.unwrap_err() {
+        ExportError::HttpError(msg) => {
+            assert!(
+                msg.contains("400") && msg.contains("Bad request"),
+                "HttpError message should contain 400 and the body text, got: {msg}"
+            );
+        }
+        other => panic!("expected ExportError::HttpError, got: {other:?}"),
+    }
+}
+
+/// SplunkHecExporter returns ExportError::HttpError when the server responds 503.
+#[tokio::test]
+async fn splunk_hec_returns_error_on_503() {
+    let server = MockServer::start().await;
+
+    Mock::given(method("POST"))
+        .and(path("/services/collector/event"))
+        .respond_with(ResponseTemplate::new(503).set_body_raw(
+            r#"{"text":"Service unavailable","code":9}"#,
+            "application/json",
+        ))
+        .mount(&server)
+        .await;
+
+    let config = SplunkConfig {
+        endpoint: server.uri(),
+        hec_token: "test-token".to_string(),
+        sourcetype: "arc:receipt".to_string(),
+        index: None,
+        host: None,
+    };
+    let exporter = SplunkHecExporter::new_plaintext_for_tests(config).expect("exporter builds");
+
+    let events = vec![SiemEvent::from_receipt(sample_receipt("splunk-rcpt-503"))];
+    let result = exporter.export_batch(&events).await;
+
+    assert!(result.is_err(), "export_batch should return Err for 503");
+    match result.unwrap_err() {
+        ExportError::HttpError(msg) => {
+            assert!(
+                msg.contains("503") && msg.contains("Service unavailable"),
+                "HttpError message should contain 503 and the body text, got: {msg}"
+            );
+        }
+        other => panic!("expected ExportError::HttpError, got: {other:?}"),
+    }
+}
+
 /// SplunkHecExporter::new rejects plaintext http:// endpoints to protect HEC tokens.
 #[test]
 fn splunk_hec_rejects_plaintext_http_endpoint() {

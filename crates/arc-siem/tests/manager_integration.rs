@@ -5,14 +5,15 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::crypto::Keypair;
 use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
 use arc_siem::event::SiemEvent;
 use arc_siem::exporter::{ExportError, ExportFuture};
 use arc_siem::manager::{ExporterManager, SiemConfig};
+use arc_siem::ratelimit::RateLimitConfig;
 use arc_siem::Exporter;
 use rusqlite::{params, Connection};
 use tokio::sync::watch;
@@ -153,6 +154,98 @@ impl Exporter for FailingExporter {
     }
 }
 
+#[derive(Clone)]
+struct FlakyExporter {
+    attempts: Arc<AtomicUsize>,
+    exported: Arc<AtomicUsize>,
+    failures_before_success: usize,
+}
+
+impl FlakyExporter {
+    fn new(failures_before_success: usize) -> Self {
+        Self {
+            attempts: Arc::new(AtomicUsize::new(0)),
+            exported: Arc::new(AtomicUsize::new(0)),
+            failures_before_success,
+        }
+    }
+
+    fn attempts(&self) -> usize {
+        self.attempts.load(Ordering::SeqCst)
+    }
+
+    fn total(&self) -> usize {
+        self.exported.load(Ordering::SeqCst)
+    }
+}
+
+impl Exporter for FlakyExporter {
+    fn name(&self) -> &str {
+        "flaky-exporter"
+    }
+
+    fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
+        let attempts = self.attempts.clone();
+        let exported = self.exported.clone();
+        let failures_before_success = self.failures_before_success;
+        let event_count = events.len();
+        Box::pin(async move {
+            let attempt_index = attempts.fetch_add(1, Ordering::SeqCst);
+            if attempt_index < failures_before_success {
+                return Err(ExportError::HttpError(format!(
+                    "transient failure on attempt {}",
+                    attempt_index + 1
+                )));
+            }
+            exported.fetch_add(event_count, Ordering::SeqCst);
+            Ok(event_count)
+        })
+    }
+}
+
+#[derive(Clone)]
+struct TimedCountingExporter {
+    count: Arc<AtomicUsize>,
+    call_times: Arc<Mutex<Vec<Instant>>>,
+}
+
+impl TimedCountingExporter {
+    fn new() -> Self {
+        Self {
+            count: Arc::new(AtomicUsize::new(0)),
+            call_times: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    fn total(&self) -> usize {
+        self.count.load(Ordering::SeqCst)
+    }
+
+    fn call_times(&self) -> Vec<Instant> {
+        self.call_times.lock().expect("call_times lock").clone()
+    }
+}
+
+impl Exporter for TimedCountingExporter {
+    fn name(&self) -> &str {
+        "timed-counting-exporter"
+    }
+
+    fn export_batch<'a>(&'a self, events: &'a [SiemEvent]) -> ExportFuture<'a> {
+        let count = self.count.clone();
+        let call_times = self.call_times.clone();
+        let n = events.len();
+        Box::pin(async move {
+            call_times
+                .lock()
+                .expect("call_times lock")
+                .push(Instant::now());
+            count.fetch_add(n, Ordering::SeqCst);
+            Ok(n)
+        })
+    }
+}
+
 // -- Tests --------------------------------------------------------------------
 
 /// ExporterManager exports all receipts and cursor tracks progress across runs.
@@ -175,6 +268,7 @@ async fn manager_cursor_advance_after_export() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
+        rate_limit: None,
     };
 
     let mut manager = ExporterManager::new(config.clone()).expect("open ExporterManager");
@@ -252,6 +346,7 @@ async fn manager_failure_isolation_dlq() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
+        rate_limit: None,
     };
 
     let mut manager = ExporterManager::new(config).expect("open ExporterManager");
@@ -310,6 +405,7 @@ async fn manager_cursor_advances_past_dlq() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
+        rate_limit: None,
     })
     .expect("open mgr1");
     mgr1.add_exporter(Box::new(FailingExporter));
@@ -341,6 +437,7 @@ async fn manager_cursor_advances_past_dlq() {
         max_retries: 0,
         base_backoff_ms: 0,
         dlq_capacity: 100,
+        rate_limit: None,
     })
     .expect("open mgr2");
     mgr2.add_exporter(Box::new(counter.clone()));
@@ -361,6 +458,128 @@ async fn manager_cursor_advances_past_dlq() {
         counter.total(),
         8,
         "phase 2 counting exporter must export all 8 receipts (5 original + 3 new)"
+    );
+
+    let _ = std::fs::remove_file(&db_path);
+}
+
+/// ExporterManager retries transient exporter failures and avoids DLQ on recovery.
+#[tokio::test]
+async fn manager_retries_transient_failure_without_dlq() {
+    let db_path = unique_db_path("retry-transient");
+    let conn = create_db(&db_path);
+
+    for i in 0..3usize {
+        insert_receipt(&conn, &make_receipt(&format!("mgr-retry-rcpt-{i:04}")));
+    }
+    drop(conn);
+
+    let exporter = FlakyExporter::new(1);
+    let mut manager = ExporterManager::new(SiemConfig {
+        db_path: db_path.clone(),
+        poll_interval: Duration::from_millis(40),
+        batch_size: 100,
+        max_retries: 1,
+        base_backoff_ms: 10,
+        dlq_capacity: 100,
+        rate_limit: None,
+    })
+    .expect("open ExporterManager");
+    manager.add_exporter(Box::new(exporter.clone()));
+
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    let run_handle = tokio::spawn(async move {
+        manager.run(cancel_rx).await;
+        manager
+    });
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    cancel_tx.send(true).expect("cancel signal sends");
+
+    let manager = run_handle.await.expect("manager task completes");
+
+    assert_eq!(
+        exporter.attempts(),
+        2,
+        "one transient failure should be retried once before succeeding"
+    );
+    assert_eq!(
+        exporter.total(),
+        3,
+        "all receipts should export after the retry succeeds"
+    );
+    assert_eq!(
+        manager.dlq_len(),
+        0,
+        "recovered exports must not land in the DLQ"
+    );
+
+    let _ = std::fs::remove_file(&db_path);
+}
+
+/// ExporterManager throttles burst traffic per exporter without silently dropping receipts.
+#[tokio::test]
+async fn manager_rate_limits_bursts_without_silent_drop() {
+    let db_path = unique_db_path("rate-limit");
+    let conn = create_db(&db_path);
+
+    for i in 0..3usize {
+        insert_receipt(&conn, &make_receipt(&format!("mgr-rate-limit-rcpt-{i:04}")));
+    }
+    drop(conn);
+
+    let exporter = TimedCountingExporter::new();
+    let mut manager = ExporterManager::new(SiemConfig {
+        db_path: db_path.clone(),
+        poll_interval: Duration::from_millis(10),
+        batch_size: 1,
+        max_retries: 0,
+        base_backoff_ms: 0,
+        dlq_capacity: 100,
+        rate_limit: Some(RateLimitConfig {
+            max_batches_per_window: 1,
+            window: Duration::from_millis(150),
+            burst_factor: 1.0,
+        }),
+    })
+    .expect("open ExporterManager");
+    manager.add_exporter(Box::new(exporter.clone()));
+
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    let run_handle = tokio::spawn(async move {
+        manager.run(cancel_rx).await;
+        manager
+    });
+
+    tokio::time::sleep(Duration::from_millis(650)).await;
+    cancel_tx.send(true).expect("cancel signal sends");
+
+    let manager = run_handle.await.expect("manager task completes");
+
+    assert_eq!(
+        exporter.total(),
+        3,
+        "all throttled receipts should still be exported"
+    );
+    assert_eq!(
+        manager.dlq_len(),
+        0,
+        "rate-limited exports must not silently fall into the DLQ"
+    );
+
+    let call_times = exporter.call_times();
+    assert_eq!(
+        call_times.len(),
+        3,
+        "batch_size=1 should force three distinct exporter calls"
+    );
+    assert!(
+        call_times[1].duration_since(call_times[0]) >= Duration::from_millis(100),
+        "second batch should be delayed by the per-exporter rate limit"
+    );
+    assert!(
+        call_times[2].duration_since(call_times[1]) >= Duration::from_millis(100),
+        "third batch should also respect the per-exporter rate limit"
     );
 
     let _ = std::fs::remove_file(&db_path);

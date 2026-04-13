@@ -25,6 +25,10 @@ clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+[dev-dependencies]
+arc-siem = { package = "arc-siem", path = "../arc-siem" }
+tokio = { workspace = true }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

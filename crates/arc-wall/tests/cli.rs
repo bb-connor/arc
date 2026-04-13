@@ -148,6 +148,38 @@ fn arc_wall_control_path_validate_writes_report_and_decision() {
         decision["selectedControlSurface"],
         "tool_access_domain_boundary"
     );
+    assert!(decision["deferredScope"]
+        .as_array()
+        .expect("deferred scope")
+        .iter()
+        .any(|item| item.as_str() == Some("generic barrier-platform breadth")));
+
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
+fn arc_wall_control_path_export_rejects_non_empty_output_dir() {
+    let output_dir = unique_path("arc-wall-export-non-empty");
+    fs::create_dir_all(&output_dir).expect("create output dir");
+    fs::write(output_dir.join("sentinel.txt"), b"occupied").expect("write sentinel");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_arc-wall"))
+        .current_dir(workspace_root())
+        .arg("control-path")
+        .arg("export")
+        .arg("--output")
+        .arg(&output_dir)
+        .output()
+        .expect("run arc-wall control-path export");
+
+    assert!(!output.status.success(), "expected export to fail");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stderr.contains("output directory must be empty")
+            || stdout.contains("output directory must be empty"),
+        "stdout={stdout}\nstderr={stderr}"
+    );
 
     let _ = fs::remove_dir_all(output_dir);
 }

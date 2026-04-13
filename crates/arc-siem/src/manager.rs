@@ -10,6 +10,7 @@ use tokio::sync::watch;
 use crate::dlq::{DeadLetterQueue, FailedEvent};
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, Exporter};
+use crate::ratelimit::{ExportRateLimiter, RateLimitConfig};
 
 /// Error variants for ExporterManager operations.
 #[derive(Debug, thiserror::Error)]
@@ -38,6 +39,8 @@ pub struct SiemConfig {
     pub base_backoff_ms: u64,
     /// Maximum capacity of the dead-letter queue. Default: 1000.
     pub dlq_capacity: usize,
+    /// Optional per-exporter batch rate limit. None means unlimited.
+    pub rate_limit: Option<RateLimitConfig>,
 }
 
 impl Default for SiemConfig {
@@ -49,6 +52,7 @@ impl Default for SiemConfig {
             max_retries: 3,
             base_backoff_ms: 500,
             dlq_capacity: DeadLetterQueue::DEFAULT_CAPACITY,
+            rate_limit: None,
         }
     }
 }
@@ -77,6 +81,7 @@ pub struct ExporterManager {
     dlq: DeadLetterQueue,
     cursor: u64,
     config: SiemConfig,
+    rate_limiter: Option<ExportRateLimiter>,
     /// Persistent read-only connection to the receipt database.
     conn: Mutex<rusqlite::Connection>,
 }
@@ -87,6 +92,15 @@ impl ExporterManager {
     /// Opens the SQLite database at `config.db_path` immediately and returns
     /// an error if the file cannot be opened.
     pub fn new(config: SiemConfig) -> Result<Self, SiemError> {
+        let rate_limiter = config
+            .rate_limit
+            .clone()
+            .map(ExportRateLimiter::new)
+            .transpose()
+            .map_err(|error| {
+                SiemError::ConfigError(format!("invalid rate-limit config: {error}"))
+            })?;
+
         let conn = rusqlite::Connection::open_with_flags(
             &config.db_path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -99,6 +113,7 @@ impl ExporterManager {
             dlq,
             cursor: 0,
             config,
+            rate_limiter,
             conn: Mutex::new(conn),
         })
     }
@@ -215,8 +230,17 @@ impl ExporterManager {
         let mut any_dlq = false;
 
         // Fan out to each registered exporter with retry.
-        for exporter in &self.exporters {
-            let result = self.export_with_retry(exporter.as_ref(), &events).await;
+        for index in 0..self.exporters.len() {
+            let exporter = self.exporters[index].as_ref();
+            let exporter_name = exporter.name().to_string();
+            let result = Self::export_with_retry(
+                &mut self.rate_limiter,
+                self.config.max_retries,
+                self.config.base_backoff_ms,
+                exporter,
+                &events,
+            )
+            .await;
             if let Err(e) = result {
                 any_dlq = true;
                 // Serialize failed events and push to DLQ.
@@ -233,12 +257,12 @@ impl ExporterManager {
                         event_json,
                         error: e.to_string(),
                         failed_at: now,
-                        exporter_name: exporter.name().to_string(),
+                        exporter_name: exporter_name.clone(),
                     });
                 }
 
                 tracing::warn!(
-                    exporter = exporter.name(),
+                    exporter = exporter_name,
                     error = %e,
                     dlq_len = self.dlq.len(),
                     "All retries exhausted -- events pushed to DLQ"
@@ -263,15 +287,17 @@ impl ExporterManager {
     ///
     /// Returns Ok(n) on success, or the last error after all retries are exhausted.
     async fn export_with_retry(
-        &self,
+        rate_limiter: &mut Option<ExportRateLimiter>,
+        max_retries: u32,
+        base_backoff_ms: u64,
         exporter: &dyn Exporter,
         events: &[SiemEvent],
     ) -> Result<usize, ExportError> {
         let mut last_err: Option<ExportError> = None;
 
-        for attempt in 0..=self.config.max_retries {
+        for attempt in 0..=max_retries {
             if attempt > 0 {
-                let backoff_ms = self.config.base_backoff_ms * (1u64 << (attempt - 1));
+                let backoff_ms = base_backoff_ms * (1u64 << (attempt - 1));
                 tracing::debug!(
                     exporter = exporter.name(),
                     attempt = attempt,
@@ -280,6 +306,8 @@ impl ExporterManager {
                 );
                 tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
             }
+
+            Self::wait_for_export_slot(rate_limiter, exporter.name()).await;
 
             match exporter.export_batch(events).await {
                 Ok(n) => return Ok(n),
@@ -296,5 +324,28 @@ impl ExporterManager {
         }
 
         Err(last_err.unwrap_or_else(|| ExportError::HttpError("unknown error".to_string())))
+    }
+
+    async fn wait_for_export_slot(
+        rate_limiter: &mut Option<ExportRateLimiter>,
+        exporter_name: &str,
+    ) {
+        let Some(rate_limiter) = rate_limiter.as_mut() else {
+            return;
+        };
+
+        loop {
+            let delay = rate_limiter.acquire_delay(exporter_name);
+            if delay.is_zero() {
+                return;
+            }
+
+            tracing::debug!(
+                exporter = exporter_name,
+                delay_ms = delay.as_millis() as u64,
+                "Rate limiting exporter batch"
+            );
+            tokio::time::sleep(delay).await;
+        }
     }
 }

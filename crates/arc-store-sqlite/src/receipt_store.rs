@@ -8043,10 +8043,10 @@ fn liability_claim_workflow_matches_query(
 }
 
 fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs()
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs(),
+        Err(_) => 0,
+    }
 }
 
 fn parse_settlement_status(value: &str) -> Result<SettlementStatus, ReceiptStoreError> {
@@ -8451,6 +8451,7 @@ fn resolve_sender_constraint_grant(
     Ok((index as u32, grant.dpop_required == Some(true)))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn derive_authorization_sender_constraint(
     receipt_id: &str,
     tool_server: &str,
