@@ -36,6 +36,9 @@ tarpaulin_args=(
   --exclude arc-formal-diff-tests
   --exclude arc-e2e
   --exclude hello-tool
+  --exclude arc-conformance
+  --exclude arc-control-plane
+  --exclude arc-web3-bindings
 )
 
 if [[ "${TARPAULIN_SKIP_CLEAN:-false}" == "true" ]]; then
