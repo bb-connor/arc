@@ -22,6 +22,9 @@ sha2 = { workspace = true }
 percent-encoding = "2"
 url = { workspace = true }
 
+[dev-dependencies]
+jsonschema = { version = "0.46.0", default-features = false }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

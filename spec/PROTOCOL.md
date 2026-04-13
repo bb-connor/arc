@@ -153,6 +153,9 @@ The native agent-to-kernel protocol uses length-prefixed JSON messages with a
 `type` discriminator. The core messages are defined by `AgentMessage` and
 `KernelMessage` in `crates/arc-core/src/message.rs`.
 
+The normative wire definition for this shipped surface now lives in
+[WIRE_PROTOCOL.md](WIRE_PROTOCOL.md).
+
 Request examples:
 
 - `tool_call_request`
@@ -176,6 +179,9 @@ length-prefixed transport:
 - standalone GET/SSE streams where supported by the hosted edge
 - bearer-token or JWT-backed session admission
 - remote admin APIs under `/admin/...`
+
+Hosted initialization, session replay, and lifecycle expectations are defined
+normatively in [WIRE_PROTOCOL.md](WIRE_PROTOCOL.md).
 
 ### 4.4 Identity
 

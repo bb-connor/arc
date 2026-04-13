@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARC ToolCallError policy_denied",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "detail"],
+  "properties": {
+    "code": {
+      "const": "policy_denied"
+    },
+    "detail": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["guard", "reason"],
+      "properties": {
+        "guard": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

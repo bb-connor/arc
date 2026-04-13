@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARC ToolCallError tool_server_error",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "detail"],
+  "properties": {
+    "code": {
+      "const": "tool_server_error"
+    },
+    "detail": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
