@@ -1,75 +1,71 @@
-# `arc-py`
+# `arc-sdk`
 
-Pure-Python SDK for the ARC trust and receipt-control plane.
+Stable Python SDK for ARC hosted MCP sessions, receipt queries, and invariant
+verification.
 
-Current scope:
+## Installation
 
-- pure-Python invariant helpers backed by the shared bindings vectors
-- low-level transport helpers for JSON-RPC over streamable HTTP
-- beta `ArcClient` and `ArcSession` APIs
-- no Rust toolchain requirement
-- no native bridge requirement
-- no stable high-level ergonomic client yet
+```bash
+pip install arc-sdk
+```
 
-Current release posture:
+The distribution name is `arc-sdk`. The import package remains `arc`.
 
-- release-ready beta with pure-Python transport and invariant coverage
-- distribution metadata, typed-package markers, wheel/sdist qualification, and clean-install smoke checks are in place
-- aligned to the current `v2.3` production-candidate protocol and release docs
-- public PyPI publication remains a later 1.0 milestone; current qualification targets internal and design-partner release quality
-
-Current invariant coverage:
-
-- canonical JSON
-- SHA-256 helpers
-- Ed25519 signing and verification over UTF-8 and canonical JSON
-- receipt verification
-- capability verification
-- signed manifest verification
-
-Current transport coverage:
-
-- JSON and `text/event-stream` response parsing
-- bearer auth plus MCP session and protocol headers
-- low-level session initialization and teardown
-- low-level request and notification execution
-- auth discovery helpers and hosted OAuth flow helpers
-- nested callback routing helpers for sampling, elicitation, and roots
-- direct reuse by the Python conformance peer for initialize/session, auth, low-level request execution, and nested callbacks
-
-Current beta limitations:
-
-- high-level ergonomic task and notification helpers are still evolving
-- public PyPI publication and broad external compatibility validation are still being hardened
-- the package should be treated as beta, not yet 1.0 stable
-
-Distribution details:
-
-- installable package name: `arc-py`
-- import package: `arc`
-
-Minimal beta example:
+## Quickstart
 
 ```py
-from arc import ArcClient
+from arc import ArcClient, ReceiptQueryClient
 
-client = ArcClient.with_static_bearer("http://127.0.0.1:8080", "token")
+client = ArcClient.with_static_bearer("http://127.0.0.1:8931", "demo-token")
 session = client.initialize()
-tools = session.list_tools()
 
-print(tools)
-session.close()
+try:
+    tools = session.list_tools()
+    print(tools)
+
+    receipts = ReceiptQueryClient("http://127.0.0.1:8940", "demo-token").query(
+        {"toolServer": "wrapped-http-mock", "limit": 5}
+    )
+    print(receipts["totalCount"])
+finally:
+    session.close()
 ```
 
-Run the current checks with:
+## API Reference
 
-```sh
+- `ArcClient` initializes authenticated ARC MCP HTTP sessions.
+- `ArcSession` exposes typed helpers for tools, resources, prompts, logging,
+  tasks, and explicit JSON-RPC envelopes.
+- `ReceiptQueryClient` wraps `GET /v1/receipts/query` with typed parameters and
+  pagination helpers.
+- `arc.invariants` provides canonical JSON, hashing, signing, capability,
+  receipt, and manifest verification helpers.
+
+The full public reference lives in [docs/SDK_PYTHON_REFERENCE.md](../../../docs/SDK_PYTHON_REFERENCE.md).
+
+## Official Example
+
+The package-local governed example expects a running ARC hosted edge and trust
+service:
+
+```bash
+ARC_BASE_URL=http://127.0.0.1:8931 \
+ARC_CONTROL_URL=http://127.0.0.1:8940 \
+ARC_AUTH_TOKEN=demo-token \
+python packages/sdk/arc-py/examples/governed_hello.py
+```
+
+For a repo-local end-to-end verification run that boots those services
+automatically, use:
+
+```bash
+./scripts/check-sdk-publication-examples.sh
+```
+
+## Release Checks
+
+```bash
 ./scripts/check-arc-py.sh
-```
-
-Run the release-artifact qualification with:
-
-```sh
 ./scripts/check-arc-py-release.sh
 ```
 

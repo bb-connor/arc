@@ -3,15 +3,15 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "arc-py"
-version = "0.1.0"
+name = "arc-sdk"
+version = "1.0.0"
 description = "Pure-Python SDK for the ARC trust and receipt-control plane"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 keywords = ["arc", "mcp", "receipts", "capabilities", "agent-governance"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",

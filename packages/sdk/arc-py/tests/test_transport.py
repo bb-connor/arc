@@ -90,7 +90,7 @@ class TransportTests(unittest.TestCase):
             base_url="http://testserver",
             auth_token="token",
             client=client,
-            client_info={"name": "arc-py-tests", "version": "0.1.0"},
+            client_info={"name": "arc-sdk-tests", "version": "1.0.0"},
         )
 
         self.assertEqual(session.session_id, "sess-123")

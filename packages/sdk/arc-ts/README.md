@@ -1,77 +1,71 @@
 # `@arc-protocol/sdk`
 
-Production-candidate TypeScript SDK for the current ARC hosted-edge and
-invariant surface.
+Stable TypeScript SDK for ARC hosted MCP sessions, receipt queries, and
+invariant verification.
 
-Current scope:
+## Installation
 
-- pure TypeScript invariant helpers
-- published package-backed remote-edge SDK for the current conformance waves
-- low-level TypeScript transport and session helpers
-- root-level `ArcClient` and `ArcSession` APIs
-- stable package-level invariant error codes
-- shared vector-fixture verification against `tests/bindings/vectors`
-- no native addons
-- no stable high-level ergonomic SDK client yet
+```bash
+npm install @arc-protocol/sdk
+```
 
-Current release posture:
+Requirements: Node.js `>=22`. The package ships as ESM and includes `.d.ts`
+types in the published artifact.
 
-- package name: `@arc-protocol/sdk`
-- release-qualified for clean build, pack, and consumer-install smoke tests
-- aligned to the `v2.3` production-candidate contract in `spec/PROTOCOL.md`
-- still intentionally narrow and Node-first rather than a broad browser SDK
-
-Current invariant coverage:
-
-- canonical JSON
-- SHA-256 helpers
-- Ed25519 signing and verification over UTF-8 and canonical JSON
-- receipt verification
-- capability verification
-- signed manifest verification
-
-Current transport coverage:
-
-- JSON-RPC response parsing for plain JSON and `text/event-stream`
-- request header helpers for bearer auth, session id, and protocol version
-- low-level `postRpc`, `postNotification`, `initializeSession`, and `deleteSession`
-- root-package reuse by the JS conformance peer across live Waves 1 through 5
-
-Current root API coverage:
-
-- `ArcClient.withStaticBearer(...).initialize()`
-- `ArcSession` request and notification primitives
-- convenience methods for tools, resources, prompts, completion, logging, and tasks
-- conformance-backed coverage for initialize/session, tools/resources/prompts, notifications, tasks, auth, and nested callbacks
-
-Current limitations:
-
-- no first-class OAuth helper surface yet
-- no browser-target packaging work yet
-- nested callback ergonomics are still low-level and conformance-driven
-- browser-target packaging remains intentionally narrow and Node-first
-
-Minimal example:
+## Quickstart
 
 ```ts
-import { ArcClient } from "@arc-protocol/sdk";
+import { ArcClient, ReceiptQueryClient } from "@arc-protocol/sdk";
 
-const client = ArcClient.withStaticBearer("http://127.0.0.1:8080/mcp", "token");
+const client = ArcClient.withStaticBearer("http://127.0.0.1:8931", "demo-token");
 const session = await client.initialize();
-const tools = await session.listTools();
 
-console.log(tools);
-await session.close();
+try {
+  const tools = await session.listTools();
+  console.log(tools);
+
+  const receipts = await new ReceiptQueryClient(
+    "http://127.0.0.1:8940",
+    "demo-token",
+  ).query({ toolServer: "wrapped-http-mock", limit: 5 });
+  console.log(receipts.totalCount);
+} finally {
+  await session.close();
+}
 ```
 
-Run the current checks with:
+## API Reference
 
-```sh
+- `ArcClient` and `ArcSession` cover ARC hosted MCP HTTP sessions.
+- `ReceiptQueryClient` wraps `GET /v1/receipts/query`.
+- `signDpopProof` signs DPoP proofs for governed invocations.
+- `@arc-protocol/sdk/invariants` exposes canonical JSON, hashing, signing,
+  receipt, capability, and manifest helpers.
+
+The full public reference lives in [docs/SDK_TYPESCRIPT_REFERENCE.md](../../../docs/SDK_TYPESCRIPT_REFERENCE.md).
+
+## Official Example
+
+The package-local governed example expects a running ARC hosted edge and trust
+service:
+
+```bash
+ARC_BASE_URL=http://127.0.0.1:8931 \
+ARC_CONTROL_URL=http://127.0.0.1:8940 \
+ARC_AUTH_TOKEN=demo-token \
+node --experimental-strip-types packages/sdk/arc-ts/examples/governed_hello.ts
+```
+
+For a repo-local end-to-end verification run that boots those services
+automatically, use:
+
+```bash
+./scripts/check-sdk-publication-examples.sh
+```
+
+## Release Checks
+
+```bash
 npm --prefix packages/sdk/arc-ts test
-```
-
-Run the release-artifact qualification with:
-
-```sh
 ./scripts/check-arc-ts-release.sh
 ```

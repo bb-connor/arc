@@ -13,6 +13,7 @@ from .client import ArcClient
 from .errors import (
     ArcError,
     ArcInvariantError,
+    ArcQueryError,
     ArcRpcError,
     ArcTransportError,
     parse_json_text,
@@ -25,6 +26,7 @@ from .nested import (
     rpc_result,
     sampling_text_result,
 )
+from .receipt_query import ReceiptQueryClient, ReceiptQueryParams, ReceiptQueryResponse
 from .session import ArcSession, initialize_session
 from .version import __version__
 
@@ -33,9 +35,13 @@ __all__ = [
     "ArcError",
     "ArcClient",
     "ArcInvariantError",
+    "ArcQueryError",
     "ArcRpcError",
     "ArcSession",
     "ArcTransportError",
+    "ReceiptQueryClient",
+    "ReceiptQueryParams",
+    "ReceiptQueryResponse",
     "SessionHandshake",
     "StaticBearerAuth",
     "TransportResponse",

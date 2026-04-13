@@ -101,9 +101,9 @@ def perform_authorization_code_flow(
     auth_scope: str,
     authorization_server_metadata: dict[str, Any],
     emit: TranscriptHook | None = None,
-    code_verifier: str = "arc-py-verifier",
+    code_verifier: str = "arc-sdk-verifier",
     redirect_uri: str = "http://localhost:7777/callback",
-    state: str = "arc-py-state",
+    state: str = "arc-sdk-state",
     client_id: str = "https://client.example/app",
 ) -> str:
     resource = f"{base_url}/mcp"

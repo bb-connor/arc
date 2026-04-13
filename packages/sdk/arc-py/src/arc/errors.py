@@ -26,6 +26,12 @@ class ArcTransportError(ArcError):
     pass
 
 
+class ArcQueryError(ArcError):
+    def __init__(self, message: str, *, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
 class ArcRpcError(ArcError):
     def __init__(self, message: str, *, code: int | None = None, data: Any = None):
         super().__init__(message)

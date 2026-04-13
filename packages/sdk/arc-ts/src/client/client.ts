@@ -59,7 +59,7 @@ export class ArcClient {
         capabilities: options.capabilities ?? {},
         clientInfo: options.clientInfo ?? {
           name: "@arc-protocol/sdk",
-          version: "0.1.0",
+          version: "1.0.0",
         },
       },
     };

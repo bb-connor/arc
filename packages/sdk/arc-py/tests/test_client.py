@@ -47,7 +47,7 @@ class ClientTests(unittest.TestCase):
             client=httpx.Client(transport=httpx.MockTransport(handler)),
         )
         session = client.initialize(
-            client_info={"name": "arc-py-tests", "version": "0.1.0"},
+            client_info={"name": "arc-sdk-tests", "version": "1.0.0"},
             on_message=lambda _message, session: callback_sessions.append(session.session_id),
         )
 

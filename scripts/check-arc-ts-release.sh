@@ -62,15 +62,24 @@ EOF
   cd "${consumer_dir}"
   npm install --no-fund --no-audit "${sdk_dir}/${pack_file}"
   node --input-type=module <<'EOF'
-import { ArcClient } from "@arc-protocol/sdk";
+import { ArcClient, ReceiptQueryClient } from "@arc-protocol/sdk";
 
 if (typeof ArcClient?.withStaticBearer !== "function") {
   throw new Error("expected ArcClient.withStaticBearer export");
 }
 
+if (typeof ReceiptQueryClient !== "function") {
+  throw new Error("expected ReceiptQueryClient export");
+}
+
 const client = ArcClient.withStaticBearer("http://127.0.0.1:8080/mcp", "token");
 if (!client || typeof client.initialize !== "function") {
   throw new Error("expected initialized ArcClient surface");
+}
+
+const receiptClient = new ReceiptQueryClient("http://127.0.0.1:8940", "token");
+if (!receiptClient || typeof receiptClient.query !== "function") {
+  throw new Error("expected receipt query surface");
 }
 
 console.log("ARC TypeScript package smoke verified");

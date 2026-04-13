@@ -1,5 +1,5 @@
-PACKAGE_NAME = "arc-py"
-__version__ = "0.1.0"
+PACKAGE_NAME = "arc-sdk"
+__version__ = "1.0.0"
 
 
 def default_client_info() -> dict[str, str]:

@@ -4,11 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "arc-py checks require python3 on PATH" >&2
+  echo "arc-sdk checks require python3 on PATH" >&2
   exit 1
 fi
 
-venv_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-py-check.XXXXXX")"
+venv_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-sdk-check.XXXXXX")"
 cleanup() {
   rm -rf "$venv_dir"
 }

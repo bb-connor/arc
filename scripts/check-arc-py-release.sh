@@ -4,11 +4,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "arc-py release checks require python3 on PATH" >&2
+  echo "arc-sdk release checks require python3 on PATH" >&2
   exit 1
 fi
 
-work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-py-release.XXXXXX")"
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/arc-sdk-release.XXXXXX")"
 builder_venv="${work_dir}/builder"
 wheel_venv="${work_dir}/wheel-smoke"
 sdist_venv="${work_dir}/sdist-smoke"
@@ -35,13 +35,13 @@ version_ns = {}
 exec(Path("packages/sdk/arc-py/src/arc/version.py").read_text(), version_ns)
 module_version = version_ns["__version__"]
 
-if declared_name != "arc-py":
-    raise SystemExit(f"expected distribution name arc-py, found {declared_name}")
+if declared_name != "arc-sdk":
+    raise SystemExit(f"expected distribution name arc-sdk, found {declared_name}")
 if declared_version != module_version:
     raise SystemExit(
         f"pyproject version {declared_version} does not match arc.version {module_version}"
     )
-print(f"arc-py metadata version {declared_version} verified")
+print(f"arc-sdk metadata version {declared_version} verified")
 PY
 
 python3 -m venv "${builder_venv}"
@@ -56,8 +56,8 @@ import tarfile
 import zipfile
 
 dist_dir = Path(sys.argv[1])
-wheel = next(dist_dir.glob("arc_py-*.whl"))
-sdist = next(dist_dir.glob("arc_py-*.tar.gz"))
+wheel = next(dist_dir.glob("arc_sdk-*.whl"))
+sdist = next(dist_dir.glob("arc_sdk-*.tar.gz"))
 
 with zipfile.ZipFile(wheel) as archive:
     names = archive.namelist()
@@ -74,6 +74,8 @@ with tarfile.open(sdist, "r:gz") as archive:
         raise SystemExit("sdist contains forbidden Python cache artifacts")
     if any("/src/arc.egg-info/" in name or name.endswith("/src/arc.egg-info") for name in names):
         raise SystemExit("sdist contains stale src/arc.egg-info metadata")
+    if any("/src/arc_py.egg-info/" in name or name.endswith("/src/arc_py.egg-info") for name in names):
+        raise SystemExit("sdist contains stale src/arc_py.egg-info metadata")
 
 print(f"validated wheel {wheel.name} and sdist {sdist.name}")
 PY
@@ -82,28 +84,30 @@ deactivate
 python3 -m venv "${wheel_venv}"
 . "${wheel_venv}/bin/activate"
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet "${dist_dir}"/arc_py-*.whl
+python -m pip install --quiet "${dist_dir}"/arc_sdk-*.whl
 python - <<'PY'
 import importlib.metadata
 import arc
 
-assert importlib.metadata.version("arc-py") == arc.__version__
+assert importlib.metadata.version("arc-sdk") == arc.__version__
 assert arc.ArcClient is not None
 assert arc.ArcSession is not None
-print(f"wheel smoke verified arc-py {arc.__version__}")
+assert arc.ReceiptQueryClient is not None
+print(f"wheel smoke verified arc-sdk {arc.__version__}")
 PY
 deactivate
 
 python3 -m venv "${sdist_venv}"
 . "${sdist_venv}/bin/activate"
 python -m pip install --quiet --upgrade pip
-python -m pip install --quiet "${dist_dir}"/arc_py-*.tar.gz
+python -m pip install --quiet "${dist_dir}"/arc_sdk-*.tar.gz
 python - <<'PY'
 import importlib.metadata
 import arc
 
-assert importlib.metadata.version("arc-py") == arc.__version__
+assert importlib.metadata.version("arc-sdk") == arc.__version__
 assert arc.ArcClient is not None
 assert arc.ArcSession is not None
-print(f"sdist smoke verified arc-py {arc.__version__}")
+assert arc.ReceiptQueryClient is not None
+print(f"sdist smoke verified arc-sdk {arc.__version__}")
 PY
