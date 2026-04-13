@@ -1,0 +1,22 @@
+[package]
+name = "arc-underwriting"
+description = "ARC underwriting decision, simulation, and appeal artifacts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_underwriting"
+
+[dependencies]
+arc-appraisal = { path = "../arc-appraisal" }
+arc-core-types = { path = "../arc-core-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

@@ -1,0 +1,23 @@
+[package]
+name = "arc-credit"
+description = "ARC credit, capital, and bonded execution contracts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_credit"
+
+[dependencies]
+arc-appraisal = { path = "../arc-appraisal" }
+arc-core-types = { path = "../arc-core-types" }
+arc-underwriting = { path = "../arc-underwriting" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
