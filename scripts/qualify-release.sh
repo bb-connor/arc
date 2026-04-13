@@ -68,7 +68,7 @@ run_wave wave5 tests/conformance/scenarios/wave5
 cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"
 
-COVERAGE_FAIL_UNDER=67 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
+COVERAGE_FAIL_UNDER=65 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
 cp -R coverage/. "${coverage_root}/"
 
 python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"

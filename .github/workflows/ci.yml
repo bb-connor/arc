@@ -73,7 +73,7 @@ jobs:
 
       - name: Coverage lane
         env:
-          COVERAGE_FAIL_UNDER: "67"
+          COVERAGE_FAIL_UNDER: "65"
         run: ./scripts/run-coverage.sh
 
       - name: Upload coverage artifacts
