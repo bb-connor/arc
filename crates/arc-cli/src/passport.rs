@@ -2160,13 +2160,13 @@ fn load_passport_verifier_policy(path: &Path) -> Result<PassportVerifierPolicy, 
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
     {
-        serde_yaml::from_str(&contents)?
+        serde_yml::from_str(&contents)?
     } else if let Ok(document) = serde_json::from_str::<SignedPassportVerifierPolicy>(&contents) {
         verify_signed_passport_verifier_policy(&document)
             .map_err(|error| CliError::Other(error.to_string()))?;
         document.body.policy
     } else {
-        serde_json::from_str(&contents).or_else(|_| serde_yaml::from_str(&contents))?
+        serde_json::from_str(&contents).or_else(|_| serde_yml::from_str(&contents))?
     };
     Ok(policy)
 }

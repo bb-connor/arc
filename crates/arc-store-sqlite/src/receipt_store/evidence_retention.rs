@@ -28,7 +28,7 @@ impl SqliteReceiptStore {
             "#,
             params![
                 receipt.id,
-                receipt.timestamp,
+                sqlite_i64(receipt.timestamp, "receipt timestamp")?,
                 receipt.capability_id,
                 attribution.subject_key,
                 attribution.issuer_key,

@@ -1750,11 +1750,11 @@ fn load_underwriting_decision_policy(
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
     {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     } else if let Ok(policy) = serde_json::from_str(&contents) {
         Ok(policy)
     } else {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     }
 }
 
@@ -1765,11 +1765,11 @@ fn load_json_or_yaml<T: DeserializeOwned>(path: &Path) -> Result<T, CliError> {
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
     {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     } else if let Ok(value) = serde_json::from_str(&contents) {
         Ok(value)
     } else {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     }
 }
 
@@ -1782,11 +1782,11 @@ fn load_credit_bonded_execution_control_policy(
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
     {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     } else if let Ok(policy) = serde_json::from_str(&contents) {
         Ok(policy)
     } else {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     }
 }
 
@@ -1914,11 +1914,11 @@ fn load_runtime_attestation_evidence(path: &Path) -> Result<RuntimeAttestationEv
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| matches!(extension, "yaml" | "yml"))
     {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     } else if let Ok(evidence) = serde_json::from_str(&contents) {
         Ok(evidence)
     } else {
-        Ok(serde_yaml::from_str(&contents)?)
+        Ok(serde_yml::from_str(&contents)?)
     }
 }
 
@@ -2420,4 +2420,3 @@ fn cmd_receipt_list(
     }
     Ok(())
 }
-

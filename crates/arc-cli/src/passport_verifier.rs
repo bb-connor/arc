@@ -35,6 +35,22 @@ const OID4VP_TRANSACTION_STATUS_ISSUED: &str = "issued";
 const OID4VP_TRANSACTION_STATUS_CONSUMED: &str = "consumed";
 const OID4VP_TRANSACTION_STATUS_EXPIRED: &str = "expired";
 
+fn sqlite_i64(value: u64, field: &str) -> Result<i64, CliError> {
+    i64::try_from(value).map_err(|_| {
+        CliError::Other(format!(
+            "{field} value {value} exceeds SQLite INTEGER range"
+        ))
+    })
+}
+
+fn sqlite_u64(value: i64, field: &str) -> Result<u64, CliError> {
+    u64::try_from(value).map_err(|_| {
+        CliError::Other(format!(
+            "{field} value {value} is outside the supported u64 range"
+        ))
+    })
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VerifierPolicyRegistry {
@@ -782,8 +798,8 @@ impl PassportVerifierChallengeStore {
                 stored.policy_id,
                 stored.challenge_hash,
                 stored.challenge_json,
-                stored.issued_at,
-                stored.expires_at,
+                sqlite_i64(stored.issued_at, "passport verifier challenge issued_at")?,
+                sqlite_i64(stored.expires_at, "passport verifier challenge expires_at")?,
                 CHALLENGE_STATUS_ISSUED,
             ],
         )?;
@@ -797,7 +813,7 @@ impl PassportVerifierChallengeStore {
     ) -> Result<PassportPresentationChallenge, CliError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
-        let Some(stored) = transaction
+        let Some((challenge_json, status, expires_at_raw)) = transaction
             .query_row(
                 "SELECT challenge_json, status, expires_at
                  FROM passport_verifier_challenges
@@ -807,7 +823,7 @@ impl PassportVerifierChallengeStore {
                     Ok((
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
-                        row.get::<_, u64>(2)?,
+                        row.get::<_, i64>(2)?,
                     ))
                 },
             )
@@ -817,7 +833,8 @@ impl PassportVerifierChallengeStore {
                 "challenge `{challenge_id}` is not registered in the verifier challenge store"
             )));
         };
-        match stored.1.as_str() {
+        let expires_at = sqlite_u64(expires_at_raw, "passport verifier challenge expires_at")?;
+        match status.as_str() {
             CHALLENGE_STATUS_ISSUED => {}
             CHALLENGE_STATUS_CONSUMED => {
                 return Err(CliError::Other(format!(
@@ -835,7 +852,7 @@ impl PassportVerifierChallengeStore {
                 )))
             }
         }
-        if now > stored.2 {
+        if now > expires_at {
             transaction.execute(
                 "UPDATE passport_verifier_challenges
                  SET status = ?2
@@ -847,7 +864,7 @@ impl PassportVerifierChallengeStore {
                 "challenge `{challenge_id}` expired before it could be fetched"
             )));
         }
-        let challenge: PassportPresentationChallenge = serde_json::from_str(&stored.0)?;
+        let challenge: PassportPresentationChallenge = serde_json::from_str(&challenge_json)?;
         verify_passport_presentation_challenge(&challenge, now)
             .map_err(|error| CliError::Other(error.to_string()))?;
         transaction.commit()?;
@@ -862,7 +879,7 @@ impl PassportVerifierChallengeStore {
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
         let challenge_id = challenge_identifier(challenge);
-        let Some(stored) = transaction
+        let Some((stored_challenge_hash, status, expires_at_raw)) = transaction
             .query_row(
                 "SELECT challenge_hash, status, expires_at
                  FROM passport_verifier_challenges
@@ -872,7 +889,7 @@ impl PassportVerifierChallengeStore {
                     Ok((
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
-                        row.get::<_, u64>(2)?,
+                        row.get::<_, i64>(2)?,
                     ))
                 },
             )
@@ -884,13 +901,14 @@ impl PassportVerifierChallengeStore {
             )));
         };
         let expected_hash = challenge_hash(challenge)?;
-        if stored.0 != expected_hash {
+        if stored_challenge_hash != expected_hash {
             return Err(CliError::Other(format!(
                 "stored verifier challenge `{}` does not match the provided challenge payload",
                 challenge_id
             )));
         }
-        match stored.1.as_str() {
+        let expires_at = sqlite_u64(expires_at_raw, "passport verifier challenge expires_at")?;
+        match status.as_str() {
             CHALLENGE_STATUS_CONSUMED => {
                 return Err(CliError::Other(format!(
                     "challenge `{}` has already been consumed",
@@ -911,7 +929,7 @@ impl PassportVerifierChallengeStore {
                 )))
             }
         }
-        if now > stored.2 {
+        if now > expires_at {
             transaction.execute(
                 "UPDATE passport_verifier_challenges
                  SET status = ?2
@@ -931,7 +949,7 @@ impl PassportVerifierChallengeStore {
             params![
                 challenge_id.as_ref(),
                 CHALLENGE_STATUS_CONSUMED,
-                now,
+                sqlite_i64(now, "passport verifier challenge consumed_at")?,
                 CHALLENGE_STATUS_ISSUED,
             ],
         )?;
@@ -1011,8 +1029,8 @@ impl Oid4vpVerifierTransactionStore {
                 stored.request_hash,
                 stored.request_json,
                 stored.request_jwt,
-                stored.issued_at,
-                stored.expires_at,
+                sqlite_i64(stored.issued_at, "OID4VP transaction issued_at")?,
+                sqlite_i64(stored.expires_at, "OID4VP transaction expires_at")?,
                 OID4VP_TRANSACTION_STATUS_ISSUED,
             ],
         )?;
@@ -1026,7 +1044,7 @@ impl Oid4vpVerifierTransactionStore {
     ) -> Result<(Oid4vpRequestObject, String), CliError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
-        let Some(stored) = transaction
+        let Some((request_json, request_jwt, status, expires_at_raw)) = transaction
             .query_row(
                 "SELECT request_json, request_jwt, status, expires_at
                  FROM passport_oid4vp_transactions
@@ -1037,7 +1055,7 @@ impl Oid4vpVerifierTransactionStore {
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
-                        row.get::<_, u64>(3)?,
+                        row.get::<_, i64>(3)?,
                     ))
                 },
             )
@@ -1047,7 +1065,8 @@ impl Oid4vpVerifierTransactionStore {
                 "OID4VP request `{request_id}` is not registered in the verifier transaction store"
             )));
         };
-        match stored.2.as_str() {
+        let expires_at = sqlite_u64(expires_at_raw, "OID4VP transaction expires_at")?;
+        match status.as_str() {
             OID4VP_TRANSACTION_STATUS_ISSUED => {}
             OID4VP_TRANSACTION_STATUS_CONSUMED => {
                 return Err(CliError::Other(format!(
@@ -1065,7 +1084,7 @@ impl Oid4vpVerifierTransactionStore {
                 )))
             }
         }
-        if now > stored.3 {
+        if now > expires_at {
             transaction.execute(
                 "UPDATE passport_oid4vp_transactions
                  SET status = ?2
@@ -1077,9 +1096,9 @@ impl Oid4vpVerifierTransactionStore {
                 "OID4VP request `{request_id}` expired before it could be fetched"
             )));
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&stored.0)?;
+        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
         transaction.commit()?;
-        Ok((request, stored.1))
+        Ok((request, request_jwt))
     }
 
     pub fn snapshot(
@@ -1089,7 +1108,14 @@ impl Oid4vpVerifierTransactionStore {
     ) -> Result<Oid4vpTransactionSnapshot, CliError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
-        let Some(stored) = transaction
+        let Some((
+            request_json,
+            request_jwt,
+            status,
+            issued_at_raw,
+            expires_at_raw,
+            consumed_at_raw,
+        )) = transaction
             .query_row(
                 "SELECT request_json, request_jwt, status, issued_at, expires_at, consumed_at
                  FROM passport_oid4vp_transactions
@@ -1100,9 +1126,9 @@ impl Oid4vpVerifierTransactionStore {
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
-                        row.get::<_, u64>(3)?,
-                        row.get::<_, u64>(4)?,
-                        row.get::<_, Option<u64>>(5)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, i64>(4)?,
+                        row.get::<_, Option<i64>>(5)?,
                     ))
                 },
             )
@@ -1112,8 +1138,13 @@ impl Oid4vpVerifierTransactionStore {
                 "OID4VP request `{request_id}` is not registered in the verifier transaction store"
             )));
         };
-        let mut status = wallet_exchange_status_from_store(stored.2.as_str())?;
-        if status == WalletExchangeTransactionStatus::Issued && now > stored.4 {
+        let issued_at = sqlite_u64(issued_at_raw, "OID4VP transaction issued_at")?;
+        let expires_at = sqlite_u64(expires_at_raw, "OID4VP transaction expires_at")?;
+        let consumed_at = consumed_at_raw
+            .map(|value| sqlite_u64(value, "OID4VP transaction consumed_at"))
+            .transpose()?;
+        let mut status = wallet_exchange_status_from_store(status.as_str())?;
+        if status == WalletExchangeTransactionStatus::Issued && now > expires_at {
             transaction.execute(
                 "UPDATE passport_oid4vp_transactions
                  SET status = ?2
@@ -1122,7 +1153,7 @@ impl Oid4vpVerifierTransactionStore {
             )?;
             status = WalletExchangeTransactionStatus::Expired;
         }
-        let request: Oid4vpRequestObject = serde_json::from_str(&stored.0)?;
+        let request: Oid4vpRequestObject = serde_json::from_str(&request_json)?;
         if request.jti != request_id {
             return Err(CliError::Other(format!(
                 "stored OID4VP request payload did not match request_id `{request_id}`"
@@ -1131,14 +1162,14 @@ impl Oid4vpVerifierTransactionStore {
         let transaction_state = build_wallet_exchange_transaction_state(
             &request.jti,
             status,
-            stored.3,
-            stored.4,
-            stored.5,
+            issued_at,
+            expires_at,
+            consumed_at,
         )?;
         transaction.commit()?;
         Ok(Oid4vpTransactionSnapshot {
             request,
-            request_jwt: stored.1,
+            request_jwt,
             transaction: transaction_state,
         })
     }
@@ -1151,7 +1182,7 @@ impl Oid4vpVerifierTransactionStore {
     ) -> Result<(), CliError> {
         let mut connection = self.connection()?;
         let transaction = connection.transaction()?;
-        let Some(stored) = transaction
+        let Some((request_hash, status, expires_at_raw)) = transaction
             .query_row(
                 "SELECT request_hash, status, expires_at
                  FROM passport_oid4vp_transactions
@@ -1161,7 +1192,7 @@ impl Oid4vpVerifierTransactionStore {
                     Ok((
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
-                        row.get::<_, u64>(2)?,
+                        row.get::<_, i64>(2)?,
                     ))
                 },
             )
@@ -1173,13 +1204,14 @@ impl Oid4vpVerifierTransactionStore {
             )));
         };
         let expected_hash = sha256_hex(request_jwt.as_bytes());
-        if stored.0 != expected_hash {
+        if request_hash != expected_hash {
             return Err(CliError::Other(format!(
                 "stored OID4VP request `{}` does not match the provided request JWT",
                 request.jti
             )));
         }
-        match stored.1.as_str() {
+        let expires_at = sqlite_u64(expires_at_raw, "OID4VP transaction expires_at")?;
+        match status.as_str() {
             OID4VP_TRANSACTION_STATUS_CONSUMED => {
                 return Err(CliError::Other(format!(
                     "OID4VP request `{}` has already been consumed",
@@ -1200,7 +1232,7 @@ impl Oid4vpVerifierTransactionStore {
                 )))
             }
         }
-        if now > stored.2 {
+        if now > expires_at {
             transaction.execute(
                 "UPDATE passport_oid4vp_transactions
                  SET status = ?2
@@ -1220,7 +1252,7 @@ impl Oid4vpVerifierTransactionStore {
             params![
                 request.jti.as_str(),
                 OID4VP_TRANSACTION_STATUS_CONSUMED,
-                now,
+                sqlite_i64(now, "OID4VP transaction consumed_at")?,
                 OID4VP_TRANSACTION_STATUS_ISSUED,
             ],
         )?;

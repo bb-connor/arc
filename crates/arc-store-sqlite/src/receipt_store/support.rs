@@ -7,6 +7,22 @@ pub(crate) fn unix_timestamp_now_i64() -> i64 {
         .unwrap_or(0)
 }
 
+pub(crate) fn sqlite_i64(value: u64, field: &str) -> Result<i64, ReceiptStoreError> {
+    i64::try_from(value).map_err(|_| {
+        ReceiptStoreError::Conflict(format!(
+            "{field} value {value} exceeds SQLite INTEGER range"
+        ))
+    })
+}
+
+pub(crate) fn sqlite_u64(value: i64, field: &str) -> Result<u64, ReceiptStoreError> {
+    u64::try_from(value).map_err(|_| {
+        ReceiptStoreError::Conflict(format!(
+            "{field} value {value} is outside the supported u64 range"
+        ))
+    })
+}
+
 pub(crate) fn settlement_reconciliation_state_text(
     state: SettlementReconciliationState,
 ) -> &'static str {
@@ -1630,7 +1646,7 @@ impl ReceiptStore for SqliteReceiptStore {
             "#,
             params![
                 receipt.id,
-                receipt.timestamp,
+                sqlite_i64(receipt.timestamp, "child receipt timestamp")?,
                 receipt.session_id.as_str(),
                 receipt.parent_request_id.as_str(),
                 receipt.request_id.as_str(),

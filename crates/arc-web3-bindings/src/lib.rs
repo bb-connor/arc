@@ -7,6 +7,8 @@
 //! - bundled ABI JSON emitted from the local contract compiler
 //! - bundled deployment and qualification artifacts for the local devnet harness
 
+#![cfg(feature = "web3")]
+
 pub mod interfaces;
 
 pub use interfaces::{

@@ -10,9 +10,13 @@ repository.workspace = true
 [lib]
 name = "arc_web3_bindings"
 
+[features]
+default = ["web3"]
+web3 = ["dep:alloy", "dep:serde_json"]
+
 [dependencies]
-alloy = { version = "1.8.3", default-features = false, features = ["json", "json-abi", "sol-types", "std"] }
-serde_json = { workspace = true }
+alloy = { version = "1.8.3", default-features = false, features = ["json", "json-abi", "sol-types", "std"], optional = true }
+serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 arc-core = { path = "../arc-core" }

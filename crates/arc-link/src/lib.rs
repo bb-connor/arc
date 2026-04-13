@@ -9,6 +9,8 @@ use arc_core::web3::{
 use tokio::sync::RwLock;
 
 pub mod cache;
+#[cfg_attr(feature = "web3", path = "chainlink.rs")]
+#[cfg_attr(not(feature = "web3"), path = "chainlink_disabled.rs")]
 pub mod chainlink;
 pub mod circuit_breaker;
 pub mod config;
@@ -16,9 +18,12 @@ pub mod control;
 pub mod convert;
 pub mod monitor;
 pub mod pyth;
+#[cfg_attr(feature = "web3", path = "sequencer.rs")]
+#[cfg_attr(not(feature = "web3"), path = "sequencer_disabled.rs")]
 pub mod sequencer;
 
 use cache::PriceCache;
+#[cfg(feature = "web3")]
 use chainlink::ChainlinkFeedReader;
 use circuit_breaker::ensure_within_threshold;
 use config::{
@@ -758,7 +763,17 @@ fn build_backend(
 ) -> Result<Arc<dyn OracleBackend>, PriceOracleError> {
     let backend: Arc<dyn OracleBackend> = match kind {
         OracleBackendKind::Chainlink => {
-            Arc::new(ChainlinkFeedReader::new(config.operator.chains.clone()))
+            #[cfg(feature = "web3")]
+            {
+                Arc::new(ChainlinkFeedReader::new(config.operator.chains.clone()))
+            }
+            #[cfg(not(feature = "web3"))]
+            {
+                let _ = config;
+                return Err(PriceOracleError::UnsupportedBackend(
+                    "Chainlink backend requires the `web3` feature".to_string(),
+                ));
+            }
         }
         OracleBackendKind::Pyth => Arc::new(PythHermesClient::new(config.pyth.hermes_url.clone())?),
     };

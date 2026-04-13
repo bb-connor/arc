@@ -8,6 +8,8 @@
 //! - canonical Solana memo publication records
 //! - fail-closed multi-lane proof bundle verification
 
+#![cfg(feature = "web3")]
+
 mod automation;
 mod bitcoin;
 mod bundle;

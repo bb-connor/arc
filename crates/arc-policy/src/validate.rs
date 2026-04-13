@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn runtime_assurance_validation_rejects_duplicate_minimum_tiers() {
-        let spec: HushSpec = serde_yaml::from_str(
+        let spec: HushSpec = serde_yml::from_str(
             r#"
 hushspec: "0.1.0"
 name: duplicate-runtime-assurance
@@ -613,7 +613,7 @@ extensions:
 
     #[test]
     fn runtime_assurance_validation_rejects_invalid_trusted_verifier_rules() {
-        let spec: HushSpec = serde_yaml::from_str(
+        let spec: HushSpec = serde_yml::from_str(
             r#"
 hushspec: "0.1.0"
 name: trusted-verifiers
@@ -683,7 +683,7 @@ extensions:
 
     #[test]
     fn tool_access_workload_identity_validation_rejects_bad_match_fields() {
-        let spec: HushSpec = serde_yaml::from_str(
+        let spec: HushSpec = serde_yml::from_str(
             r#"
 hushspec: "0.1.0"
 name: workload-identity-validation

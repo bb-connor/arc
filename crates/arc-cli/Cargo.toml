@@ -31,7 +31,7 @@ arc-reputation = { package = "arc-reputation", path = "../arc-reputation" }
 arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_yaml = "0.9"
+serde_yml = { workspace = true }
 thiserror = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 tracing = { workspace = true }
@@ -44,7 +44,7 @@ async-stream = "0.3"
 url = "2"
 percent-encoding = "2"
 base64 = "0.22"
-reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+reqwest = { workspace = true, features = ["blocking", "form", "json", "query", "rustls"] }
 ureq = { version = "2.10", features = ["json"] }
 serde_urlencoded = "0.7"
 rusqlite = { workspace = true }

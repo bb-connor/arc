@@ -15,7 +15,7 @@ arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credit = { package = "arc-credit", path = "../arc-credit" }
 arc-governance = { package = "arc-governance", path = "../arc-governance" }
-arc-link = { package = "arc-link", path = "../arc-link" }
+arc-link = { package = "arc-link", path = "../arc-link", default-features = false }
 lru = "0.16.3"
 arc-listing = { package = "arc-listing", path = "../arc-listing" }
 arc-market = { package = "arc-market", path = "../arc-market" }
@@ -30,7 +30,6 @@ rusqlite = { workspace = true }
 arc-underwriting = { package = "arc-underwriting", path = "../arc-underwriting" }
 uuid = { workspace = true, features = ["v7"] }
 ureq = { version = "2.10", features = ["json"] }
-arc-web3 = { package = "arc-web3", path = "../arc-web3" }
 
 [dev-dependencies]
 arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }

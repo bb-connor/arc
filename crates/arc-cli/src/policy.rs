@@ -113,7 +113,7 @@ pub enum PolicyError {
     Io(#[from] std::io::Error),
 
     #[error("failed to parse policy YAML: {0}")]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_yml::Error),
 
     #[error("failed to resolve HushSpec policy: {0}")]
     Resolve(#[from] arc_policy::ResolveError),
@@ -544,7 +544,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         return load_hushspec_policy(path, source_hash);
     }
 
-    let policy: ArcPolicy = serde_yaml::from_str(&contents)?;
+    let policy: ArcPolicy = serde_yml::from_str(&contents)?;
     let default_capabilities = build_runtime_default_capabilities(&policy)?;
     let runtime_hash = runtime_hash_for_arc_yaml(&policy, &default_capabilities)?;
 
@@ -760,7 +760,7 @@ fn materialize_runtime_assurance_policy(
 
 /// Parse a policy from a YAML string.
 pub fn parse_policy(yaml: &str) -> Result<ArcPolicy, PolicyError> {
-    let policy: ArcPolicy = serde_yaml::from_str(yaml)?;
+    let policy: ArcPolicy = serde_yml::from_str(yaml)?;
     Ok(policy)
 }
 

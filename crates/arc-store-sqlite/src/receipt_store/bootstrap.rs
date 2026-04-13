@@ -593,18 +593,18 @@ impl SqliteReceiptStore {
         let count =
             self.connection
                 .query_row("SELECT COUNT(*) FROM arc_tool_receipts", [], |row| {
-                    row.get::<_, u64>(0)
+                    row.get::<_, i64>(0)
                 })?;
-        Ok(count)
+        sqlite_u64(count, "arc_tool_receipts count")
     }
 
     pub fn child_receipt_count(&self) -> Result<u64, ReceiptStoreError> {
         let count =
             self.connection
                 .query_row("SELECT COUNT(*) FROM arc_child_receipts", [], |row| {
-                    row.get::<_, u64>(0)
+                    row.get::<_, i64>(0)
                 })?;
-        Ok(count)
+        sqlite_u64(count, "arc_child_receipts count")
     }
 
     pub(crate) fn load_underwriting_appeals_by_decision(

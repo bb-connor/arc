@@ -19,6 +19,12 @@ pub mod certify;
 #[path = "../../arc-cli/src/enterprise_federation.rs"]
 pub mod enterprise_federation;
 
+#[path = "../../arc-cli/src/federation_policy.rs"]
+pub mod federation_policy;
+
+#[path = "../../arc-cli/src/scim_lifecycle.rs"]
+pub mod scim_lifecycle;
+
 pub mod attestation;
 
 #[path = "../../arc-cli/src/passport_verifier.rs"]
@@ -94,7 +100,7 @@ pub enum CliError {
     Json(#[from] serde_json::Error),
 
     #[error("yaml error: {0}")]
-    Yaml(#[from] serde_yaml::Error),
+    Yaml(#[from] serde_yml::Error),
 
     #[error("http error: {0}")]
     Reqwest(#[from] reqwest::Error),

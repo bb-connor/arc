@@ -124,13 +124,13 @@ pub struct HushSpec {
 
 impl HushSpec {
     /// Parse a HushSpec document from a YAML string.
-    pub fn parse(yaml: &str) -> Result<Self, serde_yaml::Error> {
-        serde_yaml::from_str(yaml)
+    pub fn parse(yaml: &str) -> Result<Self, serde_yml::Error> {
+        serde_yml::from_str(yaml)
     }
 
     /// Serialize this spec to a YAML string.
-    pub fn to_yaml(&self) -> Result<String, serde_yaml::Error> {
-        serde_yaml::to_string(self)
+    pub fn to_yaml(&self) -> Result<String, serde_yml::Error> {
+        serde_yml::to_string(self)
     }
 }
 
