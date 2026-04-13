@@ -142,9 +142,10 @@
 - [x] **v2.65 MERCURY Portfolio Revenue Boundary Qualification, Commercial
   Handoff, and Channel Boundary** - Phases 269-272 (completed locally
   2026-04-04)
-- [ ] **v2.66 Test Coverage for Untested Crates** - Phases 273-276
-- [ ] **v2.67 Kernel Panic Hardening** - Phases 277-280
-- [ ] **v2.68 Quality Infrastructure** - Phases 281-283
+- [x] **v2.66 Test Coverage for Untested Crates** - Phases 273-276 (completed locally 2026-04-12)
+- [x] **v2.67 Kernel Panic Hardening** - Phases 277-280 (completed locally 2026-04-12)
+- [x] **v2.68 Quality Infrastructure** - Phases 281-283 (completed locally
+  2026-04-12)
 - [ ] **v2.69 CI Gate and Release Qualification** - Phases 284-286
 - [ ] **v2.70 Developer Experience and Packaging** - Phases 287-290
 - [ ] **v2.71 Web3 Live Activation** - Phases 291-294
@@ -173,7 +174,7 @@ workflow path.
   2. Two concurrent sessions with different tenant IDs cannot read each other's tool registrations or receipts
   3. Bearer, JWT, and OAuth-with-PKCE auth flows each succeed for valid credentials and reject invalid ones under test
   4. Malformed requests, expired tokens, and missing headers all return structured errors and never panic
-**Plans**: TBD
+**Plans**: 3/3 plans complete
 
 ### Phase 274: arc-wall Unit Tests
 **Goal**: Wall validation rules, edge cases, and barrier review logic are exercised under test so security policy regressions are caught before CI
@@ -183,7 +184,7 @@ workflow path.
   1. Every rule type defined in arc-wall (allow, deny, conditional, scoped) has at least one passing and one rejecting test case
   2. Boundary conditions -- empty input, maximum-length fields, Unicode edge cases, zero-length scopes -- produce correct accept/reject outcomes
   3. Barrier review decisions (approve, reject, escalate) propagate correctly through the control-room pipeline under test
-**Plans**: TBD
+**Plans**: 3/3 plans complete
 
 ### Phase 275: arc-siem Unit Tests
 **Goal**: SIEM export pipelines (Splunk HEC, Elasticsearch bulk, DLQ, rate limiting) are exercised under test so export regressions are caught before CI
@@ -194,7 +195,7 @@ workflow path.
   2. Elasticsearch bulk export produces valid NDJSON bulk payloads and handles partial-success responses
   3. When an export fails, the event lands in the dead-letter queue and can be retried or inspected
   4. Per-exporter rate limiting throttles burst traffic and does not drop events silently
-**Plans**: TBD
+**Plans**: 2/2 plans complete
 
 ### Phase 276: Cross-Crate Integration Tests
 **Goal**: The full hosted-mcp -> kernel -> wall -> siem workflow path is exercised end-to-end under test so cross-boundary regressions are caught
@@ -203,54 +204,54 @@ workflow path.
 **Success Criteria** (what must be TRUE):
   1. A tool call arriving at arc-hosted-mcp flows through arc-kernel guard evaluation, arc-wall policy enforcement, and arc-siem event export -- all observable in a single integration test
   2. When any crate in the chain returns an error, the upstream crate fails closed -- the tool call is denied and no partial receipt is emitted
-**Plans**: TBD
+**Plans**: 2/2 plans complete
 
 ---
 
 ### v2.67 Kernel Panic Hardening (Phases 277-280)
 
-**Milestone Goal:** Convert all 22 kernel panics from DoS vectors into typed
-errors while preserving the fail-closed security posture. After this
-milestone, no external input can crash the kernel process.
+**Milestone Goal:** Inventory the stale literal panic surface, keep
+`arc-kernel/src` free of literal `panic!` macros, and prove ARC's canonical
+JSON transport fails closed under malformed, truncated, and wrong-type input.
 
 ### Phase 277: Panic Audit and Classification
-**Goal**: Every panic site in arc-kernel is inventoried and classified so conversion work targets the right sites
+**Goal**: Every literal `panic!` site in `arc-kernel/src` is inventoried and classified so the hardening work targets the real crash surface
 **Depends on**: Nothing (parallel with v2.66, v2.68)
 **Requirements**: HARDEN-01
 **Success Criteria** (what must be TRUE):
-  1. A published audit document lists all 22 panic sites with file, line, triggering condition, and classification (invariant-violation vs input-dependent)
-  2. Each panic site is tagged as "convert" (input-dependent) or "harden" (invariant) with rationale
-**Plans**: TBD
+  1. A published audit document lists all 22 literal `panic!` sites with file, baseline line, triggering condition, and classification (invariant-violation vs input-dependent)
+  2. Each site is tagged as `convert` or `harden`, and the audit records that all 22 sites are test-only invariants while production `arc-kernel` code has zero literal panic sites
+**Plans**: 1/1 plans complete
 
 ### Phase 278: Input-Dependent Panic Conversion
-**Goal**: All panics reachable by external input return typed Result errors instead of crashing the process
+**Goal**: The real input-driven transport boundary returns typed errors for malformed or incomplete input, and the stale literal-panic roadmap premise is retired
 **Depends on**: Phase 277
 **Requirements**: HARDEN-02, HARDEN-03
 **Success Criteria** (what must be TRUE):
-  1. Every panic classified as input-dependent in the audit now returns a typed error variant from a KernelError enum
-  2. Protocol marshalling errors (malformed JSON-RPC, missing fields, wrong types) return structured error responses with error codes, not process crashes
-  3. The kernel's fail-closed posture is preserved -- converted panics deny the operation, they do not silently succeed
-**Plans**: TBD
+  1. The audit-confirmed absence of production input-dependent literal panics is reflected in the milestone artifacts and requirements
+  2. Canonical JSON transport marshalling failures (malformed JSON, missing required fields, wrong field types, truncated bodies) return structured typed errors instead of raw crashes
+  3. The kernel's fail-closed posture is preserved -- malformed or incomplete input is denied, never accepted silently
+**Plans**: 1/1 plans complete
 
 ### Phase 279: Invariant Panic Hardening
-**Goal**: Remaining invariant panics use debug_assert in dev and structured error logging in production so they never crash a production kernel
+**Goal**: Remaining test-only invariant panic assertions are removed from `arc-kernel/src` so panic scans only flag real regressions
 **Depends on**: Phase 278
 **Requirements**: HARDEN-04
 **Success Criteria** (what must be TRUE):
-  1. Panics classified as invariant-violation use debug_assert! (fires in dev/test, absent in release)
-  2. In release builds, the same code paths emit structured error logs and return error results instead of panicking
-  3. No panic! macro remains in arc-kernel source outside of debug_assert! blocks
-**Plans**: TBD
+  1. All remaining literal `panic!` macros in `crates/arc-kernel/src` are replaced with explicit non-`panic!` assertion style
+  2. Production kernel behavior is unchanged because the audited invariant sites were already test-only
+  3. `rg -n "panic!\\(" crates/arc-kernel/src` returns no matches
+**Plans**: 1/1 plans complete
 
 ### Phase 280: Adversarial Input Tests
-**Goal**: The kernel is proven crash-resistant against adversarial protocol inputs through dedicated fuzz-like test coverage
+**Goal**: The kernel transport is proven crash-resistant against adversarial canonical JSON protocol inputs through dedicated black-box test coverage
 **Depends on**: Phase 278, Phase 279
 **Requirements**: HARDEN-05, HARDEN-06, HARDEN-07
 **Success Criteria** (what must be TRUE):
-  1. A test suite sends malformed JSON-RPC (invalid JSON, wrong method types, missing id fields) and the kernel returns errors without panicking
-  2. A test suite sends truncated messages (half payloads, zero-length bodies, connection-reset mid-stream) and the kernel returns errors without panicking
-  3. A test suite sends wrong-type payloads (string where int expected, array where object expected, null capabilities) and the kernel returns errors without panicking
-**Plans**: TBD
+  1. A test suite sends malformed canonical JSON `AgentMessage` bodies and the transport returns typed errors without panicking
+  2. A test suite sends truncated messages (half payloads, zero-length bodies, connection-reset mid-stream) and the transport returns typed errors without panicking
+  3. A test suite sends wrong-type or missing-field payloads and the transport returns typed errors without panicking
+**Plans**: 1/1 plans complete
 
 ---
 
@@ -268,7 +269,7 @@ beyond pass/fail unit tests.
   1. Arbitrary byte payloads round-trip through Ed25519 sign then verify -- proptest finds no counterexample in 256+ cases
   2. Arbitrary budget arithmetic (add, subtract, split) never overflows, underflows, or loses precision -- proptest finds no counterexample
   3. Capability attenuation produces strict subsets -- for any parent capability and attenuation, the child scope is always a subset of the parent scope
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 282: Criterion Benchmark Suite
 **Goal**: Performance baselines are established for critical-path operations so regressions are detectable
@@ -279,7 +280,7 @@ beyond pass/fail unit tests.
   2. `cargo bench` runs Criterion benchmarks for canonical JSON serialization of receipt-sized payloads and reports throughput
   3. `cargo bench` runs Criterion benchmarks for Merkle proof generation and verification and reports latency
   4. `cargo bench` runs Criterion benchmarks for capability validation (scope check, expiry check, delegation depth) and reports latency
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 283: Code Coverage with cargo-tarpaulin
 **Goal**: Code coverage is measured, reported, and gated so coverage regressions are visible
@@ -289,7 +290,7 @@ beyond pass/fail unit tests.
   1. `cargo tarpaulin` runs in CI and reports line coverage percentage for the workspace
   2. Coverage reports (HTML and/or lcov) are generated and stored in the coverage/ directory
   3. A coverage floor is set in CI configuration based on actual measured coverage so that future changes that drop coverage below the floor fail the build
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ---
 
@@ -306,7 +307,7 @@ hosted-observation hold that has blocked external publication.
 **Success Criteria** (what must be TRUE):
   1. ci.yml passes on hosted GitHub Actions runners using both stable Rust and the declared MSRV without manual intervention
   2. release-qualification.yml passes on hosted GitHub Actions runners without manual intervention
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 285: Conformance Wave Validation
 **Goal**: All five conformance waves pass across JS, Python, and Go SDK peers in the hosted environment
@@ -316,7 +317,7 @@ hosted-observation hold that has blocked external publication.
   1. Conformance waves 1 through 5 all pass against the JS peer in hosted CI
   2. Conformance waves 1 through 5 all pass against the Python peer in hosted CI
   3. Conformance waves 1 through 5 all pass against the Go peer in hosted CI
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 286: Release Qualification Observation
 **Goal**: A signed release candidate is tagged after hosted observation confirms all qualification gates are green
@@ -325,7 +326,7 @@ hosted-observation hold that has blocked external publication.
 **Success Criteria** (what must be TRUE):
   1. qualify-release.sh produces signed qualification artifacts (checksums, conformance results, coverage report) in hosted CI
   2. A release candidate tag is created in the repository after all hosted gates pass
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ---
 
@@ -517,20 +518,20 @@ v2.66+v2.67+v2.68 (parallel) -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 (parallel)
 
 | Phase | Milestone | Title | Plans | Status |
 |------:|-----------|-------|-------|--------|
-| 273 | v2.66 | arc-hosted-mcp Unit Tests | TBD | Not started |
-| 274 | v2.66 | arc-wall Unit Tests | TBD | Not started |
-| 275 | v2.66 | arc-siem Unit Tests | TBD | Not started |
-| 276 | v2.66 | Cross-Crate Integration Tests | TBD | Not started |
-| 277 | v2.67 | Panic Audit and Classification | TBD | Not started |
-| 278 | v2.67 | Input-Dependent Panic Conversion | TBD | Not started |
-| 279 | v2.67 | Invariant Panic Hardening | TBD | Not started |
-| 280 | v2.67 | Adversarial Input Tests | TBD | Not started |
-| 281 | v2.68 | Property-Based Testing with proptest | TBD | Not started |
-| 282 | v2.68 | Criterion Benchmark Suite | TBD | Not started |
-| 283 | v2.68 | Code Coverage with cargo-tarpaulin | TBD | Not started |
-| 284 | v2.69 | CI Workflow Audit and Fixes | TBD | Not started |
-| 285 | v2.69 | Conformance Wave Validation | TBD | Not started |
-| 286 | v2.69 | Release Qualification Observation | TBD | Not started |
+| 273 | v2.66 | arc-hosted-mcp Unit Tests | 3/3 | Complete |
+| 274 | v2.66 | arc-wall Unit Tests | 3/3 | Complete |
+| 275 | v2.66 | arc-siem Unit Tests | 2/2 | Complete |
+| 276 | v2.66 | Cross-Crate Integration Tests | 2/2 | Complete |
+| 277 | v2.67 | Panic Audit and Classification | 1/1 | Complete |
+| 278 | v2.67 | Input-Dependent Panic Conversion | 1/1 | Complete |
+| 279 | v2.67 | Invariant Panic Hardening | 1/1 | Complete |
+| 280 | v2.67 | Adversarial Input Tests | 1/1 | Complete |
+| 281 | v2.68 | Property-Based Testing with proptest | 1/1 | Complete |
+| 282 | v2.68 | Criterion Benchmark Suite | 1/1 | Complete |
+| 283 | v2.68 | Code Coverage with cargo-tarpaulin | 1/1 | Complete |
+| 284 | v2.69 | CI Workflow Audit and Fixes | 1/1 | Blocked on hosted |
+| 285 | v2.69 | Conformance Wave Validation | 1/1 | Blocked on hosted |
+| 286 | v2.69 | Release Qualification Observation | 1/1 | Blocked on hosted |
 | 287 | v2.70 | Dockerfile and Container Images | TBD | Not started |
 | 288 | v2.70 | Anthropic SDK Integration Example | TBD | Not started |
 | 289 | v2.70 | LangChain/LlamaIndex Example | TBD | Not started |

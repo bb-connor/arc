@@ -167,6 +167,7 @@ pub struct CrossIssuerPortfolioEvaluation {
     pub entry_results: Vec<CrossIssuerPortfolioEntryEvaluation>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_cross_issuer_migration(
     signer: &Keypair,
     migration_id: impl Into<String>,
@@ -507,20 +508,26 @@ pub fn evaluate_cross_issuer_portfolio(
                 }
             }
             if !policy.allowed_certification_refs.is_empty() {
-                let portfolio_entry = portfolio
+                match portfolio
                     .entries
                     .iter()
                     .find(|candidate| candidate.entry_id == entry.entry_id)
-                    .expect("verified entry must exist in portfolio");
-                let matched_ref = portfolio_entry
-                    .certification_refs
-                    .iter()
-                    .any(|reference| policy.allowed_certification_refs.contains(reference));
-                if !matched_ref {
-                    reasons.push(
-                        "entry does not include a certification reference activated by the trust pack"
-                            .to_string(),
-                    );
+                {
+                    Some(portfolio_entry) => {
+                        let matched_ref = portfolio_entry
+                            .certification_refs
+                            .iter()
+                            .any(|reference| policy.allowed_certification_refs.contains(reference));
+                        if !matched_ref {
+                            reasons.push(
+                                "entry does not include a certification reference activated by the trust pack"
+                                    .to_string(),
+                            );
+                        }
+                    }
+                    None => reasons.push(
+                        "verified entry is missing from the source portfolio".to_string(),
+                    ),
                 }
             }
 

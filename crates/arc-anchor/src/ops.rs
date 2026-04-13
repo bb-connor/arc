@@ -164,6 +164,7 @@ pub struct AnchorIndexerCursor {
 
 impl AnchorIndexerCursor {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn from_sequences(
         service_id: impl Into<String>,
         lane: AnchorLaneKind,
@@ -223,6 +224,7 @@ pub struct AnchorLaneRuntimeStatus {
 
 impl AnchorLaneRuntimeStatus {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn from_indexer(
         lane: AnchorLaneKind,
         chain_id: Option<String>,

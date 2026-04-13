@@ -610,7 +610,10 @@ fn disclosure_entry(key: &str, value: Value) -> SdJwtDisclosureEntry {
             key,
             value,
         ]);
-        let bytes = serde_json::to_vec(&payload).expect("serialize disclosure");
+        let bytes = match serde_json::to_vec(&payload) {
+            Ok(bytes) => bytes,
+            Err(_) => unreachable!("sd-jwt disclosure payload is always serializable"),
+        };
         URL_SAFE_NO_PAD.encode(bytes)
     };
     let digest = sd_jwt_disclosure_digest(&encoded);

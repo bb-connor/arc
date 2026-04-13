@@ -328,6 +328,7 @@ impl MercuryPilotScenario {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_step(
     step_id: &str,
     receipt_id: &str,

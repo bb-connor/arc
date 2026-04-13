@@ -251,9 +251,10 @@ pub async fn observe_bond(
     } else {
         BondLifecycleStatus::Active
     };
-    let recovery_action = if status == BondLifecycleStatus::Active {
-        None
-    } else if status == BondLifecycleStatus::Expired {
+    let recovery_action = if matches!(
+        status,
+        BondLifecycleStatus::Active | BondLifecycleStatus::Expired
+    ) {
         None
     } else {
         Some(SettlementRecoveryAction::ManualReview)

@@ -185,8 +185,9 @@ arc-siem = { path = "../crates/arc-siem" }
 **2. Configure and run the ExporterManager.**
 
 ```rust
-use arc_siem::manager::{ExporterManager, SiemConfig};
-use arc_siem::exporters::splunk::SplunkExporter;
+use arc_siem::{
+    ExporterManager, RateLimitConfig, SiemConfig, SplunkConfig, SplunkHecExporter,
+};
 
 let config = SiemConfig {
     db_path: "/var/lib/arc/receipts.sqlite3".into(),
@@ -195,13 +196,21 @@ let config = SiemConfig {
     max_retries: 3,
     base_backoff_ms: 500,
     dlq_capacity: 1000,
+    rate_limit: Some(RateLimitConfig {
+        max_batches_per_window: 10,
+        window: Duration::from_secs(1),
+        burst_factor: 1.0,
+    }),
 };
 
 let mut manager = ExporterManager::new(config)?;
-manager.add_exporter(Box::new(SplunkExporter::new(
-    "https://splunk.example.com:8088".to_string(),
-    "your-hec-token".to_string(),
-)));
+manager.add_exporter(Box::new(SplunkHecExporter::new(SplunkConfig {
+    endpoint: "https://splunk.example.com:8088".to_string(),
+    hec_token: "your-hec-token".to_string(),
+    sourcetype: "arc:receipt".to_string(),
+    index: None,
+    host: None,
+})?));
 
 let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
 manager.run(cancel_rx).await;

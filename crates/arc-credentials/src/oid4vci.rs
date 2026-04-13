@@ -519,10 +519,12 @@ impl Oid4vciCredentialRequest {
             return Ok(credential_configuration_id.clone());
         }
 
-        let format = self
-            .format
-            .as_ref()
-            .expect("validated credential request with format");
+        let Some(format) = self.format.as_ref() else {
+            return Err(CredentialError::InvalidOid4vciCredentialRequest(
+                "credential request must include format when credential_configuration_id is absent"
+                    .to_string(),
+            ));
+        };
         let mut matches = metadata
             .credential_configurations_supported
             .iter()
@@ -651,6 +653,7 @@ impl Oid4vciCredentialResponse {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn new_portable_compact(
         format: impl Into<String>,
         compact: impl Into<String>,

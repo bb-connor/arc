@@ -143,7 +143,7 @@ pub fn build_x402_payment_requirements(
             .capability_id
             .clone()
             .unwrap_or_else(|| dispatch.dispatch_id.clone()),
-        amount_minor_units: u64::from(dispatch.settlement_amount.units),
+        amount_minor_units: dispatch.settlement_amount.units,
         currency: dispatch.settlement_amount.currency.clone(),
         settlement_mode,
         governed_authorization_required: true,

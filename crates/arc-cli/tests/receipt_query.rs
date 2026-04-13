@@ -3022,9 +3022,20 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
     let revocation_db_path = dir.join("revocations.sqlite3");
     let authority_db_path = dir.join("authority.sqlite3");
     let budget_db_path = dir.join("budgets.sqlite3");
+    let subject_kp = Keypair::generate();
+    let issuer_kp = Keypair::generate();
 
     {
         let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        record_test_capability_snapshot(
+            &mut store,
+            "cap-metered-1",
+            &issuer_kp,
+            &subject_kp,
+            "shell",
+            "bash",
+            Some(true),
+        );
         store
             .append_arc_receipt(&make_governed_receipt(
                 "rc-metered-1",
@@ -3234,8 +3245,15 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
         )
         .send()
         .expect("send operator report request");
-    assert_eq!(operator.status(), reqwest::StatusCode::OK);
-    let operator_body: serde_json::Value = operator.json().expect("parse operator report");
+    let operator_status = operator.status();
+    let operator_body_text = operator.text().expect("read operator report body");
+    assert_eq!(
+        operator_status,
+        reqwest::StatusCode::OK,
+        "operator report body: {operator_body_text}"
+    );
+    let operator_body: serde_json::Value =
+        serde_json::from_str(&operator_body_text).expect("parse operator report");
     assert_eq!(
         operator_body["meteredBillingReconciliation"]["summary"]["matchingReceipts"].as_u64(),
         Some(2)

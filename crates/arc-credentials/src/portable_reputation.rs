@@ -412,6 +412,7 @@ pub struct PortableReputationEvaluation {
     pub findings: Vec<PortableReputationFinding>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_portable_reputation_summary_artifact(
     issuer_operator_id: &str,
     issuer_operator_name: Option<String>,

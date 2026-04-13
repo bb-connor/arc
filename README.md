@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="assets/hero.png" alt="ARC" width="900" />
+  <img src="assets/hero.png" alt="CHIO" width="900" />
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License: Apache-2.0"></a>
   <img src="https://img.shields.io/badge/MSRV-1.93-orange?style=flat-square&logo=rust" alt="MSRV: 1.93">
-  <img src="https://img.shields.io/badge/status-production--candidate-yellow?style=flat-square" alt="Status: Production candidate">
   <img src="https://img.shields.io/badge/MCP-compatible-green?style=flat-square" alt="MCP compatible">
+  <img src="https://img.shields.io/badge/ACP-compatible-green?style=flat-square" alt="ACP compatible">
   <img src="https://img.shields.io/badge/A2A-interop-green?style=flat-square" alt="A2A interop">
 </p>
 
-<h1 align="center">ARC</h1>
+<h1 align="center">CHIO</h1>
 
 <p align="center">
-  <strong>Attested Rights Channel</strong><br/>
-  <em>Economic trust infrastructure for autonomous AI systems.</em>
+  <strong>Clearinghouse for Intelligent Operations</strong><br/>
+  <em>Economic trust ⚡ Autonomous AI</em>
 </p>
 
 <p align="center">
@@ -31,9 +31,9 @@
 </p>
 
 <p align="center">
-  <a href="#what-is-arc">What Is ARC</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
-  <a href="#why-arc">Why ARC</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
-  <a href="#how-it-works">How It Works</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+  <a href="#what-is-chio">What Is CHIO</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+  <a href="#why-chio">Why Is CHIO</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
+  <a href="#how-it-works">How Is CHIO</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#quick-start">Quick Start</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#cli">CLI</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
   <a href="#sdks">SDKs</a>&nbsp;&nbsp;&middot;&nbsp;&nbsp;
@@ -42,23 +42,25 @@
 
 ---
 
-## What Is ARC
+## What Is CHIO
 
-ARC (Attested Rights Channel) is a trust-and-economics control plane for governed agent actions. It is a Rust runtime and protocol that mediates every tool invocation an agent makes -- validating scoped capabilities, enforcing policy and spend limits, and signing a cryptographic receipt for every decision.
+CHIO (Clearinghouse for Intelligent Operations) is a trust-and-economics control plane for governed agent actions. It is a Rust runtime and protocol that mediates every tool invocation and handoff an AI agent makes. High level, it is just a fast and secure mediation layer to validate agent capabilities, authorize decisions, enforce stateful policies, set spend limits and bond execution, while signing cryptographic receipts for every decision.
 
-## Why ARC
+## Why CHIO
 
-Most of the ecosystem has focused on giving agents a clean way to reach tools. That matters, but it leaves unresolved the harder question of what it means for a machine actor to operate with bounded authority in systems where actions have financial, operational, or legal consequences.
+Most of the ecosystem has focused on giving agents a clean way to reach tools. As this keeps progressing rapidly it leaves unresolved hard questions of what it means for a machine actor to operate with bounded authority in systems where actions have financial, operational, or legal consequences. Who is liable for an autonomous agents' decisions and under what circumstances? What is enforcement? etc.
 
-As agents become economic actors, the relevant unit is not a model response but an authorized act: a database mutation, an infrastructure change, a purchase, a settlement-triggering API call, a delegated operation carried out across trust boundaries. Existing agent protocols mostly solve reachability. They do not solve authority. They specify how an agent invokes a tool, but not how rights are scoped, how spend is bounded, how delegation attenuates, how revocation propagates, or how a third party can later verify what actually occurred.
+As agents become economic actors, the relevant unit starts looking looking less like a call/response but an authorized act: a database mutation, an infrastructure change, a purchase, a settlement-triggering API call, a delegated operation carried out across trust boundaries. Existing agent protocols mostly solve reachability. They do not solve authority or liability. They specify how an agent invokes a tool, but not how rights are scoped, how spend is bounded, how delegation attenuates, how revocation propagates, or how a third party can later verify what actually occurred.
 
-That gap becomes structural once agents are allowed to hold real authority. An agent that can spend, transact, modify state, or recursively delegate work is no longer just a software component. It is a machine principal participating in an economic system. At that point, permissions, budget, and accountability can no longer live in separate layers stitched together by convention. They have to be fused into the execution path itself.
+That gap becomes structural once agents are allowed to hold real authority, and can have serious consequences. e.g. what is stopping the YC startup's agents from talking to those other YC startup's agents who talked to your agents from all lying to each other and then lying to you about what they did and how much it cost?
 
-ARC exists to provide that layer.
+An agent that can spend, transact, broadcast, modify state, or recursively delegate work is no longer just a software component. It is a machine principal participating in an economic system. At that point, permissions, budget, and accountability can no longer live in separate layers stitched together by convention. They must be fused into the execution path itself.
 
-ARC inserts a fail-closed kernel between agents and tools and treats every invocation as a governed act. Capability tokens define delegated rights. Policy and constraint checks determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into non-repudiable evidence rather than an ordinary log event.
+CHIO exists to provide a layer to address these shortcomings.
 
-The result is a stronger primitive than transport, payment, or audit alone. A capability in ARC is not just permission to call a function. It is a programmable authorization instrument. A delegation chain is not just access-control metadata. It is a cost-responsibility chain. A receipt log is not just telemetry. It has the structure of an audit trail, a billing ledger, and a compliance record at once. That is why ARC belongs above payment rails and below agent frameworks: it is the layer that can prove an agent was authorized to do something consequential, under what constraints, at what cost, and with what outcome.
+CHIO inserts a fail-closed kernel between agents and tools and treats every invocation as a governed act. Capability tokens define delegated rights. Policy and constraint checks determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into non-repudiable evidence rather than an ordinary log event.
+
+The result is a stronger primitive than transport, payment, or audit alone. A capability in CHIO is not just permission to call a function. It is a programmable authorization instrument. A delegation chain is not just access-control metadata. It is a cost-responsibility chain. A receipt log is not just telemetry. It has the structure of an audit trail, a billing ledger, and a compliance record at once. That is why CHIO belongs above payment rails and below agent frameworks: it is the layer that can prove an agent was authorized to do something consequential, under what constraints, at what cost, and with what outcome.
 
 ## How It Works
 
@@ -121,15 +123,15 @@ Exits `0` on allow, `2` on deny, `1` on error. Add `--json` for machine-readable
 arc run --policy <policy.yaml> <command>...
 ```
 
-Spawns a subprocess that speaks ARC's length-prefixed JSON protocol over stdio. The kernel issues a default capability from the policy and mediates all tool requests. Supports chunked streaming for long-running tool output.
+Spawns a subprocess that speaks CHIO's length-prefixed JSON protocol over stdio. The kernel issues a default capability from the policy and mediates all tool requests. Supports chunked streaming for long-running tool output.
 
-### `arc mcp serve` -- wrap an MCP server with ARC governance
+### `arc mcp serve` -- wrap an MCP server with CHIO governance
 
 ```bash
 arc mcp serve --policy <policy.yaml> --server-id <id> <command>...
 ```
 
-Wraps any MCP server subprocess with ARC's kernel. The outer edge speaks stock MCP (tools, resources, prompts, completion, logging) while the kernel enforces capabilities, guards, and budgets on every call. Supports nested sampling, elicitation, progress notifications, resource subscriptions, and task-oriented execution.
+Wraps any MCP server subprocess with CHIO's kernel. The outer edge speaks stock MCP (tools, resources, prompts, completion, logging) while the kernel enforces capabilities, guards, and budgets on every call. Supports nested sampling, elicitation, progress notifications, resource subscriptions, and task-oriented execution.
 
 ### `arc mcp serve-http` -- hosted Streamable HTTP edge
 
@@ -186,7 +188,7 @@ See [examples/policies/](examples/policies/) for starter templates.
 
 ## Agent Economy
 
-Most agent frameworks treat authorization and payment as separate concerns -- one system decides whether a call is allowed, another tracks what it costs. ARC fuses them. A capability token is simultaneously a permission grant and a spending authorization. The delegation chain that tracks who gave an agent access is the same structure that tracks cost responsibility. The receipt log that proves what happened is already a pre-audited billing ledger.
+Most agent frameworks treat authorization and payment as separate concerns -- one system decides whether a call is allowed, another tracks what it costs. CHIO fuses them. A capability token is simultaneously a permission grant and a spending authorization. The delegation chain that tracks who gave an agent access is the same structure that tracks cost responsibility. The receipt log that proves what happened is already a pre-audited billing ledger.
 
 Concretely: each `ToolGrant` carries optional `max_cost_per_invocation` and `max_total_cost` fields (minor-unit integers + ISO 4217 currency code). The kernel enforces both atomically at evaluation time and embeds financial metadata directly into the signed receipt. Delegation attenuates budgets monotonically -- a child grant can tighten a spending cap but never loosen one. DPoP proof-of-possession binds tokens to the agent's keypair, so a stolen capability is worthless without the corresponding private key.
 
@@ -194,15 +196,15 @@ Receipts are batched into Merkle-committed checkpoints. Inclusion proofs let you
 
 ## Portable Trust and Identity
 
-Agents operating across organizational boundaries need more than a session token. ARC provides a self-certifying identity layer (`did:arc`) and a portable credential system built on top of it.
+Agents operating across organizational boundaries need more than a session token. CHIO provides a self-certifying identity layer (`did:arc`) and a portable credential system built on top of it.
 
 **Agent passports** are verifiable credentials issued by operators that summarize an agent's behavioral history: reliability scores, compliance rates, scope discipline, delegation hygiene, and operational patterns. Passports are portable across trust boundaries through explicit **federation policies** -- bilateral agreements that define what evidence can be shared, under what terms, with foreign-origin marking preserved. A **reputation scoring** layer computes quantified trust from receipt history and verified credentials. An operator-administered **certification registry** manages certification state with CLI tooling.
 
-See the [Portable Trust Profile](docs/standards/ARC_PORTABLE_TRUST_PROFILE.md) standard and the [Agent Passport Guide](docs/AGENT_PASSPORT_GUIDE.md).
+See the [Portable Trust Profile](docs/standards/CHIO_PORTABLE_TRUST_PROFILE.md) standard and the [Agent Passport Guide](docs/AGENT_PASSPORT_GUIDE.md).
 
 ## Interoperability
 
-ARC is not a replacement for MCP or A2A -- it is a governance layer that wraps them. The **MCP adapter** takes any existing MCP server subprocess and interposes the ARC kernel, adding capability validation, guard enforcement, and receipt signing to every tool call, resource read, and prompt retrieval without modifying the server. The **A2A adapter** does the same for Google's Agent-to-Agent protocol (v1.0.0), with fail-closed auth negotiation and durable task correlation.
+CHIO is not a replacement for MCP or A2A -- it is a governance layer that wraps them. The **MCP adapter** takes any existing MCP server subprocess and interposes the CHIO kernel, adding capability validation, guard enforcement, and receipt signing to every tool call, resource read, and prompt retrieval without modifying the server. The **A2A adapter** does the same for Google's Agent-to-Agent protocol (v1.0.0), with fail-closed auth negotiation and durable task correlation.
 
 For observability, **SIEM exporters** provide batched async delivery to Splunk HEC and Elasticsearch (feature-gated behind `--features siem`). A **receipt dashboard** (React SPA at `crates/arc-cli/dashboard/`) renders receipt timelines, allow/deny breakdowns, cost summaries, and per-tool aggregates against the trust-control API.
 
@@ -262,7 +264,7 @@ arc/
 | Agent passports and trust     | [docs/AGENT_PASSPORT_GUIDE.md](docs/AGENT_PASSPORT_GUIDE.md)                       |
 | Identity federation           | [docs/IDENTITY_FEDERATION_GUIDE.md](docs/IDENTITY_FEDERATION_GUIDE.md)             |
 | A2A adapter                   | [docs/A2A_ADAPTER_GUIDE.md](docs/A2A_ADAPTER_GUIDE.md)                             |
-| ARC Certify                   | [docs/ARC_CERTIFY_GUIDE.md](docs/ARC_CERTIFY_GUIDE.md)                             |
+| CHIO Certify                  | [docs/CHIO_CERTIFY_GUIDE.md](docs/CHIO_CERTIFY_GUIDE.md)                           |
 | SIEM integration              | [docs/SIEM_INTEGRATION_GUIDE.md](docs/SIEM_INTEGRATION_GUIDE.md)                   |
 | Receipt dashboard             | [docs/RECEIPT_DASHBOARD_GUIDE.md](docs/RECEIPT_DASHBOARD_GUIDE.md)                 |
 | DPoP integration              | [docs/DPOP_INTEGRATION_GUIDE.md](docs/DPOP_INTEGRATION_GUIDE.md)                   |

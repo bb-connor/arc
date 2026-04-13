@@ -810,8 +810,7 @@ pub fn validate_autonomous_pricing_authority_envelope(
     if envelope.automation_mode != AutonomousAutomationMode::Active
         && envelope
             .permitted_actions
-            .iter()
-            .any(|action| *action == AutonomousPricingAction::Bind)
+            .contains(&AutonomousPricingAction::Bind)
     {
         return Err(AutonomyContractError::InvalidEnvelope(
             "only active automation envelopes may permit bind".to_string(),
@@ -960,8 +959,7 @@ pub fn validate_autonomous_pricing_decision(
         if !decision
             .authority_envelope
             .permitted_actions
-            .iter()
-            .any(|action| *action == AutonomousPricingAction::Bind)
+            .contains(&AutonomousPricingAction::Bind)
         {
             return Err(AutonomyContractError::InvalidDecision(
                 "bind-within-envelope decisions require bind permission in the authority envelope"

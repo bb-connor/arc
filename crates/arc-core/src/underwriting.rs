@@ -1045,8 +1045,7 @@ fn premium_quote_for_outcome(
 }
 
 fn quote_premium_amount(exposure: &MonetaryAmount, basis_points: u32) -> MonetaryAmount {
-    let units =
-        ((u128::from(exposure.units) * u128::from(basis_points)) + 9_999_u128) / 10_000_u128;
+    let units = (u128::from(exposure.units) * u128::from(basis_points)).div_ceil(10_000_u128);
     MonetaryAmount {
         units: units as u64,
         currency: exposure.currency.clone(),

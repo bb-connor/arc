@@ -2,13 +2,37 @@
 
 ## Active Milestone
 
-No active milestone is currently queued locally.
+### v2.69 CI Gate and Release Qualification
+
+**Status:** active locally after repo-side completion on 2026-04-12; phases
+`284` through `286` are planned and locally verified, but hosted GitHub
+Actions rerun and release-candidate tagging are still pending.
+**Executable phases:** 284-286
+**Goal:** Observe all CI workflows running green in hosted GitHub Actions and
+produce signed release qualification artifacts, closing the hosted-observation
+hold that still blocks external publication.
+
+## Latest Completed Milestone
+
+### v2.68 Quality Infrastructure
+
+**Status:** complete locally 2026-04-12; phases `281` through `283` are
+implemented and verified locally. Archive/tag/cleanup remain a separate
+operator decision.
+**Executable phases:** 281-283
+**Goal:** Add property-based testing, benchmarks, and coverage reporting so ARC
+has measurable correctness and performance baselines before hosted CI release
+gates are enforced.
 
 ## Next Planned Milestone
 
-No next milestone is currently queued locally.
+### v2.70 Developer Experience and Packaging
 
-## Latest Completed Milestone
+**Status:** queued locally after hosted closure of v2.69.
+**Executable phases:** 287-290
+**Goal:** Package ARC for easy adoption with container images, framework
+integration examples, and an updated quickstart so developers can go from zero
+to ARC-governed tool access in under 5 minutes.
 
 ### v2.65 MERCURY Portfolio Revenue Boundary Qualification, Commercial Handoff, and Channel Boundary
 

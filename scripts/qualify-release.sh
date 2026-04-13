@@ -23,25 +23,98 @@ fi
 output_root="target/release-qualification"
 conformance_root="${output_root}/conformance"
 log_root="${output_root}/logs"
-rm -rf "${conformance_root}" "${log_root}"
-mkdir -p "${conformance_root}" "${log_root}"
+coverage_root="${output_root}/coverage"
+checksum_path="${output_root}/SHA256SUMS"
+manifest_path="${output_root}/artifact-manifest.json"
+certify_seed="${output_root}/certify-release.seed"
+rm -rf "${conformance_root}" "${log_root}" "${coverage_root}"
+mkdir -p "${conformance_root}" "${log_root}" "${coverage_root}"
 
 run_wave() {
   local wave="$1"
-  shift
+  local scenarios_dir="$2"
+  shift 2
   local wave_dir="${conformance_root}/${wave}"
+  local report_path="${wave_dir}/report.md"
+  local certification_path="${wave_dir}/certification.json"
+  local certification_report_path="${wave_dir}/certification-report.md"
+  local verification_path="${wave_dir}/certification-verify.json"
   mkdir -p "${wave_dir}/results"
-cargo run -p arc-conformance --bin arc-conformance-runner -- \
+  cargo run -p arc-conformance --bin arc-conformance-runner -- \
+    --scenarios-dir "${scenarios_dir}" \
     "$@" \
     --results-dir "${wave_dir}/results" \
-    --report-output "${wave_dir}/report.md"
+    --report-output "${report_path}"
+
+  cargo run -p arc-cli --bin arc -- certify check \
+    --scenarios-dir "${scenarios_dir}" \
+    --results-dir "${wave_dir}/results" \
+    --output "${certification_path}" \
+    --report-output "${certification_report_path}" \
+    --tool-server-id "arc-conformance-${wave}" \
+    --tool-server-name "ARC Conformance ${wave}" \
+    --signing-seed-file "${certify_seed}"
+
+  cargo run -p arc-cli --bin arc -- certify verify \
+    --input "${certification_path}" >"${verification_path}"
 }
 
-run_wave wave1
-run_wave wave2 --scenarios-dir tests/conformance/scenarios/wave2
-run_wave wave3 --auth-mode oauth-local --scenarios-dir tests/conformance/scenarios/wave3
-run_wave wave4 --scenarios-dir tests/conformance/scenarios/wave4
-run_wave wave5 --scenarios-dir tests/conformance/scenarios/wave5
+run_wave wave1 tests/conformance/scenarios/wave1
+run_wave wave2 tests/conformance/scenarios/wave2
+run_wave wave3 tests/conformance/scenarios/wave3 --auth-mode oauth-local
+run_wave wave4 tests/conformance/scenarios/wave4
+run_wave wave5 tests/conformance/scenarios/wave5
 
 cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"
+
+COVERAGE_FAIL_UNDER=67 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
+cp -R coverage/. "${coverage_root}/"
+
+python3 - <<'PY' "${output_root}" "${checksum_path}" "${manifest_path}"
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+output_root = Path(sys.argv[1])
+checksum_path = Path(sys.argv[2])
+manifest_path = Path(sys.argv[3])
+
+entries = []
+for artifact in sorted(output_root.rglob("*")):
+    if not artifact.is_file():
+        continue
+    if artifact in {checksum_path, manifest_path}:
+        continue
+    payload = artifact.read_bytes()
+    entries.append(
+        {
+            "path": artifact.relative_to(output_root).as_posix(),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "bytes": len(payload),
+        }
+    )
+
+checksum_path.write_text(
+    "".join(f"{entry['sha256']}  {entry['path']}\n" for entry in entries)
+)
+
+manifest = {
+    "generatedAt": datetime.now(timezone.utc)
+    .replace(microsecond=0)
+    .isoformat()
+    .replace("+00:00", "Z"),
+    "source": "github-actions" if os.environ.get("GITHUB_ACTIONS") == "true" else "local",
+    "candidateSha": os.environ.get("GITHUB_SHA", "local"),
+    "workflowRunId": os.environ.get("GITHUB_RUN_ID"),
+    "workflowRunAttempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+    "artifacts": entries,
+}
+
+manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
+PY

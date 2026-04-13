@@ -379,6 +379,7 @@ pub enum RuntimeAttestationAppraisalError {
     UnsupportedSchema { schema: String },
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_runtime_attestation_verifier_descriptor(
     signer: &crate::crypto::Keypair,
     descriptor_id: impl Into<String>,
@@ -435,6 +436,7 @@ pub fn verify_signed_runtime_attestation_verifier_descriptor(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_runtime_attestation_reference_value_set(
     signer: &crate::crypto::Keypair,
     reference_value_id: impl Into<String>,
@@ -493,6 +495,7 @@ pub fn verify_signed_runtime_attestation_reference_value_set(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_runtime_attestation_trust_bundle(
     signer: &crate::crypto::Keypair,
     bundle_id: impl Into<String>,
@@ -1369,6 +1372,7 @@ impl RuntimeAttestationAppraisalResult {
 }
 
 impl RuntimeAttestationAppraisal {
+    #[allow(clippy::too_many_arguments)]
     fn artifact(
         adapter: impl Into<String>,
         verifier_family: AttestationVerifierFamily,

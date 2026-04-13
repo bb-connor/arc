@@ -171,6 +171,7 @@ pub struct SettlementIndexerCursor {
 
 impl SettlementIndexerCursor {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn from_blocks(
         service_id: impl Into<String>,
         chain_id: impl Into<String>,
@@ -241,6 +242,7 @@ pub struct SettlementLaneRuntimeStatus {
 
 impl SettlementLaneRuntimeStatus {
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         chain_id: impl Into<String>,
         network_name: impl Into<String>,

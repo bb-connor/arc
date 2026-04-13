@@ -34,10 +34,15 @@ pub struct SiemConfig {
     pub max_retries: u32,         // default: 3 attempts per exporter
     pub base_backoff_ms: u64,     // default: 500 ms (doubles on each retry)
     pub dlq_capacity: usize,      // default: 1000 entries
+    pub rate_limit: Option<RateLimitConfig>, // optional per-exporter batch throttle
 }
 ```
 
 On each tick the manager opens a fresh read-only connection, queries `SELECT seq, raw_json FROM arc_tool_receipts WHERE seq > cursor ORDER BY seq ASC LIMIT batch_size`, parses receipts into `SiemEvent` values, and calls `export_batch` on each registered exporter. The cursor is advanced past the batch whether or not some events were DLQ'd.
+
+If `rate_limit` is set, each exporter gets its own token bucket keyed by
+exporter name. The manager waits for capacity before sending the next batch, so
+burst traffic is delayed rather than silently dropped.
 
 The cursor is in-memory only and resets to 0 on restart. Both Splunk HEC (timestamp dedup) and Elasticsearch (idempotent `_id` upsert) handle duplicate events safely.
 

@@ -4011,11 +4011,13 @@ pub fn issue_signed_portable_reputation_summary(
         config.issuance_policy.as_ref(),
     )
     .map_err(|error| CliError::Other(error.to_string()))?;
+    let Some(receipt_db_path) = config.receipt_db_path.as_deref() else {
+        return Err(CliError::Other(
+            "receipt db path is required for imported trust reporting".to_string(),
+        ));
+    };
     let imported_trust = reputation::build_imported_trust_report(
-        config
-            .receipt_db_path
-            .as_deref()
-            .expect("checked receipt db path"),
+        receipt_db_path,
         &inspection.subject_key,
         inspection.since,
         inspection.until,
@@ -6413,16 +6415,16 @@ async fn handle_passport_issuer_jwks(State(state): State<TrustServiceState>) -> 
     match build_oid4vp_verifier_jwks(&state.config) {
         Ok(jwks) => Json(jwks).into_response(),
         Err(error) => {
-            let status = if error.to_string().contains("configured authority")
-                || error
-                    .to_string()
-                    .contains("did not publish any signing keys")
+            let message = error.to_string();
+            let status = if message.contains("configured authority")
+                || message.contains("did not publish any signing keys")
+                || message.contains("--authority-seed-file or --authority-db")
             {
                 StatusCode::NOT_FOUND
             } else {
                 StatusCode::CONFLICT
             };
-            plain_http_error(status, &error.to_string())
+            plain_http_error(status, &message)
         }
     }
 }
@@ -6432,6 +6434,7 @@ fn public_discovery_error_response(error: &CliError) -> Response {
     let status = if message.contains("configured authority")
         || message.contains("authority signing seed")
         || message.contains("did not publish any signing keys")
+        || message.contains("--authority-seed-file or --authority-db")
     {
         StatusCode::NOT_FOUND
     } else {
@@ -18353,10 +18356,8 @@ fn issue_signed_underwriting_decision_detailed(
         budget_db_path,
         certification_registry_file,
         query,
-    )
-    .map_err(TrustHttpError::from)?;
-    let quoted_exposure =
-        build_underwriting_quoted_exposure(&receipt_store, query).map_err(TrustHttpError::from)?;
+    )?;
+    let quoted_exposure = build_underwriting_quoted_exposure(&receipt_store, query)?;
     let mut artifact = arc_kernel::build_underwriting_decision_artifact(
         report,
         unix_timestamp_now(),
@@ -18594,12 +18595,10 @@ fn build_underwriting_quoted_exposure(
 
     Ok(match max_by_currency.len() {
         0 => UnderwritingQuotedExposure::None,
-        1 => UnderwritingQuotedExposure::Single(
-            max_by_currency
-                .into_values()
-                .next()
-                .expect("single currency entry"),
-        ),
+        1 => match max_by_currency.into_values().next() {
+            Some(amount) => UnderwritingQuotedExposure::Single(amount),
+            None => UnderwritingQuotedExposure::None,
+        },
         _ => UnderwritingQuotedExposure::MixedCurrencies(max_by_currency.into_keys().collect()),
     })
 }

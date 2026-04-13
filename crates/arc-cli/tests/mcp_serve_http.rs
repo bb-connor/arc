@@ -5194,7 +5194,7 @@ fn mcp_serve_http_rejects_jwt_with_wrong_audience() {
     let metadata = get_protected_resource_metadata(&client, &base_url);
     assert_eq!(metadata.status(), reqwest::StatusCode::OK);
     let metadata: Value = metadata.json().expect("metadata json");
-    assert_eq!(metadata["resource"], format!("{base_url}/mcp"));
+    assert_eq!(metadata["resource"].as_str(), Some(audience));
     assert_eq!(metadata["authorization_servers"][0].as_str(), Some(issuer));
     assert!(metadata["scopes_supported"]
         .as_array()

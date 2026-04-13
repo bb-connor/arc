@@ -333,7 +333,7 @@ impl MercurySupervisedLiveCapture {
                 .provenance
                 .source_record_id
                 .as_deref()
-                .ok_or_else(|| {
+                .ok_or({
                     MercuryContractError::MissingField(
                         "supervised_live_capture.steps[].metadata.provenance.source_record_id",
                     )
@@ -342,16 +342,11 @@ impl MercurySupervisedLiveCapture {
                 "supervised_live_capture.steps[].metadata.provenance.source_record_id",
                 source_record_id,
             )?;
-            let idempotency_key = step
-                .metadata
-                .chronology
-                .idempotency_key
-                .as_deref()
-                .ok_or_else(|| {
-                    MercuryContractError::MissingField(
-                        "supervised_live_capture.steps[].metadata.chronology.idempotency_key",
-                    )
-                })?;
+            let idempotency_key = step.metadata.chronology.idempotency_key.as_deref().ok_or({
+                MercuryContractError::MissingField(
+                    "supervised_live_capture.steps[].metadata.chronology.idempotency_key",
+                )
+            })?;
             ensure_non_empty(
                 "supervised_live_capture.steps[].metadata.chronology.idempotency_key",
                 idempotency_key,

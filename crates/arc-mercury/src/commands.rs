@@ -1740,6 +1740,7 @@ fn assurance_suite_population_configs() -> [MercuryAssurancePopulationConfig<'st
     ]
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_assurance_package(
     workflow_id: &str,
     audience: MercuryAssuranceAudience,
@@ -1773,6 +1774,7 @@ fn build_assurance_package(
     Ok(package)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_governance_review_package(
     workflow_id: &str,
     audience: MercuryGovernanceReviewAudience,
@@ -1834,6 +1836,7 @@ fn build_assurance_disclosure_profile(
     Ok(profile)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_assurance_review_package(
     workflow_id: &str,
     reviewer_population: MercuryAssuranceReviewerPopulation,

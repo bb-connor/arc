@@ -49,6 +49,27 @@ fn repo_root() -> PathBuf {
         .expect("repo root")
 }
 
+fn runtime_devnet_prereqs_available() -> bool {
+    let repo_root = repo_root();
+    if !repo_root.join("contracts/node_modules/ethers").exists()
+        || !repo_root.join("contracts/node_modules/ganache").exists()
+    {
+        return false;
+    }
+
+    matches!(
+        Command::new("node")
+            .arg("--input-type=module")
+            .arg("-e")
+            .arg("await import('ethers'); await import('ganache');")
+            .current_dir(&repo_root)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status(),
+        Ok(status) if status.success()
+    )
+}
+
 struct DevnetGuard {
     child: Child,
 }
@@ -284,6 +305,13 @@ fn sample_receipt(
 #[tokio::test]
 async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_replay(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if !runtime_devnet_prereqs_available() {
+        eprintln!(
+            "skipping runtime devnet integration test because node-based prerequisites are unavailable"
+        );
+        return Ok(());
+    }
+
     let repo_root = repo_root();
     let deployment_path = repo_root.join("contracts/deployments/runtime-devnet-drift.json");
     let operator_keypair = Keypair::from_seed_hex(
@@ -412,6 +440,13 @@ async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_repl
 #[tokio::test]
 async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if !runtime_devnet_prereqs_available() {
+        eprintln!(
+            "skipping runtime devnet integration test because node-based prerequisites are unavailable"
+        );
+        return Ok(());
+    }
+
     let repo_root = repo_root();
     let deployment_path = repo_root.join("contracts/deployments/runtime-devnet-main.json");
     let operator_keypair = Keypair::from_seed_hex(

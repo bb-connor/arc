@@ -350,7 +350,7 @@ pub(crate) fn scale_token_minor_units_to_arc_amount(
             .ok_or_else(|| {
                 SettlementError::InvalidInput("amount scaling overflowed".to_string())
             })?;
-        if units % divisor != 0 {
+        if !units.is_multiple_of(divisor) {
             return Err(SettlementError::InvalidInput(
                 "token amount cannot be represented exactly in ARC units".to_string(),
             ));
@@ -1216,11 +1216,10 @@ fn ensure_instruction_ready(
             "capital instruction amount is required".to_string(),
         ));
     }
-    if instruction
+    if !instruction
         .body
         .support_boundary
         .automatic_dispatch_supported
-        != true
     {
         return Err(SettlementError::InvalidDispatch(
             "capital instruction must explicitly enable automatic dispatch".to_string(),

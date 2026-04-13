@@ -56,11 +56,7 @@ pub fn verify_proof_bundle(
             "proof bundle must declare at least one lane".to_string(),
         ));
     }
-    if bundle
-        .secondary_lanes
-        .iter()
-        .any(|lane| *lane == AnchorLaneKind::EvmPrimary)
-    {
+    if bundle.secondary_lanes.contains(&AnchorLaneKind::EvmPrimary) {
         return Err(AnchorError::Verification(
             "proof bundle secondary lanes must not declare the primary EVM lane".to_string(),
         ));
@@ -76,11 +72,7 @@ pub fn verify_proof_bundle(
     });
 
     if bundle.primary_proof.bitcoin_anchor.is_some() {
-        if !bundle
-            .secondary_lanes
-            .iter()
-            .any(|lane| *lane == AnchorLaneKind::BitcoinOts)
-        {
+        if !bundle.secondary_lanes.contains(&AnchorLaneKind::BitcoinOts) {
             return Err(AnchorError::Verification(
                 "bundle includes Bitcoin anchor data but does not declare the Bitcoin OTS lane"
                     .to_string(),
@@ -101,11 +93,7 @@ pub fn verify_proof_bundle(
                 bitcoin_height
             ),
         });
-    } else if bundle
-        .secondary_lanes
-        .iter()
-        .any(|lane| *lane == AnchorLaneKind::BitcoinOts)
-    {
+    } else if bundle.secondary_lanes.contains(&AnchorLaneKind::BitcoinOts) {
         return Err(AnchorError::Verification(
             "bundle declares Bitcoin OTS lane but the primary proof lacks bitcoin anchor data"
                 .to_string(),
@@ -113,11 +101,7 @@ pub fn verify_proof_bundle(
     }
 
     if let Some(solana) = bundle.solana_anchor.as_ref() {
-        if !bundle
-            .secondary_lanes
-            .iter()
-            .any(|lane| *lane == AnchorLaneKind::SolanaMemo)
-        {
+        if !bundle.secondary_lanes.contains(&AnchorLaneKind::SolanaMemo) {
             return Err(AnchorError::Verification(
                 "bundle includes Solana anchor data but does not declare the Solana memo lane"
                     .to_string(),
@@ -130,11 +114,7 @@ pub fn verify_proof_bundle(
             note: "secondary Solana memo anchor matches the canonical checkpoint payload"
                 .to_string(),
         });
-    } else if bundle
-        .secondary_lanes
-        .iter()
-        .any(|lane| *lane == AnchorLaneKind::SolanaMemo)
-    {
+    } else if bundle.secondary_lanes.contains(&AnchorLaneKind::SolanaMemo) {
         return Err(AnchorError::Verification(
             "bundle declares Solana lane but does not include a Solana anchor record".to_string(),
         ));

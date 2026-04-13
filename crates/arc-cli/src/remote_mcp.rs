@@ -4728,6 +4728,7 @@ impl LocalAuthorizationServer {
         Ok((claims, signed_input))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn issue_token_response(
         &self,
         subject: String,
@@ -4758,6 +4759,7 @@ impl LocalAuthorizationServer {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sign_access_token(
         &self,
         subject: &str,
@@ -5584,6 +5586,7 @@ impl IntrospectionBearerVerifier {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn session_auth_context_from_introspection(
         &self,
         token: &str,
@@ -6359,7 +6362,7 @@ mod tests {
         )
         .expect_err("mismatched discovery metadata should fail");
         assert!(
-            error.to_string().contains("arc_authorization_profile"),
+            error.to_string().contains("ARC authorization profile id"),
             "unexpected error: {error}"
         );
     }

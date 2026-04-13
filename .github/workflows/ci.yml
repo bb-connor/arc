@@ -61,3 +61,27 @@ jobs:
 
       - name: MSRV workspace lane
         run: cargo build --workspace && cargo test --workspace
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Coverage lane
+        env:
+          COVERAGE_FAIL_UNDER: "67"
+        run: ./scripts/run-coverage.sh
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 21

@@ -711,7 +711,7 @@ pub struct MeteredBillingQuote {
 impl MeteredBillingQuote {
     #[must_use]
     pub fn is_valid_at(&self, now: u64) -> bool {
-        now >= self.issued_at && self.expires_at.map_or(true, |expires_at| now < expires_at)
+        now >= self.issued_at && self.expires_at.is_none_or(|expires_at| now < expires_at)
     }
 }
 

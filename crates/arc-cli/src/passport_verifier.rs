@@ -459,11 +459,11 @@ impl PassportIssuanceOfferRegistry {
         metadata
             .credential_configuration(credential_configuration_id)
             .map_err(CliError::from)?;
-        let offer_id = KeyId::new();
-        let pre_authorized_code = KeyId::new();
+        let offer_id = KeyId::generate();
+        let pre_authorized_code = KeyId::generate();
         let expires_at = now.saturating_add(ttl_secs);
         let offer = build_oid4vci_passport_offer(
-            &metadata,
+            metadata,
             credential_configuration_id,
             &pre_authorized_code,
             &passport,
@@ -512,10 +512,11 @@ impl PassportIssuanceOfferRegistry {
                 "pre-authorized code is not present in the issuance registry".to_string(),
             ));
         };
-        let record = self
-            .offers
-            .get_mut(&offer_id)
-            .expect("offer id found in issuance registry");
+        let Some(record) = self.offers.get_mut(&offer_id) else {
+            return Err(CliError::Other(
+                "pre-authorized code resolved to a missing issuance offer".to_string(),
+            ));
+        };
         refresh_passport_issuance_offer_state(record, now);
         if normalize_credential_issuer(&record.offer.credential_issuer)?
             != normalize_credential_issuer(&metadata.credential_issuer)?
@@ -540,7 +541,7 @@ impl PassportIssuanceOfferRegistry {
                 return Err(CliError::Other("issuance offer has expired".to_string()))
             }
         }
-        let access_token = KeyId::new();
+        let access_token = KeyId::generate();
         let token_expires_at = now
             .saturating_add(token_ttl_secs.max(1))
             .min(record.expires_at);
@@ -582,10 +583,11 @@ impl PassportIssuanceOfferRegistry {
                 "access token is not present in the issuance registry".to_string(),
             ));
         };
-        let record = self
-            .offers
-            .get_mut(&offer_id)
-            .expect("offer id found in issuance registry");
+        let Some(record) = self.offers.get_mut(&offer_id) else {
+            return Err(CliError::Other(
+                "access token resolved to a missing issuance offer".to_string(),
+            ));
+        };
         refresh_passport_issuance_offer_state(record, now);
         if normalize_credential_issuer(&record.offer.credential_issuer)?
             != normalize_credential_issuer(&metadata.credential_issuer)?
@@ -1491,7 +1493,7 @@ fn normalize_credential_issuer(value: &str) -> Result<String, CliError> {
 struct KeyId;
 
 impl KeyId {
-    fn new() -> String {
+    fn generate() -> String {
         arc_core::Keypair::generate().public_key().to_hex()
     }
 }

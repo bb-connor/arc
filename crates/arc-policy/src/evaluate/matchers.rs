@@ -355,10 +355,7 @@ fn workload_identity_matches(
                 .iter()
                 .any(|prefix| actual.path.starts_with(prefix)))
         && (expected.credential_kinds.is_empty()
-            || expected
-                .credential_kinds
-                .iter()
-                .any(|kind| *kind == actual.credential_kind))
+            || expected.credential_kinds.contains(&actual.credential_kind))
 }
 
 fn evaluate_egress(

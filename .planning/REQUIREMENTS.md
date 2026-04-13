@@ -1,11 +1,10 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v2.65 MERCURY Portfolio Revenue Boundary Qualification,
-Commercial Handoff, and Channel Boundary
-(completed locally 2026-04-04)
-**Active milestone:** v2.66 Test Coverage for Untested Crates
-**Planned milestones:** v2.67-v2.73 (Ship Readiness Roadmap)
+**Latest completed milestone:** v2.68 Quality Infrastructure
+(completed locally 2026-04-12)
+**Active milestone:** v2.69 CI Gate and Release Qualification
+**Planned milestones:** v2.70-v2.73 (Ship Readiness Roadmap)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
@@ -15,44 +14,49 @@ trust across organizational boundaries.
 
 ### v2.66 Test Coverage for Untested Crates
 
-- [ ] **TEST-01**: arc-hosted-mcp has unit tests covering session lifecycle creation, resumption, and expiry
-- [ ] **TEST-02**: arc-hosted-mcp has unit tests covering multi-tenant isolation between concurrent sessions
-- [ ] **TEST-03**: arc-hosted-mcp has unit tests covering auth flows (bearer, JWT, OAuth with PKCE)
-- [ ] **TEST-04**: arc-hosted-mcp has unit tests covering error paths and fail-closed behavior
-- [ ] **TEST-05**: arc-wall has unit tests covering validation rule enforcement for all rule types
-- [ ] **TEST-06**: arc-wall has unit tests covering edge cases and boundary conditions
-- [ ] **TEST-07**: arc-wall has unit tests covering barrier review logic and control-room decisions
-- [ ] **TEST-08**: arc-siem has unit tests covering Splunk HEC export formatting and delivery
-- [ ] **TEST-09**: arc-siem has unit tests covering Elasticsearch bulk export formatting and delivery
-- [ ] **TEST-10**: arc-siem has unit tests covering DLQ behavior on export failure
-- [ ] **TEST-11**: arc-siem has unit tests covering per-exporter rate limiting
-- [ ] **TEST-12**: Cross-crate integration tests exercise the hosted-mcp -> kernel -> wall -> siem path
-- [ ] **TEST-13**: Cross-crate integration tests verify fail-closed behavior across crate boundaries
+- [x] **TEST-01**: arc-hosted-mcp has unit tests covering session lifecycle creation, resumption, and expiry
+- [x] **TEST-02**: arc-hosted-mcp has unit tests covering multi-tenant isolation between concurrent sessions
+- [x] **TEST-03**: arc-hosted-mcp has unit tests covering auth flows (bearer, JWT, OAuth with PKCE)
+- [x] **TEST-04**: arc-hosted-mcp has unit tests covering error paths and fail-closed behavior
+- [x] **TEST-05**: arc-wall has unit tests covering validation rule enforcement for all rule types present in the bounded ARC-Wall lane
+- [x] **TEST-06**: arc-wall has unit tests covering edge cases and boundary conditions
+- [x] **TEST-07**: arc-wall has unit tests covering barrier review logic and control-room decisions in the shipped bounded companion-product path
+- [x] **TEST-08**: arc-siem has unit tests covering Splunk HEC export formatting and delivery
+- [x] **TEST-09**: arc-siem has unit tests covering Elasticsearch bulk export formatting and delivery
+- [x] **TEST-10**: arc-siem has unit tests covering DLQ behavior on export failure
+- [x] **TEST-11**: arc-siem has unit tests covering per-exporter rate limiting
+- [x] **TEST-12**: Cross-crate integration tests exercise the real hosted-mcp/kernel -> siem seam and the ARC-Wall companion receipt -> siem seam on the shared ARC substrate
+- [x] **TEST-13**: Cross-crate integration tests verify fail-closed behavior across the real crate boundaries that exist today
 
 ### v2.67 Kernel Panic Hardening
 
-- [ ] **HARDEN-01**: All 22 panic! calls in arc-kernel are audited and classified as invariant-violation vs input-dependent
-- [ ] **HARDEN-02**: Input-dependent panics are converted to typed Result errors without changing fail-closed posture
-- [ ] **HARDEN-03**: Protocol marshalling errors return structured errors instead of crashing the kernel
-- [ ] **HARDEN-04**: Remaining invariant panics use debug_assert! in dev and structured error logging in prod
-- [ ] **HARDEN-05**: Adversarial input tests prove the kernel does not crash on malformed JSON-RPC
-- [ ] **HARDEN-06**: Adversarial input tests prove the kernel does not crash on truncated messages
-- [ ] **HARDEN-07**: Adversarial input tests prove the kernel does not crash on wrong-type payloads
+- [x] **HARDEN-01**: All 22 literal `panic!` calls in `arc-kernel/src` are audited and classified, including whether they are test-only invariant assertions or external-input reachable
+- [x] **HARDEN-02**: The audited production kernel exposes no input-dependent literal panics, and externally triggered framing/parser failures return typed errors without changing fail-closed posture
+- [x] **HARDEN-03**: ARC's canonical JSON transport returns structured errors for malformed input, missing required fields, wrong field types, and mid-frame disconnects instead of crashing the kernel
+- [x] **HARDEN-04**: No literal `panic!` macro remains under `crates/arc-kernel/src`; test-only invariant assertions use explicit non-`panic!` assertion style so panic scans only flag real regressions
+- [x] **HARDEN-05**: Adversarial input tests prove the kernel transport does not crash on malformed canonical JSON `AgentMessage` payloads
+- [x] **HARDEN-06**: Adversarial input tests prove the kernel transport does not crash on truncated messages
+- [x] **HARDEN-07**: Adversarial input tests prove the kernel transport does not crash on wrong-type or missing-field payloads
 
 ### v2.68 Quality Infrastructure
 
-- [ ] **QUAL-01**: proptest property tests cover Ed25519 sign/verify roundtrips with arbitrary payloads
-- [ ] **QUAL-02**: proptest property tests cover monetary arithmetic (budget overflow, underflow, precision)
-- [ ] **QUAL-03**: proptest property tests cover capability attenuation subset relationships
-- [ ] **QUAL-04**: Criterion benchmarks establish baseline for Ed25519 signature verification throughput
-- [ ] **QUAL-05**: Criterion benchmarks establish baseline for canonical JSON serialization
-- [ ] **QUAL-06**: Criterion benchmarks establish baseline for Merkle proof generation and verification
-- [ ] **QUAL-07**: Criterion benchmarks establish baseline for capability validation latency
-- [ ] **QUAL-08**: Code coverage reporting via cargo-tarpaulin is wired into CI
-- [ ] **QUAL-09**: Coverage reports are generated and stored in coverage/ directory
-- [ ] **QUAL-10**: A meaningful coverage floor is set based on actual measured coverage
+- [x] **QUAL-01**: proptest property tests cover Ed25519 sign/verify roundtrips with arbitrary payloads
+- [x] **QUAL-02**: proptest property tests cover monetary arithmetic (budget overflow, underflow, precision)
+- [x] **QUAL-03**: proptest property tests cover capability attenuation subset relationships
+- [x] **QUAL-04**: Criterion benchmarks establish baseline for Ed25519 signature verification throughput
+- [x] **QUAL-05**: Criterion benchmarks establish baseline for canonical JSON serialization
+- [x] **QUAL-06**: Criterion benchmarks establish baseline for Merkle proof generation and verification
+- [x] **QUAL-07**: Criterion benchmarks establish baseline for capability validation latency
+- [x] **QUAL-08**: Code coverage reporting via cargo-tarpaulin is wired into CI
+- [x] **QUAL-09**: Coverage reports are generated and stored in coverage/ directory
+- [x] **QUAL-10**: A meaningful coverage floor is set based on actual measured coverage
 
 ### v2.69 CI Gate and Release Qualification
+
+Hosted-observation note: the repo-side fixes and local signed qualification
+bundle now exist, but these checkboxes remain open until the updated commit is
+rerun in GitHub Actions and the release candidate is tagged from a green
+hosted run.
 
 - [ ] **CI-01**: ci.yml runs green in hosted GitHub Actions on stable Rust and MSRV
 - [ ] **CI-02**: release-qualification.yml runs green in hosted GitHub Actions
@@ -104,41 +108,41 @@ trust across organizational boundaries.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-01 | Phase 273 | Pending |
-| TEST-02 | Phase 273 | Pending |
-| TEST-03 | Phase 273 | Pending |
-| TEST-04 | Phase 273 | Pending |
-| TEST-05 | Phase 274 | Pending |
-| TEST-06 | Phase 274 | Pending |
-| TEST-07 | Phase 274 | Pending |
-| TEST-08 | Phase 275 | Pending |
-| TEST-09 | Phase 275 | Pending |
-| TEST-10 | Phase 275 | Pending |
-| TEST-11 | Phase 275 | Pending |
-| TEST-12 | Phase 276 | Pending |
-| TEST-13 | Phase 276 | Pending |
-| HARDEN-01 | Phase 277 | Pending |
-| HARDEN-02 | Phase 278 | Pending |
-| HARDEN-03 | Phase 278 | Pending |
-| HARDEN-04 | Phase 279 | Pending |
-| HARDEN-05 | Phase 280 | Pending |
-| HARDEN-06 | Phase 280 | Pending |
-| HARDEN-07 | Phase 280 | Pending |
-| QUAL-01 | Phase 281 | Pending |
-| QUAL-02 | Phase 281 | Pending |
-| QUAL-03 | Phase 281 | Pending |
-| QUAL-04 | Phase 282 | Pending |
-| QUAL-05 | Phase 282 | Pending |
-| QUAL-06 | Phase 282 | Pending |
-| QUAL-07 | Phase 282 | Pending |
-| QUAL-08 | Phase 283 | Pending |
-| QUAL-09 | Phase 283 | Pending |
-| QUAL-10 | Phase 283 | Pending |
-| CI-01 | Phase 284 | Pending |
-| CI-02 | Phase 284 | Pending |
-| CI-03 | Phase 285 | Pending |
-| CI-04 | Phase 286 | Pending |
-| CI-05 | Phase 286 | Pending |
+| TEST-01 | Phase 273 | Complete |
+| TEST-02 | Phase 273 | Complete |
+| TEST-03 | Phase 273 | Complete |
+| TEST-04 | Phase 273 | Complete |
+| TEST-05 | Phase 274 | Complete |
+| TEST-06 | Phase 274 | Complete |
+| TEST-07 | Phase 274 | Complete |
+| TEST-08 | Phase 275 | Complete |
+| TEST-09 | Phase 275 | Complete |
+| TEST-10 | Phase 275 | Complete |
+| TEST-11 | Phase 275 | Complete |
+| TEST-12 | Phase 276 | Complete |
+| TEST-13 | Phase 276 | Complete |
+| HARDEN-01 | Phase 277 | Complete |
+| HARDEN-02 | Phase 278 | Complete |
+| HARDEN-03 | Phase 278 | Complete |
+| HARDEN-04 | Phase 279 | Complete |
+| HARDEN-05 | Phase 280 | Complete |
+| HARDEN-06 | Phase 280 | Complete |
+| HARDEN-07 | Phase 280 | Complete |
+| QUAL-01 | Phase 281 | Complete |
+| QUAL-02 | Phase 281 | Complete |
+| QUAL-03 | Phase 281 | Complete |
+| QUAL-04 | Phase 282 | Complete |
+| QUAL-05 | Phase 282 | Complete |
+| QUAL-06 | Phase 282 | Complete |
+| QUAL-07 | Phase 282 | Complete |
+| QUAL-08 | Phase 283 | Complete |
+| QUAL-09 | Phase 283 | Complete |
+| QUAL-10 | Phase 283 | Complete |
+| CI-01 | Phase 284 | Blocked on hosted |
+| CI-02 | Phase 284 | Blocked on hosted |
+| CI-03 | Phase 285 | Blocked on hosted |
+| CI-04 | Phase 286 | Blocked on hosted |
+| CI-05 | Phase 286 | Blocked on hosted |
 | DX-01 | Phase 287 | Pending |
 | DX-02 | Phase 287 | Pending |
 | DX-03 | Phase 288 | Pending |
@@ -185,7 +189,7 @@ trust across organizational boundaries.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-12 after ship readiness ladder definition (v2.66-v2.73)*
+*Last updated: 2026-04-12 after local v2.69 repo-side verification; hosted observation still pending*
 
 ## Historical Milestone Requirement Snapshots
 

@@ -75,13 +75,20 @@ pub fn prepare_ots_submission(
     let tree = MerkleTree::from_hashes(checkpoint_roots.clone())
         .map_err(|error| AnchorError::Verification(error.to_string()))?;
     let super_root = tree.root();
+    let (Some(aggregated_checkpoint_start), Some(aggregated_checkpoint_end)) =
+        (checkpoint_seqs.first(), checkpoint_seqs.last())
+    else {
+        return Err(AnchorError::Verification(
+            "OTS submission requires at least one checkpoint".to_string(),
+        ));
+    };
     Ok(PreparedOtsSubmission {
         schema: "arc.anchor.ots-submission.v1".to_string(),
         calendar_urls: calendar_urls.to_vec(),
         document_hash_algorithm: "sha256".to_string(),
         document_digest: arc_core::hashing::sha256(super_root.as_bytes()),
-        aggregated_checkpoint_start: *checkpoint_seqs.first().unwrap(),
-        aggregated_checkpoint_end: *checkpoint_seqs.last().unwrap(),
+        aggregated_checkpoint_start: *aggregated_checkpoint_start,
+        aggregated_checkpoint_end: *aggregated_checkpoint_end,
         checkpoint_seqs,
         checkpoint_roots,
         super_root,
@@ -140,11 +147,7 @@ pub fn verify_ots_proof_for_submission(
         ));
     }
     if let Some(height) = expected_bitcoin_height {
-        if !inspection
-            .bitcoin_attestation_heights
-            .iter()
-            .any(|attested| *attested == height)
-        {
+        if !inspection.bitcoin_attestation_heights.contains(&height) {
             return Err(AnchorError::Verification(format!(
                 "OTS proof does not attest to Bitcoin block height {}",
                 height
@@ -203,8 +206,7 @@ pub fn verify_bitcoin_anchor_for_proof(
     }
     if !inspection
         .bitcoin_attestation_heights
-        .iter()
-        .any(|attested| *attested == bitcoin_anchor.bitcoin_block_height)
+        .contains(&bitcoin_anchor.bitcoin_block_height)
     {
         return Err(AnchorError::Verification(format!(
             "OTS proof does not attest to Bitcoin block height {}",

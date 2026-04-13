@@ -5,6 +5,7 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::path::PathBuf;
+    use std::sync::Once;
     use std::sync::{mpsc, Arc, Mutex};
     use std::thread;
 
@@ -21,6 +22,13 @@ mod tests {
         BasicConstraints, CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose,
         IsCa, KeyPair as RcgenKeyPair,
     };
+
+    fn ensure_rustls_crypto_provider() {
+        static INIT: Once = Once::new();
+        INIT.call_once(|| {
+            let _ = ureq::rustls::crypto::aws_lc_rs::default_provider().install_default();
+        });
+    }
 
     fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
         let nonce = SystemTime::now()
@@ -1669,6 +1677,7 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_mtls_security_uses_client_certificate_for_discovery_and_invoke() {
+        ensure_rustls_crypto_provider();
         let server = FakeMtlsA2aServer::spawn_jsonrpc();
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
@@ -1915,6 +1924,7 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_mtls_invocation_produces_allow_receipt() {
+        ensure_rustls_crypto_provider();
         let server = FakeMtlsA2aServer::spawn_jsonrpc();
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
@@ -2836,6 +2846,7 @@ mod tests {
 
     impl FakeMtlsA2aServer {
         fn spawn_jsonrpc() -> Self {
+            ensure_rustls_crypto_provider();
             let materials = generate_mtls_test_materials();
             let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake mTLS A2A listener");
             let address = listener.local_addr().expect("listener address");

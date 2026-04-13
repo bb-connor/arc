@@ -137,6 +137,7 @@ pub struct SignedPublicDiscoveryTransparency {
     pub signature: Signature,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_public_issuer_discovery(
     signer_keypair: &Keypair,
     discovery_id: impl Into<String>,
@@ -194,6 +195,7 @@ pub fn ensure_signed_public_issuer_discovery_active(
     ensure_signed_public_discovery_active(document.body.published_at, document.body.expires_at, now)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_public_verifier_discovery(
     signer_keypair: &Keypair,
     discovery_id: impl Into<String>,
@@ -249,6 +251,7 @@ pub fn ensure_signed_public_verifier_discovery_active(
     ensure_signed_public_discovery_active(document.body.published_at, document.body.expires_at, now)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_signed_public_discovery_transparency(
     signer_keypair: &Keypair,
     transparency_id: impl Into<String>,

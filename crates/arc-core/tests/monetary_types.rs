@@ -43,19 +43,6 @@ fn eur(units: u64) -> MonetaryAmount {
     }
 }
 
-fn make_grant_no_monetary(server: &str, tool: &str) -> ToolGrant {
-    ToolGrant {
-        server_id: server.to_string(),
-        tool_name: tool.to_string(),
-        operations: vec![Operation::Invoke],
-        constraints: vec![],
-        max_invocations: None,
-        max_cost_per_invocation: None,
-        max_total_cost: None,
-        dpop_required: None,
-    }
-}
-
 fn make_scope(grants: Vec<ToolGrant>) -> ArcScope {
     ArcScope {
         grants,
