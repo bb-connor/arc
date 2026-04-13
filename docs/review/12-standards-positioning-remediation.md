@@ -2,15 +2,15 @@
 
 ## Problem
 
-CHIO currently makes comparative and standards-positioning claims that are
+ARC currently makes comparative and standards-positioning claims that are
 broader than the evidence boundary of the shipped repo.
 
 The problem is not that the repo has no interoperability or standards work. It
 does. The problem is that the public narrative often collapses five different
 things into one undifferentiated "protocol" claim:
 
-1. the native CHIO capability and receipt protocol
-2. the CHIO runtime and hosted control-plane product bundle
+1. the native ARC capability and receipt protocol
+2. the ARC runtime and hosted control-plane product bundle
 3. MCP compatibility and mediation
 4. A2A compatibility and bridging
 5. bounded identity and credential interoperability profiles
@@ -18,12 +18,12 @@ things into one undifferentiated "protocol" claim:
 Once those layers are merged rhetorically, the repo starts making claims that
 sound like:
 
-- CHIO is the only protocol that solves the whole stack
-- CHIO can fairly be compared to wire protocols, wallet standards, and payment
+- ARC is the only protocol that solves the whole stack
+- ARC can fairly be compared to wire protocols, wallet standards, and payment
   rails as one thing
-- CHIO is simultaneously "not a replacement for MCP/A2A" and "able to replace
+- ARC is simultaneously "not a replacement for MCP/A2A" and "able to replace
   MCP in real deployments"
-- CHIO passports and federation are general DID/VC interoperability rather than
+- ARC passports and federation are general DID/VC interoperability rather than
   ARC-first profile projection with explicit guardrails
 - adapter-level compatibility is broad ecosystem interoperability
 
@@ -68,7 +68,7 @@ This is strong evidence for:
 - MCP compatibility for the tested scenario waves
 - practical adoptability as a governance layer in front of MCP servers
 
-It is not, by itself, evidence that CHIO is a new universal MCP replacement
+It is not, by itself, evidence that ARC is a new universal MCP replacement
 standard.
 
 ### 3. The product has meaningful but narrower A2A evidence
@@ -84,9 +84,9 @@ The repo also explicitly admits the key limitation:
 - A2A does not define a native skill selector in `SendMessage`
 - the adapter uses `metadata.arc.targetSkillId` as an explicit local convention
 
-This supports an honest claim of bounded A2A interop through a CHIO adapter. It
+This supports an honest claim of bounded A2A interop through a ARC adapter. It
 does not yet support a stronger claim of broad A2A ecosystem interoperability or
-of CHIO supplying missing A2A semantics at the standard layer.
+of ARC supplying missing A2A semantics at the standard layer.
 
 ### 4. The repo already describes DID/VC scope conservatively in places
 
@@ -139,7 +139,7 @@ The strongest gaps are mostly claim-discipline gaps:
 - `CLAUDE.md` says ARC replaces MCP
 - `docs/ROADMAP_V1.md` says the goal is to be compatible enough to replace MCP
   in real deployments
-- `README.md` says CHIO is not a replacement for MCP or A2A
+- `README.md` says ARC is not a replacement for MCP or A2A
 
 The repo therefore already contains both the honest narrow story and the
 overstated broad story at the same time.
@@ -148,7 +148,7 @@ overstated broad story at the same time.
 
 ### 1. Protocol and product boundaries are blurred
 
-CHIO is frequently described as one "protocol" while comparisons quietly rely
+ARC is frequently described as one "protocol" while comparisons quietly rely
 on properties of the broader bundle:
 
 - kernel enforcement architecture
@@ -166,8 +166,8 @@ level.
 
 The repo currently says all three of the following:
 
-- CHIO is not a replacement for MCP or A2A
-- CHIO wraps MCP and adds governance
+- ARC is not a replacement for MCP or A2A
+- ARC wraps MCP and adds governance
 - ARC can replace MCP in real deployments
 
 Those can be reconciled only if the project adopts a precise distinction:
@@ -189,7 +189,7 @@ Today the repo demonstrates:
 - local tests
 - explicit adapter-local metadata conventions where A2A lacks a native field
 
-That is useful engineering. It is not enough to support claims that CHIO solves
+That is useful engineering. It is not enough to support claims that ARC solves
 the A2A standards gap or that it has broad A2A interoperability in the strong
 sense.
 
@@ -276,22 +276,22 @@ goal should be to make the standards story structurally defensible.
 
 That requires three explicit claim layers.
 
-### Layer 1: Native CHIO Protocol Claims
+### Layer 1: Native ARC Protocol Claims
 
-These are claims about CHIO's own normative core:
+These are claims about ARC's own normative core:
 
 - capability and receipt semantics
 - fail-closed kernel contract
-- signed CHIO-native artifacts
+- signed ARC-native artifacts
 - native `did:arc` identity and ARC passport truth
 - native control-plane and artifact schemas
 
-This layer may use strong protocol language because it is talking about CHIO's
+This layer may use strong protocol language because it is talking about ARC's
 own semantics.
 
 ### Layer 2: Compatibility and Bridge Claims
 
-These are claims about CHIO mediation or adapter behavior over third-party
+These are claims about ARC mediation or adapter behavior over third-party
 standards:
 
 - MCP-compatible mediation
@@ -313,7 +313,7 @@ These are claims about the full system bundle:
 - qualification matrices
 - deployment and adoption posture
 
-This layer may compare CHIO to broader platforms, but only when clearly labeled
+This layer may compare ARC to broader platforms, but only when clearly labeled
 as a platform or product-bundle comparison.
 
 If the project wants stronger standards claims beyond that, the end-state would
@@ -380,11 +380,11 @@ standards story gets much cleaner once each layer has its own normative home.
 Replace the single mixed matrix with:
 
 - `Protocol Core Matrix`
-  Compare CHIO-native protocol semantics to UCAN, ANP, AIMS, etc.
+  Compare ARC-native protocol semantics to UCAN, ANP, AIMS, etc.
 - `Compatibility/Adapter Matrix`
   Compare MCP and A2A mediation scope, tested coverage, and adoption posture
 - `Platform Bundle Matrix`
-  Compare CHIO as a product/system bundle to cloud frameworks, payment rails,
+  Compare ARC as a product/system bundle to cloud frameworks, payment rails,
   and broader agent-control platforms
 
 Rules for the new matrices:
@@ -401,10 +401,10 @@ Rules for the new matrices:
 
 Adopt the following product rule:
 
-- CHIO does not replace the MCP standard
-- CHIO can replace direct/raw MCP deployment patterns by interposing a governed
+- ARC does not replace the MCP standard
+- ARC can replace direct/raw MCP deployment patterns by interposing a governed
   MCP-compatible edge
-- CHIO may eventually become the preferred security wrapper for MCP-class
+- ARC may eventually become the preferred security wrapper for MCP-class
   deployments, but that is an adoption claim, not a standards claim
 
 Required doc changes:
@@ -418,8 +418,8 @@ Required doc changes:
 
 Adopt the following rule:
 
-- CHIO does not extend the A2A standard
-- CHIO ships a bridge to A2A v1.0 with explicit adapter-local conventions where
+- ARC does not extend the A2A standard
+- ARC ships a bridge to A2A v1.0 with explicit adapter-local conventions where
   A2A lacks native fields
 - interoperability claims are limited to the tested A2A bindings, auth modes,
   and task-follow-up flows in the qualification matrix
@@ -435,7 +435,7 @@ Required product work if stronger A2A claims are desired:
 
 Adopt the following standards rule:
 
-- ARC/CHIO ships an ARC-native identity and passport system
+- ARC ships an ARC-native identity and passport system
 - it exports bounded OID4VCI and OID4VP profiles over that truth surface
 - external DID methods may appear as compatibility inputs or mapped identities
   only within explicitly qualified profiles
@@ -480,7 +480,7 @@ Add a shared definition used across all docs:
 
 `bounded interoperability` means:
 
-- CHIO can communicate or exchange artifacts with an external standard surface
+- ARC can communicate or exchange artifacts with an external standard surface
 - only within an explicitly documented profile
 - with explicit trust roots
 - with explicit unsupported-shape rejection
@@ -492,7 +492,7 @@ Then require all interop docs to state:
 - what is compatible
 - what is intentionally unsupported
 - what evidence proves compatibility
-- what still remains CHIO-private truth
+- what still remains ARC-private truth
 
 ### 9. Add external qualification artifacts for every public interop claim
 
@@ -588,7 +588,7 @@ These results should be published as generated artifacts, not prose assertions.
 
 Run one explicit internal review that asks:
 
-- is this statement about the CHIO native protocol?
+- is this statement about the ARC native protocol?
 - is it about an adapter?
 - is it about the product bundle?
 - is it about a research direction?
@@ -668,9 +668,9 @@ Exit criteria:
 
 This hole is successfully plugged only when all of the following are true.
 
-- A reader can tell, from the README alone, what is native CHIO protocol, what
+- A reader can tell, from the README alone, what is native ARC protocol, what
   is compatibility/adapter behavior, and what is product bundle behavior.
-- No top-level doc simultaneously says CHIO both replaces and does not replace
+- No top-level doc simultaneously says ARC both replaces and does not replace
   MCP/A2A.
 - A2A claims are limited to the exact tested adapter surface unless broader
   external evidence exists.
@@ -702,7 +702,7 @@ This hole is successfully plugged only when all of the following are true.
 
 - This memo does not recommend abandoning MCP or A2A compatibility work.
 - This memo does not recommend abandoning ARC-native identity or passports.
-- This memo does not require CHIO to become a neutral third-party standard
+- This memo does not require ARC to become a neutral third-party standard
   immediately.
 - This memo does not require solving universal DID/VC interoperability unless
   the project explicitly chooses that path.
@@ -712,5 +712,5 @@ This hole is successfully plugged only when all of the following are true.
 
 The practical objective is simpler: make every public claim true on its own
 terms, and make the standards story legible enough that a skeptical external
-reviewer can tell exactly what CHIO is, what it wraps, what it projects, and
+reviewer can tell exactly what ARC is, what it wraps, what it projects, and
 what remains intentionally bounded.

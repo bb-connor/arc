@@ -2,7 +2,7 @@
 
 ## Problem
 
-CHIO currently has credible building blocks for local reputation scoring,
+ARC currently has credible building blocks for local reputation scoring,
 passport packaging, and bounded bilateral evidence portability, but it does
 not yet have the identity, issuer-independence, aggregation, or network
 governance machinery needed to make stronger portable-trust claims literally
@@ -20,7 +20,7 @@ Today the repo is honest in several narrow places:
   (`crates/arc-federation/src/lib.rs:114-136`, `974-1003`)
 
 The problem is that the broader narrative around portable trust, reputation,
-passports, federation, and Sybil resistance often reads as if CHIO already has
+passports, federation, and Sybil resistance often reads as if ARC already has
 an interoperable multi-issuer reputation network. It does not. It has local
 truth plus bounded portability scaffolding.
 
@@ -113,7 +113,7 @@ truth plus bounded portability scaffolding.
   Imported trust is intentionally kept separate from local truth and merely
   surfaced as an attenuated signal (`docs/IDENTITY_FEDERATION_GUIDE.md:140-180`,
   `docs/AGENT_PASSPORT_GUIDE.md:428-441`). That is the right current design,
-  but it means CHIO cannot yet claim that reputation itself is portable in the
+  but it means ARC cannot yet claim that reputation itself is portable in the
   strong sense.
 
 - **The identity layer is still ARC-private at the trust anchor.**
@@ -131,7 +131,7 @@ truth plus bounded portability scaffolding.
   trust with automatic cross-operator semantics.
 
 - **The strongest honest claim today is narrower.**
-  Before a real network exists, CHIO can honestly claim:
+  Before a real network exists, ARC can honestly claim:
   - deterministic local reputation scoring per operator
   - signed reputation/passport artifacts with multi-issuer presentation
   - conservative imported trust reporting with attenuation and fail-closed
@@ -146,7 +146,7 @@ truth plus bounded portability scaffolding.
 
 ## Target End-State
 
-CHIO should target a five-layer model and name each layer precisely.
+ARC should target a five-layer model and name each layer precisely.
 
 - **Layer 1: Local Truth.**
   One operator computes one local reputation scorecard from its own receipts,
@@ -176,7 +176,7 @@ CHIO should target a five-layer model and name each layer precisely.
   Every relying party and operator still makes its own admission decision from
   local policy, local truth, and optionally network-cleared portable trust.
 
-If CHIO reaches that architecture, it can honestly claim:
+If ARC reaches that architecture, it can honestly claim:
 
 - portable reputation attestations
 - bounded, independence-aware cross-issuer clearing
@@ -240,7 +240,7 @@ they need real issuer-descriptor plumbing rather than free-form operator names.
 
 ### 3. Add a real subject-continuity and subject-migration layer
 
-CHIO needs an explicit continuity model that separates:
+ARC needs an explicit continuity model that separates:
 
 - local subject key
 - portable subject identifier
@@ -422,7 +422,7 @@ This separation is crucial and should remain true even after the network exists.
 - network clearing must remain a derived external layer
 - local admission remains a relying-party decision
 
-That is how CHIO avoids turning "portable trust" into "ambient trust."
+That is how ARC avoids turning "portable trust" into "ambient trust."
 
 ### 10. Add claim-discipline gates
 
@@ -532,7 +532,7 @@ Release documentation should be gated by qualification states:
 
 ## Acceptance Criteria
 
-- CHIO can produce a signed local reputation scorecard, a signed portable
+- ARC can produce a signed local reputation scorecard, a signed portable
   summary, and a signed network-clearing artifact as three distinct artifacts.
 - Imported trust is no longer just an attenuated local scorecard replay; it can
   verify and ingest first-class portable summaries and negative events.
@@ -546,7 +546,7 @@ Release documentation should be gated by qualification states:
   local-admission-ready trust modes.
 - Federation imports remain non-ambient by default and only widen to admission
   under explicit qualified policy.
-- Documentation can state, precisely and testably, whether CHIO ships:
+- Documentation can state, precisely and testably, whether ARC ships:
   - local reputation
   - portable reputation artifacts
   - network clearing
@@ -576,5 +576,5 @@ Release documentation should be gated by qualification states:
   careful privacy, retention, and dispute-handling design.
 
 - **Non-goal: universal identity interoperability on day one.**
-  It is acceptable for CHIO to remain `did:arc`-anchored until broader DID
+  It is acceptable for ARC to remain `did:arc`-anchored until broader DID
   method support is actually verified, not just named in schemas.

@@ -51,6 +51,7 @@ fn main() {
             control_url.as_deref(),
             control_token.as_deref(),
         ),
+        Commands::Init { path } => scaffold::cmd_init(&path),
         Commands::Mcp { command } => match command {
             McpCommands::Serve {
                 policy,
@@ -2013,4 +2014,3 @@ fn main() {
         std::process::exit(1);
     }
 }
-

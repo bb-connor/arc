@@ -2,7 +2,7 @@
 
 Date: 2026-04-13
 
-This folder converts the adversarial review of ARC/CHIO into a concrete
+This folder converts the adversarial review of ARC into a concrete
 remediation package.
 
 Each document covers one hole:

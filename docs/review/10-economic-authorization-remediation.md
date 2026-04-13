@@ -5,7 +5,7 @@ Owner: Economic-authorization and payment-binding gap
 
 ## Problem
 
-ARC/CHIO currently speaks as if one object does four jobs at once:
+ARC currently speaks as if one object does four jobs at once:
 
 - capability token
 - spending authorization

@@ -1,0 +1,140 @@
+use std::io::{self, BufRead, Write};
+
+use serde_json::{json, Value};
+
+const PROTOCOL_VERSION: &str = "2025-11-25";
+
+fn respond(stdout: &mut io::StdoutLock<'_>, payload: Value) -> io::Result<()> {
+    writeln!(stdout, "{}", serde_json::to_string(&payload)?)?;
+    stdout.flush()
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let stdin = io::stdin();
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+
+    for line in stdin.lock().lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let message: Value = serde_json::from_str(&line)?;
+        match message.get("method").and_then(Value::as_str) {
+            Some("initialize") => {
+                respond(
+                    &mut stdout,
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": message["id"].clone(),
+                        "result": {
+                            "protocolVersion": PROTOCOL_VERSION,
+                            "capabilities": { "tools": {} },
+                            "serverInfo": {
+                                "name": "{{PROJECT_NAME}} hello server",
+                                "version": "0.1.0"
+                            }
+                        }
+                    }),
+                )?;
+            }
+            Some("notifications/initialized") => {}
+            Some("tools/list") => {
+                respond(
+                    &mut stdout,
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": message["id"].clone(),
+                        "result": {
+                            "tools": [
+                                {
+                                    "name": "hello_world",
+                                    "title": "Hello World",
+                                    "description": "Return a governed greeting",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": { "type": "string" }
+                                        },
+                                        "required": ["name"]
+                                    },
+                                    "annotations": {
+                                        "readOnlyHint": true
+                                    }
+                                }
+                            ]
+                        }
+                    }),
+                )?;
+            }
+            Some("tools/call") => {
+                let tool_name = message
+                    .get("params")
+                    .and_then(|params| params.get("name"))
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                if tool_name != "hello_world" {
+                    respond(
+                        &mut stdout,
+                        json!({
+                            "jsonrpc": "2.0",
+                            "id": message["id"].clone(),
+                            "error": {
+                                "code": -32601,
+                                "message": format!("unsupported tool: {tool_name}")
+                            }
+                        }),
+                    )?;
+                    continue;
+                }
+
+                let name = message
+                    .get("params")
+                    .and_then(|params| params.get("arguments"))
+                    .and_then(|arguments| arguments.get("name"))
+                    .and_then(Value::as_str)
+                    .unwrap_or("ARC");
+                let greeting = format!("Hello, {name}! This call was mediated by ARC.");
+
+                respond(
+                    &mut stdout,
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": message["id"].clone(),
+                        "result": {
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": greeting
+                                }
+                            ],
+                            "structuredContent": {
+                                "greeting": greeting
+                            },
+                            "isError": false
+                        }
+                    }),
+                )?;
+            }
+            Some(method) => {
+                if message.get("id").is_some() {
+                    respond(
+                        &mut stdout,
+                        json!({
+                            "jsonrpc": "2.0",
+                            "id": message["id"].clone(),
+                            "error": {
+                                "code": -32601,
+                                "message": format!("unsupported method: {method}")
+                            }
+                        }),
+                    )?;
+                }
+            }
+            None => {}
+        }
+    }
+
+    Ok(())
+}

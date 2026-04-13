@@ -16,6 +16,7 @@
 mod admin;
 mod did;
 mod passport;
+mod scaffold;
 
 include!("cli/types.rs");
 include!("cli/dispatch.rs");

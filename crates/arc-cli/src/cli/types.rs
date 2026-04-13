@@ -121,6 +121,12 @@ enum Commands {
         server: String,
     },
 
+    /// Scaffold a runnable ARC example project with a governed demo flow.
+    Init {
+        /// Directory to create for the scaffolded project.
+        path: PathBuf,
+    },
+
     /// Serve an MCP-compatible edge backed by the ARC kernel.
     Mcp {
         #[command(subcommand)]
@@ -2644,4 +2650,3 @@ enum ReputationCommands {
         verifier_policy: Option<PathBuf>,
     },
 }
-

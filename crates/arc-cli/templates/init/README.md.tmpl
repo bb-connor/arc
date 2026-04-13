@@ -1,0 +1,34 @@
+# {{PROJECT_NAME}}
+
+This project was scaffolded by `arc init`.
+
+## What You Get
+
+- `policy.yaml`: a minimal ARC policy that grants one governed tool call
+- `src/bin/hello_server.rs`: a tiny MCP tool server stub
+- `src/bin/demo.rs`: a smoke runner that launches `arc mcp serve`, calls the
+  governed tool, and prints the resulting receipt line
+
+## Run It
+
+1. Build the scaffold:
+
+   ```bash
+   cargo build
+   ```
+
+2. Point the demo at an `arc` binary if it is not already on your `PATH`:
+
+   ```bash
+   ARC_BIN=/path/to/arc cargo run --quiet --bin demo
+   ```
+
+3. The demo writes the local receipt store under `.arc/receipts.db` and prints
+   the latest receipt after the governed tool call succeeds.
+
+## Customize It
+
+- Rename `hello_world` in `src/bin/hello_server.rs` to your first tool
+- Tighten `policy.yaml` to the exact server, tool, and budget envelope you need
+- Extend `demo.rs` into your own client or replace it with a framework SDK in
+  later phases

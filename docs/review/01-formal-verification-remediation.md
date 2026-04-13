@@ -5,7 +5,7 @@ Owner: Formal-verification gap
 
 ## Problem
 
-ARC/CHIO currently makes public formal-proof claims that are stronger than the proof artifacts and release gates actually shipped in the repo.
+ARC currently makes public formal-proof claims that are stronger than the proof artifacts and release gates actually shipped in the repo.
 
 The core mismatch has five parts:
 
@@ -35,7 +35,7 @@ Current command status on this checkout:
 - `./scripts/check-formal-proofs.sh`: passed
 - `cargo test -p arc-formal-diff-tests`: passed
 
-That is useful evidence. It is not yet evidence for the broader claim that the ARC/CHIO protocol, as implemented in Rust, is formally verified across recursive delegation chains, execution environments, and trust boundaries.
+That is useful evidence. It is not yet evidence for the broader claim that the ARC protocol, as implemented in Rust, is formally verified across recursive delegation chains, execution environments, and trust boundaries.
 
 ## Why Claims Overreach
 
@@ -94,7 +94,7 @@ The public P1-P5 story suggests a closed set of protocol theorems. The actual ro
 
 The target end-state should be:
 
-1. ARC/CHIO defines a precise `Verified Core` boundary.
+1. ARC defines a precise `Verified Core` boundary.
 2. Every public formal claim is mapped to a named theorem over that boundary.
 3. The production runtime routes its security-critical pure decision logic through code that is refinement-checked against the Lean model.
 4. Every proof dependency on symbolic or computational assumptions is explicit, machine-audited, and documented.
@@ -391,7 +391,7 @@ Anything short of this is still useful, but it is not enough to justify the curr
 
 ### Risks
 
-- Proof-scope explosion if the team tries to verify all of ARC/CHIO instead of a pure core.
+- Proof-scope explosion if the team tries to verify all of ARC instead of a pure core.
 - Architecture churn while carving out the verified-core evaluator from existing kernel logic.
 - Proof brittleness if public theorem names are tied too directly to unstable implementation details.
 - Tooling risk if the Rust verification toolchain chosen for refinement is immature for the required subset.
@@ -404,4 +404,4 @@ Anything short of this is still useful, but it is not enough to justify the curr
 - Proving Ed25519, SHA-256, or Merkle trees from first principles inside Lean
 - Claiming more than "properties hold under explicit assumptions" for the cryptographic layer
 
-The disciplined end-state is not "everything is formally verified." It is "the security-critical pure semantics that justify ARC/CHIO's core authorization claims are formally verified, implementation-linked, assumption-audited, and release-gated."
+The disciplined end-state is not "everything is formally verified." It is "the security-critical pure semantics that justify ARC's core authorization claims are formally verified, implementation-linked, assumption-audited, and release-gated."

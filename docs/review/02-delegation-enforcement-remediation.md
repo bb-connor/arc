@@ -2,7 +2,7 @@
 
 ## Problem
 
-CHIO currently presents delegation attenuation, delegation-chain validity, and revocation completeness as runtime properties, but the kernel admission path does not actually enforce them as first-class acceptance conditions.
+ARC currently presents delegation attenuation, delegation-chain validity, and revocation completeness as runtime properties, but the kernel admission path does not actually enforce them as first-class acceptance conditions.
 
 Today, the main tool-call path verifies:
 
@@ -65,7 +65,7 @@ The current implementation overclaims for five reasons.
 5. **The trust model is not yet a true recursive delegation model.**
    `verify_capability_signature` currently trusts CA/kernel/authority keys, not an arbitrary parent subject chained back to a trusted root: `crates/arc-kernel/src/lib.rs:2576-2600`. In practice, this makes delegation look more like authority-mediated reissuance plus metadata than recursively validated authority transfer.
 
-Until those gaps are closed, the strongest honest claim is: CHIO has delegation data structures, helper validators, and some lineage persistence, but not a fully enforced delegated-authority acceptance model in the runtime.
+Until those gaps are closed, the strongest honest claim is: ARC has delegation data structures, helper validators, and some lineage persistence, but not a fully enforced delegated-authority acceptance model in the runtime.
 
 ## Target End-State
 
@@ -78,7 +78,7 @@ The target state should be explicit and narrow enough to test:
 - missing lineage, missing snapshots, ambiguous ancestry, or unverifiable imported ancestry fail closed
 - the same validation routine is used for tool calls, resource access, prompt access, and any other entry point that accepts capabilities
 
-To make the public claims true, CHIO should commit to a real delegation semantics:
+To make the public claims true, ARC should commit to a real delegation semantics:
 
 - **Recommended model:** the immediate parent subject signs the child capability, or signs a dedicated delegation proof that is bound to the child capability body; the kernel recursively validates that chain to a trusted root
 - **Not recommended if the claims stay strong:** continuing to rely on centralized authority reissuance while describing the result as runtime-enforced recursive delegation
