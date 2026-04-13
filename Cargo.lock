@@ -823,11 +823,28 @@ dependencies = [
 name = "arc-core"
 version = "0.1.0"
 dependencies = [
+ "arc-core-types",
  "criterion",
  "ed25519-dalek",
  "hex",
  "percent-encoding",
  "proptest",
+ "rand_core 0.6.4",
+ "ryu",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "url",
+]
+
+[[package]]
+name = "arc-core-types"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "hex",
+ "percent-encoding",
  "rand_core 0.6.4",
  "ryu",
  "serde",
