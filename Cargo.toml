@@ -9,6 +9,7 @@ members = [
     "crates/arc-a2a-adapter",
     "crates/arc-control-plane",
     "crates/arc-core",
+    "crates/arc-core-types",
     "crates/arc-credentials",
     "crates/arc-did",
     "crates/arc-hosted-mcp",

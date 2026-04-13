@@ -1,0 +1,27 @@
+[package]
+name = "arc-core-types"
+description = "Shared ARC substrate types for capability, receipt, manifest, and session boundaries"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_core_types"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand_core = { workspace = true }
+hex = { workspace = true }
+ryu = { workspace = true }
+sha2 = { workspace = true }
+percent-encoding = "2"
+url = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
