@@ -15,6 +15,7 @@ name = "core_primitives"
 harness = false
 
 [dependencies]
+arc-core-types = { path = "../arc-core-types" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

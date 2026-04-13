@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+pub use arc_core_types::runtime_attestation::AttestationVerifierFamily;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -40,15 +41,6 @@ pub const RUNTIME_ATTESTATION_VERIFIER_DESCRIPTOR_SCHEMA: &str =
 pub const RUNTIME_ATTESTATION_REFERENCE_VALUE_SET_SCHEMA: &str =
     "arc.runtime-attestation.reference-values.v1";
 pub const RUNTIME_ATTESTATION_TRUST_BUNDLE_SCHEMA: &str = "arc.runtime-attestation.trust-bundle.v1";
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum AttestationVerifierFamily {
-    AzureMaa,
-    AwsNitro,
-    GoogleAttestation,
-    EnterpriseVerifier,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
