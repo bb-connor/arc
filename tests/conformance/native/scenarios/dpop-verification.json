@@ -1,0 +1,16 @@
+{
+  "id": "dpop-verification",
+  "title": "ARC-native DPoP proof verifies for the expected capability and action binding",
+  "category": "dpop_verification",
+  "driver": "artifact",
+  "fixture": "valid_dpop",
+  "specVersion": "arc-wire-v1",
+  "assertions": [
+    {
+      "name": "dpop_proof_valid",
+      "kind": "dpop_proof_valid",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Verifies the shared DPoP proof semantics against deterministic capability and request bindings."
+}

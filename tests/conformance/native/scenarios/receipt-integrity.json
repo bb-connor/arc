@@ -1,0 +1,21 @@
+{
+  "id": "receipt-integrity",
+  "title": "Signed receipt verifies and tampering is detected",
+  "category": "receipt_integrity",
+  "driver": "artifact",
+  "fixture": "signed_receipt",
+  "specVersion": "arc-wire-v1",
+  "assertions": [
+    {
+      "name": "receipt_signature_valid",
+      "kind": "receipt_signature_valid",
+      "expectedBool": true
+    },
+    {
+      "name": "receipt_tamper_rejected",
+      "kind": "receipt_tamper_rejected",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Uses a deterministic receipt plus a tampered variant to prove integrity checks fail closed."
+}

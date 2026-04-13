@@ -1,0 +1,21 @@
+{
+  "id": "delegation-attenuation",
+  "title": "Delegated capability remains structurally valid and narrower than its parent",
+  "category": "delegation_attenuation",
+  "driver": "artifact",
+  "fixture": "delegation_pair",
+  "specVersion": "arc-wire-v1",
+  "assertions": [
+    {
+      "name": "delegation_chain_valid",
+      "kind": "delegation_chain_valid",
+      "expectedBool": true
+    },
+    {
+      "name": "delegation_attenuates_parent",
+      "kind": "delegation_attenuates_parent",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Captures the checked-in subset relation and signed delegation-link shape."
+}

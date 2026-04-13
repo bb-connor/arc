@@ -1,0 +1,16 @@
+{
+  "id": "capability-validation",
+  "title": "Signed capability verifies under the native fixture corpus",
+  "category": "capability_validation",
+  "driver": "artifact",
+  "fixture": "valid_capability",
+  "specVersion": "arc-wire-v1",
+  "assertions": [
+    {
+      "name": "capability_signature_valid",
+      "kind": "capability_signature_valid",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Checks deterministic capability signature validity without depending on a target implementation."
+}

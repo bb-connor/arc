@@ -1,5 +1,6 @@
 mod load;
 mod model;
+mod native_suite;
 mod report;
 mod runner;
 
@@ -8,6 +9,12 @@ pub use model::{
     AssertionOutcome, AssertionResult, CompatibilityReport, DeploymentMode, PeerRole,
     RequiredCapabilities, ResultStatus, ScenarioCategory, ScenarioDescriptor, ScenarioResult,
     Transport,
+};
+pub use native_suite::{
+    default_native_run_options, fixture_messages_for_request, load_native_scenarios_from_dir,
+    run_native_conformance_suite, NativeConformanceRunOptions, NativeConformanceRunSummary,
+    NativeDriver, NativeFixtureRequest, NativeFixtureResponse, NativeScenarioCategory,
+    NativeScenarioDescriptor, NativeScenarioResult, NativeStatus, NativeSuiteError,
 };
 pub use report::generate_markdown_report;
 pub use runner::{

@@ -1,0 +1,26 @@
+{
+  "id": "revocation-propagation",
+  "title": "Revoked capability is surfaced as a terminal capability_revoked response",
+  "category": "revocation_propagation",
+  "driver": "stdio",
+  "fixture": "revoked_capability_request",
+  "specVersion": "arc-wire-v1",
+  "assertions": [
+    {
+      "name": "terminal_status_err",
+      "kind": "terminal_status",
+      "expectedString": "err"
+    },
+    {
+      "name": "revocation_error_code",
+      "kind": "tool_error_code",
+      "expectedString": "capability_revoked"
+    },
+    {
+      "name": "response_receipt_signature_valid",
+      "kind": "response_receipt_signature_valid",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Exercises the language-neutral stdio driver against a revoked capability fixture."
+}

@@ -50,6 +50,7 @@ Wave 2 task scenarios live under `scenarios/wave2/`.
 Wave 3 auth scenarios live under `scenarios/wave3/`.
 Wave 4 notification scenarios live under `scenarios/wave4/`.
 Wave 5 nested-flow scenarios live under `scenarios/wave5/`.
+The native ARC conformance lane lives under `native/`.
 
 Current live status:
 
@@ -110,4 +111,19 @@ cargo run -p arc-conformance --bin arc-conformance-runner -- \
   --scenarios-dir tests/conformance/scenarios/wave3 \
   --results-dir tests/conformance/results/generated/wave3-go-live \
   --report-output tests/conformance/reports/generated/wave3-go-live.md
+```
+
+Run the dedicated native ARC lane with:
+
+```bash
+target/debug/arc-native-conformance-fixture --http-listen 127.0.0.1:9954
+```
+
+```bash
+target/debug/arc-native-conformance-runner \
+  --scenarios-dir tests/conformance/native/scenarios \
+  --results-output tests/conformance/native/results/generated/arc-self.json \
+  --report-output tests/conformance/native/reports/generated/arc-self.md \
+  --stdio-command target/debug/arc-native-conformance-fixture \
+  --http-base-url http://127.0.0.1:9954
 ```

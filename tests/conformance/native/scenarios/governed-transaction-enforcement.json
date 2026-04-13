@@ -1,0 +1,27 @@
+{
+  "id": "governed-transaction-enforcement",
+  "title": "HTTP driver returns a governed receipt for the governed transfer fixture",
+  "category": "governed_transaction_enforcement",
+  "driver": "http",
+  "fixture": "governed_request",
+  "specVersion": "arc-wire-v1",
+  "httpPath": "/arc-conformance/v1/invoke",
+  "assertions": [
+    {
+      "name": "terminal_status_ok",
+      "kind": "terminal_status",
+      "expectedString": "ok"
+    },
+    {
+      "name": "governed_receipt_present",
+      "kind": "governed_receipt_present",
+      "expectedBool": true
+    },
+    {
+      "name": "response_receipt_signature_valid",
+      "kind": "response_receipt_signature_valid",
+      "expectedBool": true
+    }
+  ],
+  "notes": "Exercises the HTTP driver contract and verifies governed metadata survives on the receipt."
+}
