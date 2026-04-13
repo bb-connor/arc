@@ -27,6 +27,7 @@ export interface ReceiptAction {
 
 export type ReceiptDecision =
   | 'allow'
+  | { verdict: 'allow' }
   | { deny: { reason: string; guard: string } }
   | { cancelled: Record<string, unknown> }
   | { incomplete: Record<string, unknown> }
@@ -409,6 +410,9 @@ export interface ReceiptAnalyticsFilters {
  */
 export function decisionKind(decision: ReceiptDecision): DecisionKind {
   if (decision === 'allow') return 'allow'
+  if (typeof decision === 'object' && 'verdict' in decision && decision.verdict === 'allow') {
+    return 'allow'
+  }
   if (typeof decision === 'object' && 'deny' in decision) return 'deny'
   if (typeof decision === 'object' && 'cancelled' in decision) return 'cancelled'
   return 'incomplete'

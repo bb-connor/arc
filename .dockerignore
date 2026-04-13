@@ -1,0 +1,13 @@
+.git
+.github
+.planning
+.codex_agent_runs
+coverage
+target
+**/target
+node_modules
+**/node_modules
+npm-debug.log
+dist
+tmp
+.DS_Store

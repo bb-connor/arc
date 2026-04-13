@@ -1,0 +1,40 @@
+name: arc-docker-quickstart
+
+services:
+  arc-trust-demo:
+    image: arc-trust-demo:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: arc-trust-demo
+    environment:
+      ARC_SERVICE_TOKEN: ${ARC_SERVICE_TOKEN:-demo-token}
+    ports:
+      - "${ARC_TRUST_PORT:-8940}:8940"
+    volumes:
+      - arc_demo_state:/var/lib/arc
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8940/health >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  arc-mcp-demo:
+    image: arc-mcp-demo:local
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      target: arc-mcp-demo
+    environment:
+      ARC_AUTH_TOKEN: ${ARC_AUTH_TOKEN:-demo-token}
+      ARC_CONTROL_URL: http://arc-trust-demo:8940
+      ARC_CONTROL_TOKEN: ${ARC_SERVICE_TOKEN:-demo-token}
+    ports:
+      - "${ARC_EDGE_PORT:-8931}:8931"
+    depends_on:
+      arc-trust-demo:
+        condition: service_healthy
+
+volumes:
+  arc_demo_state:

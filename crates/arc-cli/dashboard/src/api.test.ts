@@ -7,7 +7,7 @@ import {
   fetchReceiptAnalytics,
   getToken,
 } from './api'
-import { receiptSubjectKey, type Receipt } from './types'
+import { decisionKind, receiptSubjectKey, type Receipt } from './types'
 
 describe('dashboard api helpers', () => {
   beforeEach(() => {
@@ -307,5 +307,9 @@ describe('dashboard api helpers', () => {
     } satisfies Receipt
 
     expect(receiptSubjectKey(receipt)).toBe('agent-subject')
+  })
+
+  it('classifies tagged allow decisions from receipt query responses', () => {
+    expect(decisionKind({ verdict: 'allow' })).toBe('allow')
   })
 })
