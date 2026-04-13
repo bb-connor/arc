@@ -46,18 +46,18 @@ measure_case() {
     local target_dir="$4"
     local log_file="$TMP_ROOT/${label}.log"
 
-    echo "== ${label} =="
-    echo "ref: $(git -C "$worktree" rev-parse --short HEAD)"
-    echo "package: $PACKAGE"
-    echo "touch: $touch_file"
+    echo "== ${label} ==" >&2
+    echo "ref: $(git -C "$worktree" rev-parse --short HEAD)" >&2
+    echo "package: $PACKAGE" >&2
+    echo "touch: $touch_file" >&2
 
     (
         cd "$worktree"
         export CARGO_TARGET_DIR="$target_dir"
-        cargo check -p "$PACKAGE" >/dev/null
+        cargo check -q -p "$PACKAGE" >/dev/null
         touch "$touch_file"
-        /usr/bin/time -p cargo check -p "$PACKAGE"
-    ) 2>&1 | tee "$log_file"
+        /usr/bin/time -p cargo check -q -p "$PACKAGE"
+    ) 2>&1 | tee "$log_file" >&2
 
     awk '/^real / {print $2}' "$log_file" | tail -n 1
 }
@@ -69,13 +69,13 @@ echo
 echo "== comparison =="
 printf 'baseline_real_seconds=%s\n' "$BASELINE_REAL"
 printf 'split_real_seconds=%s\n' "$SPLIT_REAL"
-awk -v baseline="$BASELINE_REAL" -v split="$SPLIT_REAL" '
+awk -v baseline_time="$BASELINE_REAL" -v split_time="$SPLIT_REAL" '
     BEGIN {
-        if (split <= 0) {
+        if (split_time <= 0) {
             print "split timing was not positive" > "/dev/stderr";
             exit 1;
         }
-        printf "speedup_ratio=%.2fx\n", baseline / split;
-        printf "delta_seconds=%.2f\n", baseline - split;
+        printf "speedup_ratio=%.2fx\n", baseline_time / split_time;
+        printf "delta_seconds=%.2f\n", baseline_time - split_time;
     }
 '
