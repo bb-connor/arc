@@ -1,0 +1,1053 @@
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use arc_core::session::{SessionAuthMethod, SessionTransport};
+    use p256::ecdsa::signature::Signer as _;
+    use rsa::pkcs1v15::SigningKey as RsaPkcs1v15SigningKey;
+    use rsa::pss::BlindedSigningKey as RsaPssSigningKey;
+    use rsa::rand_core::OsRng;
+    use rsa::signature::{RandomizedSigner as _, SignatureEncoding as _};
+    use serde_json::json;
+
+    fn sign_jwt_with_header(
+        header: Value,
+        claims: &serde_json::Value,
+        sign: impl Fn(&[u8]) -> Vec<u8>,
+    ) -> String {
+        let header =
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header).expect("serialize JWT header"));
+        let payload =
+            URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).expect("serialize JWT claims"));
+        let signing_input = format!("{header}.{payload}");
+        let signature = URL_SAFE_NO_PAD.encode(sign(signing_input.as_bytes()));
+        format!("{signing_input}.{signature}")
+    }
+
+    fn sign_jwt_rs256(
+        private_key: &rsa::RsaPrivateKey,
+        claims: &serde_json::Value,
+        kid: &str,
+    ) -> String {
+        let signing_key = RsaPkcs1v15SigningKey::<Sha256>::new(private_key.clone());
+        sign_jwt_with_header(
+            json!({
+                "alg": "RS256",
+                "typ": "JWT",
+                "kid": kid,
+            }),
+            claims,
+            |message| signing_key.sign(message).to_vec(),
+        )
+    }
+
+    fn sign_jwt_es256(
+        signing_key: &p256::ecdsa::SigningKey,
+        claims: &serde_json::Value,
+        kid: &str,
+    ) -> String {
+        sign_jwt_with_header(
+            json!({
+                "alg": "ES256",
+                "typ": "JWT",
+                "kid": kid,
+            }),
+            claims,
+            |message| {
+                let signature: p256::ecdsa::Signature = signing_key.sign(message);
+                signature.to_bytes().to_vec()
+            },
+        )
+    }
+
+    fn sign_jwt_ps256(
+        private_key: &rsa::RsaPrivateKey,
+        claims: &serde_json::Value,
+        kid: &str,
+    ) -> String {
+        let signing_key = RsaPssSigningKey::<Sha256>::new(private_key.clone());
+        sign_jwt_with_header(
+            json!({
+                "alg": "PS256",
+                "typ": "JWT",
+                "kid": kid,
+            }),
+            claims,
+            |message| signing_key.sign_with_rng(&mut OsRng, message).to_vec(),
+        )
+    }
+
+    fn sign_jwt_es384(
+        signing_key: &p384::ecdsa::SigningKey,
+        claims: &serde_json::Value,
+        kid: &str,
+    ) -> String {
+        sign_jwt_with_header(
+            json!({
+                "alg": "ES384",
+                "typ": "JWT",
+                "kid": kid,
+            }),
+            claims,
+            |message| {
+                let signature: p384::ecdsa::Signature = signing_key.sign(message);
+                signature.to_bytes().to_vec()
+            },
+        )
+    }
+
+    fn test_introspection_verifier(
+        issuer: Option<&str>,
+        audience: Option<&str>,
+        required_scopes: &[&str],
+    ) -> IntrospectionBearerVerifier {
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        IntrospectionBearerVerifier {
+            client: HttpClient::builder().build().expect("build http client"),
+            introspection_url: Url::parse("http://127.0.0.1:9/introspect")
+                .expect("parse introspection url"),
+            client_id: None,
+            client_secret: None,
+            issuer: issuer.map(ToOwned::to_owned),
+            audience: audience.map(ToOwned::to_owned),
+            required_scopes: required_scopes
+                .iter()
+                .map(|scope| (*scope).to_string())
+                .collect(),
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        }
+    }
+
+    fn test_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
+        let config = DpopConfig::default();
+        let store = Arc::new(DpopNonceStore::new(
+            config.nonce_store_capacity,
+            Duration::from_secs(config.proof_ttl_secs),
+        ));
+        (store, config)
+    }
+
+    fn empty_header_map() -> HeaderMap {
+        HeaderMap::new()
+    }
+
+    #[test]
+    fn arc_oauth_discovery_profile_metadata_advertises_sender_constraints() {
+        let metadata =
+            build_arc_oauth_authorization_profile_metadata().expect("build ARC auth profile");
+        let profile: ArcOAuthAuthorizationProfile =
+            serde_json::from_value(metadata.clone()).expect("parse ARC auth profile");
+        assert_eq!(profile.id, ARC_OAUTH_AUTHORIZATION_PROFILE_ID);
+        assert_eq!(profile.schema, ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA);
+        assert_eq!(
+            profile.sender_constraints.subject_binding,
+            ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT
+        );
+        assert!(profile
+            .sender_constraints
+            .proof_types_supported
+            .iter()
+            .any(|proof| proof == ARC_OAUTH_SENDER_PROOF_ARC_DPOP));
+        assert!(profile
+            .sender_constraints
+            .proof_types_supported
+            .iter()
+            .any(|proof| proof == arc_kernel::operator_report::ARC_OAUTH_SENDER_PROOF_ARC_MTLS));
+        assert!(profile
+            .sender_constraints
+            .proof_types_supported
+            .iter()
+            .any(|proof| proof
+                == arc_kernel::operator_report::ARC_OAUTH_SENDER_PROOF_ARC_ATTESTATION));
+        assert_eq!(
+            profile
+                .request_time_contract
+                .authorization_details_parameter
+                .as_str(),
+            ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_PARAMETER
+        );
+        assert!(
+            profile
+                .resource_binding
+                .request_resource_must_match_protected_resource
+        );
+        assert!(
+            !profile
+                .artifact_boundary
+                .reviewer_evidence_runtime_admission_supported
+        );
+        assert_eq!(metadata["discoveryInformationalOnly"].as_bool(), Some(true));
+    }
+
+    #[test]
+    fn arc_oauth_discovery_validation_rejects_profile_mismatch() {
+        let protected_resource_metadata = ProtectedResourceMetadata {
+            resource: "https://edge.example/mcp".to_string(),
+            resource_metadata_url: "https://edge.example/.well-known/oauth-protected-resource/mcp"
+                .to_string(),
+            authorization_servers: vec!["https://edge.example/oauth".to_string()],
+            scopes_supported: vec!["mcp:invoke".to_string()],
+            arc_authorization_profile: build_arc_oauth_authorization_profile_metadata()
+                .expect("build protected ARC auth profile"),
+        };
+        let authorization_server_metadata = AuthorizationServerMetadata {
+            metadata_path: "/.well-known/oauth-authorization-server/oauth".to_string(),
+            document: json!({
+                "issuer": "https://edge.example/oauth",
+                "arc_authorization_profile": {
+                    "schema": ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA,
+                    "id": "mismatched-profile",
+                    "authoritativeSource": "governed_receipt_projection",
+                    "authorizationDetailTypes": ["arc_governed_tool"],
+                    "transactionContextFields": ["intentId", "intentHash"],
+                    "senderConstraints": {
+                        "schema": "arc.oauth.sender-constraint.v1",
+                        "subjectBinding": ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT,
+                        "proofTypesSupported": [ARC_OAUTH_SENDER_PROOF_ARC_DPOP],
+                        "proofRequiredWhen": "matchedGrant.dpopRequired == true",
+                        "runtimeAssuranceBindingFields": ["runtimeAssuranceTier"],
+                        "delegatedCallChainField": "callChain",
+                        "unsupportedSenderShapesFailClosed": true
+                    },
+                    "unsupportedShapesFailClosed": true
+                }
+            }),
+        };
+
+        let error = validate_arc_oauth_discovery_metadata_pair(
+            &protected_resource_metadata,
+            &authorization_server_metadata,
+        )
+        .expect_err("mismatched discovery metadata should fail");
+        assert!(
+            error.to_string().contains("ARC authorization profile id"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn remote_session_auth_context_uses_static_bearer_fingerprint_and_origin() {
+        let mut headers = HeaderMap::new();
+        headers.insert(ORIGIN, HeaderValue::from_static("http://localhost:3000"));
+
+        let auth_context = build_static_bearer_session_auth_context(&headers, "test-token");
+        assert_eq!(auth_context.transport, SessionTransport::StreamableHttp);
+        assert_eq!(
+            auth_context.origin.as_deref(),
+            Some("http://localhost:3000")
+        );
+        assert!(auth_context.is_authenticated());
+
+        match &auth_context.method {
+            SessionAuthMethod::StaticBearer {
+                principal,
+                token_fingerprint,
+            } => {
+                assert_eq!(token_fingerprint, &sha256_hex(b"test-token"));
+                assert!(principal.starts_with("static-bearer:"));
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
+        let keypair = Keypair::generate();
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        let token = sign_jwt(
+            &keypair,
+            &json!({
+                "iss": "https://issuer.example",
+                "sub": "user-123",
+                "aud": "arc-mcp",
+                "scope": "tools.read tools.write",
+                "client_id": "client-abc",
+                "tid": "tenant-123",
+                "org_id": "org-789",
+                "groups": ["ops", "eng"],
+                "roles": ["reviewer", "operator"],
+                "exp": unix_now() + 300,
+            }),
+        );
+        let verifier = JwtBearerVerifier {
+            key_source: JwtVerificationKeySource::Static(keypair.public_key()),
+            issuer: Some("https://issuer.example".to_string()),
+            audience: Some("arc-mcp".to_string()),
+            required_scopes: vec![],
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        };
+
+        let auth_context = verifier
+            .authenticate_token(
+                &token,
+                &empty_header_map(),
+                Some("http://localhost:3000".to_string()),
+                None,
+                "POST",
+                "arc-mcp",
+            )
+            .unwrap();
+        assert_eq!(auth_context.transport, SessionTransport::StreamableHttp);
+        assert_eq!(
+            auth_context.origin.as_deref(),
+            Some("http://localhost:3000")
+        );
+
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal,
+                issuer,
+                subject,
+                audience,
+                scopes,
+                federated_claims,
+                enterprise_identity,
+                token_fingerprint,
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:user-123")
+                );
+                assert_eq!(issuer.as_deref(), Some("https://issuer.example"));
+                assert_eq!(subject.as_deref(), Some("user-123"));
+                assert_eq!(audience.as_deref(), Some("arc-mcp"));
+                assert_eq!(
+                    scopes,
+                    &vec!["tools.read".to_string(), "tools.write".to_string()]
+                );
+                assert_eq!(federated_claims.client_id.as_deref(), Some("client-abc"));
+                assert_eq!(federated_claims.tenant_id.as_deref(), Some("tenant-123"));
+                assert_eq!(federated_claims.organization_id.as_deref(), Some("org-789"));
+                assert_eq!(
+                    federated_claims.groups,
+                    vec!["eng".to_string(), "ops".to_string()]
+                );
+                assert_eq!(
+                    federated_claims.roles,
+                    vec!["operator".to_string(), "reviewer".to_string()]
+                );
+                assert_eq!(
+                    token_fingerprint.as_deref(),
+                    Some(sha256_hex(token.as_bytes()).as_str())
+                );
+                let enterprise_identity = enterprise_identity
+                    .as_ref()
+                    .expect("enterprise identity should be populated");
+                assert_eq!(enterprise_identity.provider_id, "https://issuer.example");
+                assert_eq!(enterprise_identity.provider_record_id, None);
+                assert_eq!(enterprise_identity.provider_kind, "oidc_jwks");
+                assert_eq!(
+                    enterprise_identity.federation_method,
+                    EnterpriseFederationMethod::Jwt
+                );
+                assert_eq!(
+                    enterprise_identity.principal,
+                    "oidc:https://issuer.example#sub:user-123"
+                );
+                assert_eq!(
+                    enterprise_identity.subject_key,
+                    derive_enterprise_subject_key(
+                        "https://issuer.example",
+                        "oidc:https://issuer.example#sub:user-123",
+                    )
+                );
+                assert_eq!(enterprise_identity.tenant_id.as_deref(), Some("tenant-123"));
+                assert_eq!(
+                    enterprise_identity.organization_id.as_deref(),
+                    Some("org-789")
+                );
+                assert_eq!(
+                    enterprise_identity.attribute_sources.get("principal"),
+                    Some(&"sub".to_string())
+                );
+                assert_eq!(
+                    enterprise_identity.attribute_sources.get("groups"),
+                    Some(&"groups".to_string())
+                );
+                assert_eq!(
+                    enterprise_identity.attribute_sources.get("roles"),
+                    Some(&"roles".to_string())
+                );
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
+        let private_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let public_key = private_key.to_public_key();
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        let token = sign_jwt_rs256(
+            &private_key,
+            &json!({
+                "iss": "https://issuer.example",
+                "sub": "user-rsa",
+                "aud": "arc-mcp",
+                "scope": "tools.read",
+                "exp": unix_now() + 300,
+            }),
+            "rsa-key-1",
+        );
+        let verifier = JwtBearerVerifier {
+            key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
+                keys_by_kid: HashMap::from([(
+                    "rsa-key-1".to_string(),
+                    JwtResolvedJwkPublicKey {
+                        key: JwtResolvedPublicKey::Rsa(public_key),
+                        alg_hint: Some("RS256".to_string()),
+                    },
+                )]),
+                anonymous_keys: vec![],
+            }),
+            issuer: Some("https://issuer.example".to_string()),
+            audience: Some("arc-mcp".to_string()),
+            required_scopes: vec![],
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        };
+
+        let auth_context = verifier
+            .authenticate_token(
+                &token,
+                &empty_header_map(),
+                Some("http://localhost:3000".to_string()),
+                None,
+                "POST",
+                "arc-mcp",
+            )
+            .unwrap();
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal, subject, ..
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:user-rsa")
+                );
+                assert_eq!(subject.as_deref(), Some("user-rsa"));
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn jwt_bearer_verifier_authenticates_es256_jwks_token() {
+        let signing_key =
+            p256::ecdsa::SigningKey::random(&mut p256::elliptic_curve::rand_core::OsRng);
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        let token = sign_jwt_es256(
+            &signing_key,
+            &json!({
+                "iss": "https://issuer.example",
+                "sub": "user-ec",
+                "aud": "arc-mcp",
+                "scope": "tools.read",
+                "exp": unix_now() + 300,
+            }),
+            "ec-key-1",
+        );
+        let verifier = JwtBearerVerifier {
+            key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
+                keys_by_kid: HashMap::from([(
+                    "ec-key-1".to_string(),
+                    JwtResolvedJwkPublicKey {
+                        key: JwtResolvedPublicKey::P256(*signing_key.verifying_key()),
+                        alg_hint: Some("ES256".to_string()),
+                    },
+                )]),
+                anonymous_keys: vec![],
+            }),
+            issuer: Some("https://issuer.example".to_string()),
+            audience: Some("arc-mcp".to_string()),
+            required_scopes: vec![],
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        };
+
+        let auth_context = verifier
+            .authenticate_token(&token, &empty_header_map(), None, None, "POST", "arc-mcp")
+            .unwrap();
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal, subject, ..
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:user-ec")
+                );
+                assert_eq!(subject.as_deref(), Some("user-ec"));
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn jwt_bearer_verifier_authenticates_ps256_jwks_token() {
+        let private_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let public_key = private_key.to_public_key();
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        let token = sign_jwt_ps256(
+            &private_key,
+            &json!({
+                "iss": "https://issuer.example",
+                "sub": "user-pss",
+                "aud": "arc-mcp",
+                "scope": "tools.read",
+                "exp": unix_now() + 300,
+            }),
+            "pss-key-1",
+        );
+        let verifier = JwtBearerVerifier {
+            key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
+                keys_by_kid: HashMap::from([(
+                    "pss-key-1".to_string(),
+                    JwtResolvedJwkPublicKey {
+                        key: JwtResolvedPublicKey::Rsa(public_key),
+                        alg_hint: Some("PS256".to_string()),
+                    },
+                )]),
+                anonymous_keys: vec![],
+            }),
+            issuer: Some("https://issuer.example".to_string()),
+            audience: Some("arc-mcp".to_string()),
+            required_scopes: vec![],
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        };
+
+        let auth_context = verifier
+            .authenticate_token(&token, &empty_header_map(), None, None, "POST", "arc-mcp")
+            .unwrap();
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal, subject, ..
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:user-pss")
+                );
+                assert_eq!(subject.as_deref(), Some("user-pss"));
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn jwt_bearer_verifier_authenticates_es384_jwks_token() {
+        let signing_key =
+            p384::ecdsa::SigningKey::random(&mut p384::elliptic_curve::rand_core::OsRng);
+        let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
+        let token = sign_jwt_es384(
+            &signing_key,
+            &json!({
+                "iss": "https://issuer.example",
+                "sub": "user-es384",
+                "aud": "arc-mcp",
+                "scope": "tools.read",
+                "exp": unix_now() + 300,
+            }),
+            "ec384-key-1",
+        );
+        let verifier = JwtBearerVerifier {
+            key_source: JwtVerificationKeySource::Jwks(JwtJwksKeySet {
+                keys_by_kid: HashMap::from([(
+                    "ec384-key-1".to_string(),
+                    JwtResolvedJwkPublicKey {
+                        key: JwtResolvedPublicKey::P384(*signing_key.verifying_key()),
+                        alg_hint: Some("ES384".to_string()),
+                    },
+                )]),
+                anonymous_keys: vec![],
+            }),
+            issuer: Some("https://issuer.example".to_string()),
+            audience: Some("arc-mcp".to_string()),
+            required_scopes: vec![],
+            provider_profile: JwtProviderProfile::Generic,
+            enterprise_provider_registry: None,
+            sender_dpop_nonce_store,
+            sender_dpop_config,
+        };
+
+        let auth_context = verifier
+            .authenticate_token(&token, &empty_header_map(), None, None, "POST", "arc-mcp")
+            .unwrap();
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal, subject, ..
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:user-es384")
+                );
+                assert_eq!(subject.as_deref(), Some("user-es384"));
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn introspection_bearer_verifier_accepts_active_token_with_resource_claim() {
+        let verifier = test_introspection_verifier(
+            Some("https://issuer.example"),
+            Some("arc-mcp"),
+            &["mcp:invoke"],
+        );
+        let auth_context = verifier
+            .session_auth_context_from_introspection(
+                "opaque-token",
+                &empty_header_map(),
+                OAuthIntrospectionResponse {
+                    active: true,
+                    token_type: Some("Bearer".to_string()),
+                    claims: JwtClaims {
+                        iss: Some("https://issuer.example".to_string()),
+                        sub: Some("opaque-user".to_string()),
+                        aud: None,
+                        scope: Some("mcp:invoke tools.read".to_string()),
+                        scp: vec![],
+                        client_id: Some("client-123".to_string()),
+                        jti: None,
+                        oid: None,
+                        azp: None,
+                        appid: None,
+                        tid: Some("tenant-123".to_string()),
+                        tenant_id: None,
+                        org_id: Some("org-789".to_string()),
+                        organization_id: None,
+                        groups: vec!["ops".to_string(), "eng".to_string()],
+                        roles: vec!["operator".to_string()],
+                        resource: Some("arc-mcp".to_string()),
+                        authorization_details: None,
+                        arc_transaction_context: None,
+                        cnf: None,
+                        exp: Some(unix_now() + 300),
+                        nbf: None,
+                    },
+                },
+                Some("http://localhost:3000".to_string()),
+                None,
+                "POST",
+                "arc-mcp",
+            )
+            .unwrap();
+        match &auth_context.method {
+            SessionAuthMethod::OAuthBearer {
+                principal,
+                issuer,
+                subject,
+                audience,
+                scopes,
+                federated_claims,
+                enterprise_identity,
+                token_fingerprint,
+            } => {
+                assert_eq!(
+                    principal.as_deref(),
+                    Some("oidc:https://issuer.example#sub:opaque-user")
+                );
+                assert_eq!(issuer.as_deref(), Some("https://issuer.example"));
+                assert_eq!(subject.as_deref(), Some("opaque-user"));
+                assert_eq!(audience.as_deref(), Some("arc-mcp"));
+                assert_eq!(
+                    scopes,
+                    &vec!["mcp:invoke".to_string(), "tools.read".to_string()]
+                );
+                assert_eq!(federated_claims.client_id.as_deref(), Some("client-123"));
+                assert_eq!(federated_claims.tenant_id.as_deref(), Some("tenant-123"));
+                assert_eq!(federated_claims.organization_id.as_deref(), Some("org-789"));
+                assert_eq!(
+                    federated_claims.groups,
+                    vec!["eng".to_string(), "ops".to_string()]
+                );
+                assert_eq!(federated_claims.roles, vec!["operator".to_string()]);
+                assert_eq!(
+                    token_fingerprint.as_deref(),
+                    Some(sha256_hex(b"opaque-token").as_str())
+                );
+                let enterprise_identity = enterprise_identity
+                    .as_ref()
+                    .expect("enterprise identity should be populated");
+                assert_eq!(enterprise_identity.provider_kind, "oauth_introspection");
+                assert_eq!(
+                    enterprise_identity.federation_method,
+                    EnterpriseFederationMethod::Introspection
+                );
+                assert_eq!(
+                    enterprise_identity.subject_key,
+                    derive_enterprise_subject_key(
+                        "https://issuer.example",
+                        "oidc:https://issuer.example#sub:opaque-user",
+                    )
+                );
+            }
+            other => panic!("unexpected auth method: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn introspection_bearer_verifier_rejects_inactive_token() {
+        let verifier = test_introspection_verifier(None, None, &[]);
+        let error = verifier
+            .session_auth_context_from_introspection(
+                "opaque-token",
+                &empty_header_map(),
+                OAuthIntrospectionResponse {
+                    active: false,
+                    token_type: Some("Bearer".to_string()),
+                    claims: JwtClaims {
+                        iss: None,
+                        sub: Some("opaque-user".to_string()),
+                        aud: None,
+                        scope: None,
+                        scp: vec![],
+                        client_id: None,
+                        jti: None,
+                        oid: None,
+                        azp: None,
+                        appid: None,
+                        tid: None,
+                        tenant_id: None,
+                        org_id: None,
+                        organization_id: None,
+                        groups: Vec::new(),
+                        roles: Vec::new(),
+                        resource: None,
+                        authorization_details: None,
+                        arc_transaction_context: None,
+                        cnf: None,
+                        exp: None,
+                        nbf: None,
+                    },
+                },
+                None,
+                None,
+                "POST",
+                "arc-mcp",
+            )
+            .unwrap_err();
+        assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn build_federated_principal_prefers_subject_over_client_id() {
+        let principal = build_federated_principal(
+            &JwtClaims {
+                iss: Some("https://issuer.example/".to_string()),
+                sub: Some("user-123".to_string()),
+                aud: None,
+                scope: None,
+                scp: vec![],
+                client_id: Some("client-abc".to_string()),
+                jti: None,
+                oid: None,
+                azp: None,
+                appid: None,
+                tid: None,
+                tenant_id: None,
+                org_id: None,
+                organization_id: None,
+                groups: Vec::new(),
+                roles: Vec::new(),
+                resource: None,
+                authorization_details: None,
+                arc_transaction_context: None,
+                cnf: None,
+                exp: None,
+                nbf: None,
+            },
+            None,
+            None,
+            JwtProviderProfile::Generic,
+        )
+        .unwrap();
+        assert_eq!(principal, "oidc:https://issuer.example#sub:user-123");
+    }
+
+    #[test]
+    fn build_federated_principal_azure_ad_prefers_oid_and_appid() {
+        let principal = build_federated_principal(
+            &JwtClaims {
+                iss: Some("https://login.microsoftonline.com/example/v2.0".to_string()),
+                sub: Some("subject-123".to_string()),
+                aud: None,
+                scope: None,
+                scp: vec![],
+                client_id: None,
+                jti: None,
+                oid: Some("object-456".to_string()),
+                azp: None,
+                appid: Some("app-789".to_string()),
+                tid: None,
+                tenant_id: None,
+                org_id: None,
+                organization_id: None,
+                groups: Vec::new(),
+                roles: Vec::new(),
+                resource: None,
+                authorization_details: None,
+                arc_transaction_context: None,
+                cnf: None,
+                exp: None,
+                nbf: None,
+            },
+            None,
+            None,
+            JwtProviderProfile::AzureAd,
+        )
+        .unwrap();
+        assert_eq!(
+            principal,
+            "oidc:https://login.microsoftonline.com/example/v2.0#oid:object-456"
+        );
+    }
+
+    #[test]
+    fn build_federated_claims_normalizes_enterprise_identity_metadata() {
+        let federated_claims = build_federated_claims(
+            &JwtClaims {
+                iss: Some("https://issuer.example".to_string()),
+                sub: Some("user-123".to_string()),
+                aud: None,
+                scope: None,
+                scp: vec![],
+                client_id: None,
+                jti: None,
+                oid: Some("object-456".to_string()),
+                azp: Some("client-azp".to_string()),
+                appid: Some("client-app".to_string()),
+                tid: Some("tenant-123".to_string()),
+                tenant_id: Some("tenant-fallback".to_string()),
+                org_id: Some("org-789".to_string()),
+                organization_id: Some("org-fallback".to_string()),
+                groups: vec![
+                    " ops ".to_string(),
+                    "eng".to_string(),
+                    "eng".to_string(),
+                    "".to_string(),
+                ],
+                roles: vec![" reviewer ".to_string(), "operator".to_string()],
+                resource: None,
+                authorization_details: None,
+                arc_transaction_context: None,
+                cnf: None,
+                exp: None,
+                nbf: None,
+            },
+            JwtProviderProfile::AzureAd,
+        );
+        assert_eq!(federated_claims.client_id.as_deref(), Some("client-azp"));
+        assert_eq!(federated_claims.object_id.as_deref(), Some("object-456"));
+        assert_eq!(federated_claims.tenant_id.as_deref(), Some("tenant-123"));
+        assert_eq!(federated_claims.organization_id.as_deref(), Some("org-789"));
+        assert_eq!(
+            federated_claims.groups,
+            vec!["eng".to_string(), "ops".to_string()]
+        );
+        assert_eq!(
+            federated_claims.roles,
+            vec!["operator".to_string(), "reviewer".to_string()]
+        );
+    }
+
+    #[test]
+    fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
+        let config = RemoteServeHttpConfig {
+            listen: "127.0.0.1:0".parse().unwrap(),
+            auth_token: None,
+            auth_jwt_public_key: Some(Keypair::generate().public_key().to_hex()),
+            auth_jwt_discovery_url: None,
+            auth_introspection_url: None,
+            auth_introspection_client_id: None,
+            auth_introspection_client_secret: None,
+            auth_jwt_provider_profile: Some(JwtProviderProfile::Okta),
+            auth_server_seed_path: None,
+            identity_federation_seed_path: None,
+            enterprise_providers_file: None,
+            auth_jwt_issuer: Some("https://id.example.com/oauth2/default".to_string()),
+            auth_jwt_audience: None,
+            admin_token: Some("admin-token".to_string()),
+            control_url: None,
+            control_token: None,
+            public_base_url: None,
+            auth_servers: vec![],
+            auth_authorization_endpoint: None,
+            auth_token_endpoint: None,
+            auth_registration_endpoint: None,
+            auth_jwks_uri: None,
+            auth_scopes: vec![],
+            auth_subject: "operator".to_string(),
+            auth_code_ttl_secs: 300,
+            auth_access_token_ttl_secs: 600,
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            session_db_path: None,
+            policy_path: PathBuf::from("policy.yaml"),
+            server_id: "srv".to_string(),
+            server_name: "srv".to_string(),
+            server_version: "0.1.0".to_string(),
+            manifest_public_key: None,
+            page_size: 50,
+            tools_list_changed: false,
+            shared_hosted_owner: false,
+            wrapped_command: "python3".to_string(),
+            wrapped_args: vec!["mock.py".to_string()],
+        };
+
+        let discovery_url = resolve_identity_provider_discovery_url(&config)
+            .unwrap()
+            .expect("discovery url");
+        assert_eq!(
+            discovery_url.as_str(),
+            "https://id.example.com/oauth2/default/.well-known/openid-configuration"
+        );
+    }
+
+    #[test]
+    fn identity_federation_derives_stable_keypair_per_principal() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let seed_path = std::env::temp_dir().join(format!(
+            "arc-identity-federation-seed-{}-{nonce}.seed",
+            std::process::id()
+        ));
+
+        let first =
+            derive_federated_agent_keypair(&seed_path, "oidc:https://issuer.example#sub:user-123")
+                .unwrap();
+        let second =
+            derive_federated_agent_keypair(&seed_path, "oidc:https://issuer.example#sub:user-123")
+                .unwrap();
+        let other =
+            derive_federated_agent_keypair(&seed_path, "oidc:https://issuer.example#sub:user-456")
+                .unwrap();
+
+        assert_eq!(first.public_key().to_hex(), second.public_key().to_hex());
+        assert_ne!(first.public_key().to_hex(), other.public_key().to_hex());
+    }
+
+    #[test]
+    fn jwt_remote_auth_requires_separate_admin_token() {
+        let config = RemoteServeHttpConfig {
+            listen: "127.0.0.1:0".parse().unwrap(),
+            auth_token: None,
+            auth_jwt_public_key: Some(Keypair::generate().public_key().to_hex()),
+            auth_jwt_discovery_url: None,
+            auth_introspection_url: None,
+            auth_introspection_client_id: None,
+            auth_introspection_client_secret: None,
+            auth_jwt_provider_profile: None,
+            auth_server_seed_path: None,
+            identity_federation_seed_path: None,
+            enterprise_providers_file: None,
+            auth_jwt_issuer: None,
+            auth_jwt_audience: None,
+            admin_token: None,
+            control_url: None,
+            control_token: None,
+            public_base_url: None,
+            auth_servers: vec![],
+            auth_authorization_endpoint: None,
+            auth_token_endpoint: None,
+            auth_registration_endpoint: None,
+            auth_jwks_uri: None,
+            auth_scopes: vec![],
+            auth_subject: "operator".to_string(),
+            auth_code_ttl_secs: 300,
+            auth_access_token_ttl_secs: 600,
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            session_db_path: None,
+            policy_path: PathBuf::from("policy.yaml"),
+            server_id: "srv".to_string(),
+            server_name: "srv".to_string(),
+            server_version: "0.1.0".to_string(),
+            manifest_public_key: None,
+            page_size: 50,
+            tools_list_changed: false,
+            shared_hosted_owner: false,
+            wrapped_command: "python3".to_string(),
+            wrapped_args: vec!["mock.py".to_string()],
+        };
+
+        let error = build_remote_auth_state(&config, "127.0.0.1:0".parse().unwrap(), None, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("--admin-token"));
+    }
+
+    #[test]
+    fn shared_upstream_notification_fanout_copies_notifications_to_live_subscribers() {
+        let subscribers = Arc::new(StdMutex::new(Vec::new()));
+        let queue_a = Arc::new(StdMutex::new(VecDeque::new()));
+        let queue_b = Arc::new(StdMutex::new(VecDeque::new()));
+        let dropped_queue = Arc::new(StdMutex::new(VecDeque::new()));
+        if let Ok(mut guard) = subscribers.lock() {
+            guard.push(Arc::downgrade(&queue_a));
+            guard.push(Arc::downgrade(&queue_b));
+            guard.push(Arc::downgrade(&dropped_queue));
+        }
+        drop(dropped_queue);
+
+        fan_out_shared_upstream_notifications(
+            &subscribers,
+            vec![
+                json!({"jsonrpc": "2.0", "method": "notifications/resources/list_changed"}),
+                json!({"jsonrpc": "2.0", "method": "notifications/tools/list_changed"}),
+            ],
+        );
+
+        let queue_a = queue_a.lock().unwrap();
+        let queue_b = queue_b.lock().unwrap();
+        assert_eq!(queue_a.len(), 2);
+        assert_eq!(queue_b.len(), 2);
+        assert_eq!(
+            queue_a[0]["method"].as_str(),
+            Some("notifications/resources/list_changed")
+        );
+        assert_eq!(
+            queue_b[1]["method"].as_str(),
+            Some("notifications/tools/list_changed")
+        );
+        drop(queue_a);
+        drop(queue_b);
+
+        let subscriber_count = subscribers.lock().unwrap().len();
+        assert_eq!(subscriber_count, 2);
+    }
+
+    fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> String {
+        let header = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&json!({
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }))
+            .unwrap(),
+        );
+        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(claims).unwrap());
+        let signing_input = format!("{header}.{payload}");
+        let signature = keypair.sign(signing_input.as_bytes()).to_bytes();
+        let signature = URL_SAFE_NO_PAD.encode(signature);
+        format!("{signing_input}.{signature}")
+    }
+}

@@ -1,0 +1,2894 @@
+async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
+    let listener = tokio::net::TcpListener::bind(config.listen).await?;
+    let local_addr = listener.local_addr()?;
+    let enterprise_provider_registry = load_enterprise_provider_registry(
+        config.enterprise_providers_file.as_deref(),
+        "trust_control",
+    )?;
+    let verifier_policy_registry =
+        load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    let cluster = build_cluster_state(&config, local_addr)?;
+    let state = TrustServiceState {
+        config,
+        enterprise_provider_registry,
+        verifier_policy_registry,
+        federation_admission_rate_limiter: Arc::new(Mutex::new(
+            FederationAdmissionRateLimiter::default(),
+        )),
+        cluster,
+    };
+    if state.cluster.is_some() {
+        tokio::spawn(run_cluster_sync_loop(state.clone()));
+    }
+    let router = trust_control_health::install_health_routes(Router::new())
+        .route(
+            AUTHORITY_PATH,
+            get(handle_authority_status).post(handle_rotate_authority),
+        )
+        .route(ISSUE_CAPABILITY_PATH, post(handle_issue_capability))
+        .route(FEDERATED_ISSUE_PATH, post(handle_federated_issue))
+        .route(SCIM_USERS_PATH, post(handle_scim_create_user))
+        .route(SCIM_USER_PATH, delete(handle_scim_delete_user))
+        .route(
+            FEDERATION_PROVIDERS_PATH,
+            get(handle_list_enterprise_providers),
+        )
+        .route(
+            FEDERATION_PROVIDER_PATH,
+            get(handle_get_enterprise_provider)
+                .put(handle_upsert_enterprise_provider)
+                .delete(handle_delete_enterprise_provider),
+        )
+        .route(
+            FEDERATION_POLICIES_PATH,
+            get(handle_list_federation_policies),
+        )
+        .route(
+            FEDERATION_POLICY_PATH,
+            get(handle_get_federation_policy)
+                .put(handle_upsert_federation_policy)
+                .delete(handle_delete_federation_policy),
+        )
+        .route(
+            FEDERATION_POLICY_EVALUATE_PATH,
+            post(handle_evaluate_federation_policy),
+        )
+        .route(
+            CERTIFICATIONS_PATH,
+            get(handle_list_certifications).post(handle_publish_certification),
+        )
+        .route(CERTIFICATION_PATH, get(handle_get_certification))
+        .route(
+            CERTIFICATION_RESOLVE_PATH,
+            get(handle_resolve_certification),
+        )
+        .route(
+            CERTIFICATION_DISCOVERY_PATH,
+            post(handle_publish_certification_network),
+        )
+        .route(
+            CERTIFICATION_DISCOVERY_RESOLVE_PATH,
+            get(handle_discover_certification),
+        )
+        .route(
+            CERTIFICATION_DISCOVERY_SEARCH_PATH,
+            get(handle_search_certification_marketplace),
+        )
+        .route(
+            CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH,
+            get(handle_transparency_certification_marketplace),
+        )
+        .route(
+            CERTIFICATION_DISCOVERY_CONSUME_PATH,
+            post(handle_consume_certification_marketplace),
+        )
+        .route(CERTIFICATION_REVOKE_PATH, post(handle_revoke_certification))
+        .route(
+            CERTIFICATION_DISPUTE_PATH,
+            post(handle_dispute_certification),
+        )
+        .route(
+            PUBLIC_CERTIFICATION_METADATA_PATH,
+            get(handle_public_certification_metadata),
+        )
+        .route(
+            PUBLIC_CERTIFICATION_RESOLVE_PATH,
+            get(handle_public_resolve_certification),
+        )
+        .route(
+            PUBLIC_CERTIFICATION_SEARCH_PATH,
+            get(handle_public_search_certifications),
+        )
+        .route(
+            PUBLIC_CERTIFICATION_TRANSPARENCY_PATH,
+            get(handle_public_certification_transparency),
+        )
+        .route(
+            PUBLIC_GENERIC_NAMESPACE_PATH,
+            get(handle_public_generic_namespace),
+        )
+        .route(
+            PUBLIC_GENERIC_LISTINGS_PATH,
+            get(handle_public_generic_listings),
+        )
+        .route(
+            GENERIC_TRUST_ACTIVATION_ISSUE_PATH,
+            post(handle_issue_generic_trust_activation),
+        )
+        .route(
+            GENERIC_TRUST_ACTIVATION_EVALUATE_PATH,
+            post(handle_evaluate_generic_trust_activation),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH,
+            post(handle_issue_generic_governance_charter),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CASE_ISSUE_PATH,
+            post(handle_issue_generic_governance_case),
+        )
+        .route(
+            GENERIC_GOVERNANCE_CASE_EVALUATE_PATH,
+            post(handle_evaluate_generic_governance_case),
+        )
+        .route(
+            OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH,
+            post(handle_issue_open_market_fee_schedule),
+        )
+        .route(
+            OPEN_MARKET_PENALTY_ISSUE_PATH,
+            post(handle_issue_open_market_penalty),
+        )
+        .route(
+            OPEN_MARKET_PENALTY_EVALUATE_PATH,
+            post(handle_evaluate_open_market_penalty),
+        )
+        .route(
+            PASSPORT_ISSUER_METADATA_PATH,
+            get(handle_passport_issuer_metadata),
+        )
+        .route(
+            PUBLIC_PASSPORT_ISSUER_DISCOVERY_PATH,
+            get(handle_public_passport_issuer_discovery),
+        )
+        .route(
+            PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH,
+            get(handle_public_passport_verifier_discovery),
+        )
+        .route(
+            PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH,
+            get(handle_public_passport_discovery_transparency),
+        )
+        .route(PASSPORT_ISSUER_JWKS_PATH, get(handle_passport_issuer_jwks))
+        .route(
+            PASSPORT_SD_JWT_TYPE_METADATA_PATH,
+            get(handle_passport_sd_jwt_type_metadata),
+        )
+        .route(
+            ARC_PASSPORT_JWT_VC_JSON_TYPE_METADATA_PATH,
+            get(handle_passport_jwt_vc_json_type_metadata),
+        )
+        .route(
+            PASSPORT_ISSUANCE_OFFERS_PATH,
+            post(handle_create_passport_issuance_offer),
+        )
+        .route(
+            PASSPORT_ISSUANCE_TOKEN_PATH,
+            post(handle_redeem_passport_issuance_token),
+        )
+        .route(
+            PASSPORT_ISSUANCE_CREDENTIAL_PATH,
+            post(handle_redeem_passport_issuance_credential),
+        )
+        .route(
+            PASSPORT_STATUSES_PATH,
+            get(handle_list_passport_statuses).post(handle_publish_passport_status),
+        )
+        .route(PASSPORT_STATUS_PATH, get(handle_get_passport_status))
+        .route(
+            PASSPORT_STATUS_RESOLVE_PATH,
+            get(handle_resolve_passport_status),
+        )
+        .route(
+            PUBLIC_PASSPORT_STATUS_RESOLVE_PATH,
+            get(handle_public_resolve_passport_status),
+        )
+        .route(
+            PASSPORT_STATUS_REVOKE_PATH,
+            post(handle_revoke_passport_status),
+        )
+        .route(
+            PASSPORT_VERIFIER_POLICIES_PATH,
+            get(handle_list_verifier_policies),
+        )
+        .route(
+            PASSPORT_VERIFIER_POLICY_PATH,
+            get(handle_get_verifier_policy)
+                .put(handle_upsert_verifier_policy)
+                .delete(handle_delete_verifier_policy),
+        )
+        .route(
+            PASSPORT_CHALLENGES_PATH,
+            post(handle_create_passport_challenge),
+        )
+        .route(
+            PASSPORT_CHALLENGE_VERIFY_PATH,
+            post(handle_verify_passport_challenge),
+        )
+        .route(
+            PUBLIC_PASSPORT_CHALLENGE_PATH,
+            get(handle_public_get_passport_challenge),
+        )
+        .route(
+            PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH,
+            post(handle_public_verify_passport_challenge),
+        )
+        .route(
+            OID4VP_VERIFIER_METADATA_PATH,
+            get(handle_oid4vp_verifier_metadata),
+        )
+        .route(
+            PASSPORT_OID4VP_REQUESTS_PATH,
+            post(handle_create_oid4vp_request),
+        )
+        .route(
+            PUBLIC_PASSPORT_WALLET_EXCHANGE_PATH,
+            get(handle_public_get_wallet_exchange),
+        )
+        .route(
+            PUBLIC_PASSPORT_OID4VP_REQUEST_PATH,
+            get(handle_public_get_oid4vp_request),
+        )
+        .route(
+            PUBLIC_PASSPORT_OID4VP_LAUNCH_PATH,
+            get(handle_public_launch_oid4vp_request),
+        )
+        .route(
+            PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH,
+            post(handle_public_submit_oid4vp_response),
+        )
+        .route(
+            REVOCATIONS_PATH,
+            get(handle_list_revocations).post(handle_revoke_capability),
+        )
+        .route(
+            TOOL_RECEIPTS_PATH,
+            get(handle_list_tool_receipts).post(handle_append_tool_receipt),
+        )
+        .route(
+            CHILD_RECEIPTS_PATH,
+            get(handle_list_child_receipts).post(handle_append_child_receipt),
+        )
+        .route(BUDGETS_PATH, get(handle_list_budgets))
+        .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
+        .route(BUDGET_CHARGE_PATH, post(handle_try_charge_cost))
+        .route(BUDGET_REVERSE_PATH, post(handle_reverse_charge_cost))
+        .route(BUDGET_REDUCE_PATH, post(handle_reduce_charge_cost))
+        .route(
+            INTERNAL_CLUSTER_STATUS_PATH,
+            get(handle_internal_cluster_status),
+        )
+        .route(
+            INTERNAL_CLUSTER_SNAPSHOT_PATH,
+            get(handle_internal_cluster_snapshot),
+        )
+        .route(
+            INTERNAL_CLUSTER_PARTITION_PATH,
+            post(handle_internal_cluster_partition),
+        )
+        .route(
+            INTERNAL_AUTHORITY_SNAPSHOT_PATH,
+            get(handle_internal_authority_snapshot),
+        )
+        .route(
+            INTERNAL_REVOCATIONS_DELTA_PATH,
+            get(handle_internal_revocations_delta),
+        )
+        .route(
+            INTERNAL_TOOL_RECEIPTS_DELTA_PATH,
+            get(handle_internal_tool_receipts_delta),
+        )
+        .route(
+            INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
+            get(handle_internal_child_receipts_delta),
+        )
+        .route(
+            INTERNAL_BUDGETS_DELTA_PATH,
+            get(handle_internal_budgets_delta),
+        )
+        .route(
+            INTERNAL_LINEAGE_DELTA_PATH,
+            get(handle_internal_lineage_delta),
+        )
+        .route(RECEIPT_QUERY_PATH, get(handle_query_receipts))
+        .route(RECEIPT_ANALYTICS_PATH, get(handle_receipt_analytics))
+        .route(EVIDENCE_EXPORT_PATH, post(handle_evidence_export))
+        .route(EVIDENCE_IMPORT_PATH, post(handle_evidence_import))
+        .route(
+            FEDERATION_EVIDENCE_SHARES_PATH,
+            get(handle_shared_evidence_report),
+        )
+        .route(COST_ATTRIBUTION_PATH, get(handle_cost_attribution_report))
+        .route(OPERATOR_REPORT_PATH, get(handle_operator_report))
+        .route(
+            RUNTIME_ATTESTATION_APPRAISAL_PATH,
+            post(handle_runtime_attestation_appraisal_report),
+        )
+        .route(
+            RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH,
+            post(handle_runtime_attestation_appraisal_result_export),
+        )
+        .route(
+            RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH,
+            post(handle_runtime_attestation_appraisal_import),
+        )
+        .route(BEHAVIORAL_FEED_PATH, get(handle_behavioral_feed_report))
+        .route(EXPOSURE_LEDGER_PATH, get(handle_exposure_ledger_report))
+        .route(CREDIT_SCORECARD_PATH, get(handle_credit_scorecard_report))
+        .route(CAPITAL_BOOK_PATH, get(handle_capital_book_report))
+        .route(
+            CAPITAL_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_capital_execution_instruction),
+        )
+        .route(
+            CAPITAL_ALLOCATION_ISSUE_PATH,
+            post(handle_issue_capital_allocation_decision),
+        )
+        .route(
+            CREDIT_FACILITY_REPORT_PATH,
+            get(handle_credit_facility_report),
+        )
+        .route(
+            CREDIT_FACILITY_ISSUE_PATH,
+            post(handle_issue_credit_facility),
+        )
+        .route(
+            CREDIT_FACILITIES_REPORT_PATH,
+            get(handle_query_credit_facilities),
+        )
+        .route(CREDIT_BOND_REPORT_PATH, get(handle_credit_bond_report))
+        .route(CREDIT_BOND_ISSUE_PATH, post(handle_issue_credit_bond))
+        .route(CREDIT_BONDS_REPORT_PATH, get(handle_query_credit_bonds))
+        .route(
+            CREDIT_BONDED_EXECUTION_SIMULATION_PATH,
+            post(handle_credit_bonded_execution_simulation_report),
+        )
+        .route(
+            CREDIT_LOSS_LIFECYCLE_REPORT_PATH,
+            get(handle_credit_loss_lifecycle_report),
+        )
+        .route(
+            CREDIT_LOSS_LIFECYCLE_ISSUE_PATH,
+            post(handle_issue_credit_loss_lifecycle),
+        )
+        .route(
+            CREDIT_LOSS_LIFECYCLE_LIST_PATH,
+            get(handle_query_credit_loss_lifecycle),
+        )
+        .route(CREDIT_BACKTEST_PATH, get(handle_credit_backtest_report))
+        .route(
+            CREDIT_PROVIDER_RISK_PACKAGE_PATH,
+            get(handle_credit_provider_risk_package_report),
+        )
+        .route(
+            LIABILITY_PROVIDER_ISSUE_PATH,
+            post(handle_issue_liability_provider),
+        )
+        .route(
+            LIABILITY_PROVIDERS_REPORT_PATH,
+            get(handle_query_liability_providers),
+        )
+        .route(
+            LIABILITY_PROVIDER_RESOLVE_PATH,
+            get(handle_resolve_liability_provider),
+        )
+        .route(
+            LIABILITY_QUOTE_REQUEST_ISSUE_PATH,
+            post(handle_issue_liability_quote_request),
+        )
+        .route(
+            LIABILITY_QUOTE_RESPONSE_ISSUE_PATH,
+            post(handle_issue_liability_quote_response),
+        )
+        .route(
+            LIABILITY_PRICING_AUTHORITY_ISSUE_PATH,
+            post(handle_issue_liability_pricing_authority),
+        )
+        .route(
+            LIABILITY_PLACEMENT_ISSUE_PATH,
+            post(handle_issue_liability_placement),
+        )
+        .route(
+            LIABILITY_BOUND_COVERAGE_ISSUE_PATH,
+            post(handle_issue_liability_bound_coverage),
+        )
+        .route(
+            LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH,
+            post(handle_issue_liability_auto_bind),
+        )
+        .route(
+            LIABILITY_MARKET_WORKFLOW_REPORT_PATH,
+            get(handle_query_liability_market_workflows),
+        )
+        .route(
+            LIABILITY_CLAIM_PACKAGE_ISSUE_PATH,
+            post(handle_issue_liability_claim_package),
+        )
+        .route(
+            LIABILITY_CLAIM_RESPONSE_ISSUE_PATH,
+            post(handle_issue_liability_claim_response),
+        )
+        .route(
+            LIABILITY_CLAIM_DISPUTE_ISSUE_PATH,
+            post(handle_issue_liability_claim_dispute),
+        )
+        .route(
+            LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH,
+            post(handle_issue_liability_claim_adjudication),
+        )
+        .route(
+            LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_liability_claim_payout_instruction),
+        )
+        .route(
+            LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH,
+            post(handle_issue_liability_claim_payout_receipt),
+        )
+        .route(
+            LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH,
+            post(handle_issue_liability_claim_settlement_instruction),
+        )
+        .route(
+            LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH,
+            post(handle_issue_liability_claim_settlement_receipt),
+        )
+        .route(
+            LIABILITY_CLAIM_WORKFLOW_REPORT_PATH,
+            get(handle_query_liability_claim_workflows),
+        )
+        .route(SETTLEMENT_REPORT_PATH, get(handle_settlement_report))
+        .route(
+            SETTLEMENT_RECONCILE_PATH,
+            post(handle_record_settlement_reconciliation),
+        )
+        .route(
+            METERED_BILLING_REPORT_PATH,
+            get(handle_metered_billing_report),
+        )
+        .route(
+            METERED_BILLING_RECONCILE_PATH,
+            post(handle_record_metered_billing_reconciliation),
+        )
+        .route(
+            AUTHORIZATION_CONTEXT_REPORT_PATH,
+            get(handle_authorization_context_report),
+        )
+        .route(
+            AUTHORIZATION_PROFILE_METADATA_PATH,
+            get(handle_authorization_profile_metadata_report),
+        )
+        .route(
+            AUTHORIZATION_REVIEW_PACK_PATH,
+            get(handle_authorization_review_pack_report),
+        )
+        .route(
+            UNDERWRITING_INPUT_PATH,
+            get(handle_underwriting_policy_input),
+        )
+        .route(
+            UNDERWRITING_DECISION_PATH,
+            get(handle_underwriting_decision_report),
+        )
+        .route(
+            UNDERWRITING_SIMULATION_PATH,
+            post(handle_underwriting_simulation_report),
+        )
+        .route(
+            UNDERWRITING_DECISIONS_REPORT_PATH,
+            get(handle_query_underwriting_decisions),
+        )
+        .route(
+            UNDERWRITING_DECISION_ISSUE_PATH,
+            post(handle_issue_underwriting_decision),
+        )
+        .route(
+            UNDERWRITING_APPEALS_PATH,
+            post(handle_create_underwriting_appeal),
+        )
+        .route(
+            UNDERWRITING_APPEAL_RESOLVE_PATH,
+            post(handle_resolve_underwriting_appeal),
+        )
+        .route(LOCAL_REPUTATION_PATH, get(handle_local_reputation))
+        .route(REPUTATION_COMPARE_PATH, post(handle_reputation_compare))
+        .route(
+            PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH,
+            post(handle_issue_portable_reputation_summary),
+        )
+        .route(
+            PORTABLE_NEGATIVE_EVENT_ISSUE_PATH,
+            post(handle_issue_portable_negative_event),
+        )
+        .route(
+            PORTABLE_REPUTATION_EVALUATE_PATH,
+            post(handle_evaluate_portable_reputation),
+        )
+        .route(LINEAGE_RECORD_PATH, post(handle_record_lineage_snapshot))
+        .route(LINEAGE_PATH, get(handle_get_lineage))
+        .route(LINEAGE_CHAIN_PATH, get(handle_get_delegation_chain))
+        .route(AGENT_RECEIPTS_PATH, get(handle_agent_receipts));
+
+    // Wire the dashboard SPA after all API routes so it acts as a catch-all.
+    // API routes registered above take priority over the fallback service.
+    // The conditional avoids a hard startup failure when the dashboard has not
+    // been built (e.g. in CI or API-only deployments).
+    let dashboard_dir = std::path::Path::new(DASHBOARD_DIST_DIR);
+    let router = if dashboard_dir.join("index.html").exists() {
+        let spa_fallback = ServeFile::new(dashboard_dir.join("index.html"));
+        let spa_service = ServeDir::new(dashboard_dir).not_found_service(spa_fallback);
+        router.fallback_service(spa_service)
+    } else {
+        warn!(
+            "dashboard/dist/index.html not found -- dashboard UI will not be served. \
+             Run 'npm run build' in crates/arc-cli/dashboard/ to enable."
+        );
+        router
+    };
+
+    let router = router.with_state(state);
+
+    // Dashboard SPA is served from the same origin via ServeDir -- no CORS
+    // headers needed. If the dashboard is ever served from a separate origin,
+    // add tower-http CorsLayer.
+
+    // Apply Content-Security-Policy to every response to restrict resource
+    // loading to same-origin and prevent XSS escalation.
+    let csp_value = HeaderValue::from_static(CSP_VALUE);
+    let router = router.layer(SetResponseHeaderLayer::overriding(
+        axum::http::header::CONTENT_SECURITY_POLICY,
+        csp_value,
+    ));
+
+    info!(listen_addr = %local_addr, "serving ARC trust control service");
+    eprintln!("ARC trust control service listening on http://{local_addr}");
+
+    axum::serve(listener, router)
+        .await
+        .map_err(|error| CliError::Other(format!("trust control service failed: {error}")))
+}
+
+pub fn build_client(
+    control_url: &str,
+    control_token: &str,
+) -> Result<TrustControlClient, CliError> {
+    let endpoints = control_url
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.trim_end_matches('/').to_string())
+        .collect::<Vec<_>>();
+    if endpoints.is_empty() {
+        return Err(CliError::Other("control URL must not be empty".to_string()));
+    }
+    let http = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    Ok(TrustControlClient {
+        endpoints: Arc::new(endpoints),
+        preferred_index: Arc::new(Mutex::new(0)),
+        token: Arc::<str>::from(control_token.to_string()),
+        http,
+    })
+}
+
+fn encode_path_segment(segment: &str) -> String {
+    utf8_percent_encode(segment, NON_ALPHANUMERIC).to_string()
+}
+
+fn path_with_encoded_param(template: &str, param_name: &str, value: &str) -> String {
+    template.replace(&format!("{{{param_name}}}"), &encode_path_segment(value))
+}
+
+pub fn resolve_public_certification(
+    registry_url: &str,
+    tool_server_id: &str,
+) -> Result<CertificationResolutionResponse, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public certification registry URL must not be empty".to_string(),
+        ));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let path = path_with_encoded_param(
+        PUBLIC_CERTIFICATION_RESOLVE_PATH,
+        "tool_server_id",
+        tool_server_id,
+    );
+    let response = agent
+        .get(&format!("{endpoint}{path}"))
+        .call()
+        .map_err(|error| {
+            CliError::Other(format!(
+                "failed to query public certification registry {endpoint}: {error}"
+            ))
+        })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public certification response from {endpoint}: {error}"
+        ))
+    })
+}
+
+pub fn resolve_public_certification_metadata(
+    registry_url: &str,
+) -> Result<CertificationPublicMetadata, CliError> {
+    public_certification_get_json(registry_url, PUBLIC_CERTIFICATION_METADATA_PATH)
+}
+
+pub fn resolve_public_generic_namespace(
+    registry_url: &str,
+) -> Result<SignedGenericNamespace, CliError> {
+    public_registry_get_json(registry_url, PUBLIC_GENERIC_NAMESPACE_PATH)
+}
+
+pub fn search_public_generic_listings(
+    registry_url: &str,
+    query: &GenericListingQuery,
+) -> Result<GenericListingReport, CliError> {
+    public_registry_get_json_with_query(registry_url, PUBLIC_GENERIC_LISTINGS_PATH, query)
+}
+
+pub fn issue_signed_generic_trust_activation(
+    config: &TrustServiceConfig,
+    request: &GenericTrustActivationIssueRequest,
+) -> Result<SignedGenericTrustActivation, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.requested_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_generic_trust_activation_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedGenericTrustActivation::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!("failed to sign trust activation artifact: {error}"))
+    })
+}
+
+pub fn evaluate_generic_trust_activation_request(
+    request: &GenericTrustActivationEvaluationRequest,
+) -> Result<GenericTrustActivationEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_generic_trust_activation(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_generic_governance_charter(
+    config: &TrustServiceConfig,
+    request: &GenericGovernanceCharterIssueRequest,
+) -> Result<SignedGenericGovernanceCharter, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_generic_governance_charter_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedGenericGovernanceCharter::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign governance charter artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_generic_governance_case(
+    config: &TrustServiceConfig,
+    request: &GenericGovernanceCaseIssueRequest,
+) -> Result<SignedGenericGovernanceCase, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.opened_at.unwrap_or(now_unix_secs()?);
+    let artifact =
+        build_generic_governance_case_artifact(&local_operator.operator_id, request, issued_at)
+            .map_err(CliError::Other)?;
+    SignedGenericGovernanceCase::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!("failed to sign governance case artifact: {error}"))
+    })
+}
+
+pub fn evaluate_generic_governance_case_request(
+    request: &GenericGovernanceCaseEvaluationRequest,
+) -> Result<GenericGovernanceCaseEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_generic_governance_case(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_open_market_fee_schedule(
+    config: &TrustServiceConfig,
+    request: &OpenMarketFeeScheduleIssueRequest,
+) -> Result<SignedOpenMarketFeeSchedule, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_open_market_fee_schedule_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )
+    .map_err(CliError::Other)?;
+    SignedOpenMarketFeeSchedule::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign open-market fee schedule artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_open_market_penalty(
+    config: &TrustServiceConfig,
+    request: &OpenMarketPenaltyIssueRequest,
+) -> Result<SignedOpenMarketPenalty, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.opened_at.unwrap_or(now_unix_secs()?);
+    let artifact =
+        build_open_market_penalty_artifact(&local_operator.operator_id, request, issued_at)
+            .map_err(CliError::Other)?;
+    SignedOpenMarketPenalty::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign open-market penalty artifact: {error}"
+        ))
+    })
+}
+
+pub fn evaluate_open_market_penalty_request(
+    request: &OpenMarketPenaltyEvaluationRequest,
+) -> Result<OpenMarketPenaltyEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_open_market_penalty(request, now).map_err(CliError::Other)
+}
+
+pub fn issue_signed_portable_reputation_summary(
+    config: &TrustServiceConfig,
+    request: &PortableReputationSummaryIssueRequest,
+) -> Result<SignedPortableReputationSummary, CliError> {
+    if config.receipt_db_path.is_none() {
+        return Err(CliError::Other(
+            "trust service is missing receipt_db_path for portable reputation summary issuance"
+                .to_string(),
+        ));
+    }
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.issued_at.unwrap_or(now_unix_secs()?);
+    let inspection = issuance::inspect_local_reputation(
+        &request.subject_key,
+        config.receipt_db_path.as_deref(),
+        config.budget_db_path.as_deref(),
+        request.since,
+        request.until,
+        config.issuance_policy.as_ref(),
+    )
+    .map_err(|error| CliError::Other(error.to_string()))?;
+    let Some(receipt_db_path) = config.receipt_db_path.as_deref() else {
+        return Err(CliError::Other(
+            "receipt db path is required for imported trust reporting".to_string(),
+        ));
+    };
+    let imported_trust = reputation::build_imported_trust_report(
+        receipt_db_path,
+        &inspection.subject_key,
+        inspection.since,
+        inspection.until,
+        issued_at,
+        &inspection.scoring,
+    )?;
+    let artifact = build_portable_reputation_summary_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        &inspection.scorecard,
+        inspection.effective_score,
+        inspection.probationary,
+        Some(imported_trust.signal_count),
+        Some(imported_trust.accepted_count),
+        issued_at,
+    )?;
+    SignedPortableReputationSummary::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign portable reputation summary artifact: {error}"
+        ))
+    })
+}
+
+pub fn issue_signed_portable_negative_event(
+    config: &TrustServiceConfig,
+    request: &PortableNegativeEventIssueRequest,
+) -> Result<SignedPortableNegativeEvent, CliError> {
+    let signer_keypair = load_behavioral_feed_signing_keypair(
+        config.authority_seed_path.as_deref(),
+        config.authority_db_path.as_deref(),
+    )?;
+    let local_operator = public_generic_registry_publisher(config)?;
+    let issued_at = request.published_at.unwrap_or(now_unix_secs()?);
+    let artifact = build_portable_negative_event_artifact(
+        &local_operator.operator_id,
+        local_operator.operator_name.clone(),
+        request,
+        issued_at,
+    )?;
+    SignedPortableNegativeEvent::sign(artifact, &signer_keypair).map_err(|error| {
+        CliError::Other(format!(
+            "failed to sign portable negative event artifact: {error}"
+        ))
+    })
+}
+
+pub fn evaluate_portable_reputation_request(
+    request: &PortableReputationEvaluationRequest,
+) -> Result<PortableReputationEvaluation, CliError> {
+    let now = request.evaluated_at.unwrap_or(now_unix_secs()?);
+    evaluate_portable_reputation(request, now).map_err(|error| CliError::Other(error.to_string()))
+}
+
+fn evaluate_federation_policy_request(
+    state: &TrustServiceState,
+    request: &FederationAdmissionEvaluationRequest,
+    now: u64,
+) -> Result<FederationAdmissionEvaluationResponse, CliError> {
+    let (_, registry) = load_federation_policy_registry_for_admin(&state.config)?;
+    let record = registry.get(&request.policy_id).cloned().ok_or_else(|| {
+        CliError::Other(format!(
+            "federation policy `{}` was not found",
+            request.policy_id
+        ))
+    })?;
+    verify_federation_admission_policy_record(&record)?;
+
+    let policy = &record.policy.body;
+    let proof_of_work_required = record.anti_sybil.proof_of_work_bits.is_some();
+    let proof_of_work_verified = record
+        .anti_sybil
+        .proof_of_work_bits
+        .map(|difficulty_bits| {
+            request.proof_of_work_nonce.as_deref().is_some_and(|nonce| {
+                verify_admission_proof_of_work(
+                    &request.policy_id,
+                    &request.subject_key,
+                    nonce,
+                    difficulty_bits,
+                )
+            })
+        })
+        .unwrap_or(true);
+    let bond_backed_required = record.anti_sybil.bond_backed_only;
+    let bond_backed_satisfied = !bond_backed_required
+        || request.requested_admission_class == GenericTrustAdmissionClass::BondBacked;
+
+    let mut response = FederationAdmissionEvaluationResponse {
+        policy_id: request.policy_id.clone(),
+        subject_key: request.subject_key.clone(),
+        requested_admission_class: request.requested_admission_class,
+        accepted: false,
+        decision_reason: String::new(),
+        proof_of_work_required,
+        proof_of_work_verified,
+        bond_backed_required,
+        bond_backed_satisfied,
+        minimum_reputation_score: record.minimum_reputation_score,
+        observed_reputation_score: None,
+        rate_limit: None,
+    };
+
+    if !policy
+        .allowed_admission_classes
+        .contains(&request.requested_admission_class)
+    {
+        response.decision_reason =
+            "requested admission class is not allowed by the signed federation policy".to_string();
+        return Ok(response);
+    }
+
+    if proof_of_work_required && !proof_of_work_verified {
+        response.decision_reason =
+            "proof-of-work nonce did not satisfy the configured federation policy difficulty"
+                .to_string();
+        return Ok(response);
+    }
+
+    if !bond_backed_satisfied {
+        response.decision_reason =
+            "federation policy requires bond_backed admission for permissionless entry".to_string();
+        return Ok(response);
+    }
+
+    if let Some(minimum_score) = record.minimum_reputation_score {
+        let inspection = issuance::inspect_local_reputation(
+            &request.subject_key,
+            state.config.receipt_db_path.as_deref(),
+            state.config.budget_db_path.as_deref(),
+            None,
+            None,
+            state.config.issuance_policy.as_ref(),
+        )
+        .map_err(|error| {
+            CliError::Other(format!(
+                "failed to inspect local reputation for federation admission: {error}"
+            ))
+        })?;
+        response.observed_reputation_score = Some(inspection.effective_score);
+        if inspection.effective_score < minimum_score {
+            response.decision_reason = format!(
+                "effective local reputation score {:.4} is below the federation threshold {:.4}",
+                inspection.effective_score, minimum_score
+            );
+            return Ok(response);
+        }
+    }
+
+    if let Some(limit) = record.anti_sybil.rate_limit.as_ref() {
+        let mut limiter = state
+            .federation_admission_rate_limiter
+            .lock()
+            .map_err(|_| {
+                CliError::Other("federation admission rate limiter is poisoned".to_string())
+            })?;
+        let status = limiter.check_and_record(&request.policy_id, &request.subject_key, limit, now);
+        let limited = status.retry_after_seconds.is_some();
+        response.rate_limit = Some(status);
+        if limited {
+            response.decision_reason =
+                "federation admission rate limit exceeded for the configured policy window"
+                    .to_string();
+            return Ok(response);
+        }
+    }
+
+    response.accepted = true;
+    response.decision_reason =
+        "subject satisfied the configured federation reputation and anti-sybil controls"
+            .to_string();
+    Ok(response)
+}
+
+pub fn search_public_certifications(
+    registry_url: &str,
+    query: &CertificationPublicSearchQuery,
+) -> Result<CertificationPublicSearchResponse, CliError> {
+    public_certification_get_json_with_query(registry_url, PUBLIC_CERTIFICATION_SEARCH_PATH, query)
+}
+
+pub fn resolve_public_certification_transparency(
+    registry_url: &str,
+    query: &CertificationTransparencyQuery,
+) -> Result<CertificationTransparencyResponse, CliError> {
+    public_certification_get_json_with_query(
+        registry_url,
+        PUBLIC_CERTIFICATION_TRANSPARENCY_PATH,
+        query,
+    )
+}
+
+fn public_certification_get_json<T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public certification registry URL must not be empty".to_string(),
+        ));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent
+        .get(&format!("{endpoint}{path}"))
+        .call()
+        .map_err(|error| {
+            CliError::Other(format!(
+                "failed to query public certification registry {endpoint}: {error}"
+            ))
+        })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public certification response from {endpoint}: {error}"
+        ))
+    })
+}
+
+fn public_registry_get_json<T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public registry URL must not be empty".to_string(),
+        ));
+    }
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent
+        .get(&format!("{endpoint}{path}"))
+        .call()
+        .map_err(|error| {
+            CliError::Other(format!(
+                "failed to query public registry {endpoint}: {error}"
+            ))
+        })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public registry response from {endpoint}: {error}"
+        ))
+    })
+}
+
+fn public_registry_get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+    query: &Q,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public registry URL must not be empty".to_string(),
+        ));
+    }
+    let encoded_query = serde_urlencoded::to_string(query).map_err(|error| {
+        CliError::Other(format!("failed to encode public registry query: {error}"))
+    })?;
+    let url = if encoded_query.is_empty() {
+        format!("{endpoint}{path}")
+    } else {
+        format!("{endpoint}{path}?{encoded_query}")
+    };
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent.get(&url).call().map_err(|error| {
+        CliError::Other(format!(
+            "failed to query public registry {endpoint}: {error}"
+        ))
+    })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public registry response from {endpoint}: {error}"
+        ))
+    })
+}
+
+fn public_certification_get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
+    registry_url: &str,
+    path: &str,
+    query: &Q,
+) -> Result<T, CliError> {
+    let endpoint = registry_url.trim().trim_end_matches('/');
+    if endpoint.is_empty() {
+        return Err(CliError::Other(
+            "public certification registry URL must not be empty".to_string(),
+        ));
+    }
+    let encoded_query = serde_urlencoded::to_string(query).map_err(|error| {
+        CliError::Other(format!(
+            "failed to encode public certification query: {error}"
+        ))
+    })?;
+    let url = if encoded_query.is_empty() {
+        format!("{endpoint}{path}")
+    } else {
+        format!("{endpoint}{path}?{encoded_query}")
+    };
+    let agent = ureq::AgentBuilder::new()
+        .timeout(CONTROL_HTTP_TIMEOUT)
+        .build();
+    let response = agent.get(&url).call().map_err(|error| {
+        CliError::Other(format!(
+            "failed to query public certification registry {endpoint}: {error}"
+        ))
+    })?;
+    response.into_json().map_err(|error| {
+        CliError::Other(format!(
+            "failed to parse public certification response from {endpoint}: {error}"
+        ))
+    })
+}
+
+pub fn build_remote_receipt_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Box<dyn ReceiptStore>, CliError> {
+    Ok(Box::new(RemoteReceiptStore {
+        client: build_client(control_url, control_token)?,
+    }))
+}
+
+pub fn build_remote_budget_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Box<dyn BudgetStore>, CliError> {
+    Ok(Box::new(RemoteBudgetStore {
+        client: build_client(control_url, control_token)?,
+    }))
+}
+
+pub fn build_remote_revocation_store(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Box<dyn RevocationStore>, CliError> {
+    Ok(Box::new(RemoteRevocationStore {
+        client: build_client(control_url, control_token)?,
+    }))
+}
+
+pub fn build_remote_capability_authority(
+    control_url: &str,
+    control_token: &str,
+) -> Result<Box<dyn CapabilityAuthority>, CliError> {
+    let client = build_client(control_url, control_token)?;
+    let status = client.authority_status()?;
+    let cache = AuthorityKeyCache::from_status(&status)?;
+    Ok(Box::new(RemoteCapabilityAuthority {
+        client,
+        cache: Mutex::new(cache),
+    }))
+}
+
+impl TrustControlClient {
+    pub fn authority_status(&self) -> Result<TrustAuthorityStatus, CliError> {
+        self.get_json(AUTHORITY_PATH)
+    }
+
+    pub fn rotate_authority(&self) -> Result<TrustAuthorityStatus, CliError> {
+        self.post_json::<Value, TrustAuthorityStatus>(AUTHORITY_PATH, &json!({}))
+    }
+
+    pub fn issue_capability(
+        &self,
+        subject: &PublicKey,
+        scope: ArcScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, CliError> {
+        self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
+    }
+
+    pub fn issue_capability_with_attestation(
+        &self,
+        subject: &PublicKey,
+        scope: ArcScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+    ) -> Result<CapabilityToken, CliError> {
+        let response: IssueCapabilityResponse = self.post_json(
+            ISSUE_CAPABILITY_PATH,
+            &IssueCapabilityRequest {
+                subject_public_key: subject.to_hex(),
+                scope,
+                ttl_seconds,
+                runtime_attestation,
+            },
+        )?;
+        Ok(response.capability)
+    }
+
+    pub fn federated_issue(
+        &self,
+        request: &FederatedIssueRequest,
+    ) -> Result<FederatedIssueResponse, CliError> {
+        self.post_json(FEDERATED_ISSUE_PATH, request)
+    }
+
+    pub fn list_enterprise_providers(&self) -> Result<EnterpriseProviderListResponse, CliError> {
+        self.get_json(FEDERATION_PROVIDERS_PATH)
+    }
+
+    pub fn get_enterprise_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<EnterpriseProviderRecord, CliError> {
+        self.get_json(&path_with_encoded_param(
+            FEDERATION_PROVIDER_PATH,
+            "provider_id",
+            provider_id,
+        ))
+    }
+
+    pub fn upsert_enterprise_provider(
+        &self,
+        provider_id: &str,
+        record: &EnterpriseProviderRecord,
+    ) -> Result<EnterpriseProviderRecord, CliError> {
+        self.put_json(
+            &path_with_encoded_param(FEDERATION_PROVIDER_PATH, "provider_id", provider_id),
+            record,
+        )
+    }
+
+    pub fn delete_enterprise_provider(
+        &self,
+        provider_id: &str,
+    ) -> Result<EnterpriseProviderDeleteResponse, CliError> {
+        self.delete_json(&path_with_encoded_param(
+            FEDERATION_PROVIDER_PATH,
+            "provider_id",
+            provider_id,
+        ))
+    }
+
+    pub fn list_federation_policies(
+        &self,
+    ) -> Result<FederationAdmissionPolicyListResponse, CliError> {
+        self.get_json(FEDERATION_POLICIES_PATH)
+    }
+
+    pub fn get_federation_policy(
+        &self,
+        policy_id: &str,
+    ) -> Result<FederationAdmissionPolicyRecord, CliError> {
+        self.get_json(&path_with_encoded_param(
+            FEDERATION_POLICY_PATH,
+            "policy_id",
+            policy_id,
+        ))
+    }
+
+    pub fn upsert_federation_policy(
+        &self,
+        policy_id: &str,
+        record: &FederationAdmissionPolicyRecord,
+    ) -> Result<FederationAdmissionPolicyRecord, CliError> {
+        self.put_json(
+            &path_with_encoded_param(FEDERATION_POLICY_PATH, "policy_id", policy_id),
+            record,
+        )
+    }
+
+    pub fn delete_federation_policy(
+        &self,
+        policy_id: &str,
+    ) -> Result<FederationAdmissionPolicyDeleteResponse, CliError> {
+        self.delete_json(&path_with_encoded_param(
+            FEDERATION_POLICY_PATH,
+            "policy_id",
+            policy_id,
+        ))
+    }
+
+    pub fn evaluate_federation_policy(
+        &self,
+        request: &FederationAdmissionEvaluationRequest,
+    ) -> Result<FederationAdmissionEvaluationResponse, CliError> {
+        self.post_json(FEDERATION_POLICY_EVALUATE_PATH, request)
+    }
+
+    pub fn issue_generic_trust_activation(
+        &self,
+        request: &GenericTrustActivationIssueRequest,
+    ) -> Result<SignedGenericTrustActivation, CliError> {
+        self.post_json(GENERIC_TRUST_ACTIVATION_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_generic_trust_activation(
+        &self,
+        request: &GenericTrustActivationEvaluationRequest,
+    ) -> Result<GenericTrustActivationEvaluation, CliError> {
+        self.post_json(GENERIC_TRUST_ACTIVATION_EVALUATE_PATH, request)
+    }
+
+    pub fn issue_generic_governance_charter(
+        &self,
+        request: &GenericGovernanceCharterIssueRequest,
+    ) -> Result<SignedGenericGovernanceCharter, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CHARTER_ISSUE_PATH, request)
+    }
+
+    pub fn issue_generic_governance_case(
+        &self,
+        request: &GenericGovernanceCaseIssueRequest,
+    ) -> Result<SignedGenericGovernanceCase, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CASE_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_generic_governance_case(
+        &self,
+        request: &GenericGovernanceCaseEvaluationRequest,
+    ) -> Result<GenericGovernanceCaseEvaluation, CliError> {
+        self.post_json(GENERIC_GOVERNANCE_CASE_EVALUATE_PATH, request)
+    }
+
+    pub fn issue_open_market_fee_schedule(
+        &self,
+        request: &OpenMarketFeeScheduleIssueRequest,
+    ) -> Result<SignedOpenMarketFeeSchedule, CliError> {
+        self.post_json(OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_open_market_penalty(
+        &self,
+        request: &OpenMarketPenaltyIssueRequest,
+    ) -> Result<SignedOpenMarketPenalty, CliError> {
+        self.post_json(OPEN_MARKET_PENALTY_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_open_market_penalty(
+        &self,
+        request: &OpenMarketPenaltyEvaluationRequest,
+    ) -> Result<OpenMarketPenaltyEvaluation, CliError> {
+        self.post_json(OPEN_MARKET_PENALTY_EVALUATE_PATH, request)
+    }
+
+    pub fn list_certifications(&self) -> Result<CertificationRegistryListResponse, CliError> {
+        self.get_json(CERTIFICATIONS_PATH)
+    }
+
+    pub fn get_certification(
+        &self,
+        artifact_id: &str,
+    ) -> Result<CertificationRegistryEntry, CliError> {
+        self.get_json(&path_with_encoded_param(
+            CERTIFICATION_PATH,
+            "artifact_id",
+            artifact_id,
+        ))
+    }
+
+    pub fn publish_certification(
+        &self,
+        artifact: &SignedCertificationCheck,
+    ) -> Result<CertificationRegistryEntry, CliError> {
+        self.post_json(CERTIFICATIONS_PATH, artifact)
+    }
+
+    pub fn resolve_certification(
+        &self,
+        tool_server_id: &str,
+    ) -> Result<CertificationResolutionResponse, CliError> {
+        self.get_json(&path_with_encoded_param(
+            CERTIFICATION_RESOLVE_PATH,
+            "tool_server_id",
+            tool_server_id,
+        ))
+    }
+
+    pub fn discover_certification(
+        &self,
+        tool_server_id: &str,
+    ) -> Result<CertificationDiscoveryResponse, CliError> {
+        self.get_json(&path_with_encoded_param(
+            CERTIFICATION_DISCOVERY_RESOLVE_PATH,
+            "tool_server_id",
+            tool_server_id,
+        ))
+    }
+
+    pub fn publish_certification_network(
+        &self,
+        request: &CertificationNetworkPublishRequest,
+    ) -> Result<CertificationNetworkPublishResponse, CliError> {
+        self.post_json("/v1/certifications/discovery/publish", request)
+    }
+
+    pub fn search_certification_marketplace(
+        &self,
+        query: &CertificationMarketplaceSearchQuery,
+    ) -> Result<CertificationPublicSearchResponse, CliError> {
+        self.get_json(&certification_marketplace_search_path(query))
+    }
+
+    pub fn certification_marketplace_transparency(
+        &self,
+        query: &CertificationMarketplaceTransparencyQuery,
+    ) -> Result<CertificationTransparencyResponse, CliError> {
+        self.get_json(&certification_marketplace_transparency_path(query))
+    }
+
+    pub fn consume_certification_marketplace(
+        &self,
+        request: &CertificationConsumptionRequest,
+    ) -> Result<CertificationConsumptionResponse, CliError> {
+        self.post_json(CERTIFICATION_DISCOVERY_CONSUME_PATH, request)
+    }
+
+    pub fn revoke_certification(
+        &self,
+        artifact_id: &str,
+        request: &CertificationRevocationRequest,
+    ) -> Result<CertificationRegistryEntry, CliError> {
+        self.post_json(
+            &path_with_encoded_param(CERTIFICATION_REVOKE_PATH, "artifact_id", artifact_id),
+            request,
+        )
+    }
+
+    pub fn dispute_certification(
+        &self,
+        artifact_id: &str,
+        request: &CertificationDisputeRequest,
+    ) -> Result<CertificationRegistryEntry, CliError> {
+        self.post_json(
+            &path_with_encoded_param(CERTIFICATION_DISPUTE_PATH, "artifact_id", artifact_id),
+            request,
+        )
+    }
+
+    pub fn list_passport_statuses(&self) -> Result<PassportStatusListResponse, CliError> {
+        self.get_json(PASSPORT_STATUSES_PATH)
+    }
+
+    pub fn passport_issuer_metadata(&self) -> Result<Oid4vciCredentialIssuerMetadata, CliError> {
+        self.public_get_json(PASSPORT_ISSUER_METADATA_PATH)
+    }
+
+    pub fn create_passport_issuance_offer(
+        &self,
+        request: &CreatePassportIssuanceOfferRequest,
+    ) -> Result<PassportIssuanceOfferRecord, CliError> {
+        self.post_json(PASSPORT_ISSUANCE_OFFERS_PATH, request)
+    }
+
+    pub fn redeem_passport_issuance_token(
+        &self,
+        request: &Oid4vciTokenRequest,
+    ) -> Result<Oid4vciTokenResponse, CliError> {
+        self.public_post_json(PASSPORT_ISSUANCE_TOKEN_PATH, request)
+    }
+
+    pub fn redeem_passport_issuance_credential(
+        &self,
+        access_token: &str,
+        request: &Oid4vciCredentialRequest,
+    ) -> Result<Oid4vciCredentialResponse, CliError> {
+        self.bearer_post_json(PASSPORT_ISSUANCE_CREDENTIAL_PATH, access_token, request)
+    }
+
+    pub fn get_passport_status(
+        &self,
+        passport_id: &str,
+    ) -> Result<PassportLifecycleRecord, CliError> {
+        self.get_json(&path_with_encoded_param(
+            PASSPORT_STATUS_PATH,
+            "passport_id",
+            passport_id,
+        ))
+    }
+
+    pub fn publish_passport_status(
+        &self,
+        request: &PublishPassportStatusRequest,
+    ) -> Result<PassportLifecycleRecord, CliError> {
+        self.post_json(PASSPORT_STATUSES_PATH, request)
+    }
+
+    pub fn resolve_passport_status(
+        &self,
+        passport_id: &str,
+    ) -> Result<PassportLifecycleResolution, CliError> {
+        self.get_json(&path_with_encoded_param(
+            PASSPORT_STATUS_RESOLVE_PATH,
+            "passport_id",
+            passport_id,
+        ))
+    }
+
+    pub fn public_resolve_passport_status(
+        &self,
+        passport_id: &str,
+    ) -> Result<PassportLifecycleResolution, CliError> {
+        self.public_get_json(&path_with_encoded_param(
+            PUBLIC_PASSPORT_STATUS_RESOLVE_PATH,
+            "passport_id",
+            passport_id,
+        ))
+    }
+
+    pub fn revoke_passport_status(
+        &self,
+        passport_id: &str,
+        request: &PassportStatusRevocationRequest,
+    ) -> Result<PassportLifecycleRecord, CliError> {
+        self.post_json(
+            &path_with_encoded_param(PASSPORT_STATUS_REVOKE_PATH, "passport_id", passport_id),
+            request,
+        )
+    }
+
+    pub fn list_verifier_policies(&self) -> Result<VerifierPolicyListResponse, CliError> {
+        self.get_json(PASSPORT_VERIFIER_POLICIES_PATH)
+    }
+
+    pub fn get_verifier_policy(
+        &self,
+        policy_id: &str,
+    ) -> Result<SignedPassportVerifierPolicy, CliError> {
+        self.get_json(&path_with_encoded_param(
+            PASSPORT_VERIFIER_POLICY_PATH,
+            "policy_id",
+            policy_id,
+        ))
+    }
+
+    pub fn upsert_verifier_policy(
+        &self,
+        policy_id: &str,
+        document: &SignedPassportVerifierPolicy,
+    ) -> Result<SignedPassportVerifierPolicy, CliError> {
+        self.put_json(
+            &path_with_encoded_param(PASSPORT_VERIFIER_POLICY_PATH, "policy_id", policy_id),
+            document,
+        )
+    }
+
+    pub fn delete_verifier_policy(
+        &self,
+        policy_id: &str,
+    ) -> Result<VerifierPolicyDeleteResponse, CliError> {
+        self.delete_json(&path_with_encoded_param(
+            PASSPORT_VERIFIER_POLICY_PATH,
+            "policy_id",
+            policy_id,
+        ))
+    }
+
+    pub fn create_passport_challenge(
+        &self,
+        request: &CreatePassportChallengeRequest,
+    ) -> Result<CreatePassportChallengeResponse, CliError> {
+        self.post_json(PASSPORT_CHALLENGES_PATH, request)
+    }
+
+    pub fn verify_passport_challenge(
+        &self,
+        request: &VerifyPassportChallengeRequest,
+    ) -> Result<PassportPresentationVerification, CliError> {
+        self.post_json(PASSPORT_CHALLENGE_VERIFY_PATH, request)
+    }
+
+    pub fn public_get_passport_challenge(
+        &self,
+        challenge_id: &str,
+    ) -> Result<PassportPresentationChallenge, CliError> {
+        self.public_get_json(&path_with_encoded_param(
+            PUBLIC_PASSPORT_CHALLENGE_PATH,
+            "challenge_id",
+            challenge_id,
+        ))
+    }
+
+    pub fn public_verify_passport_challenge(
+        &self,
+        request: &VerifyPassportChallengeRequest,
+    ) -> Result<PassportPresentationVerification, CliError> {
+        self.public_post_json(PUBLIC_PASSPORT_CHALLENGE_VERIFY_PATH, request)
+    }
+
+    pub fn create_oid4vp_request(
+        &self,
+        request: &CreateOid4vpRequest,
+    ) -> Result<CreateOid4vpRequestResponse, CliError> {
+        self.post_json(PASSPORT_OID4VP_REQUESTS_PATH, request)
+    }
+
+    pub fn public_get_oid4vp_request(&self, request_id: &str) -> Result<String, CliError> {
+        self.public_get_text(&path_with_encoded_param(
+            PUBLIC_PASSPORT_OID4VP_REQUEST_PATH,
+            "request_id",
+            request_id,
+        ))
+    }
+
+    pub fn public_get_wallet_exchange(
+        &self,
+        request_id: &str,
+    ) -> Result<WalletExchangeStatusResponse, CliError> {
+        self.public_get_json(&path_with_encoded_param(
+            PUBLIC_PASSPORT_WALLET_EXCHANGE_PATH,
+            "request_id",
+            request_id,
+        ))
+    }
+
+    pub fn public_submit_oid4vp_response(
+        &self,
+        response_jwt: &str,
+    ) -> Result<Oid4vpPresentationVerification, CliError> {
+        self.public_post_form(
+            PUBLIC_PASSPORT_OID4VP_DIRECT_POST_PATH,
+            &[("response", response_jwt)],
+        )
+    }
+
+    pub fn list_revocations(
+        &self,
+        query: &RevocationQuery,
+    ) -> Result<RevocationListResponse, CliError> {
+        self.get_json_with_query(REVOCATIONS_PATH, query)
+    }
+
+    pub fn revoke_capability(
+        &self,
+        capability_id: &str,
+    ) -> Result<RevokeCapabilityResponse, CliError> {
+        self.post_json(
+            REVOCATIONS_PATH,
+            &RevokeCapabilityRequest {
+                capability_id: capability_id.to_string(),
+            },
+        )
+    }
+
+    pub fn list_tool_receipts(
+        &self,
+        query: &ToolReceiptQuery,
+    ) -> Result<ReceiptListResponse, CliError> {
+        self.get_json_with_query(TOOL_RECEIPTS_PATH, query)
+    }
+
+    pub fn list_child_receipts(
+        &self,
+        query: &ChildReceiptQuery,
+    ) -> Result<ReceiptListResponse, CliError> {
+        self.get_json_with_query(CHILD_RECEIPTS_PATH, query)
+    }
+
+    pub fn query_receipts(
+        &self,
+        query: &ReceiptQueryHttpQuery,
+    ) -> Result<ReceiptQueryResponse, CliError> {
+        self.get_json_with_query(RECEIPT_QUERY_PATH, query)
+    }
+
+    pub fn export_evidence(
+        &self,
+        request: &evidence_export::RemoteEvidenceExportRequest,
+    ) -> Result<evidence_export::RemoteEvidenceExportResponse, CliError> {
+        self.post_json(EVIDENCE_EXPORT_PATH, request)
+    }
+
+    pub fn import_evidence(
+        &self,
+        request: &evidence_export::RemoteEvidenceImportRequest,
+    ) -> Result<evidence_export::RemoteEvidenceImportResponse, CliError> {
+        self.post_json(EVIDENCE_IMPORT_PATH, request)
+    }
+
+    pub fn shared_evidence_report(
+        &self,
+        query: &SharedEvidenceQuery,
+    ) -> Result<SharedEvidenceReferenceReport, CliError> {
+        self.get_json_with_query(FEDERATION_EVIDENCE_SHARES_PATH, query)
+    }
+
+    #[allow(dead_code)]
+    pub fn cost_attribution_report(
+        &self,
+        query: &CostAttributionQuery,
+    ) -> Result<CostAttributionReport, CliError> {
+        self.get_json_with_query(COST_ATTRIBUTION_PATH, query)
+    }
+
+    #[allow(dead_code)]
+    pub fn operator_report(&self, query: &OperatorReportQuery) -> Result<OperatorReport, CliError> {
+        self.get_json_with_query(OPERATOR_REPORT_PATH, query)
+    }
+
+    pub fn behavioral_feed(
+        &self,
+        query: &BehavioralFeedQuery,
+    ) -> Result<SignedBehavioralFeed, CliError> {
+        self.get_json_with_query(BEHAVIORAL_FEED_PATH, query)
+    }
+
+    pub fn exposure_ledger(
+        &self,
+        query: &ExposureLedgerQuery,
+    ) -> Result<SignedExposureLedgerReport, CliError> {
+        self.get_json_with_query(EXPOSURE_LEDGER_PATH, query)
+    }
+
+    pub fn credit_scorecard(
+        &self,
+        query: &ExposureLedgerQuery,
+    ) -> Result<SignedCreditScorecardReport, CliError> {
+        self.get_json_with_query(CREDIT_SCORECARD_PATH, query)
+    }
+
+    pub fn capital_book(
+        &self,
+        query: &CapitalBookQuery,
+    ) -> Result<SignedCapitalBookReport, CliError> {
+        self.get_json_with_query(CAPITAL_BOOK_PATH, query)
+    }
+
+    pub fn issue_capital_execution_instruction(
+        &self,
+        request: &CapitalExecutionInstructionRequest,
+    ) -> Result<SignedCapitalExecutionInstruction, CliError> {
+        self.post_json(CAPITAL_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_capital_allocation_decision(
+        &self,
+        request: &CapitalAllocationDecisionRequest,
+    ) -> Result<SignedCapitalAllocationDecision, CliError> {
+        self.post_json(CAPITAL_ALLOCATION_ISSUE_PATH, request)
+    }
+
+    pub fn credit_facility_report(
+        &self,
+        query: &ExposureLedgerQuery,
+    ) -> Result<CreditFacilityReport, CliError> {
+        self.get_json_with_query(CREDIT_FACILITY_REPORT_PATH, query)
+    }
+
+    pub fn issue_credit_facility(
+        &self,
+        request: &CreditFacilityIssueRequest,
+    ) -> Result<SignedCreditFacility, CliError> {
+        self.post_json(CREDIT_FACILITY_ISSUE_PATH, request)
+    }
+
+    pub fn list_credit_facilities(
+        &self,
+        query: &CreditFacilityListQuery,
+    ) -> Result<CreditFacilityListReport, CliError> {
+        self.get_json_with_query(CREDIT_FACILITIES_REPORT_PATH, query)
+    }
+
+    pub fn credit_bond_report(
+        &self,
+        query: &ExposureLedgerQuery,
+    ) -> Result<CreditBondReport, CliError> {
+        self.get_json_with_query(CREDIT_BOND_REPORT_PATH, query)
+    }
+
+    pub fn issue_credit_bond(
+        &self,
+        request: &CreditBondIssueRequest,
+    ) -> Result<SignedCreditBond, CliError> {
+        self.post_json(CREDIT_BOND_ISSUE_PATH, request)
+    }
+
+    pub fn list_credit_bonds(
+        &self,
+        query: &CreditBondListQuery,
+    ) -> Result<CreditBondListReport, CliError> {
+        self.get_json_with_query(CREDIT_BONDS_REPORT_PATH, query)
+    }
+
+    pub fn simulate_credit_bonded_execution(
+        &self,
+        request: &CreditBondedExecutionSimulationRequest,
+    ) -> Result<CreditBondedExecutionSimulationReport, CliError> {
+        self.post_json(CREDIT_BONDED_EXECUTION_SIMULATION_PATH, request)
+    }
+
+    pub fn credit_loss_lifecycle_report(
+        &self,
+        query: &CreditLossLifecycleQuery,
+    ) -> Result<CreditLossLifecycleReport, CliError> {
+        self.get_json_with_query(CREDIT_LOSS_LIFECYCLE_REPORT_PATH, query)
+    }
+
+    pub fn issue_credit_loss_lifecycle(
+        &self,
+        request: &CreditLossLifecycleIssueRequest,
+    ) -> Result<SignedCreditLossLifecycle, CliError> {
+        self.post_json(CREDIT_LOSS_LIFECYCLE_ISSUE_PATH, request)
+    }
+
+    pub fn list_credit_loss_lifecycle(
+        &self,
+        query: &CreditLossLifecycleListQuery,
+    ) -> Result<CreditLossLifecycleListReport, CliError> {
+        self.get_json_with_query(CREDIT_LOSS_LIFECYCLE_LIST_PATH, query)
+    }
+
+    pub fn credit_backtest(
+        &self,
+        query: &CreditBacktestQuery,
+    ) -> Result<CreditBacktestReport, CliError> {
+        self.get_json_with_query(CREDIT_BACKTEST_PATH, query)
+    }
+
+    pub fn credit_provider_risk_package(
+        &self,
+        query: &CreditProviderRiskPackageQuery,
+    ) -> Result<SignedCreditProviderRiskPackage, CliError> {
+        self.get_json_with_query(CREDIT_PROVIDER_RISK_PACKAGE_PATH, query)
+    }
+
+    pub fn issue_liability_provider(
+        &self,
+        request: &LiabilityProviderIssueRequest,
+    ) -> Result<SignedLiabilityProvider, CliError> {
+        self.post_json(LIABILITY_PROVIDER_ISSUE_PATH, request)
+    }
+
+    pub fn list_liability_providers(
+        &self,
+        query: &LiabilityProviderListQuery,
+    ) -> Result<LiabilityProviderListReport, CliError> {
+        self.get_json_with_query(LIABILITY_PROVIDERS_REPORT_PATH, query)
+    }
+
+    pub fn resolve_liability_provider(
+        &self,
+        query: &LiabilityProviderResolutionQuery,
+    ) -> Result<LiabilityProviderResolutionReport, CliError> {
+        self.get_json_with_query(LIABILITY_PROVIDER_RESOLVE_PATH, query)
+    }
+
+    pub fn issue_liability_quote_request(
+        &self,
+        request: &LiabilityQuoteRequestIssueRequest,
+    ) -> Result<SignedLiabilityQuoteRequest, CliError> {
+        self.post_json(LIABILITY_QUOTE_REQUEST_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_quote_response(
+        &self,
+        request: &LiabilityQuoteResponseIssueRequest,
+    ) -> Result<SignedLiabilityQuoteResponse, CliError> {
+        self.post_json(LIABILITY_QUOTE_RESPONSE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_pricing_authority(
+        &self,
+        request: &LiabilityPricingAuthorityIssueRequest,
+    ) -> Result<SignedLiabilityPricingAuthority, CliError> {
+        self.post_json(LIABILITY_PRICING_AUTHORITY_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_placement(
+        &self,
+        request: &LiabilityPlacementIssueRequest,
+    ) -> Result<SignedLiabilityPlacement, CliError> {
+        self.post_json(LIABILITY_PLACEMENT_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_bound_coverage(
+        &self,
+        request: &LiabilityBoundCoverageIssueRequest,
+    ) -> Result<SignedLiabilityBoundCoverage, CliError> {
+        self.post_json(LIABILITY_BOUND_COVERAGE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_auto_bind(
+        &self,
+        request: &LiabilityAutoBindIssueRequest,
+    ) -> Result<SignedLiabilityAutoBindDecision, CliError> {
+        self.post_json(LIABILITY_AUTO_BIND_DECISION_ISSUE_PATH, request)
+    }
+
+    pub fn liability_market_workflows(
+        &self,
+        query: &LiabilityMarketWorkflowQuery,
+    ) -> Result<LiabilityMarketWorkflowReport, CliError> {
+        self.get_json_with_query(LIABILITY_MARKET_WORKFLOW_REPORT_PATH, query)
+    }
+
+    pub fn issue_liability_claim_package(
+        &self,
+        request: &LiabilityClaimPackageIssueRequest,
+    ) -> Result<SignedLiabilityClaimPackage, CliError> {
+        self.post_json(LIABILITY_CLAIM_PACKAGE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_response(
+        &self,
+        request: &LiabilityClaimResponseIssueRequest,
+    ) -> Result<SignedLiabilityClaimResponse, CliError> {
+        self.post_json(LIABILITY_CLAIM_RESPONSE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_dispute(
+        &self,
+        request: &LiabilityClaimDisputeIssueRequest,
+    ) -> Result<SignedLiabilityClaimDispute, CliError> {
+        self.post_json(LIABILITY_CLAIM_DISPUTE_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_adjudication(
+        &self,
+        request: &LiabilityClaimAdjudicationIssueRequest,
+    ) -> Result<SignedLiabilityClaimAdjudication, CliError> {
+        self.post_json(LIABILITY_CLAIM_ADJUDICATION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_payout_instruction(
+        &self,
+        request: &LiabilityClaimPayoutInstructionIssueRequest,
+    ) -> Result<SignedLiabilityClaimPayoutInstruction, CliError> {
+        self.post_json(LIABILITY_CLAIM_PAYOUT_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_payout_receipt(
+        &self,
+        request: &LiabilityClaimPayoutReceiptIssueRequest,
+    ) -> Result<SignedLiabilityClaimPayoutReceipt, CliError> {
+        self.post_json(LIABILITY_CLAIM_PAYOUT_RECEIPT_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_settlement_instruction(
+        &self,
+        request: &LiabilityClaimSettlementInstructionIssueRequest,
+    ) -> Result<SignedLiabilityClaimSettlementInstruction, CliError> {
+        self.post_json(LIABILITY_CLAIM_SETTLEMENT_INSTRUCTION_ISSUE_PATH, request)
+    }
+
+    pub fn issue_liability_claim_settlement_receipt(
+        &self,
+        request: &LiabilityClaimSettlementReceiptIssueRequest,
+    ) -> Result<SignedLiabilityClaimSettlementReceipt, CliError> {
+        self.post_json(LIABILITY_CLAIM_SETTLEMENT_RECEIPT_ISSUE_PATH, request)
+    }
+
+    pub fn liability_claim_workflows(
+        &self,
+        query: &LiabilityClaimWorkflowQuery,
+    ) -> Result<LiabilityClaimWorkflowReport, CliError> {
+        self.get_json_with_query(LIABILITY_CLAIM_WORKFLOW_REPORT_PATH, query)
+    }
+
+    pub fn runtime_attestation_appraisal(
+        &self,
+        request: &RuntimeAttestationAppraisalRequest,
+    ) -> Result<SignedRuntimeAttestationAppraisalReport, CliError> {
+        self.post_json(RUNTIME_ATTESTATION_APPRAISAL_PATH, request)
+    }
+
+    pub fn runtime_attestation_appraisal_result(
+        &self,
+        request: &RuntimeAttestationAppraisalResultExportRequest,
+    ) -> Result<SignedRuntimeAttestationAppraisalResult, CliError> {
+        self.post_json(RUNTIME_ATTESTATION_APPRAISAL_RESULT_PATH, request)
+    }
+
+    pub fn import_runtime_attestation_appraisal(
+        &self,
+        request: &RuntimeAttestationAppraisalImportRequest,
+    ) -> Result<RuntimeAttestationAppraisalImportReport, CliError> {
+        self.post_json(RUNTIME_ATTESTATION_APPRAISAL_IMPORT_PATH, request)
+    }
+
+    pub fn metered_billing_report(
+        &self,
+        query: &OperatorReportQuery,
+    ) -> Result<MeteredBillingReconciliationReport, CliError> {
+        self.get_json_with_query(METERED_BILLING_REPORT_PATH, query)
+    }
+
+    pub fn authorization_context_report(
+        &self,
+        query: &OperatorReportQuery,
+    ) -> Result<AuthorizationContextReport, CliError> {
+        self.get_json_with_query(AUTHORIZATION_CONTEXT_REPORT_PATH, query)
+    }
+
+    pub fn authorization_profile_metadata(
+        &self,
+    ) -> Result<ArcOAuthAuthorizationMetadataReport, CliError> {
+        self.get_json(AUTHORIZATION_PROFILE_METADATA_PATH)
+    }
+
+    pub fn authorization_review_pack(
+        &self,
+        query: &OperatorReportQuery,
+    ) -> Result<ArcOAuthAuthorizationReviewPack, CliError> {
+        self.get_json_with_query(AUTHORIZATION_REVIEW_PACK_PATH, query)
+    }
+
+    pub fn underwriting_policy_input(
+        &self,
+        query: &UnderwritingPolicyInputQuery,
+    ) -> Result<SignedUnderwritingPolicyInput, CliError> {
+        self.get_json_with_query(UNDERWRITING_INPUT_PATH, query)
+    }
+
+    pub fn underwriting_decision(
+        &self,
+        query: &UnderwritingPolicyInputQuery,
+    ) -> Result<UnderwritingDecisionReport, CliError> {
+        self.get_json_with_query(UNDERWRITING_DECISION_PATH, query)
+    }
+
+    pub fn simulate_underwriting_decision(
+        &self,
+        request: &UnderwritingSimulationRequest,
+    ) -> Result<UnderwritingSimulationReport, CliError> {
+        self.post_json(UNDERWRITING_SIMULATION_PATH, request)
+    }
+
+    pub fn issue_underwriting_decision(
+        &self,
+        request: &UnderwritingDecisionIssueRequest,
+    ) -> Result<SignedUnderwritingDecision, CliError> {
+        self.post_json(UNDERWRITING_DECISION_ISSUE_PATH, request)
+    }
+
+    pub fn list_underwriting_decisions(
+        &self,
+        query: &UnderwritingDecisionQuery,
+    ) -> Result<UnderwritingDecisionListReport, CliError> {
+        self.get_json_with_query(UNDERWRITING_DECISIONS_REPORT_PATH, query)
+    }
+
+    pub fn create_underwriting_appeal(
+        &self,
+        request: &UnderwritingAppealCreateRequest,
+    ) -> Result<UnderwritingAppealRecord, CliError> {
+        self.post_json(UNDERWRITING_APPEALS_PATH, request)
+    }
+
+    pub fn resolve_underwriting_appeal(
+        &self,
+        request: &UnderwritingAppealResolveRequest,
+    ) -> Result<UnderwritingAppealRecord, CliError> {
+        self.post_json(UNDERWRITING_APPEAL_RESOLVE_PATH, request)
+    }
+
+    pub fn record_metered_billing_reconciliation(
+        &self,
+        request: &MeteredBillingReconciliationUpdateRequest,
+    ) -> Result<MeteredBillingReconciliationUpdateResponse, CliError> {
+        self.post_json(METERED_BILLING_RECONCILE_PATH, request)
+    }
+
+    pub fn local_reputation(
+        &self,
+        subject_key: &str,
+        query: &LocalReputationQuery,
+    ) -> Result<issuance::LocalReputationInspection, CliError> {
+        self.get_json_with_query(
+            &path_with_encoded_param(LOCAL_REPUTATION_PATH, "subject_key", subject_key),
+            query,
+        )
+    }
+
+    pub fn reputation_compare(
+        &self,
+        subject_key: &str,
+        request: &ReputationCompareRequest,
+    ) -> Result<reputation::PortableReputationComparison, CliError> {
+        self.post_json(
+            &path_with_encoded_param(REPUTATION_COMPARE_PATH, "subject_key", subject_key),
+            request,
+        )
+    }
+
+    pub fn issue_portable_reputation_summary(
+        &self,
+        request: &PortableReputationSummaryIssueRequest,
+    ) -> Result<SignedPortableReputationSummary, CliError> {
+        self.post_json(PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH, request)
+    }
+
+    pub fn issue_portable_negative_event(
+        &self,
+        request: &PortableNegativeEventIssueRequest,
+    ) -> Result<SignedPortableNegativeEvent, CliError> {
+        self.post_json(PORTABLE_NEGATIVE_EVENT_ISSUE_PATH, request)
+    }
+
+    pub fn evaluate_portable_reputation(
+        &self,
+        request: &PortableReputationEvaluationRequest,
+    ) -> Result<PortableReputationEvaluation, CliError> {
+        self.post_json(PORTABLE_REPUTATION_EVALUATE_PATH, request)
+    }
+
+    pub fn append_tool_receipt(&self, receipt: &ArcReceipt) -> Result<(), CliError> {
+        let _: Value = self.post_json(TOOL_RECEIPTS_PATH, receipt)?;
+        Ok(())
+    }
+
+    pub fn append_child_receipt(&self, receipt: &ChildRequestReceipt) -> Result<(), CliError> {
+        let _: Value = self.post_json(CHILD_RECEIPTS_PATH, receipt)?;
+        Ok(())
+    }
+
+    pub fn record_capability_snapshot(
+        &self,
+        capability: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), CliError> {
+        let _: Value = self.post_json(
+            LINEAGE_RECORD_PATH,
+            &RecordCapabilitySnapshotRequest {
+                capability: capability.clone(),
+                parent_capability_id: parent_capability_id.map(ToOwned::to_owned),
+            },
+        )?;
+        Ok(())
+    }
+
+    pub fn list_budgets(&self, query: &BudgetQuery) -> Result<BudgetListResponse, CliError> {
+        self.get_json_with_query(BUDGETS_PATH, query)
+    }
+
+    fn try_increment_budget(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<TryIncrementBudgetResponse, CliError> {
+        self.post_json(
+            BUDGET_INCREMENT_PATH,
+            &TryIncrementBudgetRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                max_invocations,
+            },
+        )
+    }
+
+    fn try_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<TryChargeCostResponse, CliError> {
+        self.post_json(
+            BUDGET_CHARGE_PATH,
+            &TryChargeCostRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+            },
+        )
+    }
+
+    fn reverse_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<ReverseChargeCostResponse, CliError> {
+        self.post_json(
+            BUDGET_REVERSE_PATH,
+            &ReverseChargeCostRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                cost_units,
+            },
+        )
+    }
+
+    fn reduce_charge_cost(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
+        self.post_json(
+            BUDGET_REDUCE_PATH,
+            &ReduceChargeCostRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                cost_units,
+            },
+        )
+    }
+
+    fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
+        self.get_json(INTERNAL_CLUSTER_STATUS_PATH)
+    }
+
+    fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
+        self.get_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH)
+    }
+
+    fn cluster_snapshot(&self) -> Result<ClusterStateSnapshotResponse, CliError> {
+        self.get_json(INTERNAL_CLUSTER_SNAPSHOT_PATH)
+    }
+
+    fn revocation_deltas(
+        &self,
+        query: &RevocationDeltaQuery,
+    ) -> Result<RevocationDeltaResponse, CliError> {
+        self.get_json_with_query(INTERNAL_REVOCATIONS_DELTA_PATH, query)
+    }
+
+    fn tool_receipt_deltas(
+        &self,
+        query: &ReceiptDeltaQuery,
+    ) -> Result<ReceiptDeltaResponse, CliError> {
+        self.get_json_with_query(INTERNAL_TOOL_RECEIPTS_DELTA_PATH, query)
+    }
+
+    fn child_receipt_deltas(
+        &self,
+        query: &ReceiptDeltaQuery,
+    ) -> Result<ReceiptDeltaResponse, CliError> {
+        self.get_json_with_query(INTERNAL_CHILD_RECEIPTS_DELTA_PATH, query)
+    }
+
+    fn lineage_deltas(&self, query: &ReceiptDeltaQuery) -> Result<LineageDeltaResponse, CliError> {
+        self.get_json_with_query(INTERNAL_LINEAGE_DELTA_PATH, query)
+    }
+
+    fn budget_deltas(&self, query: &BudgetDeltaQuery) -> Result<BudgetDeltaResponse, CliError> {
+        self.get_json_with_query(INTERNAL_BUDGETS_DELTA_PATH, query)
+    }
+
+    fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
+        self.request_json(
+            |client, url, token| {
+                client
+                    .get(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call()
+            },
+            path,
+        )
+    }
+
+    fn public_get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
+        self.request_json_without_service_auth(|client, url| client.get(url).call(), path)
+    }
+
+    fn public_get_text(&self, path: &str) -> Result<String, CliError> {
+        self.request_text_without_service_auth(|client, url| client.get(url).call(), path)
+    }
+
+    fn get_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        query: &Q,
+    ) -> Result<T, CliError> {
+        let encoded_query = serde_urlencoded::to_string(query).map_err(|error| {
+            CliError::Other(format!("failed to encode trust control query: {error}"))
+        })?;
+        let url = if encoded_query.is_empty() {
+            path.to_string()
+        } else {
+            format!("{path}?{encoded_query}")
+        };
+        self.request_json(
+            |client, base_url, token| {
+                client
+                    .get(&format!("{base_url}{url}"))
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call()
+            },
+            "",
+        )
+    }
+
+    fn post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        self.request_json(
+            |client, url, token| {
+                client
+                    .post(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .send_json(json.clone())
+            },
+            path,
+        )
+    }
+
+    fn public_post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        self.request_json_without_service_auth(
+            |client, url| client.post(url).send_json(json.clone()),
+            path,
+        )
+    }
+
+    fn public_post_form<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &[(&str, &str)],
+    ) -> Result<T, CliError> {
+        self.request_json_without_service_auth(|client, url| client.post(url).send_form(body), path)
+    }
+
+    fn bearer_post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        bearer_token: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        self.request_json_with_bearer(
+            |client, url| {
+                client
+                    .post(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {bearer_token}"))
+                    .send_json(json.clone())
+            },
+            path,
+        )
+    }
+
+    fn put_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, CliError> {
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        self.request_json(
+            |client, url, token| {
+                client
+                    .put(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .send_json(json.clone())
+            },
+            path,
+        )
+    }
+
+    fn delete_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
+        self.request_json(
+            |client, url, token| {
+                client
+                    .delete(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .call()
+            },
+            path,
+        )
+    }
+
+    fn request_json<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
+    where
+        T: for<'de> Deserialize<'de>,
+        F: Fn(&Agent, &str, &str) -> Result<ureq::Response, ureq::Error>,
+    {
+        let endpoint_order = self.endpoint_order();
+        let mut last_error = None;
+        for index in endpoint_order {
+            let url = format!("{}{}", self.endpoints[index], path);
+            match request(&self.http, &url, &self.token) {
+                Ok(response) => {
+                    self.mark_preferred(index);
+                    return serde_json::from_reader(response.into_reader()).map_err(|error| {
+                        CliError::Other(format!(
+                            "failed to decode trust control service response body: {error}"
+                        ))
+                    });
+                }
+                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Status(status, response)) => {
+                    return Err(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service transport failed: {error}"
+                    )));
+                }
+            }
+        }
+        Err(last_error.unwrap_or_else(|| {
+            CliError::Other("trust control service request failed with no endpoints".to_string())
+        }))
+    }
+
+    fn request_json_without_service_auth<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
+    where
+        T: for<'de> Deserialize<'de>,
+        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+    {
+        let endpoint_order = self.endpoint_order();
+        let mut last_error = None;
+        for index in endpoint_order {
+            let url = format!("{}{}", self.endpoints[index], path);
+            match request(&self.http, &url) {
+                Ok(response) => {
+                    self.mark_preferred(index);
+                    return serde_json::from_reader(response.into_reader()).map_err(|error| {
+                        CliError::Other(format!(
+                            "failed to decode trust control service response body: {error}"
+                        ))
+                    });
+                }
+                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Status(status, response)) => {
+                    return Err(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service transport failed: {error}"
+                    )));
+                }
+            }
+        }
+        Err(last_error.unwrap_or_else(|| {
+            CliError::Other("trust control service request failed with no endpoints".to_string())
+        }))
+    }
+
+    fn request_text_without_service_auth<F>(
+        &self,
+        request: F,
+        path: &str,
+    ) -> Result<String, CliError>
+    where
+        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+    {
+        let endpoint_order = self.endpoint_order();
+        let mut last_error = None;
+        for index in endpoint_order {
+            let url = format!("{}{}", self.endpoints[index], path);
+            match request(&self.http, &url) {
+                Ok(response) => {
+                    self.mark_preferred(index);
+                    return response.into_string().map_err(|error| {
+                        CliError::Other(format!(
+                            "failed to decode trust control text response body: {error}"
+                        ))
+                    });
+                }
+                Err(ureq::Error::Status(status, response)) if should_retry_status(status) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Status(status, response)) => {
+                    return Err(CliError::Other(format!(
+                        "trust control service request failed with {status}: {}",
+                        response.into_string().unwrap_or_default()
+                    )));
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    last_error = Some(CliError::Other(format!(
+                        "trust control service transport failed: {error}"
+                    )));
+                }
+            }
+        }
+        Err(last_error.unwrap_or_else(|| {
+            CliError::Other("trust control service request failed with no endpoints".to_string())
+        }))
+    }
+
+    fn request_json_with_bearer<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
+    where
+        T: for<'de> Deserialize<'de>,
+        F: Fn(&Agent, &str) -> Result<ureq::Response, ureq::Error>,
+    {
+        self.request_json_without_service_auth(request, path)
+    }
+
+    fn endpoint_order(&self) -> Vec<usize> {
+        let preferred = match self.preferred_index.lock() {
+            Ok(guard) => *guard,
+            Err(poisoned) => *poisoned.into_inner(),
+        };
+        let total = self.endpoints.len();
+        (0..total)
+            .map(|offset| (preferred + offset) % total)
+            .collect()
+    }
+
+    fn mark_preferred(&self, index: usize) {
+        match self.preferred_index.lock() {
+            Ok(mut guard) => *guard = index,
+            Err(poisoned) => *poisoned.into_inner() = index,
+        }
+    }
+}
+
+fn certification_marketplace_search_path(query: &CertificationMarketplaceSearchQuery) -> String {
+    let mut serializer = UrlFormSerializer::new(String::new());
+    if let Some(tool_server_id) = query.filters.tool_server_id.as_deref() {
+        serializer.append_pair("toolServerId", tool_server_id);
+    }
+    if let Some(criteria_profile) = query.filters.criteria_profile.as_deref() {
+        serializer.append_pair("criteriaProfile", criteria_profile);
+    }
+    if let Some(evidence_profile) = query.filters.evidence_profile.as_deref() {
+        serializer.append_pair("evidenceProfile", evidence_profile);
+    }
+    if let Some(status) = query.filters.status {
+        serializer.append_pair("status", status.label());
+    }
+    if let Some(operator_ids) = query.operator_ids.as_deref() {
+        serializer.append_pair("operatorIds", operator_ids);
+    }
+    let encoded = serializer.finish();
+    if encoded.is_empty() {
+        CERTIFICATION_DISCOVERY_SEARCH_PATH.to_string()
+    } else {
+        format!("{CERTIFICATION_DISCOVERY_SEARCH_PATH}?{encoded}")
+    }
+}
+
+fn certification_marketplace_transparency_path(
+    query: &CertificationMarketplaceTransparencyQuery,
+) -> String {
+    let mut serializer = UrlFormSerializer::new(String::new());
+    if let Some(tool_server_id) = query.filters.tool_server_id.as_deref() {
+        serializer.append_pair("toolServerId", tool_server_id);
+    }
+    if let Some(operator_ids) = query.operator_ids.as_deref() {
+        serializer.append_pair("operatorIds", operator_ids);
+    }
+    let encoded = serializer.finish();
+    if encoded.is_empty() {
+        CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH.to_string()
+    } else {
+        format!("{CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH}?{encoded}")
+    }
+}
+
+impl RemoteCapabilityAuthority {
+    pub fn refresh_status(&self) -> Result<(), CliError> {
+        let status = self.client.authority_status()?;
+        let cache = AuthorityKeyCache::from_status(&status)?;
+        match self.cache.lock() {
+            Ok(mut guard) => *guard = cache,
+            Err(poisoned) => *poisoned.into_inner() = cache,
+        }
+        Ok(())
+    }
+
+    fn refresh_status_if_stale(&self) {
+        let should_refresh = match self.cache.lock() {
+            Ok(guard) => guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
+            Err(poisoned) => poisoned.into_inner().refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
+        };
+        if should_refresh {
+            let _ = self.refresh_status();
+        }
+    }
+}
+
+impl CapabilityAuthority for RemoteCapabilityAuthority {
+    fn authority_public_key(&self) -> PublicKey {
+        self.refresh_status_if_stale();
+        match self.cache.lock() {
+            Ok(guard) => match &guard.current {
+                Some(public_key) => public_key.clone(),
+                None => unreachable!("remote capability authority cache missing current key"),
+            },
+            Err(poisoned) => match &poisoned.into_inner().current {
+                Some(public_key) => public_key.clone(),
+                None => unreachable!("remote capability authority cache missing current key"),
+            },
+        }
+    }
+
+    fn trusted_public_keys(&self) -> Vec<PublicKey> {
+        self.refresh_status_if_stale();
+        match self.cache.lock() {
+            Ok(guard) => guard.trusted.clone(),
+            Err(poisoned) => poisoned.into_inner().trusted.clone(),
+        }
+    }
+
+    fn issue_capability(
+        &self,
+        subject: &PublicKey,
+        scope: ArcScope,
+        ttl_seconds: u64,
+    ) -> Result<CapabilityToken, arc_kernel::KernelError> {
+        self.issue_capability_with_attestation(subject, scope, ttl_seconds, None)
+    }
+
+    fn issue_capability_with_attestation(
+        &self,
+        subject: &PublicKey,
+        scope: ArcScope,
+        ttl_seconds: u64,
+        runtime_attestation: Option<RuntimeAttestationEvidence>,
+    ) -> Result<CapabilityToken, arc_kernel::KernelError> {
+        let capability = self
+            .client
+            .issue_capability_with_attestation(subject, scope, ttl_seconds, runtime_attestation)
+            .map_err(|error| {
+                arc_kernel::KernelError::CapabilityIssuanceFailed(error.to_string())
+            })?;
+        match self.cache.lock() {
+            Ok(mut guard) => {
+                guard.current = Some(capability.issuer.clone());
+                if !guard.trusted.contains(&capability.issuer) {
+                    guard.trusted.push(capability.issuer.clone());
+                }
+                guard.refreshed_at = Instant::now();
+            }
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                guard.current = Some(capability.issuer.clone());
+                if !guard.trusted.contains(&capability.issuer) {
+                    guard.trusted.push(capability.issuer.clone());
+                }
+                guard.refreshed_at = Instant::now();
+            }
+        }
+        Ok(capability)
+    }
+}
+
+impl RevocationStore for RemoteRevocationStore {
+    fn is_revoked(&self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        self.client
+            .list_revocations(&RevocationQuery {
+                capability_id: Some(capability_id.to_string()),
+                limit: Some(1),
+            })
+            .map(|response| response.revoked.unwrap_or(false))
+            .map_err(into_revocation_store_error)
+    }
+
+    fn revoke(&mut self, capability_id: &str) -> Result<bool, RevocationStoreError> {
+        self.client
+            .revoke_capability(capability_id)
+            .map(|response| response.newly_revoked)
+            .map_err(into_revocation_store_error)
+    }
+}
+
+impl ReceiptStore for RemoteReceiptStore {
+    fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+        self.client
+            .append_tool_receipt(receipt)
+            .map_err(into_receipt_store_error)
+    }
+
+    fn append_child_receipt(
+        &mut self,
+        receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        self.client
+            .append_child_receipt(receipt)
+            .map_err(into_receipt_store_error)
+    }
+
+    fn record_capability_snapshot(
+        &mut self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        self.client
+            .record_capability_snapshot(token, parent_capability_id)
+            .map_err(into_receipt_store_error)
+    }
+
+    fn resolve_credit_bond(
+        &self,
+        bond_id: &str,
+    ) -> Result<Option<arc_kernel::CreditBondRow>, ReceiptStoreError> {
+        self.client
+            .list_credit_bonds(&CreditBondListQuery {
+                bond_id: Some(bond_id.to_string()),
+                facility_id: None,
+                capability_id: None,
+                agent_subject: None,
+                tool_server: None,
+                tool_name: None,
+                disposition: None,
+                lifecycle_state: None,
+                limit: Some(1),
+            })
+            .map(|report| report.bonds.into_iter().next())
+            .map_err(into_receipt_store_error)
+    }
+}
+
+impl BudgetStore for RemoteBudgetStore {
+    fn try_increment(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.client
+            .try_increment_budget(capability_id, grant_index, max_invocations)
+            .map(|response| response.allowed)
+            .map_err(into_budget_store_error)
+    }
+
+    fn try_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.client
+            .try_charge_cost(
+                capability_id,
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+            )
+            .map(|response| response.allowed)
+            .map_err(into_budget_store_error)
+    }
+
+    fn reverse_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reverse_charge_cost(capability_id, grant_index, cost_units)
+            .map(|_| ())
+            .map_err(into_budget_store_error)
+    }
+
+    fn reduce_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reduce_charge_cost(capability_id, grant_index, cost_units)
+            .map(|_| ())
+            .map_err(into_budget_store_error)
+    }
+
+    fn list_usages(
+        &self,
+        limit: usize,
+        capability_id: Option<&str>,
+    ) -> Result<Vec<BudgetUsageRecord>, BudgetStoreError> {
+        self.client
+            .list_budgets(&BudgetQuery {
+                capability_id: capability_id.map(ToOwned::to_owned),
+                limit: Some(limit),
+            })
+            .map(|response| {
+                response
+                    .usages
+                    .into_iter()
+                    .map(|usage| BudgetUsageRecord {
+                        capability_id: usage.capability_id,
+                        grant_index: usage.grant_index,
+                        invocation_count: usage.invocation_count,
+                        updated_at: usage.updated_at,
+                        seq: usage.seq.unwrap_or(0),
+                        total_cost_charged: usage.total_cost_charged,
+                    })
+                    .collect()
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn get_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        self.list_usages(MAX_LIST_LIMIT, Some(capability_id))
+            .map(|usages| {
+                usages
+                    .into_iter()
+                    .find(|usage| usage.grant_index == grant_index as u32)
+            })
+    }
+}
+
+impl AuthorityKeyCache {
+    fn from_status(status: &TrustAuthorityStatus) -> Result<Self, CliError> {
+        if !status.configured {
+            return Err(CliError::Other(
+                "trust control service does not have an authority configured".to_string(),
+            ));
+        }
+        let current = status
+            .public_key
+            .as_deref()
+            .map(PublicKey::from_hex)
+            .transpose()?;
+        if current.is_none() {
+            return Err(CliError::Other(
+                "trust control service returned no current authority public key".to_string(),
+            ));
+        }
+        let trusted = status
+            .trusted_public_keys
+            .iter()
+            .map(|value| PublicKey::from_hex(value))
+            .collect::<Result<Vec<_>, _>>()?;
+        let mut trusted = trusted;
+        if let Some(current) = current.as_ref() {
+            if !trusted.iter().any(|public_key| public_key == current) {
+                trusted.push(current.clone());
+            }
+        }
+        Ok(Self {
+            current,
+            trusted,
+            refreshed_at: Instant::now(),
+        })
+    }
+}
+
+fn should_retry_status(status: u16) -> bool {
+    matches!(status, 500 | 502 | 503 | 504)
+}
+
+fn into_receipt_store_error(error: CliError) -> ReceiptStoreError {
+    ReceiptStoreError::Io(std::io::Error::other(error.to_string()))
+}
+
+fn into_revocation_store_error(error: CliError) -> RevocationStoreError {
+    RevocationStoreError::Io(std::io::Error::other(error.to_string()))
+}
+
+fn into_budget_store_error(error: CliError) -> BudgetStoreError {
+    BudgetStoreError::Io(std::io::Error::other(error.to_string()))
+}
+
