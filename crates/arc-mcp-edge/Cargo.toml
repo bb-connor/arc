@@ -11,7 +11,7 @@ repository.workspace = true
 name = "arc_mcp_edge"
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
 chrono = { version = "0.4", features = ["clock"] }

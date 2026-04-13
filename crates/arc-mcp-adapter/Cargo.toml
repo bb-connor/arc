@@ -11,7 +11,7 @@ repository.workspace = true
 name = "arc_mcp_adapter"
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-mcp-edge = { package = "arc-mcp-edge", path = "../arc-mcp-edge" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }

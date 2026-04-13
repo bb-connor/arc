@@ -11,7 +11,7 @@ repository.workspace = true
 name = "arc_store_sqlite"
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 serde = { workspace = true }
 serde_json = { workspace = true }

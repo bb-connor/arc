@@ -9,7 +9,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../../crates/arc-core" }
+arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../../crates/arc-guards" }
 serde_json = { workspace = true }

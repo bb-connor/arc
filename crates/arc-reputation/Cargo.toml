@@ -11,7 +11,7 @@ repository.workspace = true
 name = "arc_reputation"
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

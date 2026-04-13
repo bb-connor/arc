@@ -12,7 +12,7 @@ name = "arc_hosted_mcp"
 
 [dependencies]
 arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plane" }
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../arc-mcp-adapter" }
 arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }

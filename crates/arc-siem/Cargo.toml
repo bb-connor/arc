@@ -11,7 +11,7 @@ repository.workspace = true
 name = "arc_siem"
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

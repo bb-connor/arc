@@ -8,6 +8,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../../crates/arc-core" }
+arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
 proptest = "1.10"
 serde_json = { workspace = true }

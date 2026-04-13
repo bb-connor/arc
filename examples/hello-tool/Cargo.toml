@@ -8,7 +8,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-arc-core = { package = "arc-core", path = "../../crates/arc-core" }
+arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../../crates/arc-manifest" }
 arc-mcp-adapter = { package = "arc-mcp-adapter", path = "../../crates/arc-mcp-adapter" }

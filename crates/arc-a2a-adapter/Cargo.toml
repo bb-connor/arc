@@ -12,7 +12,7 @@ name = "arc_a2a_adapter"
 
 [dependencies]
 base64 = "0.22"
-arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
 rustls-pemfile = "2"
