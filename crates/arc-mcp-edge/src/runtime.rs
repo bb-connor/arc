@@ -32,15 +32,20 @@ use nested_flow::*;
 use protocol::*;
 
 const MCP_PROTOCOL_VERSION: &str = "2025-11-25";
+const SUPPORTED_MCP_PROTOCOL_VERSIONS: &[&str] = &[MCP_PROTOCOL_VERSION];
 const JSONRPC_INVALID_REQUEST: i64 = -32600;
 const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
 const JSONRPC_INVALID_PARAMS: i64 = -32602;
 const JSONRPC_INTERNAL_ERROR: i64 = -32603;
 const JSONRPC_SERVER_NOT_INITIALIZED: i64 = -32002;
 const JSONRPC_URL_ELICITATION_REQUIRED: i64 = -32042;
+const ARC_ERROR_PROTOCOL_VERSION_UNSUPPORTED: i64 = 1000;
+const ARC_ERROR_INVALID_REQUEST_SHAPE: i64 = 1002;
 const CLIENT_IDLE_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const ARC_TOOL_STREAMING_CAPABILITY_KEY: &str = "arcToolStreaming";
 const LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY: &str = "pactToolStreaming";
+const ARC_PROTOCOL_CAPABILITY_KEY: &str = "arcProtocol";
+const ARC_ERROR_REGISTRY_SCHEMA: &str = "arc.error-registry.v1";
 const ARC_TOOL_STREAM_KEY: &str = "arcToolStream";
 const LEGACY_PACT_TOOL_STREAM_KEY: &str = "pactToolStream";
 const ARC_TOOL_STREAMING_NOTIFICATION_METHOD: &str = "notifications/arc/tool_call_chunk";
@@ -115,6 +120,85 @@ impl LogLevel {
             Self::Alert => "alert",
             Self::Emergency => "emergency",
         }
+    }
+}
+
+fn arc_protocol_error_payload(
+    code: i64,
+    name: &str,
+    transient: bool,
+    retry_strategy: &str,
+    guidance: &str,
+) -> Value {
+    json!({
+        "code": code,
+        "name": name,
+        "category": "protocol",
+        "transient": transient,
+        "retry": {
+            "strategy": retry_strategy,
+            "guidance": guidance,
+        }
+    })
+}
+
+fn jsonrpc_protocol_error(
+    id: Value,
+    jsonrpc_code: i64,
+    message: &str,
+    arc_code: i64,
+    name: &str,
+    retry_strategy: &str,
+    guidance: &str,
+    context: Option<Value>,
+) -> Value {
+    let mut data = serde_json::Map::new();
+    data.insert(
+        "arcError".to_string(),
+        arc_protocol_error_payload(arc_code, name, false, retry_strategy, guidance),
+    );
+    if let Some(context) = context.and_then(|value| value.as_object().cloned()) {
+        for (key, value) in context {
+            data.insert(key, value);
+        }
+    }
+    jsonrpc_error_with_data(id, jsonrpc_code, message, Some(Value::Object(data)))
+}
+
+fn negotiate_protocol_version(id: &Value, params: &Value) -> Result<&'static str, Value> {
+    let Some(requested) = params.get("protocolVersion") else {
+        return Ok(MCP_PROTOCOL_VERSION);
+    };
+    let Some(requested) = requested.as_str() else {
+        return Err(jsonrpc_protocol_error(
+            id.clone(),
+            JSONRPC_INVALID_REQUEST,
+            "initialize.params.protocolVersion must be a string",
+            ARC_ERROR_INVALID_REQUEST_SHAPE,
+            "invalid_request_shape",
+            "do_not_retry",
+            "correct the initialize request shape before retrying",
+            Some(json!({
+                "parameter": "protocolVersion"
+            })),
+        ));
+    };
+    if SUPPORTED_MCP_PROTOCOL_VERSIONS.contains(&requested) {
+        Ok(MCP_PROTOCOL_VERSION)
+    } else {
+        Err(jsonrpc_protocol_error(
+            id.clone(),
+            JSONRPC_INVALID_REQUEST,
+            "unsupported protocolVersion",
+            ARC_ERROR_PROTOCOL_VERSION_UNSUPPORTED,
+            "protocol_version_unsupported",
+            "do_not_retry_until_version_change",
+            "retry only after selecting one of the server's supported protocol versions",
+            Some(json!({
+                "requestedProtocolVersion": requested,
+                "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
+            })),
+        ))
     }
 }
 
@@ -689,6 +773,10 @@ impl ArcMcpEdge {
                 "initialize may only be called once",
             );
         }
+        let selected_protocol_version = match negotiate_protocol_version(&id, &params) {
+            Ok(version) => version,
+            Err(error) => return error,
+        };
 
         let session_id = self
             .kernel
@@ -759,6 +847,19 @@ impl ArcMcpEdge {
                 "toolCallChunkNotifications": true,
             }),
         );
+        experimental.insert(
+            ARC_PROTOCOL_CAPABILITY_KEY.to_string(),
+            json!({
+                "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
+                "selectedProtocolVersion": selected_protocol_version,
+                "compatibility": "exact_match",
+                "downgradeBehavior": "reject",
+                "errorRegistry": {
+                    "schema": ARC_ERROR_REGISTRY_SCHEMA,
+                    "path": "spec/errors/arc-error-registry.v1.json",
+                }
+            }),
+        );
         capabilities.insert("experimental".to_string(), Value::Object(experimental));
         capabilities.insert(
             "tasks".to_string(),
@@ -776,7 +877,7 @@ impl ArcMcpEdge {
         jsonrpc_result(
             id,
             json!({
-                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "protocolVersion": selected_protocol_version,
                 "capabilities": Value::Object(capabilities),
                 "serverInfo": {
                     "name": self.config.server_name,

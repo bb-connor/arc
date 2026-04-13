@@ -254,6 +254,36 @@ Rules:
   **MUST** not silently resume prior state.
 - Clients encountering those terminal states **MUST** re-run initialization.
 
+### 3.4 Version Negotiation
+
+The machine-readable negotiation artifact for the shipped stack is:
+
+- `spec/versions/arc-protocol-negotiation.v1.json`
+
+Hosted MCP negotiation rules:
+
+- Clients **MAY** send `initialize.params.protocolVersion`.
+- The server compares that value against its supported version set.
+- The current shipped implementation supports one MCP protocol version:
+  `2025-11-25`.
+- Compatibility determination is therefore an exact-match test against that
+  supported set.
+- The current implementation has no downgrade path; unsupported requested
+  versions are rejected rather than silently downgraded.
+- On success, the selected version is echoed in `result.protocolVersion` and
+  exposed again under
+  `result.capabilities.experimental.arcProtocol.selectedProtocolVersion`.
+- On failure, initialize is rejected with JSON-RPC `-32600` plus a structured
+  ARC protocol error descriptor in `error.data.arcError`.
+
+Native ARC direct transport versioning rules:
+
+- Native ARC framed transport is currently `arc-wire-v1`.
+- Native direct peers do not negotiate in-band today; compatibility is an
+  exact-match, out-of-band requirement.
+- Because no in-band downgrade exists, incompatible native peers **MUST**
+  close or reset the transport instead of attempting best-effort interop.
+
 ## 4. Trust-Control Capability Lifecycle
 
 The trust-control service is implemented by `arc trust serve`.
@@ -360,9 +390,44 @@ Success response:
 | `revoked` | boolean | Current revocation state |
 | `newlyRevoked` | boolean | Whether this call changed state |
 
-## 5. Sequence Diagrams
+## 5. Error Taxonomy
 
-### 5.1 Hosted Initialization
+The machine-readable error registry for the shipped stack is:
+
+- `spec/errors/arc-error-registry.v1.json`
+
+Registry guarantees:
+
+- every ARC error entry has a unique numeric code
+- every entry names one category
+- every entry is marked `transient: true|false`
+- every entry carries explicit retry guidance
+
+The current registry categories are:
+
+- `protocol`
+- `auth`
+- `capability`
+- `guard`
+- `budget`
+- `tool`
+- `internal`
+
+Surface mapping rules:
+
+- Native ARC `ToolCallError` discriminators map deterministically to registry
+  entries such as `capability_denied`, `capability_expired`,
+  `capability_revoked`, `guard_denied`, `tool_server_error`, and
+  `internal_error`.
+- Hosted MCP initialize-time protocol rejection communicates the numeric ARC
+  protocol code under JSON-RPC `error.data.arcError.code`.
+- Trust-control remains HTTP-status-driven, but registry codes define the
+  stable cross-surface classification and retry semantics for future
+  conformance and SDK work.
+
+## 6. Sequence Diagrams
+
+### 6.1 Hosted Initialization
 
 ```mermaid
 sequenceDiagram
@@ -381,7 +446,7 @@ sequenceDiagram
     end
 ```
 
-### 5.2 Capability Issuance
+### 6.2 Capability Issuance
 
 ```mermaid
 sequenceDiagram
@@ -395,7 +460,7 @@ sequenceDiagram
     Trust-->>Caller: 200 { capability }
 ```
 
-### 5.3 Delegated Issuance
+### 6.3 Delegated Issuance
 
 ```mermaid
 sequenceDiagram
@@ -418,7 +483,7 @@ sequenceDiagram
     Trust-->>Caller: 200 { capability, delegationAnchorCapabilityId? }
 ```
 
-### 5.4 Native Tool Invocation With Receipt
+### 6.4 Native Tool Invocation With Receipt
 
 ```mermaid
 sequenceDiagram
@@ -438,7 +503,7 @@ sequenceDiagram
     Kernel-->>Agent: tool_call_response { result, receipt }
 ```
 
-### 5.5 Revocation Propagation
+### 6.5 Revocation Propagation
 
 ```mermaid
 sequenceDiagram
@@ -460,7 +525,7 @@ sequenceDiagram
     end
 ```
 
-### 5.6 Error Handling
+### 6.6 Error Handling
 
 ```mermaid
 sequenceDiagram
@@ -481,7 +546,7 @@ sequenceDiagram
     end
 ```
 
-## 6. Schemas And Conformance
+## 7. Schemas And Conformance
 
 Versioned native message schemas live under:
 

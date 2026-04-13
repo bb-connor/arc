@@ -1,0 +1,134 @@
+{
+  "schema": "arc.error-registry.v1",
+  "updatedAt": "2026-04-13",
+  "categories": [
+    "protocol",
+    "auth",
+    "capability",
+    "guard",
+    "budget",
+    "tool",
+    "internal"
+  ],
+  "codes": [
+    {
+      "code": 1000,
+      "name": "protocol_version_unsupported",
+      "category": "protocol",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry_until_version_change",
+        "guidance": "Retry only after selecting a supported protocol version."
+      },
+      "jsonrpcCode": -32600
+    },
+    {
+      "code": 1001,
+      "name": "session_not_initialized",
+      "category": "protocol",
+      "transient": false,
+      "retry": {
+        "strategy": "reinitialize",
+        "guidance": "Open a new session and rerun initialize before retrying the operation."
+      },
+      "jsonrpcCode": -32002
+    },
+    {
+      "code": 1002,
+      "name": "invalid_request_shape",
+      "category": "protocol",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Correct the request shape before retrying."
+      },
+      "jsonrpcCode": -32600
+    },
+    {
+      "code": 1100,
+      "name": "auth_missing_or_invalid",
+      "category": "auth",
+      "transient": true,
+      "retry": {
+        "strategy": "retry_after_refresh",
+        "guidance": "Acquire valid credentials or refresh the token before retrying."
+      }
+    },
+    {
+      "code": 2100,
+      "name": "capability_denied",
+      "category": "capability",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Do not retry the same capability without correcting signature, scope, or subject binding."
+      },
+      "nativeWireName": "capability_denied"
+    },
+    {
+      "code": 2101,
+      "name": "capability_expired",
+      "category": "capability",
+      "transient": false,
+      "retry": {
+        "strategy": "retry_after_reissue",
+        "guidance": "Issue or obtain a fresh capability before retrying."
+      },
+      "nativeWireName": "capability_expired"
+    },
+    {
+      "code": 2102,
+      "name": "capability_revoked",
+      "category": "capability",
+      "transient": false,
+      "retry": {
+        "strategy": "retry_after_reissue",
+        "guidance": "Obtain a newly issued capability; the revoked capability must not be retried."
+      },
+      "nativeWireName": "capability_revoked"
+    },
+    {
+      "code": 3100,
+      "name": "guard_denied",
+      "category": "guard",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Adjust the request or policy inputs before retrying."
+      },
+      "nativeWireName": "policy_denied"
+    },
+    {
+      "code": 4100,
+      "name": "budget_exhausted",
+      "category": "budget",
+      "transient": true,
+      "retry": {
+        "strategy": "retry_after_budget_change",
+        "guidance": "Retry only after budget replenishment, grant widening, or billing reconciliation."
+      }
+    },
+    {
+      "code": 5100,
+      "name": "tool_server_error",
+      "category": "tool",
+      "transient": true,
+      "retry": {
+        "strategy": "retry_with_backoff",
+        "guidance": "Use bounded exponential backoff unless upstream tooling documents a permanent failure."
+      },
+      "nativeWireName": "tool_server_error"
+    },
+    {
+      "code": 6100,
+      "name": "internal_error",
+      "category": "internal",
+      "transient": true,
+      "retry": {
+        "strategy": "retry_with_backoff",
+        "guidance": "Retry with bounded backoff and escalate if the condition persists."
+      },
+      "nativeWireName": "internal_error"
+    }
+  ]
+}

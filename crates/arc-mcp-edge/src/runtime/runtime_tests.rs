@@ -809,6 +809,26 @@ fn initialize_then_initialized_enters_ready_state() {
         true
     );
     assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][ARC_PROTOCOL_CAPABILITY_KEY]
+            ["supportedProtocolVersions"],
+        json!([MCP_PROTOCOL_VERSION])
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][ARC_PROTOCOL_CAPABILITY_KEY]
+            ["selectedProtocolVersion"],
+        MCP_PROTOCOL_VERSION
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][ARC_PROTOCOL_CAPABILITY_KEY]
+            ["compatibility"],
+        "exact_match"
+    );
+    assert_eq!(
+        initialize["result"]["capabilities"]["experimental"][ARC_PROTOCOL_CAPABILITY_KEY]
+            ["downgradeBehavior"],
+        "reject"
+    );
+    assert_eq!(
         initialize["result"]["capabilities"]["tasks"]["list"],
         json!({})
     );
@@ -831,6 +851,48 @@ fn initialize_then_initialized_enters_ready_state() {
     }));
     assert!(initialized.is_none());
     assert!(matches!(edge.state, EdgeState::Ready { .. }));
+}
+
+#[test]
+fn initialize_unsupported_protocol_version_rejected() {
+    let mut edge = make_edge(10);
+
+    let response = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-01-01"
+            }
+        }))
+        .unwrap();
+
+    assert_eq!(response["error"]["code"], JSONRPC_INVALID_REQUEST);
+    assert_eq!(response["error"]["message"], "unsupported protocolVersion");
+    assert_eq!(
+        response["error"]["data"]["arcError"]["code"],
+        ARC_ERROR_PROTOCOL_VERSION_UNSUPPORTED
+    );
+    assert_eq!(
+        response["error"]["data"]["arcError"]["name"],
+        "protocol_version_unsupported"
+    );
+    assert_eq!(response["error"]["data"]["arcError"]["category"], "protocol");
+    assert_eq!(response["error"]["data"]["arcError"]["transient"], false);
+    assert_eq!(
+        response["error"]["data"]["arcError"]["retry"]["strategy"],
+        "do_not_retry_until_version_change"
+    );
+    assert_eq!(
+        response["error"]["data"]["requestedProtocolVersion"],
+        "2024-01-01"
+    );
+    assert_eq!(
+        response["error"]["data"]["supportedProtocolVersions"],
+        json!([MCP_PROTOCOL_VERSION])
+    );
+    assert!(matches!(edge.state, EdgeState::Uninitialized));
 }
 
 #[test]
