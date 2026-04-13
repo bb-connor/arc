@@ -6,7 +6,8 @@
 
 This document defines the shipped ARC wire protocol tightly enough for an
 independent implementation. It is narrower than [PROTOCOL.md](PROTOCOL.md),
-which remains the repository-wide profile.
+which remains the repository-wide profile. The paired threat model and
+transport-security requirements live in [SECURITY.md](SECURITY.md).
 
 ## 1. Surface Model
 
