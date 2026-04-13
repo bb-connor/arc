@@ -8,9 +8,9 @@
 //! data-and-crypto crate suitable for use in WASM, embedded, and no-std
 //! (with alloc) environments.
 //!
-//! The shared substrate now lives in `arc-core-types`; this crate preserves the
-//! historical `arc_core::*` surface while heavier domain modules continue to
-//! split away in later phases.
+//! The shared substrate now lives in `arc-core-types`, and the heavier domain
+//! implementations now live in dedicated crates. This crate preserves the
+//! historical `arc_core::*` surface by re-exporting those extracted crates.
 
 pub mod appraisal;
 pub mod autonomy;
