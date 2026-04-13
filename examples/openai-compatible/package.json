@@ -1,0 +1,12 @@
+{
+  "name": "arc-openai-compatible-example",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@arc-protocol/sdk": "file:../../packages/sdk/arc-ts",
+    "openai": "^6.34.0"
+  }
+}

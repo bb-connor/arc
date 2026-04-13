@@ -1,0 +1,67 @@
+# OpenAI-Compatible Example
+
+This example demonstrates ARC governance over function calling by mapping the
+hosted edge tool inventory into OpenAI Chat Completions tool definitions and
+executing the returned function calls through `@arc-protocol/sdk`.
+
+## What it does
+
+- initializes a hosted ARC session through `@arc-protocol/sdk`
+- lists tools from the hosted edge and converts them into OpenAI-compatible
+  function definitions
+- routes tool calls back through ARC's typed client
+- resolves the resulting receipt through the trust service query API
+
+## Prerequisites
+
+- Node.js 22+
+- the phase `309` demo stack running locally, or equivalent direct
+  `arc trust serve` plus `arc mcp serve-http` processes
+- optional: an OpenAI-compatible Chat Completions endpoint and API key for a
+  live function-calling run
+
+## Install
+
+From this directory:
+
+```bash
+npm --prefix ../../packages/sdk/arc-ts ci
+npm --prefix ../../packages/sdk/arc-ts run build
+npm install
+```
+
+## Offline verification
+
+The script defaults to the Docker quickstart endpoints:
+
+- `ARC_BASE_URL=http://127.0.0.1:8931`
+- `ARC_CONTROL_URL=http://127.0.0.1:8940`
+- `ARC_AUTH_TOKEN=demo-token`
+
+`--dry-run` exercises the ARC SDK path only. It initializes the hosted session,
+lists tools, performs a governed `echo_text` call, and resolves the resulting
+receipt.
+
+```bash
+node run.mjs --dry-run
+```
+
+## Live OpenAI-Compatible Run
+
+```bash
+OPENAI_API_KEY=... node run.mjs "Use the echo_text function to say hello from GPT."
+```
+
+Optional environment variables:
+
+- `OPENAI_MODEL`: defaults to `gpt-5-mini`
+- `OPENAI_BASE_URL`: override the Chat Completions base URL for another
+  OpenAI-compatible provider
+- `ARC_BASE_URL`: hosted edge base URL
+- `ARC_CONTROL_URL`: trust service base URL
+- `ARC_AUTH_TOKEN`: bearer token accepted by both services
+
+See also:
+
+- [docs/PROGRESSIVE_TUTORIAL.md](/Users/connor/Medica/backbay/standalone/arc/docs/PROGRESSIVE_TUTORIAL.md)
+- [examples/docker/README.md](/Users/connor/Medica/backbay/standalone/arc/examples/docker/README.md)
