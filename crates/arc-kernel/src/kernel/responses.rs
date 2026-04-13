@@ -1,9 +1,11 @@
+use std::sync::atomic::Ordering;
+
 use super::*;
 
 impl ArcKernel {
     /// denial reason is monetary budget exhaustion.
     pub(crate) fn build_monetary_deny_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
@@ -102,7 +104,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn build_pre_execution_monetary_deny_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
@@ -175,7 +177,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn finalize_tool_output(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         elapsed: Duration,
@@ -210,7 +212,7 @@ impl ArcKernel {
     /// Finalize a tool output with optional monetary metadata injected into the receipt.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize_tool_output_with_cost(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: ToolServerOutput,
         elapsed: Duration,
@@ -503,7 +505,7 @@ impl ArcKernel {
 
     /// Build a denial response with a signed receipt.
     pub(crate) fn build_deny_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
@@ -554,7 +556,7 @@ impl ArcKernel {
 
     /// Build a cancellation response with a signed cancelled receipt.
     pub(crate) fn build_cancelled_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
@@ -606,7 +608,7 @@ impl ArcKernel {
 
     /// Build an incomplete response with a signed incomplete receipt.
     pub(crate) fn build_incomplete_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         reason: &str,
         timestamp: u64,
@@ -623,7 +625,7 @@ impl ArcKernel {
 
     /// Build an incomplete response with optional partial output and a signed incomplete receipt.
     pub(crate) fn build_incomplete_response_with_output(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: Option<ToolCallOutput>,
         reason: &str,
@@ -641,7 +643,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn build_incomplete_response_with_output_and_metadata(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: Option<ToolCallOutput>,
         reason: &str,
@@ -697,7 +699,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn build_allow_response(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: ToolCallOutput,
         timestamp: u64,
@@ -713,7 +715,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn build_allow_response_with_metadata(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         output: ToolCallOutput,
         timestamp: u64,
@@ -779,7 +781,7 @@ impl ArcKernel {
 
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
     pub(crate) fn build_and_sign_receipt(
-        &mut self,
+        &self,
         params: ReceiptParams<'_>,
     ) -> Result<ArcReceipt, KernelError> {
         let body = ArcReceiptBody {
@@ -801,38 +803,38 @@ impl ArcKernel {
             .map_err(|e| KernelError::ReceiptSigningFailed(e.to_string()))
     }
 
-    pub(crate) fn record_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), KernelError> {
-        if let Some(store) = self.receipt_store.as_deref_mut() {
-            let seq = store
-                .append_arc_receipt_returning_seq(receipt)?
-                .unwrap_or(0);
-
-            // Trigger a Merkle checkpoint if we've accumulated enough receipts.
+    pub(crate) fn record_arc_receipt(&self, receipt: &ArcReceipt) -> Result<(), KernelError> {
+        if let Some(seq) = self
+            .with_receipt_store(|store| Ok(store.append_arc_receipt_returning_seq(receipt)?))?
+            .flatten()
+        {
+            let last_checkpoint_seq = self.last_checkpoint_seq.load(Ordering::SeqCst);
             if seq > 0
                 && self.checkpoint_batch_size > 0
-                && (seq - self.last_checkpoint_seq) >= self.checkpoint_batch_size
+                && (seq - last_checkpoint_seq) >= self.checkpoint_batch_size
             {
                 self.maybe_trigger_checkpoint(seq)?;
             }
         }
-        self.receipt_log.append(receipt.clone());
+        self.receipt_log
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt log lock poisoned".to_string()))?
+            .append(receipt.clone());
         Ok(())
     }
 
     /// Trigger a Merkle checkpoint for all receipts in [last_checkpoint_seq+1, batch_end_seq].
     pub(crate) fn maybe_trigger_checkpoint(
-        &mut self,
+        &self,
         batch_end_seq: u64,
     ) -> Result<(), KernelError> {
-        let batch_start_seq = self.last_checkpoint_seq + 1;
+        let batch_start_seq = self.last_checkpoint_seq.load(Ordering::SeqCst) + 1;
 
-        let Some(store) = self.receipt_store.as_deref_mut() else {
+        let Some(receipt_bytes_with_seqs) = self.with_receipt_store(|store| {
+            Ok(store.receipts_canonical_bytes_range(batch_start_seq, batch_end_seq)?)
+        })? else {
             return Ok(());
         };
-
-        let receipt_bytes_with_seqs = store
-            .receipts_canonical_bytes_range(batch_start_seq, batch_end_seq)
-            .map_err(KernelError::ReceiptPersistence)?;
 
         if receipt_bytes_with_seqs.is_empty() {
             return Ok(());
@@ -843,8 +845,7 @@ impl ArcKernel {
             .map(|(_, bytes)| bytes)
             .collect();
 
-        self.checkpoint_seq_counter += 1;
-        let checkpoint_seq = self.checkpoint_seq_counter;
+        let checkpoint_seq = self.checkpoint_seq_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
         let checkpoint = checkpoint::build_checkpoint(
             checkpoint_seq,
@@ -855,11 +856,8 @@ impl ArcKernel {
         )
         .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
 
-        store
-            .store_checkpoint(&checkpoint)
-            .map_err(KernelError::ReceiptPersistence)?;
-
-        self.last_checkpoint_seq = batch_end_seq;
+        let _ = self.with_receipt_store(|store| Ok(store.store_checkpoint(&checkpoint)?))?;
+        self.last_checkpoint_seq.store(batch_end_seq, Ordering::SeqCst);
         Ok(())
     }
 }

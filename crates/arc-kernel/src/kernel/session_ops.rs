@@ -1,96 +1,107 @@
+use std::sync::atomic::Ordering;
+
 use super::*;
 
 impl ArcKernel {
     pub fn open_session(
-        &mut self,
+        &self,
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
     ) -> SessionId {
-        self.session_counter += 1;
-        let session_id = SessionId::new(format!("sess-{}", self.session_counter));
+        let session_number = self.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        let session_id = SessionId::new(format!("sess-{}", session_number));
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
-        self.sessions.insert(
-            session_id.clone(),
-            Session::new(session_id.clone(), agent_id, issued_capabilities),
-        );
+        self.with_sessions_write(|sessions| {
+            sessions.insert(
+                session_id.clone(),
+                Session::new(session_id.clone(), agent_id, issued_capabilities),
+            );
+            Ok(())
+        })
+        .unwrap_or_else(|error| panic!("failed to open session: {error}"));
 
         session_id
     }
 
     /// Transition a session into the `ready` state once setup is complete.
-    pub fn activate_session(&mut self, session_id: &SessionId) -> Result<(), KernelError> {
+    pub fn activate_session(&self, session_id: &SessionId) -> Result<(), KernelError> {
         self.validate_web3_evidence_prerequisites()?;
-        self.session_mut(session_id)?.activate()?;
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.activate()?;
+            Ok(())
+        })
     }
 
     /// Persist transport/session authentication context for a session.
     pub fn set_session_auth_context(
-        &mut self,
+        &self,
         session_id: &SessionId,
         auth_context: SessionAuthContext,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.set_auth_context(auth_context);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.set_auth_context(auth_context);
+            Ok(())
+        })
     }
 
     /// Persist peer capabilities negotiated at the edge for a session.
     pub fn set_session_peer_capabilities(
-        &mut self,
+        &self,
         session_id: &SessionId,
         peer_capabilities: PeerCapabilities,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?
-            .set_peer_capabilities(peer_capabilities);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.set_peer_capabilities(peer_capabilities);
+            Ok(())
+        })
     }
 
     /// Replace the session's current root snapshot.
     pub fn replace_session_roots(
-        &mut self,
+        &self,
         session_id: &SessionId,
         roots: Vec<RootDefinition>,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.replace_roots(roots);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.replace_roots(roots);
+            Ok(())
+        })
     }
 
     /// Return the runtime's normalized root view for a session.
     pub fn normalized_session_roots(
         &self,
         session_id: &SessionId,
-    ) -> Result<&[NormalizedRoot], KernelError> {
-        Ok(self
-            .session(session_id)
-            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?
-            .normalized_roots())
+    ) -> Result<Vec<NormalizedRoot>, KernelError> {
+        self.with_session(session_id, |session| Ok(session.normalized_roots().to_vec()))
     }
 
     /// Return only the enforceable filesystem root paths for a session.
     pub fn enforceable_filesystem_root_paths(
         &self,
         session_id: &SessionId,
-    ) -> Result<Vec<&str>, KernelError> {
-        Ok(self
-            .session(session_id)
-            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?
-            .enforceable_filesystem_roots()
-            .filter_map(NormalizedRoot::normalized_filesystem_path)
-            .collect())
+    ) -> Result<Vec<String>, KernelError> {
+        self.with_session(session_id, |session| {
+            Ok(session
+                .enforceable_filesystem_roots()
+                .filter_map(NormalizedRoot::normalized_filesystem_path)
+                .map(str::to_string)
+                .collect())
+        })
     }
 
     pub(crate) fn session_enforceable_filesystem_root_paths_owned(
         &self,
         session_id: &SessionId,
     ) -> Result<Vec<String>, KernelError> {
-        Ok(self
-            .session(session_id)
-            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?
-            .enforceable_filesystem_roots()
-            .filter_map(NormalizedRoot::normalized_filesystem_path)
-            .map(str::to_string)
-            .collect())
+        self.with_session(session_id, |session| {
+            Ok(session
+                .enforceable_filesystem_roots()
+                .filter_map(NormalizedRoot::normalized_filesystem_path)
+                .map(str::to_string)
+                .collect())
+        })
     }
 
     pub(crate) fn resource_path_within_root(candidate: &str, root: &str) -> bool {
@@ -163,7 +174,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn build_resource_read_deny_receipt(
-        &mut self,
+        &self,
         operation: &ReadResourceOperation,
         reason: &str,
     ) -> Result<ArcReceipt, KernelError> {
@@ -204,7 +215,7 @@ impl ArcKernel {
 
     /// Subscribe the session to update notifications for a concrete resource URI.
     pub fn subscribe_session_resource(
-        &mut self,
+        &self,
         session_id: &SessionId,
         capability: &CapabilityToken,
         agent_id: &str,
@@ -222,19 +233,22 @@ impl ArcKernel {
             return Err(KernelError::ResourceNotRegistered(uri.to_string()));
         }
 
-        self.session_mut(session_id)?
-            .subscribe_resource(uri.to_string());
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.subscribe_resource(uri.to_string());
+            Ok(())
+        })
     }
 
     /// Remove a session-scoped resource subscription. Missing subscriptions are ignored.
     pub fn unsubscribe_session_resource(
-        &mut self,
+        &self,
         session_id: &SessionId,
         uri: &str,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.unsubscribe_resource(uri);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.unsubscribe_resource(uri);
+            Ok(())
+        })
     }
 
     /// Check whether a session currently holds a resource subscription.
@@ -243,31 +257,35 @@ impl ArcKernel {
         session_id: &SessionId,
         uri: &str,
     ) -> Result<bool, KernelError> {
-        Ok(self
-            .session(session_id)
-            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?
-            .is_resource_subscribed(uri))
+        self.with_session(session_id, |session| Ok(session.is_resource_subscribed(uri)))
     }
 
     /// Mark a session as draining. New tool calls are rejected after this point.
-    pub fn begin_draining_session(&mut self, session_id: &SessionId) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.begin_draining()?;
-        Ok(())
+    pub fn begin_draining_session(&self, session_id: &SessionId) -> Result<(), KernelError> {
+        self.with_session_mut(session_id, |session| {
+            session.begin_draining()?;
+            Ok(())
+        })
     }
 
     /// Close a session and clear transient session-scoped state.
-    pub fn close_session(&mut self, session_id: &SessionId) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.close()?;
-        Ok(())
+    pub fn close_session(&self, session_id: &SessionId) -> Result<(), KernelError> {
+        self.with_session_mut(session_id, |session| {
+            session.close()?;
+            Ok(())
+        })
     }
 
     /// Inspect an existing session.
-    pub fn session(&self, session_id: &SessionId) -> Option<&Session> {
-        self.sessions.get(session_id)
+    pub fn session(&self, session_id: &SessionId) -> Option<Session> {
+        self.with_sessions_read(|sessions| Ok(sessions.get(session_id).cloned()))
+            .ok()
+            .flatten()
     }
 
     pub fn session_count(&self) -> usize {
-        self.sessions.len()
+        self.with_sessions_read(|sessions| Ok(sessions.len()))
+            .unwrap_or(0)
     }
 
     pub fn resource_provider_count(&self) -> usize {
@@ -280,36 +298,40 @@ impl ArcKernel {
 
     /// Validate a session-scoped operation and register it as in flight.
     pub fn begin_session_request(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation_kind: OperationKind,
         cancellable: bool,
     ) -> Result<(), KernelError> {
-        begin_session_request_in_sessions(&mut self.sessions, context, operation_kind, cancellable)
+        self.with_sessions_write(|sessions| {
+            begin_session_request_in_sessions(sessions, context, operation_kind, cancellable)
+        })
     }
 
     /// Construct and register a child request under an existing parent request.
     pub fn begin_child_request(
-        &mut self,
+        &self,
         parent_context: &OperationContext,
         request_id: RequestId,
         operation_kind: OperationKind,
         progress_token: Option<ProgressToken>,
         cancellable: bool,
     ) -> Result<OperationContext, KernelError> {
-        begin_child_request_in_sessions(
-            &mut self.sessions,
-            parent_context,
-            request_id,
-            operation_kind,
-            progress_token,
-            cancellable,
-        )
+        self.with_sessions_write(|sessions| {
+            begin_child_request_in_sessions(
+                sessions,
+                parent_context,
+                request_id,
+                operation_kind,
+                progress_token,
+                cancellable,
+            )
+        })
     }
 
     /// Complete an in-flight session request.
     pub fn complete_session_request(
-        &mut self,
+        &self,
         session_id: &SessionId,
         request_id: &RequestId,
     ) -> Result<(), KernelError> {
@@ -322,28 +344,32 @@ impl ArcKernel {
 
     /// Complete an in-flight session request with an explicit terminal state.
     pub fn complete_session_request_with_terminal_state(
-        &mut self,
+        &self,
         session_id: &SessionId,
         request_id: &RequestId,
         terminal_state: OperationTerminalState,
     ) -> Result<(), KernelError> {
-        complete_session_request_with_terminal_state_in_sessions(
-            &mut self.sessions,
-            session_id,
-            request_id,
-            terminal_state,
-        )
+        self.with_sessions_write(|sessions| {
+            complete_session_request_with_terminal_state_in_sessions(
+                sessions,
+                session_id,
+                request_id,
+                terminal_state,
+            )
+        })
     }
 
     /// Mark an in-flight session request as cancelled.
     pub fn request_session_cancellation(
-        &mut self,
+        &self,
         session_id: &SessionId,
         request_id: &RequestId,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?
-            .request_cancellation(request_id)
-            .map_err(KernelError::from)
+        self.with_session_mut(session_id, |session| {
+            session
+                .request_cancellation(request_id)
+                .map_err(KernelError::from)
+        })
     }
 
     /// Validate whether a sampling child request is allowed for this session.
@@ -352,13 +378,15 @@ impl ArcKernel {
         context: &OperationContext,
         operation: &CreateMessageOperation,
     ) -> Result<(), KernelError> {
-        validate_sampling_request_in_sessions(
-            &self.sessions,
-            self.config.allow_sampling,
-            self.config.allow_sampling_tool_use,
-            context,
-            operation,
-        )
+        self.with_sessions_read(|sessions| {
+            validate_sampling_request_in_sessions(
+                sessions,
+                self.config.allow_sampling,
+                self.config.allow_sampling_tool_use,
+                context,
+                operation,
+            )
+        })
     }
 
     /// Validate whether an elicitation child request is allowed for this session.
@@ -367,18 +395,20 @@ impl ArcKernel {
         context: &OperationContext,
         operation: &CreateElicitationOperation,
     ) -> Result<(), KernelError> {
-        validate_elicitation_request_in_sessions(
-            &self.sessions,
-            self.config.allow_elicitation,
-            context,
-            operation,
-        )
+        self.with_sessions_read(|sessions| {
+            validate_elicitation_request_in_sessions(
+                sessions,
+                self.config.allow_elicitation,
+                context,
+                operation,
+            )
+        })
     }
 
     /// Evaluate a session-scoped tool call while allowing the target tool server to proxy
     /// negotiated nested flows back through a client transport owned by the edge.
     pub fn evaluate_tool_call_operation_with_nested_flow_client<C: NestedFlowClient>(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation: &ToolCallOperation,
         client: &mut C,
@@ -404,8 +434,10 @@ impl ArcKernel {
             Err(KernelError::RequestCancelled { request_id, reason })
                 if request_id == &context.request_id =>
             {
-                self.session_mut(&context.session_id)?
-                    .request_cancellation(&context.request_id)?;
+                self.with_session_mut(&context.session_id, |session| {
+                    session.request_cancellation(&context.request_id)?;
+                    Ok(())
+                })?;
                 OperationTerminalState::Cancelled {
                     reason: reason.clone(),
                 }
@@ -426,7 +458,7 @@ impl ArcKernel {
     /// should target. The current stdio loop normalizes raw frames into these
     /// operations before invoking the kernel.
     pub fn evaluate_session_operation(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
@@ -443,9 +475,11 @@ impl ArcKernel {
         if should_track_inflight {
             self.begin_session_request(context, operation_kind, true)?;
         } else {
-            let session = self.session_mut(&context.session_id)?;
-            session.validate_context(context)?;
-            session.ensure_operation_allowed(operation_kind)?;
+            self.with_session_mut(&context.session_id, |session| {
+                session.validate_context(context)?;
+                session.ensure_operation_allowed(operation_kind)?;
+                Ok(())
+            })?;
         }
 
         let evaluation = match operation {
@@ -464,7 +498,10 @@ impl ArcKernel {
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
 
-                self.evaluate_tool_call_with_session_roots(&request, Some(session_roots.as_slice()))
+                self.evaluate_tool_call_sync_with_session_roots(
+                    &request,
+                    Some(session_roots.as_slice()),
+                )
                     .map(SessionOperationResponse::ToolCall)
             }
             SessionOperation::CreateMessage(_) => Err(KernelError::Internal(
@@ -599,7 +636,7 @@ impl ArcKernel {
     }
 
     pub(crate) fn evaluate_resource_read(
-        &mut self,
+        &self,
         context: &OperationContext,
         operation: &ReadResourceOperation,
     ) -> Result<SessionOperationResponse, KernelError> {

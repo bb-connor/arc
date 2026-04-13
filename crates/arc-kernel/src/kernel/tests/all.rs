@@ -1313,7 +1313,7 @@ fn issue_and_use_capability() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-1", &cap, "read_file", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
     assert!(matches!(response.output, Some(ToolCallOutput::Value(_))));
     assert!(response.reason.is_none());
@@ -1322,7 +1322,8 @@ fn issue_and_use_capability() {
     assert_eq!(kernel.receipt_log().len(), 1);
 
     // Receipt signature verifies.
-    let r = kernel.receipt_log().get(0).unwrap();
+    let receipt_log = kernel.receipt_log();
+    let r = receipt_log.get(0).unwrap();
     assert!(r.verify_signature().unwrap());
 }
 
@@ -1338,7 +1339,7 @@ fn kernel_persists_tool_receipts_to_sqlite_store() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-sqlite-1", &cap, "read_file", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
     drop(kernel);
 
@@ -1379,7 +1380,7 @@ fn kernel_accepts_capabilities_from_configured_authority() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-authority-1", &cap, "read_file", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(cap.issuer, authority_keypair.public_key());
     assert_eq!(response.verdict, Verdict::Allow);
 }
@@ -1395,7 +1396,7 @@ fn expired_capability_denied() {
     let cap = make_capability(&kernel, &agent_kp, scope, 0);
     let request = make_request("req-1", &cap, "read_file", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("expired"), "reason was: {reason}");
@@ -1417,7 +1418,7 @@ fn revoked_capability_denied() {
     kernel.revoke_capability(&cap.id).unwrap();
 
     let request = make_request("req-1", &cap, "read_file", "srv-a");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("revoked"), "reason was: {reason}");
@@ -1449,7 +1450,7 @@ fn sqlite_revocation_store_survives_kernel_restart() {
     restarted.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
     let request = make_request("req-revoked-after-restart", &cap, "read_file", "srv-a");
-    let response = restarted.evaluate_tool_call(&request).unwrap();
+    let response = restarted.evaluate_tool_call_blocking(&request).unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(
@@ -1475,7 +1476,7 @@ fn out_of_scope_tool_denied() {
 
     // Request write_file, but capability only grants read_file.
     let request = make_request("req-1", &cap, "write_file", "srv-a");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(
@@ -1495,7 +1496,7 @@ fn subject_mismatch_denied() {
     let mut request = make_request("req-1", &cap, "read_file", "srv-a");
     request.agent_id = make_keypair().public_key().to_hex();
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("does not match capability subject"));
@@ -1538,10 +1539,10 @@ fn path_prefix_constraint_is_enforced() {
     );
 
     assert_eq!(
-        kernel.evaluate_tool_call(&allowed).unwrap().verdict,
+        kernel.evaluate_tool_call_blocking(&allowed).unwrap().verdict,
         Verdict::Allow
     );
-    let denied_response = kernel.evaluate_tool_call(&denied).unwrap();
+    let denied_response = kernel.evaluate_tool_call_blocking(&denied).unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
     assert!(denied_response
         .reason
@@ -1587,11 +1588,11 @@ fn domain_exact_constraint_is_enforced() {
     );
 
     assert_eq!(
-        kernel.evaluate_tool_call(&allowed).unwrap().verdict,
+        kernel.evaluate_tool_call_blocking(&allowed).unwrap().verdict,
         Verdict::Allow
     );
     assert_eq!(
-        kernel.evaluate_tool_call(&denied).unwrap().verdict,
+        kernel.evaluate_tool_call_blocking(&denied).unwrap().verdict,
         Verdict::Deny
     );
 }
@@ -1620,13 +1621,13 @@ fn budget_exhaustion() {
     // First two calls succeed.
     for i in 0..2 {
         let req = make_request(&format!("req-{i}"), &cap, "read_file", "srv-a");
-        let resp = kernel.evaluate_tool_call(&req).unwrap();
+        let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
         assert_eq!(resp.verdict, Verdict::Allow, "call {i} should succeed");
     }
 
     // Third call is denied.
     let req = make_request("req-2", &cap, "read_file", "srv-a");
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
     assert!(reason.contains("budget"), "reason was: {reason}");
@@ -1670,28 +1671,28 @@ fn budgets_are_tracked_per_matching_grant() {
 
     assert_eq!(
         kernel
-            .evaluate_tool_call(&make_request("read-1", &cap, "read_file", "srv-a"))
+            .evaluate_tool_call_blocking(&make_request("read-1", &cap, "read_file", "srv-a"))
             .unwrap()
             .verdict,
         Verdict::Allow
     );
     assert_eq!(
         kernel
-            .evaluate_tool_call(&make_request("read-2", &cap, "read_file", "srv-a"))
+            .evaluate_tool_call_blocking(&make_request("read-2", &cap, "read_file", "srv-a"))
             .unwrap()
             .verdict,
         Verdict::Allow
     );
     assert_eq!(
         kernel
-            .evaluate_tool_call(&make_request("write-1", &cap, "write_file", "srv-a"))
+            .evaluate_tool_call_blocking(&make_request("write-1", &cap, "write_file", "srv-a"))
             .unwrap()
             .verdict,
         Verdict::Allow
     );
 
     let denied = kernel
-        .evaluate_tool_call(&make_request("write-2", &cap, "write_file", "srv-a"))
+        .evaluate_tool_call_blocking(&make_request("write-2", &cap, "write_file", "srv-a"))
         .unwrap();
     assert_eq!(denied.verdict, Verdict::Deny);
     assert!(denied.reason.as_deref().unwrap_or("").contains("budget"));
@@ -1718,7 +1719,7 @@ fn guard_denies_request() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-1", &cap, "dangerous", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("deny-all"), "reason was: {reason}");
@@ -1745,7 +1746,7 @@ fn guard_error_treated_as_deny() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-1", &cap, "tool", "srv-a");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("fail-closed"), "reason was: {reason}");
@@ -1753,7 +1754,7 @@ fn guard_error_treated_as_deny() {
 
 #[test]
 fn unregistered_server_denied() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     // No tool servers registered.
 
     let agent_kp = make_keypair();
@@ -1761,7 +1762,7 @@ fn unregistered_server_denied() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
     let request = make_request("req-1", &cap, "read_file", "srv-missing");
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(reason.contains("not registered"), "reason was: {reason}");
@@ -1799,7 +1800,7 @@ fn untrusted_issuer_denied() {
         approval_token: None,
     };
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     let reason = response.reason.as_deref().unwrap_or("");
     assert!(
@@ -1819,11 +1820,11 @@ fn all_calls_produce_verified_receipts() {
 
     // Allowed call.
     let req = make_request("req-1", &cap, "read_file", "srv-a");
-    let _ = kernel.evaluate_tool_call(&req).unwrap();
+    let _ = kernel.evaluate_tool_call_blocking(&req).unwrap();
 
     // Denied call (wrong tool).
     let req2 = make_request("req-2", &cap, "write_file", "srv-a");
-    let _ = kernel.evaluate_tool_call(&req2).unwrap();
+    let _ = kernel.evaluate_tool_call_blocking(&req2).unwrap();
 
     assert_eq!(kernel.receipt_log().len(), 2);
 
@@ -1842,7 +1843,7 @@ fn wildcard_server_grant_allows_real_server() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
     let request = make_request("req-1", &cap, "read_file", "filesystem");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
 }
 
@@ -1874,7 +1875,7 @@ fn revoked_ancestor_capability_denies_descendant() {
     kernel.revoke_capability(&parent.id).unwrap();
 
     let request = make_request("req-1", &child, "read_file", "srv-a");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response
         .reason
@@ -1918,7 +1919,7 @@ fn delegated_tool_call_records_observed_capability_lineage() {
     .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&make_request("req-observed", &child, "read_file", "srv-a"))
+        .evaluate_tool_call_blocking(&make_request("req-observed", &child, "read_file", "srv-a"))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
 
@@ -1947,7 +1948,7 @@ fn wildcard_tool_grant_allows_any_tool() {
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
 
     let request = make_request("req-1", &cap, "anything", "srv-a");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Allow);
 }
 
@@ -1989,30 +1990,30 @@ fn kernel_guard_registration() {
 
 #[test]
 fn session_lifecycle_is_hosted_by_kernel() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
 
     assert_eq!(kernel.session_count(), 1);
     assert_eq!(
-        kernel.session(&session_id).map(Session::state),
+        kernel.session(&session_id).map(|session| session.state()),
         Some(SessionState::Initializing)
     );
 
     kernel.activate_session(&session_id).unwrap();
     assert_eq!(
-        kernel.session(&session_id).map(Session::state),
+        kernel.session(&session_id).map(|session| session.state()),
         Some(SessionState::Ready)
     );
 
     kernel.begin_draining_session(&session_id).unwrap();
     assert_eq!(
-        kernel.session(&session_id).map(Session::state),
+        kernel.session(&session_id).map(|session| session.state()),
         Some(SessionState::Draining)
     );
 
     kernel.close_session(&session_id).unwrap();
     assert_eq!(
-        kernel.session(&session_id).map(Session::state),
+        kernel.session(&session_id).map(|session| session.state()),
         Some(SessionState::Closed)
     );
 }
@@ -2021,7 +2022,7 @@ fn session_lifecycle_is_hosted_by_kernel() {
 fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
-    let mut kernel = ArcKernel::new(config);
+    let kernel = ArcKernel::new(config);
     let session_id = kernel.open_session("agent-1".to_string(), Vec::new());
 
     let error = kernel.activate_session(&session_id).unwrap_err();
@@ -2072,7 +2073,7 @@ fn web3_evidence_required_activation_allows_checkpoint_capable_store() {
 
     kernel.activate_session(&session_id).unwrap();
     assert_eq!(
-        kernel.session(&session_id).map(Session::state),
+        kernel.session(&session_id).map(|session| session.state()),
         Some(SessionState::Ready)
     );
 
@@ -2112,7 +2113,7 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
 
 #[test]
 fn session_operation_capability_list_uses_session_snapshot() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     let agent_kp = make_keypair();
     let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let cap = make_capability(&kernel, &agent_kp, scope, 300);
@@ -2131,7 +2132,7 @@ fn session_operation_capability_list_uses_session_snapshot() {
 
 #[test]
 fn session_operation_list_roots_uses_session_snapshot() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     let agent_kp = make_keypair();
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]);
     kernel.activate_session(&session_id).unwrap();
@@ -2176,7 +2177,7 @@ fn session_operation_list_roots_uses_session_snapshot() {
 
 #[test]
 fn kernel_exposes_normalized_session_roots_for_later_enforcement() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     let agent_kp = make_keypair();
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]);
     kernel.activate_session(&session_id).unwrap();
@@ -2228,7 +2229,7 @@ fn kernel_exposes_normalized_session_roots_for_later_enforcement() {
 
 #[test]
 fn begin_child_request_requires_parent_lineage() {
-    let mut kernel = ArcKernel::new(make_config());
+    let kernel = ArcKernel::new(make_config());
     let agent_kp = make_keypair();
     let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![]);
     kernel.activate_session(&session_id).unwrap();
@@ -2249,9 +2250,8 @@ fn begin_child_request_requires_parent_lineage() {
         )
         .unwrap();
 
-    let child = kernel
-        .session(&session_id)
-        .unwrap()
+    let session = kernel.session(&session_id).unwrap();
+    let child = session
         .inflight()
         .get(&child_context.request_id)
         .unwrap();
@@ -2577,7 +2577,8 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
     assert_eq!(value["model"], "gpt-test");
     assert!(kernel.session(&session_id).unwrap().inflight().is_empty());
     assert_eq!(kernel.child_receipt_log().len(), 1);
-    let child_receipt = kernel.child_receipt_log().get(0).unwrap();
+    let child_receipt_log = kernel.child_receipt_log();
+    let child_receipt = child_receipt_log.get(0).unwrap();
     assert_eq!(child_receipt.parent_request_id, context.request_id);
     assert_eq!(child_receipt.operation_kind, OperationKind::CreateMessage);
     assert_eq!(
@@ -3034,7 +3035,8 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         })
     );
     assert_eq!(kernel.child_receipt_log().len(), 1);
-    let child_receipt = kernel.child_receipt_log().get(0).unwrap();
+    let child_receipt_log = kernel.child_receipt_log();
+    let child_receipt = child_receipt_log.get(0).unwrap();
     assert_eq!(child_receipt.parent_request_id, context.request_id);
     assert_eq!(child_receipt.operation_kind, OperationKind::CreateMessage);
     assert_eq!(
@@ -3140,7 +3142,7 @@ fn streamed_tool_receipt_records_chunk_hash_metadata() {
         serde_json::json!({"path": "/workspace/README.md"}),
     );
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
     assert_eq!(response.verdict, Verdict::Allow);
     let metadata = response.receipt.metadata.as_ref().expect("stream metadata");
@@ -3199,7 +3201,7 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
         serde_json::json!({}),
     );
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.receipt.is_incomplete());
@@ -4486,7 +4488,7 @@ fn monetary_denial_exceeds_per_invocation_cap() {
     // 5 invocations: 5 * 100 = 500 total -- all should pass.
     for i in 0..5 {
         let resp = kernel
-            .evaluate_tool_call(&request(&format!("req-{i}")))
+            .evaluate_tool_call_blocking(&request(&format!("req-{i}")))
             .unwrap();
         assert_eq!(
             resp.verdict,
@@ -4496,7 +4498,7 @@ fn monetary_denial_exceeds_per_invocation_cap() {
     }
 
     // 6th invocation would need 600 total, exceeding max_total_cost=500.
-    let resp = kernel.evaluate_tool_call(&request("req-6")).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&request("req-6")).unwrap();
     assert_eq!(
         resp.verdict,
         Verdict::Deny,
@@ -4528,14 +4530,14 @@ fn monetary_denial_receipt_contains_financial_metadata() {
     };
 
     // First invocation uses up the entire budget (100 of 100).
-    let _allow = kernel.evaluate_tool_call(&request).unwrap();
+    let _allow = kernel.evaluate_tool_call_blocking(&request).unwrap();
 
     // Second invocation should be denied.
     let deny_req = ToolCallRequest {
         request_id: "req-2".to_string(),
         ..request
     };
-    let resp = kernel.evaluate_tool_call(&deny_req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&deny_req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 
     // Receipt must contain financial metadata.
@@ -4605,7 +4607,7 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
         approval_token: None,
     };
 
-    let denied_response = kernel.evaluate_tool_call(&request("req-deny")).unwrap();
+    let denied_response = kernel.evaluate_tool_call_blocking(&request("req-deny")).unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
     let denied_metadata = denied_response
         .receipt
@@ -4620,7 +4622,7 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
     assert_eq!(denied_financial["budget_remaining"].as_u64(), Some(100));
     assert_eq!(denied_financial["settlement_status"], "not_applicable");
 
-    let allowed_response = kernel.evaluate_tool_call(&request("req-allow")).unwrap();
+    let allowed_response = kernel.evaluate_tool_call_blocking(&request("req-allow")).unwrap();
     assert_eq!(allowed_response.verdict, Verdict::Allow);
     let allowed_metadata = allowed_response
         .receipt
@@ -4661,7 +4663,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-payment-deny".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -4688,7 +4690,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -4706,7 +4708,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-prepaid".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -4730,7 +4732,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
     assert_eq!(financial["settlement_status"], "settled");
     assert_eq!(financial["cost_charged"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.total_cost_charged, 100);
 }
 
@@ -4747,7 +4749,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
         .unwrap();
 
     let resp = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-1".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -4780,7 +4782,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
         .expect("should have 'attribution' key");
     assert_eq!(attribution["grant_index"].as_u64(), Some(0));
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 1);
     assert_eq!(usage.total_cost_charged, 75);
 }
@@ -4813,7 +4815,7 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -4885,7 +4887,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -4957,7 +4959,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -4976,7 +4978,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .as_deref()
         .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -5013,7 +5015,7 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5075,7 +5077,7 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5125,7 +5127,7 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5176,7 +5178,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -5204,7 +5206,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
         .and_then(|metadata| metadata.get("financial"))
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.total_cost_charged, 0);
 }
 
@@ -5240,7 +5242,7 @@ fn governed_monetary_allow_records_runtime_assurance_metadata() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5321,7 +5323,7 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5377,7 +5379,7 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5437,7 +5439,7 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5493,7 +5495,7 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5560,7 +5562,7 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5620,7 +5622,7 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5696,7 +5698,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5773,7 +5775,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -5818,7 +5820,7 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-governed-deny".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -5859,7 +5861,7 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     assert_eq!(financial["settlement_status"], "not_applicable");
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -5898,7 +5900,7 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "stream_file".to_string(),
@@ -5997,7 +5999,7 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -6101,7 +6103,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -6149,7 +6151,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
         .expect("deny receipt should carry governed transaction metadata");
     assert_eq!(governed["intent_id"], intent.id);
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 
@@ -6216,7 +6218,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -6325,7 +6327,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     );
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: request_id.to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -6370,7 +6372,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     assert_eq!(governed["intent_id"], intent.id);
     assert_eq!(governed["commerce"]["seller"], "wrong-merchant.example");
 
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -6387,7 +6389,7 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-overrun".to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -6427,7 +6429,7 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
         .unwrap();
 
     let resp = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-1".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -6467,7 +6469,7 @@ fn monetary_tool_server_error_releases_precharged_budget() {
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-tool-error".to_string(),
             capability: cap.clone(),
             tool_name: "compute".to_string(),
@@ -6481,7 +6483,7 @@ fn monetary_tool_server_error_releases_precharged_budget() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    let usage = kernel.budget_store.get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -6513,13 +6515,13 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         approval_token: None,
     };
 
-    let r1 = kernel.evaluate_tool_call(&make_req("req-1")).unwrap();
+    let r1 = kernel.evaluate_tool_call_blocking(&make_req("req-1")).unwrap();
     assert_eq!(r1.verdict, Verdict::Allow, "first invocation should pass");
 
-    let r2 = kernel.evaluate_tool_call(&make_req("req-2")).unwrap();
+    let r2 = kernel.evaluate_tool_call_blocking(&make_req("req-2")).unwrap();
     assert_eq!(r2.verdict, Verdict::Allow, "second invocation should pass");
 
-    let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
+    let r3 = kernel.evaluate_tool_call_blocking(&make_req("req-3")).unwrap();
     assert_eq!(
         r3.verdict,
         Verdict::Deny,
@@ -6560,10 +6562,10 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
     };
 
     let _ = kernel
-        .evaluate_tool_call(&invoke("req-a", "compute-a"))
+        .evaluate_tool_call_blocking(&invoke("req-a", "compute-a"))
         .unwrap();
     let response_b = kernel
-        .evaluate_tool_call(&invoke("req-b", "compute-b"))
+        .evaluate_tool_call_blocking(&invoke("req-b", "compute-b"))
         .unwrap();
 
     let metadata = response_b
@@ -6578,6 +6580,118 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
     assert_eq!(financial["cost_charged"].as_u64(), Some(40));
     assert_eq!(financial["budget_total"].as_u64(), Some(200));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(160));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Barrier};
+
+    struct ConcurrentServer {
+        barrier: Arc<Barrier>,
+        current: Arc<AtomicUsize>,
+        max_concurrent: Arc<AtomicUsize>,
+    }
+
+    impl ToolServerConnection for ConcurrentServer {
+        fn server_id(&self) -> &str {
+            "srv"
+        }
+
+        fn tool_names(&self) -> Vec<String> {
+            vec!["echo".to_string()]
+        }
+
+        fn invoke(
+            &self,
+            tool_name: &str,
+            arguments: serde_json::Value,
+            _bridge: Option<&mut dyn NestedFlowBridge>,
+        ) -> Result<serde_json::Value, KernelError> {
+            assert_eq!(tool_name, "echo");
+
+            let concurrent = self.current.fetch_add(1, Ordering::SeqCst) + 1;
+            let _ = self
+                .max_concurrent
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |observed| {
+                    (concurrent > observed).then_some(concurrent)
+                });
+
+            self.barrier.wait();
+            std::thread::sleep(Duration::from_millis(25));
+            self.current.fetch_sub(1, Ordering::SeqCst);
+
+            Ok(arguments)
+        }
+    }
+
+    let barrier = Arc::new(Barrier::new(2));
+    let max_concurrent = Arc::new(AtomicUsize::new(0));
+
+    let mut configured_kernel = ArcKernel::new(make_config());
+    configured_kernel.register_tool_server(Box::new(ConcurrentServer {
+        barrier: barrier.clone(),
+        current: Arc::new(AtomicUsize::new(0)),
+        max_concurrent: max_concurrent.clone(),
+    }));
+
+    let agent_kp = Keypair::generate();
+    let capability = configured_kernel
+        .issue_capability(
+            &agent_kp.public_key(),
+            make_scope(vec![ToolGrant {
+                server_id: "srv".to_string(),
+                tool_name: "echo".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![],
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }]),
+            3600,
+        )
+        .unwrap();
+
+    let kernel = Arc::new(configured_kernel);
+    let make_request = |request_id: &str| ToolCallRequest {
+        request_id: request_id.to_string(),
+        capability: capability.clone(),
+        tool_name: "echo".to_string(),
+        server_id: "srv".to_string(),
+        agent_id: agent_kp.public_key().to_hex(),
+        arguments: serde_json::json!({ "request_id": request_id }),
+        dpop_proof: None,
+        governed_intent: None,
+        approval_token: None,
+    };
+
+    let task_a = {
+        let kernel = kernel.clone();
+        let request = make_request("req-a");
+        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+    };
+    let task_b = {
+        let kernel = kernel.clone();
+        let request = make_request("req-b");
+        tokio::spawn(async move { kernel.evaluate_tool_call(&request).await })
+    };
+
+    let (response_a, response_b) = tokio::time::timeout(Duration::from_secs(2), async move {
+        tokio::try_join!(task_a, task_b)
+    })
+    .await
+    .expect("shared kernel evaluation should not deadlock")
+    .unwrap();
+
+    let response_a = response_a.unwrap();
+    let response_b = response_b.unwrap();
+    assert_eq!(response_a.verdict, Verdict::Allow);
+    assert_eq!(response_b.verdict, Verdict::Allow);
+    assert!(
+        max_concurrent.load(Ordering::SeqCst) >= 2,
+        "expected concurrent server invocations on a shared kernel"
+    );
 }
 
 #[test]
@@ -6643,7 +6757,7 @@ fn matched_grant_index_populated_in_guard_context() {
 
     // Request tool2 -- matched grant should be at index 1.
     let resp = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-1".to_string(),
             capability: cap.clone(),
             tool_name: "tool2".to_string(),
@@ -6722,13 +6836,13 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
     };
 
     // First two invocations allowed.
-    let r1 = kernel.evaluate_tool_call(&make_req("req-1")).unwrap();
+    let r1 = kernel.evaluate_tool_call_blocking(&make_req("req-1")).unwrap();
     assert_eq!(r1.verdict, Verdict::Allow);
-    let r2 = kernel.evaluate_tool_call(&make_req("req-2")).unwrap();
+    let r2 = kernel.evaluate_tool_call_blocking(&make_req("req-2")).unwrap();
     assert_eq!(r2.verdict, Verdict::Allow);
 
     // Third invocation should be denied by the counting guard.
-    let r3 = kernel.evaluate_tool_call(&make_req("req-3")).unwrap();
+    let r3 = kernel.evaluate_tool_call_blocking(&make_req("req-3")).unwrap();
     assert_eq!(
         r3.verdict,
         Verdict::Deny,
@@ -6762,7 +6876,7 @@ fn checkpoint_triggers_at_100_receipts() {
 
     for i in 0..10 {
         kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: format!("req-{i}"),
                 capability: cap.clone(),
                 tool_name: "echo".to_string(),
@@ -6811,7 +6925,7 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
 
     for i in 0..5 {
         kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: format!("req-{i}"),
                 capability: cap.clone(),
                 tool_name: "echo".to_string(),
@@ -6910,7 +7024,7 @@ fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-cross-currency-ok".to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -6957,7 +7071,7 @@ fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settl
         .unwrap();
 
     let response = kernel
-        .evaluate_tool_call(&ToolCallRequest {
+        .evaluate_tool_call_blocking(&ToolCallRequest {
             request_id: "req-cross-currency-failed".to_string(),
             capability: cap,
             tool_name: "compute".to_string(),
@@ -7079,7 +7193,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
     let agent_kp = Keypair::generate();
     let server = "dpop-srv";
     let tool = "secure_op";
-    let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+    let (kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
 
     let arguments = serde_json::json!({"action": "read"});
     let proof = make_dpop_proof(&agent_kp, &cap, server, tool, &arguments, "nonce-abc-001");
@@ -7096,7 +7210,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         approval_token: None,
     };
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
         response.verdict,
         Verdict::Allow,
@@ -7110,7 +7224,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
     let agent_kp = Keypair::generate();
     let server = "dpop-srv";
     let tool = "secure_op";
-    let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+    let (kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
 
     let request = ToolCallRequest {
         request_id: "req-dpop-deny-no-proof".to_string(),
@@ -7124,7 +7238,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         approval_token: None,
     };
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
         response.verdict,
         Verdict::Deny,
@@ -7142,7 +7256,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
     let agent_kp = Keypair::generate();
     let server = "dpop-srv";
     let tool = "secure_op";
-    let (mut kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
+    let (kernel, cap) = make_dpop_kernel_and_cap(&agent_kp, server, tool);
 
     let arguments = serde_json::json!({"action": "read"});
     // Proof claims wrong tool name -- binding check should fail.
@@ -7167,7 +7281,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         approval_token: None,
     };
 
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
         response.verdict,
         Verdict::Deny,
@@ -7188,7 +7302,7 @@ fn dpop_not_required_grant_allows_without_proof() {
         .unwrap();
 
     let request = make_request("req-no-dpop", &cap, "echo", "srv");
-    let response = kernel.evaluate_tool_call(&request).unwrap();
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(
         response.verdict,
         Verdict::Allow,

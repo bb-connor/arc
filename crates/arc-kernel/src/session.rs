@@ -68,7 +68,7 @@ impl InflightRequest {
 }
 
 /// Registry of requests that are currently active within a session.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct InflightRegistry {
     requests: HashMap<RequestId, InflightRequest>,
 }
@@ -153,7 +153,7 @@ enum SubscriptionSubject {
 }
 
 /// Registry for session-scoped subscriptions.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SubscriptionRegistry {
     subscriptions: HashSet<SubscriptionSubject>,
 }
@@ -209,7 +209,7 @@ impl SubscriptionRegistry {
 const TERMINAL_HISTORY_LIMIT: usize = 256;
 
 /// Bounded history of terminal request outcomes for a session.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TerminalRegistry {
     states: HashMap<RequestId, OperationTerminalState>,
     order: VecDeque<RequestId>,
@@ -295,7 +295,7 @@ pub enum SessionError {
 }
 
 /// Session host object owned by the kernel.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Session {
     id: SessionId,
     agent_id: AgentId,

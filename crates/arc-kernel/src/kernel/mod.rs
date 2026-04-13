@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicU64;
+use std::sync::{Mutex, RwLock};
+
 use crate::*;
 
 pub type AgentId = String;
@@ -251,7 +254,7 @@ pub trait PromptProvider: Send + Sync {
 ///
 /// This remains useful for process-local inspection even when a durable
 /// backend is configured.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ReceiptLog {
     receipts: Vec<ArcReceipt>,
 }
@@ -283,7 +286,7 @@ impl ReceiptLog {
 }
 
 /// In-memory append-only log of signed child-request receipts.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ChildReceiptLog {
     receipts: Vec<ChildRequestReceipt>,
 }
@@ -377,26 +380,26 @@ pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 pub struct ArcKernel {
     config: KernelConfig,
     guards: Vec<Box<dyn Guard>>,
-    budget_store: Box<dyn BudgetStore>,
-    revocation_store: Box<dyn RevocationStore>,
+    budget_store: Mutex<Box<dyn BudgetStore>>,
+    revocation_store: Mutex<Box<dyn RevocationStore>>,
     capability_authority: Box<dyn CapabilityAuthority>,
     tool_servers: HashMap<ServerId, Box<dyn ToolServerConnection>>,
     resource_providers: Vec<Box<dyn ResourceProvider>>,
     prompt_providers: Vec<Box<dyn PromptProvider>>,
-    sessions: HashMap<SessionId, Session>,
-    receipt_log: ReceiptLog,
-    child_receipt_log: ChildReceiptLog,
-    receipt_store: Option<Box<dyn ReceiptStore>>,
+    sessions: RwLock<HashMap<SessionId, Session>>,
+    receipt_log: Mutex<ReceiptLog>,
+    child_receipt_log: Mutex<ChildReceiptLog>,
+    receipt_store: Option<Mutex<Box<dyn ReceiptStore>>>,
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
-    session_counter: u64,
+    session_counter: AtomicU64,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
     checkpoint_batch_size: u64,
     /// Monotonic counter for checkpoint_seq values.
-    checkpoint_seq_counter: u64,
+    checkpoint_seq_counter: AtomicU64,
     /// seq of the last receipt included in the previous checkpoint batch.
-    last_checkpoint_seq: u64,
+    last_checkpoint_seq: AtomicU64,
     /// Nonce replay store for DPoP proof verification. Required when any grant has dpop_required.
     dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
@@ -627,6 +630,89 @@ impl<C: NestedFlowClient> NestedFlowBridge for SessionNestedFlowBridge<'_, C> {
 }
 
 impl ArcKernel {
+    fn with_sessions_read<R>(
+        &self,
+        f: impl FnOnce(&HashMap<SessionId, Session>) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        let sessions = self
+            .sessions
+            .read()
+            .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
+        f(&sessions)
+    }
+
+    fn with_sessions_write<R>(
+        &self,
+        f: impl FnOnce(&mut HashMap<SessionId, Session>) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        let mut sessions = self
+            .sessions
+            .write()
+            .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
+        f(&mut sessions)
+    }
+
+    fn with_session<R>(
+        &self,
+        session_id: &SessionId,
+        f: impl FnOnce(&Session) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        self.with_sessions_read(|sessions| {
+            let session = sessions
+                .get(session_id)
+                .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?;
+            f(session)
+        })
+    }
+
+    fn with_session_mut<R>(
+        &self,
+        session_id: &SessionId,
+        f: impl FnOnce(&mut Session) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        self.with_sessions_write(|sessions| {
+            let session = sessions
+                .get_mut(session_id)
+                .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))?;
+            f(session)
+        })
+    }
+
+    fn with_budget_store<R>(
+        &self,
+        f: impl FnOnce(&mut dyn BudgetStore) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        let mut store = self
+            .budget_store
+            .lock()
+            .map_err(|_| KernelError::Internal("budget store lock poisoned".to_string()))?;
+        f(store.as_mut())
+    }
+
+    fn with_revocation_store<R>(
+        &self,
+        f: impl FnOnce(&mut dyn RevocationStore) -> Result<R, KernelError>,
+    ) -> Result<R, KernelError> {
+        let mut store = self
+            .revocation_store
+            .lock()
+            .map_err(|_| KernelError::Internal("revocation store lock poisoned".to_string()))?;
+        f(store.as_mut())
+    }
+
+    fn with_receipt_store<R>(
+        &self,
+        f: impl FnOnce(&mut dyn ReceiptStore) -> Result<R, KernelError>,
+    ) -> Result<Option<R>, KernelError> {
+        let Some(store) = self.receipt_store.as_ref() else {
+            return Ok(None);
+        };
+        let mut store = store
+            .lock()
+            .map_err(|_| KernelError::Internal("receipt store lock poisoned".to_string()))?;
+        f(store.as_mut()).map(Some)
+    }
+
     pub fn new(config: KernelConfig) -> Self {
         info!("initializing ARC kernel");
         let authority_keypair = config.keypair.clone();
@@ -634,30 +720,30 @@ impl ArcKernel {
         Self {
             config,
             guards: Vec::new(),
-            budget_store: Box::new(InMemoryBudgetStore::new()),
-            revocation_store: Box::new(InMemoryRevocationStore::new()),
+            budget_store: Mutex::new(Box::new(InMemoryBudgetStore::new())),
+            revocation_store: Mutex::new(Box::new(InMemoryRevocationStore::new())),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
             tool_servers: HashMap::new(),
             resource_providers: Vec::new(),
             prompt_providers: Vec::new(),
-            sessions: HashMap::new(),
-            receipt_log: ReceiptLog::new(),
-            child_receipt_log: ChildReceiptLog::new(),
+            sessions: RwLock::new(HashMap::new()),
+            receipt_log: Mutex::new(ReceiptLog::new()),
+            child_receipt_log: Mutex::new(ChildReceiptLog::new()),
             receipt_store: None,
             payment_adapter: None,
             price_oracle: None,
             attestation_trust_policy: None,
-            session_counter: 0,
+            session_counter: AtomicU64::new(0),
             checkpoint_batch_size,
-            checkpoint_seq_counter: 0,
-            last_checkpoint_seq: 0,
+            checkpoint_seq_counter: AtomicU64::new(0),
+            last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
         }
     }
 
     pub fn set_receipt_store(&mut self, receipt_store: Box<dyn ReceiptStore>) {
-        self.receipt_store = Some(receipt_store);
+        self.receipt_store = Some(Mutex::new(receipt_store));
     }
 
     pub fn set_payment_adapter(&mut self, payment_adapter: Box<dyn PaymentAdapter>) {
@@ -676,7 +762,7 @@ impl ArcKernel {
     }
 
     pub fn set_revocation_store(&mut self, revocation_store: Box<dyn RevocationStore>) {
-        self.revocation_store = revocation_store;
+        self.revocation_store = Mutex::new(revocation_store);
     }
 
     pub fn set_capability_authority(&mut self, capability_authority: Box<dyn CapabilityAuthority>) {
@@ -684,7 +770,7 @@ impl ArcKernel {
     }
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
-        self.budget_store = budget_store;
+        self.budget_store = Mutex::new(budget_store);
     }
 
     /// Install a DPoP nonce replay store and verification config.
@@ -706,7 +792,9 @@ impl ArcKernel {
             return Ok(());
         }
 
-        let Some(store) = self.receipt_store.as_deref() else {
+        let Some(supports_kernel_signed_checkpoints) =
+            self.with_receipt_store(|store| Ok(store.supports_kernel_signed_checkpoints()))?
+        else {
             return Err(KernelError::Web3EvidenceUnavailable(
                 "web3-enabled deployments require a durable receipt store".to_string(),
             ));
@@ -718,7 +806,7 @@ impl ArcKernel {
             ));
         }
 
-        if !store.supports_kernel_signed_checkpoints() {
+        if !supports_kernel_signed_checkpoints {
             return Err(KernelError::Web3EvidenceUnavailable(
                 "web3-enabled deployments require local receipt persistence with kernel-signed checkpoint support; append-only remote receipt mirrors are unsupported".to_string(),
             ));
@@ -783,15 +871,22 @@ impl ArcKernel {
     ///
     /// Every call -- whether allowed or denied -- produces exactly one signed
     /// receipt.
-    pub fn evaluate_tool_call(
-        &mut self,
+    pub async fn evaluate_tool_call(
+        &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_with_session_roots(request, None)
+        self.evaluate_tool_call_sync_with_session_roots(request, None)
     }
 
-    fn evaluate_tool_call_with_session_roots(
-        &mut self,
+    pub fn evaluate_tool_call_blocking(
+        &self,
+        request: &ToolCallRequest,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_roots(request, None)
+    }
+
+    fn evaluate_tool_call_sync_with_session_roots(
+        &self,
         request: &ToolCallRequest,
         session_filesystem_roots: Option<&[String]>,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -1059,7 +1154,7 @@ impl ArcKernel {
     }
 
     fn evaluate_tool_call_with_nested_flow_client<C: NestedFlowClient>(
-        &mut self,
+        &self,
         parent_context: &OperationContext,
         request: &ToolCallRequest,
         client: &mut C,
@@ -1256,8 +1351,12 @@ impl ArcKernel {
                     request.server_id, request.tool_name
                 ))
             })?;
+            let mut sessions = self
+                .sessions
+                .write()
+                .map_err(|_| KernelError::Internal("session state lock poisoned".to_string()))?;
             let mut bridge = SessionNestedFlowBridge {
-                sessions: &mut self.sessions,
+                sessions: &mut sessions,
                 child_receipts: &mut child_receipts,
                 parent_context,
                 allow_sampling: self.config.allow_sampling,
@@ -1310,8 +1409,10 @@ impl ArcKernel {
                     payment_authorization.as_ref(),
                 )?;
                 if request_id == parent_context.request_id {
-                    self.session_mut(&parent_context.session_id)?
-                        .request_cancellation(&parent_context.request_id)?;
+                    self.with_session_mut(&parent_context.session_id, |session| {
+                        session.request_cancellation(&parent_context.request_id)?;
+                        Ok(())
+                    })?;
                 }
                 warn!(
                     request_id = %request.request_id,
@@ -1399,19 +1500,25 @@ impl ArcKernel {
     /// `delegation_chain` contains the revoked ID will also be rejected
     /// on presentation (the kernel checks all chain entries against the
     /// revocation store).
-    pub fn revoke_capability(&mut self, capability_id: &CapabilityId) -> Result<(), KernelError> {
+    pub fn revoke_capability(&self, capability_id: &CapabilityId) -> Result<(), KernelError> {
         info!(capability_id = %capability_id, "revoking capability");
-        let _ = self.revocation_store.revoke(capability_id)?;
+        let _ = self.with_revocation_store(|store| Ok(store.revoke(capability_id)?))?;
         Ok(())
     }
 
     /// Read-only access to the receipt log.
-    pub fn receipt_log(&self) -> &ReceiptLog {
-        &self.receipt_log
+    pub fn receipt_log(&self) -> ReceiptLog {
+        match self.receipt_log.lock() {
+            Ok(log) => log.clone(),
+            Err(_) => panic!("receipt log lock poisoned"),
+        }
     }
 
-    pub fn child_receipt_log(&self) -> &ChildReceiptLog {
-        &self.child_receipt_log
+    pub fn child_receipt_log(&self) -> ChildReceiptLog {
+        match self.child_receipt_log.lock() {
+            Ok(log) => log.clone(),
+            Err(_) => panic!("child receipt log lock poisoned"),
+        }
     }
 
     pub fn guard_count(&self) -> usize {
@@ -1434,72 +1541,80 @@ impl ArcKernel {
     }
 
     pub fn register_session_pending_url_elicitation(
-        &mut self,
+        &self,
         session_id: &SessionId,
         elicitation_id: impl Into<String>,
         related_task_id: Option<String>,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?
-            .register_pending_url_elicitation(elicitation_id, related_task_id);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.register_pending_url_elicitation(elicitation_id, related_task_id);
+            Ok(())
+        })
     }
 
     pub fn register_session_required_url_elicitations(
-        &mut self,
+        &self,
         session_id: &SessionId,
         elicitations: &[CreateElicitationOperation],
         related_task_id: Option<&str>,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?
-            .register_required_url_elicitations(elicitations, related_task_id);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.register_required_url_elicitations(elicitations, related_task_id);
+            Ok(())
+        })
     }
 
     pub fn queue_session_elicitation_completion(
-        &mut self,
+        &self,
         session_id: &SessionId,
         elicitation_id: &str,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?
-            .queue_elicitation_completion(elicitation_id);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.queue_elicitation_completion(elicitation_id);
+            Ok(())
+        })
     }
 
     pub fn queue_session_late_event(
-        &mut self,
+        &self,
         session_id: &SessionId,
         event: LateSessionEvent,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.queue_late_event(event);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.queue_late_event(event);
+            Ok(())
+        })
     }
 
     pub fn queue_session_tool_server_event(
-        &mut self,
+        &self,
         session_id: &SessionId,
         event: ToolServerEvent,
     ) -> Result<(), KernelError> {
-        self.session_mut(session_id)?.queue_tool_server_event(event);
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            session.queue_tool_server_event(event);
+            Ok(())
+        })
     }
 
     pub fn queue_session_tool_server_events(
-        &mut self,
+        &self,
         session_id: &SessionId,
     ) -> Result<(), KernelError> {
         let events = self.drain_tool_server_events();
-        let session = self.session_mut(session_id)?;
-        for event in events {
-            session.queue_tool_server_event(event);
-        }
-        Ok(())
+        self.with_session_mut(session_id, |session| {
+            for event in events {
+                session.queue_tool_server_event(event);
+            }
+            Ok(())
+        })
     }
 
     pub fn drain_session_late_events(
-        &mut self,
+        &self,
         session_id: &SessionId,
     ) -> Result<Vec<LateSessionEvent>, KernelError> {
-        Ok(self.session_mut(session_id)?.take_late_events())
+        self.with_session_mut(session_id, |session| Ok(session.take_late_events()))
     }
 
     pub fn ca_count(&self) -> usize {
@@ -1508,12 +1623,6 @@ impl ArcKernel {
 
     pub fn public_key(&self) -> arc_core::PublicKey {
         self.config.keypair.public_key()
-    }
-
-    fn session_mut(&mut self, session_id: &SessionId) -> Result<&mut Session, KernelError> {
-        self.sessions
-            .get_mut(session_id)
-            .ok_or_else(|| KernelError::UnknownSession(session_id.clone()))
     }
 
     /// Verify the capability's signature against the trusted CA keys or the
@@ -1547,11 +1656,11 @@ impl ArcKernel {
     /// delegation chain. If any ancestor is revoked, the capability is
     /// rejected.
     fn check_revocation(&self, cap: &CapabilityToken) -> Result<(), KernelError> {
-        if self.revocation_store.is_revoked(&cap.id)? {
+        if self.with_revocation_store(|store| Ok(store.is_revoked(&cap.id)?))? {
             return Err(KernelError::CapabilityRevoked(cap.id.clone()));
         }
         for link in &cap.delegation_chain {
-            if self.revocation_store.is_revoked(&link.capability_id)? {
+            if self.with_revocation_store(|store| Ok(store.is_revoked(&link.capability_id)?))? {
                 return Err(KernelError::DelegationChainRevoked(
                     link.capability_id.clone(),
                 ));
@@ -1565,7 +1674,7 @@ impl ArcKernel {
     /// Returns `(matched_grant_index, Option<BudgetChargeResult>)`.
     /// The charge result is populated only for monetary grants.
     fn check_and_increment_budget(
-        &mut self,
+        &self,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
     ) -> Result<(usize, Option<BudgetChargeResult>), KernelError> {
@@ -1593,22 +1702,21 @@ impl ArcKernel {
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
 
-                let ok = self.budget_store.try_charge_cost(
-                    &cap.id,
-                    matching.index,
-                    grant.max_invocations,
-                    cost_units,
-                    max_per,
-                    max_total,
-                )?;
+                let ok = self.with_budget_store(|store| {
+                    Ok(store.try_charge_cost(
+                        &cap.id,
+                        matching.index,
+                        grant.max_invocations,
+                        cost_units,
+                        max_per,
+                        max_total,
+                    )?)
+                })?;
                 if ok {
                     // Read the new running total from the store so budget_remaining
                     // is computed against cumulative spend, not just this invocation.
                     let new_total_cost_charged = self
-                        .budget_store
-                        .get_usage(&cap.id, matching.index)
-                        .ok()
-                        .flatten()
+                        .with_budget_store(|store| Ok(store.get_usage(&cap.id, matching.index)?))?
                         .map(|record| record.total_cost_charged)
                         .unwrap_or(cost_units);
                     let charge = BudgetChargeResult {
@@ -1623,11 +1731,9 @@ impl ArcKernel {
                 saw_exhausted_budget = true;
             } else {
                 // Non-monetary path: use try_increment as before.
-                if self.budget_store.try_increment(
-                    &cap.id,
-                    matching.index,
-                    grant.max_invocations,
-                )? {
+                if self.with_budget_store(|store| {
+                    Ok(store.try_increment(&cap.id, matching.index, grant.max_invocations)?)
+                })? {
                     return Ok((matching.index, None));
                 }
                 saw_exhausted_budget = saw_exhausted_budget || grant.max_invocations.is_some();
@@ -1644,24 +1750,25 @@ impl ArcKernel {
     }
 
     fn reverse_budget_charge(
-        &mut self,
+        &self,
         capability_id: &str,
         charge: &BudgetChargeResult,
     ) -> Result<u64, KernelError> {
-        self.budget_store.reverse_charge_cost(
-            capability_id,
-            charge.grant_index,
-            charge.cost_charged,
-        )?;
+        self.with_budget_store(|store| {
+            Ok(store.reverse_charge_cost(
+                capability_id,
+                charge.grant_index,
+                charge.cost_charged,
+            )?)
+        })?;
         Ok(self
-            .budget_store
-            .get_usage(capability_id, charge.grant_index)?
+            .with_budget_store(|store| Ok(store.get_usage(capability_id, charge.grant_index)?))?
             .map(|record| record.total_cost_charged)
             .unwrap_or(0))
     }
 
     fn reduce_budget_charge_to_actual(
-        &mut self,
+        &self,
         capability_id: &str,
         charge: &BudgetChargeResult,
         actual_cost_units: u64,
@@ -1670,14 +1777,15 @@ impl ArcKernel {
             return Ok(charge.new_total_cost_charged);
         }
 
-        self.budget_store.reduce_charge_cost(
-            capability_id,
-            charge.grant_index,
-            charge.cost_charged - actual_cost_units,
-        )?;
+        self.with_budget_store(|store| {
+            Ok(store.reduce_charge_cost(
+                capability_id,
+                charge.grant_index,
+                charge.cost_charged - actual_cost_units,
+            )?)
+        })?;
         Ok(self
-            .budget_store
-            .get_usage(capability_id, charge.grant_index)?
+            .with_budget_store(|store| Ok(store.get_usage(capability_id, charge.grant_index)?))?
             .map(|record| record.total_cost_charged)
             .unwrap_or(actual_cost_units))
     }
@@ -2119,24 +2227,24 @@ impl ArcKernel {
         bond_id: &str,
         now: u64,
     ) -> Result<(), KernelError> {
-        let store = self.receipt_store.as_deref().ok_or_else(|| {
-            KernelError::GovernedTransactionDenied(
-                "delegation bond lookup unavailable because no receipt store is configured"
-                    .to_string(),
-            )
-        })?;
-        let bond_row = store
-            .resolve_credit_bond(bond_id)
-            .map_err(|error| {
+        let Some(bond_row) = self.with_receipt_store(|store| {
+            Ok(store.resolve_credit_bond(bond_id).map_err(|error| {
                 KernelError::GovernedTransactionDenied(format!(
                     "failed to resolve delegation bond `{bond_id}`: {error}"
                 ))
-            })?
-            .ok_or_else(|| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "delegation bond `{bond_id}` was not found"
-                ))
-            })?;
+            })?)
+        })?
+        else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "delegation bond lookup unavailable because no receipt store is configured"
+                    .to_string(),
+            ));
+        };
+        let bond_row = bond_row.ok_or_else(|| {
+            KernelError::GovernedTransactionDenied(format!(
+                "delegation bond `{bond_id}` was not found"
+            ))
+        })?;
 
         let signed_bond = &bond_row.bond;
         let signature_valid = signed_bond.verify_signature().map_err(|error| {
@@ -2428,7 +2536,7 @@ impl ArcKernel {
     }
 
     fn unwind_aborted_monetary_invocation(
-        &mut self,
+        &self,
         request: &ToolCallRequest,
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
@@ -2466,16 +2574,16 @@ impl ArcKernel {
     }
 
     fn record_observed_capability_snapshot(
-        &mut self,
+        &self,
         capability: &CapabilityToken,
     ) -> Result<(), KernelError> {
         let parent_capability_id = capability
             .delegation_chain
             .last()
             .map(|link| link.capability_id.as_str());
-        if let Some(store) = self.receipt_store.as_deref_mut() {
-            store.record_capability_snapshot(capability, parent_capability_id)?;
-        }
+        let _ = self.with_receipt_store(|store| {
+            Ok(store.record_capability_snapshot(capability, parent_capability_id)?)
+        })?;
         Ok(())
     }
 
@@ -2601,14 +2709,15 @@ impl ArcKernel {
 
     /// Build a denial response, including FinancialReceiptMetadata when the
     fn record_child_receipts(
-        &mut self,
+        &self,
         receipts: Vec<ChildRequestReceipt>,
     ) -> Result<(), KernelError> {
         for receipt in receipts {
-            if let Some(store) = self.receipt_store.as_deref_mut() {
-                store.append_child_receipt(&receipt)?;
-            }
-            self.child_receipt_log.append(receipt);
+            let _ = self.with_receipt_store(|store| Ok(store.append_child_receipt(&receipt)?))?;
+            self.child_receipt_log
+                .lock()
+                .map_err(|_| KernelError::Internal("child receipt log lock poisoned".to_string()))?
+                .append(receipt);
         }
         Ok(())
     }

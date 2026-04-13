@@ -551,7 +551,7 @@ capabilities:
             approval_token: None,
         };
 
-        let response = restarted.evaluate_tool_call(&request).unwrap();
+        let response = restarted.evaluate_tool_call_blocking(&request).unwrap();
         assert_eq!(response.verdict, arc_kernel::Verdict::Deny);
         assert!(response.reason.as_deref().unwrap_or("").contains("revoked"));
 
@@ -749,7 +749,7 @@ capabilities:
             approval_token: None,
         };
 
-        let response = kernel.evaluate_tool_call(&request).unwrap();
+        let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
         assert_eq!(response.verdict, arc_kernel::Verdict::Allow);
     }
 
@@ -791,7 +791,7 @@ capabilities:
             approval_token: None,
         };
 
-        let response = kernel.evaluate_tool_call(&request).unwrap();
+        let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
         assert_eq!(response.verdict, arc_kernel::Verdict::Deny);
     }
 

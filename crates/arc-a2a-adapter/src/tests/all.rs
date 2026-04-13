@@ -1769,7 +1769,7 @@ mod tests {
         .expect("sign capability");
 
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -1831,7 +1831,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-query-auth");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-query-auth".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -1891,7 +1891,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-basic-auth");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-basic-auth".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -1960,7 +1960,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-mtls");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-mtls".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2045,7 +2045,7 @@ mod tests {
         .expect("sign capability");
 
         let initial = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-start".to_string(),
                 capability: capability.clone(),
                 tool_name: "research".to_string(),
@@ -2069,7 +2069,7 @@ mod tests {
         );
 
         let follow_up = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-poll".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2135,7 +2135,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-cancel");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-cancel".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2196,7 +2196,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-stream");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-stream".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2255,7 +2255,7 @@ mod tests {
         let capability =
             test_capability(&issuer, &subject, &server_id, "cap-a2a-stream-incomplete");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-stream-incomplete".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2315,7 +2315,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-subscribe");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-subscribe".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2377,7 +2377,7 @@ mod tests {
             "cap-a2a-subscribe-incomplete",
         );
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-subscribe-incomplete".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2436,7 +2436,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-auth-deny");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-auth-deny".to_string(),
                 capability,
                 tool_name: "research".to_string(),
@@ -2493,7 +2493,7 @@ mod tests {
 
         let capability = test_capability(&issuer, &subject, &server_id, "cap-a2a-oauth");
         let response = kernel
-            .evaluate_tool_call(&ToolCallRequest {
+            .evaluate_tool_call_blocking(&ToolCallRequest {
                 request_id: "req-a2a-oauth".to_string(),
                 capability,
                 tool_name: "research".to_string(),

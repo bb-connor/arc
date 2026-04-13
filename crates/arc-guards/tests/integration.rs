@@ -112,7 +112,7 @@ fn forbidden_path_blocks_etc_shadow() {
         serde_json::json!({"path": "/etc/shadow"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
@@ -129,7 +129,7 @@ fn forbidden_path_allows_normal_file() {
         serde_json::json!({"path": "/home/user/project/src/main.rs"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
@@ -146,7 +146,7 @@ fn shell_command_blocks_rm_rf() {
         serde_json::json!({"command": "rm -rf /"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
@@ -163,7 +163,7 @@ fn shell_command_allows_git_status() {
         serde_json::json!({"command": "git status"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
@@ -180,7 +180,7 @@ fn egress_allowlist_blocks_evil_com() {
         serde_json::json!({"url": "https://evil.com/steal"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
@@ -197,7 +197,7 @@ fn egress_allowlist_allows_github_api() {
         serde_json::json!({"url": "https://api.github.com/repos"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
@@ -220,7 +220,7 @@ fn pipeline_one_deny_means_overall_deny() {
         serde_json::json!({"path": "/home/user/.ssh/id_rsa"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
@@ -243,7 +243,7 @@ fn pipeline_all_allow_means_overall_allow() {
         serde_json::json!({"path": "/home/user/project/src/main.rs"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
@@ -264,7 +264,7 @@ fn filesystem_tool_blocks_etc_shadow() {
         serde_json::json!({"path": "/etc/shadow"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
@@ -281,7 +281,7 @@ fn filesystem_tool_allows_normal_path() {
         serde_json::json!({"path": "/home/user/project/src/main.rs"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
 }
 
@@ -298,7 +298,7 @@ fn filesystem_tool_with_action_read_blocks_forbidden() {
         serde_json::json!({"path": "/etc/shadow", "action": "read"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call_blocking(&req).unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
 }
 
