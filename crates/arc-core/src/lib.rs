@@ -7,6 +7,10 @@
 //! Nothing in this crate performs I/O or depends on a runtime. It is a pure
 //! data-and-crypto crate suitable for use in WASM, embedded, and no-std
 //! (with alloc) environments.
+//!
+//! The shared substrate now lives in `arc-core-types`; this crate preserves the
+//! historical `arc_core::*` surface while heavier domain modules continue to
+//! split away in later phases.
 
 pub mod appraisal;
 pub mod autonomy;
@@ -369,13 +373,4 @@ pub use web3::{
 };
 
 pub use capability::{validate_attenuation, validate_delegation_chain};
-
-/// Opaque agent identifier. In practice this is a hex-encoded Ed25519 public key
-/// or a SPIFFE URI, but the core treats it as an opaque string.
-pub type AgentId = String;
-
-/// Opaque tool server identifier.
-pub type ServerId = String;
-
-/// UUIDv7 capability identifier (time-ordered).
-pub type CapabilityId = String;
+pub use arc_core_types::{AgentId, CapabilityId, ServerId};
