@@ -30,6 +30,7 @@ include!("receipt.rs");
 include!("attestation.rs");
 include!("kernel_signer.rs");
 include!("kernel_checker.rs");
+include!("compliance.rs");
 include!("interceptor.rs");
 include!("transport.rs");
 include!("proxy.rs");

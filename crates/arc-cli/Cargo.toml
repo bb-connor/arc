@@ -16,6 +16,7 @@ path = "src/bin/arc.rs"
 [dependencies]
 arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plane" }
+arc-acp-proxy = { package = "arc-acp-proxy", path = "../arc-acp-proxy" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
 arc-did = { package = "arc-did", path = "../arc-did" }

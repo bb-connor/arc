@@ -14,6 +14,7 @@
 //   MCP-compatible edge over stdio for stock MCP clients.
 
 mod admin;
+mod cert;
 mod did;
 mod passport;
 mod scaffold;

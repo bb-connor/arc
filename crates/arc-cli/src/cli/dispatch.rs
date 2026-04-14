@@ -1964,6 +1964,34 @@ fn main() {
                 }
             },
         },
+        Commands::Cert { command } => match command {
+            CertCommands::Generate {
+                session_id,
+                receipt_db: cert_receipt_db,
+                budget_limit,
+                output,
+            } => cert::cmd_cert_generate(
+                &session_id,
+                &cert_receipt_db,
+                budget_limit,
+                output.as_deref(),
+                authority_seed_file.as_deref(),
+                cli.json,
+            ),
+            CertCommands::Verify {
+                certificate,
+                full,
+                receipt_db: cert_receipt_db,
+            } => cert::cmd_cert_verify(
+                &certificate,
+                full,
+                cert_receipt_db.as_deref(),
+                cli.json,
+            ),
+            CertCommands::Inspect { certificate } => {
+                cert::cmd_cert_inspect(&certificate, cli.json)
+            }
+        },
         Commands::Reputation { command } => match command {
             ReputationCommands::Local {
                 subject_public_key,

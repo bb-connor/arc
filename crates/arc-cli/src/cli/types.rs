@@ -174,6 +174,12 @@ enum Commands {
         #[command(subcommand)]
         command: ReputationCommands,
     },
+
+    /// Generate, verify, and inspect ACP session compliance certificates.
+    Cert {
+        #[command(subcommand)]
+        command: CertCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2648,5 +2654,49 @@ enum ReputationCommands {
         /// Optional YAML or JSON verifier policy used to evaluate the passport during comparison.
         #[arg(long)]
         verifier_policy: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand)]
+enum CertCommands {
+    /// Generate a compliance certificate for an ACP session.
+    Generate {
+        /// ACP session ID to certify.
+        #[arg(long)]
+        session_id: String,
+
+        /// Path to the receipt database.
+        #[arg(long)]
+        receipt_db: PathBuf,
+
+        /// Maximum invocation budget (0 = unlimited).
+        #[arg(long, default_value_t = 0)]
+        budget_limit: u64,
+
+        /// Output file for the certificate JSON.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Verify a compliance certificate.
+    Verify {
+        /// Path to the certificate JSON file.
+        #[arg(long)]
+        certificate: PathBuf,
+
+        /// Enable full-bundle verification (re-verify all receipt signatures).
+        #[arg(long, default_value_t = false)]
+        full: bool,
+
+        /// Path to the receipt database (required for full-bundle mode).
+        #[arg(long)]
+        receipt_db: Option<PathBuf>,
+    },
+
+    /// Inspect a compliance certificate and display its contents.
+    Inspect {
+        /// Path to the certificate JSON file.
+        #[arg(long)]
+        certificate: PathBuf,
     },
 }
