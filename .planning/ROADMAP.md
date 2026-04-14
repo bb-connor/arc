@@ -11071,7 +11071,11 @@ Plans:
   3. All example guards compile to `wasm32-unknown-unknown` and produce valid `.wasm` binaries that pass `wasmparser` validation
   4. An integration test loads a compiled example guard `.wasm` into `WasmtimeBackend`, sends test requests, and verifies correct Allow and Deny verdicts including deny reason content
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 383-01-PLAN.md -- arc-guard-sdk-macros crate with #[arc_guard] proc macro
+- [ ] 383-02-PLAN.md -- tool-gate and enriched-inspector example guard crates
+- [ ] 383-03-PLAN.md -- integration tests loading .wasm into WasmtimeBackend
 
 ### Phase 384: CLI Scaffolding -- New, Build, Inspect
 **Goal**: Guard authors can scaffold a new guard project, compile it to WASM, and inspect compiled binaries -- the first three steps of the guard development lifecycle -- without leaving the `arc` CLI
