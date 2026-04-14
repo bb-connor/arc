@@ -1,0 +1,32 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: arc-mutating-webhook
+  labels:
+    app.kubernetes.io/name: arc-admission-controller
+    app.kubernetes.io/component: mutating-webhook
+webhooks:
+  - name: mutate.arc.backbay.io
+    admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: arc-admission-controller
+        namespace: arc-system
+        path: /mutate
+        port: 443
+      # caBundle should be injected by cert-manager or manually set.
+      # caBundle: <base64-encoded-ca-cert>
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: Namespaced
+    failurePolicy: Fail
+    sideEffects: None
+    reinvocationPolicy: IfNeeded
+    timeoutSeconds: 10
+    namespaceSelector:
+      matchLabels:
+        arc.backbay.io/inject: "true"
