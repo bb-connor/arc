@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
 stopped_at: Completed 373-02-PLAN.md
-last_updated: "2026-04-14T21:09:07.788Z"
+last_updated: "2026-04-14T21:12:01.515Z"
 last_activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
 progress:
   total_phases: 342
