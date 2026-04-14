@@ -45,6 +45,7 @@ members = [
     "crates/arc-a2a-edge",
     "crates/arc-acp-edge",
     "crates/arc-openai",
+    "crates/arc-tower",
     "crates/arc-siem",
     "crates/arc-underwriting",
     "crates/arc-web3",
