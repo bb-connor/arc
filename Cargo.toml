@@ -34,6 +34,7 @@ members = [
     "crates/arc-store-sqlite",
     "crates/arc-reputation",
     "crates/arc-guards",
+    "crates/arc-http-session",
     "crates/arc-policy",
     "crates/arc-cli",
     "crates/arc-conformance",
