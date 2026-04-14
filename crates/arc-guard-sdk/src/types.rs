@@ -1,6 +1,114 @@
-// Stub -- types will be implemented after tests are written.
+//! ABI types shared between the WASM guest guard and the ARC host runtime.
+//!
+//! These types serialize to JSON identically to the host-side types defined in
+//! `arc-wasm-guards/src/abi.rs`. Every `#[serde(...)]` annotation must match
+//! the host exactly; mismatches cause deserialization failures at runtime.
+
+use serde::{Deserialize, Serialize};
+
+// ---------------------------------------------------------------------------
+// ABI constants
+// ---------------------------------------------------------------------------
+
+/// Return code from the guest `evaluate` function indicating "allow".
+pub const VERDICT_ALLOW: i32 = 0;
+
+/// Return code from the guest `evaluate` function indicating "deny".
+pub const VERDICT_DENY: i32 = 1;
+
+// ---------------------------------------------------------------------------
+// GuardRequest
+// ---------------------------------------------------------------------------
+
+/// Read-only request context passed to the WASM guard.
+///
+/// Serialized as JSON by the host and written into guest linear memory before
+/// calling `evaluate`. The field order and serde annotations match the host
+/// definition in `arc-wasm-guards/src/abi.rs` exactly.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GuardRequest {
+    /// Tool being invoked.
+    pub tool_name: String,
+    /// Server hosting the tool.
+    pub server_id: String,
+    /// Agent making the request.
+    pub agent_id: String,
+    /// Tool arguments as an opaque JSON value.
+    pub arguments: serde_json::Value,
+    /// Capability scopes granted (serialized scope names).
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    /// Host-extracted action type from extract_action().
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action_type: Option<String>,
+    /// Normalized file path for filesystem actions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_path: Option<String>,
+    /// Target domain string for network egress actions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_target: Option<String>,
+    /// Session-scoped filesystem roots from the kernel context.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filesystem_roots: Vec<String>,
+    /// Index of the matched grant in the capability scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_grant_index: Option<usize>,
+}
+
+// ---------------------------------------------------------------------------
+// GuardVerdict
+// ---------------------------------------------------------------------------
+
+/// Verdict returned by a guest guard's evaluate function.
+///
+/// Guest-side `Deny` carries a required `String` reason because a guard that
+/// denies should always explain why. The host-side `GuardVerdict::Deny` uses
+/// `Option<String>` because the reason may be absent when the guest does not
+/// export `arc_deny_reason`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GuardVerdict {
+    /// The guard allows the request.
+    Allow,
+    /// The guard denies the request with a mandatory reason.
+    Deny { reason: String },
+}
+
+impl GuardVerdict {
+    /// Create an Allow verdict.
+    #[must_use]
+    pub fn allow() -> Self {
+        Self::Allow
+    }
+
+    /// Create a Deny verdict with a reason.
+    #[must_use]
+    pub fn deny(reason: impl Into<String>) -> Self {
+        Self::Deny {
+            reason: reason.into(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// GuestDenyResponse
+// ---------------------------------------------------------------------------
+
+/// Structured deny response written by the guest into shared memory.
+///
+/// The guest serializes this as JSON and returns it via `arc_deny_reason`.
+/// The host reads it and extracts the human-readable reason.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GuestDenyResponse {
+    /// Human-readable reason for the denial.
+    pub reason: String,
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 
