@@ -675,4 +675,239 @@ mod tests {
         let result = authority.validate_step(&execution, &manifest.steps[1], &grant);
         assert!(matches!(result, Err(WorkflowError::InvalidState(_))));
     }
+
+    #[test]
+    fn single_step_workflow() {
+        let manifest = SkillManifest::new(
+            "simple".to_string(),
+            "1.0.0".to_string(),
+            "Simple Task".to_string(),
+            vec![SkillStep {
+                index: 0,
+                server_id: "srv".to_string(),
+                tool_name: "tool".to_string(),
+                label: Some("Do thing".to_string()),
+                input_contract: None,
+                output_contract: None,
+                budget_limit: None,
+                retryable: false,
+                max_retries: None,
+            }],
+        );
+        let grant = SkillGrant::new(
+            "simple".to_string(),
+            "1.0.0".to_string(),
+            vec!["srv:tool".to_string()],
+        );
+        let mut authority = WorkflowAuthority::new(Keypair::generate());
+
+        let mut execution = authority
+            .begin(
+                &manifest,
+                &grant,
+                "agent-1".to_string(),
+                "cap-1".to_string(),
+                None,
+            )
+            .unwrap();
+
+        authority
+            .validate_step(&execution, &manifest.steps[0], &grant)
+            .unwrap();
+        authority
+            .record_step(
+                &mut execution,
+                &manifest.steps[0],
+                StepOutcome::Success,
+                50,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        let receipt = authority.finalize(execution).unwrap();
+        assert!(receipt.is_complete());
+        assert_eq!(receipt.successful_steps(), 1);
+        assert!(receipt.verify().unwrap());
+    }
+
+    #[test]
+    fn execution_limit_reached() {
+        let manifest = SkillManifest::new(
+            "limited".to_string(),
+            "1.0.0".to_string(),
+            "Limited".to_string(),
+            vec![SkillStep {
+                index: 0,
+                server_id: "srv".to_string(),
+                tool_name: "tool".to_string(),
+                label: None,
+                input_contract: None,
+                output_contract: None,
+                budget_limit: None,
+                retryable: false,
+                max_retries: None,
+            }],
+        );
+        let mut grant = SkillGrant::new(
+            "limited".to_string(),
+            "1.0.0".to_string(),
+            vec!["srv:tool".to_string()],
+        );
+        grant.max_executions = Some(1);
+
+        let mut authority = WorkflowAuthority::new(Keypair::generate());
+
+        // First execution should work
+        let mut execution = authority
+            .begin(
+                &manifest,
+                &grant,
+                "a".to_string(),
+                "c".to_string(),
+                None,
+            )
+            .unwrap();
+        authority
+            .record_step(
+                &mut execution,
+                &manifest.steps[0],
+                StepOutcome::Success,
+                10,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+        authority.finalize(execution).unwrap();
+
+        // Second execution should be rejected
+        let result = authority.begin(
+            &manifest,
+            &grant,
+            "a".to_string(),
+            "c".to_string(),
+            None,
+        );
+        assert!(matches!(
+            result,
+            Err(WorkflowError::ExecutionLimitReached { .. })
+        ));
+    }
+
+    #[test]
+    fn budget_exactly_at_limit_passes() {
+        let manifest = make_manifest();
+        let mut grant = make_grant();
+        grant.budget_envelope = Some(MonetaryAmount {
+            units: 100,
+            currency: "USD".to_string(),
+        });
+
+        let authority = WorkflowAuthority::new(Keypair::generate());
+        let mut execution = authority
+            .begin(
+                &manifest,
+                &grant,
+                "agent-1".to_string(),
+                "cap-1".to_string(),
+                None,
+            )
+            .unwrap();
+
+        // Spend exactly the limit (100)
+        authority
+            .record_step(
+                &mut execution,
+                &manifest.steps[0],
+                StepOutcome::Success,
+                100,
+                Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                None,
+                None,
+            )
+            .unwrap();
+
+        // Spending 0 more should still be fine (100 <= 100)
+        authority
+            .record_step(
+                &mut execution,
+                &manifest.steps[1],
+                StepOutcome::Success,
+                100,
+                Some(MonetaryAmount {
+                    units: 0,
+                    currency: "USD".to_string(),
+                }),
+                None,
+                None,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn record_step_on_inactive_workflow_errors() {
+        let manifest = make_manifest();
+        let grant = make_grant();
+        let authority = WorkflowAuthority::new(Keypair::generate());
+
+        let mut execution = authority
+            .begin(
+                &manifest,
+                &grant,
+                "agent-1".to_string(),
+                "cap-1".to_string(),
+                None,
+            )
+            .unwrap();
+
+        // Manually deactivate
+        execution.active = false;
+
+        let result = authority.record_step(
+            &mut execution,
+            &manifest.steps[0],
+            StepOutcome::Success,
+            10,
+            None,
+            None,
+            None,
+        );
+        assert!(matches!(result, Err(WorkflowError::InvalidState(_))));
+    }
+
+    #[test]
+    fn denied_step_deactivates_workflow() {
+        let manifest = make_manifest();
+        let grant = make_grant();
+        let authority = WorkflowAuthority::new(Keypair::generate());
+
+        let mut execution = authority
+            .begin(
+                &manifest,
+                &grant,
+                "agent-1".to_string(),
+                "cap-1".to_string(),
+                None,
+            )
+            .unwrap();
+
+        authority
+            .record_step(
+                &mut execution,
+                &manifest.steps[0],
+                StepOutcome::Denied,
+                50,
+                None,
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert!(!execution.active);
+    }
 }

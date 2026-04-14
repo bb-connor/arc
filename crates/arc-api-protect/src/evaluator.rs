@@ -315,6 +315,71 @@ mod tests {
     }
 
     #[test]
+    fn path_matching_trailing_slash_mismatch() {
+        // Trailing slash should NOT match if pattern has no trailing slash
+        assert!(!path_matches_pattern("/pets/", "/pets"));
+        assert!(!path_matches_pattern("/pets", "/pets/"));
+    }
+
+    #[test]
+    fn path_matching_double_slashes() {
+        // Double slashes produce empty segments, should not match normal paths
+        assert!(!path_matches_pattern("//pets", "/pets"));
+    }
+
+    #[test]
+    fn path_matching_case_sensitivity() {
+        // Path matching should be case-sensitive
+        assert!(!path_matches_pattern("/Pets", "/pets"));
+        assert!(path_matches_pattern("/Pets", "/Pets"));
+    }
+
+    #[test]
+    fn path_matching_multiple_params() {
+        assert!(path_matches_pattern("/orgs/123/members/456", "/orgs/{orgId}/members/{memberId}"));
+        assert!(!path_matches_pattern("/orgs/123/members", "/orgs/{orgId}/members/{memberId}"));
+    }
+
+    #[test]
+    fn path_matching_root() {
+        assert!(path_matches_pattern("/", "/"));
+        assert!(!path_matches_pattern("/pets", "/"));
+    }
+
+    #[test]
+    fn extract_api_key_caller() {
+        let mut headers = HashMap::new();
+        headers.insert("X-API-Key".to_string(), "my-api-key-value".to_string());
+        let caller = extract_caller(&headers);
+        assert!(caller.subject.starts_with("apikey:"));
+        assert!(matches!(caller.auth_method, AuthMethod::ApiKey { .. }));
+    }
+
+    #[test]
+    fn evaluate_with_body_hash() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/data".to_string(),
+            method: HttpMethod::Get,
+            operation_id: Some("getData".to_string()),
+            policy: PolicyDecision::SessionAllow,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/data",
+                &HashMap::new(),
+                Some("bodyhash123".to_string()),
+                1024,
+            )
+            .unwrap();
+        assert!(result.verdict.is_allowed());
+        assert!(result.receipt.verify_signature().unwrap());
+    }
+
+    #[test]
     fn fallback_policy_for_unmatched_route() {
         let keypair = Keypair::generate();
         let evaluator = RequestEvaluator::new(vec![], keypair, "test-policy".to_string());

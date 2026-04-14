@@ -342,6 +342,79 @@ mod tests {
     }
 
     #[test]
+    fn adapter_with_no_auth_section_passes() {
+        let config = minimal_config();
+        // The minimal config already has no auth section; verify this passes.
+        assert!(config.adapters[0].auth.is_none());
+        validate(&config).unwrap_or_else(|e| panic!("should pass without auth: {e}"));
+    }
+
+    #[test]
+    fn empty_adapter_id_rejected() {
+        let mut config = minimal_config();
+        config.adapters[0].id = String::new();
+        let err = validate(&config).unwrap_err();
+        match err {
+            ConfigError::Validation(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.contains("adapter ID must not be empty")),
+                    "should mention empty ID: {errors:?}"
+                );
+            }
+            other => panic!("wrong error: {other}"),
+        }
+    }
+
+    #[test]
+    fn empty_edge_id_rejected() {
+        let mut config = minimal_config();
+        config.edges.push(EdgeConfig {
+            id: String::new(),
+            protocol: "mcp".to_string(),
+            expose_from: "test".to_string(),
+        });
+        let err = validate(&config).unwrap_err();
+        match err {
+            ConfigError::Validation(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.contains("edge ID must not be empty")),
+                    "should mention empty edge ID: {errors:?}"
+                );
+            }
+            other => panic!("wrong error: {other}"),
+        }
+    }
+
+    #[test]
+    fn api_key_auth_without_header_rejected() {
+        let mut config = minimal_config();
+        config.adapters[0].auth = Some(AdapterAuthConfig {
+            auth_type: "api_key".to_string(),
+            header: None,
+        });
+        let err = validate(&config).unwrap_err();
+        match err {
+            ConfigError::Validation(errors) => {
+                assert!(
+                    errors.iter().any(|e| e.contains("requires a \"header\"")),
+                    "should mention missing header for api_key: {errors:?}"
+                );
+            }
+            other => panic!("wrong error: {other}"),
+        }
+    }
+
+    #[test]
+    fn mtls_auth_no_header_passes() {
+        let mut config = minimal_config();
+        config.adapters[0].auth = Some(AdapterAuthConfig {
+            auth_type: "mtls".to_string(),
+            header: None,
+        });
+        validate(&config).unwrap_or_else(|e| panic!("mtls should pass without header: {e}"));
+    }
+
+    #[test]
     fn duplicate_edge_ids_rejected() {
         let mut config = minimal_config();
         config.edges.push(EdgeConfig {

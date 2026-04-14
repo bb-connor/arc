@@ -288,4 +288,63 @@ mod tests {
         assert_eq!(arc_receipt.tool_server, "http");
         assert!(arc_receipt.tool_name.contains("GET"));
     }
+
+    #[test]
+    fn receipt_with_evidence_entries() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.evidence = vec![
+            GuardEvidence {
+                guard_name: "PolicyGuard".to_string(),
+                verdict: true,
+                details: Some("session-scoped allow".to_string()),
+            },
+            GuardEvidence {
+                guard_name: "RateLimitGuard".to_string(),
+                verdict: true,
+                details: None,
+            },
+        ];
+        let receipt = HttpReceipt::sign(body, &kp).unwrap();
+        assert!(receipt.verify_signature().unwrap());
+        assert_eq!(receipt.evidence.len(), 2);
+        assert_eq!(receipt.evidence[0].guard_name, "PolicyGuard");
+        assert!(receipt.evidence[0].verdict);
+    }
+
+    #[test]
+    fn receipt_with_metadata() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.metadata = Some(serde_json::json!({
+            "trace_id": "abc123",
+            "tags": ["production", "v2"]
+        }));
+        let receipt = HttpReceipt::sign(body, &kp).unwrap();
+        assert!(receipt.verify_signature().unwrap());
+        let meta = receipt.metadata.as_ref().unwrap();
+        assert_eq!(meta["trace_id"], "abc123");
+    }
+
+    #[test]
+    fn receipt_with_capability_id() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.capability_id = Some("cap-xyz-789".to_string());
+        let receipt = HttpReceipt::sign(body, &kp).unwrap();
+        assert!(receipt.verify_signature().unwrap());
+        assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
+        let arc_receipt = receipt.to_arc_receipt().unwrap();
+        assert_eq!(arc_receipt.capability_id, "cap-xyz-789");
+    }
+
+    #[test]
+    fn tampered_receipt_fails_verification() {
+        let kp = test_keypair();
+        let body = sample_body(&kp);
+        let mut receipt = HttpReceipt::sign(body, &kp).unwrap();
+        // Tamper with the response status
+        receipt.response_status = 500;
+        assert!(!receipt.verify_signature().unwrap());
+    }
 }

@@ -223,4 +223,66 @@ mod tests {
         assert!(iso.starts_with("2023-"));
         assert!(iso.ends_with('Z'));
     }
+
+    #[test]
+    fn billing_export_empty_records() {
+        let export = create_billing_export(&[], 1700000000);
+        assert_eq!(export.record_count, 0);
+        assert!(export.records.is_empty());
+        assert!(export.total_cost.is_none());
+    }
+
+    #[test]
+    fn billing_export_mixed_currencies_no_total() {
+        let make_with_currency = |id: &str, units: u64, currency: &str| {
+            let mut m = CostMetadata::new(
+                id.to_string(),
+                1700000000,
+                "a".to_string(),
+                "s".to_string(),
+                "t".to_string(),
+            );
+            m.add_dimension(CostDimension::ApiCost {
+                amount: MonetaryAmount {
+                    units,
+                    currency: currency.to_string(),
+                },
+                provider: "p".to_string(),
+            });
+            m.compute_total_monetary_cost();
+            m
+        };
+
+        let records = vec![
+            make_with_currency("r1", 100, "USD"),
+            make_with_currency("r2", 200, "EUR"),
+        ];
+        let export = create_billing_export(&records, 0);
+        // Mixed currencies should produce no total
+        assert!(export.total_cost.is_none());
+        assert_eq!(export.record_count, 2);
+    }
+
+    #[test]
+    fn billing_record_serde_roundtrip() {
+        let record = BillingRecord {
+            schema: BILLING_EXPORT_SCHEMA.to_string(),
+            receipt_id: "r-1".to_string(),
+            timestamp: 1700000000,
+            timestamp_iso: "2023-11-14T22:13:20Z".to_string(),
+            session_id: Some("sess-1".to_string()),
+            agent_id: "agent-1".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            compute_time_ms: 200,
+            data_bytes: 1024,
+            cost_units: Some(50),
+            currency: Some("USD".to_string()),
+            provider: Some("openai".to_string()),
+        };
+        let json = serde_json::to_string(&record).unwrap();
+        let back: BillingRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.receipt_id, "r-1");
+        assert_eq!(back.cost_units, Some(50));
+    }
 }

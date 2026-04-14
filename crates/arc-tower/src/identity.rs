@@ -114,4 +114,65 @@ mod tests {
         assert_eq!(caller.subject, "anonymous");
         assert!(matches!(caller.auth_method, AuthMethod::Anonymous));
     }
+
+    #[test]
+    fn extract_cookie_identity() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::COOKIE,
+            http::HeaderValue::from_static("session_id=abc123xyz"),
+        );
+        let caller = extract_identity(&headers);
+        assert!(caller.subject.starts_with("cookie:"));
+        match &caller.auth_method {
+            AuthMethod::Cookie {
+                cookie_name,
+                cookie_hash,
+            } => {
+                assert_eq!(cookie_name, "session_id");
+                assert_eq!(cookie_hash.len(), 64); // SHA-256 hex
+            }
+            other => panic!("expected Cookie, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bearer_takes_precedence_over_cookie() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_static("Bearer my-token"),
+        );
+        headers.insert(
+            http::header::COOKIE,
+            http::HeaderValue::from_static("session_id=abc123"),
+        );
+        let caller = extract_identity(&headers);
+        // Bearer should take precedence
+        assert!(caller.subject.starts_with("bearer:"));
+    }
+
+    #[test]
+    fn non_bearer_authorization_falls_through() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::AUTHORIZATION,
+            http::HeaderValue::from_static("Basic dXNlcjpwYXNz"),
+        );
+        let caller = extract_identity(&headers);
+        // Basic auth is not recognized, should fall through to anonymous
+        assert_eq!(caller.subject, "anonymous");
+    }
+
+    #[test]
+    fn empty_cookie_value_falls_through() {
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            http::header::COOKIE,
+            http::HeaderValue::from_static("session_id="),
+        );
+        let caller = extract_identity(&headers);
+        // Empty cookie value should not be used
+        assert_eq!(caller.subject, "anonymous");
+    }
 }

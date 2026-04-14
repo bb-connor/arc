@@ -590,6 +590,118 @@ paths:
     }
 
     #[test]
+    fn missing_paths_field() {
+        let input = r##"{"openapi": "3.0.3", "info": {"title": "T", "version": "1"}}"##;
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::MissingField(ref f) if f == "paths"));
+    }
+
+    #[test]
+    fn missing_info_field() {
+        let input = r##"{"openapi": "3.0.3", "paths": {}}"##;
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::MissingField(ref f) if f == "info"));
+    }
+
+    #[test]
+    fn empty_paths_object() {
+        let input =
+            r##"{"openapi": "3.0.3", "info": {"title": "T", "version": "1"}, "paths": {}}"##;
+        let spec = OpenApiSpec::parse(input).unwrap();
+        assert!(spec.paths.is_empty());
+        assert_eq!(spec.title, "T");
+    }
+
+    #[test]
+    fn spec_with_no_operations_on_path() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": {"title": "T", "version": "1"},
+            "paths": {
+                "/empty": {
+                    "parameters": [
+                        {"name": "id", "in": "query", "schema": {"type": "string"}}
+                    ]
+                }
+            }
+        }"##;
+        let spec = OpenApiSpec::parse(input).unwrap();
+        assert_eq!(spec.paths.len(), 1);
+        let (_, item) = &spec.paths[0];
+        assert!(item.operations.is_empty());
+        assert_eq!(item.common_parameters.len(), 1);
+    }
+
+    #[test]
+    fn broken_ref_produces_error() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": {"title": "T", "version": "1"},
+            "paths": {
+                "/things": {
+                    "get": {
+                        "parameters": [
+                            {"$ref": "#/components/parameters/NonExistent"}
+                        ],
+                        "responses": {"200": {"description": "OK"}}
+                    }
+                }
+            }
+        }"##;
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::UnresolvedRef(_)));
+    }
+
+    #[test]
+    fn external_ref_produces_error() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": {"title": "T", "version": "1"},
+            "paths": {
+                "/things": {
+                    "get": {
+                        "parameters": [
+                            {"$ref": "https://example.com/params.yaml#/Limit"}
+                        ],
+                        "responses": {"200": {"description": "OK"}}
+                    }
+                }
+            }
+        }"##;
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::UnresolvedRef(_)));
+    }
+
+    #[test]
+    fn invalid_json_produces_error() {
+        let input = r##"{not valid json"##;
+        let err = OpenApiSpec::parse(input).unwrap_err();
+        assert!(matches!(err, OpenApiError::InvalidJson(_)));
+    }
+
+    #[test]
+    fn missing_title_defaults_to_untitled() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": {"version": "1"},
+            "paths": {}
+        }"##;
+        let spec = OpenApiSpec::parse(input).unwrap();
+        assert_eq!(spec.title, "Untitled API");
+    }
+
+    #[test]
+    fn missing_version_defaults_to_000() {
+        let input = r##"{
+            "openapi": "3.0.3",
+            "info": {"title": "T"},
+            "paths": {}
+        }"##;
+        let spec = OpenApiSpec::parse(input).unwrap();
+        assert_eq!(spec.api_version, "0.0.0");
+    }
+
+    #[test]
     fn arc_extensions_extracted() {
         let input = r##"{
             "openapi": "3.0.3",

@@ -150,4 +150,80 @@ mod tests {
             panic!("expected Deny");
         }
     }
+
+    #[test]
+    fn cancel_verdict_conversion() {
+        let v = Verdict::Cancel {
+            reason: "timed out".to_string(),
+        };
+        assert!(!v.is_allowed());
+        assert!(!v.is_denied());
+        let decision = v.to_decision();
+        assert!(matches!(
+            decision,
+            arc_core_types::Decision::Cancelled { .. }
+        ));
+        let v2 = Verdict::from(decision);
+        assert!(matches!(v2, Verdict::Cancel { reason } if reason == "timed out"));
+    }
+
+    #[test]
+    fn incomplete_verdict_conversion() {
+        let v = Verdict::Incomplete {
+            reason: "partial evaluation".to_string(),
+        };
+        assert!(!v.is_allowed());
+        assert!(!v.is_denied());
+        let decision = v.to_decision();
+        assert!(matches!(
+            decision,
+            arc_core_types::Decision::Incomplete { .. }
+        ));
+        let v2 = Verdict::from(decision);
+        assert!(
+            matches!(v2, Verdict::Incomplete { reason } if reason == "partial evaluation")
+        );
+    }
+
+    #[test]
+    fn cancel_serde_roundtrip() {
+        let v = Verdict::Cancel {
+            reason: "circuit breaker".to_string(),
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        let back: Verdict = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn incomplete_serde_roundtrip() {
+        let v = Verdict::Incomplete {
+            reason: "pending approval".to_string(),
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        let back: Verdict = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, v);
+    }
+
+    #[test]
+    fn deny_default_status_via_serde_default() {
+        // When deserializing a Deny variant without the http_status field,
+        // the default should be 403.
+        let json = r#"{"verdict":"deny","reason":"blocked","guard":"TestGuard"}"#;
+        let v: Verdict = serde_json::from_str(json).unwrap();
+        if let Verdict::Deny { http_status, .. } = v {
+            assert_eq!(http_status, 403);
+        } else {
+            panic!("expected Deny");
+        }
+    }
+
+    #[test]
+    fn allow_roundtrip_through_decision() {
+        let v = Verdict::Allow;
+        let decision = v.to_decision();
+        assert!(matches!(decision, arc_core_types::Decision::Allow));
+        let v2 = Verdict::from(decision);
+        assert!(v2.is_allowed());
+    }
 }

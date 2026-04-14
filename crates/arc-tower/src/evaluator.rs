@@ -294,6 +294,77 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_all_safe_methods() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let headers = http::HeaderMap::new();
+
+        for method in &["GET", "HEAD", "OPTIONS"] {
+            let caller = CallerIdentity::anonymous();
+            let result = evaluator
+                .evaluate(method, "/test", caller, &headers, None, 0)
+                .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
+            assert!(
+                result.verdict.is_allowed(),
+                "{method} should be allowed"
+            );
+        }
+    }
+
+    #[test]
+    fn evaluate_all_unsafe_methods_denied() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let headers = http::HeaderMap::new();
+
+        for method in &["POST", "PUT", "PATCH", "DELETE"] {
+            let caller = CallerIdentity::anonymous();
+            let result = evaluator
+                .evaluate(method, "/test", caller, &headers, None, 0)
+                .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
+            assert!(
+                result.verdict.is_denied(),
+                "{method} should be denied without capability"
+            );
+        }
+    }
+
+    #[test]
+    fn fail_open_mode() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string()).with_fail_open(true);
+        assert!(evaluator.is_fail_open());
+    }
+
+    #[test]
+    fn custom_route_resolver() {
+        fn resolver(_method: &str, path: &str) -> String {
+            // Normalize by stripping trailing slashes
+            path.trim_end_matches('/').to_string()
+        }
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string())
+            .with_route_resolver(resolver);
+
+        let caller = CallerIdentity::anonymous();
+        let headers = http::HeaderMap::new();
+        let result = evaluator
+            .evaluate("GET", "/pets/", caller, &headers, None, 0)
+            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        assert!(result.verdict.is_allowed());
+        // Route pattern should have trailing slash stripped
+        assert_eq!(result.receipt.route_pattern, "/pets");
+    }
+
+    #[test]
+    fn parse_method_case_insensitive() {
+        // parse_method uppercases internally
+        assert!(parse_method("get").is_ok());
+        assert!(parse_method("Get").is_ok());
+        assert!(parse_method("GET").is_ok());
+    }
+
+    #[test]
     fn evaluator_clone() {
         let keypair = Keypair::generate();
         let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());

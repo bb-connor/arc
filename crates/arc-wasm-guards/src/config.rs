@@ -93,4 +93,48 @@ mod tests {
         assert_eq!(recovered.name, original.name);
         assert_eq!(recovered.fuel_limit, original.fuel_limit);
     }
+
+    #[test]
+    fn config_missing_name_fails() {
+        let json = r#"{"path": "/etc/arc/guards/test.wasm"}"#;
+        let result: Result<WasmGuardConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_missing_path_fails() {
+        let json = r#"{"name": "test"}"#;
+        let result: Result<WasmGuardConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn config_all_fields_explicit() {
+        let json = r#"{
+            "name": "pii-guard",
+            "path": "/etc/arc/guards/pii.wasm",
+            "fuel_limit": 2000000,
+            "priority": 50,
+            "advisory": true
+        }"#;
+        let config: WasmGuardConfig = serde_json::from_str(json).expect("deserialize all fields");
+        assert_eq!(config.name, "pii-guard");
+        assert_eq!(config.fuel_limit, 2_000_000);
+        assert_eq!(config.priority, 50);
+        assert!(config.advisory);
+    }
+
+    #[test]
+    fn config_zero_fuel_limit_allowed() {
+        let json = r#"{"name": "test", "path": "/test.wasm", "fuel_limit": 0}"#;
+        let config: WasmGuardConfig = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(config.fuel_limit, 0);
+    }
+
+    #[test]
+    fn config_max_priority_allowed() {
+        let json = r#"{"name": "test", "path": "/test.wasm", "priority": 4294967295}"#;
+        let config: WasmGuardConfig = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(config.priority, u32::MAX);
+    }
 }

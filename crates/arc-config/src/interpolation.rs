@@ -139,4 +139,42 @@ mod tests {
             other => panic!("wrong error variant: {other}"),
         }
     }
+
+    #[test]
+    fn deeply_nested_var_in_yaml() {
+        env::set_var("ARC_TEST_NESTED_HOST", "db.internal");
+        env::set_var("ARC_TEST_NESTED_PORT", "5432");
+        let input = "connection: postgresql://${ARC_TEST_NESTED_HOST}:${ARC_TEST_NESTED_PORT}/mydb";
+        let out = interpolate(input).unwrap_or_else(|e| panic!("interpolation failed: {e}"));
+        assert_eq!(out, "connection: postgresql://db.internal:5432/mydb");
+        env::remove_var("ARC_TEST_NESTED_HOST");
+        env::remove_var("ARC_TEST_NESTED_PORT");
+    }
+
+    #[test]
+    fn var_at_start_of_line() {
+        env::set_var("ARC_TEST_PREFIX", "hello");
+        let input = "${ARC_TEST_PREFIX} world";
+        let out = interpolate(input).unwrap_or_else(|e| panic!("interpolation failed: {e}"));
+        assert_eq!(out, "hello world");
+        env::remove_var("ARC_TEST_PREFIX");
+    }
+
+    #[test]
+    fn dollar_brace_without_var_name_unchanged() {
+        // ${} is not a valid variable pattern, should be left as-is
+        let input = "no var here: ${}";
+        let out = interpolate(input).unwrap_or_else(|e| panic!("interpolation failed: {e}"));
+        assert_eq!(out, "no var here: ${}");
+    }
+
+    #[test]
+    fn mixed_set_and_unset_with_defaults() {
+        env::set_var("ARC_TEST_MIX_SET", "real");
+        env::remove_var("ARC_TEST_MIX_UNSET");
+        let input = "${ARC_TEST_MIX_SET}--${ARC_TEST_MIX_UNSET:-default_val}";
+        let out = interpolate(input).unwrap_or_else(|e| panic!("interpolation failed: {e}"));
+        assert_eq!(out, "real--default_val");
+        env::remove_var("ARC_TEST_MIX_SET");
+    }
 }

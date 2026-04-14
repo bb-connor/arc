@@ -410,4 +410,88 @@ mod tests {
         assert!(result.truncated);
         assert_eq!(result.summary.receipt_count, MAX_COST_QUERY_LIMIT as u64);
     }
+
+    #[test]
+    fn query_empty_records() {
+        let records: Vec<CostMetadata> = vec![];
+        let result = execute_cost_query(&records, &CostQuery::default());
+        assert_eq!(result.summary.receipt_count, 0);
+        assert_eq!(result.summary.total_compute_time_ms, 0);
+        assert_eq!(result.summary.total_data_bytes, 0);
+        assert!(result.summary.total_monetary_cost.is_none());
+        assert!(!result.truncated);
+    }
+
+    #[test]
+    fn query_group_by_session() {
+        let records = vec![
+            make_record("r1", 1000, "a1", "s1", "t1", 50),
+            make_record("r2", 2000, "a1", "s1", "t1", 100),
+        ];
+        let query = CostQuery {
+            group_by: GroupBy::Session,
+            ..Default::default()
+        };
+        let result = execute_cost_query(&records, &query);
+        assert_eq!(result.groups.len(), 1);
+        assert_eq!(result.groups[0].key, "sess-1");
+        assert_eq!(result.groups[0].receipt_count, 2);
+    }
+
+    #[test]
+    fn query_filter_by_tool_server() {
+        let records = vec![
+            make_record("r1", 1000, "a1", "s1", "t1", 50),
+            make_record("r2", 2000, "a1", "s2", "t1", 100),
+        ];
+        let query = CostQuery {
+            tool_server: Some("s1".to_string()),
+            ..Default::default()
+        };
+        let result = execute_cost_query(&records, &query);
+        assert_eq!(result.summary.receipt_count, 1);
+    }
+
+    #[test]
+    fn query_filter_by_tool_name() {
+        let records = vec![
+            make_record("r1", 1000, "a1", "s1", "t1", 50),
+            make_record("r2", 2000, "a1", "s1", "t2", 100),
+        ];
+        let query = CostQuery {
+            tool_name: Some("t2".to_string()),
+            ..Default::default()
+        };
+        let result = execute_cost_query(&records, &query);
+        assert_eq!(result.summary.receipt_count, 1);
+        assert_eq!(
+            result.summary.total_monetary_cost.as_ref().unwrap().units,
+            100
+        );
+    }
+
+    #[test]
+    fn query_currency_filter() {
+        let mut r1 = make_record("r1", 1000, "a1", "s1", "t1", 50);
+        r1.total_monetary_cost = Some(MonetaryAmount {
+            units: 50,
+            currency: "USD".to_string(),
+        });
+        let mut r2 = make_record("r2", 2000, "a1", "s1", "t1", 100);
+        r2.total_monetary_cost = Some(MonetaryAmount {
+            units: 100,
+            currency: "EUR".to_string(),
+        });
+        let records = vec![r1, r2];
+        let query = CostQuery {
+            currency: Some("EUR".to_string()),
+            ..Default::default()
+        };
+        let result = execute_cost_query(&records, &query);
+        assert_eq!(result.summary.receipt_count, 1);
+        assert_eq!(
+            result.summary.total_monetary_cost.as_ref().unwrap().currency,
+            "EUR"
+        );
+    }
 }

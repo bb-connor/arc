@@ -257,4 +257,92 @@ mod tests {
         });
         assert_eq!(meta.total_data_bytes(), 380);
     }
+
+    #[test]
+    fn compute_total_with_zero_costs() {
+        let mut meta = CostMetadata::new(
+            "r-zero".to_string(),
+            0,
+            "a".to_string(),
+            "s".to_string(),
+            "t".to_string(),
+        );
+        meta.add_dimension(CostDimension::ApiCost {
+            amount: MonetaryAmount {
+                units: 0,
+                currency: "USD".to_string(),
+            },
+            provider: "free".to_string(),
+        });
+        meta.compute_total_monetary_cost();
+        assert_eq!(meta.total_monetary_cost.as_ref().unwrap().units, 0);
+    }
+
+    #[test]
+    fn compute_total_with_mixed_currencies_takes_first() {
+        let mut meta = CostMetadata::new(
+            "r-mixed".to_string(),
+            0,
+            "a".to_string(),
+            "s".to_string(),
+            "t".to_string(),
+        );
+        meta.add_dimension(CostDimension::ApiCost {
+            amount: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            },
+            provider: "a".to_string(),
+        });
+        meta.add_dimension(CostDimension::ApiCost {
+            amount: MonetaryAmount {
+                units: 200,
+                currency: "EUR".to_string(),
+            },
+            provider: "b".to_string(),
+        });
+        meta.compute_total_monetary_cost();
+        // Only USD should be summed, EUR skipped
+        assert_eq!(meta.total_monetary_cost.as_ref().unwrap().units, 100);
+        assert_eq!(meta.total_monetary_cost.as_ref().unwrap().currency, "USD");
+    }
+
+    #[test]
+    fn no_api_costs_produces_no_total() {
+        let mut meta = CostMetadata::new(
+            "r-none".to_string(),
+            0,
+            "a".to_string(),
+            "s".to_string(),
+            "t".to_string(),
+        );
+        meta.add_dimension(CostDimension::ComputeTime { duration_ms: 500 });
+        meta.compute_total_monetary_cost();
+        assert!(meta.total_monetary_cost.is_none());
+    }
+
+    #[test]
+    fn empty_dimensions_produce_zero_totals() {
+        let meta = CostMetadata::new(
+            "r-empty".to_string(),
+            0,
+            "a".to_string(),
+            "s".to_string(),
+            "t".to_string(),
+        );
+        assert_eq!(meta.total_compute_time_ms(), 0);
+        assert_eq!(meta.total_data_bytes(), 0);
+    }
+
+    #[test]
+    fn custom_dimension_roundtrip() {
+        let dim = CostDimension::Custom {
+            name: "tokens".to_string(),
+            value: 4096,
+            unit: Some("tokens".to_string()),
+        };
+        let json = serde_json::to_string(&dim).unwrap();
+        let back: CostDimension = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, dim);
+    }
 }

@@ -165,4 +165,64 @@ mod tests {
         assert_eq!(back.query.get("verbose").map(|s| s.as_str()), Some("true"));
         assert_eq!(back.body_hash.as_deref(), Some("abc123"));
     }
+
+    #[test]
+    fn content_hash_changes_with_query_params() {
+        let mut req1 = ArcHttpRequest::new(
+            "req-a".to_string(),
+            HttpMethod::Get,
+            "/search".to_string(),
+            "/search".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        let mut req2 = req1.clone();
+
+        req1.query.insert("q".to_string(), "cats".to_string());
+        req2.query.insert("q".to_string(), "dogs".to_string());
+
+        let h1 = req1.content_hash().unwrap();
+        let h2 = req2.content_hash().unwrap();
+        assert_ne!(h1, h2, "different query params should produce different hashes");
+    }
+
+    #[test]
+    fn content_hash_changes_with_body_hash() {
+        let mut req1 = ArcHttpRequest::new(
+            "req-b".to_string(),
+            HttpMethod::Post,
+            "/data".to_string(),
+            "/data".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        let mut req2 = req1.clone();
+
+        req1.body_hash = Some("bodyhash1".to_string());
+        req2.body_hash = Some("bodyhash2".to_string());
+
+        let h1 = req1.content_hash().unwrap();
+        let h2 = req2.content_hash().unwrap();
+        assert_ne!(h1, h2, "different body hashes should produce different content hashes");
+    }
+
+    #[test]
+    fn content_hash_differs_between_methods() {
+        let req_get = ArcHttpRequest::new(
+            "req-c".to_string(),
+            HttpMethod::Get,
+            "/resource".to_string(),
+            "/resource".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        let req_post = ArcHttpRequest::new(
+            "req-d".to_string(),
+            HttpMethod::Post,
+            "/resource".to_string(),
+            "/resource".to_string(),
+            CallerIdentity::anonymous(),
+        );
+
+        let h1 = req_get.content_hash().unwrap();
+        let h2 = req_post.content_hash().unwrap();
+        assert_ne!(h1, h2, "different methods should produce different content hashes");
+    }
 }

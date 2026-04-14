@@ -172,13 +172,16 @@ impl BudgetEnforcer {
         self.total_spent = self.total_spent.saturating_add(cost_units);
 
         if let Some(ref sid) = meta.session_id {
-            *self.session_spent.entry(sid.clone()).or_insert(0) += cost_units;
+            let entry = self.session_spent.entry(sid.clone()).or_insert(0);
+            *entry = entry.saturating_add(cost_units);
         }
 
-        *self.agent_spent.entry(meta.agent_id.clone()).or_insert(0) += cost_units;
+        let agent_entry = self.agent_spent.entry(meta.agent_id.clone()).or_insert(0);
+        *agent_entry = agent_entry.saturating_add(cost_units);
 
         let tool_key = format!("{}:{}", meta.tool_server, meta.tool_name);
-        *self.tool_spent.entry(tool_key).or_insert(0) += cost_units;
+        let tool_entry = self.tool_spent.entry(tool_key).or_insert(0);
+        *tool_entry = tool_entry.saturating_add(cost_units);
     }
 
     /// Return the total amount spent so far.
@@ -300,6 +303,66 @@ mod tests {
         enforcer.record(&meta, 400);
         let result = enforcer.check(&meta, 200);
         assert!(matches!(result, Err(BudgetViolation::Tool { .. })));
+    }
+
+    #[test]
+    fn zero_cost_always_passes() {
+        let enforcer = BudgetEnforcer::new(make_policy());
+        let meta = make_meta("a1", "s1", "t1");
+        assert!(enforcer.check(&meta, 0).is_ok());
+    }
+
+    #[test]
+    fn record_with_very_large_numbers_saturates() {
+        let policy = BudgetPolicy {
+            max_total: MonetaryAmount {
+                units: u64::MAX,
+                currency: "USD".to_string(),
+            },
+            max_per_session: None,
+            max_per_agent: None,
+            max_per_tool: HashMap::new(),
+            currency: "USD".to_string(),
+        };
+        let mut enforcer = BudgetEnforcer::new(policy);
+        let meta = make_meta("a1", "s1", "t1");
+        enforcer.record(&meta, u64::MAX - 10);
+        enforcer.record(&meta, 20);
+        // Should saturate at u64::MAX, not overflow
+        assert_eq!(enforcer.total_spent(), u64::MAX);
+    }
+
+    #[test]
+    fn remaining_when_overspent_returns_zero() {
+        let policy = BudgetPolicy {
+            max_total: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            },
+            max_per_session: None,
+            max_per_agent: None,
+            max_per_tool: HashMap::new(),
+            currency: "USD".to_string(),
+        };
+        let mut enforcer = BudgetEnforcer::new(policy);
+        let meta = make_meta("a1", "s1", "t1");
+        // record() does not enforce budget; it just tracks spending
+        enforcer.record(&meta, 150);
+        // remaining() should saturate to 0
+        assert_eq!(enforcer.remaining(), 0);
+    }
+
+    #[test]
+    fn budget_violation_serde_roundtrip() {
+        let violation = BudgetViolation::Total {
+            limit_units: 1000,
+            current_units: 900,
+            requested_units: 200,
+            currency: "USD".to_string(),
+        };
+        let json = serde_json::to_string(&violation).unwrap();
+        let back: BudgetViolation = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, violation);
     }
 
     #[test]

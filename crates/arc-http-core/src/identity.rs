@@ -131,4 +131,93 @@ mod tests {
         assert_eq!(back.subject, "svc-agent");
         assert_eq!(back.agent_id.as_deref(), Some("agent-42"));
     }
+
+    #[test]
+    fn mtls_certificate_serde_roundtrip() {
+        let id = CallerIdentity {
+            subject: "CN=service.internal".to_string(),
+            auth_method: AuthMethod::MtlsCertificate {
+                subject_dn: "CN=service.internal,O=Acme".to_string(),
+                fingerprint: "abcdef1234567890".to_string(),
+            },
+            verified: true,
+            tenant: Some("acme-corp".to_string()),
+            agent_id: None,
+        };
+        let json = serde_json::to_string(&id).unwrap();
+        let back: CallerIdentity = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.subject, "CN=service.internal");
+        assert!(back.verified);
+        assert_eq!(back.tenant.as_deref(), Some("acme-corp"));
+        match &back.auth_method {
+            AuthMethod::MtlsCertificate {
+                subject_dn,
+                fingerprint,
+            } => {
+                assert_eq!(subject_dn, "CN=service.internal,O=Acme");
+                assert_eq!(fingerprint, "abcdef1234567890");
+            }
+            other => panic!("expected MtlsCertificate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cookie_auth_method_serde_roundtrip() {
+        let id = CallerIdentity {
+            subject: "cookie-user".to_string(),
+            auth_method: AuthMethod::Cookie {
+                cookie_name: "session_id".to_string(),
+                cookie_hash: "cookiehash123".to_string(),
+            },
+            verified: false,
+            tenant: None,
+            agent_id: None,
+        };
+        let json = serde_json::to_string(&id).unwrap();
+        let back: CallerIdentity = serde_json::from_str(&json).unwrap();
+        match &back.auth_method {
+            AuthMethod::Cookie {
+                cookie_name,
+                cookie_hash,
+            } => {
+                assert_eq!(cookie_name, "session_id");
+                assert_eq!(cookie_hash, "cookiehash123");
+            }
+            other => panic!("expected Cookie, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn different_identities_produce_different_hashes() {
+        let id1 = CallerIdentity {
+            subject: "user-a".to_string(),
+            auth_method: AuthMethod::Bearer {
+                token_hash: "hash1".to_string(),
+            },
+            verified: true,
+            tenant: None,
+            agent_id: None,
+        };
+        let id2 = CallerIdentity {
+            subject: "user-b".to_string(),
+            auth_method: AuthMethod::Bearer {
+                token_hash: "hash2".to_string(),
+            },
+            verified: true,
+            tenant: None,
+            agent_id: None,
+        };
+        let h1 = id1.identity_hash().unwrap();
+        let h2 = id2.identity_hash().unwrap();
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn anonymous_identity_serde_omits_optional_fields() {
+        let id = CallerIdentity::anonymous();
+        let json = serde_json::to_string(&id).unwrap();
+        // tenant and agent_id should be skipped because of skip_serializing_if
+        assert!(!json.contains("tenant"));
+        assert!(!json.contains("agent_id"));
+    }
 }
