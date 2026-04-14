@@ -1,11 +1,14 @@
 # Session Compliance Certificate
 
-**Status:** Draft | **Version:** 0.1.0 | **Schema:** `arc.session_compliance_certificate.v1`
+**Status:** Shipped | **Version:** 1.0.0 | **Schema:** `arc.session_compliance_certificate.v1`
+Normative spec: `spec/COMPLIANCE-CERTIFICATE.md`
 
-> **Status**: Design proposal. The certificate generation API
-> (`generate_compliance_certificate`) and verification API described here are
-> not yet implemented. This document specifies the target architecture for
-> session compliance certificates.
+> **Status**: The certificate generation and verification APIs described here
+> are implemented in `crates/arc-acp-proxy/src/compliance.rs`. The normative
+> specification for certificate structure, generation algorithm, abort errors,
+> and verification modes is `spec/COMPLIANCE-CERTIFICATE.md`. This document
+> is retained as a non-normative companion for design rationale, regulatory
+> mapping, and integration details.
 
 ## 1. Problem Statement
 

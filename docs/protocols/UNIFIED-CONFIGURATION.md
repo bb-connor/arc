@@ -1,13 +1,13 @@
 # Unified Configuration
 
-Status: **Draft**
+Status: **Shipped**
 Authors: ARC core team
+Normative spec: `spec/CONFIGURATION.md`
 
-> **Status note**: This document describes a proposed **runtime**
-> configuration system. The current repo already supports `arc_yaml` as a
-> policy format, but does **not** currently ship a full
-> `arc start --config arc.yaml` command. Read this file as target
-> architecture, not current CLI behavior.
+> **Status note**: This document describes the design rationale and migration
+> guide for the unified `arc.yaml` configuration system. The normative schema
+> and validation rules are defined in `spec/CONFIGURATION.md`. This document
+> is retained as a non-normative companion for context and history.
 
 ## 1. Problem Statement
 
