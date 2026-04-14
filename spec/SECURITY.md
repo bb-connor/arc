@@ -55,6 +55,12 @@ The required threats for the shipped ARC boundary are:
 | `native_channel_replay` | a captured native request or proof is replayed on the framed lane | native ARC |
 | `resource_exhaustion_dos` | memory, stream, or concurrency pressure denies service | all surfaces |
 | `delegation_chain_abuse` | an attacker widens, truncates, or otherwise abuses delegated authority | trust-control, kernel admission |
+| `ssrf_via_http_substrate` | an agent crafts tool invocations that target internal network endpoints through the HTTP substrate | HTTP substrate, kernel-to-tool transport |
+| `pii_phi_exposure` | a tool response leaks PII or PHI (SSN, MRN, ICD-10 codes, email, etc.) to the agent or downstream consumers | tool response pipeline |
+| `agent_velocity_abuse` | a single agent overwhelms the system by issuing requests across many capabilities faster than intended | all surfaces |
+| `cumulative_data_exfiltration` | an attacker exfiltrates data through many small requests that individually appear benign | session data flow |
+| `behavioral_sequence_attack` | an attacker chains tool invocations in dangerous sequences (e.g., execute then overwrite, or skip required initialization) | session tool sequence |
+| `wasm_guard_resource_exhaustion` | a malicious or buggy WASM guard module consumes unbounded CPU or memory | WASM guard runtime |
 
 ### 2.1 Capability Token Theft
 
@@ -228,6 +234,207 @@ Residual risk:
   system at every entry point
 - revocation completeness is only as strong as the resolved lineage available
   to the runtime
+
+### 2.7 SSRF via HTTP Substrate
+
+Attack:
+an agent crafts tool invocations that target internal network endpoints
+(RFC 1918 addresses, loopback, link-local, cloud metadata, Kubernetes service
+endpoints) through the HTTP substrate, bypassing network-level controls by
+routing requests through a trusted tool server.
+
+Existing controls:
+
+- the InternalNetworkGuard blocks egress to private, reserved, loopback,
+  link-local, cloud metadata, and Kubernetes addresses
+- DNS rebinding detection catches hostnames embedding private IP patterns
+- encoded IP detection blocks hex, decimal, and octal obfuscated addresses
+- IPv4-mapped IPv6 addresses are resolved and checked against IPv4 rules
+
+Required mitigations:
+
+- deployments exposing HTTP substrate endpoints **MUST** enable the
+  InternalNetworkGuard with DNS rebinding detection
+- operators **SHOULD** add deployment-specific internal hostnames to the
+  `extra_blocked_hosts` list
+- the guard **MUST** fail closed on any address parse ambiguity
+
+Residual risk:
+
+- DNS time-of-check/time-of-use gaps remain: a hostname that resolves to a
+  public address during guard evaluation may resolve to a private address
+  when the tool server makes the actual request
+- the guard operates on hostnames and IPs presented in tool arguments; it
+  does not inspect redirects that occur during tool execution
+
+### 2.8 PII/PHI Exposure in Responses
+
+Attack:
+a tool response contains personally identifiable information (PII) or
+protected health information (PHI) such as SSNs, medical record numbers,
+ICD-10 codes, email addresses, or credit card numbers, which the agent then
+exfiltrates or includes in outputs visible to unauthorized parties.
+
+Existing controls:
+
+- the ResponseSanitizationGuard scans responses for PII/PHI patterns with
+  configurable sensitivity levels and block/redact actions
+- pre-invocation scanning prevents PII in request arguments from reaching
+  tool servers
+- custom patterns can be added for deployment-specific sensitive data
+
+Required mitigations:
+
+- deployments handling healthcare or financial data **MUST** enable the
+  ResponseSanitizationGuard at `Medium` sensitivity or higher
+- operators **SHOULD** configure `Redact` mode rather than `Block` where
+  partial results are acceptable, to reduce information loss
+- operators **SHOULD** define custom patterns for any deployment-specific
+  identifiers (employee IDs, internal account numbers)
+
+Residual risk:
+
+- regex-based pattern detection is inherently incomplete; novel PII formats
+  or obfuscated values (base64-encoded SSNs, split across fields) may evade
+  detection
+- the ICD-10 pattern may produce false positives on short alphanumeric strings
+  in non-medical contexts
+- image or binary content in tool responses is not scanned
+
+### 2.9 Agent Velocity Abuse
+
+Attack:
+a single agent issues requests at a rate far exceeding intended usage, either
+to exhaust system resources, race condition exploit time-sensitive operations,
+or generate excessive billing across multiple capabilities.
+
+Existing controls:
+
+- the AgentVelocityGuard enforces per-agent and per-session rate limits using
+  token-bucket semantics with configurable burst factors
+- separate buckets per agent prevent one agent's exhaustion from affecting
+  others
+- separate buckets per session prevent cross-session token sharing
+
+Required mitigations:
+
+- multi-tenant deployments **MUST** configure per-agent rate limits
+- operators **SHOULD** set per-session limits to bound the damage from a
+  single compromised capability
+- operators **SHOULD** set burst factors close to 1.0 for high-value
+  operations to prevent burst abuse
+
+Residual risk:
+
+- rate limits are process-local; a multi-node deployment without shared state
+  allows an agent to consume its full budget on each node
+- an attacker controlling multiple agent identities can multiply the effective
+  rate by the number of identities
+
+### 2.10 Cumulative Data Exfiltration
+
+Attack:
+an attacker extracts sensitive data through many small, individually
+innocuous requests that cumulatively transfer a large volume of data out of
+the protected system. Each request appears benign to per-request guards.
+
+Existing controls:
+
+- the DataFlowGuard reads cumulative bytes-read and bytes-written totals
+  from the session journal and denies requests when configured limits are
+  exceeded
+- the DataTransferAdvisoryGuard provides early warning signals before hard
+  limits are hit
+- the session journal tracks all data flow with saturating arithmetic to
+  prevent overflow
+
+Required mitigations:
+
+- deployments with sensitive data stores **MUST** configure DataFlowGuard
+  limits appropriate to their data classification
+- operators **SHOULD** pair DataFlowGuard with DataTransferAdvisoryGuard
+  promotion rules to detect gradual exfiltration before the hard limit
+- operators **SHOULD** set `max_bytes_total` in addition to individual
+  read/write limits to catch mixed-mode exfiltration
+
+Residual risk:
+
+- data flow accounting is per-session; an attacker that establishes many
+  short sessions can circumvent per-session limits
+- byte counts reflect content-length, not semantic information density;
+  compressed data may carry more information than the byte count suggests
+- denied requests still count toward cumulative totals; the session is
+  effectively terminated once a limit is hit
+
+### 2.11 Behavioral Sequence Attacks
+
+Attack:
+an attacker chains tool invocations in dangerous sequences that bypass
+safety assumptions. Examples include executing arbitrary code and then
+overwriting audit logs, writing to sensitive paths without first reading
+the existing content, or repeating a destructive operation many times in
+succession.
+
+Existing controls:
+
+- the BehavioralSequenceGuard enforces four types of ordering constraints:
+  required predecessors, forbidden transitions, max consecutive invocations,
+  and required first tool
+- the session journal tracks the complete tool invocation sequence including
+  denied invocations
+
+Required mitigations:
+
+- operators **SHOULD** define forbidden transitions for known dangerous
+  sequences in their deployment (e.g., `bash` followed by `write_file`)
+- operators **SHOULD** require initialization tools as the first tool in
+  sessions that depend on setup state
+- operators **SHOULD** set max consecutive limits to prevent infinite loops
+  on destructive operations
+
+Residual risk:
+
+- the guard cannot prevent dangerous sequences that span multiple sessions
+- forbidden transitions only check the immediately preceding tool; a
+  dangerous pair separated by an innocent tool in between will not be caught
+- the guard operates on tool names, not on the semantic content of the
+  invocations
+
+### 2.12 WASM Guard Resource Exhaustion
+
+Attack:
+a malicious or buggy WASM guard module enters an infinite loop, allocates
+unbounded memory, or performs excessive computation, consuming host resources
+and denying service to the kernel.
+
+Existing controls:
+
+- WASM guards execute under a fuel budget (default 10,000,000 units) that
+  limits CPU consumption per invocation
+- fuel exhaustion immediately terminates the guest and the invocation is
+  treated as denied (fail-closed)
+- WASM guards execute in isolated linear memory with no access to host
+  filesystem, network, or kernel state
+- no host callback functions are exposed to the guest
+
+Required mitigations:
+
+- operators **MUST** set fuel limits appropriate to the complexity of their
+  custom guards; the default of 10,000,000 units is suitable for simple
+  pattern-matching guards
+- operators **SHOULD** test WASM guards in advisory mode before enabling
+  them as blocking guards in production
+- operators **SHOULD** monitor fuel consumption to detect guards that
+  consistently approach their fuel limit
+
+Residual risk:
+
+- linear memory allocation within the fuel budget is bounded by the WASM
+  runtime's memory limits but not explicitly capped by ARC; a guard that
+  allocates large amounts of memory within its fuel budget may increase host
+  memory pressure
+- compilation of WASM modules is not fuel-metered; a pathologically complex
+  module could consume significant CPU during compilation
 
 ## 3. Transport Security Requirements
 
