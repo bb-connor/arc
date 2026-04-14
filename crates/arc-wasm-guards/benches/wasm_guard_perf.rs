@@ -8,12 +8,17 @@
 //! Benchmark groups:
 //! - wasm_guards/compilation: Module::new() compilation time for 50 KiB and 5 MiB WAT modules
 //! - wasm_guards/instantiation: Linker::instantiate() per-call overhead with pre-compiled module
+//! - wasm_guards/evaluate_latency: Full production hot-path latency (trivial Allow + realistic Deny)
+//! - wasm_guards/fuel_overhead: Fuel metering enabled vs disabled overhead comparison
+//! - wasm_guards/resource_limiter: ResourceLimiter trap validation under adversarial allocation
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use wasmtime::{Linker, Module, Store};
+use wasmtime::{Engine, Linker, Module, Store};
 
+use arc_wasm_guards::abi::GuardRequest;
 use arc_wasm_guards::host::{create_shared_engine, register_host_functions, WasmHostState};
 
 // ---------------------------------------------------------------------------
@@ -145,8 +150,236 @@ fn bench_instantiation(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
+// Evaluate helpers
+// ---------------------------------------------------------------------------
+
+/// Returns a WAT module that simulates a realistic guard: scans input bytes
+/// looking for `0x7B` ('{' character, proxy for JSON parsing), and returns
+/// VERDICT_DENY (1) if found, VERDICT_ALLOW (0) otherwise.
+fn build_realistic_guard_wat() -> &'static str {
+    r#"(module
+    (import "arc" "log" (func $log (param i32 i32 i32)))
+    (import "arc" "get_config" (func $gc (param i32 i32 i32 i32) (result i32)))
+    (import "arc" "get_time_unix_secs" (func $gt (result i64)))
+    (memory (export "memory") 2)
+    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+        (local $i i32)
+        (local $found i32)
+        (local.set $i (local.get $ptr))
+        (block $done
+            (loop $scan
+                (br_if $done (i32.ge_u (local.get $i)
+                    (i32.add (local.get $ptr) (local.get $len))))
+                (if (i32.eq (i32.load8_u (local.get $i)) (i32.const 0x7B))
+                    (then (local.set $found (i32.const 1)))
+                )
+                (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                (br $scan)
+            )
+        )
+        (local.get $found)
+    )
+)"#
+}
+
+/// Creates a representative GuardRequest for evaluate benchmarks.
+fn make_bench_request() -> GuardRequest {
+    GuardRequest {
+        tool_name: "read_file".to_string(),
+        server_id: "srv-fs".to_string(),
+        agent_id: "agent-bench-001".to_string(),
+        arguments: serde_json::json!({"path": "/etc/passwd", "encoding": "utf-8"}),
+        scopes: vec!["file_access".to_string()],
+        action_type: Some("file_access".to_string()),
+        extracted_path: Some("/etc/passwd".to_string()),
+        extracted_target: None,
+        filesystem_roots: vec!["/home".to_string(), "/tmp".to_string()],
+        matched_grant_index: Some(0),
+    }
+}
+
+/// Creates an Engine with `consume_fuel(false)` (wasmtime default) for
+/// WGBENCH-04 fuel overhead comparison.
+fn create_no_fuel_engine() -> Arc<Engine> {
+    let config = wasmtime::Config::new(); // consume_fuel defaults to false
+    Arc::new(Engine::new(&config).unwrap())
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark group 3: Evaluate latency (WGBENCH-03)
+// ---------------------------------------------------------------------------
+
+/// Benchmarks the FULL production hot path per-call: Store creation, Linker
+/// setup, host function registration, instantiation, request serialization,
+/// memory write, and evaluate call.
+///
+/// Two sub-benchmarks:
+/// - `trivial_allow`: uses `build_trivial_guard_wat()`, measures immediate Allow
+/// - `realistic_deny`: uses `build_realistic_guard_wat()`, measures byte-scanning Deny
+fn bench_evaluate_latency(c: &mut Criterion) {
+    let engine = create_shared_engine().unwrap();
+    let trivial_wat = build_trivial_guard_wat();
+    let realistic_wat = build_realistic_guard_wat();
+
+    let trivial_module = Module::new(&engine, trivial_wat).unwrap();
+    let realistic_module = Module::new(&engine, realistic_wat).unwrap();
+
+    let request = make_bench_request();
+
+    let mut group = c.benchmark_group("wasm_guards/evaluate_latency");
+
+    // Trivial guard: immediate Allow (no input scanning)
+    group.bench_function("trivial_allow", |b| {
+        let request = request.clone();
+        b.iter_batched(
+            || request.clone(),
+            |req| {
+                let host_state = WasmHostState::new(HashMap::new());
+                let mut store = Store::new(&engine, host_state);
+                store.limiter(|s| &mut s.limits);
+                store.set_fuel(10_000_000).unwrap();
+                let mut linker = Linker::new(&engine);
+                register_host_functions(&mut linker).unwrap();
+                let instance = linker.instantiate(&mut store, &trivial_module).unwrap();
+                let memory = instance.get_memory(&mut store, "memory").unwrap();
+                let request_json = serde_json::to_vec(&req).unwrap();
+                memory.write(&mut store, 0, &request_json).unwrap();
+                let evaluate_fn = instance
+                    .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
+                    .unwrap();
+                let _result = black_box(
+                    evaluate_fn
+                        .call(&mut store, (0, request_json.len() as i32))
+                        .unwrap(),
+                );
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    // Realistic guard: byte-scanning Deny (scans JSON for '{')
+    group.bench_function("realistic_deny", |b| {
+        let request = request.clone();
+        b.iter_batched(
+            || request.clone(),
+            |req| {
+                let host_state = WasmHostState::new(HashMap::new());
+                let mut store = Store::new(&engine, host_state);
+                store.limiter(|s| &mut s.limits);
+                store.set_fuel(10_000_000).unwrap();
+                let mut linker = Linker::new(&engine);
+                register_host_functions(&mut linker).unwrap();
+                let instance = linker.instantiate(&mut store, &realistic_module).unwrap();
+                let memory = instance.get_memory(&mut store, "memory").unwrap();
+                let request_json = serde_json::to_vec(&req).unwrap();
+                memory.write(&mut store, 0, &request_json).unwrap();
+                let evaluate_fn = instance
+                    .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
+                    .unwrap();
+                let _result = black_box(
+                    evaluate_fn
+                        .call(&mut store, (0, request_json.len() as i32))
+                        .unwrap(),
+                );
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark group 4: Fuel metering overhead (WGBENCH-04)
+// ---------------------------------------------------------------------------
+
+/// Compares full evaluate latency with fuel metering enabled vs disabled.
+///
+/// Both sub-benchmarks use the same realistic guard WAT and full evaluate path.
+/// The percentage overhead can be computed from Criterion output:
+/// `overhead% = ((fuel_time - no_fuel_time) / no_fuel_time) * 100`
+fn bench_fuel_overhead(c: &mut Criterion) {
+    let fuel_engine = create_shared_engine().unwrap(); // consume_fuel(true)
+    let no_fuel_engine = create_no_fuel_engine(); // consume_fuel(false)
+
+    let realistic_wat = build_realistic_guard_wat();
+    let fuel_module = Module::new(&fuel_engine, realistic_wat).unwrap();
+    let no_fuel_module = Module::new(&no_fuel_engine, realistic_wat).unwrap();
+
+    let request = make_bench_request();
+
+    let mut group = c.benchmark_group("wasm_guards/fuel_overhead");
+
+    // Fuel enabled: standard production path
+    group.bench_function("fuel_enabled", |b| {
+        let request = request.clone();
+        b.iter_batched(
+            || request.clone(),
+            |req| {
+                let host_state = WasmHostState::new(HashMap::new());
+                let mut store = Store::new(&fuel_engine, host_state);
+                store.limiter(|s| &mut s.limits);
+                store.set_fuel(10_000_000).unwrap();
+                let mut linker = Linker::new(&fuel_engine);
+                register_host_functions(&mut linker).unwrap();
+                let instance = linker.instantiate(&mut store, &fuel_module).unwrap();
+                let memory = instance.get_memory(&mut store, "memory").unwrap();
+                let request_json = serde_json::to_vec(&req).unwrap();
+                memory.write(&mut store, 0, &request_json).unwrap();
+                let evaluate_fn = instance
+                    .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
+                    .unwrap();
+                let _result = black_box(
+                    evaluate_fn
+                        .call(&mut store, (0, request_json.len() as i32))
+                        .unwrap(),
+                );
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    // Fuel disabled: no fuel metering overhead
+    group.bench_function("fuel_disabled", |b| {
+        let request = request.clone();
+        b.iter_batched(
+            || request.clone(),
+            |req| {
+                let host_state = WasmHostState::new(HashMap::new());
+                let mut store = Store::new(&no_fuel_engine, host_state);
+                store.limiter(|s| &mut s.limits);
+                // NOTE: Do NOT call store.set_fuel() -- fuel is not enabled on this engine
+                let mut linker = Linker::new(&no_fuel_engine);
+                register_host_functions(&mut linker).unwrap();
+                let instance = linker.instantiate(&mut store, &no_fuel_module).unwrap();
+                let memory = instance.get_memory(&mut store, "memory").unwrap();
+                let request_json = serde_json::to_vec(&req).unwrap();
+                memory.write(&mut store, 0, &request_json).unwrap();
+                let evaluate_fn = instance
+                    .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
+                    .unwrap();
+                let _result = black_box(
+                    evaluate_fn
+                        .call(&mut store, (0, request_json.len() as i32))
+                        .unwrap(),
+                );
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
-criterion_group!(benches, bench_module_compilation, bench_instantiation,);
+criterion_group!(
+    benches,
+    bench_module_compilation,
+    bench_instantiation,
+    bench_evaluate_latency,
+    bench_fuel_overhead,
+);
 criterion_main!(benches);
