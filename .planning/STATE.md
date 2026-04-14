@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 373-01-PLAN.md
-last_updated: "2026-04-14T20:52:15.626Z"
+stopped_at: Completed 373-02-PLAN.md
+last_updated: "2026-04-14T21:09:07.788Z"
 last_activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
 progress:
   total_phases: 342
-  completed_phases: 250
+  completed_phases: 251
   total_plans: 725
-  completed_plans: 742
+  completed_plans: 745
   percent: 100
 ---
 
@@ -101,6 +101,7 @@ Progress: [##########] 100%
 - v3.12 exists specifically to close that credibility gap. It is the active
   corrective lane even though v4.0 was already planned in parallel and v2.83
   remains locally unarchived.
+- [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 
 ### Pending Todos
 
@@ -125,13 +126,14 @@ Progress: [##########] 100%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 373 (in progress)
-Plan: 01 of 2 complete
-Status: Plan 01 complete -- WasmHostState, shared Arc<Engine>, three host
-functions (arc.log, arc.get_config, arc.get_time_unix_secs) implemented and
-tested. Plan 02 (arc_alloc/arc_deny_reason guest export detection) is next.
-Last activity: 2026-04-14 -- completed 373-01 host foundation plan with 9
-WAT-based tests, refactored WasmtimeBackend to Store<WasmHostState>
+Phase: 373 (complete)
+Plan: 02 of 2 complete
+Status: Phase 373 complete -- WasmHostState, shared Arc<Engine>, three host
+functions, arc_alloc guest allocator probing with offset-0 fallback, and
+arc_deny_reason structured deny reason extraction with legacy NUL-string
+fallback. All 32 crate tests pass, clippy clean.
+Last activity: 2026-04-14 -- completed 373-02 guest export detection plan with
+8 WAT-based tests covering arc_alloc and arc_deny_reason code paths
 
 
 ## v4.1 Guard SDK and Developer Experience
@@ -144,7 +146,7 @@ colliding with active v3.12 phases
 
 ## Session Continuity
 
-Last session: 2026-04-14T20:52:15.611Z
-Stopped at: Completed 373-01-PLAN.md
-Next action: Execute 373-02-PLAN.md (arc_alloc/arc_deny_reason guest export detection)
+Last session: 2026-04-14T21:09:07.743Z
+Stopped at: Completed 373-02-PLAN.md
+Next action: Phase 373 complete; advance to Phase 374 (WASM security enrichment)
 Resume file: None

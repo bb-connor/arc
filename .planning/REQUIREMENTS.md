@@ -2975,8 +2975,8 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 - [x] **WGRT-03**: WASM guards can call `arc.log(level, msg_ptr, msg_len)` host function to emit structured tracing log lines
 - [x] **WGRT-04**: WASM guards can call `arc.get_config(key_ptr, key_len, val_out_ptr, val_out_len)` host function to read manifest config values
 - [x] **WGRT-05**: WASM guards can call `arc.get_time_unix_secs()` host function to read wall-clock time
-- [ ] **WGRT-06**: Host checks for guest-exported `arc_alloc` and uses it for request memory allocation, falling back to offset-0 write when absent
-- [ ] **WGRT-07**: Host checks for guest-exported `arc_deny_reason` and uses it to read structured deny reasons, falling back to offset-64K NUL-terminated string when absent
+- [x] **WGRT-06**: Host checks for guest-exported `arc_alloc` and uses it for request memory allocation, falling back to offset-0 write when absent
+- [x] **WGRT-07**: Host checks for guest-exported `arc_deny_reason` and uses it to read structured deny reasons, falling back to offset-64K NUL-terminated string when absent
 
 ### Security
 
@@ -3044,8 +3044,8 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGRT-03 | Phase 373 | Complete |
 | WGRT-04 | Phase 373 | Complete |
 | WGRT-05 | Phase 373 | Complete |
-| WGRT-06 | Phase 373 | Pending |
-| WGRT-07 | Phase 373 | Pending |
+| WGRT-06 | Phase 373 | Complete |
+| WGRT-07 | Phase 373 | Complete |
 | WGSEC-01 | Phase 374 | Pending |
 | WGSEC-02 | Phase 374 | Pending |
 | WGSEC-03 | Phase 374 | Pending |
