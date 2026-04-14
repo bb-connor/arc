@@ -1,4 +1,78 @@
-// Stub -- allocator will be implemented after tests are written.
+//! Vec-based guest allocator for the ARC WASM guard ABI.
+//!
+//! The host runtime calls `arc_alloc` to reserve space in guest linear memory
+//! before writing the serialized `GuardRequest` JSON. The guest calls
+//! `arc_free` to release the allocation when done.
+//!
+//! This allocator keeps each `Vec<u8>` alive in thread-local storage so the
+//! underlying memory is not reclaimed before the host writes into it.
+
+use std::cell::RefCell;
+
+thread_local! {
+    static ALLOCATIONS: RefCell<Vec<Vec<u8>>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Allocate `size` bytes of zeroed memory in the guest and return a pointer.
+///
+/// Returns 0 if `size <= 0` or if the allocation fails for any reason.
+/// The host probes this export via `get_typed_func::<i32, i32>`.
+#[no_mangle]
+pub extern "C" fn arc_alloc(size: i32) -> i32 {
+    if size <= 0 {
+        return 0;
+    }
+    let buf = vec![0u8; size as usize];
+    let ptr = buf.as_ptr() as usize;
+    // On wasm32, usize is 32 bits so this cast is lossless.
+    // On 64-bit native targets (used for testing), truncation may occur
+    // but the allocator logic itself is still exercised correctly.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+    let ptr_i32 = ptr as i32;
+    ALLOCATIONS.with(|allocs| {
+        if let Ok(mut v) = allocs.try_borrow_mut() {
+            v.push(buf);
+        }
+    });
+    ptr_i32
+}
+
+/// Free a previously allocated region.
+///
+/// Removes the matching `Vec` from thread-local storage. If no match is
+/// found (e.g., double-free or invalid pointer), this is a silent no-op.
+#[no_mangle]
+pub extern "C" fn arc_free(ptr: i32, size: i32) {
+    if ptr <= 0 || size <= 0 {
+        return;
+    }
+    ALLOCATIONS.with(|allocs| {
+        if let Ok(mut v) = allocs.try_borrow_mut() {
+            // Find and remove the allocation whose base pointer and length match.
+            #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+            let idx = v.iter().position(|buf| {
+                buf.as_ptr() as usize as i32 == ptr && buf.len() as i32 == size
+            });
+            if let Some(i) = idx {
+                v.swap_remove(i);
+            }
+        }
+    });
+}
+
+/// Clear all tracked allocations (for testing).
+#[cfg(test)]
+fn reset_allocations() {
+    ALLOCATIONS.with(|allocs| {
+        if let Ok(mut v) = allocs.try_borrow_mut() {
+            v.clear();
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
