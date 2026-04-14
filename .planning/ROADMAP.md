@@ -455,7 +455,7 @@ tooling.
 **Success Criteria** (what must be TRUE):
   1. A multi-chain qualification report documents EVM settlement, Bitcoin OTS anchoring, and Solana memo publication all passing with evidence (tx hashes, block numbers)
   2. An operator runbook covers how to enable web3 settlement, configure chain endpoints, monitor transaction status, and handle failures
-**Plans**: TBD
+**Plans**: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
 
 ---
 
@@ -10734,7 +10734,7 @@ Plans:
   3. After a WASM guard evaluates, the fuel consumed and the guard manifest SHA-256 hash are both available in receipt metadata for the kernel to sign
   4. Guard config values from the manifest's `config:` block are loaded into WasmHostState and readable by the guest via `arc.get_config`
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
 
 ### Phase 376: Benchmark Validation
 **Goal**: Performance characteristics of the WASM guard runtime are measured and validated against the thresholds defined in the v1 decision record
@@ -10755,7 +10755,7 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 373 | 2/2 | Complete    | 2026-04-14 |
-| 374 | v4.0 | Security Hardening and Request Enrichment | Not started |
+| 374 | 1/2 | In Progress|  |
 | 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
 | 376 | v4.0 | Benchmark Validation | Not started |
 
@@ -10891,7 +10891,7 @@ depends on the authoritative runtime behavior defined by the earlier ones.
   2. `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
   3. Orchestrated bridge executions emit signed receipts or truthful receipt references that preserve origin protocol and bridge lineage
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
 
 ### Phase 391: Authoritative Edge Unification
 **Goal**: Move ACP and outward A2A/ACP authority onto the orchestrated kernel path and quarantine non-authoritative compatibility helpers

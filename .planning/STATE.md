@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: completed
-stopped_at: Completed 373-02-PLAN.md
-last_updated: "2026-04-14T21:12:01.515Z"
-last_activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
+status: v3.13 is active. The generic cross-protocol orchestrator slice now has
+stopped_at: Completed 374-01-PLAN.md (WASM guard security hardening)
+last_updated: "2026-04-14T21:34:54.562Z"
+last_activity: 2026-04-14 -- created phase 390 context and plan artifacts for
 progress:
-  total_phases: 342
+  total_phases: 347
   completed_phases: 251
-  total_plans: 725
-  completed_plans: 745
-  percent: 100
+  total_plans: 728
+  completed_plans: 748
+  percent: 0
 ---
 
 # Project State
@@ -24,24 +24,25 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v3.12 Cross-Protocol Integrity and Truth Completion is
-complete locally; the next repo-management step is milestone archival/closeout
-before resuming the parallel v4.0 lane.
+**Current focus:** v3.13 Universal Orchestration Closure is now the active
+planning lane. Phase `390` has context and one executable plan, so the
+immediate task is implementation of the shared orchestrator substrate while
+keeping v3.12 in the locally complete pending-archive state and v4.0 as a
+parallel strategic lane.
 
 ## Current Position
 
-Phase: 381 (complete locally)
-Plan: 01 complete; milestone ready for closeout
-Status: all v3.12 corrective work is complete locally. ACP live-path
-cryptographic enforcement is in place, the outward A2A/ACP edges default to
-kernel-backed execution with explicit compatibility helpers, the remaining
-operational parity gaps are closed, and the docs/planning stack now reflects
-the narrowed truthful ARC claim.
-Last activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
-remaining roadmap/planning metadata drift, and confirmed the
-milestone-ready-for-closeout state across the planning stack.
+Phase: 390 (planned, execution not started)
+Plan: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
+Status: v3.13 is active. The generic cross-protocol orchestrator slice now has
+one concrete implementation plan covering shared bridge contracts,
+attenuation, receipt-lineage tracing, and first adoption in the A2A and ACP
+authoritative paths.
+Last activity: 2026-04-14 -- created phase 390 context and plan artifacts for
+the cross-protocol orchestrator, and kept v3.12 explicitly in the locally
+complete pending-archive state.
 
-Progress: [##########] 100%
+Progress: [----------] 0%
 
 ## Performance Metrics
 
@@ -50,7 +51,7 @@ Progress: [##########] 100%
 - v2.0 completed: 6 phases, 19 plans
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
-- v3.0-v3.12: 59 phases planned across 13 milestones
+- v3.0-v3.13: 64 phases planned across 14 milestones
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 - v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
@@ -85,8 +86,9 @@ Progress: [##########] 100%
   than introducing a second demo stack before the Docker milestone lands.
 - Phase `310` anchored the tutorial and framework examples to the same hosted
   HTTP edge topology rather than reviving the old stdio demo path.
-- v4.0 WASM Guard Runtime Completion runs in parallel with the v3.12
-  corrective lane (and remains independent from the unfinished v2.83 closeout).
+- v4.0 WASM Guard Runtime Completion runs in parallel with the v3.13
+  orchestration-closure lane (and remains independent from the unfinished
+  v2.83 closeout).
   Design authority is `docs/guards/05-V1-DECISION.md`. ABI is raw core-WASM
   (not WIT), stateless per-call Store, HushSpec-first pipeline order.
 - Phase 373-01 established the WasmHostState pattern: per-invocation fresh
@@ -98,24 +100,31 @@ Progress: [##########] 100%
   universal cross-protocol governance kernel" claim still requires ACP
   cryptographic enforcement, truthful outward-edge mediation, operational
   parity, and repo-wide truth reconciliation.
-- v3.12 exists specifically to close that credibility gap. It is the active
-  corrective lane even though v4.0 was already planned in parallel and v2.83
-  remains locally unarchived.
+- v3.12 closed the first credibility gap and established the narrow truthful
+  ARC claim, but the follow-on review found four remaining closures: generic
+  orchestration, authoritative edge unification, bridge-fidelity truth, and
+  late-v3 ledger reconciliation.
+- v3.13 exists specifically to close those four remaining gaps even though
+  v4.0 was already planned in parallel and v2.83 remains locally unarchived.
+- Phase `390` will introduce a reusable cross-protocol runtime home instead of
+  embedding the orchestrator inside either outward edge crate, because the
+  remaining gap is split authority, not missing edge-local helper methods.
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
+- [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
+- [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
 
 ### Pending Todos
 
-- Close and archive `v3.12` now that phases `377` through `381` are complete
-  locally.
-- Close or explicitly defer the remaining `v2.83` coverage / qualification
-  loose ends once the repo's top-level truth narrative is stable.
-- Resume `v4.0` planning/execution after the v3.12 corrective lane no longer
-  competes with the repo's active truth narrative.
+- Execute Phase `390` plan `01` (`Shared Orchestrator Substrate and First Edge
+  Adoption`) as the first v3.13 implementation slice.
+- Archive `v3.12` now that phases `377` through `381` are complete locally.
+- Reconcile the remaining `v3.9`-`v3.11` ledger truth debt under Phase `393`.
+- Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
 - `v3.12` is complete locally but not yet archived, so the repo still carries
-  an active-milestone marker until closeout is performed.
+  milestone-closeout debt alongside the new v3.13 planning lane.
 - `v2.83` is still locally incomplete, so it should be explicitly archived or
   deferred later instead of silently remaining the repo's "active" milestone.
 - `v4.0` already reserved phases `373-376`, so `v3.12` begins at `377`; future
@@ -141,12 +150,12 @@ Last activity: 2026-04-14 -- completed 373-02 guest export detection plan with
 Phase: 382 (not started)
 Plan: --
 Status: Roadmap created; phases 382-385 defined; depends on v4.0 completion
-Last activity: 2026-04-14 -- v4.1 roadmap renumbered to 382-385 to avoid
-colliding with active v3.12 phases
+Last activity: 2026-04-14 -- v3.13 was started from the post-v3 review, with
+phases 390-394 reserved after the v4.x placeholder ranges
 
 ## Session Continuity
 
-Last session: 2026-04-14T21:09:07.743Z
-Stopped at: Completed 373-02-PLAN.md
-Next action: Phase 373 complete; advance to Phase 374 (WASM security enrichment)
+Last session: 2026-04-14T21:34:54.535Z
+Stopped at: Completed 374-01-PLAN.md (WASM guard security hardening)
+Next action: `/gsd:execute-phase 390` to implement the shared cross-protocol orchestrator substrate
 Resume file: None

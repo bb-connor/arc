@@ -1,11 +1,11 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v2.82 Normative Protocol Specification and
-Conformance
-(completed locally 2026-04-13)
-**Active milestone:** v3.12 Cross-Protocol Integrity and Truth Completion
-**Planned milestones:** v3.0 through v3.12 (Universal Security Kernel era)
+**Latest completed milestone:** v3.12 Cross-Protocol Integrity and Truth
+Completion
+(completed locally 2026-04-14; pending archival)
+**Active milestone:** v3.13 Universal Orchestration Closure
+**Planned milestones:** v3.0 through v3.13 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -938,7 +938,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | FINAL-11 | Phase 372 | Complete |
 
 **Coverage:**
-- Universal security kernel requirements (v3.0-v3.12): 164 total, 164 mapped, 0 unmapped
+- Universal security kernel requirements (v3.0-v3.13): 179 total, 179 mapped, 0 unmapped
 
 ## Out of Scope (v3.x)
 
@@ -957,7 +957,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after adding v3.12 cross-protocol integrity and truth completion requirements*
+*Last updated: 2026-04-14 after adding v3.13 universal orchestration closure requirements*
 
 ## Historical Milestone Requirement Snapshots
 
@@ -2962,6 +2962,83 @@ forces the repo/docs/planning story to match the live code.
 *Requirements defined: 2026-04-14*
 *Last updated: 2026-04-14 after completing milestone v3.12 Cross-Protocol Integrity and Truth Completion locally*
 
+## v3.13 Universal Orchestration Closure
+
+Closes the remaining gap between ARC's shipped kernel/substrate breakthrough
+and the full original vision. This milestone implements the generic
+cross-protocol orchestrator, unifies authoritative edge paths, upgrades bridge
+fidelity semantics to truthful publication-gating behavior, and reconciles the
+late-v3 ledger and older vision material with the claim gate ARC can actually
+defend.
+
+### Cross-Protocol Orchestration
+
+- [ ] **ORCH-01**: A reusable `CrossProtocolOrchestrator` exists as the default runtime for bridged protocol execution instead of edge-specific bespoke authority flows
+- [ ] **ORCH-02**: `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
+- [ ] **ORCH-03**: Orchestrated bridge executions emit signed receipts or truthful receipt references that preserve origin protocol and bridge lineage across hops
+
+### Authoritative Edge Unification
+
+- [ ] **AUTH-01**: ACP authoritative enforcement routes through a kernel-backed service or guard pipeline rather than local token verification logic alone
+- [ ] **AUTH-02**: A2A and ACP passthrough helpers are quarantined to explicit compatibility/test surfaces and cannot be confused with default authoritative execution
+- [ ] **AUTH-03**: Permission-preview APIs remain explicitly non-authoritative and cannot satisfy receipt-bearing execution claims
+
+### Fidelity and Publication Gating
+
+- [ ] **FID-01**: Bridge fidelity implements `Lossless`, `Adapted { caveats }`, and `Unsupported { reason }` semantics instead of heuristic `Full/Partial/Degraded` labels
+- [ ] **FID-02**: Unsupported bridges are not auto-published, and adapted bridges surface caveats in outward metadata and docs
+- [ ] **FID-03**: Streaming, cancellation, permission-prompt, and partial-output semantics are tested and mapped through fidelity rules rather than side-effect heuristics alone
+
+### Ledger and Narrative Reconciliation
+
+- [ ] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
+- [ ] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, and true plan counts
+- [ ] **TRUTH-05**: Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
+
+### Qualification
+
+- [ ] **UPGRADE-01**: End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops
+- [ ] **UPGRADE-02**: Operator-facing claim-gate docs state the upgraded claim ARC can make after orchestration and edge unification land, plus the remaining non-goals
+- [ ] **UPGRADE-03**: Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, and receipt continuity under real runtime flows
+
+## v3.13 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| New economic / liability marketplace claims | Follows only after orchestrated governance is real and operator evidence exists |
+| Full dynamic or intent-aware governance | Separate future layer after deterministic orchestration closure |
+| Net-new protocol adapters beyond MCP/A2A/ACP/OpenAI/HTTP | Close authority split and fidelity truth on existing surfaces first |
+| v4.x WASM guard SDK / WIT work | Parallel strategic lane, not part of this closure milestone |
+
+## v3.13 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| ORCH-01 | Phase 390 | Planned |
+| ORCH-02 | Phase 390 | Planned |
+| ORCH-03 | Phase 390 | Planned |
+| AUTH-01 | Phase 391 | Planned |
+| AUTH-02 | Phase 391 | Planned |
+| AUTH-03 | Phase 391 | Planned |
+| FID-01 | Phase 392 | Planned |
+| FID-02 | Phase 392 | Planned |
+| FID-03 | Phase 392 | Planned |
+| LEDGER-01 | Phase 393 | Planned |
+| LEDGER-02 | Phase 393 | Planned |
+| TRUTH-05 | Phase 393 | Planned |
+| UPGRADE-01 | Phase 394 | Planned |
+| UPGRADE-02 | Phase 394 | Planned |
+| UPGRADE-03 | Phase 394 | Planned |
+
+**Coverage:**
+- v3.13 requirements: 15 total
+- Mapped to phases: 15
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-14*
+*Last updated: 2026-04-14 after defining milestone v3.13 Universal Orchestration Closure*
+
 ## v4.0 WASM Guard Runtime Completion
 
 Completes the arc-wasm-guards host-side runtime that Phase 347 scaffolded.
@@ -2980,9 +3057,9 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Security
 
-- [ ] **WGSEC-01**: ResourceLimiter caps guest linear memory growth (configurable, default 16 MiB)
-- [ ] **WGSEC-02**: Module import validation rejects WASM modules that import functions outside the `arc` namespace (no WASI, no unknown imports)
-- [ ] **WGSEC-03**: Module size is validated at load time against a configurable maximum
+- [x] **WGSEC-01**: ResourceLimiter caps guest linear memory growth (configurable, default 16 MiB)
+- [x] **WGSEC-02**: Module import validation rejects WASM modules that import functions outside the `arc` namespace (no WASI, no unknown imports)
+- [x] **WGSEC-03**: Module size is validated at load time against a configurable maximum
 
 ### Guard Request Enrichment
 
@@ -3046,9 +3123,9 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGRT-05 | Phase 373 | Complete |
 | WGRT-06 | Phase 373 | Complete |
 | WGRT-07 | Phase 373 | Complete |
-| WGSEC-01 | Phase 374 | Pending |
-| WGSEC-02 | Phase 374 | Pending |
-| WGSEC-03 | Phase 374 | Pending |
+| WGSEC-01 | Phase 374 | Complete |
+| WGSEC-02 | Phase 374 | Complete |
+| WGSEC-03 | Phase 374 | Complete |
 | WGREQ-01 | Phase 374 | Pending |
 | WGREQ-02 | Phase 374 | Pending |
 | WGREQ-03 | Phase 374 | Pending |
