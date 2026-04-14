@@ -11043,7 +11043,10 @@ crate)
   4. The SDK deserializes `GuardRequest` from a `(ptr, len)` pair in linear memory and encodes `GuardVerdict` back to the host without the guard author handling raw memory
   5. When a guard returns `GuardVerdict::deny(reason)`, the SDK exports `arc_deny_reason` with the structured reason string readable by the host
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 382-01-PLAN.md -- crate scaffold, ABI types (GuardRequest, GuardVerdict), Vec-based guest allocator (arc_alloc, arc_free)
+- [ ] 382-02-PLAN.md -- typed host function bindings (log, get_config, get_time), ABI glue (read_request, encode_verdict, arc_deny_reason)
 
 ### Phase 383: Proc Macro, Example Guards, and Integration Tests
 **Goal**: Guard authors write a single annotated function and the proc macro generates all ABI exports; example guards demonstrate the SDK surface; integration tests prove the compiled WASM loads and evaluates correctly in the host runtime
