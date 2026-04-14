@@ -22,29 +22,35 @@ security, regulatory compliance, and portable trust.
 **Latest completed milestone:** v2.82 Normative Protocol Specification and
 Conformance
 (completed locally 2026-04-13)
-**Active milestone:** v2.83 Coverage, Hardening, and Production Qualification
-(phases 315-318)
+**Active milestone:** v3.12 Cross-Protocol Integrity and Truth Completion
+(phases 377-381)
+**Parallel milestone:** v4.0 WASM Guard Runtime Completion (phases 373-376)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
 Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
-**Planned milestones:** v3.0 through v3.11 (Universal Security Kernel era)
+**Planned milestones:** v3.0 through v3.12 (Universal Security Kernel era)
 **Planned milestones:** v4.0 through v4.2 (WASM Guard Plugin Ecosystem)
-**Next GSD action:** complete v2.83 phases 316-318; v4.0 can execute in
-parallel (no dependency on v2.83 or v3.x)
+**Next GSD action:** `/gsd:plan-phase 377` to begin ACP live-path
+cryptographic enforcement; v4.0 remains parallel and v2.83 remains an
+unarchived local qualification lane
 
-## Current Milestone: v4.0 WASM Guard Runtime Completion
+## Current Milestone: v3.12 Cross-Protocol Integrity and Truth Completion
 
-**Goal:** Complete the arc-wasm-guards host-side runtime that Phase 347
-scaffolded, turning the WASM guard crate from a working skeleton into a
-production-ready, HushSpec-aware guard execution surface.
+**Goal:** Close the credibility gap between ARC's shipped kernel/substrate
+breakthrough and the broader cross-protocol governance vision by finishing ACP
+live-path cryptographic enforcement, making outward A2A/ACP edges genuinely
+kernel-mediated, completing the remaining operational parity gaps, and forcing
+the repo/docs/planning stack to tell one truthful story.
 
 **Target features:**
-- Shared wasmtime Engine, host state, and host function imports
-- Guard manifest format with integrity verification
-- Enriched GuardRequest with host-extracted action context
-- Memory limits, import validation, and security hardening
-- Startup wiring via arc-policy compiler with correct pipeline ordering
-- Receipt enrichment with fuel and manifest metadata
-- Benchmark validation of the execution envelope
+- ACP live-path capability checking with real signature verification and
+  fail-closed enforcement on filesystem and terminal operations
+- A2A and ACP outward-edge flows routed through the ARC kernel with signed
+  receipt parity instead of direct adapter invocation
+- Persistent sidecar receipt storage, `arc-tower` raw-body binding, and
+  kernel-backed Kubernetes capability validation
+- Full protocol/docs/planning reconciliation so shipped claims match live code
+- Qualification artifacts that codify the narrower truthful breakthrough claim
+  and block broader overclaiming until the remaining conditions are proven
 
 ## v4.x WASM Guard Plugin Ecosystem
 
@@ -56,19 +62,21 @@ production-ready, HushSpec-aware guard execution surface.
 |-----------|------|--------|-------|
 | v4.0 | WASM Guard Runtime Completion | 373-376 | Host-side hardening, manifest, enriched request, startup wiring, benchmarks |
 | v4.1 | Guard SDK and Developer Experience | 377-380 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
-| v4.2 | WIT Migration and Multi-Language SDKs | 381-384 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
+| v4.1 | Guard SDK and Developer Experience | 382-385 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
+| v4.2 | WIT Migration and Multi-Language SDKs | 386-389 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
 
 **Design docs:** `docs/guards/01-05` (current guard system, WASM runtime
 landscape, long-range roadmap, HushSpec/ClawdStrike integration, v1 decisions)
 
 ## Current Milestone Status
 
-`v2.83 Coverage, Hardening, and Production Qualification` is active. Phase
-`315` is complete locally and phases `316` through `318` remain queued. This
-milestone follows the completed
-deployable/onboarding push from `v2.81` and the archived normative protocol
-package from `v2.82`, which now leaves the repo with a third-party
-implementable spec surface, security analysis, and native conformance lane.
+`v3.12 Cross-Protocol Integrity and Truth Completion` is now the active
+planning lane. The v3.9-v3.11 remediation wave closed the major HTTP and
+cross-SDK substrate gaps, but the cross-protocol debate established that ARC's
+broader vision claim still depends on ACP live-path cryptographic enforcement,
+kernel-mediated outward edges, operational parity completion, and a full truth
+pass across docs and planning. `v4.0` remains a parallel strategic bet, and
+`v2.83` remains locally unarchived rather than silently treated as complete.
 
 ## v3.x Universal Security Kernel Era
 
@@ -76,8 +84,10 @@ implementable spec surface, security analysis, and native conformance lane.
 security kernel for the agent economy. One kernel, many substrates. Signed
 receipts across HTTP APIs, agent protocols, and framework middleware.
 
-**12 milestones:** v3.0 through v3.11, from foundation through body-integrity completion.
-**Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 -> v3.5 -> v3.6 -> v3.7
+**13 milestones:** v3.0 through v3.12, from foundation through
+cross-protocol integrity and truth completion.
+**Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 ->
+v3.5 -> v3.6 -> v3.7 -> v3.8 -> v3.9 -> v3.10 -> v3.11 -> v3.12
 
 | Milestone | Name | Phases | Focus |
 |-----------|------|--------|-------|
@@ -93,6 +103,7 @@ receipts across HTTP APIs, agent protocols, and framework middleware.
 | v3.9 | Runtime Correctness and Contract Remediation | 359-363 | OpenAI/kernel fix, certificate wire format, adapter validation, flake cleanup |
 | v3.10 | HTTP Sidecar and Cross-SDK Contract Completion | 364-367 | Rust sidecar endpoints, Python substrate migration, cross-SDK capability alignment |
 | v3.11 | Sidecar Entrypoint and Body-Integrity Completion | 368-372 | `arc api protect` CLI, body-preserving middleware, raw-byte hashing, schema cleanup |
+| v3.12 | Cross-Protocol Integrity and Truth Completion | 377-381 | ACP crypto enforcement, outward-edge kernel mediation, operational parity, repo-truth reconciliation |
 
 ## Foundation and Adoption Ladder (v2.80-v2.83)
 
@@ -1375,4 +1386,4 @@ Key regulatory milestones achieved:
 | Workload identity bridges follow portable and economic interop | Concrete verifier integrations should bind into already-stabilized policy, credential, and economic semantics | Completed in v2.12 |
 
 ---
-*Last updated: 2026-04-03 after completing v2.50 ARC-Wall companion-product work and auditing phases 209-212*
+*Last updated: 2026-04-14 after starting v3.12 Cross-Protocol Integrity and Truth Completion*
