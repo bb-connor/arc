@@ -3091,8 +3091,8 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Benchmarks
 
-- [ ] **WGBENCH-01**: Benchmark measures wasmtime Module::new() compilation time for representative .wasm guard binaries (50 KiB Rust, 5 MiB Python-via-componentize-py)
-- [ ] **WGBENCH-02**: Benchmark measures Linker::instantiate() per-call overhead
+- [x] **WGBENCH-01**: Benchmark measures wasmtime Module::new() compilation time for representative .wasm guard binaries (50 KiB Rust, 5 MiB Python-via-componentize-py)
+- [x] **WGBENCH-02**: Benchmark measures Linker::instantiate() per-call overhead
 - [ ] **WGBENCH-03**: Benchmark measures p50/p99 evaluate latency for a trivial guard (immediate Allow) and a realistic guard (JSON parse + pattern match + Deny)
 - [ ] **WGBENCH-04**: Benchmark measures fuel metering overhead percentage (fuel enabled vs disabled)
 - [ ] **WGBENCH-05**: Benchmark verifies ResourceLimiter actually caps memory growth under adversarial guest allocation
@@ -3142,8 +3142,8 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGWIRE-04 | Phase 375 | Complete |
 | WGRCPT-01 | Phase 375 | Complete |
 | WGRCPT-02 | Phase 375 | Complete |
-| WGBENCH-01 | Phase 376 | Pending |
-| WGBENCH-02 | Phase 376 | Pending |
+| WGBENCH-01 | Phase 376 | Complete |
+| WGBENCH-02 | Phase 376 | Complete |
 | WGBENCH-03 | Phase 376 | Pending |
 | WGBENCH-04 | Phase 376 | Pending |
 | WGBENCH-05 | Phase 376 | Pending |

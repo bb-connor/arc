@@ -173,15 +173,18 @@
 - [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
 - [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
 - [ ] **v3.8 Normative Specification Alignment** - Phases 351-358 (planned)
-- [x] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
-  (completed locally 2026-04-14)
-- [x] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
-  364-367 (completed locally 2026-04-14)
-- [x] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
-  368-372 (completed locally 2026-04-14)
+- [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
+  (implemented locally 2026-04-14; ledger reconciliation pending under v3.13
+  phase 393)
+- [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
+  364-367 (implemented locally 2026-04-14; ledger reconciliation pending under
+  v3.13 phase 393)
+- [ ] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
+  368-372 (implemented locally 2026-04-14; ledger reconciliation pending under
+  v3.13 phase 393)
 - [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
   (completed locally 2026-04-14; pending archival)
-- [ ] **v3.13 Universal Orchestration Closure** - Phases 390-394
+- [ ] **v3.13 Universal Orchestration Closure** - Phases 390-396
   (active locally 2026-04-14; follows v3.12 and can execute in parallel with
   v4.x)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
@@ -10619,6 +10622,10 @@ final.
 
 ## Phase Summary (v3.0-v3.11)
 
+Legacy note: rows `319-358` still reflect pre-reconciliation planning labels.
+Phase `393` is the explicit owner for converting that early/mid-v3 section from
+flat `Planned` placeholders into truthful implementation and audit status.
+
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 319 | v3.0 | arc-http-core Types and Request Model | Planned |
@@ -10661,20 +10668,20 @@ final.
 | 356 | v3.8 | SDK Reference Documentation | Planned |
 | 357 | v3.8 | Protocol Bridge and Edge Documentation | Planned |
 | 358 | v3.8 | Strategic Vision and Design Doc Reconciliation | Planned |
-| 359 | v3.9 | OpenAI Adapter Kernel Execution | Planned |
-| 360 | v3.9 | Compliance Certificate Wire Format Alignment | Planned |
-| 361 | v3.9 | HTTP Adapter Request Binding and Capability Validation | Planned |
-| 362 | v3.9 | Test Stabilization and Invariant Enforcement | Planned |
-| 363 | v3.9 | Residual SDK and Spec Drift Cleanup | Planned |
-| 364 | v3.10 | Rust HTTP Sidecar Surface | Planned |
-| 365 | v3.10 | Python HTTP Substrate Alignment | Planned |
-| 366 | v3.10 | Cross-SDK Capability Presentation Alignment | Planned |
-| 367 | v3.10 | HTTP Receipt Conversion Safety | Planned |
-| 368 | v3.11 | Shippable `arc api protect` Entrypoint | Planned |
-| 369 | v3.11 | TypeScript Request-Body Preservation | Planned |
-| 370 | v3.11 | JVM Request-Body Preservation and Raw-Byte Hashing | Planned |
-| 371 | v3.11 | Cross-SDK Raw-Byte Binding and EvaluateResponse Contract | Planned |
-| 372 | v3.11 | HTTP Schema and Platform Doc Consistency | Planned |
+| 359 | v3.9 | OpenAI Adapter Kernel Execution | Implemented / reconciliation pending |
+| 360 | v3.9 | Compliance Certificate Wire Format Alignment | Implemented / reconciliation pending |
+| 361 | v3.9 | HTTP Adapter Request Binding and Capability Validation | Implemented / reconciliation pending |
+| 362 | v3.9 | Test Stabilization and Invariant Enforcement | Implemented / reconciliation pending |
+| 363 | v3.9 | Residual SDK and Spec Drift Cleanup | Implemented / reconciliation pending |
+| 364 | v3.10 | Rust HTTP Sidecar Surface | Implemented / reconciliation pending |
+| 365 | v3.10 | Python HTTP Substrate Alignment | Implemented / reconciliation pending |
+| 366 | v3.10 | Cross-SDK Capability Presentation Alignment | Implemented / reconciliation pending |
+| 367 | v3.10 | HTTP Receipt Conversion Safety | Implemented / reconciliation pending |
+| 368 | v3.11 | Shippable `arc api protect` Entrypoint | Implemented / reconciliation pending |
+| 369 | v3.11 | TypeScript Request-Body Preservation | Implemented / reconciliation pending |
+| 370 | v3.11 | JVM Request-Body Preservation and Raw-Byte Hashing | Implemented / reconciliation pending |
+| 371 | v3.11 | Cross-SDK Raw-Byte Binding and EvaluateResponse Contract | Implemented / reconciliation pending |
+| 372 | v3.11 | HTTP Schema and Platform Doc Consistency | Implemented / reconciliation pending |
 
 ---
 
@@ -10766,7 +10773,7 @@ Plans:
 | 373 | 2/2 | Complete    | 2026-04-14 |
 | 374 | 2/2 | Complete    | 2026-04-14 |
 | 375 | 2/2 | Complete    | 2026-04-14 |
-| 376 | v4.0 | Benchmark Validation | Not started |
+| 376 | 1/2 | In Progress|  |
 
 ---
 

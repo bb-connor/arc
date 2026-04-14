@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 375-02 startup wiring plan -- phase 375 complete
-last_updated: "2026-04-14T22:40:38.811Z"
+stopped_at: Completed 376-01-PLAN.md
+last_updated: "2026-04-14T22:59:40.258Z"
 last_activity: 2026-04-14 -- completed phase 392 by replacing heuristic edge
 progress:
   total_phases: 347
   completed_phases: 256
-  total_plans: 732
-  completed_plans: 754
+  total_plans: 734
+  completed_plans: 757
   percent: 60
 ---
 
@@ -126,6 +126,7 @@ Progress: [######----] 60%
 - [Phase 375]: load_wasm_guards() sorts by (advisory as u8, priority) for non-advisory-first ordering at equal priority
 - [Phase 375]: arc-config added as direct dependency to arc-wasm-guards for WasmGuardEntry; WasmtimeBackend defaults used for memory/module-size limits
 - [Phase 375]: build_guard_pipeline() takes pre-composed guard vectors to separate pipeline composition from guard creation
+- [Phase 376]: File-level lint suppression (#![allow(clippy::unwrap_used, clippy::expect_used)]) required for benchmark binaries since cfg_attr(test) does not apply to bench targets
 
 ### Pending Todos
 
@@ -150,14 +151,13 @@ Progress: [######----] 60%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 375 (complete -- 02 of 02 plans done)
-Plan: 02 of 2 complete
-Status: Phase 375 complete -- guard manifest YAML parsing, SHA-256 integrity
-verification, ABI version gating, per-evaluation fuel/hash receipt metadata,
-and startup wiring module with manifest-aware pipeline composition. 83 crate
-tests pass, clippy clean, no workspace regressions. Phase 376 is next.
-Last activity: 2026-04-14 -- completed 375-02 startup wiring plan with
-load_wasm_guards() and build_guard_pipeline() plus 9 new tests
+Phase: 376 (in progress -- 01 of 02 plans done)
+Plan: 01 of 2 complete
+Status: Phase 376 plan 01 complete -- Criterion benchmark harness with
+compilation (50 KiB + 5 MiB WAT modules) and instantiation overhead benchmarks.
+All 83 crate tests pass, clippy clean, bench dry-run succeeds. Plan 02 is next.
+Last activity: 2026-04-14 -- completed 376-01 benchmark harness with
+compilation and instantiation benchmark groups
 
 
 ## v4.1 Guard SDK and Developer Experience
@@ -170,7 +170,7 @@ phases 390-394 reserved after the v4.x placeholder ranges
 
 ## Session Continuity
 
-Last session: 2026-04-14T22:36:18Z
-Stopped at: Completed 375-02 startup wiring plan -- phase 375 complete
-Next action: plan and execute phase 376
+Last session: 2026-04-14T22:59:40.214Z
+Stopped at: Completed 376-01-PLAN.md
+Next action: execute phase 376 plan 02
 Resume file: None
