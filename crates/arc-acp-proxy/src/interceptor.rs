@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 /// Direction of a message flowing through the proxy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -16,6 +18,12 @@ pub enum InterceptResult {
     Block(Value),
     /// Forward the message AND record an audit entry for it.
     ForwardWithReceipt(Value, AcpToolCallAuditEntry),
+}
+
+enum CapabilityGate {
+    Skip,
+    Allow(AcpCapabilityAuditContext),
+    Block(Value),
 }
 
 /// Core message interception logic for the ACP proxy.
@@ -40,6 +48,8 @@ pub struct MessageInterceptor {
     capability_checker: Option<Box<dyn CapabilityChecker>>,
     /// Attestation mode controlling how signing failures are handled.
     attestation_mode: AcpAttestationMode,
+    /// Session-scoped capability context captured from successful live-path checks.
+    live_capability_contexts: std::sync::Mutex<HashMap<String, AcpCapabilityAuditContext>>,
 }
 
 impl MessageInterceptor {
@@ -59,6 +69,7 @@ impl MessageInterceptor {
             receipt_signer: None,
             capability_checker: None,
             attestation_mode: AcpAttestationMode::default(),
+            live_capability_contexts: std::sync::Mutex::new(HashMap::new()),
         }
     }
 
@@ -83,6 +94,7 @@ impl MessageInterceptor {
             receipt_signer: signer,
             capability_checker: checker,
             attestation_mode,
+            live_capability_contexts: std::sync::Mutex::new(HashMap::new()),
         }
     }
 
@@ -171,9 +183,32 @@ impl MessageInterceptor {
                 AcpProxyError::Protocol(format!("invalid fs/read_text_file params: {e}"))
             })?;
 
+        let capability_context = match self.check_capability_gate(
+            message.get("id"),
+            AcpCapabilityRequest {
+                session_id: read_params.session_id.clone(),
+                operation: "fs_read".to_string(),
+                resource: read_params.path.clone(),
+                token: extract_capability_token(params),
+            },
+        ) {
+            CapabilityGate::Skip => None,
+            CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Block(response) => {
+                self.clear_capability_context(&read_params.session_id);
+                return Ok(InterceptResult::Block(response));
+            }
+        };
+
         match self.fs_guard.check_read(&read_params.path) {
-            Ok(()) => Ok(InterceptResult::Forward(message.clone())),
+            Ok(()) => {
+                if let Some(ref context) = capability_context {
+                    self.remember_capability_context(&read_params.session_id, context.clone());
+                }
+                Ok(InterceptResult::Forward(message.clone()))
+            }
             Err(err) => {
+                self.clear_capability_context(&read_params.session_id);
                 let id = message.get("id");
                 let error_response = json_rpc_error(id, ACP_ERROR_ACCESS_DENIED, &err.to_string());
                 tracing::warn!(path = %read_params.path, "fs read blocked");
@@ -192,9 +227,32 @@ impl MessageInterceptor {
                 AcpProxyError::Protocol(format!("invalid fs/write_text_file params: {e}"))
             })?;
 
+        let capability_context = match self.check_capability_gate(
+            message.get("id"),
+            AcpCapabilityRequest {
+                session_id: write_params.session_id.clone(),
+                operation: "fs_write".to_string(),
+                resource: write_params.path.clone(),
+                token: extract_capability_token(params),
+            },
+        ) {
+            CapabilityGate::Skip => None,
+            CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Block(response) => {
+                self.clear_capability_context(&write_params.session_id);
+                return Ok(InterceptResult::Block(response));
+            }
+        };
+
         match self.fs_guard.check_write(&write_params.path) {
-            Ok(()) => Ok(InterceptResult::Forward(message.clone())),
+            Ok(()) => {
+                if let Some(ref context) = capability_context {
+                    self.remember_capability_context(&write_params.session_id, context.clone());
+                }
+                Ok(InterceptResult::Forward(message.clone()))
+            }
             Err(err) => {
+                self.clear_capability_context(&write_params.session_id);
                 let id = message.get("id");
                 let error_response = json_rpc_error(id, ACP_ERROR_ACCESS_DENIED, &err.to_string());
                 tracing::warn!(path = %write_params.path, "fs write blocked");
@@ -208,17 +266,38 @@ impl MessageInterceptor {
             .get("params")
             .ok_or_else(|| AcpProxyError::Protocol("missing params in terminal/create".into()))?;
 
-        let term_params: CreateTerminalParams =
-            serde_json::from_value(params.clone()).map_err(|e| {
-                AcpProxyError::Protocol(format!("invalid terminal/create params: {e}"))
-            })?;
+        let term_params: CreateTerminalParams = serde_json::from_value(params.clone())
+            .map_err(|e| AcpProxyError::Protocol(format!("invalid terminal/create params: {e}")))?;
+
+        let capability_context = match self.check_capability_gate(
+            message.get("id"),
+            AcpCapabilityRequest {
+                session_id: term_params.session_id.clone(),
+                operation: "terminal".to_string(),
+                resource: term_params.command.clone(),
+                token: extract_capability_token(params),
+            },
+        ) {
+            CapabilityGate::Skip => None,
+            CapabilityGate::Allow(context) => Some(context),
+            CapabilityGate::Block(response) => {
+                self.clear_capability_context(&term_params.session_id);
+                return Ok(InterceptResult::Block(response));
+            }
+        };
 
         match self
             .terminal_guard
             .check_command(&term_params.command, &term_params.args)
         {
-            Ok(()) => Ok(InterceptResult::Forward(message.clone())),
+            Ok(()) => {
+                if let Some(ref context) = capability_context {
+                    self.remember_capability_context(&term_params.session_id, context.clone());
+                }
+                Ok(InterceptResult::Forward(message.clone()))
+            }
             Err(err) => {
+                self.clear_capability_context(&term_params.session_id);
                 let id = message.get("id");
                 let error_response = json_rpc_error(id, ACP_ERROR_ACCESS_DENIED, &err.to_string());
                 tracing::warn!(command = %term_params.command, "terminal create blocked");
@@ -258,22 +337,21 @@ impl MessageInterceptor {
         Ok(InterceptResult::Forward(message.clone()))
     }
 
-    fn intercept_session_update(
-        &self,
-        message: &Value,
-    ) -> Result<InterceptResult, AcpProxyError> {
+    fn intercept_session_update(&self, message: &Value) -> Result<InterceptResult, AcpProxyError> {
         let params = message.get("params");
-        let notification = params.and_then(|p| {
-            serde_json::from_value::<SessionUpdateNotification>(p.clone()).ok()
-        });
+        let notification = params
+            .and_then(|p| serde_json::from_value::<SessionUpdateNotification>(p.clone()).ok());
 
         if let Some(ref notif) = notification {
+            let capability_context = self.lookup_capability_context(&notif.session_id);
             let update = parse_session_update(&notif.update);
             match update {
                 SessionUpdate::ToolCall(ref event) => {
-                    let receipt = self
-                        .receipt_logger
-                        .log_tool_call(&notif.session_id, event);
+                    let receipt = self.receipt_logger.log_tool_call(
+                        &notif.session_id,
+                        event,
+                        capability_context.as_ref(),
+                    );
                     tracing::info!(
                         tool_call_id = %receipt.tool_call_id,
                         status = %receipt.status,
@@ -285,10 +363,14 @@ impl MessageInterceptor {
                     ));
                 }
                 SessionUpdate::ToolCallUpdate(ref event) => {
-                    if let Some(receipt) = self
-                        .receipt_logger
-                        .log_tool_call_update(&notif.session_id, event)
-                    {
+                    if let Some(receipt) = self.receipt_logger.log_tool_call_update(
+                        &notif.session_id,
+                        event,
+                        capability_context.as_ref(),
+                    ) {
+                        if should_clear_capability_context(&receipt.status) {
+                            self.clear_capability_context(&notif.session_id);
+                        }
                         tracing::info!(
                             tool_call_id = %receipt.tool_call_id,
                             status = %receipt.status,
@@ -313,4 +395,88 @@ impl MessageInterceptor {
 
         Ok(InterceptResult::Forward(message.clone()))
     }
+
+    fn check_capability_gate(
+        &self,
+        id: Option<&Value>,
+        request: AcpCapabilityRequest,
+    ) -> CapabilityGate {
+        let Some(checker) = self.capability_checker.as_ref() else {
+            return CapabilityGate::Skip;
+        };
+
+        match checker.check_access(&request) {
+            Ok(verdict) if verdict.allowed => {
+                let Some(capability_id) = verdict.capability_id else {
+                    return CapabilityGate::Block(json_rpc_error(
+                        id,
+                        ACP_ERROR_ACCESS_DENIED,
+                        "capability checker allowed access without a capability_id",
+                    ));
+                };
+                CapabilityGate::Allow(AcpCapabilityAuditContext {
+                    capability_id,
+                    enforcement_mode: AcpEnforcementMode::CryptographicallyEnforced,
+                })
+            }
+            Ok(verdict) => {
+                CapabilityGate::Block(json_rpc_error(id, ACP_ERROR_ACCESS_DENIED, &verdict.reason))
+            }
+            Err(err) => CapabilityGate::Block(json_rpc_error(
+                id,
+                ACP_ERROR_ACCESS_DENIED,
+                &format!("capability check failed closed: {err}"),
+            )),
+        }
+    }
+
+    fn remember_capability_context(&self, session_id: &str, context: AcpCapabilityAuditContext) {
+        if let Ok(mut contexts) = self.live_capability_contexts.lock() {
+            contexts.insert(session_id.to_string(), context);
+        }
+    }
+
+    fn lookup_capability_context(&self, session_id: &str) -> Option<AcpCapabilityAuditContext> {
+        self.live_capability_contexts
+            .lock()
+            .ok()
+            .and_then(|contexts| contexts.get(session_id).cloned())
+    }
+
+    fn clear_capability_context(&self, session_id: &str) {
+        if let Ok(mut contexts) = self.live_capability_contexts.lock() {
+            contexts.remove(session_id);
+        }
+    }
+}
+
+fn extract_capability_token(params: &Value) -> Option<String> {
+    extract_token_value(params.get("capabilityToken"))
+        .or_else(|| extract_token_value(params.get("capability_token")))
+        .or_else(|| {
+            params
+                .get("arc")
+                .and_then(|arc| extract_token_value(arc.get("capabilityToken")))
+        })
+        .or_else(|| {
+            params
+                .get("arc")
+                .and_then(|arc| extract_token_value(arc.get("capability_token")))
+        })
+}
+
+fn extract_token_value(value: Option<&Value>) -> Option<String> {
+    match value? {
+        Value::Null => None,
+        Value::String(raw) if raw.trim().is_empty() => None,
+        Value::String(raw) => Some(raw.clone()),
+        other => serde_json::to_string(other).ok(),
+    }
+}
+
+fn should_clear_capability_context(status: &str) -> bool {
+    matches!(
+        status,
+        "completed" | "failed" | "error" | "cancelled" | "canceled"
+    )
 }

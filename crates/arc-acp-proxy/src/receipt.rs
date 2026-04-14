@@ -2,6 +2,26 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha2::{Digest, Sha256};
 
+/// How strongly an ACP audit entry is tied to live capability enforcement.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AcpEnforcementMode {
+    /// The proxy only observed the event; no live cryptographic enforcement
+    /// context was attached.
+    AuditOnly,
+    /// A live capability check allowed the operation before the event was
+    /// forwarded.
+    CryptographicallyEnforced,
+}
+
+/// Session-scoped capability context captured from a live ACP access check.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AcpCapabilityAuditContext {
+    pub capability_id: String,
+    pub enforcement_mode: AcpEnforcementMode,
+}
+
 /// Generates unsigned audit entries from ACP tool-call events.
 ///
 /// These are **not** signed ARC receipts (`ArcReceipt`). They are
@@ -34,6 +54,12 @@ pub struct AcpToolCallAuditEntry {
     /// SHA-256 hex digest of the canonical JSON representation of
     /// the originating tool-call event.
     pub content_hash: String,
+    /// The capability ID that authorized the live operation, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    /// Whether the event was tied to live cryptographic enforcement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enforcement_mode: Option<AcpEnforcementMode>,
 }
 
 impl ReceiptLogger {
@@ -49,9 +75,10 @@ impl ReceiptLogger {
         &self,
         session_id: &str,
         event: &ToolCallEvent,
+        capability_context: Option<&AcpCapabilityAuditContext>,
     ) -> AcpToolCallAuditEntry {
         let content_hash = compute_content_hash(event);
-        AcpToolCallAuditEntry {
+        let mut entry = AcpToolCallAuditEntry {
             tool_call_id: event.tool_call_id.clone(),
             title: event.title.clone().unwrap_or_default(),
             kind: event.kind.clone(),
@@ -63,7 +90,11 @@ impl ReceiptLogger {
             timestamp: now_unix_secs(),
             server_id: self.server_id.clone(),
             content_hash,
-        }
+            capability_id: None,
+            enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
+        };
+        apply_capability_context(&mut entry, capability_context);
+        entry
     }
 
     /// Optionally generate an audit entry for a tool-call update event.
@@ -73,10 +104,11 @@ impl ReceiptLogger {
         &self,
         session_id: &str,
         event: &ToolCallUpdateEvent,
+        capability_context: Option<&AcpCapabilityAuditContext>,
     ) -> Option<AcpToolCallAuditEntry> {
         let status = event.status.as_deref()?;
         let content_hash = compute_update_content_hash(event);
-        Some(AcpToolCallAuditEntry {
+        let mut entry = AcpToolCallAuditEntry {
             tool_call_id: event.tool_call_id.clone(),
             title: String::new(),
             kind: None,
@@ -85,7 +117,21 @@ impl ReceiptLogger {
             timestamp: now_unix_secs(),
             server_id: self.server_id.clone(),
             content_hash,
-        })
+            capability_id: None,
+            enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
+        };
+        apply_capability_context(&mut entry, capability_context);
+        Some(entry)
+    }
+}
+
+fn apply_capability_context(
+    entry: &mut AcpToolCallAuditEntry,
+    capability_context: Option<&AcpCapabilityAuditContext>,
+) {
+    if let Some(context) = capability_context {
+        entry.capability_id = Some(context.capability_id.clone());
+        entry.enforcement_mode = Some(context.enforcement_mode);
     }
 }
 
