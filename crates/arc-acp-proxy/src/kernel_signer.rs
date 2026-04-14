@@ -191,7 +191,24 @@ impl ReceiptSigner for KernelReceiptSigner {
         }
 
         // Attempt a checkpoint if the batch threshold was reached.
-        let _checkpoint = self.maybe_checkpoint();
+        // Checkpoint failures are logged but not propagated -- the receipt
+        // itself was already signed and stored successfully, and blocking
+        // receipt issuance on a checkpoint error would be disproportionate.
+        match self.maybe_checkpoint() {
+            Ok(Some(cp)) => {
+                tracing::debug!(
+                    checkpoint_seq = cp.body.checkpoint_seq,
+                    "Merkle checkpoint created"
+                );
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Merkle checkpoint failed (receipt was still signed and stored)"
+                );
+            }
+        }
 
         tracing::info!(
             receipt_id = %receipt.id,
