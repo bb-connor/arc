@@ -2,6 +2,7 @@
 
 use thiserror::Error;
 
+/// Errors produced by the protect proxy.
 #[derive(Debug, Error)]
 pub enum ProtectError {
     #[error("failed to load OpenAPI spec: {0}")]
