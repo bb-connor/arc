@@ -9,7 +9,7 @@
     <Version>0.1.0</Version>
     <Description>ASP.NET Core middleware for ARC capability validation and receipt signing</Description>
     <Authors>Backbay Labs</Authors>
-    <License>Apache-2.0</License>
+    <License>MIT</License>
     <RepositoryUrl>https://github.com/backbay-labs/arc</RepositoryUrl>
   </PropertyGroup>
 

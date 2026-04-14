@@ -348,13 +348,40 @@ function jsonResponse(status: number, body: ArcErrorResponse): Response {
   });
 }
 
+/**
+ * Handle a sidecar error during Node.js request interception.
+ *
+ * When onSidecarError is "allow" (fail-open), returns a synthetic allow
+ * EvaluateResponse so the caller forwards the request to the inner handler.
+ * When "deny" (fail-closed, default), sends a 502 error response and
+ * returns null to signal that the response has already been sent.
+ */
 function handleSidecarError(
   res: ServerResponse,
   resolved: ResolvedConfig,
   error: unknown,
 ): EvaluateResponse | null {
   if (resolved.onSidecarError === "allow") {
-    return null;
+    // Return a synthetic allow result so the caller forwards the request.
+    return {
+      verdict: { verdict: "allow" },
+      receipt: {
+        id: "arc-sidecar-unavailable",
+        request_id: "",
+        route_pattern: "",
+        method: "GET",
+        caller_identity_hash: "",
+        verdict: { verdict: "allow" },
+        evidence: [],
+        response_status: 0,
+        timestamp: Math.floor(Date.now() / 1000),
+        content_hash: "",
+        policy_hash: "",
+        kernel_key: "",
+        signature: "",
+      },
+      evidence: [],
+    };
   }
 
   const message =
