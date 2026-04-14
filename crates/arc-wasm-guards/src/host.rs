@@ -84,8 +84,7 @@ impl WasmHostState {
 pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
     let mut config = wasmtime::Config::new();
     config.consume_fuel(true);
-    let engine =
-        Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
+    let engine = Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
     Ok(Arc::new(engine))
 }
 
@@ -102,9 +101,7 @@ pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
 ///
 /// All host function closures are safe: they never panic, never call
 /// `unwrap()` or `expect()`, and return graceful sentinel values on error.
-pub fn register_host_functions(
-    linker: &mut Linker<WasmHostState>,
-) -> Result<(), WasmGuardError> {
+pub fn register_host_functions(linker: &mut Linker<WasmHostState>) -> Result<(), WasmGuardError> {
     // -----------------------------------------------------------------------
     // arc.log(level: i32, ptr: i32, len: i32)
     // -----------------------------------------------------------------------
@@ -123,10 +120,7 @@ pub fn register_host_functions(
                 }
                 let len_usize = len as usize;
 
-                let memory = match caller
-                    .get_export("memory")
-                    .and_then(|e| e.into_memory())
-                {
+                let memory = match caller.get_export("memory").and_then(|e| e.into_memory()) {
                     Some(m) => m,
                     None => return,
                 };
@@ -176,17 +170,17 @@ pub fn register_host_functions(
                 }
                 let key_len_usize = key_len as usize;
 
-                let memory = match caller
-                    .get_export("memory")
-                    .and_then(|e| e.into_memory())
-                {
+                let memory = match caller.get_export("memory").and_then(|e| e.into_memory()) {
                     Some(m) => m,
                     None => return -1,
                 };
 
                 // Read the key from guest memory
                 let mut key_buf = vec![0u8; key_len_usize];
-                if memory.read(&caller, key_ptr as usize, &mut key_buf).is_err() {
+                if memory
+                    .read(&caller, key_ptr as usize, &mut key_buf)
+                    .is_err()
+                {
                     return -1;
                 }
 
@@ -210,8 +204,7 @@ pub fn register_host_functions(
                 // Write as much as fits into the output buffer
                 let copy_len = actual_len.min(out_len);
                 if out_ptr.saturating_add(copy_len) <= mem_data.len() {
-                    mem_data[out_ptr..out_ptr + copy_len]
-                        .copy_from_slice(&value_bytes[..copy_len]);
+                    mem_data[out_ptr..out_ptr + copy_len].copy_from_slice(&value_bytes[..copy_len]);
                 }
 
                 // Return actual value length so guest can detect truncation
@@ -259,9 +252,7 @@ mod tests {
         let host_state = WasmHostState::new(config);
         let mut store = Store::new(&engine, host_state);
         store.limiter(|state| &mut state.limits);
-        store
-            .set_fuel(1_000_000)
-            .expect("set fuel");
+        store.set_fuel(1_000_000).expect("set fuel");
         (store, linker, engine)
     }
 

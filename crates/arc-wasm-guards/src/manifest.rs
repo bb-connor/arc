@@ -61,12 +61,10 @@ pub struct GuardManifest {
 /// reads `/opt/guards/pii/guard-manifest.yaml`.
 pub fn load_manifest(wasm_path: &str) -> Result<GuardManifest, WasmGuardError> {
     let wasm = Path::new(wasm_path);
-    let parent = wasm
-        .parent()
-        .ok_or_else(|| WasmGuardError::ManifestLoad {
-            path: wasm_path.to_string(),
-            reason: "wasm path has no parent directory".to_string(),
-        })?;
+    let parent = wasm.parent().ok_or_else(|| WasmGuardError::ManifestLoad {
+        path: wasm_path.to_string(),
+        reason: "wasm path has no parent directory".to_string(),
+    })?;
 
     let manifest_path = parent.join(MANIFEST_FILENAME);
     let contents =
@@ -152,7 +150,10 @@ wasm_sha256: deadbeef
 "#;
         let manifest: GuardManifest = serde_yml::from_str(yaml).unwrap();
         assert_eq!(manifest.name, "simple-guard");
-        assert!(manifest.config.is_empty(), "config should default to empty HashMap");
+        assert!(
+            manifest.config.is_empty(),
+            "config should default to empty HashMap"
+        );
     }
 
     #[test]
@@ -203,12 +204,18 @@ wasm_path: foo.wasm
     #[test]
     fn verify_wasm_hash_rejects_mismatching_digest() {
         let data = b"hello wasm module";
-        let result = verify_wasm_hash(data, "0000000000000000000000000000000000000000000000000000000000000000");
+        let result = verify_wasm_hash(
+            data,
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        );
         assert!(result.is_err());
         let err = result.unwrap_err();
         match err {
             WasmGuardError::HashMismatch { expected, actual } => {
-                assert_eq!(expected, "0000000000000000000000000000000000000000000000000000000000000000");
+                assert_eq!(
+                    expected,
+                    "0000000000000000000000000000000000000000000000000000000000000000"
+                );
                 assert!(!actual.is_empty());
                 assert_ne!(actual, expected);
             }
@@ -274,7 +281,10 @@ config:
         let err = result.unwrap_err();
         match err {
             WasmGuardError::ManifestLoad { path, reason } => {
-                assert!(path.contains("guard-manifest.yaml"), "path should contain manifest filename, got: {path}");
+                assert!(
+                    path.contains("guard-manifest.yaml"),
+                    "path should contain manifest filename, got: {path}"
+                );
                 assert!(!reason.is_empty());
             }
             other => panic!("expected ManifestLoad, got: {other:?}"),

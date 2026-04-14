@@ -21,6 +21,10 @@ use crate::error::WasmGuardError;
 /// Wraps a `WasmGuardAbi` backend and adapts it to the kernel's `Guard` trait.
 /// On any error (fuel exhaustion, traps, serialization failures) the guard
 /// fails closed and returns `Verdict::Deny`.
+///
+/// Carries optional receipt metadata: `manifest_sha256` (set at construction
+/// from the guard manifest) and `last_fuel_consumed` (updated after each
+/// `evaluate()` call).
 pub struct WasmGuard {
     /// Guard name (from config).
     name: String,
@@ -28,15 +32,30 @@ pub struct WasmGuard {
     backend: Mutex<Box<dyn WasmGuardAbi>>,
     /// Whether this guard is advisory-only (non-blocking).
     advisory: bool,
+    /// SHA-256 hex digest of the guard manifest, if loaded from a manifest.
+    manifest_sha256: Option<String>,
+    /// Fuel consumed during the most recent `evaluate()` call.
+    last_fuel_consumed: Mutex<Option<u64>>,
 }
 
 impl WasmGuard {
     /// Create a new WASM guard from a loaded backend.
-    pub fn new(name: String, backend: Box<dyn WasmGuardAbi>, advisory: bool) -> Self {
+    ///
+    /// `manifest_sha256` is the hex-encoded SHA-256 digest of the guard's
+    /// manifest file, used for receipt metadata. Pass `None` when loading
+    /// without a manifest (e.g. in tests).
+    pub fn new(
+        name: String,
+        backend: Box<dyn WasmGuardAbi>,
+        advisory: bool,
+        manifest_sha256: Option<String>,
+    ) -> Self {
         Self {
             name,
             backend: Mutex::new(backend),
             advisory,
+            manifest_sha256,
+            last_fuel_consumed: Mutex::new(None),
         }
     }
 
@@ -44,6 +63,30 @@ impl WasmGuard {
     #[must_use]
     pub fn is_advisory(&self) -> bool {
         self.advisory
+    }
+
+    /// Returns the SHA-256 hex digest of the guard manifest, if set.
+    #[must_use]
+    pub fn manifest_sha256(&self) -> Option<&str> {
+        self.manifest_sha256.as_deref()
+    }
+
+    /// Returns the fuel consumed during the most recent `evaluate()` call,
+    /// or `None` if no evaluation has occurred or the backend does not track
+    /// fuel.
+    #[must_use]
+    pub fn last_fuel_consumed(&self) -> Option<u64> {
+        self.last_fuel_consumed.lock().ok().and_then(|guard| *guard)
+    }
+
+    /// Returns a JSON object containing receipt metadata from the most
+    /// recent evaluation: `fuel_consumed` and `manifest_sha256`.
+    #[must_use]
+    pub fn guard_evidence_metadata(&self) -> serde_json::Value {
+        serde_json::json!({
+            "fuel_consumed": self.last_fuel_consumed(),
+            "manifest_sha256": self.manifest_sha256.as_deref(),
+        })
     }
 
     pub(crate) fn build_request(ctx: &GuardContext<'_>) -> GuardRequest {
@@ -56,47 +99,18 @@ impl WasmGuard {
             .map(|g| format!("{}:{}", g.server_id, g.tool_name))
             .collect();
 
-        let action = arc_guards::extract_action(
-            &ctx.request.tool_name,
-            &ctx.request.arguments,
-        );
+        let action = arc_guards::extract_action(&ctx.request.tool_name, &ctx.request.arguments);
 
         let (action_type, extracted_path, extracted_target) = match &action {
-            ToolAction::FileAccess(path) => (
-                Some("file_access".into()),
-                Some(path.clone()),
-                None,
-            ),
-            ToolAction::FileWrite(path, _) => (
-                Some("file_write".into()),
-                Some(path.clone()),
-                None,
-            ),
-            ToolAction::NetworkEgress(host, _) => (
-                Some("network_egress".into()),
-                None,
-                Some(host.clone()),
-            ),
-            ToolAction::ShellCommand(_) => (
-                Some("shell_command".into()),
-                None,
-                None,
-            ),
-            ToolAction::McpTool(_, _) => (
-                Some("mcp_tool".into()),
-                None,
-                None,
-            ),
-            ToolAction::Patch(path, _) => (
-                Some("patch".into()),
-                Some(path.clone()),
-                None,
-            ),
-            ToolAction::Unknown => (
-                Some("unknown".into()),
-                None,
-                None,
-            ),
+            ToolAction::FileAccess(path) => (Some("file_access".into()), Some(path.clone()), None),
+            ToolAction::FileWrite(path, _) => (Some("file_write".into()), Some(path.clone()), None),
+            ToolAction::NetworkEgress(host, _) => {
+                (Some("network_egress".into()), None, Some(host.clone()))
+            }
+            ToolAction::ShellCommand(_) => (Some("shell_command".into()), None, None),
+            ToolAction::McpTool(_, _) => (Some("mcp_tool".into()), None, None),
+            ToolAction::Patch(path, _) => (Some("patch".into()), Some(path.clone()), None),
+            ToolAction::Unknown => (Some("unknown".into()), None, None),
         };
 
         let filesystem_roots = ctx
@@ -141,7 +155,16 @@ impl Guard for WasmGuard {
             .lock()
             .map_err(|e| KernelError::Internal(format!("WASM guard mutex poisoned: {e}")))?;
 
-        match backend.evaluate(&request) {
+        let result = backend.evaluate(&request);
+        let fuel = backend.last_fuel_consumed();
+        drop(backend); // explicit drop after reading fuel
+
+        // Store fuel consumed for receipt metadata
+        if let Ok(mut fuel_lock) = self.last_fuel_consumed.lock() {
+            *fuel_lock = fuel;
+        }
+
+        match result {
             Ok(GuardVerdict::Allow) => {
                 debug!(guard = %self.name, "WASM guard allowed request");
                 Ok(Verdict::Allow)
@@ -234,6 +257,7 @@ impl WasmGuardRuntime {
             config.name.clone(),
             backend,
             config.advisory,
+            None, // manifest_sha256 -- Plan 02 will pass the real value
         ));
 
         Ok(())
@@ -351,6 +375,7 @@ pub mod wasmtime_backend {
         config: HashMap<String, String>,
         max_memory_bytes: usize,
         max_module_size: usize,
+        last_fuel_consumed: Option<u64>,
     }
 
     impl WasmtimeBackend {
@@ -367,6 +392,7 @@ pub mod wasmtime_backend {
                 config: HashMap::new(),
                 max_memory_bytes: MAX_MEMORY_BYTES,
                 max_module_size: DEFAULT_MAX_MODULE_SIZE,
+                last_fuel_consumed: None,
             })
         }
 
@@ -383,6 +409,7 @@ pub mod wasmtime_backend {
                 config: HashMap::new(),
                 max_memory_bytes: MAX_MEMORY_BYTES,
                 max_module_size: DEFAULT_MAX_MODULE_SIZE,
+                last_fuel_consumed: None,
             }
         }
 
@@ -399,6 +426,7 @@ pub mod wasmtime_backend {
                 config,
                 max_memory_bytes: MAX_MEMORY_BYTES,
                 max_module_size: DEFAULT_MAX_MODULE_SIZE,
+                last_fuel_consumed: None,
             }
         }
 
@@ -424,6 +452,7 @@ pub mod wasmtime_backend {
                     config: HashMap::new(),
                     max_memory_bytes: MAX_MEMORY_BYTES,
                     max_module_size: DEFAULT_MAX_MODULE_SIZE,
+                    last_fuel_consumed: None,
                 },
             }
         }
@@ -468,10 +497,8 @@ pub mod wasmtime_backend {
                 .ok_or(WasmGuardError::BackendUnavailable)?;
 
             // WGSEC-01: Create a fresh Store with configurable memory limit
-            let host_state = WasmHostState::with_memory_limit(
-                self.config.clone(),
-                self.max_memory_bytes,
-            );
+            let host_state =
+                WasmHostState::with_memory_limit(self.config.clone(), self.max_memory_bytes);
             let mut store = Store::new(&self.engine, host_state);
             store.limiter(|state| &mut state.limits);
             store
@@ -555,6 +582,8 @@ pub mod wasmtime_backend {
                         let consumed = self
                             .fuel_limit
                             .saturating_sub(store.get_fuel().unwrap_or(0));
+                        // Record fuel even on exhaustion
+                        self.last_fuel_consumed = Some(consumed);
                         WasmGuardError::FuelExhausted {
                             consumed,
                             limit: self.fuel_limit,
@@ -563,6 +592,11 @@ pub mod wasmtime_backend {
                         WasmGuardError::Trap(msg)
                     }
                 })?;
+
+            // Track fuel consumed for receipt metadata
+            let remaining = store.get_fuel().unwrap_or(0);
+            let consumed = self.fuel_limit.saturating_sub(remaining);
+            self.last_fuel_consumed = Some(consumed);
 
             let verdict = match result {
                 crate::abi::VERDICT_ALLOW => Ok(GuardVerdict::Allow),
@@ -607,6 +641,10 @@ pub mod wasmtime_backend {
         fn backend_name(&self) -> &str {
             "wasmtime"
         }
+
+        fn last_fuel_consumed(&self) -> Option<u64> {
+            self.last_fuel_consumed
+        }
     }
 
     /// Read a structured deny reason from the guest via the `arc_deny_reason`
@@ -635,7 +673,10 @@ pub mod wasmtime_backend {
 
         // Read the response from guest memory
         let mut buf = vec![0u8; bytes_written as usize];
-        if memory.read(store, DENY_BUF_OFFSET as usize, &mut buf).is_err() {
+        if memory
+            .read(store, DENY_BUF_OFFSET as usize, &mut buf)
+            .is_err()
+        {
             return None;
         }
 
@@ -858,10 +899,7 @@ pub mod wasmtime_backend {
             let json_len = json_bytes.len(); // 30
 
             // Build WAT data segment using \xx hex escapes to avoid quote issues
-            let hex_data: String = json_bytes
-                .iter()
-                .map(|b| format!("\\{b:02x}"))
-                .collect();
+            let hex_data: String = json_bytes.iter().map(|b| format!("\\{b:02x}")).collect();
 
             let wat = format!(
                 r#"
@@ -986,7 +1024,8 @@ pub mod wasmtime_backend {
         #[test]
         fn module_too_large_rejected() {
             // Set a very small max_module_size and provide bytes exceeding it
-            let mut backend = WasmtimeBackend::new().unwrap()
+            let mut backend = WasmtimeBackend::new()
+                .unwrap()
                 .with_limits(16 * 1024 * 1024, 100);
             let big_bytes = vec![0u8; 200];
             let result = backend.load_module(&big_bytes, 1_000_000);
@@ -1058,7 +1097,10 @@ pub mod wasmtime_backend {
             "#;
             let mut backend = WasmtimeBackend::new().unwrap();
             let result = backend.load_module(wat.as_bytes(), 1_000_000);
-            assert!(result.is_ok(), "expected Ok for arc-only imports, got: {result:?}");
+            assert!(
+                result.is_ok(),
+                "expected Ok for arc-only imports, got: {result:?}"
+            );
         }
 
         #[test]
@@ -1078,7 +1120,8 @@ pub mod wasmtime_backend {
                     )
                 )
             "#;
-            let mut backend = WasmtimeBackend::new().unwrap()
+            let mut backend = WasmtimeBackend::new()
+                .unwrap()
                 .with_limits(2 * 64 * 1024, 10 * 1024 * 1024);
             backend.load_module(wat.as_bytes(), 10_000_000).unwrap();
 
@@ -1149,6 +1192,91 @@ pub mod wasmtime_backend {
                 _ => panic!("expected Deny verdict, got: {result:?}"),
             }
         }
+
+        // -------------------------------------------------------------------
+        // Fuel tracking tests
+        // -------------------------------------------------------------------
+
+        #[test]
+        fn wasmtime_fuel_consumed_after_evaluate() {
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        (i32.const 0)
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            assert!(
+                backend.last_fuel_consumed().is_none(),
+                "fuel should be None before any evaluation"
+            );
+
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+            let req = make_guard_request();
+            let _ = backend.evaluate(&req).unwrap();
+
+            let fuel = backend.last_fuel_consumed();
+            assert!(fuel.is_some(), "fuel should be Some after evaluation");
+            assert!(fuel.unwrap() > 0, "fuel consumed should be > 0");
+        }
+
+        #[test]
+        fn wasmtime_fuel_consumed_tracked_on_wasm_guard() {
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        (i32.const 0)
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let guard = WasmGuard::new(
+                "fuel-test".to_string(),
+                Box::new(backend),
+                false,
+                Some("deadbeef".to_string()),
+            );
+
+            // Before evaluation
+            assert!(guard.last_fuel_consumed().is_none());
+            assert_eq!(guard.manifest_sha256(), Some("deadbeef"));
+
+            // After evaluation -- use abi-level evaluate via mock context
+            let req = make_guard_request();
+            {
+                let mut be = guard.backend.lock().unwrap();
+                let _ = be.evaluate(&req).unwrap();
+                let fuel = be.last_fuel_consumed();
+                drop(be);
+                if let Ok(mut fl) = guard.last_fuel_consumed.lock() {
+                    *fl = fuel;
+                }
+            }
+
+            assert!(guard.last_fuel_consumed().is_some());
+            assert!(guard.last_fuel_consumed().unwrap() > 0);
+
+            // manifest_sha256 unchanged after evaluate
+            assert_eq!(guard.manifest_sha256(), Some("deadbeef"));
+
+            // guard_evidence_metadata returns both values
+            let evidence = guard.guard_evidence_metadata();
+            assert!(evidence["fuel_consumed"].as_u64().unwrap() > 0);
+            assert_eq!(evidence["manifest_sha256"], "deadbeef");
+        }
     }
 }
 
@@ -1193,7 +1321,7 @@ mod tests {
         let mut backend = MockWasmBackend::allowing();
         backend.load_module(b"fake", 1000).unwrap();
 
-        let guard = WasmGuard::new("test-allow".to_string(), Box::new(backend), false);
+        let guard = WasmGuard::new("test-allow".to_string(), Box::new(backend), false, None);
 
         let request = make_test_request();
         let scope = ArcScope::default();
@@ -1218,7 +1346,7 @@ mod tests {
         let mut backend = MockWasmBackend::denying("blocked by test");
         backend.load_module(b"fake", 1000).unwrap();
 
-        let guard = WasmGuard::new("test-deny".to_string(), Box::new(backend), false);
+        let guard = WasmGuard::new("test-deny".to_string(), Box::new(backend), false, None);
 
         let request = make_test_request();
         let scope = ArcScope::default();
@@ -1243,7 +1371,7 @@ mod tests {
         let mut backend = MockWasmBackend::denying("advisory denial");
         backend.load_module(b"fake", 1000).unwrap();
 
-        let guard = WasmGuard::new("test-advisory".to_string(), Box::new(backend), true);
+        let guard = WasmGuard::new("test-advisory".to_string(), Box::new(backend), true, None);
         assert!(guard.is_advisory());
 
         let request = make_test_request();
@@ -1272,11 +1400,11 @@ mod tests {
 
         let mut b1 = MockWasmBackend::allowing();
         b1.load_module(b"fake", 1000).unwrap();
-        runtime.add_guard(WasmGuard::new("g1".to_string(), Box::new(b1), false));
+        runtime.add_guard(WasmGuard::new("g1".to_string(), Box::new(b1), false, None));
 
         let mut b2 = MockWasmBackend::denying("no");
         b2.load_module(b"fake", 1000).unwrap();
-        runtime.add_guard(WasmGuard::new("g2".to_string(), Box::new(b2), false));
+        runtime.add_guard(WasmGuard::new("g2".to_string(), Box::new(b2), false, None));
 
         assert_eq!(runtime.guard_count(), 2);
 
@@ -1370,7 +1498,8 @@ mod tests {
 
     #[test]
     fn build_request_action_type_file_access() {
-        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let request =
+            make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
         let scope = ArcScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
@@ -1390,7 +1519,8 @@ mod tests {
 
     #[test]
     fn build_request_extracted_path_for_file_access() {
-        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let request =
+            make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
         let scope = ArcScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
@@ -1410,7 +1540,10 @@ mod tests {
 
     #[test]
     fn build_request_action_type_network_egress() {
-        let request = make_test_request_with("fetch", serde_json::json!({"url": "https://example.com/api"}));
+        let request = make_test_request_with(
+            "fetch",
+            serde_json::json!({"url": "https://example.com/api"}),
+        );
         let scope = ArcScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
@@ -1427,12 +1560,18 @@ mod tests {
         let req = WasmGuard::build_request(&ctx);
         assert_eq!(req.action_type.as_deref(), Some("network_egress"));
         assert_eq!(req.extracted_target.as_deref(), Some("example.com"));
-        assert!(req.extracted_path.is_none(), "network_egress should not set extracted_path");
+        assert!(
+            req.extracted_path.is_none(),
+            "network_egress should not set extracted_path"
+        );
     }
 
     #[test]
     fn build_request_filesystem_roots_from_context() {
-        let request = make_test_request_with("read_file", serde_json::json!({"path": "/home/user/file.txt"}));
+        let request = make_test_request_with(
+            "read_file",
+            serde_json::json!({"path": "/home/user/file.txt"}),
+        );
         let scope = ArcScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
@@ -1448,12 +1587,16 @@ mod tests {
         };
 
         let req = WasmGuard::build_request(&ctx);
-        assert_eq!(req.filesystem_roots, vec!["/home".to_string(), "/tmp".to_string()]);
+        assert_eq!(
+            req.filesystem_roots,
+            vec!["/home".to_string(), "/tmp".to_string()]
+        );
     }
 
     #[test]
     fn build_request_matched_grant_index_from_context() {
-        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let request =
+            make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
         let scope = ArcScope::default();
         let agent_id = "agent-1".to_string();
         let server_id = "test_server".to_string();
@@ -1491,5 +1634,103 @@ mod tests {
         // "test_tool" is not a recognized filesystem/network/shell tool,
         // so extract_action returns McpTool (fallback) which we map to "mcp_tool"
         assert_eq!(req.action_type.as_deref(), Some("mcp_tool"));
+    }
+
+    // -------------------------------------------------------------------
+    // Receipt metadata tests (manifest_sha256, fuel_consumed, evidence)
+    // -------------------------------------------------------------------
+
+    #[test]
+    fn wasm_guard_stores_manifest_sha256() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let guard = WasmGuard::new(
+            "test-hash".to_string(),
+            Box::new(backend),
+            false,
+            Some("abcdef0123456789".to_string()),
+        );
+        assert_eq!(guard.manifest_sha256(), Some("abcdef0123456789"));
+    }
+
+    #[test]
+    fn wasm_guard_manifest_sha256_none_when_unset() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let guard = WasmGuard::new("test-no-hash".to_string(), Box::new(backend), false, None);
+        assert!(guard.manifest_sha256().is_none());
+    }
+
+    #[test]
+    fn wasm_guard_last_fuel_consumed_none_before_evaluate() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let guard = WasmGuard::new("test-fuel".to_string(), Box::new(backend), false, None);
+        assert!(guard.last_fuel_consumed().is_none());
+    }
+
+    #[test]
+    fn mock_backend_last_fuel_consumed_returns_none() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let req = GuardRequest {
+            tool_name: "t".to_string(),
+            server_id: "s".to_string(),
+            agent_id: "a".to_string(),
+            arguments: serde_json::Value::Null,
+            scopes: vec![],
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
+        };
+        let _ = backend.evaluate(&req).unwrap();
+        assert!(
+            backend.last_fuel_consumed().is_none(),
+            "mock backend should not track fuel"
+        );
+    }
+
+    #[test]
+    fn guard_evidence_metadata_returns_json_structure() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let guard = WasmGuard::new(
+            "test-evidence".to_string(),
+            Box::new(backend),
+            false,
+            Some("sha256hex".to_string()),
+        );
+
+        let evidence = guard.guard_evidence_metadata();
+        assert!(evidence.is_object());
+        assert!(evidence.get("fuel_consumed").is_some());
+        assert!(
+            evidence["fuel_consumed"].is_null(),
+            "fuel should be null before evaluate"
+        );
+        assert_eq!(evidence["manifest_sha256"], "sha256hex");
+    }
+
+    #[test]
+    fn guard_evidence_metadata_null_when_no_manifest() {
+        let mut backend = MockWasmBackend::allowing();
+        backend.load_module(b"fake", 1000).unwrap();
+
+        let guard = WasmGuard::new(
+            "test-evidence-null".to_string(),
+            Box::new(backend),
+            false,
+            None,
+        );
+
+        let evidence = guard.guard_evidence_metadata();
+        assert!(evidence["manifest_sha256"].is_null());
     }
 }

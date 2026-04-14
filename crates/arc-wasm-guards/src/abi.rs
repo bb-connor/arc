@@ -105,6 +105,15 @@ pub trait WasmGuardAbi: Send + Sync {
 
     /// Return the name of the runtime backend (e.g. "wasmtime", "mock").
     fn backend_name(&self) -> &str;
+
+    /// Return fuel consumed during the last `evaluate()` call, if tracked.
+    ///
+    /// Backends that support fuel metering (e.g. Wasmtime) return
+    /// `Some(consumed)` after each evaluation. Backends without fuel
+    /// tracking (e.g. mock) return `None`.
+    fn last_fuel_consumed(&self) -> Option<u64> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +157,10 @@ mod tests {
         let json: serde_json::Value = serde_json::to_value(&req).unwrap();
         assert_eq!(json["action_type"], "file_access");
         assert_eq!(json["extracted_path"], "/etc/passwd");
-        assert!(json.get("extracted_target").is_none(), "None fields with skip_serializing_if should be absent");
+        assert!(
+            json.get("extracted_target").is_none(),
+            "None fields with skip_serializing_if should be absent"
+        );
         assert_eq!(json["filesystem_roots"][0], "/home");
         assert_eq!(json["filesystem_roots"][1], "/tmp");
         assert_eq!(json["matched_grant_index"], 0);
@@ -167,11 +179,26 @@ mod tests {
 
         let req: GuardRequest = serde_json::from_value(json).unwrap();
         assert_eq!(req.tool_name, "test_tool");
-        assert!(req.action_type.is_none(), "action_type should default to None");
-        assert!(req.extracted_path.is_none(), "extracted_path should default to None");
-        assert!(req.extracted_target.is_none(), "extracted_target should default to None");
-        assert!(req.filesystem_roots.is_empty(), "filesystem_roots should default to empty Vec");
-        assert!(req.matched_grant_index.is_none(), "matched_grant_index should default to None");
+        assert!(
+            req.action_type.is_none(),
+            "action_type should default to None"
+        );
+        assert!(
+            req.extracted_path.is_none(),
+            "extracted_path should default to None"
+        );
+        assert!(
+            req.extracted_target.is_none(),
+            "extracted_target should default to None"
+        );
+        assert!(
+            req.filesystem_roots.is_empty(),
+            "filesystem_roots should default to empty Vec"
+        );
+        assert!(
+            req.matched_grant_index.is_none(),
+            "matched_grant_index should default to None"
+        );
     }
 
     #[test]
