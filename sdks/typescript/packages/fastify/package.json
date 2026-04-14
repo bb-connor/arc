@@ -1,0 +1,41 @@
+{
+  "name": "@arc-protocol/fastify",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ARC protocol plugin for Fastify",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arc-protocol/node-http": "file:../node-http",
+    "fastify-plugin": "^5.0.0"
+  },
+  "peerDependencies": {
+    "fastify": ">=4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "fastify": "^5.3.3",
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
