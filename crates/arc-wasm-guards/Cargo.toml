@@ -1,0 +1,32 @@
+[package]
+name = "arc-wasm-guards"
+description = "WASM guard runtime for ARC -- load and execute .wasm guard modules with fuel metering"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_wasm_guards"
+
+[features]
+default = []
+# Enable the wasmtime-based runtime backend.
+wasmtime-runtime = ["dep:wasmtime"]
+
+[dependencies]
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-core = { package = "arc-core", path = "../arc-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+wasmtime = { version = "29", optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
