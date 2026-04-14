@@ -1120,6 +1120,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-guard-sdk"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "arc-guard-sdk-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "arc-guards"
 version = "0.1.0"
 dependencies = [
@@ -1541,6 +1558,7 @@ dependencies = [
  "arc-core",
  "arc-guards",
  "arc-kernel",
+ "criterion",
  "hex",
  "serde",
  "serde_json",
