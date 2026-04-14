@@ -10752,7 +10752,10 @@ Plans:
   3. Fuel metering overhead is quantified as a percentage slowdown (fuel-enabled vs fuel-disabled) on representative workloads
   4. ResourceLimiter effectiveness is validated under adversarial guest allocation patterns that attempt to exceed the configured memory ceiling
 **Estimated complexity**: M
-**Plans**: 01 (`Authoritative ACP Guarding and Compatibility Surface Quarantine`) -- complete
+**Plans**: 2 plans
+Plans:
+- [ ] 376-01-PLAN.md -- Criterion harness setup, module compilation (WGBENCH-01) and instantiation overhead (WGBENCH-02) benchmarks
+- [ ] 376-02-PLAN.md -- Evaluate latency (WGBENCH-03), fuel overhead (WGBENCH-04), and ResourceLimiter validation (WGBENCH-05)
 
 ---
 
