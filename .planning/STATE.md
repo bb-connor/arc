@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
 stopped_at: Completed 376-02-PLAN.md
-last_updated: "2026-04-14T23:04:16.007Z"
+last_updated: "2026-04-14T23:06:47.074Z"
 last_activity: 2026-04-14 -- began phase 393 by extending v3.13 from phases
 progress:
   total_phases: 349
@@ -135,6 +135,15 @@ Progress: [####------] 43%
 - [Phase 376]: File-level lint suppression (#![allow(clippy::unwrap_used, clippy::expect_used)]) required for benchmark binaries since cfg_attr(test) does not apply to bench targets
 - [Phase 376]: Full production hot path (Store + Linker + host functions + instantiate + serialize + write + call) measured in evaluate latency benchmarks to match runtime.rs::evaluate()
 - [Phase 376]: ResourceLimiter benchmark uses assert!(result.is_err()) as correctness gate; benchmark failure means ResourceLimiter is misconfigured
+
+### Roadmap Evolution
+
+- `v3.13` was extended from phases `390-394` to `390-396` so the post-phase-392
+  audit gaps have explicit owners instead of leaking into vague “qualification”
+  work.
+- Phase `394` now owns HTTP authority/evidence convergence.
+- Phase `395` now owns A2A/ACP lifecycle and authority-surface closure.
+- Phase `396` now owns the final post-closure claim qualification.
 
 ### Pending Todos
 
