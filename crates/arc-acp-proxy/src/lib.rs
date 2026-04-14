@@ -27,6 +27,7 @@ include!("fs_guard.rs");
 include!("terminal_guard.rs");
 include!("permission.rs");
 include!("receipt.rs");
+include!("attestation.rs");
 include!("interceptor.rs");
 include!("transport.rs");
 include!("proxy.rs");

@@ -23,12 +23,23 @@ pub enum InterceptResult {
 /// The interceptor examines every JSON-RPC message, delegates to
 /// specialized guards, and decides whether to forward, block, or
 /// augment the message with an audit entry.
+///
+/// When a `ReceiptSigner` is installed, audit entries are promoted
+/// to signed ARC receipts. When a `CapabilityChecker` is installed,
+/// file and terminal operations are validated against capability tokens
+/// before falling back to the built-in guards.
 pub struct MessageInterceptor {
     config: AcpProxyConfig,
     permission_mapper: PermissionMapper,
     fs_guard: FsGuard,
     terminal_guard: TerminalGuard,
     receipt_logger: ReceiptLogger,
+    /// Optional receipt signer for producing signed ARC receipts.
+    receipt_signer: Option<Box<dyn ReceiptSigner>>,
+    /// Optional capability checker for token-based access control.
+    capability_checker: Option<Box<dyn CapabilityChecker>>,
+    /// Attestation mode controlling how signing failures are handled.
+    attestation_mode: AcpAttestationMode,
 }
 
 impl MessageInterceptor {
@@ -45,7 +56,49 @@ impl MessageInterceptor {
             fs_guard,
             terminal_guard,
             receipt_logger,
+            receipt_signer: None,
+            capability_checker: None,
+            attestation_mode: AcpAttestationMode::default(),
         }
+    }
+
+    /// Build an interceptor with kernel-injected signer and checker.
+    pub fn with_kernel(
+        config: AcpProxyConfig,
+        signer: Option<Box<dyn ReceiptSigner>>,
+        checker: Option<Box<dyn CapabilityChecker>>,
+        attestation_mode: AcpAttestationMode,
+    ) -> Self {
+        let fs_guard = FsGuard::new(config.allowed_path_prefixes().to_vec());
+        let terminal_guard = TerminalGuard::new(config.allowed_commands().to_vec());
+        let receipt_logger = ReceiptLogger::new(config.server_id());
+        let permission_mapper = PermissionMapper::new(3600);
+
+        Self {
+            config,
+            permission_mapper,
+            fs_guard,
+            terminal_guard,
+            receipt_logger,
+            receipt_signer: signer,
+            capability_checker: checker,
+            attestation_mode,
+        }
+    }
+
+    /// Whether a receipt signer is installed.
+    pub fn has_receipt_signer(&self) -> bool {
+        self.receipt_signer.is_some()
+    }
+
+    /// Whether a capability checker is installed.
+    pub fn has_capability_checker(&self) -> bool {
+        self.capability_checker.is_some()
+    }
+
+    /// The current attestation mode.
+    pub fn attestation_mode(&self) -> AcpAttestationMode {
+        self.attestation_mode
     }
 
     /// Intercept a JSON-RPC message flowing in the given `direction`.
