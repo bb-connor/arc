@@ -53,6 +53,7 @@ Progress: [#####-----] 50%
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
 - v3.0-v3.11: 54 phases planned across 12 milestones
+- v4.0: 4 phases planned (parallel with v2.83)
 
 ## Accumulated Context
 
@@ -84,6 +85,9 @@ Progress: [#####-----] 50%
   than introducing a second demo stack before the Docker milestone lands.
 - Phase `310` anchored the tutorial and framework examples to the same hosted
   HTTP edge topology rather than reviving the old stdio demo path.
+- v4.0 WASM Guard Runtime Completion runs in parallel with v2.83 (no code
+  dependency). Design authority is `docs/guards/05-V1-DECISION.md`. ABI is raw
+  core-WASM (not WIT), stateless per-call Store, HushSpec-first pipeline order.
 
 ### Pending Todos
 
@@ -119,7 +123,7 @@ Progress: [#####-----] 50%
 - The new qualification bundle now includes one fresh `arc-core` microbenchmark
   baseline, but there is still no broader end-to-end CLI/kernel latency
   baseline captured for `v2.83`.
-- The default web3-enabled graph still carries alloy’s transitive hashbrown
+- The default web3-enabled graph still carries alloy's transitive hashbrown
   split; the core-path no-default-features graph is now the validated slim path.
 - The planning/state pointers still describe the older `v2.83` lane as the
   active milestone even though the v3.9-v3.11 remediation patch set is now
@@ -127,15 +131,16 @@ Progress: [#####-----] 50%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: Not started (defining requirements)
+Phase: 373 (not started)
 Plan: --
-Status: Defining requirements
-Last activity: 2026-04-14 -- Milestone v4.0 started; runs in parallel with
-v2.83 (no code dependency)
+Status: Roadmap created; phases 373-376 defined; ready for `plan-phase 373`
+Last activity: 2026-04-14 -- v4.0 roadmap created with 4 phases covering 31
+requirements across runtime hardening, security/enrichment, manifest/wiring/
+receipts, and benchmark validation
 
 ## Session Continuity
 
 Last session: 2026-04-14
-Stopped at: v4.0 milestone initialization from docs/guards/ research
-Next action: define v4.0 requirements, create roadmap phases 373+
+Stopped at: v4.0 roadmap created; phases 373-376 defined in ROADMAP.md
+Next action: `/gsd:plan-phase 373` to begin WASM runtime host foundation
 Resume file: None

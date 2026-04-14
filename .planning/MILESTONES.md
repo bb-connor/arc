@@ -230,6 +230,142 @@ governance without forking the kernel. Metering and economics create the
 receipt-as-billing-ledger model. AG-UI and skill authority extend ARC to
 emerging agent-to-user and orchestrated workflow surfaces.
 
+### v3.8 Normative Specification Alignment
+
+**Status:** planned
+**Executable phases:** 351-358
+**Goal:** Bring the v3.x public specification, schema, and SDK documentation
+into line with the shipped universal security kernel so external consumers can
+rely on the documented contract.
+
+**Key intended outcomes:**
+- Normative specs for the HTTP substrate, OpenAPI integration, guards,
+  configuration, compliance certificates, metering, workflow authority, and
+  protocol bridges
+- JSON Schemas under `spec/schemas/arc-http/v1/` for the sidecar contract
+- SDK reference docs for Python, TypeScript, Go, and platform substrates
+- Reconciled design docs under `docs/protocols/` that distinguish rationale
+  from normative contract
+
+**Why this milestone matters:** ARC cannot claim portable attestation and
+cross-language adoption if the public contract drifts from the implementation.
+This milestone makes the v3.x kernel consumable by external implementers.
+
+### v3.9 Runtime Correctness and Contract Remediation
+
+**Status:** active locally
+**Executable phases:** 359-363
+**Goal:** Close the highest-severity v3.x review gaps by restoring
+kernel-mediated OpenAI execution, aligning certificate serialization with the
+normative spec, fixing HTTP request binding and capability validation,
+stabilizing flaky integration tests, and correcting residual SDK/spec drift.
+
+**Key intended outcomes:**
+- `arc-openai` executes function calls through the ARC kernel and returns real
+  signed receipt artifacts instead of synthetic receipt references
+- Compliance certificates serialize in the normative snake_case wire format and
+  remain verifiable through `arc cert`
+- `arc-api-protect` and `arc-tower` bind query parameters into request hashes,
+  carry `capability_id`, and deny invalid or expired capability tokens
+- `mcp_serve` integration tests stop exhibiting order-sensitive flake
+- Residual contract drift is closed in `spec/CONFIGURATION.md`, Python SDK
+  timeout defaults, and workspace-level lint policy
+
+**Why this milestone matters:** These gaps are the difference between an
+interesting internal prototype and an externally credible runtime security
+kernel. v3.9 restores trust in the documented fail-closed and signed-evidence
+claims.
+
+### v3.10 HTTP Sidecar and Cross-SDK Contract Completion
+
+**Status:** active locally
+**Executable phases:** 364-367
+**Goal:** Finish the residual v3.x HTTP substrate work by exposing the
+normative `/arc/*` sidecar interface in Rust, migrating Python onto that
+contract, aligning non-Rust capability presentation semantics, and removing
+the remaining misleading HTTP-receipt conversion surface.
+
+**Key intended outcomes:**
+- `arc-api-protect` exposes `POST /arc/evaluate`, `POST /arc/verify`, and
+  `GET /arc/health` with the normative v3 request/response shapes
+- Python SDK, ASGI, Django, and FastAPI wrappers use the `/arc/*` sidecar
+  endpoints and `EvaluateResponse` rather than the pre-v3 `/v1/evaluate-http`
+  contract
+- TypeScript, Go, JVM, and .NET HTTP adapters stop embedding raw capability
+  tokens in `ArcHttpRequest.headers`, carry token IDs in `capability_id`, and
+  document/query both accepted presentation paths
+- `HttpReceipt::to_arc_receipt()` no longer fabricates an invalid signed
+  `ArcReceipt`; callers must provide a signing keypair for conversion
+
+**Why this milestone matters:** v3.9 fixed the first wave of correctness
+issues, but ARC still lacked an in-repo sidecar implementation for the
+normative HTTP substrate and still had cross-language SDK drift. v3.10 closes
+the last external-consumption blockers in the HTTP/kernel adoption path.
+
+### v3.11 Sidecar Entrypoint and Body-Integrity Completion
+
+**Status:** active locally
+**Executable phases:** 368-372
+**Goal:** Finish the final shippability and request-integrity gaps by
+shipping the documented `arc api protect` operator entrypoint, preserving
+request bodies across Node/JVM middleware, aligning byte-accurate body
+hashing across SDKs, and correcting the last HTTP substrate schema/doc
+drift.
+
+**Key intended outcomes:**
+- `arc` exposes the documented `api protect` subcommand and wires it to
+  OpenAPI spec loading or discovery, so operators and the K8s injector can
+  launch the sidecar exactly as the docs describe
+- TypeScript node/Express/Web interceptors and the JVM Spring filter preserve
+  request bodies for downstream handlers while still computing ARC body hashes
+- Fastify, JVM, and .NET compute `body_hash` from the raw request bytes, not
+  decoded strings or reparsed JSON
+- `EvaluateResponse.evidence` is always present on the wire, matching the
+  normative schema and generated client expectations
+- HTTP JSON schemas model nullable optional fields correctly, and platform
+  docs describe capability transport consistently
+
+**Why this milestone matters:** v3.10 closed the first sidecar and SDK
+contract gaps, but ARC still could not honestly claim that the documented
+`arc api protect` entrypoint was shippable or that its middleware preserved
+request semantics while binding content cryptographically. v3.11 closes the
+remaining body-integrity and operator-surface gaps that would undermine real
+deployments.
+
+### v4.0 WASM Guard Runtime Completion
+
+**Status:** planned
+**Executable phases:** 373-376
+**Goal:** Complete the arc-wasm-guards host-side runtime that Phase 347
+scaffolded. Extend v3.7's WASM guard skeleton into a production-ready,
+HushSpec-aware guard execution surface with proper host functions, security
+hardening, guard manifests, kernel pipeline wiring, receipt metadata, and
+validated performance benchmarks.
+
+**Key intended outcomes:**
+- Shared `Arc<Engine>` across all WASM guards with `WasmHostState` carrying
+  per-guard config and log buffer
+- Host functions (`arc.log`, `arc.get_config`, `arc.get_time_unix_secs`) and
+  guest memory protocol (`arc_alloc`, `arc_deny_reason`)
+- ResourceLimiter memory caps, module import validation, and module size
+  limits
+- Enriched GuardRequest with host-extracted action context fields replacing
+  session_metadata
+- Guard manifest format with SHA-256 verification and ABI version validation
+- Startup wiring: HushSpec-compiled guards -> sorted WASM guards -> advisory
+  pipeline
+- Receipt metadata carrying fuel consumed and manifest SHA-256
+- Benchmark suite validating module load, instantiation, evaluate latency,
+  fuel overhead, and memory caps
+
+**Why this milestone matters:** Phase 347 scaffolded the WASM guard execution
+envelope but left the host functions, security surface, manifest format,
+pipeline wiring, and performance validation incomplete. Without these, WASM
+guards cannot be loaded from a manifest, cannot interact with the host, have
+no memory or import safety, and lack the benchmarks needed to validate the
+per-call fresh-Store model. v4.0 closes every gap between the skeleton and a
+production-ready WASM guard runtime.
+
 ## Deferred Milestone
 
 ### v2.71 Web3 Live Activation
@@ -255,14 +391,23 @@ v3.0 (Kernel Foundation)
   |--- v3.3 (TypeScript)        [parallel]
   |--- v3.4 (Guards)            [parallel]
   |--- v3.5 (Protocol)          [mostly parallel -- most phases need v3.0 only; edge crates need v3.1]
-  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic)
+  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity)
 ```
+
+v4.0 (WASM Guard Runtime)    [parallel with v2.83 -- no dependency on v3.x chain]
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
 v3.1, v3.2, v3.3, v3.4, and most of v3.5 can execute in parallel after v3.0.
 v3.5 Phase 341 (A2A/ACP edge crates) depends on v3.1 for signed receipts.
-v3.6 and v3.7 are sequential after v3.5.
+v3.6 and v3.7 are sequential after v3.5. v3.8 documents the shipped v3.x
+surface. v3.9 remediates the first wave of correctness and contract gaps
+surfaced by the post-implementation audit. v3.10 closes the remaining HTTP
+sidecar and cross-SDK substrate gaps that still blocked external adoption.
+v3.11 ships the missing operator entrypoint and closes the remaining
+request-body integrity and schema consistency gaps.
+v4.0 runs in parallel with v2.83 and the v3.x chain. It depends only on the
+Phase 347 skeleton (already shipped in v3.7).
 
 ## Latest Completed Milestone
 
