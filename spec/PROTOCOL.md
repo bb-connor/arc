@@ -1,8 +1,13 @@
 # ARC Protocol
 
-**Version:** 2.0
-**Date:** 2026-04-02
+**Version:** 3.0
+**Date:** 2026-04-14
 **Status:** Shipped repository profile
+
+v3.0 is a backward-compatible extension of v2.0. All v2 artifacts, wire
+formats, and verification rules remain valid. v3 adds the HTTP substrate
+protocol, OpenAPI integration pipeline, and supporting CLI surfaces without
+changing existing contract semantics.
 
 ---
 
@@ -107,6 +112,26 @@ The shipped `v2` contract does not claim:
   release from Functions or paymaster infrastructure beyond ARC's documented
   bounded web3 interop surfaces
 - a replacement of MCP or A2A at the wire-protocol ecosystem level
+
+### v3 Additions
+
+The `v3` contract extends the `v2` scope with:
+
+- an HTTP substrate sidecar protocol for protecting arbitrary HTTP APIs through
+  ARC policy evaluation, typed HTTP receipts, and structured verdicts (see
+  [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md))
+- an OpenAPI-to-manifest pipeline that derives `arc.manifest.v1` tool
+  definitions from OpenAPI specifications with `x-arc-*` policy extensions (see
+  [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md))
+- a reverse-proxy entrypoint (`arc api protect`) that combines OpenAPI
+  ingestion, sidecar evaluation, and live traffic enforcement
+- certificate management CLI surfaces (`arc cert generate`, `arc cert verify`,
+  `arc cert inspect`) for operator-facing TLS and signing material
+
+These surfaces share the same core receipt, capability, and policy primitives
+documented in v2 sections below. The HTTP substrate's `HttpReceipt` maps
+deterministically to `ArcReceipt` so all existing receipt verification,
+checkpoint, and evidence-export workflows continue to apply.
 
 Compatibility rule:
 
@@ -450,6 +475,33 @@ lanes additionally require durable local receipt storage and kernel-signed
 checkpoint issuance; append-only remote receipt mirrors are insufficient when
 the runtime claims Merkle or Solana evidence readiness.
 
+### 6.5 HTTP Receipts
+
+The HTTP substrate (see [HTTP-SUBSTRATE.md](HTTP-SUBSTRATE.md)) introduces
+`HttpReceipt`, a domain-specific receipt type for HTTP-layer policy evaluations.
+`HttpReceipt` captures HTTP-specific context that `ArcReceipt` does not natively
+model, including the evaluated HTTP method, path, query parameters, request
+headers, caller identity, authentication method, and the sidecar verdict.
+
+`HttpReceipt` is the receipt format returned by the sidecar evaluation endpoint.
+`ArcReceipt` remains the unified storage and verification format for all ARC
+receipt workflows, including checkpoints, evidence export, and federation.
+
+The deterministic mapping from `HttpReceipt` to `ArcReceipt` is defined in
+[HTTP-SUBSTRATE.md Section 5](HTTP-SUBSTRATE.md). That mapping preserves:
+
+- `receipt_id` as the stable identifier across both formats
+- `tool_server` derived from the OpenAPI server identity or sidecar
+  configuration
+- `tool_name` derived from the matched `operationId`
+- `decision` mapped from the sidecar verdict
+- HTTP-specific evaluation context projected into `ArcReceipt.metadata`
+- `policy_hash` and `content_hash` carried through unchanged
+
+This mapping is deterministic: the same `HttpReceipt` always produces the same
+`ArcReceipt`. Operators may store either or both formats, but checkpoint
+signing and evidence export always operate on the `ArcReceipt` representation.
+
 ## 7. Manifest Contract
 
 Tool discovery currently uses the frozen manifest schema:
@@ -469,6 +521,31 @@ This manifest is the authoritative discovery contract for native tool servers
 and for mediated adapters that synthesize an ARC tool surface from another
 protocol. `arc.manifest.v1` remains frozen in this release for compatibility.
 
+### 7.1 OpenAPI-Derived Manifests
+
+ARC v3 adds an automated pipeline for deriving `arc.manifest.v1` tool
+definitions from OpenAPI 3.0.x and 3.1.x specifications. Each HTTP operation
+(method + path pair) in the OpenAPI spec becomes one `ToolDefinition`. The full
+pipeline is specified in [OPENAPI-INTEGRATION.md](OPENAPI-INTEGRATION.md).
+
+The `x-arc-*` extension vocabulary provides the policy overlay for OpenAPI
+specs. Extensions may appear at the operation, path, or root level and control:
+
+- `x-arc-scope`: capability scope required for the operation
+- `x-arc-guard`: guard expressions evaluated during policy admission
+- `x-arc-rate-limit`: per-operation rate constraints
+- `x-arc-require-auth`: authentication requirements beyond the OpenAPI
+  `securitySchemes`
+
+When no `x-arc-*` extensions are present, the pipeline applies a default
+deny-by-method policy that assigns conservative scope requirements based on
+the HTTP method. This ensures fail-closed behavior for undecorated specs.
+
+The derived `arc.manifest.v1` output is identical in structure to hand-authored
+manifests. Downstream consumers (the kernel, trust-control, and receipt
+pipeline) do not distinguish between hand-authored and OpenAPI-derived
+manifests.
+
 ## 8. Runtime Surfaces
 
 ### 8.1 Local CLI And Kernel
@@ -480,6 +557,10 @@ The repository ships these primary runtime entrypoints:
 - `arc mcp serve`
 - `arc mcp serve-http`
 - `arc trust serve`
+- `arc api protect` -- reverse proxy that enforces ARC policy over an HTTP API using an OpenAPI spec
+- `arc cert generate` -- generate TLS or signing certificates for ARC operator use
+- `arc cert verify` -- verify a certificate chain or signing material against ARC trust roots
+- `arc cert inspect` -- display certificate metadata, expiry, and key bindings
 
 These surfaces intentionally share the same core receipt, capability,
 revocation, and policy primitives rather than defining separate trust models.
@@ -2110,7 +2191,7 @@ For operational guidance, see:
 
 ## 14. Explicit Gaps
 
-The following are intentionally outside the shipped `v2` contract:
+The following are intentionally outside the shipped `v3` contract:
 
 - permissionless or auto-trusting public federation or certification
   marketplace semantics
