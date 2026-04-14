@@ -675,6 +675,176 @@ pub mod wasmtime_backend {
                 "expected ALLOW (negative arc_alloc should fall back to offset 0), got: {result:?}"
             );
         }
+
+        // -------------------------------------------------------------------
+        // arc_deny_reason tests
+        // -------------------------------------------------------------------
+
+        #[test]
+        fn arc_deny_reason_structured() {
+            // WAT module with arc_deny_reason that writes a JSON GuestDenyResponse
+            // into the provided buffer and returns the byte count.
+            //
+            // The JSON {"reason":"blocked by policy"} is stored using escaped
+            // quotes in the WAT data segment at offset 512.
+            // arc_deny_reason copies it to buf_ptr using memory.copy.
+            let json_bytes = br#"{"reason":"blocked by policy"}"#;
+            let json_len = json_bytes.len(); // 30
+
+            // Build WAT data segment using \xx hex escapes to avoid quote issues
+            let hex_data: String = json_bytes
+                .iter()
+                .map(|b| format!("\\{b:02x}"))
+                .collect();
+
+            let wat = format!(
+                r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    ;; Store the JSON response at offset 512 using hex escapes
+                    (data (i32.const 512) "{hex_data}")
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return DENY (1)
+                        (i32.const 1)
+                    )
+                    (func (export "arc_deny_reason") (param $buf_ptr i32) (param $buf_len i32) (result i32)
+                        ;; Copy JSON from offset 512 to buf_ptr using memory.copy
+                        (memory.copy
+                            (local.get $buf_ptr)  ;; dest
+                            (i32.const 512)       ;; src
+                            (i32.const {json_len})  ;; len
+                        )
+                        ;; Return number of bytes written
+                        (i32.const {json_len})
+                    )
+                )
+            "#
+            );
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            match &result {
+                GuardVerdict::Deny { reason } => {
+                    assert_eq!(
+                        reason.as_deref(),
+                        Some("blocked by policy"),
+                        "expected structured deny reason from arc_deny_reason"
+                    );
+                }
+                _ => panic!("expected Deny verdict, got: {result:?}"),
+            }
+        }
+
+        #[test]
+        fn arc_deny_reason_fallback_legacy() {
+            // WAT module WITHOUT arc_deny_reason export.
+            // Has a NUL-terminated string at offset 65536 ("legacy reason\0").
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (data (i32.const 65536) "legacy reason\00")
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return DENY (1)
+                        (i32.const 1)
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            match &result {
+                GuardVerdict::Deny { reason } => {
+                    assert_eq!(
+                        reason.as_deref(),
+                        Some("legacy reason"),
+                        "expected legacy deny reason from offset 64K"
+                    );
+                }
+                _ => panic!("expected Deny verdict, got: {result:?}"),
+            }
+        }
+
+        #[test]
+        fn arc_deny_reason_invalid_returns_none() {
+            // WAT module with arc_deny_reason that returns -1 (error).
+            // The host should fall back to None reason.
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return DENY (1)
+                        (i32.const 1)
+                    )
+                    (func (export "arc_deny_reason") (param $buf_ptr i32) (param $buf_len i32) (result i32)
+                        ;; Return -1 (error)
+                        (i32.const -1)
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            match &result {
+                GuardVerdict::Deny { reason } => {
+                    assert_eq!(
+                        reason, &None,
+                        "expected None reason when arc_deny_reason returns -1"
+                    );
+                }
+                _ => panic!("expected Deny verdict, got: {result:?}"),
+            }
+        }
+
+        #[test]
+        fn deny_no_reason_at_all() {
+            // WAT module without arc_deny_reason and no string at offset 64K.
+            // Memory is zeroed so read_deny_reason will find a NUL at position 0.
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return DENY (1)
+                        (i32.const 1)
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            match &result {
+                GuardVerdict::Deny { reason } => {
+                    assert_eq!(
+                        reason, &None,
+                        "expected None reason when no deny reason mechanism is available"
+                    );
+                }
+                _ => panic!("expected Deny verdict, got: {result:?}"),
+            }
+        }
     }
 }
 
