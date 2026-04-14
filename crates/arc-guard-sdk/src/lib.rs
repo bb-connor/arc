@@ -19,6 +19,7 @@
 //! ```
 
 pub mod alloc;
+pub mod glue;
 pub mod host;
 pub mod types;
 
