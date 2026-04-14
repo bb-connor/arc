@@ -5,7 +5,7 @@
 Conformance
 (completed locally 2026-04-13)
 **Active milestone:** v2.83 Coverage, Hardening, and Production Qualification
-**Planned milestones:** v3.0 through v3.7 (Universal Security Kernel era)
+**Planned milestones:** v3.0 through v3.11 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -662,7 +662,95 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 ---
 
-## Traceability (v3.0-v3.8)
+### v3.9 Runtime Correctness and Contract Remediation
+
+#### Phase 359: OpenAI Adapter Kernel Execution
+
+- [ ] **REM-01**: `arc-openai` routes OpenAI function calls through `ArcKernel::evaluate_tool_call_blocking` using a real `ToolCallRequest` rather than calling a tool server directly
+- [ ] **REM-02**: `ToolCallResult` carries the kernel-signed `ArcReceipt` object for calls that reach the kernel and uses the receipt's real `id` as `receipt_ref`
+- [ ] **REM-03**: OpenAI adapter tests cover allow, deny, tool-server error, unknown function, and argument-parse failure under the kernel-backed execution path
+
+#### Phase 360: Compliance Certificate Wire Format Alignment
+
+- [ ] **REM-04**: Compliance certificate JSON serializes with snake_case field names matching `spec/COMPLIANCE-CERTIFICATE.md` (`session_id`, `receipt_count`, `signer_key`, `receipts_reverified`, etc.)
+- [ ] **REM-05**: `arc cert generate`, `arc cert verify`, and `arc cert inspect` continue to work with the corrected wire format and accept previously emitted camelCase payloads when feasible
+
+#### Phase 361: HTTP Adapter Request Binding and Capability Validation
+
+- [ ] **REM-06**: `arc-api-protect` and `arc-tower` parse query parameters into the normalized `ArcHttpRequest` so query values participate in the receipt `content_hash`
+- [ ] **REM-07**: `arc-api-protect` and `arc-tower` carry `capability_id` into `ArcHttpRequest` and `HttpReceipt` when a valid capability token is presented in `X-Arc-Capability` or `arc_capability`
+- [ ] **REM-08**: Unsafe HTTP requests with malformed, invalid-signature, or expired capability tokens are denied fail-closed instead of being allowed on token presence alone
+
+#### Phase 362: Test Stabilization and Invariant Enforcement
+
+- [ ] **REM-09**: `crates/arc-cli/tests/mcp_serve.rs` no longer exhibits order-sensitive flake under repeated or concurrent workspace test execution
+- [ ] **REM-10**: Workspace-level lint configuration documents and enforces the no-`unwrap`/`expect` invariant at the root in addition to crate-local clippy settings
+
+#### Phase 363: Residual SDK and Spec Drift Cleanup
+
+- [ ] **REM-11**: `spec/CONFIGURATION.md` no longer documents a nonexistent `arc start --config arc.yaml` command as the normative configuration entrypoint
+- [ ] **REM-12**: Python SDK, ASGI, and Django timeout defaults are `5.0` seconds (5000ms) to match `spec/HTTP-SUBSTRATE.md`
+- [ ] **REM-13**: Documentation is updated anywhere the runtime contract changed during remediation, including OpenAI receipt behavior and capability-token validation semantics
+
+---
+
+### v3.10 HTTP Sidecar and Cross-SDK Contract Completion
+
+#### Phase 364: Rust HTTP Sidecar Surface
+
+- [ ] **ALIGN-01**: `arc-api-protect` exposes `POST /arc/evaluate` and returns a normative `EvaluateResponse` with `200 OK` for both allow and deny verdicts
+- [ ] **ALIGN-02**: `arc-api-protect` exposes `POST /arc/verify` for `HttpReceipt` signature verification and `GET /arc/health` with the normative `status` and `version` fields
+- [ ] **ALIGN-03**: The in-repo Rust sidecar implementation stores signed receipts from `/arc/evaluate` and uses the same kernel/evaluator path as the proxy runtime
+
+#### Phase 365: Python HTTP Substrate Alignment
+
+- [ ] **ALIGN-04**: `arc-sdk-python` uses `/arc/health`, `/arc/verify`, and `/arc/evaluate` for the HTTP substrate instead of the pre-v3 `/health` and `/v1/evaluate-http` surface
+- [ ] **ALIGN-05**: `arc-sdk-python` publishes `ArcHttpRequest` and `EvaluateResponse` typed models, and `evaluate_http_request()` returns `EvaluateResponse`
+- [ ] **ALIGN-06**: `arc-asgi`, `arc-django`, and `arc-fastapi` consume the normative sidecar response shape and do not rely on `403` deny responses from the sidecar
+
+#### Phase 366: Cross-SDK Capability Presentation Alignment
+
+- [ ] **ALIGN-07**: TypeScript, Go, JVM, and .NET HTTP adapters stop forwarding raw capability-token material inside `ArcHttpRequest.headers`
+- [ ] **ALIGN-08**: TypeScript, Go, JVM, and .NET carry the presented token's `id` in `capability_id` when derivable and preserve both header and query-param presentation paths in user-facing deny guidance
+- [ ] **ALIGN-09**: Platform SDK docs (`docs/sdk/PLATFORM.md` and per-language references where relevant) describe header-or-query capability presentation semantics consistently with the normative spec
+
+#### Phase 367: HTTP Receipt Conversion Safety
+
+- [ ] **ALIGN-10**: `HttpReceipt::to_arc_receipt()` no longer returns an `ArcReceipt` with a copied invalid signature, and the crate offers only explicit fail-closed or re-signing-based conversion behavior
+
+---
+
+### v3.11 Sidecar Entrypoint and Body-Integrity Completion
+
+#### Phase 368: Shippable `arc api protect` Entrypoint
+
+- [ ] **FINAL-01**: `arc` exposes an `api protect` subcommand that launches the HTTP sidecar runtime documented in `spec/OPENAPI-INTEGRATION.md`
+- [ ] **FINAL-02**: The `api protect` command accepts `--upstream`, optional `--spec`, and optional `--listen`, and loads or auto-discovers the OpenAPI spec instead of requiring preloaded `spec_content`
+- [ ] **FINAL-03**: The Kubernetes injector's documented sidecar command line is runnable against the checked-in CLI without local patching or hidden entrypoints
+
+#### Phase 369: TypeScript Request-Body Preservation
+
+- [ ] **FINAL-04**: `@arc-protocol/node-http` preserves request bodies for downstream consumers when computing body hashes for Node and Web request interception
+- [ ] **FINAL-05**: `@arc-protocol/express` remains body-safe for downstream handlers on body-bearing requests, and TypeScript docs no longer recommend direct interception patterns that drain bodies irreversibly
+
+#### Phase 370: JVM Request-Body Preservation and Raw-Byte Hashing
+
+- [ ] **FINAL-06**: `arc-spring-boot` wraps requests so downstream filters and controllers can still read the body after ARC evaluation
+- [ ] **FINAL-07**: JVM request hashing is computed from the raw request bytes, not UTF-8-decoded strings
+
+#### Phase 371: Cross-SDK Raw-Byte Binding and EvaluateResponse Contract
+
+- [ ] **FINAL-08**: Fastify and .NET compute `body_hash` from raw request bytes rather than reparsed JSON or decoded strings
+- [ ] **FINAL-09**: `EvaluateResponse.evidence` is always serialized on the wire so the Rust runtime matches `spec/HTTP-SUBSTRATE.md` and the shipped JSON schema
+
+#### Phase 372: HTTP Schema and Platform Doc Consistency
+
+- [ ] **FINAL-10**: The HTTP JSON schemas model nullable optional fields (`body_hash`, `session_id`, `capability_id`) consistently with the prose spec and Rust `Option<_>` types
+- [ ] **FINAL-11**: `docs/sdk/PLATFORM.md` consistently documents capability transport as `X-Arc-Capability` header or `arc_capability` query parameter everywhere
+
+---
+
+## Traceability (v3.0-v3.11)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -814,9 +902,43 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | SPEC-32 | Phase 358 | Planned |
 | SPEC-33 | Phase 358 | Planned |
 | SPEC-34 | Phase 358 | Planned |
+| REM-01 | Phase 359 | Planned |
+| REM-02 | Phase 359 | Planned |
+| REM-03 | Phase 359 | Planned |
+| REM-04 | Phase 360 | Planned |
+| REM-05 | Phase 360 | Planned |
+| REM-06 | Phase 361 | Planned |
+| REM-07 | Phase 361 | Planned |
+| REM-08 | Phase 361 | Planned |
+| REM-09 | Phase 362 | Planned |
+| REM-10 | Phase 362 | Planned |
+| REM-11 | Phase 363 | Planned |
+| REM-12 | Phase 363 | Planned |
+| REM-13 | Phase 363 | Planned |
+| ALIGN-01 | Phase 364 | Planned |
+| ALIGN-02 | Phase 364 | Planned |
+| ALIGN-03 | Phase 364 | Planned |
+| ALIGN-04 | Phase 365 | Planned |
+| ALIGN-05 | Phase 365 | Planned |
+| ALIGN-06 | Phase 365 | Planned |
+| ALIGN-07 | Phase 366 | Planned |
+| ALIGN-08 | Phase 366 | Planned |
+| ALIGN-09 | Phase 366 | Planned |
+| ALIGN-10 | Phase 367 | Planned |
+| FINAL-01 | Phase 368 | Planned |
+| FINAL-02 | Phase 368 | Planned |
+| FINAL-03 | Phase 368 | Planned |
+| FINAL-04 | Phase 369 | Planned |
+| FINAL-05 | Phase 369 | Planned |
+| FINAL-06 | Phase 370 | Planned |
+| FINAL-07 | Phase 370 | Planned |
+| FINAL-08 | Phase 371 | Planned |
+| FINAL-09 | Phase 371 | Planned |
+| FINAL-10 | Phase 372 | Planned |
+| FINAL-11 | Phase 372 | Planned |
 
 **Coverage:**
-- Universal security kernel requirements (v3.0-v3.7): 114 total, 114 mapped, 0 unmapped
+- Universal security kernel requirements (v3.0-v3.11): 148 total, 148 mapped, 0 unmapped
 
 ## Out of Scope (v3.x)
 
@@ -835,7 +957,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-13 after defining v3.0-v3.7 universal security kernel requirements*
+*Last updated: 2026-04-14 after adding v3.11 sidecar entrypoint and body-integrity completion requirements*
 
 ## Historical Milestone Requirement Snapshots
 
@@ -2762,6 +2884,120 @@ Nyquist artifacts, and ownership boundaries that future work depends on.
 - Mapped to phases: 230
 - Unmapped: 0
 
+## v4.0 WASM Guard Runtime Completion
+
+Completes the arc-wasm-guards host-side runtime that Phase 347 scaffolded.
+Extends v3.7's WASM guard skeleton into a production-ready, HushSpec-aware
+guard execution surface. Design docs: `docs/guards/01-05`.
+
+### Runtime Hardening
+
+- [ ] **WGRT-01**: WasmtimeBackend shares a single `Arc<Engine>` across all loaded WASM guards instead of creating one Engine per guard
+- [ ] **WGRT-02**: WasmtimeBackend uses a `WasmHostState` struct in the Store instead of `()`, carrying guard config and a log buffer
+- [ ] **WGRT-03**: WASM guards can call `arc.log(level, msg_ptr, msg_len)` host function to emit structured tracing log lines
+- [ ] **WGRT-04**: WASM guards can call `arc.get_config(key_ptr, key_len, val_out_ptr, val_out_len)` host function to read manifest config values
+- [ ] **WGRT-05**: WASM guards can call `arc.get_time_unix_secs()` host function to read wall-clock time
+- [ ] **WGRT-06**: Host checks for guest-exported `arc_alloc` and uses it for request memory allocation, falling back to offset-0 write when absent
+- [ ] **WGRT-07**: Host checks for guest-exported `arc_deny_reason` and uses it to read structured deny reasons, falling back to offset-64K NUL-terminated string when absent
+
+### Security
+
+- [ ] **WGSEC-01**: ResourceLimiter caps guest linear memory growth (configurable, default 16 MiB)
+- [ ] **WGSEC-02**: Module import validation rejects WASM modules that import functions outside the `arc` namespace (no WASI, no unknown imports)
+- [ ] **WGSEC-03**: Module size is validated at load time against a configurable maximum
+
+### Guard Request Enrichment
+
+- [ ] **WGREQ-01**: GuardRequest includes `action_type` field pre-extracted by the host via `extract_action()`
+- [ ] **WGREQ-02**: GuardRequest includes `extracted_path` field with normalized file path for filesystem actions
+- [ ] **WGREQ-03**: GuardRequest includes `extracted_target` field with domain string for network egress actions
+- [ ] **WGREQ-04**: GuardRequest includes `filesystem_roots` field from session context
+- [ ] **WGREQ-05**: GuardRequest includes `matched_grant_index` field from capability scope
+- [ ] **WGREQ-06**: `session_metadata` field is removed from GuardRequest (always None, replaced by structured fields)
+
+### Guard Manifest
+
+- [ ] **WGMAN-01**: Guard manifest format (`guard-manifest.yaml`) defines name, version, abi_version, wasm path, config schema, and wasm_sha256
+- [ ] **WGMAN-02**: Host verifies wasm_sha256 against actual .wasm binary content at load time and rejects mismatches
+- [ ] **WGMAN-03**: Host validates abi_version from manifest and rejects unsupported versions
+- [ ] **WGMAN-04**: Guard config values are loaded from manifest config block and made available via `arc.get_config` host function
+
+### Startup Wiring
+
+- [ ] **WGWIRE-01**: Startup code loads HushSpec-compiled guards via `arc_policy::compiler::compile_policy()` and registers them first in the kernel pipeline
+- [ ] **WGWIRE-02**: Startup code sorts `WasmGuardEntry` list by priority field before loading into WasmGuardRuntime
+- [ ] **WGWIRE-03**: Startup code registers WASM guards after HushSpec guards and before the advisory pipeline
+- [ ] **WGWIRE-04**: Startup code loads `guard-manifest.yaml` adjacent to each .wasm path and passes config to WasmHostState
+
+### Receipt Integration
+
+- [ ] **WGRCPT-01**: When a WASM guard evaluates, fuel consumed is recorded and available for inclusion in receipt metadata
+- [ ] **WGRCPT-02**: When a WASM guard evaluates, the guard manifest SHA-256 hash is recorded and available for inclusion in receipt metadata
+
+### Benchmarks
+
+- [ ] **WGBENCH-01**: Benchmark measures wasmtime Module::new() compilation time for representative .wasm guard binaries (50 KiB Rust, 5 MiB Python-via-componentize-py)
+- [ ] **WGBENCH-02**: Benchmark measures Linker::instantiate() per-call overhead
+- [ ] **WGBENCH-03**: Benchmark measures p50/p99 evaluate latency for a trivial guard (immediate Allow) and a realistic guard (JSON parse + pattern match + Deny)
+- [ ] **WGBENCH-04**: Benchmark measures fuel metering overhead percentage (fuel enabled vs disabled)
+- [ ] **WGBENCH-05**: Benchmark verifies ResourceLimiter actually caps memory growth under adversarial guest allocation
+
+## v4.0 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| WIT / Component Model ABI | v4.2 -- validate raw ABI on real workloads first |
+| Guest-side Rust SDK / proc macro | v4.1 -- host must be stable before guest SDK |
+| Non-Rust guest SDKs (TS, Python, Go) | v4.2 -- after WIT migration |
+| CLI tooling (arc guard new/build/test/pack) | v4.1 -- developer experience milestone |
+| Guard registry / marketplace / OCI | v4.2+ -- ecosystem maturity |
+| Persistent per-guard state across calls | Requires state model redesign |
+| Async host functions / network access | Kernel Guard trait is sync |
+| WasmGuardEntry.config field in arc.yaml | v4.0.1 fast-follow after manifest validation |
+| Epoch interruption | v4.0.1 -- secondary timeout after fuel validation |
+| Severity on GuardVerdict::Deny | v4.0.1 -- receipts-only, not advisory promotion |
+
+## v4.0 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| WGRT-01 | Phase 373 | Pending |
+| WGRT-02 | Phase 373 | Pending |
+| WGRT-03 | Phase 373 | Pending |
+| WGRT-04 | Phase 373 | Pending |
+| WGRT-05 | Phase 373 | Pending |
+| WGRT-06 | Phase 373 | Pending |
+| WGRT-07 | Phase 373 | Pending |
+| WGSEC-01 | Phase 374 | Pending |
+| WGSEC-02 | Phase 374 | Pending |
+| WGSEC-03 | Phase 374 | Pending |
+| WGREQ-01 | Phase 374 | Pending |
+| WGREQ-02 | Phase 374 | Pending |
+| WGREQ-03 | Phase 374 | Pending |
+| WGREQ-04 | Phase 374 | Pending |
+| WGREQ-05 | Phase 374 | Pending |
+| WGREQ-06 | Phase 374 | Pending |
+| WGMAN-01 | Phase 375 | Pending |
+| WGMAN-02 | Phase 375 | Pending |
+| WGMAN-03 | Phase 375 | Pending |
+| WGMAN-04 | Phase 375 | Pending |
+| WGWIRE-01 | Phase 375 | Pending |
+| WGWIRE-02 | Phase 375 | Pending |
+| WGWIRE-03 | Phase 375 | Pending |
+| WGWIRE-04 | Phase 375 | Pending |
+| WGRCPT-01 | Phase 375 | Pending |
+| WGRCPT-02 | Phase 375 | Pending |
+| WGBENCH-01 | Phase 376 | Pending |
+| WGBENCH-02 | Phase 376 | Pending |
+| WGBENCH-03 | Phase 376 | Pending |
+| WGBENCH-04 | Phase 376 | Pending |
+| WGBENCH-05 | Phase 376 | Pending |
+
+**Coverage:**
+- v4.0 requirements: 31 total
+- Mapped to phases: 31
+- Unmapped: 0 ✓
+
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-03 after activating v2.52 and queueing phases 217-220*
+*Last updated: 2026-04-14 after starting milestone v4.0 WASM Guard Runtime Completion*
