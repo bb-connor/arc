@@ -6,12 +6,32 @@
 
 ---
 
+## 0. How To Read This Document
+
+This document mixes three kinds of statements. They should not be read as if
+they have the same epistemic weight:
+
+- **Current state.** What is shipped in the repo today, or what the current
+  CLI/runtime demonstrably supports.
+- **Design proposal.** Architecture we intend to build, but which is not yet
+  implemented.
+- **Strategic assumption.** A directional thesis about the market, buyer, or
+  eventual business model. These guide prioritization, but are not primary
+  evidence by themselves.
+
+Where a surface is only proposed, this document now labels it explicitly. In
+particular: `arc mcp serve`, `arc mcp serve-http`, and the receipt dashboard
+ship today; `arc start --config arc.yaml` and cross-protocol ACP attestation
+remain proposed.
+
+---
+
 ## 1. The One-Sentence Vision
 
-ARC is the comptroller of the agent economy -- the only system providing
+ARC is the comptroller of the agent economy -- a system designed to provide
 cryptographically signed, cross-protocol attestation of what AI agents actually
-did, across MCP, A2A, and ACP, with a full liability market for pricing the
-residual risk.
+did across MCP, A2A, and ACP, with a liability market for pricing the residual
+risk as a long-term extension.
 
 ---
 
@@ -22,10 +42,11 @@ well. None solves the problem that matters most.
 
 ### MCP: Agent-to-Tool (Anthropic)
 
-97M+ downloads. The de facto standard for how LLMs call tools. Defines tool
-schemas, resources, prompts, sampling, and completions over stdio or HTTP+SSE.
-OAuth 2.1 support added in the 2026 spec revision. Broad adoption: Cursor,
-Windsurf, Claude Desktop, VS Code, and the growing registry ecosystem.
+MCP is the leading open tool-calling wire format in the current agent tooling
+ecosystem. It defines tool schemas, resources, prompts, sampling, and
+completions over stdio or HTTP+SSE. In this document, MCP's importance is a
+working strategic assumption based on ecosystem observation, not a citation-
+backed market measurement.
 
 MCP is a tool-calling wire format. It explicitly defers authorization to the
 application layer. OpenTelemetry logging provides observability, not proof.
@@ -34,9 +55,10 @@ no revocation semantics.
 
 ### A2A: Agent-to-Agent (Google / Linux Foundation)
 
-Google donated A2A to the Linux Foundation in June 2025. 150+ launch partners.
-v1.0 shipped with JWS-signed Agent Cards (RFC 7515), task lifecycle streaming,
-and DNS/HTTP discovery.
+A2A is the clearest open attempt to standardize agent-to-agent discovery and
+task exchange. It introduces signed Agent Cards, task lifecycle streaming, and
+DNS/HTTP discovery. ARC treats A2A as strategically important, but this
+document does not use it as the system of record for ecosystem metrics.
 
 A2A added cryptographic identity for card publishers but still has no scoped
 authorization tokens, no capability delegation, and no mechanism to constrain
@@ -54,9 +76,10 @@ the agent actually did, no signed receipts, and no delegation model.
 
 ### The Convergence
 
-Every enterprise deploying agents at scale will use all three protocols. MCP
-for tool access. A2A for multi-agent coordination. ACP for developer-facing
-agent integration. The three protocols are complementary, not competitive.
+ARC's working strategic assumption is that many enterprise agent deployments
+will encounter all three interaction patterns: MCP for tool access, A2A for
+multi-agent coordination, and ACP for developer-facing agent integration. The
+three protocols are complementary, not competitive.
 
 ### The Gap Nobody Fills
 
@@ -75,6 +98,46 @@ ARC fills that gap.
 ARC is not an alternative to MCP, A2A, or ACP. It is the authorization,
 attestation, and audit layer that sits across all three.
 
+### ARC Is Not Just an MCP Gateway
+
+MCP gateway-style enforcement is an important adoption wedge, but it is not the
+full ARC architecture and should not be treated as the end-state product
+identity.
+
+A pure gateway gives a clean enforcement chokepoint for wrapped MCP traffic.
+That is useful. It is also structurally incomplete:
+
+- It evaluates requests at the protocol boundary, often with weaker access to
+  full workflow history, delegation ancestry, and cross-step intent than the
+  kernel itself can preserve.
+- It only governs the traffic that actually passes through it. Agent actions
+  may migrate to A2A, ACP, native APIs, or framework-specific skill surfaces.
+- If the market shifts from MCP-heavy integrations toward protocol-mixed or
+  native-function architectures, an MCP-only control point secures a shrinking
+  fraction of agent behavior.
+
+ARC should therefore position wrapped MCP enforcement as the fastest current
+on-ramp, not the complete runtime-security strategy.
+
+Detailed research notes and open questions live in
+`RUNTIME-SECURITY-GATEWAY-VS-CONTEXT-RESEARCH.md`. The complementary HTTP and
+framework adoption track lives in `HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md`.
+
+### Three Runtime Security Layers
+
+ARC's runtime-security story is strongest when described as three layers, not
+one:
+
+1. **Deterministic governance.** Capability validation, static policy checks,
+   guards, budgets, revocation, and fail-closed enforcement.
+2. **Continuous observability.** Signed receipts, delegation lineage, session
+   traces, cost attribution, and evidence bundles that explain what happened.
+3. **Dynamic governance.** Optional future controls that use live context,
+   drift signals, and intent/risk scoring to change what is allowed mid-session.
+
+Today ARC is strongest in layers 1 and 2. Layer 3 is strategic expansion, not a
+claim of fully shipped intent-aware runtime intervention.
+
 ### Three Protocol Adapters, One Kernel
 
 ```
@@ -90,44 +153,65 @@ same trusted kernel. The kernel validates capability tokens, runs the guard
 pipeline, and signs receipts -- regardless of which protocol originated the
 request.
 
-### Signed Receipts Across All Three Protocols
+### Target Signed Receipts Across All Three Protocols
 
 The receipt log is protocol-agnostic. An MCP tool call, an A2A task
-delegation, and an ACP filesystem write all produce the same `ArcReceipt`
-structure: signed, timestamped, capability-bound, and append-only. Nested
-operations produce parent-child receipt chains that preserve the full lineage
-across protocol boundaries.
+delegation, and a future ACP filesystem write are intended to produce the same
+`ArcReceipt` structure: signed, timestamped, capability-bound, and append-only.
+Today that is fully shipped for MCP and A2A; ACP receipt promotion remains a
+Tier 1 design/implementation gap. Nested operations produce parent-child
+receipt chains that preserve the full lineage across protocol boundaries.
 
-### The Receipt Log as the Deepest Moat
+### The Receipt Log as the Deepest Long-Term Moat
 
 The receipt log is not just an audit trail. It is a billing ledger, a
 compliance record, a behavioral dataset, and an underwriting input -- all from
-one data structure. Every receipt that flows through ARC deepens the dataset
-that no competitor can replicate without first building the authorization and
-attestation layer that produces it.
+one data structure. Every receipt that flows through ARC deepens a dataset that
+would be hard to match: a competitor would need comparable authorization,
+attestation, portability, and real deployment distribution before they could
+assemble an equivalent evidence corpus.
+
+The key nuance: observability is not equivalent to enforcement. ARC should not
+collapse those concepts. The receipt log is valuable because it is rooted in
+enforced, signed execution, not because it is "just more telemetry."
 
 ### ARC vs. Microsoft AGT
 
-Microsoft's Agent Governance Toolkit provides policy enforcement for agent
-systems within the Azure ecosystem. AGT enforces policies. ARC is designed to
-enforce policies and produce cryptographic proof that the enforcement happened.
-The distinction is fundamental: policy enforcement without signed evidence is
-an assertion. Policy enforcement with signed evidence is auditable evidence.
+Microsoft's Agent Governance Toolkit is the clearest emerging runtime-
+governance reference point as of April 2026. Public Microsoft material
+emphasizes multi-language packaging, a stateless policy engine, DID-based
+identity, and dynamic trust scoring. ARC should not dismiss AGT as a toy or as
+an Azure-only niche. The better contrast is:
+
+- AGT appears strongest on packaging, language reach, and enterprise
+  distribution.
+- ARC's differentiation thesis is portable signed receipts, cross-protocol
+  delegation/evidence chains, and economic primitives in the decision path.
+- AGT is not best framed as "single protocol"; ARC wins if it proves broader
+  attested lineage and third-party-verifiable evidence, not if it relies on a
+  weak competitor caricature.
 
 Cross-protocol signed receipts are fully shipped for MCP and A2A adapters.
-ACP proxy kernel integration is Tier 1 priority (see ACP-KERNEL-INTEGRATION.md).
+ACP proxy kernel integration remains the largest open attestation gap and is a
+Tier 1 priority (see `ACP-KERNEL-INTEGRATION.md`).
 
-### What ARC Has That Nobody Else Does
+### ARC's Differentiation Thesis Today
 
-| Capability | ARC | Everyone Else |
-|------------|-----|---------------|
-| **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, formally verified (Lean 4 P1) | No protocol-level equivalent |
-| **Guard pipeline** | 7 composable, fail-closed guards with signed evidence capture | Application-level guardrails without attestation |
-| **Receipt signing** | Every outcome (allow, deny, cancel, incomplete) signed by the kernel | Mutable logs or no logging at all |
-| **Merkle commitment** | Append-only receipt log with checkpoint publication | No tamper-evident ordering guarantees |
-| **Liability market** | Receipts feed actuarial data for per-session agent insurance pricing | No connection between security controls and insurance |
-| **Cascade revocation** | Delegation-chain-aware, formally proven (Lean 4 P2) | No revocation or best-effort propagation |
-| **Cross-protocol attestation** | MCP + A2A + ACP through one kernel | Single-protocol or no attestation |
+| Area | ARC position | Status / caveat |
+|------|--------------|-----------------|
+| **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, formally verified (Lean 4 P1) | Shipped in the core model |
+| **Guard evidence** | Composable fail-closed guards with signed evidence capture | Shipped; advanced stateful guards remain planned |
+| **Receipt signing** | Kernel-signed receipts for MCP/A2A, with ACP as the major remaining gap | Partial today, important Tier 1 gap |
+| **Merkle commitment** | Append-only receipt log with checkpoint publication | Shipped in the receipt architecture |
+| **Formal verification** | Capability monotonicity and cascade revocation proofs in Lean 4 | Real but scoped to specific subsystems |
+| **Economic primitives** | Budgets, settlement hooks, and insurance-linked framing in the security path | Mixed: some pieces shipped, broader market story is a strategic bet |
+| **Cross-protocol lineage** | One evidence model spanning MCP, A2A, ACP, and future native/API surfaces | Strong thesis; ACP completion and HTTP/native packaging still needed |
+
+The adjacent comparison set is broader than one product. Runtime governance
+toolkits, policy engines, API-security platforms, and observability systems all
+cover part of this landscape. ARC's claim is the fusion of deterministic
+enforcement, signed portable evidence, delegation lineage, and economic
+controls -- not that no adjacent system exists.
 
 ---
 
@@ -143,14 +227,19 @@ shipping surface.
 | Item | Rationale | Crate |
 |------|-----------|-------|
 | ACP kernel integration | Promote arc-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `arc-acp-proxy` |
-| Drop-in proxy binary | `arc proxy` CLI that wraps any MCP server in one command, zero config | `arc-cli` |
-| Unified config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` |
+| MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `arc-cli` |
+| Unified runtime config (proposed) | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` |
 | Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` |
 
 **Why Tier 1 first:** The ACP proxy currently generates unsigned audit entries.
 Promoting those to signed ARC receipts completes the three-protocol attestation
-story. The proxy binary and unified config are the developer experience surface
-that makes adoption frictionless.
+story. The wrapped MCP edge already exists; the near-term DX work is making the
+current CLI easier to adopt and documenting proposed future entry points
+honestly.
+
+**Runtime-security framing:** Tier 1 is about making deterministic governance
+and signed observability easy to adopt. It is intentionally not framed as full
+dynamic or intent-aware governance on day one.
 
 ### Tier 2: Build Next
 
@@ -160,7 +249,7 @@ These items extend the protocol surface and complete the compliance story.
 |------|-----------|-------|
 | A2A edge crate | Bidirectional bridging: expose ARC tools as A2A Agent Cards | `arc-a2a-edge` (new) |
 | ACP edge crate | Bidirectional bridging: expose ARC tools as ACP capabilities | `arc-acp-edge` (new) |
-| MCP adapter completion | Close coverage from 13 tests to 80+, covering streaming, error paths, and edge cases | `arc-mcp-adapter` |
+| MCP adapter completion | Close coverage from 14 tests to 80+, covering streaming, error paths, and edge cases | `arc-mcp-adapter` |
 | Compliance certificates | Session-scoped, single-artifact proof bundles for auditors (SOC 2, HIPAA, EU AI Act) | `arc-core` |
 
 **Why Tier 2 second:** Edge symmetry means every protocol gets both inbound
@@ -175,23 +264,41 @@ These items create new market categories or defensible network effects.
 | Item | Rationale | Crate / Surface |
 |------|-----------|-----------------|
 | Capability attenuation SDK | Programmatic sub-agent delegation with provable subset guarantees | `arc-core` |
-| Receipt analytics dashboard | Web UI for exploring receipt chains, compliance status, and cost attribution | `arc-dashboard` (new) |
+| Receipt dashboard expansion | The dashboard ships today; the strategic work is adding cross-protocol traces, compliance views, and certificate inspection | `arc-cli/dashboard` |
 | OpenAI function calling adapter | Fourth protocol edge, capturing the OpenAI ecosystem | `arc-openai-adapter` (new) |
 | WASM guard runtime | Custom guards authored in any language compiled to WASM, sandboxed execution | `arc-guards` |
 | Kubernetes admission controller | Enforce ARC capability policies at pod deployment time | `arc-k8s` (new) |
 
 **Why Tier 3 last:** These are force multipliers that assume Tier 1 and Tier 2
 are complete. The WASM guard runtime and K8s controller extend ARC into
-infrastructure-level enforcement. The OpenAI adapter captures the largest
-remaining agent ecosystem. The dashboard is the product surface that makes
-receipts visible to non-technical stakeholders.
+infrastructure-level enforcement. The OpenAI adapter captures a major remaining
+agent ecosystem. The dashboard work here is expansion of an existing operator
+surface, not net-new UI creation.
+
+### Cross-Language Packaging Constraint
+
+The kernel can remain Rust-first. The adoption surface cannot.
+
+ARC's current shipping story is strongest where the Rust CLI can wrap a known
+protocol edge directly. That is valuable, but it is not enough to win ordinary
+API developers or mixed-language platform teams. The complementary adoption
+track is defined in `HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md`:
+
+- zero-code sidecar / reverse-proxy onboarding
+- OpenAPI-driven manifest and policy generation
+- Python first, TypeScript second, Go third for native packaging
+- thin framework wrappers over shared substrate adapters
+
+This is not optional DX polish. It is the packaging path that keeps ARC from
+being a strong kernel with weak reach.
 
 ---
 
-## 5. Novel Security Features
+## 5. ARC's Differentiation Features
 
-These features differentiate ARC from every other system in the agent security
-landscape. Some are shipped. Some are in progress. Some are research horizon.
+These features are where ARC appears differentiated today or where it is making
+explicit strategic bets. Some are shipped. Some are in progress. Some are
+research horizon.
 
 ### 5.1 Capability Delegation with Attenuation (Shipped)
 
@@ -288,26 +395,49 @@ naturally: ARC-mediated billing where every invocation produces a receipt
 carrying financial metadata. The receipt chain is the settlement evidence.
 The billing ledger is not a separate system. It is the receipt log.
 
+This is a strategic thesis, not a present-day claim that a multi-protocol tool
+store or liability-linked billing surface is already implemented.
+
+The reason this matters to runtime security is simple: if tools and skills can
+be invoked through multiple protocols or through native APIs, security
+architecture cannot stop at MCP chokepoints alone.
+
+The same principle applies to HTTP/OpenAPI surfaces. Spec-driven import is a
+useful governance wedge, but route publication should be curated rather than
+treated as a naive 1:1 "every endpoint becomes a tool" rule.
+
 ---
 
 ## 7. Developer Experience Roadmap
 
 Five phases, each building on the last. The goal is to take ARC from "powerful
-but requires expertise" to "secure any agent in one command."
+but requires expertise" to "secure any agent in one command." The phases below
+explicitly distinguish shipped surfaces from proposed next steps.
 
-### Phase 1: `arc proxy` CLI Binary
+### Phase 1: Wrapped MCP Edge Commands (Shipped, DX polish next)
 
-Wrap any existing MCP server in ARC security with a single command:
+Current shipped surface:
 
 ```
-arc proxy --server "npx my-mcp-server" --policy default
+arc mcp serve --policy <policy.yaml> --server-id <id> <command>...
 ```
 
-The proxy spawns the MCP server as a subprocess, interposes the ARC kernel,
-and produces signed receipts for every tool call. No code changes to the MCP
-server. No configuration beyond the command line.
+and, for hosted HTTP:
 
-### Phase 2: `arc.yaml` Unified Config
+```bash
+arc mcp serve-http --policy <policy.yaml> --server-id <id> --listen <addr> <command>...
+```
+
+These commands already wrap an MCP server subprocess, interpose the ARC
+kernel, and produce signed receipts for every tool call. The next DX step is
+to simplify naming, defaults, and documentation further, potentially including
+an `arc proxy` alias.
+
+This is the **adoption wedge**, not the architectural boundary. ARC should win
+initial deployment through wrapped MCP edges while building toward broader
+protocol and native-surface coverage.
+
+### Phase 2: `arc.yaml` Unified Runtime Config (Proposed)
 
 One configuration file that defines all three protocol edges, shared policy,
 capability authorities, and receipt storage:
@@ -332,6 +462,10 @@ receipts:
   path: "./arc-receipts.db"
 ```
 
+Status note: this is a design proposal. The repo currently supports `arc_yaml`
+as a policy format, but does not currently ship an `arc start --config arc.yaml`
+runtime command.
+
 ### Phase 3: Guard SDK
 
 Custom guards in Rust or any language that compiles to WASM. A guard is a
@@ -339,19 +473,36 @@ pure function: it receives the tool call context and returns allow or deny
 with evidence. The SDK provides the trait, the WASM runtime provides the
 sandbox, and the kernel provides the integration.
 
-### Phase 4: Receipt Analytics Dashboard
+### Phase 3.5: Behavioral and Intent Signals (Research / Design)
 
-Web UI for exploring receipt chains, visualizing delegation trees, tracking
-budget consumption, and generating compliance reports. The dashboard reads
-from the receipt store and presents the data that is already there -- it does
-not introduce new data collection.
+ARC should explicitly research which live signals are useful for runtime risk
+evaluation without introducing a false sense of precision:
+
+- workflow drift from the initial session objective
+- unusual tool sequencing or data-volume changes
+- cross-tool exfiltration patterns
+- mismatch between declared task intent and observed side effects
+- escalation triggers for human approval
+
+The important discipline is to treat these as inputs to optional governance
+layers, not as magic "understanding" that replaces deterministic controls.
+
+### Phase 4: Receipt Dashboard Expansion (Base Surface Shipped)
+
+The receipt dashboard already exists as an operator-facing UI. The expansion
+work is cross-protocol trace visualization, compliance certificate inspection,
+and richer non-receipt summaries. The dashboard reads from the receipt store
+and presents data that is already there -- it does not introduce new data
+collection.
 
 ### Phase 5: Hosted Managed Service
 
 ARC-as-a-service with per-receipt pricing. Organizations that do not want to
 operate the kernel, receipt store, or control plane can use the hosted service.
 The trust model is preserved: the managed kernel signs receipts with keys the
-customer controls, so the hosted service cannot forge receipts.
+customer controls, so the hosted service cannot forge receipts. Key custody,
+verifier onboarding, and trust-root distribution are specified separately in
+`TRUST-MODEL-AND-KEY-MANAGEMENT.md`.
 
 ---
 
@@ -359,12 +510,15 @@ customer controls, so the hosted service cannot forge receipts.
 
 Four concentric rings, each capturing a different buyer.
 
+These rings are strategic assumptions about adoption order. They are not
+presented here as externally validated market research.
+
 ### Ring 1: Open-Source Adoption (Developers)
 
-ARC is open source and free. Developers adopt it because `arc proxy` is the
-fastest way to add authorization and audit to any MCP server. The on-ramp is
-a single CLI command. The receipt log is local SQLite. No account, no
-sign-up, no cloud dependency.
+ARC is open source and free. Developers adopt it because `arc mcp serve` /
+`arc mcp serve-http` are the fastest current way to add authorization and audit
+to an MCP server. A future `arc proxy` alias may compress that further. The
+receipt log is local SQLite. No account, no sign-up, no cloud dependency.
 
 ### Ring 2: Enterprise SIEM Integration (Security Teams)
 
@@ -372,6 +526,9 @@ sign-up, no cloud dependency.
 that accepts structured events. Security teams adopt ARC because it gives
 them the agent audit trail they cannot get from any other source. The
 integration is the wedge into enterprise procurement.
+
+But SIEM export alone is not the runtime strategy. Post-hoc monitoring without
+pre-execution enforcement is still reactive.
 
 ### Ring 3: Managed Receipt Analytics (Compliance Teams)
 
@@ -387,7 +544,9 @@ ARC receipts are actuarial data. The behavioral metrics computed from the
 receipt log -- reliability, compliance rate, scope discipline, delegation
 hygiene -- are the inputs an underwriter needs to price agent liability
 coverage. Per-session pricing, capability-scoped coverage, and receipt-backed
-claims adjudication create a new category: parametric agent insurance.
+claims adjudication could create a new category: parametric agent insurance.
+This is a long-term strategic bet, not a claim that product-market fit is
+already proven.
 
 ---
 
@@ -398,6 +557,8 @@ Planned integrations, ordered by expected adoption impact.
 | Integration | Description | Status |
 |-------------|-------------|--------|
 | **OpenAI function calling adapter** | Wrap OpenAI-style function calls through the ARC kernel | Planned |
+| **HTTP/OpenAPI sidecar** | Reverse-proxy adoption path for any documented API, with manifest generation from OpenAPI and `x-arc-*` policy hints | Proposed |
+| **Python / TypeScript / Go substrate SDKs** | Multi-language middleware and wrapper packages around the Rust kernel | Planned |
 | **LangChain / LlamaIndex wrappers** | Python packages that inject ARC authorization into existing agent frameworks | Planned |
 | **Kubernetes admission controller** | Enforce ARC capability policies at pod deployment, reject workloads without valid tokens | Planned |
 | **WASM guard runtime** | Execute custom guards compiled to WASM in a sandboxed runtime | Planned |
@@ -405,6 +566,10 @@ Planned integrations, ordered by expected adoption impact.
 | **TEE / confidential computing** | Run the ARC kernel inside a Trusted Execution Environment (Intel SGX, AMD SEV, ARM CCA) | Research |
 | **SCIM provisioning** | Sync agent identities and capability grants from enterprise identity providers | Planned |
 | **OpenTelemetry collector** | Export receipt data as OTel spans for existing observability infrastructure | Planned |
+
+These integrations matter partly because agent execution is already moving
+beyond MCP-specific surfaces. ARC's protocol-agnostic story gets stronger as it
+secures a wider share of actual runtime behavior.
 
 ---
 
@@ -414,10 +579,10 @@ Current state and targets for the four protocol surfaces.
 
 | Adapter | Tests (Current) | Grade | Target | Target Grade |
 |---------|-----------------|-------|--------|--------------|
-| `arc-mcp-adapter` | 13 | C | 80+ | A |
-| `arc-a2a-adapter` | 55 | A- | 60+ | Maintain |
+| `arc-mcp-adapter` | 14 | C | 80+ | A |
+| `arc-a2a-adapter` | 56 | A- | 60+ | Maintain |
 | `arc-acp-proxy` | 129 | A | 130+ | Maintain |
-| `arc-mcp-edge` | 41 | B+ | 60+ | A- |
+| `arc-mcp-edge` | 42 | B+ | 60+ | A- |
 
 Counts reflect `#[test]` functions in each crate's source tree. For line-level
 coverage metrics, see CI reports.
@@ -486,18 +651,21 @@ invocable from MCP clients, A2A agents, and ACP editors simultaneously.
 
 ## The Strategic Thesis
 
-The agent economy will be built on MCP, A2A, and ACP. All three will succeed.
-None of them will solve authorization, attestation, or non-repudiation,
-because those are not their jobs.
+ARC's near-term protocol bet centers on MCP, A2A, and ACP, but the broader
+strategic view is that agent execution will remain protocol-mixed: MCP, A2A,
+ACP, native APIs, and framework-level tool surfaces will coexist.
+None of these surfaces natively solve authorization, attestation, or non-
+repudiation, because those are not their jobs.
 
-ARC is the system that sits across all three and answers the questions that
-matter after the agent acts: was it authorized, what did it cost, can you
-prove it, and who is liable if it went wrong?
+ARC is the system that aims to sit across those surfaces and answer the
+questions that matter after the agent acts: was it authorized, what did it
+cost, can you prove it, and who is liable if it went wrong?
 
 The receipt log is the asset. Every signed receipt makes the dataset larger,
-the compliance story stronger, the underwriting data richer, and the moat
-deeper. The protocol adapters are the distribution mechanism. The kernel is
-the trust anchor. The liability market is the endgame.
+the compliance story stronger, and the operational evidence richer. The
+protocol adapters are the distribution mechanism. The kernel is the trust
+anchor. Liability-market applications are a long-term strategic extension if
+the security and compliance layers prove valuable first.
 
 ARC does not compete with agent protocols. It makes them safe to use for
 things that matter.

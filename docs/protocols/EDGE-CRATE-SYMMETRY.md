@@ -24,6 +24,11 @@ The outward column has only MCP. That means:
   listable via MCP `tools/list`, the A2A Agent Card `skills` array, and
   ACP command enumeration from the same kernel.
 
+This is not just a product-completeness issue. It is also a runtime-security
+coverage issue: if ARC only exposes or governs MCP-native surfaces cleanly,
+security teams may overestimate how much of the agent runtime is actually under
+deterministic control.
+
 ### Target Scenarios
 
 - **A2A skills.** `arc-a2a-edge` on HTTPS; remote agents discover via
@@ -34,6 +39,13 @@ The outward column has only MCP. That means:
   capability validation.
 - **One tool, three surfaces.** Single `ToolManifest` loaded once, three
   edge crates translate it. Kernel is the single enforcement point.
+
+### Coverage Principle
+
+`arc-mcp-edge` is the immediate adoption wedge because MCP is the easiest
+wrapped surface to deploy today. But edge symmetry matters because wrapped MCP
+traffic is only one slice of real agent execution. ARC should avoid implying
+that an MCP-facing chokepoint equals complete runtime security.
 
 ## 2. `arc-a2a-edge` Design
 
@@ -268,6 +280,38 @@ pub fn iso8601_now() -> String;
 | Caps | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` |
 | Manifests | `Vec<ToolManifest>` | `Vec<ToolManifest>` | `Vec<ToolManifest>` |
 
+### 4.4 Semantic Publication Gates
+
+Edge symmetry does **not** mean every tool should automatically appear on every
+protocol surface. Before publication, each edge should classify the fidelity of
+the projection:
+
+```rust
+pub enum EdgePublicationFidelity {
+    Lossless,
+    Adapted { caveats: Vec<String> },
+    Unsupported { reason: String },
+}
+```
+
+Examples:
+
+- A simple JSON request/response tool may be `Lossless` on MCP, A2A, and ACP.
+- A long-running task with partial artifacts may be `Lossless` on MCP/A2A but
+  only `Adapted` on ACP if the editor surface cannot represent the lifecycle
+  cleanly.
+- A tool that depends on interactive ACP permission prompts may be
+  `Unsupported` on A2A if no honest translation exists.
+
+The registry and discovery surfaces should publish caveats alongside any
+`Adapted` tool rather than implying protocol equivalence where it does not
+exist.
+
+This same discipline should apply to security claims. ARC should never present
+"discoverable on MCP" as equivalent to "governed across the full runtime path"
+when meaningful A2A, ACP, or native execution paths remain outside the same
+kernel/evidence model.
+
 ## 5. Cross-Protocol Discovery
 
 A single deployment runs all three edges backed by one kernel and one set
@@ -330,6 +374,10 @@ Protocol Client          arc-*-edge               ARC Kernel           Tool Serv
    management needed. Simpler to test and deploy.
 4. **Incremental streaming.** Blocking `SendMessage` is sufficient for v1.
 
+Security rationale: A2A coverage is one of the clearest ways to avoid reducing
+ARC to an MCP-only gateway story. It expands deterministic enforcement and
+signed observability to a second major runtime surface.
+
 | Phase | Scope |
 |-------|-------|
 | 1 | Agent Card generation + `SendMessage` (blocking) |
@@ -342,6 +390,11 @@ Protocol Client          arc-*-edge               ARC Kernel           Tool Serv
 ACP is newer; the editor ecosystem is still consolidating. `arc-acp-proxy`
 provides partial coverage. The edge crate is a cleaner design (acts as the
 agent rather than proxying one) but can wait until A2A edge is stable.
+
+Security rationale: ACP matters because developer-local and workstation-resident
+agents are often the least visible class of runtime behavior. Long term, ACP
+coverage is part of reducing blind spots rather than merely adding another
+integration checkbox.
 
 | Phase | Scope |
 |-------|-------|

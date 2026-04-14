@@ -3,6 +3,12 @@
 Status: **Draft**
 Authors: ARC core team
 
+> **Status note**: This document describes a proposed **runtime**
+> configuration system. The current repo already supports `arc_yaml` as a
+> policy format, but does **not** currently ship a full
+> `arc start --config arc.yaml` command. Read this file as target
+> architecture, not current CLI behavior.
+
 ## 1. Problem Statement
 
 ARC supports three protocol adapters -- MCP, A2A, and ACP -- each with its own
@@ -20,7 +26,8 @@ receipt storage ad-hoc. The kernel's own `KernelConfig` adds yet another
 keypair, policy hash, sampling flags, and checkpoint tuning.
 
 This fragmentation is the number one developer experience barrier for new
-deployments. One file should configure everything.
+deployments. One file should configure everything for the common case while
+remaining honest about trust-boundary complexity in larger deployments.
 
 ## 2. Design Goals
 
@@ -28,8 +35,9 @@ deployments. One file should configure everything.
    receipts, and logging.
 2. **Environment variable interpolation** -- `${VAR}` syntax for secrets and
    per-environment values.
-3. **Shared key management** -- one keypair path, used by the kernel and all
-   adapters. No more passing `public_key` to each config struct separately.
+3. **Default shared key management** -- one keypair path for local and
+   single-operator deployments, with a clear upgrade path to richer key
+   hierarchies for hosted or federated environments.
 4. **Protocol-specific sections** -- MCP, A2A, and ACP each get their own
    subsection for protocol-specific fields.
 5. **Fail-fast validation** -- the config is fully validated at parse time.
@@ -42,7 +50,8 @@ deployments. One file should configure everything.
 
 YAML. Nested structures (auth blocks, partner policies, exporter lists) are more
 readable in YAML than in TOML's table syntax. The file is named `arc.yaml` by
-convention and loaded via `arc start --config arc.yaml`.
+convention and, in the proposed runtime flow, would be loaded via
+`arc start --config arc.yaml`.
 
 ### Full Annotated Example
 
@@ -506,6 +515,11 @@ is the kernel's signing identity and is used for:
 - Issuing capability tokens
 - Generating the `public_key` field for all adapter manifests
 
+This single-keypair model is the **default local profile**, not the entire ARC
+trust model. Production hosted deployments may separate trust roots, kernel
+signers, capability-authority keys, checkpoint publishers, and verifier trust
+bundles. See `TRUST-MODEL-AND-KEY-MANAGEMENT.md` for the broader model.
+
 ### Keypair loading
 
 1. Read the file at `kernel.keypair` (resolved relative to the config file's
@@ -529,8 +543,10 @@ let public_key_hex = keypair.public_key().to_hex();
 // Injected into McpAdapterConfig, A2aAdapterConfig, AcpProxyConfig
 ```
 
-If a deployment requires distinct keys per adapter (rare), it should use the
-programmatic builder API instead of the unified config file.
+If a deployment requires distinct keys per adapter, customer-managed HSM
+signing, or separate verifier trust roots, it should use the programmatic
+builder API or a future extended runtime config profile instead of assuming the
+single-key default here.
 
 ## 7. Validation Rules
 
@@ -585,11 +601,15 @@ versions.
 
 ## 8. CLI Integration
 
-The unified config is loaded by the `arc start` command:
+Proposed CLI integration:
 
 ```
 arc start --config arc.yaml
 ```
+
+Status note: `arc start` is not a current command in the repo. The shipped CLI
+today exposes `arc mcp serve`, `arc mcp serve-http`, `arc run`, and related
+trust/receipt commands. This section specifies the intended future entry point.
 
 ### Startup sequence
 

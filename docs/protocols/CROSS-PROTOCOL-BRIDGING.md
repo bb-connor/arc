@@ -16,10 +16,12 @@ own tool/skill/capability model, invocation envelope, and trust assumptions.
 Tool authors implement three adapters, operators run three control planes,
 and audit trails scatter across incompatible formats.
 
-ARC eliminates this by serving as the universal protocol bridge. A tool
-published once through ARC is automatically consumable via MCP, A2A, and ACP
-surfaces. Every invocation passes through the same kernel -- the same
-capability validation, guard pipeline, and signed receipt log.
+ARC aims to reduce this fragmentation by serving as the universal protocol
+bridge. A tool published once through ARC can be made consumable via MCP, A2A,
+and ACP surfaces when the semantic projection is faithful enough to preserve
+ARC's security and execution guarantees. Every bridged invocation passes
+through the same kernel -- the same capability validation, guard pipeline, and
+signed receipt log.
 
 ```
                    +------------------+
@@ -36,6 +38,25 @@ capability validation, guard pipeline, and signed receipt log.
 ```
 
 One tool, three protocol surfaces, unified security, unified receipts.
+
+### 1.1 Why MCP-Only Coverage Is Structurally Incomplete
+
+Wrapped MCP edges are useful because they create a deterministic enforcement
+point for a large class of current agent-to-tool traffic. They are not enough
+on their own.
+
+Reasons:
+
+- agent execution can move to A2A task exchange, ACP editor sessions, or native
+  function/API surfaces
+- session meaning is distributed across workflow history, delegation lineage,
+  approvals, and tool sequences rather than a single isolated tool call
+- observability without enforcement is reactive, while enforcement without
+  enough context can be brittle or misleading
+
+Cross-protocol bridging is therefore not just a feature-expansion story. It is
+part of closing the gap between "we secure one protocol boundary" and "we
+govern the runtime behavior that actually matters."
 
 ---
 
@@ -54,6 +75,20 @@ One tool, three protocol surfaces, unified security, unified receipts.
 
 Capability tokens and receipts have no external equivalents. ARC adds these
 security properties transparently at the bridge layer.
+
+### 2.1.1 Deterministic Governance, Observability, and Dynamic Governance
+
+Cross-protocol design should preserve three distinct layers:
+
+- **Deterministic governance**: capability checks, guard evaluation, budget
+  enforcement, revocation, allow/deny decisions
+- **Continuous observability**: signed receipts, trace context, lineage,
+  sequence integrity, evidence bundles
+- **Dynamic governance**: optional future decisions that incorporate live risk
+  or intent signals
+
+The bridge layer must not pretend to provide layer 3 merely because it can
+translate layer 1 and emit layer 2 artifacts.
 
 ### 2.2 MCP <-> A2A
 
@@ -111,6 +146,33 @@ Skill `inputModes`/`outputModes` are recorded in adapter metadata.
 | isError: true    | Task.status: failed | error content block  |
 | ProgressToken    | Task.status: working| (stream signal)      |
 
+### 2.6 Semantic Conformance Matrix
+
+Not every tool maps cleanly across MCP calls, A2A tasks, and ACP sessions. ARC
+should only auto-publish a tool on a target protocol when the projection is
+either lossless or explicitly caveated.
+
+| Concern | MCP | A2A | ACP | Bridge rule |
+|---------|-----|-----|-----|-------------|
+| Invocation shape | Direct request/response | Task-oriented, may be long-lived | Session-scoped prompt/capability flow | Reject publication when the target protocol cannot represent lifecycle semantics honestly |
+| Streaming | Progress tokens / chunked tool output | Task status + artifact streaming | Session updates / notifications | Mark as adapted when streaming must be down-leveled |
+| Cancellation | Client/task cancellation | Task cancellation | Session cancellation | Expose only if cancellation semantics can be mapped or clearly caveated |
+| Permission prompts | Usually external to protocol | Usually external to protocol | First-class permission requests | ACP surfaces may require adapted mode when tool side effects need interactive approval |
+| Side-effect visibility | Tool metadata only | Skill metadata + task status | Capability metadata + session events | Preserve side-effect labeling on every bridged surface |
+| Partial output | Natural | Natural | Depends on session/update contract | Reject auto-bridge if partial output would be silently dropped |
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BridgeFidelity {
+    Lossless,
+    Adapted { caveats: Vec<String> },
+    Unsupported { reason: String },
+}
+```
+
+Every outward edge should compute a per-tool `BridgeFidelity` before automatic
+publication. `Unsupported` tools stay local to their source protocol.
+
 ---
 
 ## 3. Capability Propagation Across Protocols
@@ -139,7 +201,8 @@ pub trait CapabilityBridge: Send + Sync {
     fn source_protocol(&self) -> &str;
 
     /// Extract capability reference from inbound protocol envelope.
-    /// None triggers fallback to session-level ambient grants.
+    /// None triggers fallback to session-level grants only when the deployment
+    /// explicitly enables ambient bridging. Otherwise the bridge denies.
     fn extract_capability_ref(
         &self,
         request: &serde_json::Value,
@@ -218,6 +281,7 @@ pub struct DiscoveredTool {
     pub origin: String,
     pub definition: ToolDefinition,
     pub adapter_metadata: AdapterMetadata,
+    pub bridge_fidelity: BridgeFidelity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -255,15 +319,16 @@ pub struct ToolQuery {
 
 ### 4.3 Automatic Multi-Protocol Registration
 
-Registration through any adapter generates all three external
-representations at registration time (not query time):
+Registration through any adapter attempts to generate all three external
+representations at registration time (not query time), but only publishes
+surfaces whose fidelity is `Lossless` or `Adapted`:
 
 ```
   Register "analyze-code" via ARC native API
      |
-     +-> MCP: tools/list entry     (available to MCP clients)
-     +-> A2A: AgentCard skill      (available to A2A agents)
-     +-> ACP: capability entry     (available to ACP agents)
+     +-> MCP: tools/list entry     (published if fidelity != Unsupported)
+     +-> A2A: AgentCard skill      (published if fidelity != Unsupported)
+     +-> ACP: capability entry     (published if fidelity != Unsupported)
 ```
 
 ---
@@ -307,12 +372,13 @@ the full cross-protocol call tree.
 ### 5.3 Session Fingerprint
 
 ```
-SHA-256(session_id || initiating_protocol || initiating_agent_key || workflow_start_ts)
+SHA-256(canonical_json_bytes({
+  "session_id": session_id,
+  "initiating_protocol": initiating_protocol,
+  "initiating_agent_key": initiating_agent_key,
+  "workflow_start_ts": workflow_start_ts
+}))
 ```
-
-All components are UTF-8 encoded bytes. The `||` operator denotes byte
-concatenation with no delimiter. Agent keys are hex-encoded before
-concatenation. Timestamps are decimal Unix seconds (e.g., "1712973840").
 
 Binds all receipts from a logical workflow together, even across kernel
 instances in federated deployments.
@@ -351,6 +417,10 @@ This orchestrator is part of the Tier 2 roadmap (Phase 6). Not yet implemented.
      |                  |-- unified receipt   |             |
      |<- Task artifact -|                     |             |
 ```
+
+This example illustrates why protocol breadth matters. An organization could
+enforce MCP at the inner hop and still miss material runtime context unless the
+outer A2A and ACP hops are tied into the same kernel and receipt graph.
 
 ### 6.3 Unified Receipt
 
@@ -441,9 +511,14 @@ is a future extension through the evidence-sharing mechanism.
 |-------|-------|------------|
 | 1 | Foundation: MCP + A2A adapters (shipped) | -- |
 | 2 | `UnifiedToolRegistry`, `DiscoveredTool`, `ToolQuery` API | Phase 1 |
-| 3 | `arc-acp-adapter` crate, ACP discovery + invocation | Phase 1 |
-| 4 | `CapabilityBridge` trait, `CrossProtocolCapabilityEnvelope`, attenuation | Phase 2 |
-| 5 | `CrossProtocolTraceContext`, receipt correlation, session fingerprint | Phase 4 |
-| 6 | `CrossProtocolOrchestrator`, multi-hop chaining, unified receipts | Phase 4, 5 |
-| 7 | `AdapterMetadata` collection, `RoutingPolicy`, latency-aware selection | Phase 2 |
-| 8 | Conformance tests, fuzz testing, benchmarks, honest boundary docs | Phase 6, 7 |
+| 3 | Protocol-semantic conformance matrix + `BridgeFidelity` gating | Phase 2 |
+| 4 | `arc-acp-adapter` crate, ACP discovery + invocation | Phase 1 |
+| 5 | `CapabilityBridge` trait, `CrossProtocolCapabilityEnvelope`, attenuation | Phase 2, 3 |
+| 6 | `CrossProtocolTraceContext`, receipt correlation, session fingerprint | Phase 5 |
+| 7 | `CrossProtocolOrchestrator`, multi-hop chaining, unified receipts | Phase 5, 6 |
+| 8 | `AdapterMetadata` collection, `RoutingPolicy`, latency-aware selection | Phase 2 |
+| 9 | Conformance tests, fuzz testing, benchmarks, honest boundary docs | Phase 7, 8 |
+
+The roadmap priority is not "more protocols for completeness theater." It is
+"secure the runtime surfaces agents actually use as traffic diversifies beyond
+MCP-only architectures."

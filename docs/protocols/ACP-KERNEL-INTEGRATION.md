@@ -39,13 +39,45 @@ This is the single largest security gap in the ARC protocol stack.
 | Signed `ArcReceipt` for ACP tool-call events | Must not force proxy to implement `ToolServerConnection` |
 | Capability-token validation for resource access | Preserve proxy's boundary architecture |
 | Merkle receipt chain integration | Proxy must not hold private key material |
-| Standalone proxy support (no kernel) | Degrade gracefully to unsigned audit entries |
+| Standalone proxy support (no kernel) | Preserve optional unsigned standalone mode, but label it as outside full attestation claims |
 | Minimal coupling | Traits in `arc-acp-proxy`; impls in `arc-kernel` or bridge crate |
 
 Core decision: **inject the kernel as a service, not as a trait implementation.** The
 proxy accepts `ReceiptSigner` and `CapabilityChecker` via constructor injection. It
 never implements `ToolServerConnection` -- it is an interposition proxy, not a tool
 server.
+
+### 2.1 Attestation Modes and Statuses
+
+This design distinguishes **policy enforcement** from **attestation
+completeness**. A request can be correctly guarded yet still fail to produce a
+signed receipt. That must be surfaced explicitly; it cannot be silently treated
+as equivalent to a fully attested ACP event.
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AcpAttestationMode {
+    /// Default for ARC-governed deployments. Unsigned ACP observations are
+    /// treated as non-compliant evidence gaps.
+    Required,
+    /// Standalone compatibility mode only. Unsigned ACP observations may still be written,
+    /// but the session is not eligible for full cross-protocol attestation
+    /// claims or compliance certificates.
+    UnsignedCompatibility,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AcpAttestationStatus {
+    FullyAttested,
+    PolicyEnforcedButUnsigned { reason: String },
+    SignerUnavailable { reason: String },
+    EvidenceIncomplete { reason: String },
+}
+```
+
+Any ACP session containing a status other than `FullyAttested` is outside ARC's
+full cross-protocol attestation claim and must be excluded from compliance
+certificate issuance unless a later repair flow closes the evidence gap.
 
 ---
 
@@ -65,6 +97,7 @@ pub struct MessageInterceptor {
     // ... existing fields ...
     receipt_signer: Option<Box<dyn ReceiptSigner>>,
     capability_checker: Option<Box<dyn CapabilityChecker>>,
+    attestation_mode: AcpAttestationMode,
 }
 ```
 
@@ -88,7 +121,14 @@ Both layers must allow; either can deny (defense-in-depth).
 
 **Post-observation:** On `session/update` with a tool-call event, the interceptor builds
 an `AcpToolCallAuditEntry`, then promotes it to a signed `ArcReceipt` via
-`ReceiptSigner`. On signer error, it falls back to the unsigned entry with a warning.
+`ReceiptSigner`.
+
+- In `Required` mode, signer failure emits an explicit attestation-gap artifact
+  with `SignerUnavailable` or `EvidenceIncomplete` status and marks the session
+  non-compliant for certificate purposes.
+- In `UnsignedCompatibility` mode, the proxy may still persist the unsigned
+  entry, but it must label the event `PolicyEnforcedButUnsigned` rather than
+  treating it as equivalent to a signed receipt.
 
 ---
 
@@ -146,7 +186,8 @@ pub trait ReceiptSigner: Send + Sync {
     /// `capability_id` and `policy_hash`, building `ArcReceiptBody`,
     /// signing with the kernel keypair, and appending to `ReceiptStore`.
     ///
-    /// Errors are non-fatal -- the proxy falls back to unsigned entries.
+    /// Errors surface as explicit degraded-attestation states. Unsigned
+    /// fallback is opt-in only.
     fn sign_acp_receipt(
         &self,
         request: &AcpReceiptRequest,
@@ -215,39 +256,58 @@ pub trait CapabilityChecker: Send + Sync {
 
 ---
 
-## 6. Migration Path
+## 6. Implementation Rollout
 
 **Phase 1 -- Additive.** Both traits are `Option`-wrapped. Existing `AcpProxy::start`
 remains unchanged. A new `AcpProxy::start_with_kernel` constructor accepts the signer
-and checker. `InterceptResult` gains a new variant:
+and checker. `InterceptResult` gains explicit attestation artifacts:
 
 ```rust
 pub enum InterceptResult {
     Forward(Value),
     Block(Value),
-    ForwardWithAuditEntry(Value, AcpToolCallAuditEntry),     // legacy
-    ForwardWithSignedReceipt(Value, ArcReceipt),             // new
+    ForwardWithAttestation(Value, AcpAttestationArtifact),
+}
+
+pub enum AcpAttestationArtifact {
+    SignedReceipt(ArcReceipt),
+    Gap(AcpAttestationGap),
+    UnsignedObservation(AcpToolCallAuditEntry),
+}
+
+pub struct AcpAttestationGap {
+    pub session_id: String,
+    pub tool_call_id: String,
+    pub status: AcpAttestationStatus,
+    pub observed_entry_hash: String,
 }
 ```
 
-The existing `ForwardWithReceipt` is deprecated and aliased to `ForwardWithAuditEntry`.
+The result surface should converge on `ForwardWithAttestation(...)` as the
+single outward representation, rather than keeping separate signed vs unsigned
+result variants.
 
-**Phase 2 -- Dual-write.** When both signer and logger are present, the interceptor
-produces both unsigned and signed artifacts. Downstream consumers migrate at their pace.
+**Phase 2 -- Explicit degraded mode.** When signer integration is enabled, the
+proxy defaults to `AcpAttestationMode::Required`. Downstream consumers begin
+handling `Gap` artifacts explicitly instead of assuming unsigned == acceptable.
 
-**Phase 3 -- Deprecation.** After one major release, the unsigned-only path emits a
-compile-time warning. `ReceiptLogger` moves behind a `legacy-unsigned` feature flag.
+**Phase 3 -- Unsigned isolation.** The unsigned-only path remains available
+only behind explicit standalone/compatibility configuration or feature flags.
+Sessions containing `UnsignedObservation` events are ineligible for
+cross-protocol compliance claims.
 
 ---
 
 ## 7. Security Properties
 
-**Fail-closed receipt signing.** Signer errors cause fallback to unsigned entries with
-`warn`-level logging. Signing failure is an observability gap, not a safety violation --
-the guards have already made the enforcement decision.
-
 **Fail-closed capability checking.** `check_access` errors (`Err`) are treated as deny.
 The proxy returns `InterceptResult::Block` and logs at `warn` level.
+
+**Explicit attestation degradation.** Signer errors are not silently collapsed
+into success. In required mode, signing failure produces an attestation-gap
+artifact and marks the session non-compliant for certificate generation. In
+unsigned-compatibility mode, unsigned entries are still labeled as degraded
+evidence.
 
 **Guard ordering.** When a `CapabilityChecker` is present: (1) capability check,
 (2) existing guard (`FsGuard`/`TerminalGuard`), (3) forward. Both layers must allow.
@@ -255,10 +315,14 @@ The proxy returns `InterceptResult::Block` and logs at `warn` level.
 **No key material in the proxy.** The `ReceiptSigner` trait is opaque. Implementations
 may hold the key in-process or call out to the kernel over an authenticated channel.
 
-**Receipt integrity.** Signed receipts carry the same properties as MCP/A2A receipts:
-Ed25519 signature over canonical JSON, embedded `kernel_key`, `content_hash` from the
-ACP event, `policy_hash`, and inclusion in the Merkle checkpoint chain when a
-`ReceiptStore` is configured.
+**Receipt integrity.** Signed receipts carry the same properties as MCP/A2A
+receipts: Ed25519 signature over canonical JSON, embedded `kernel_key`,
+`content_hash` from the ACP event, `policy_hash`, and inclusion in the Merkle
+checkpoint chain when a `ReceiptStore` is configured.
+
+**Compliance boundary honesty.** ARC may still enforce policy even when ACP
+attestation is degraded, but such sessions must not be described as fully
+attested. This preserves the integrity of cross-protocol claims.
 
 ---
 
@@ -326,7 +390,7 @@ let config = AcpProxyConfig::new("claude-code", public_key_hex)
 // With kernel integration:
 let proxy = AcpProxy::start_with_kernel(config, signer, checker)?;
 
-// Without kernel (unchanged, unsigned audit entries only):
+// Without kernel (unsigned standalone mode only; outside full attestation claims):
 // let proxy = AcpProxy::start(config)?;
 ```
 
