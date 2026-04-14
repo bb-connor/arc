@@ -4,4 +4,5 @@
 //! identically to the host's JSON schema, and an allocator the host runtime
 //! can call to place request data in guest linear memory.
 
+pub mod alloc;
 pub mod types;
