@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 382-02-PLAN.md (host bindings, ABI glue, arc_deny_reason)
-last_updated: "2026-04-14T23:39:28.886Z"
+stopped_at: Completed 383-01-PLAN.md (arc-guard-sdk-macros proc-macro crate)
+last_updated: "2026-04-14T23:53:46.476Z"
 last_activity: 2026-04-14 -- began phase 394 by landing OpenAPI override
 progress:
   total_phases: 349
   completed_phases: 259
-  total_plans: 740
-  completed_plans: 766
+  total_plans: 743
+  completed_plans: 769
   percent: 57
 ---
 
@@ -144,6 +144,7 @@ Progress: [#####-----] 57%
 - [Phase 382]: Host function wrappers use cfg(target_arch = "wasm32") gating with no-op/default fallbacks; matches wasm-bindgen convention for dual-target compilation
 - [Phase 382]: serialize_deny_reason() extracted from arc_deny_reason for testability; i32 buf_ptr truncates 64-bit heap pointers on native, so the pure-logic function enables safe testing
 - [Phase 382]: const thread_local initializer pattern (RefCell::new(None)) used consistently across alloc.rs and glue.rs for Rust 1.93 clippy compliance
+- [Phase 383]: Proc-macro crate generates path references (arc_guard_sdk::*) instead of depending on arc-guard-sdk; user fn renamed to __arc_guard_user_{name} for ABI symbol isolation
 
 ### Roadmap Evolution
 
@@ -203,7 +204,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:35:05Z
-Stopped at: Completed 382-02-PLAN.md (host bindings, ABI glue, arc_deny_reason)
+Last session: 2026-04-14T23:53:46.459Z
+Stopped at: Completed 383-01-PLAN.md (arc-guard-sdk-macros proc-macro crate)
 Next action: begin Phase 383 (proc macro and example guards)
 Resume file: None
