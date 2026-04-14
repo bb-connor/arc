@@ -11,7 +11,7 @@
 
 use std::cell::RefCell;
 
-use crate::types::{GuestDenyResponse, GuardRequest, GuardVerdict, VERDICT_ALLOW, VERDICT_DENY};
+use crate::types::{GuardRequest, GuardVerdict, GuestDenyResponse, VERDICT_ALLOW, VERDICT_DENY};
 
 // ---------------------------------------------------------------------------
 // Thread-local deny reason storage
@@ -79,9 +79,7 @@ pub fn encode_verdict(verdict: GuardVerdict) -> i32 {
 /// This is the pure logic extracted from [`arc_deny_reason`] so it can be
 /// tested without unsafe pointer casts on 64-bit native targets.
 fn serialize_deny_reason() -> Option<Vec<u8>> {
-    let reason = LAST_DENY_REASON.with(|cell| {
-        cell.try_borrow().ok().and_then(|r| r.clone())
-    });
+    let reason = LAST_DENY_REASON.with(|cell| cell.try_borrow().ok().and_then(|r| r.clone()));
 
     let reason = reason?;
     let resp = GuestDenyResponse { reason };
@@ -126,6 +124,7 @@ pub extern "C" fn arc_deny_reason(buf_ptr: i32, buf_len: i32) -> i32 {
 // ---------------------------------------------------------------------------
 
 /// Clear the stored deny reason. Exposed for testing only.
+#[cfg(test)]
 pub(crate) fn clear_deny_reason() {
     LAST_DENY_REASON.with(|cell| {
         if let Ok(mut r) = cell.try_borrow_mut() {
@@ -141,7 +140,9 @@ pub(crate) fn clear_deny_reason() {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use crate::types::{GuardRequest, GuardVerdict, GuestDenyResponse, VERDICT_ALLOW, VERDICT_DENY};
+    use crate::types::{
+        GuardRequest, GuardVerdict, GuestDenyResponse, VERDICT_ALLOW, VERDICT_DENY,
+    };
 
     #[test]
     fn encode_verdict_allow_returns_zero_and_clears_reason() {
@@ -150,7 +151,10 @@ mod tests {
         let code = super::encode_verdict(GuardVerdict::Allow);
         assert_eq!(code, VERDICT_ALLOW);
         // After Allow, the internal serialization should return None.
-        assert!(super::serialize_deny_reason().is_none(), "No deny reason should exist after Allow");
+        assert!(
+            super::serialize_deny_reason().is_none(),
+            "No deny reason should exist after Allow"
+        );
     }
 
     #[test]
@@ -165,8 +169,8 @@ mod tests {
 
         // Test via the extracted pure-logic function (avoids 64-bit pointer
         // truncation issues with arc_deny_reason's i32 buf_ptr on native).
-        let json_bytes = super::serialize_deny_reason()
-            .expect("deny reason should be present after Deny");
+        let json_bytes =
+            super::serialize_deny_reason().expect("deny reason should be present after Deny");
         let resp: GuestDenyResponse = serde_json::from_slice(&json_bytes).unwrap();
         assert_eq!(resp.reason, "blocked");
     }
@@ -174,16 +178,20 @@ mod tests {
     #[test]
     fn arc_deny_reason_returns_negative_after_allow() {
         super::encode_verdict(GuardVerdict::Allow);
-        assert!(super::serialize_deny_reason().is_none(), "No deny reason after Allow");
+        assert!(
+            super::serialize_deny_reason().is_none(),
+            "No deny reason after Allow"
+        );
     }
 
     #[test]
     fn arc_deny_reason_returns_negative_for_tiny_buffer() {
-        super::encode_verdict(GuardVerdict::deny("this reason is definitely longer than 2 bytes"));
+        super::encode_verdict(GuardVerdict::deny(
+            "this reason is definitely longer than 2 bytes",
+        ));
 
         // The serialized JSON for this reason is well over 2 bytes.
-        let json_bytes = super::serialize_deny_reason()
-            .expect("deny reason should be present");
+        let json_bytes = super::serialize_deny_reason().expect("deny reason should be present");
         assert!(json_bytes.len() > 2, "JSON should be longer than 2 bytes");
 
         // Verify the arc_deny_reason logic: if buf_len < json_bytes.len(), it

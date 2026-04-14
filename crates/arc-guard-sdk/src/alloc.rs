@@ -50,9 +50,9 @@ pub extern "C" fn arc_free(ptr: i32, size: i32) {
         if let Ok(mut v) = allocs.try_borrow_mut() {
             // Find and remove the allocation whose base pointer and length match.
             #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-            let idx = v.iter().position(|buf| {
-                buf.as_ptr() as usize as i32 == ptr && buf.len() as i32 == size
-            });
+            let idx = v
+                .iter()
+                .position(|buf| buf.as_ptr() as usize as i32 == ptr && buf.len() as i32 == size);
             if let Some(i) = idx {
                 v.swap_remove(i);
             }

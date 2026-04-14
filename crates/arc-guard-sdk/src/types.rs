@@ -160,11 +160,26 @@ mod tests {
         let req: GuardRequest = serde_json::from_value(json).unwrap();
         assert_eq!(req.tool_name, "test_tool");
         assert!(req.scopes.is_empty(), "scopes should default to empty Vec");
-        assert!(req.action_type.is_none(), "action_type should default to None");
-        assert!(req.extracted_path.is_none(), "extracted_path should default to None");
-        assert!(req.extracted_target.is_none(), "extracted_target should default to None");
-        assert!(req.filesystem_roots.is_empty(), "filesystem_roots should default to empty Vec");
-        assert!(req.matched_grant_index.is_none(), "matched_grant_index should default to None");
+        assert!(
+            req.action_type.is_none(),
+            "action_type should default to None"
+        );
+        assert!(
+            req.extracted_path.is_none(),
+            "extracted_path should default to None"
+        );
+        assert!(
+            req.extracted_target.is_none(),
+            "extracted_target should default to None"
+        );
+        assert!(
+            req.filesystem_roots.is_empty(),
+            "filesystem_roots should default to empty Vec"
+        );
+        assert!(
+            req.matched_grant_index.is_none(),
+            "matched_grant_index should default to None"
+        );
     }
 
     #[test]
@@ -183,11 +198,26 @@ mod tests {
         };
 
         let json = serde_json::to_value(&req).unwrap();
-        assert!(json.get("action_type").is_none(), "None fields should be omitted");
-        assert!(json.get("extracted_path").is_none(), "None fields should be omitted");
-        assert!(json.get("extracted_target").is_none(), "None fields should be omitted");
-        assert!(json.get("matched_grant_index").is_none(), "None fields should be omitted");
-        assert!(json.get("filesystem_roots").is_none(), "Empty Vec should be omitted");
+        assert!(
+            json.get("action_type").is_none(),
+            "None fields should be omitted"
+        );
+        assert!(
+            json.get("extracted_path").is_none(),
+            "None fields should be omitted"
+        );
+        assert!(
+            json.get("extracted_target").is_none(),
+            "None fields should be omitted"
+        );
+        assert!(
+            json.get("matched_grant_index").is_none(),
+            "None fields should be omitted"
+        );
+        assert!(
+            json.get("filesystem_roots").is_none(),
+            "Empty Vec should be omitted"
+        );
     }
 
     #[test]
