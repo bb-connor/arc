@@ -141,6 +141,9 @@ Progress: [#####-----] 57%
 - [Phase 382]: arc-guard-sdk crate uses no host-side dependencies (wasmtime, arc-core, arc-kernel); types mirror host abi.rs serde annotations exactly
 - [Phase 382]: Guest-side GuardVerdict::Deny carries mandatory String reason (not Option) because denying guards should always explain why; the host-side Option comes from the arc_deny_reason fallback path
 - [Phase 382]: Vec-based thread-local allocator chosen over bump allocator for simplicity; each arc_alloc pushes a fresh Vec, arc_free matches by pointer+length
+- [Phase 382]: Host function wrappers use cfg(target_arch = "wasm32") gating with no-op/default fallbacks; matches wasm-bindgen convention for dual-target compilation
+- [Phase 382]: serialize_deny_reason() extracted from arc_deny_reason for testability; i32 buf_ptr truncates 64-bit heap pointers on native, so the pure-logic function enables safe testing
+- [Phase 382]: const thread_local initializer pattern (RefCell::new(None)) used consistently across alloc.rs and glue.rs for Rust 1.93 clippy compliance
 
 ### Roadmap Evolution
 
@@ -188,18 +191,19 @@ overhead, and ResourceLimiter benchmarks
 
 ## v4.1 Guard SDK and Developer Experience
 
-Phase: 382 (in progress)
-Plan: 01 of 2 complete
-Status: Plan 382-01 complete -- arc-guard-sdk crate created with ABI-identical
-types (GuardRequest, GuardVerdict, GuestDenyResponse), Vec-based guest allocator
-(arc_alloc, arc_free), and prelude module. 12 tests passing, clippy clean.
-Last activity: 2026-04-14 -- completed 382-01 with crate scaffold, ABI types,
-and guest allocator
+Phase: 382 (complete -- 02 of 02 plans done)
+Plan: 02 of 2 complete
+Status: Phase 382 complete -- arc-guard-sdk crate has full guest-side API:
+ABI-identical types (GuardRequest, GuardVerdict, GuestDenyResponse), Vec-based
+allocator (arc_alloc, arc_free), typed host bindings (arc.log, arc.get_config,
+arc.get_time), ABI glue (read_request, encode_verdict, arc_deny_reason), and
+expanded prelude. 24 tests passing, clippy clean, fmt clean.
+Last activity: 2026-04-14 -- completed 382-02 with host function bindings, ABI
+glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:25:05Z
-Stopped at: Completed 382-01-PLAN.md (guest SDK core types and allocator)
-Next action: execute 382-02-PLAN.md (host function bindings, ABI glue,
-arc_deny_reason)
+Last session: 2026-04-14T23:35:05Z
+Stopped at: Completed 382-02-PLAN.md (host bindings, ABI glue, arc_deny_reason)
+Next action: begin Phase 383 (proc macro and example guards)
 Resume file: None

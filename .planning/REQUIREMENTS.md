@@ -3199,9 +3199,9 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 - [x] **GSDK-01**: `arc-guard-sdk` crate provides `GuardRequest` and `GuardVerdict` types matching the host ABI
 - [x] **GSDK-02**: `arc-guard-sdk` crate implements a guest-side allocator exported as `arc_alloc` and `arc_free`
-- [ ] **GSDK-03**: `arc-guard-sdk` crate provides typed host function bindings for `arc::log`, `arc::get_config`, and `arc::get_time`
-- [ ] **GSDK-04**: `arc-guard-sdk` crate handles `GuardRequest` deserialization from linear memory and `GuardVerdict` encoding back to the host
-- [ ] **GSDK-05**: `arc-guard-sdk` crate exports `arc_deny_reason` for structured deny reason reporting
+- [x] **GSDK-03**: `arc-guard-sdk` crate provides typed host function bindings for `arc::log`, `arc::get_config`, and `arc::get_time`
+- [x] **GSDK-04**: `arc-guard-sdk` crate handles `GuardRequest` deserialization from linear memory and `GuardVerdict` encoding back to the host
+- [x] **GSDK-05**: `arc-guard-sdk` crate exports `arc_deny_reason` for structured deny reason reporting
 - [ ] **GSDK-06**: `arc-guard-sdk-macros` crate provides `#[arc_guard]` proc macro that generates the `evaluate` export, allocator, and ABI glue from a user function
 
 ### Example Guards
@@ -3243,9 +3243,9 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 |-------------|-------|--------|
 | GSDK-01 | Phase 377 | Complete |
 | GSDK-02 | Phase 377 | Complete |
-| GSDK-03 | Phase 377 | Pending |
-| GSDK-04 | Phase 377 | Pending |
-| GSDK-05 | Phase 377 | Pending |
+| GSDK-03 | Phase 377 | Complete |
+| GSDK-04 | Phase 377 | Complete |
+| GSDK-05 | Phase 377 | Complete |
 | GSDK-06 | Phase 378 | Pending |
 | GEXM-01 | Phase 378 | Pending |
 | GEXM-02 | Phase 378 | Pending |
