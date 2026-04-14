@@ -658,9 +658,17 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 - [x] **SPEC-31**: `docs/protocols/STRATEGIC-VISION.md` updated with shipped status for all Tier 1/2/3 items and new future-horizon section
 - [x] **SPEC-32**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated with shipped status for all 6 build phases, actual crate/package names, and implementation notes
 - [x] **SPEC-33**: `docs/sdk/PLATFORM.md` documents arc-tower (Rust), K8s controller/injector, JVM Spring Boot, and .NET ASP.NET Core substrates with usage examples
-- [ ] **SPEC-34**: `spec/WIRE_PROTOCOL.md` updated with Section 7 referencing the HTTP substrate as a fourth cooperating protocol surface
+- [x] **SPEC-34**: `spec/WIRE_PROTOCOL.md` updated with Section 7 referencing the HTTP substrate as a fourth cooperating protocol surface
 
 ---
+
+Historical note: the phase-local checkbox lists above preserve the original
+planning documents. For `v3.0` through `v3.8`, the authoritative reconciled
+state is now the traceability table below, which marks those phases as
+implemented but still awaiting a dedicated audit closeout rather than flat
+`Planned`. For `v3.9` through `v3.11`, the traceability table reflects the
+reconciled execution truth from the remediation lane even where the original
+checklists were never flipped at the time.
 
 ### v3.9 Runtime Correctness and Contract Remediation
 
@@ -754,186 +762,186 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 319 | Planned |
-| CORE-02 | Phase 319 | Planned |
-| CORE-03 | Phase 319 | Planned |
-| CORE-04 | Phase 319 | Planned |
-| CORE-05 | Phase 320 | Planned |
-| CORE-06 | Phase 320 | Planned |
-| CORE-07 | Phase 320 | Planned |
-| CORE-08 | Phase 320 | Planned |
-| CORE-09 | Phase 320 | Planned |
-| CORE-10 | Phase 321 | Planned |
-| CORE-11 | Phase 321 | Planned |
-| CORE-12 | Phase 321 | Planned |
-| CORE-13 | Phase 321 | Planned |
-| CORE-14 | Phase 322 | Planned |
-| CORE-15 | Phase 322 | Planned |
-| CORE-16 | Phase 322 | Planned |
-| CORE-17 | Phase 322 | Planned |
-| CORE-18 | Phase 322 | Planned |
-| ATT-01 | Phase 323 | Planned |
-| ATT-02 | Phase 323 | Planned |
-| ATT-03 | Phase 323 | Planned |
-| ATT-04 | Phase 323 | Planned |
-| ATT-05 | Phase 324 | Planned |
-| ATT-06 | Phase 324 | Planned |
-| ATT-07 | Phase 324 | Planned |
-| ATT-08 | Phase 324 | Planned |
-| ATT-09 | Phase 325 | Planned |
-| ATT-10 | Phase 325 | Planned |
-| ATT-11 | Phase 325 | Planned |
-| ATT-12 | Phase 325 | Planned |
-| ATT-13 | Phase 326 | Planned |
-| ATT-14 | Phase 326 | Planned |
-| ATT-15 | Phase 326 | Planned |
-| PY-01 | Phase 327 | Planned |
-| PY-02 | Phase 327 | Planned |
-| PY-03 | Phase 327 | Planned |
-| PY-04 | Phase 327 | Planned |
-| PY-05 | Phase 328 | Planned |
-| PY-06 | Phase 328 | Planned |
-| PY-07 | Phase 328 | Planned |
-| PY-08 | Phase 329 | Planned |
-| PY-09 | Phase 329 | Planned |
-| PY-10 | Phase 329 | Planned |
-| PY-11 | Phase 330 | Planned |
-| PY-12 | Phase 330 | Planned |
-| PY-13 | Phase 330 | Planned |
-| TS-01 | Phase 331 | Planned |
-| TS-02 | Phase 331 | Planned |
-| TS-03 | Phase 331 | Planned |
-| TS-04 | Phase 332 | Planned |
-| TS-05 | Phase 332 | Planned |
-| TS-06 | Phase 332 | Planned |
-| TS-07 | Phase 333 | Planned |
-| TS-08 | Phase 333 | Planned |
-| TS-09 | Phase 333 | Planned |
-| TS-10 | Phase 334 | Planned |
-| TS-11 | Phase 334 | Planned |
-| TS-12 | Phase 334 | Planned |
-| GUARD-01 | Phase 335 | Planned |
-| GUARD-02 | Phase 335 | Planned |
-| GUARD-03 | Phase 335 | Planned |
-| GUARD-04 | Phase 336 | Planned |
-| GUARD-05 | Phase 336 | Planned |
-| GUARD-06 | Phase 337 | Planned |
-| GUARD-07 | Phase 336 | Planned |
-| GUARD-08 | Phase 337 | Planned |
-| GUARD-09 | Phase 337 | Planned |
-| GUARD-10 | Phase 337 | Planned |
-| GUARD-11 | Phase 338 | Planned |
-| GUARD-12 | Phase 338 | Planned |
-| GUARD-13 | Phase 338 | Planned |
-| PROTO-01 | Phase 339 | Planned |
-| PROTO-02 | Phase 339 | Planned |
-| PROTO-03 | Phase 339 | Planned |
-| PROTO-04 | Phase 340 | Planned |
-| PROTO-05 | Phase 340 | Planned |
-| PROTO-06 | Phase 340 | Planned |
-| PROTO-07 | Phase 341 | Planned |
-| PROTO-08 | Phase 341 | Planned |
-| PROTO-09 | Phase 341 | Planned |
-| PROTO-10 | Phase 341 | Planned |
-| PROTO-11 | Phase 342 | Planned |
-| PROTO-12 | Phase 342 | Planned |
-| PROTO-13 | Phase 342 | Planned |
-| PLAT-01 | Phase 343 | Planned |
-| PLAT-02 | Phase 343 | Planned |
-| PLAT-03 | Phase 343 | Planned |
-| PLAT-04 | Phase 343 | Planned |
-| PLAT-05 | Phase 344 | Planned |
-| PLAT-06 | Phase 344 | Planned |
-| PLAT-07 | Phase 344 | Planned |
-| PLAT-08 | Phase 344 | Planned |
-| PLAT-09 | Phase 345 | Planned |
-| PLAT-10 | Phase 345 | Planned |
-| PLAT-11 | Phase 345 | Planned |
-| PLAT-12 | Phase 346 | Planned |
-| PLAT-13 | Phase 346 | Planned |
-| PLAT-14 | Phase 346 | Planned |
-| PLAT-15 | Phase 346 | Planned |
-| STRAT-01 | Phase 347 | Planned |
-| STRAT-02 | Phase 347 | Planned |
-| STRAT-03 | Phase 347 | Planned |
-| STRAT-04 | Phase 347 | Planned |
-| STRAT-05 | Phase 348 | Planned |
-| STRAT-06 | Phase 348 | Planned |
-| STRAT-07 | Phase 348 | Planned |
-| STRAT-08 | Phase 348 | Planned |
-| STRAT-09 | Phase 349 | Planned |
-| STRAT-10 | Phase 349 | Planned |
-| STRAT-11 | Phase 349 | Planned |
-| STRAT-12 | Phase 350 | Planned |
-| STRAT-13 | Phase 350 | Planned |
-| STRAT-14 | Phase 350 | Planned |
-| STRAT-15 | Phase 350 | Planned |
-| SPEC-01 | Phase 351 | Planned |
-| SPEC-02 | Phase 351 | Planned |
-| SPEC-03 | Phase 351 | Planned |
-| SPEC-04 | Phase 351 | Planned |
-| SPEC-05 | Phase 351 | Planned |
-| SPEC-06 | Phase 352 | Planned |
-| SPEC-07 | Phase 352 | Planned |
-| SPEC-08 | Phase 352 | Planned |
-| SPEC-09 | Phase 352 | Planned |
-| SPEC-10 | Phase 353 | Planned |
-| SPEC-11 | Phase 353 | Planned |
-| SPEC-12 | Phase 353 | Planned |
-| SPEC-13 | Phase 353 | Planned |
-| SPEC-14 | Phase 354 | Planned |
-| SPEC-15 | Phase 354 | Planned |
-| SPEC-16 | Phase 354 | Planned |
-| SPEC-17 | Phase 354 | Planned |
-| SPEC-18 | Phase 355 | Planned |
-| SPEC-19 | Phase 355 | Planned |
-| SPEC-20 | Phase 355 | Planned |
-| SPEC-21 | Phase 355 | Planned |
-| SPEC-22 | Phase 355 | Planned |
-| SPEC-23 | Phase 356 | Planned |
-| SPEC-24 | Phase 356 | Planned |
-| SPEC-25 | Phase 356 | Planned |
-| SPEC-26 | Phase 356 | Planned |
-| SPEC-27 | Phase 357 | Planned |
-| SPEC-28 | Phase 357 | Planned |
-| SPEC-29 | Phase 357 | Planned |
-| SPEC-30 | Phase 357 | Planned |
+| CORE-01 | Phase 319 | Implemented / audit pending |
+| CORE-02 | Phase 319 | Implemented / audit pending |
+| CORE-03 | Phase 319 | Implemented / audit pending |
+| CORE-04 | Phase 319 | Implemented / audit pending |
+| CORE-05 | Phase 320 | Implemented / audit pending |
+| CORE-06 | Phase 320 | Implemented / audit pending |
+| CORE-07 | Phase 320 | Implemented / audit pending |
+| CORE-08 | Phase 320 | Implemented / audit pending |
+| CORE-09 | Phase 320 | Implemented / audit pending |
+| CORE-10 | Phase 321 | Implemented / audit pending |
+| CORE-11 | Phase 321 | Implemented / audit pending |
+| CORE-12 | Phase 321 | Implemented / audit pending |
+| CORE-13 | Phase 321 | Implemented / audit pending |
+| CORE-14 | Phase 322 | Implemented / audit pending |
+| CORE-15 | Phase 322 | Implemented / audit pending |
+| CORE-16 | Phase 322 | Implemented / audit pending |
+| CORE-17 | Phase 322 | Implemented / audit pending |
+| CORE-18 | Phase 322 | Implemented / audit pending |
+| ATT-01 | Phase 323 | Implemented / audit pending |
+| ATT-02 | Phase 323 | Implemented / audit pending |
+| ATT-03 | Phase 323 | Implemented / audit pending |
+| ATT-04 | Phase 323 | Implemented / audit pending |
+| ATT-05 | Phase 324 | Implemented / audit pending |
+| ATT-06 | Phase 324 | Implemented / audit pending |
+| ATT-07 | Phase 324 | Implemented / audit pending |
+| ATT-08 | Phase 324 | Implemented / audit pending |
+| ATT-09 | Phase 325 | Implemented / audit pending |
+| ATT-10 | Phase 325 | Implemented / audit pending |
+| ATT-11 | Phase 325 | Implemented / audit pending |
+| ATT-12 | Phase 325 | Implemented / audit pending |
+| ATT-13 | Phase 326 | Implemented / audit pending |
+| ATT-14 | Phase 326 | Implemented / audit pending |
+| ATT-15 | Phase 326 | Implemented / audit pending |
+| PY-01 | Phase 327 | Implemented / audit pending |
+| PY-02 | Phase 327 | Implemented / audit pending |
+| PY-03 | Phase 327 | Implemented / audit pending |
+| PY-04 | Phase 327 | Implemented / audit pending |
+| PY-05 | Phase 328 | Implemented / audit pending |
+| PY-06 | Phase 328 | Implemented / audit pending |
+| PY-07 | Phase 328 | Implemented / audit pending |
+| PY-08 | Phase 329 | Implemented / audit pending |
+| PY-09 | Phase 329 | Implemented / audit pending |
+| PY-10 | Phase 329 | Implemented / audit pending |
+| PY-11 | Phase 330 | Implemented / audit pending |
+| PY-12 | Phase 330 | Implemented / audit pending |
+| PY-13 | Phase 330 | Implemented / audit pending |
+| TS-01 | Phase 331 | Implemented / audit pending |
+| TS-02 | Phase 331 | Implemented / audit pending |
+| TS-03 | Phase 331 | Implemented / audit pending |
+| TS-04 | Phase 332 | Implemented / audit pending |
+| TS-05 | Phase 332 | Implemented / audit pending |
+| TS-06 | Phase 332 | Implemented / audit pending |
+| TS-07 | Phase 333 | Implemented / audit pending |
+| TS-08 | Phase 333 | Implemented / audit pending |
+| TS-09 | Phase 333 | Implemented / audit pending |
+| TS-10 | Phase 334 | Implemented / audit pending |
+| TS-11 | Phase 334 | Implemented / audit pending |
+| TS-12 | Phase 334 | Implemented / audit pending |
+| GUARD-01 | Phase 335 | Implemented / audit pending |
+| GUARD-02 | Phase 335 | Implemented / audit pending |
+| GUARD-03 | Phase 335 | Implemented / audit pending |
+| GUARD-04 | Phase 336 | Implemented / audit pending |
+| GUARD-05 | Phase 336 | Implemented / audit pending |
+| GUARD-06 | Phase 337 | Implemented / audit pending |
+| GUARD-07 | Phase 336 | Implemented / audit pending |
+| GUARD-08 | Phase 337 | Implemented / audit pending |
+| GUARD-09 | Phase 337 | Implemented / audit pending |
+| GUARD-10 | Phase 337 | Implemented / audit pending |
+| GUARD-11 | Phase 338 | Implemented / audit pending |
+| GUARD-12 | Phase 338 | Implemented / audit pending |
+| GUARD-13 | Phase 338 | Implemented / audit pending |
+| PROTO-01 | Phase 339 | Implemented / audit pending |
+| PROTO-02 | Phase 339 | Implemented / audit pending |
+| PROTO-03 | Phase 339 | Implemented / audit pending |
+| PROTO-04 | Phase 340 | Implemented / audit pending |
+| PROTO-05 | Phase 340 | Implemented / audit pending |
+| PROTO-06 | Phase 340 | Implemented / audit pending |
+| PROTO-07 | Phase 341 | Implemented / audit pending |
+| PROTO-08 | Phase 341 | Implemented / audit pending |
+| PROTO-09 | Phase 341 | Implemented / audit pending |
+| PROTO-10 | Phase 341 | Implemented / audit pending |
+| PROTO-11 | Phase 342 | Implemented / audit pending |
+| PROTO-12 | Phase 342 | Implemented / audit pending |
+| PROTO-13 | Phase 342 | Implemented / audit pending |
+| PLAT-01 | Phase 343 | Implemented / audit pending |
+| PLAT-02 | Phase 343 | Implemented / audit pending |
+| PLAT-03 | Phase 343 | Implemented / audit pending |
+| PLAT-04 | Phase 343 | Implemented / audit pending |
+| PLAT-05 | Phase 344 | Implemented / audit pending |
+| PLAT-06 | Phase 344 | Implemented / audit pending |
+| PLAT-07 | Phase 344 | Implemented / audit pending |
+| PLAT-08 | Phase 344 | Implemented / audit pending |
+| PLAT-09 | Phase 345 | Implemented / audit pending |
+| PLAT-10 | Phase 345 | Implemented / audit pending |
+| PLAT-11 | Phase 345 | Implemented / audit pending |
+| PLAT-12 | Phase 346 | Implemented / audit pending |
+| PLAT-13 | Phase 346 | Implemented / audit pending |
+| PLAT-14 | Phase 346 | Implemented / audit pending |
+| PLAT-15 | Phase 346 | Implemented / audit pending |
+| STRAT-01 | Phase 347 | Implemented / audit pending |
+| STRAT-02 | Phase 347 | Implemented / audit pending |
+| STRAT-03 | Phase 347 | Implemented / audit pending |
+| STRAT-04 | Phase 347 | Implemented / audit pending |
+| STRAT-05 | Phase 348 | Implemented / audit pending |
+| STRAT-06 | Phase 348 | Implemented / audit pending |
+| STRAT-07 | Phase 348 | Implemented / audit pending |
+| STRAT-08 | Phase 348 | Implemented / audit pending |
+| STRAT-09 | Phase 349 | Implemented / audit pending |
+| STRAT-10 | Phase 349 | Implemented / audit pending |
+| STRAT-11 | Phase 349 | Implemented / audit pending |
+| STRAT-12 | Phase 350 | Implemented / audit pending |
+| STRAT-13 | Phase 350 | Implemented / audit pending |
+| STRAT-14 | Phase 350 | Implemented / audit pending |
+| STRAT-15 | Phase 350 | Implemented / audit pending |
+| SPEC-01 | Phase 351 | Implemented / audit pending |
+| SPEC-02 | Phase 351 | Implemented / audit pending |
+| SPEC-03 | Phase 351 | Implemented / audit pending |
+| SPEC-04 | Phase 351 | Implemented / audit pending |
+| SPEC-05 | Phase 351 | Implemented / audit pending |
+| SPEC-06 | Phase 352 | Implemented / audit pending |
+| SPEC-07 | Phase 352 | Implemented / audit pending |
+| SPEC-08 | Phase 352 | Implemented / audit pending |
+| SPEC-09 | Phase 352 | Implemented / audit pending |
+| SPEC-10 | Phase 353 | Implemented / audit pending |
+| SPEC-11 | Phase 353 | Implemented / audit pending |
+| SPEC-12 | Phase 353 | Implemented / audit pending |
+| SPEC-13 | Phase 353 | Implemented / audit pending |
+| SPEC-14 | Phase 354 | Implemented / audit pending |
+| SPEC-15 | Phase 354 | Implemented / audit pending |
+| SPEC-16 | Phase 354 | Implemented / audit pending |
+| SPEC-17 | Phase 354 | Implemented / audit pending |
+| SPEC-18 | Phase 355 | Implemented / audit pending |
+| SPEC-19 | Phase 355 | Implemented / audit pending |
+| SPEC-20 | Phase 355 | Implemented / audit pending |
+| SPEC-21 | Phase 355 | Implemented / audit pending |
+| SPEC-22 | Phase 355 | Implemented / audit pending |
+| SPEC-23 | Phase 356 | Implemented / audit pending |
+| SPEC-24 | Phase 356 | Implemented / audit pending |
+| SPEC-25 | Phase 356 | Implemented / audit pending |
+| SPEC-26 | Phase 356 | Implemented / audit pending |
+| SPEC-27 | Phase 357 | Implemented / audit pending |
+| SPEC-28 | Phase 357 | Implemented / audit pending |
+| SPEC-29 | Phase 357 | Implemented / audit pending |
+| SPEC-30 | Phase 357 | Implemented / audit pending |
 | SPEC-31 | Phase 358 | Complete |
 | SPEC-32 | Phase 358 | Complete |
 | SPEC-33 | Phase 358 | Complete |
-| SPEC-34 | Phase 358 | Planned |
-| REM-01 | Phase 359 | Planned |
-| REM-02 | Phase 359 | Planned |
-| REM-03 | Phase 359 | Planned |
-| REM-04 | Phase 360 | Planned |
-| REM-05 | Phase 360 | Planned |
+| SPEC-34 | Phase 358 | Complete |
+| REM-01 | Phase 359 | Complete |
+| REM-02 | Phase 359 | Complete |
+| REM-03 | Phase 359 | Complete |
+| REM-04 | Phase 360 | Complete |
+| REM-05 | Phase 360 | Complete |
 | REM-06 | Phase 361 | Complete |
 | REM-07 | Phase 361 | Complete |
 | REM-08 | Phase 361 | Complete |
-| REM-09 | Phase 362 | Planned |
-| REM-10 | Phase 362 | Planned |
-| REM-11 | Phase 363 | Planned |
-| REM-12 | Phase 363 | Planned |
+| REM-09 | Phase 362 | Complete |
+| REM-10 | Phase 362 | Complete |
+| REM-11 | Phase 363 | Complete |
+| REM-12 | Phase 363 | Complete |
 | REM-13 | Phase 363 | Complete |
-| ALIGN-01 | Phase 364 | Planned |
-| ALIGN-02 | Phase 364 | Planned |
-| ALIGN-03 | Phase 364 | Planned |
-| ALIGN-04 | Phase 365 | Planned |
-| ALIGN-05 | Phase 365 | Planned |
-| ALIGN-06 | Phase 365 | Planned |
+| ALIGN-01 | Phase 364 | Complete |
+| ALIGN-02 | Phase 364 | Complete |
+| ALIGN-03 | Phase 364 | Complete |
+| ALIGN-04 | Phase 365 | Complete |
+| ALIGN-05 | Phase 365 | Complete |
+| ALIGN-06 | Phase 365 | Complete |
 | ALIGN-07 | Phase 366 | Complete |
 | ALIGN-08 | Phase 366 | Complete |
 | ALIGN-09 | Phase 366 | Complete |
-| ALIGN-10 | Phase 367 | Planned |
-| FINAL-01 | Phase 368 | Planned |
-| FINAL-02 | Phase 368 | Planned |
-| FINAL-03 | Phase 368 | Planned |
-| FINAL-04 | Phase 369 | Planned |
-| FINAL-05 | Phase 369 | Planned |
-| FINAL-06 | Phase 370 | Planned |
-| FINAL-07 | Phase 370 | Planned |
+| ALIGN-10 | Phase 367 | Complete |
+| FINAL-01 | Phase 368 | Complete |
+| FINAL-02 | Phase 368 | Complete |
+| FINAL-03 | Phase 368 | Complete |
+| FINAL-04 | Phase 369 | Complete |
+| FINAL-05 | Phase 369 | Complete |
+| FINAL-06 | Phase 370 | Complete |
+| FINAL-07 | Phase 370 | Complete |
 | FINAL-08 | Phase 371 | Complete |
-| FINAL-09 | Phase 371 | Planned |
+| FINAL-09 | Phase 371 | Complete |
 | FINAL-10 | Phase 372 | Complete |
 | FINAL-11 | Phase 372 | Complete |
 
@@ -957,7 +965,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after adding v3.13 universal orchestration closure requirements*
+*Last updated: 2026-04-14 after phase 393 ledger reconciliation updates*
 
 ## Historical Milestone Requirement Snapshots
 
@@ -3039,11 +3047,11 @@ defend.
 | FID-01 | Phase 392 | Complete |
 | FID-02 | Phase 392 | Complete |
 | FID-03 | Phase 392 | Complete |
-| LEDGER-01 | Phase 393 | Planned |
-| LEDGER-02 | Phase 393 | Planned |
-| LEDGER-03 | Phase 393 | Planned |
-| TRUTH-05 | Phase 393 | Planned |
-| TRUTH-06 | Phase 393 | Planned |
+| LEDGER-01 | Phase 393 | Complete |
+| LEDGER-02 | Phase 393 | Complete |
+| LEDGER-03 | Phase 393 | Complete |
+| TRUTH-05 | Phase 393 | Complete |
+| TRUTH-06 | Phase 393 | Complete |
 | HTTP-01 | Phase 394 | Planned |
 | HTTP-02 | Phase 394 | Planned |
 | HTTP-03 | Phase 394 | Planned |
@@ -3189,8 +3197,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 ### Guest SDK
 
-- [ ] **GSDK-01**: `arc-guard-sdk` crate provides `GuardRequest` and `GuardVerdict` types matching the host ABI
-- [ ] **GSDK-02**: `arc-guard-sdk` crate implements a guest-side allocator exported as `arc_alloc` and `arc_free`
+- [x] **GSDK-01**: `arc-guard-sdk` crate provides `GuardRequest` and `GuardVerdict` types matching the host ABI
+- [x] **GSDK-02**: `arc-guard-sdk` crate implements a guest-side allocator exported as `arc_alloc` and `arc_free`
 - [ ] **GSDK-03**: `arc-guard-sdk` crate provides typed host function bindings for `arc::log`, `arc::get_config`, and `arc::get_time`
 - [ ] **GSDK-04**: `arc-guard-sdk` crate handles `GuardRequest` deserialization from linear memory and `GuardVerdict` encoding back to the host
 - [ ] **GSDK-05**: `arc-guard-sdk` crate exports `arc_deny_reason` for structured deny reason reporting
@@ -3233,8 +3241,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GSDK-01 | Phase 377 | Pending |
-| GSDK-02 | Phase 377 | Pending |
+| GSDK-01 | Phase 377 | Complete |
+| GSDK-02 | Phase 377 | Complete |
 | GSDK-03 | Phase 377 | Pending |
 | GSDK-04 | Phase 377 | Pending |
 | GSDK-05 | Phase 377 | Pending |

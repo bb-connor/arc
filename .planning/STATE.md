@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.66
-milestone_name: Test Coverage for Untested Crates
-status: completed
-stopped_at: Completed 376-02-PLAN.md
-last_updated: "2026-04-14T23:06:47.074Z"
-last_activity: 2026-04-14 -- began phase 393 by extending v3.13 from phases
+milestone: v3.13
+milestone_name: Universal Orchestration Closure
+status: active
+stopped_at: Executing phase 394 after landing OpenAPI override enforcement in arc-api-protect
+last_updated: "2026-04-14T23:22:26Z"
+last_activity: 2026-04-14 -- began phase 394 implementation by landing OpenAPI override enforcement and tests in arc-api-protect
 progress:
-  total_phases: 349
-  completed_phases: 257
-  total_plans: 735
-  completed_plans: 759
-  percent: 43
+  total_phases: 7
+  completed_phases: 4
+  total_plans: 7
+  completed_plans: 4
+  percent: 57
 ---
 
 # Project State
@@ -25,27 +25,30 @@ authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
 **Current focus:** v3.13 Universal Orchestration Closure is now the active
-execution lane. Phases `390` through `392` are complete, so the immediate task
-is planning and executing phase `393` (`Ledger and Narrative Reconciliation`)
-while keeping v3.12 in the locally complete pending-archive state and v4.0 as
-a parallel strategic lane.
+execution lane. Phases `390` through `393` are complete, so the immediate task
+is executing phase `394` (`HTTP Authority and Evidence Convergence`) while
+keeping v3.12 in the locally complete pending-archive state and v4.0 as a
+parallel strategic lane.
 
 ## Current Position
 
-Phase: 393 (in progress)
+Phase: 394 (in progress)
 Plan: 01 (in progress)
-Status: v3.13 is active. Phases `390` through `392` are complete and landed
+Status: v3.13 is active. Phases `390` through `393` are complete and landed
 the shared orchestrator substrate, authoritative ACP live-path guarding,
 explicit compatibility-only A2A/ACP passthrough surfaces, and truthful bridge
-publication gates with tested caveats. The next closure slice is phase `393`,
-which now also owns the newly documented remaining gaps: v3.0-v3.11 ledger
-truth, stale planning metadata, and docs that still overclaim or understate
-the shipped runtime. Later v3.13 phases now explicitly own HTTP convergence,
-protocol lifecycle closure, and final claim qualification.
-Last activity: 2026-04-14 -- began phase 393 by extending v3.13 from phases
-`390-394` to `390-396` so every audited gap has an explicit owner.
+publication gates with tested caveats. Phase `393` then reconciled the late-v3
+ledger, stale planning metadata, and older overclaiming narrative material.
+Phase `394` is now in progress: the first runtime slice landed by preserving
+`x-arc-side-effects` and `x-arc-approval-required` overrides when
+`arc-api-protect` builds its route table from OpenAPI. Remaining 394 work is
+receipt-status semantics, proxy header fidelity, and `arc-tower`
+authority/evidence convergence. Phases `395` and `396` remain queued behind
+that runtime work.
+Last activity: 2026-04-14 -- began phase 394 by landing OpenAPI override
+enforcement and focused proxy tests.
 
-Progress: [####------] 43%
+Progress: [#####-----] 57%
 
 ## Performance Metrics
 
@@ -135,6 +138,9 @@ Progress: [####------] 43%
 - [Phase 376]: File-level lint suppression (#![allow(clippy::unwrap_used, clippy::expect_used)]) required for benchmark binaries since cfg_attr(test) does not apply to bench targets
 - [Phase 376]: Full production hot path (Store + Linker + host functions + instantiate + serialize + write + call) measured in evaluate latency benchmarks to match runtime.rs::evaluate()
 - [Phase 376]: ResourceLimiter benchmark uses assert!(result.is_err()) as correctness gate; benchmark failure means ResourceLimiter is misconfigured
+- [Phase 382]: arc-guard-sdk crate uses no host-side dependencies (wasmtime, arc-core, arc-kernel); types mirror host abi.rs serde annotations exactly
+- [Phase 382]: Guest-side GuardVerdict::Deny carries mandatory String reason (not Option) because denying guards should always explain why; the host-side Option comes from the arc_deny_reason fallback path
+- [Phase 382]: Vec-based thread-local allocator chosen over bump allocator for simplicity; each arc_alloc pushes a fresh Vec, arc_free matches by pointer+length
 
 ### Roadmap Evolution
 
@@ -147,19 +153,21 @@ Progress: [####------] 43%
 
 ### Pending Todos
 
-- Continue executing phase `393` (`Ledger and Narrative Reconciliation`) on
-  top of the landed shared orchestrator, unified authoritative edge path, and
-  truthful bridge publication semantics.
+- Continue executing phase `394` (`HTTP Authority and Evidence Convergence`) on
+  top of the landed shared orchestrator, unified authoritative edge path,
+  truthful bridge publication semantics, completed phase `393`
+  reconciliation, and the newly landed OpenAPI override enforcement slice.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
-- Reconcile the remaining `v3.9`-`v3.11` ledger truth debt under Phase `393`.
+- Execute the runtime closure items owned by phases `394` through `396`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
 - `v3.12` is complete locally but not yet archived, so the repo still carries
-  milestone-closeout debt alongside the new v3.13 planning lane.
-- `v2.83` is still locally incomplete, so it should be explicitly archived or
-  deferred later instead of silently remaining the repo's "active" milestone.
+  milestone-closeout debt alongside the active v3.13 execution lane.
+- `v2.83` is still partially complete locally (phases `316` and `317` remain
+  pending), so it should stay marked as unresolved prior-lane debt instead of
+  silently reading as either archived or active.
 - `v4.0` already reserved phases `373-376`, so `v3.12` begins at `377`; future
   v4.x placeholders must stay shifted to avoid roadmap collisions.
 - The default web3-enabled graph still carries alloy's transitive hashbrown
@@ -180,15 +188,18 @@ overhead, and ResourceLimiter benchmarks
 
 ## v4.1 Guard SDK and Developer Experience
 
-Phase: 382 (not started)
-Plan: --
-Status: Roadmap created; phases 382-385 defined; depends on v4.0 completion
-Last activity: 2026-04-14 -- v3.13 remains active after expanding to phases
-390-396 so the remaining audited gaps have explicit owners
+Phase: 382 (in progress)
+Plan: 01 of 2 complete
+Status: Plan 382-01 complete -- arc-guard-sdk crate created with ABI-identical
+types (GuardRequest, GuardVerdict, GuestDenyResponse), Vec-based guest allocator
+(arc_alloc, arc_free), and prelude module. 12 tests passing, clippy clean.
+Last activity: 2026-04-14 -- completed 382-01 with crate scaffold, ABI types,
+and guest allocator
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:04:06.341Z
-Stopped at: Completed 376-02-PLAN.md
-Next action: continue phase 393 reconciliation work, then move to phase 394
+Last session: 2026-04-14T23:25:05Z
+Stopped at: Completed 382-01-PLAN.md (guest SDK core types and allocator)
+Next action: execute 382-02-PLAN.md (host function bindings, ABI glue,
+arc_deny_reason)
 Resume file: None

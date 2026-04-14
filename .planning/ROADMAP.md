@@ -10904,6 +10904,7 @@ authoritative runtime behavior defined by the earlier ones.
 **Goal**: Implement `CrossProtocolOrchestrator` and `CapabilityBridge` as reusable runtime architecture so bridged protocol execution no longer depends on bespoke per-edge authority flow
 **Depends on**: Phase 381 (the narrow breakthrough claim and its gaps are explicitly qualified)
 **Requirements**: ORCH-01, ORCH-02, ORCH-03
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. A reusable `CrossProtocolOrchestrator` exists and is the default runtime for bridged A2A/ACP execution rather than edge-local bespoke logic
   2. `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
@@ -10917,17 +10918,19 @@ Plans:
 **Goal**: Move ACP and outward A2A/ACP authority onto the orchestrated kernel path and quarantine non-authoritative compatibility helpers
 **Depends on**: Phase 390 (generic orchestration/runtime contract exists)
 **Requirements**: AUTH-01, AUTH-02, AUTH-03
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. ACP authoritative enforcement routes through a kernel-backed service or guard pipeline rather than local token verification alone
   2. A2A and ACP passthrough helpers are quarantined to explicit compatibility/test-only surfaces and cannot be mistaken for default authoritative execution
   3. Permission-preview APIs remain explicitly non-authoritative and cannot satisfy receipt-bearing execution claims
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 392: Fidelity Semantics and Publication Gating
 **Goal**: Upgrade bridge fidelity from heuristic labels to truthful publication-gating semantics with explicit caveats and unsupported cases
 **Depends on**: Phase 391 (authoritative edge path is unified)
 **Requirements**: FID-01, FID-02, FID-03
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Bridge fidelity implements `Lossless`, `Adapted { caveats }`, and `Unsupported { reason }` semantics
   2. Unsupported bridges are not auto-published, and adapted bridges surface caveats in outward metadata and docs
@@ -10941,50 +10944,60 @@ Plans:
 **Goal**: Finish the remaining late-v3 milestone truth debt and older overclaim cleanup now that the final runtime shape is explicit
 **Depends on**: Phase 392 (final bridge/runtime behavior exists to document honestly)
 **Requirements**: LEDGER-01, LEDGER-02, LEDGER-03, TRUTH-05, TRUTH-06
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
   2. Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and early/mid-v3 implementation qualification state
   3. Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
   4. Protocol/design docs no longer describe the shipped cross-protocol substrate or edge baseline as unimplemented
 **Estimated complexity**: M
-**Plans**: 1 plan
+**Plans**: 1/1 plan complete
 Plans:
-- [ ] 393-01-PLAN.md -- ledger truth repair, stale planning metadata fixes, and narrative/doc reconciliation
+- [x] 393-01-PLAN.md -- ledger truth repair, stale planning metadata fixes, and narrative/doc reconciliation
 
 ### Phase 394: HTTP Authority and Evidence Convergence
 **Goal**: Close the remaining HTTP-side authority, evidence, and proxy/runtime convergence gaps that still block the strongest production-ready ARC claim
 **Depends on**: Phase 393 (ledger and docs reflect the current truth before runtime closure resumes)
 **Requirements**: HTTP-01, HTTP-02, HTTP-03, HTTP-04
+**Status**: in progress -- OpenAPI override enforcement landed 2026-04-14; receipt semantics, proxy header fidelity, and arc-tower convergence remain
 **Success Criteria** (what must be TRUE):
   1. HTTP receipt semantics reflect actual downstream response evidence or are explicitly renamed and documented as evaluation-time semantics across the runtime and SDK surfaces
   2. `arc-api-protect` honors OpenAPI extension-aware policy overrides and forwards the request headers needed for real protected reverse-proxy behavior
   3. `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator
   4. The Rust HTTP lane can be described as one coherent authority story rather than a sidecar path plus a divergent in-process path
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 394-01-PLAN.md -- receipt-status semantics, OpenAPI override enforcement, proxy header fidelity, and arc-tower authority convergence
 
 ### Phase 395: Protocol Lifecycle and Authority-Surface Closure
 **Goal**: Make A2A and ACP lifecycle claims as truthful as their execution authority by either implementing missing lifecycle semantics or narrowing the public surface and docs to what really exists
 **Depends on**: Phase 394 (HTTP authority/evidence gaps no longer undermine the shared kernel story)
 **Requirements**: SURFACE-01, SURFACE-02, SURFACE-03, SURFACE-04
+**Status**: not started
 **Success Criteria** (what must be TRUE):
   1. A2A lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
   2. ACP lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
   3. Non-authoritative compatibility APIs are isolated strongly enough that public/default authority surfaces cannot be confused with receipt-bearing mediation
   4. Discovery collisions and outward publication edge cases are handled deterministically and truthfully rather than by silent dropping
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 395-01-PLAN.md -- A2A/ACP lifecycle truth, compatibility-surface isolation, and discovery collision handling
 
 ### Phase 396: Claim Upgrade Qualification
 **Goal**: Qualify the strongest honest post-v3 ARC claim with orchestrated end-to-end tests and operator-facing evidence after ledger, HTTP, and lifecycle closure
 **Depends on**: Phase 395 (runtime and docs now reflect the strongest truthful implementation state)
 **Requirements**: UPGRADE-01, UPGRADE-02, UPGRADE-03
+**Status**: not started
 **Success Criteria** (what must be TRUE):
   1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops and the lifecycle/evidence semantics ARC still advertises
   2. Operator-facing claim-gate docs state the strongest honest claim ARC can make after orchestration and explicitly distinguish the shipped edge-to-native substrate from future full protocol-to-protocol fabric
   3. Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, receipt continuity, and non-misleading protocol claims under real runtime flows
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [ ] 396-01-PLAN.md -- end-to-end claim qualification tests, operator claim-gate docs, and fail-closed evidence validation
 
 ---
 
@@ -10995,7 +11008,7 @@ Plans:
 | 390 | v3.13 | Generic Cross-Protocol Orchestrator | Complete |
 | 391 | v3.13 | Authoritative Edge Unification | Complete |
 | 392 | v3.13 | Fidelity Semantics and Publication Gating | Complete |
-| 393 | v3.13 | Ledger and Narrative Reconciliation | In progress |
+| 393 | v3.13 | Ledger and Narrative Reconciliation | Complete |
 | 394 | v3.13 | HTTP Authority and Evidence Convergence | Not started |
 | 395 | v3.13 | Protocol Lifecycle and Authority-Surface Closure | Not started |
 | 396 | v3.13 | Claim Upgrade Qualification | Not started |
@@ -11088,7 +11101,7 @@ Plans:
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 382 | v4.1 | Guest SDK Core | Not started |
+| 382 | 1/2 | In Progress|  |
 | 383 | v4.1 | Proc Macro, Example Guards, and Integration Tests | Not started |
 | 384 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
 | 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
