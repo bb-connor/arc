@@ -252,20 +252,10 @@ impl WorkflowAuthority {
         // Track budget
         if let Some(ref c) = cost {
             execution.budget_spent = execution.budget_spent.saturating_add(c.units);
-
-            // Check budget envelope
-            if let Some(ref limit) = execution.budget_limit {
-                if execution.budget_spent > limit.units {
-                    execution.active = false;
-                    return Err(WorkflowError::BudgetExceeded {
-                        limit_units: limit.units,
-                        spent_units: execution.budget_spent,
-                        currency: limit.currency.clone(),
-                    });
-                }
-            }
         }
 
+        // Always record the step so the audit trail is complete, even when
+        // the budget is exceeded on this step.
         let record = StepRecord {
             step_index: step.index,
             server_id: step.server_id.clone(),
@@ -279,6 +269,19 @@ impl WorkflowAuthority {
         };
 
         execution.step_records.push(record);
+
+        // Check budget envelope after recording so that finalize() includes
+        // the offending step in the receipt.
+        if let Some(ref limit) = execution.budget_limit {
+            if execution.budget_spent > limit.units {
+                execution.active = false;
+                return Err(WorkflowError::BudgetExceeded {
+                    limit_units: limit.units,
+                    spent_units: execution.budget_spent,
+                    currency: limit.currency.clone(),
+                });
+            }
+        }
 
         if outcome == StepOutcome::Failed || outcome == StepOutcome::Denied {
             execution.active = false;
@@ -609,6 +612,10 @@ mod tests {
             None,
         );
         assert!(matches!(result, Err(WorkflowError::BudgetExceeded { .. })));
+
+        // The offending step should still be recorded for audit completeness.
+        assert_eq!(execution.step_records.len(), 2);
+        assert_eq!(execution.step_records[1].step_index, 1);
     }
 
     #[test]

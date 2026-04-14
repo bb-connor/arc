@@ -143,7 +143,7 @@ impl CostMetadata {
                 CostDimension::ComputeTime { duration_ms } => Some(*duration_ms),
                 _ => None,
             })
-            .sum()
+            .fold(0u64, u64::saturating_add)
     }
 
     /// Total data volume (read + written) across all DataVolume dimensions.
@@ -158,7 +158,7 @@ impl CostMetadata {
                 } => Some(bytes_read.saturating_add(*bytes_written)),
                 _ => None,
             })
-            .sum()
+            .fold(0u64, u64::saturating_add)
     }
 }
 

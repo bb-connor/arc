@@ -254,7 +254,7 @@ fn build_groups(records: &[&CostMetadata], group_by: &GroupBy) -> Vec<CostGroup>
 
         let entry = map.entry(key).or_insert_with(|| (0, 0, 0, None, 0));
 
-        entry.0 += 1;
+        entry.0 = entry.0.saturating_add(1);
         entry.1 = entry.1.saturating_add(r.total_compute_time_ms());
         entry.2 = entry.2.saturating_add(r.total_data_bytes());
 
