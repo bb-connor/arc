@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.12
-milestone_name: Cross-Protocol Integrity and Truth Completion
-status: active
-stopped_at: v3.12 roadmap and requirements created; phases 377-381 are defined while v4.0 remains parallel and v2.83 remains an unarchived local closeout lane
-last_updated: "2026-04-14T18:47:52Z"
-last_activity: 2026-04-14 -- created v3.12 from the cross-protocol debate findings to close ACP cryptographic enforcement, outward-edge kernel mediation, operational parity gaps, and repo-truth drift
+milestone: v2.66
+milestone_name: Test Coverage for Untested Crates
+status: completed
+stopped_at: Completed 373-01-PLAN.md
+last_updated: "2026-04-14T20:52:15.626Z"
+last_activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_phases: 342
+  completed_phases: 250
+  total_plans: 725
+  completed_plans: 742
+  percent: 100
 ---
 
 # Project State
@@ -24,27 +24,24 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v3.12 Cross-Protocol Integrity and Truth Completion --
-finish ACP live-path cryptographic enforcement, kernel-mediated outward edges,
-operational parity on the remaining weak surfaces, and a repo-wide truth pass
-that aligns the vision narrative to shipped code.
+**Current focus:** v3.12 Cross-Protocol Integrity and Truth Completion is
+complete locally; the next repo-management step is milestone archival/closeout
+before resuming the parallel v4.0 lane.
 
 ## Current Position
 
-Phase: 377 (not started)
-Plan: --
-Status: v3.12 is now the active planning lane because the cross-protocol
-debate concluded ARC's kernel/substrate breakthrough is real, but the broader
-vision still depends on ACP live-path cryptographic enforcement, truthful
-kernel mediation at the A2A/ACP edges, operational parity on the last weak
-runtime surfaces, and repo/doc reconciliation. `v4.0` remains a parallel
-strategic bet, and `v2.83` remains locally unarchived rather than silently
-treated as complete.
-Last activity: 2026-04-14 -- defined phases 377-381 for ACP enforcement,
-edge-kernel mediation, operational parity, truth reconciliation, and
-claim-gate qualification.
+Phase: 381 (complete locally)
+Plan: 01 complete; milestone ready for closeout
+Status: all v3.12 corrective work is complete locally. ACP live-path
+cryptographic enforcement is in place, the outward A2A/ACP edges default to
+kernel-backed execution with explicit compatibility helpers, the remaining
+operational parity gaps are closed, and the docs/planning stack now reflects
+the narrowed truthful ARC claim.
+Last activity: 2026-04-14 -- added the v3.12 milestone audit, corrected the
+remaining roadmap/planning metadata drift, and confirmed the
+milestone-ready-for-closeout state across the planning stack.
 
-Progress: [----------] 0%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
@@ -92,6 +89,10 @@ Progress: [----------] 0%
   corrective lane (and remains independent from the unfinished v2.83 closeout).
   Design authority is `docs/guards/05-V1-DECISION.md`. ABI is raw core-WASM
   (not WIT), stateless per-call Store, HushSpec-first pipeline order.
+- Phase 373-01 established the WasmHostState pattern: per-invocation fresh
+  Store with config and bounded log buffer, host functions registered via
+  Linker::func_wrap with typed Caller closures, and shared Arc<Engine> across
+  all WasmtimeBackend instances.
 - The 2026-04-14 cross-protocol debate established the correct ARC claim:
   the kernel/substrate breakthrough is real, but the broader "fully realized
   universal cross-protocol governance kernel" claim still requires ACP
@@ -103,16 +104,8 @@ Progress: [----------] 0%
 
 ### Pending Todos
 
-- Plan and execute phase `377` to wire ACP live-path capability checking all
-  the way through signature verification and fail-closed enforcement.
-- Plan and execute phase `378` to make the A2A/ACP outward edges truthfully
-  kernel-mediated with signed receipt parity or explicitly narrowed claims.
-- Plan and execute phase `379` to close sidecar receipt persistence,
-  `arc-tower` body binding, and Kubernetes kernel-validation gaps.
-- Plan and execute phase `380` to reconcile protocol docs, crate comments, and
-  planning artifacts with what the live code actually ships.
-- Plan and execute phase `381` to qualify the narrowed ARC claim with
-  integration tests and operator-facing verification artifacts.
+- Close and archive `v3.12` now that phases `377` through `381` are complete
+  locally.
 - Close or explicitly defer the remaining `v2.83` coverage / qualification
   loose ends once the repo's top-level truth narrative is stable.
 - Resume `v4.0` planning/execution after the v3.12 corrective lane no longer
@@ -120,9 +113,8 @@ Progress: [----------] 0%
 
 ### Blockers/Concerns
 
-- ACP and outward-edge surfaces still contain partial or overstated
-  cryptographic/kernel claims in live code and docs; phase `380` must treat
-  comment/doc truth as part of the product surface, not cleanup polish.
+- `v3.12` is complete locally but not yet archived, so the repo still carries
+  an active-milestone marker until closeout is performed.
 - `v2.83` is still locally incomplete, so it should be explicitly archived or
   deferred later instead of silently remaining the repo's "active" milestone.
 - `v4.0` already reserved phases `373-376`, so `v3.12` begins at `377`; future
@@ -133,28 +125,26 @@ Progress: [----------] 0%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 373 (not started)
-Plan: --
-Status: Roadmap created; phases 373-376 defined; ready for `plan-phase 373`
-Last activity: 2026-04-14 -- v4.0 roadmap created with 4 phases covering 31
-requirements across runtime hardening, security/enrichment, manifest/wiring/
-receipts, and benchmark validation
+Phase: 373 (in progress)
+Plan: 01 of 2 complete
+Status: Plan 01 complete -- WasmHostState, shared Arc<Engine>, three host
+functions (arc.log, arc.get_config, arc.get_time_unix_secs) implemented and
+tested. Plan 02 (arc_alloc/arc_deny_reason guest export detection) is next.
+Last activity: 2026-04-14 -- completed 373-01 host foundation plan with 9
+WAT-based tests, refactored WasmtimeBackend to Store<WasmHostState>
 
 
 ## v4.1 Guard SDK and Developer Experience
 
-Phase: 377 (not started)
+Phase: 382 (not started)
 Plan: --
-Status: Roadmap created; phases 377-380 defined; depends on v4.0 completion
-Last activity: 2026-04-14 -- v4.1 roadmap created with 4 phases covering 19
-requirements across guest SDK core, proc macro/examples, CLI scaffolding, and
-CLI test/bench/pack/install
+Status: Roadmap created; phases 382-385 defined; depends on v4.0 completion
+Last activity: 2026-04-14 -- v4.1 roadmap renumbered to 382-385 to avoid
+colliding with active v3.12 phases
 
 ## Session Continuity
 
-Last session: 2026-04-14
-Stopped at: v3.12 roadmap created; phases 377-381 defined in ROADMAP.md and
-REQUIREMENTS.md
-Next action: `/gsd:plan-phase 377` to begin ACP live-path cryptographic
-enforcement
+Last session: 2026-04-14T20:52:15.611Z
+Stopped at: Completed 373-01-PLAN.md
+Next action: Execute 373-02-PLAN.md (arc_alloc/arc_deny_reason guest export detection)
 Resume file: None

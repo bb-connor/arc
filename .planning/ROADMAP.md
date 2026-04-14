@@ -173,12 +173,14 @@
 - [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
 - [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
 - [ ] **v3.8 Normative Specification Alignment** - Phases 351-358 (planned)
-- [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
-  (planned)
-- [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
-  364-367 (planned)
-- [ ] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
-  368-372 (planned)
+- [x] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
+  (completed locally 2026-04-14)
+- [x] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
+  364-367 (completed locally 2026-04-14)
+- [x] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
+  368-372 (completed locally 2026-04-14)
+- [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
+  (completed locally 2026-04-14; pending archival)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -10746,7 +10748,7 @@ Plans:
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 373 | v4.0 | WASM Runtime Host Foundation | Not started |
+| 373 | 1/2 | In Progress|  |
 | 374 | v4.0 | Security Hardening and Request Enrichment | Not started |
 | 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
 | 376 | v4.0 | Benchmark Validation | Not started |
@@ -10785,7 +10787,8 @@ narrative corrections are in place.
   2. `KernelCapabilityChecker` verifies token signatures, time validity, server binding, and scope coverage using configured trust material rather than parse/time/scope checks alone
   3. ACP live-path receipts or equivalent compliance artifacts record the validated `capability_id` and make it obvious which operations were cryptographically enforced
 **Estimated complexity**: M
-**Plans**: TBD
+**Status**: complete locally 2026-04-14
+**Plans**: 1/1 plan complete
 
 ### Phase 378: Outward Edge Kernel Mediation and Receipt Parity
 **Goal**: A2A and ACP edge crates stop overstating kernel mediation and either route live authority through the kernel with signed receipts or narrow their claims explicitly
@@ -10796,6 +10799,7 @@ narrative corrections are in place.
   2. Allowed, denied, failed, and streaming edge flows expose signed receipt output or truthful receipt references instead of implying kernel mediation without emitting evidence
   3. `arc-acp-edge` capability invocation surfaces are kernel-mediated with signed receipts, or any remaining discovery-only/non-kernel paths are explicitly documented as outside enforcement claims
 **Estimated complexity**: L
+**Status**: complete locally 2026-04-14
 **Plans**: 1/1 plan complete
 
 ### Phase 379: Operational Parity and Persistence Completion
@@ -10807,6 +10811,7 @@ narrative corrections are in place.
   2. `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated on real body-bearing requests
   3. The Kubernetes controller validates ARC capability tokens and scope requirements against kernel-backed logic rather than annotation presence alone
 **Estimated complexity**: M
+**Status**: complete locally 2026-04-14
 **Plans**: 2/2 plans complete
 
 ### Phase 380: Truth and Narrative Reconciliation
@@ -10819,6 +10824,7 @@ narrative corrections are in place.
   3. Planning files consistently represent v3.12 as the corrective credibility lane and v4.0 as a parallel strategic bet rather than the active truth narrative
   4. Crate-level comments and bridge docs no longer claim kernel mediation or signed receipt behavior on live paths that do not implement it
 **Estimated complexity**: M
+**Status**: complete locally 2026-04-14
 **Plans**: 1/1 plan complete
 
 ### Phase 381: Claim-Gate Qualification
@@ -10830,6 +10836,7 @@ narrative corrections are in place.
   2. Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit prerequisites for any stronger "fully realized universal kernel" claim
   3. Operator-facing verification demonstrates receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
 **Estimated complexity**: M
+**Status**: complete locally 2026-04-14
 **Plans**: 1/1 plan complete
 
 ---

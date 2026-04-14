@@ -655,9 +655,9 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 #### Phase 358: Strategic Vision and Design Doc Reconciliation
 
-- [ ] **SPEC-31**: `docs/protocols/STRATEGIC-VISION.md` updated with shipped status for all Tier 1/2/3 items and new future-horizon section
-- [ ] **SPEC-32**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated with shipped status for all 6 build phases, actual crate/package names, and implementation notes
-- [ ] **SPEC-33**: `docs/sdk/PLATFORM.md` documents arc-tower (Rust), K8s controller/injector, JVM Spring Boot, and .NET ASP.NET Core substrates with usage examples
+- [x] **SPEC-31**: `docs/protocols/STRATEGIC-VISION.md` updated with shipped status for all Tier 1/2/3 items and new future-horizon section
+- [x] **SPEC-32**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated with shipped status for all 6 build phases, actual crate/package names, and implementation notes
+- [x] **SPEC-33**: `docs/sdk/PLATFORM.md` documents arc-tower (Rust), K8s controller/injector, JVM Spring Boot, and .NET ASP.NET Core substrates with usage examples
 - [ ] **SPEC-34**: `spec/WIRE_PROTOCOL.md` updated with Section 7 referencing the HTTP substrate as a fourth cooperating protocol surface
 
 ---
@@ -677,9 +677,9 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 #### Phase 361: HTTP Adapter Request Binding and Capability Validation
 
-- [ ] **REM-06**: `arc-api-protect` and `arc-tower` parse query parameters into the normalized `ArcHttpRequest` so query values participate in the receipt `content_hash`
-- [ ] **REM-07**: `arc-api-protect` and `arc-tower` carry `capability_id` into `ArcHttpRequest` and `HttpReceipt` when a valid capability token is presented in `X-Arc-Capability` or `arc_capability`
-- [ ] **REM-08**: Unsafe HTTP requests with malformed, invalid-signature, or expired capability tokens are denied fail-closed instead of being allowed on token presence alone
+- [x] **REM-06**: `arc-api-protect` and `arc-tower` parse query parameters into the normalized `ArcHttpRequest` so query values participate in the receipt `content_hash`
+- [x] **REM-07**: `arc-api-protect` and `arc-tower` carry `capability_id` into `ArcHttpRequest` and `HttpReceipt` when a valid capability token is presented in `X-Arc-Capability` or `arc_capability`
+- [x] **REM-08**: Unsafe HTTP requests with malformed, invalid-signature, or expired capability tokens are denied fail-closed instead of being allowed on token presence alone
 
 #### Phase 362: Test Stabilization and Invariant Enforcement
 
@@ -690,7 +690,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 - [ ] **REM-11**: `spec/CONFIGURATION.md` no longer documents a nonexistent `arc start --config arc.yaml` command as the normative configuration entrypoint
 - [ ] **REM-12**: Python SDK, ASGI, and Django timeout defaults are `5.0` seconds (5000ms) to match `spec/HTTP-SUBSTRATE.md`
-- [ ] **REM-13**: Documentation is updated anywhere the runtime contract changed during remediation, including OpenAI receipt behavior and capability-token validation semantics
+- [x] **REM-13**: Documentation is updated anywhere the runtime contract changed during remediation, including OpenAI receipt behavior and capability-token validation semantics
 
 ---
 
@@ -710,9 +710,9 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 #### Phase 366: Cross-SDK Capability Presentation Alignment
 
-- [ ] **ALIGN-07**: TypeScript, Go, JVM, and .NET HTTP adapters stop forwarding raw capability-token material inside `ArcHttpRequest.headers`
-- [ ] **ALIGN-08**: TypeScript, Go, JVM, and .NET carry the presented token's `id` in `capability_id` when derivable and preserve both header and query-param presentation paths in user-facing deny guidance
-- [ ] **ALIGN-09**: Platform SDK docs (`docs/sdk/PLATFORM.md` and per-language references where relevant) describe header-or-query capability presentation semantics consistently with the normative spec
+- [x] **ALIGN-07**: TypeScript, Go, JVM, and .NET HTTP adapters stop forwarding raw capability-token material inside `ArcHttpRequest.headers`
+- [x] **ALIGN-08**: TypeScript, Go, JVM, and .NET carry the presented token's `id` in `capability_id` when derivable and preserve both header and query-param presentation paths in user-facing deny guidance
+- [x] **ALIGN-09**: Platform SDK docs (`docs/sdk/PLATFORM.md` and per-language references where relevant) describe header-or-query capability presentation semantics consistently with the normative spec
 
 #### Phase 367: HTTP Receipt Conversion Safety
 
@@ -740,13 +740,13 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 #### Phase 371: Cross-SDK Raw-Byte Binding and EvaluateResponse Contract
 
-- [ ] **FINAL-08**: Fastify and .NET compute `body_hash` from raw request bytes rather than reparsed JSON or decoded strings
+- [x] **FINAL-08**: Fastify and .NET compute `body_hash` from raw request bytes rather than reparsed JSON or decoded strings
 - [ ] **FINAL-09**: `EvaluateResponse.evidence` is always serialized on the wire so the Rust runtime matches `spec/HTTP-SUBSTRATE.md` and the shipped JSON schema
 
 #### Phase 372: HTTP Schema and Platform Doc Consistency
 
-- [ ] **FINAL-10**: The HTTP JSON schemas model nullable optional fields (`body_hash`, `session_id`, `capability_id`) consistently with the prose spec and Rust `Option<_>` types
-- [ ] **FINAL-11**: `docs/sdk/PLATFORM.md` consistently documents capability transport as `X-Arc-Capability` header or `arc_capability` query parameter everywhere
+- [x] **FINAL-10**: The HTTP JSON schemas model nullable optional fields (`body_hash`, `session_id`, `capability_id`) consistently with the prose spec and Rust `Option<_>` types
+- [x] **FINAL-11**: `docs/sdk/PLATFORM.md` consistently documents capability transport as `X-Arc-Capability` header or `arc_capability` query parameter everywhere
 
 ---
 
@@ -898,32 +898,32 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | SPEC-28 | Phase 357 | Planned |
 | SPEC-29 | Phase 357 | Planned |
 | SPEC-30 | Phase 357 | Planned |
-| SPEC-31 | Phase 358 | Planned |
-| SPEC-32 | Phase 358 | Planned |
-| SPEC-33 | Phase 358 | Planned |
+| SPEC-31 | Phase 358 | Complete |
+| SPEC-32 | Phase 358 | Complete |
+| SPEC-33 | Phase 358 | Complete |
 | SPEC-34 | Phase 358 | Planned |
 | REM-01 | Phase 359 | Planned |
 | REM-02 | Phase 359 | Planned |
 | REM-03 | Phase 359 | Planned |
 | REM-04 | Phase 360 | Planned |
 | REM-05 | Phase 360 | Planned |
-| REM-06 | Phase 361 | Planned |
-| REM-07 | Phase 361 | Planned |
-| REM-08 | Phase 361 | Planned |
+| REM-06 | Phase 361 | Complete |
+| REM-07 | Phase 361 | Complete |
+| REM-08 | Phase 361 | Complete |
 | REM-09 | Phase 362 | Planned |
 | REM-10 | Phase 362 | Planned |
 | REM-11 | Phase 363 | Planned |
 | REM-12 | Phase 363 | Planned |
-| REM-13 | Phase 363 | Planned |
+| REM-13 | Phase 363 | Complete |
 | ALIGN-01 | Phase 364 | Planned |
 | ALIGN-02 | Phase 364 | Planned |
 | ALIGN-03 | Phase 364 | Planned |
 | ALIGN-04 | Phase 365 | Planned |
 | ALIGN-05 | Phase 365 | Planned |
 | ALIGN-06 | Phase 365 | Planned |
-| ALIGN-07 | Phase 366 | Planned |
-| ALIGN-08 | Phase 366 | Planned |
-| ALIGN-09 | Phase 366 | Planned |
+| ALIGN-07 | Phase 366 | Complete |
+| ALIGN-08 | Phase 366 | Complete |
+| ALIGN-09 | Phase 366 | Complete |
 | ALIGN-10 | Phase 367 | Planned |
 | FINAL-01 | Phase 368 | Planned |
 | FINAL-02 | Phase 368 | Planned |
@@ -932,10 +932,10 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | FINAL-05 | Phase 369 | Planned |
 | FINAL-06 | Phase 370 | Planned |
 | FINAL-07 | Phase 370 | Planned |
-| FINAL-08 | Phase 371 | Planned |
+| FINAL-08 | Phase 371 | Complete |
 | FINAL-09 | Phase 371 | Planned |
-| FINAL-10 | Phase 372 | Planned |
-| FINAL-11 | Phase 372 | Planned |
+| FINAL-10 | Phase 372 | Complete |
+| FINAL-11 | Phase 372 | Complete |
 
 **Coverage:**
 - Universal security kernel requirements (v3.0-v3.12): 164 total, 164 mapped, 0 unmapped
@@ -2894,34 +2894,34 @@ forces the repo/docs/planning story to match the live code.
 
 ### ACP Live-Path Cryptographic Enforcement
 
-- [ ] **ACPX-01**: `arc-acp-proxy` filesystem and terminal interception paths invoke the configured `CapabilityChecker` before built-in allow logic and fail closed on deny or validation error
-- [ ] **ACPX-02**: `KernelCapabilityChecker` verifies capability token signatures, time validity, server binding, and scope coverage using configured kernel trust material instead of parse/time/scope checks alone
-- [ ] **ACPX-03**: ACP live-path receipts or equivalent compliance artifacts record the validated `capability_id` and clearly distinguish cryptographically enforced operations from audit-only permission mapping
+- [x] **ACPX-01**: `arc-acp-proxy` filesystem and terminal interception paths invoke the configured `CapabilityChecker` before built-in allow logic and fail closed on deny or validation error
+- [x] **ACPX-02**: `KernelCapabilityChecker` verifies capability token signatures, time validity, server binding, and scope coverage using configured kernel trust material instead of parse/time/scope checks alone
+- [x] **ACPX-03**: ACP live-path receipts or equivalent compliance artifacts record the validated `capability_id` and clearly distinguish cryptographically enforced operations from audit-only permission mapping
 
 ### Outward Edge Kernel Mediation
 
-- [ ] **EDGE-01**: `arc-a2a-edge` live send/invoke paths route authority decisions through the ARC kernel instead of directly invoking adapter connections
-- [ ] **EDGE-02**: `arc-a2a-edge` allowed, denied, failed, and streaming flows expose signed receipt output or truthful receipt references rather than implying kernel mediation without evidence
-- [ ] **EDGE-03**: `arc-acp-edge` capability invocation and permission surfaces are kernel-mediated with signed receipts, or any remaining non-kernel discovery-only paths are explicitly documented and excluded from enforcement claims
+- [x] **EDGE-01**: `arc-a2a-edge` live send/invoke paths route authority decisions through the ARC kernel instead of directly invoking adapter connections
+- [x] **EDGE-02**: `arc-a2a-edge` allowed, denied, failed, and streaming flows expose signed receipt output or truthful receipt references rather than implying kernel mediation without evidence
+- [x] **EDGE-03**: `arc-acp-edge` capability invocation and permission surfaces are kernel-mediated with signed receipts, or any remaining non-kernel discovery-only paths are explicitly documented and excluded from enforcement claims
 
 ### Operational Parity
 
-- [ ] **OPER-01**: `arc-api-protect` persists signed receipts when `receipt_db` is configured and exposes the same persisted receipts across proxy and `/arc/evaluate` flows
-- [ ] **OPER-02**: `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated instead of always `None` / `0`
-- [ ] **OPER-03**: The Kubernetes controller validates ARC capability tokens and required scopes against kernel-backed logic rather than annotation presence alone
+- [x] **OPER-01**: `arc-api-protect` persists signed receipts when `receipt_db` is configured and exposes the same persisted receipts across proxy and `/arc/evaluate` flows
+- [x] **OPER-02**: `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated instead of always `None` / `0`
+- [x] **OPER-03**: The Kubernetes controller validates ARC capability tokens and required scopes against kernel-backed logic rather than annotation presence alone
 
 ### Truth and Narrative Reconciliation
 
-- [ ] **TRUTH-01**: `docs/protocols/STRATEGIC-VISION.md` distinguishes the shipped kernel/substrate breakthrough from future generic cross-protocol orchestration and aligns shipped-status tables with code reality
-- [ ] **TRUTH-02**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` and `docs/sdk/PLATFORM.md` reflect the actual shipped crates/packages, remaining gaps, and precise capability/receipt semantics
-- [ ] **TRUTH-03**: Planning docs (`PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`) consistently represent `v3.12` as the corrective credibility lane and `v4.0` as a parallel strategic bet rather than the active truth narrative
-- [ ] **TRUTH-04**: Crate-level doc comments and bridge docs no longer state kernel mediation or signed receipt behavior where the live path does not implement it
+- [x] **TRUTH-01**: `docs/protocols/STRATEGIC-VISION.md` distinguishes the shipped kernel/substrate breakthrough from future generic cross-protocol orchestration and aligns shipped-status tables with code reality
+- [x] **TRUTH-02**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` and `docs/sdk/PLATFORM.md` reflect the actual shipped crates/packages, remaining gaps, and precise capability/receipt semantics
+- [x] **TRUTH-03**: Planning docs (`PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`) consistently represent `v3.12` as the corrective credibility lane and `v4.0` as a parallel strategic bet rather than the active truth narrative
+- [x] **TRUTH-04**: Crate-level doc comments and bridge docs no longer state kernel mediation or signed receipt behavior where the live path does not implement it
 
 ### Qualification
 
-- [ ] **QUAL-01**: Integration tests cover ACP live-path cryptographic enforcement and A2A/ACP outward-edge kernel mediation, including allow, deny, invalid-token, and receipt-emission cases
-- [ ] **QUAL-02**: Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit conditions for any broader "fully realized universal kernel" claim
-- [ ] **QUAL-03**: Operator-facing verification proves receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
+- [x] **QUAL-01**: Integration tests cover ACP live-path cryptographic enforcement and A2A/ACP outward-edge kernel mediation, including allow, deny, invalid-token, and receipt-emission cases
+- [x] **QUAL-02**: Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit conditions for any broader "fully realized universal kernel" claim
+- [x] **QUAL-03**: Operator-facing verification proves receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
 
 ## v3.12 Out of Scope
 
@@ -2936,22 +2936,22 @@ forces the repo/docs/planning story to match the live code.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ACPX-01 | Phase 377 | Pending |
-| ACPX-02 | Phase 377 | Pending |
-| ACPX-03 | Phase 377 | Pending |
-| EDGE-01 | Phase 378 | Pending |
-| EDGE-02 | Phase 378 | Pending |
-| EDGE-03 | Phase 378 | Pending |
-| OPER-01 | Phase 379 | Pending |
-| OPER-02 | Phase 379 | Pending |
-| OPER-03 | Phase 379 | Pending |
-| TRUTH-01 | Phase 380 | Pending |
-| TRUTH-02 | Phase 380 | Pending |
-| TRUTH-03 | Phase 380 | Pending |
-| TRUTH-04 | Phase 380 | Pending |
-| QUAL-01 | Phase 381 | Pending |
-| QUAL-02 | Phase 381 | Pending |
-| QUAL-03 | Phase 381 | Pending |
+| ACPX-01 | Phase 377 | Complete |
+| ACPX-02 | Phase 377 | Complete |
+| ACPX-03 | Phase 377 | Complete |
+| EDGE-01 | Phase 378 | Complete |
+| EDGE-02 | Phase 378 | Complete |
+| EDGE-03 | Phase 378 | Complete |
+| OPER-01 | Phase 379 | Complete |
+| OPER-02 | Phase 379 | Complete |
+| OPER-03 | Phase 379 | Complete |
+| TRUTH-01 | Phase 380 | Complete |
+| TRUTH-02 | Phase 380 | Complete |
+| TRUTH-03 | Phase 380 | Complete |
+| TRUTH-04 | Phase 380 | Complete |
+| QUAL-01 | Phase 381 | Complete |
+| QUAL-02 | Phase 381 | Complete |
+| QUAL-03 | Phase 381 | Complete |
 
 **Coverage:**
 - v3.12 requirements: 16 total
@@ -2960,7 +2960,7 @@ forces the repo/docs/planning story to match the live code.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after starting milestone v3.12 Cross-Protocol Integrity and Truth Completion*
+*Last updated: 2026-04-14 after completing milestone v3.12 Cross-Protocol Integrity and Truth Completion locally*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -2970,11 +2970,11 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Runtime Hardening
 
-- [ ] **WGRT-01**: WasmtimeBackend shares a single `Arc<Engine>` across all loaded WASM guards instead of creating one Engine per guard
-- [ ] **WGRT-02**: WasmtimeBackend uses a `WasmHostState` struct in the Store instead of `()`, carrying guard config and a log buffer
-- [ ] **WGRT-03**: WASM guards can call `arc.log(level, msg_ptr, msg_len)` host function to emit structured tracing log lines
-- [ ] **WGRT-04**: WASM guards can call `arc.get_config(key_ptr, key_len, val_out_ptr, val_out_len)` host function to read manifest config values
-- [ ] **WGRT-05**: WASM guards can call `arc.get_time_unix_secs()` host function to read wall-clock time
+- [x] **WGRT-01**: WasmtimeBackend shares a single `Arc<Engine>` across all loaded WASM guards instead of creating one Engine per guard
+- [x] **WGRT-02**: WasmtimeBackend uses a `WasmHostState` struct in the Store instead of `()`, carrying guard config and a log buffer
+- [x] **WGRT-03**: WASM guards can call `arc.log(level, msg_ptr, msg_len)` host function to emit structured tracing log lines
+- [x] **WGRT-04**: WASM guards can call `arc.get_config(key_ptr, key_len, val_out_ptr, val_out_len)` host function to read manifest config values
+- [x] **WGRT-05**: WASM guards can call `arc.get_time_unix_secs()` host function to read wall-clock time
 - [ ] **WGRT-06**: Host checks for guest-exported `arc_alloc` and uses it for request memory allocation, falling back to offset-0 write when absent
 - [ ] **WGRT-07**: Host checks for guest-exported `arc_deny_reason` and uses it to read structured deny reasons, falling back to offset-64K NUL-terminated string when absent
 
@@ -3039,11 +3039,11 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WGRT-01 | Phase 373 | Pending |
-| WGRT-02 | Phase 373 | Pending |
-| WGRT-03 | Phase 373 | Pending |
-| WGRT-04 | Phase 373 | Pending |
-| WGRT-05 | Phase 373 | Pending |
+| WGRT-01 | Phase 373 | Complete |
+| WGRT-02 | Phase 373 | Complete |
+| WGRT-03 | Phase 373 | Complete |
+| WGRT-04 | Phase 373 | Complete |
+| WGRT-05 | Phase 373 | Complete |
 | WGRT-06 | Phase 373 | Pending |
 | WGRT-07 | Phase 373 | Pending |
 | WGSEC-01 | Phase 374 | Pending |
