@@ -19,6 +19,7 @@ members = [
     "crates/arc-federation",
     "crates/arc-governance",
     "crates/arc-hosted-mcp",
+    "crates/arc-http-core",
     "crates/arc-kernel",
     "crates/arc-listing",
     "crates/arc-market",
