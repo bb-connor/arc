@@ -253,14 +253,16 @@ v3.0 (Kernel Foundation)
   |--- v3.1 (Attestation)       [parallel]
   |--- v3.2 (Python)            [parallel]
   |--- v3.3 (TypeScript)        [parallel]
-  |--- v3.4 (Guards)            [parallel -- phases depend on v3.0 only]
-  v3.1 + v3.2 + v3.3 + v3.4 ---> v3.5 (Protocol) ---> v3.6 (Platform) ---> v3.7 (Strategic)
+  |--- v3.4 (Guards)            [parallel]
+  |--- v3.5 (Protocol)          [mostly parallel -- most phases need v3.0 only; edge crates need v3.1]
+  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic)
 ```
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
-v3.1, v3.2, v3.3, and v3.4 can all execute in parallel after v3.0.
-v3.5 through v3.7 are sequential after the parallel wave converges.
+v3.1, v3.2, v3.3, v3.4, and most of v3.5 can execute in parallel after v3.0.
+v3.5 Phase 341 (A2A/ACP edge crates) depends on v3.1 for signed receipts.
+v3.6 and v3.7 are sequential after v3.5.
 
 ## Latest Completed Milestone
 
