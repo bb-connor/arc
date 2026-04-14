@@ -1,0 +1,40 @@
+{
+  "name": "@arc-protocol/elysia",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ARC protocol lifecycle hook for Elysia",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arc-protocol/node-http": "file:../node-http"
+  },
+  "peerDependencies": {
+    "elysia": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "elysia": "^1.3.2",
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
