@@ -3076,6 +3076,85 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 - Mapped to phases: 31
 - Unmapped: 0 ✓
 
+## v4.1 Guard SDK and Developer Experience
+
+Guest-side Rust SDK with proc macro so guard authors write
+`fn evaluate(req) -> verdict` and compile to wasm32-unknown-unknown.
+CLI tooling for the full guard development lifecycle. Depends on v4.0
+(host runtime must be stable before guest SDK targets it).
+Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
+
+### Guest SDK
+
+- [ ] **GSDK-01**: `arc-guard-sdk` crate provides `GuardRequest` and `GuardVerdict` types matching the host ABI
+- [ ] **GSDK-02**: `arc-guard-sdk` crate implements a guest-side allocator exported as `arc_alloc` and `arc_free`
+- [ ] **GSDK-03**: `arc-guard-sdk` crate provides typed host function bindings for `arc::log`, `arc::get_config`, and `arc::get_time`
+- [ ] **GSDK-04**: `arc-guard-sdk` crate handles `GuardRequest` deserialization from linear memory and `GuardVerdict` encoding back to the host
+- [ ] **GSDK-05**: `arc-guard-sdk` crate exports `arc_deny_reason` for structured deny reason reporting
+- [ ] **GSDK-06**: `arc-guard-sdk-macros` crate provides `#[arc_guard]` proc macro that generates the `evaluate` export, allocator, and ABI glue from a user function
+
+### Example Guards
+
+- [ ] **GEXM-01**: An example guard using the SDK demonstrates allowing or denying based on tool name inspection
+- [ ] **GEXM-02**: An example guard using the SDK demonstrates reading `action_type` and `extracted_path` from the enriched GuardRequest
+- [ ] **GEXM-03**: An example guard using the SDK demonstrates calling `arc::log` and `arc::get_config` host functions
+- [ ] **GEXM-04**: Example guards compile to `wasm32-unknown-unknown` and produce valid .wasm binaries
+- [ ] **GEXM-05**: Integration test loads an example guard .wasm into WasmtimeBackend, evaluates it against test requests, and verifies correct Allow/Deny verdicts
+
+### CLI Scaffolding
+
+- [ ] **GCLI-01**: `arc guard new <name>` scaffolds a new guard project with Cargo.toml, src/lib.rs using `#[arc_guard]`, and guard-manifest.yaml
+- [ ] **GCLI-02**: `arc guard build` compiles the guard to `wasm32-unknown-unknown` release and reports binary size
+- [ ] **GCLI-03**: `arc guard inspect <path>` reads a .wasm file and prints exported functions, ABI compatibility, and memory requirements
+
+### CLI Test and Package
+
+- [ ] **GCLI-04**: `arc guard test` loads a compiled .wasm and runs it against YAML test fixture files with expected verdicts
+- [ ] **GCLI-05**: Test fixture YAML format specifies request fields, expected verdict (allow/deny), and optional expected deny reason substring
+- [ ] **GCLI-06**: `arc guard bench <path>` measures fuel consumption and execution time on sample requests and reports p50/p99
+- [ ] **GCLI-07**: `arc guard pack` creates a distributable `.arcguard` archive (gzipped tar) from guard-manifest.yaml + .wasm binary
+- [ ] **GCLI-08**: `arc guard install <path>` extracts an `.arcguard` archive to the configured guard directory
+
+## v4.1 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Non-Rust guest SDKs (TS, Python, Go) | v4.2 -- after WIT migration |
+| WIT interface definition | v4.2 -- raw ABI must be stable first |
+| Guard registry / marketplace | v4.2+ -- ecosystem maturity |
+| OCI distribution | v4.2+ -- after packaging is validated |
+| `arc guard publish` (remote upload) | v4.2+ -- needs registry |
+| Guard signing (beyond SHA-256) | v4.2+ -- needs key management story |
+
+## v4.1 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| GSDK-01 | Phase 377 | Pending |
+| GSDK-02 | Phase 377 | Pending |
+| GSDK-03 | Phase 377 | Pending |
+| GSDK-04 | Phase 377 | Pending |
+| GSDK-05 | Phase 377 | Pending |
+| GSDK-06 | Phase 378 | Pending |
+| GEXM-01 | Phase 378 | Pending |
+| GEXM-02 | Phase 378 | Pending |
+| GEXM-03 | Phase 378 | Pending |
+| GEXM-04 | Phase 378 | Pending |
+| GEXM-05 | Phase 378 | Pending |
+| GCLI-01 | Phase 379 | Pending |
+| GCLI-02 | Phase 379 | Pending |
+| GCLI-03 | Phase 379 | Pending |
+| GCLI-04 | Phase 380 | Pending |
+| GCLI-05 | Phase 380 | Pending |
+| GCLI-06 | Phase 380 | Pending |
+| GCLI-07 | Phase 380 | Pending |
+| GCLI-08 | Phase 380 | Pending |
+
+**Coverage:**
+- v4.1 requirements: 19 total
+- Mapped to phases: 19
+- Unmapped: 0 ✓
+
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after starting milestone v3.12 Cross-Protocol Integrity and Truth Completion*
+*Last updated: 2026-04-14 after defining milestone v4.1 Guard SDK and Developer Experience*
