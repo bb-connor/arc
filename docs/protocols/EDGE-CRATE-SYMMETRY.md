@@ -1,0 +1,351 @@
+# Edge Crate Symmetry: `arc-a2a-edge` and `arc-acp-edge`
+
+Design spec for bidirectional protocol bridging. Edge crates bridge
+_outward_: exposing ARC-native tools through a foreign protocol so non-ARC
+clients can discover and invoke them. `arc-mcp-edge` is the reference
+implementation. This document covers A2A and ACP equivalents.
+
+## 1. The Composability Gap
+
+| Crate | Direction | Protocol |
+|-------|-----------|----------|
+| `arc-mcp-edge` | outward | MCP |
+| `arc-mcp-adapter` | inward | MCP |
+| `arc-a2a-adapter` | inward | A2A |
+| `arc-acp-proxy` | inward | ACP |
+
+The outward column has only MCP. That means:
+
+- An ARC tool cannot appear in an A2A Agent Card. Agents that speak only
+  A2A have no discovery or invocation path.
+- An ARC tool cannot appear in an ACP session. Editors like Zed or
+  JetBrains that speak ACP cannot use it.
+- Cross-protocol discovery is impossible. A tool registered once should be
+  listable via MCP `tools/list`, the A2A Agent Card `skills` array, and
+  ACP command enumeration from the same kernel.
+
+### Target Scenarios
+
+- **A2A skills.** `arc-a2a-edge` on HTTPS; remote agents discover via
+  Agent Card, invoke with `SendMessage`, kernel runs guards and signs
+  receipts.
+- **ACP capabilities.** Editor connects to `arc-acp-edge` over stdio;
+  each `session/prompt` triggers a kernel tool invocation with full
+  capability validation.
+- **One tool, three surfaces.** Single `ToolManifest` loaded once, three
+  edge crates translate it. Kernel is the single enforcement point.
+
+## 2. `arc-a2a-edge` Design
+
+### 2.1 Core Types
+
+```rust
+pub struct A2aEdgeConfig {
+    pub agent_name: String,
+    pub agent_description: String,
+    pub agent_version: String,
+    pub base_url: String,
+    pub security_schemes: Vec<A2aSecuritySchemeConfig>,
+    pub streaming_enabled: bool,
+}
+
+pub enum A2aSecuritySchemeConfig {
+    BearerToken,
+    OAuth2 { token_url: String, scopes: Vec<String> },
+    ApiKey { header_name: String },
+}
+
+pub struct A2aExposedSkill {
+    pub id: String,          // matches ARC tool name
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+    pub output_schema: Option<serde_json::Value>,
+    pub tags: Vec<String>,   // "side-effects", "latency:fast", etc.
+}
+
+pub struct ArcA2aEdge {
+    config: A2aEdgeConfig,
+    kernel: ArcKernel,
+    agent_id: String,
+    capabilities: Vec<CapabilityToken>,
+    skills: Vec<A2aExposedSkillBinding>,
+    skill_index: BTreeMap<String, usize>,
+    task_counter: u64,
+    tasks: BTreeMap<String, A2aEdgeTask>,
+}
+```
+
+### 2.2 Tool Definition Translation
+
+`manifest_tool_to_a2a_skill` maps `ToolDefinition` fields directly.
+`has_side_effects` and `latency_hint` become skill tags. The function
+mirrors `manifest_tool_to_mcp_tool` in `arc-mcp-edge`.
+
+### 2.3 Agent Card Generation
+
+`ArcA2aEdge::agent_card() -> serde_json::Value` builds the A2A Agent Card
+from config and registered skills. Served at
+`/.well-known/agent-card.json`. Includes `securitySchemes`,
+`securityRequirements`, and a JSONRPC interface entry pointing to
+`{base_url}/a2a`.
+
+### 2.4 Request Handling
+
+| A2A Method | Edge Behavior |
+|------------|---------------|
+| `SendMessage` | Extract `targetSkillId`, resolve binding, build `ToolCallOperation`, submit to kernel, return A2A task |
+| `SendStreamingMessage` | Same, but open SSE; emit `task/status` (`working`), `task/artifact` per `ToolCallChunk`, `task/status` (`completed`/`failed`) |
+| `GetTask` | Look up task by ID, return current status |
+| `CancelTask` | Forward cancellation to the kernel session |
+
+Kernel call path mirrors `arc-mcp-edge`: resolve binding, build
+`OperationContext` + `ToolCallOperation`, call
+`kernel.process_session_operation(...)`, translate
+`SessionOperationResponse` into A2A task JSON.
+
+### 2.5 Authentication
+
+Inbound credentials are validated before creating a `SessionAuthContext`
+(bearer, API key, or OAuth2). The auth context flows into the kernel and
+is available to guards for policy decisions.
+
+## 3. `arc-acp-edge` Design
+
+### 3.1 Core Types
+
+```rust
+pub struct AcpEdgeConfig {
+    pub agent_name: String,
+    pub agent_version: String,
+    pub advertised_capabilities: AcpAdvertisedCapabilities,
+}
+
+pub struct AcpAdvertisedCapabilities {
+    pub streaming: bool,
+    pub permissions: bool,
+}
+
+pub struct AcpExposedCommand {
+    pub name: String,
+    pub description: String,
+    pub parameters_schema: serde_json::Value,
+    pub has_side_effects: bool,
+}
+
+pub struct ArcAcpEdge {
+    config: AcpEdgeConfig,
+    kernel: ArcKernel,
+    agent_id: String,
+    capabilities: Vec<CapabilityToken>,
+    commands: Vec<AcpExposedCommandBinding>,
+    command_index: BTreeMap<String, usize>,
+    session_counter: u64,
+    sessions: BTreeMap<String, AcpEdgeSession>,
+}
+```
+
+`AcpExposedCommandBinding` pairs an `AcpExposedCommand` with `server_id`
+and `tool_name`. `AcpEdgeSession` tracks the ACP session ID, kernel
+session ID, and auth context.
+
+### 3.2 Tool Definition Translation
+
+`manifest_tool_to_acp_command` maps name, description, `input_schema`
+(as `parameters_schema`), and `has_side_effects` directly.
+
+### 3.3 ACP Protocol Handling
+
+| ACP Method | Edge Behavior |
+|------------|---------------|
+| `initialize` | Create kernel session, return agent info and capabilities |
+| `session/new` | Allocate `AcpEdgeSession`, return available commands |
+| `session/prompt` | Extract command + args, resolve binding, build `ToolCallOperation`, submit to kernel |
+| `session/request_permission` | Map ACP permission to ARC `Operation` + scope, call `kernel.check_capability(...)`, return granted/denied |
+| `session/cancel` | Forward cancellation to kernel session |
+
+```rust
+impl ArcAcpEdge {
+    pub fn handle_acp_message(&mut self, message: Value) -> Option<Value> {
+        let method = message.get("method").and_then(Value::as_str)?;
+        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+        let id = message.get("id").cloned();
+        match (id, method) {
+            (Some(id), "initialize") => Some(self.handle_initialize(id, params)),
+            (Some(id), "session/new") => Some(self.handle_session_new(id, params)),
+            (Some(id), "session/prompt") => Some(self.handle_session_prompt(id, params)),
+            (Some(id), "session/request_permission") =>
+                Some(self.handle_permission_request(id, params)),
+            (None, "session/cancel") => { self.handle_session_cancel(params); None }
+            _ => id.map(|id| jsonrpc_error(id, -32601, "method not found")),
+        }
+    }
+}
+```
+
+### 3.4 Session Update Notifications
+
+Each kernel response is emitted as an ACP `session/update` notification
+with `tool_call` events:
+
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+        "sessionId": "...",
+        "events": [{
+            "type": "tool_call",
+            "tool": "search_code",
+            "arguments": { "query": "..." },
+            "result": { "content": ["..."] }
+        }]
+    }
+}
+```
+
+### 3.5 Permission Gating
+
+`session/request_permission` replaces `arc-acp-proxy`'s allowlist model
+with the kernel's full capability pipeline (guards + budgets). The edge
+maps the ACP permission type to an ARC `Operation` and scope, then
+delegates to `kernel.check_capability(...)`.
+
+### 3.6 Transport
+
+Primary transport is stdio, matching how editors launch ACP agents:
+
+```rust
+impl ArcAcpEdge {
+    pub fn serve_stdio<R: BufRead, W: Write>(
+        &mut self, reader: R, writer: W,
+    ) -> Result<(), AcpEdgeError> { /* ... */ }
+}
+```
+
+## 4. Shared Edge Abstractions
+
+All three edge crates follow the same structural pattern:
+
+1. Accept `Vec<ToolManifest>` at construction.
+2. Translate each `ToolDefinition` into protocol-native format.
+3. Build `BTreeMap<String, usize>` index for O(1) name lookup.
+4. On request: resolve binding, build `OperationContext` +
+   `ToolCallOperation`, submit to kernel.
+5. Translate `SessionOperationResponse` into protocol response shape.
+
+### 4.1 No Shared `ProtocolEdge` Trait
+
+The protocols have fundamentally different lifecycles (MCP: stateful
+handshake; A2A: stateless HTTP with task-based async; ACP: session-scoped
+JSON-RPC). A shared trait would be too abstract to be useful. The pattern
+is documented here; each crate implements it directly.
+
+### 4.2 Shared Utilities (`arc-edge-common`)
+
+Candidates for a small internal crate:
+
+```rust
+pub fn latency_hint_label(hint: LatencyHint) -> &'static str;
+
+pub fn build_operation_context(
+    request_id: RequestId, agent_id: &str,
+    progress_token: Option<ProgressToken>,
+) -> OperationContext;
+
+pub fn tool_output_to_content_blocks(output: &ToolCallOutput) -> Vec<Value>;
+
+pub fn iso8601_now() -> String;
+```
+
+### 4.3 Common Config Shape
+
+| Field | MCP | A2A | ACP |
+|-------|-----|-----|-----|
+| Name | `server_name` | `agent_name` | `agent_name` |
+| Version | `server_version` | `agent_version` | `agent_version` |
+| Kernel | `ArcKernel` | `ArcKernel` | `ArcKernel` |
+| Caps | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` | `Vec<CapabilityToken>` |
+| Manifests | `Vec<ToolManifest>` | `Vec<ToolManifest>` | `Vec<ToolManifest>` |
+
+## 5. Cross-Protocol Discovery
+
+A single deployment runs all three edges backed by one kernel and one set
+of manifests.
+
+| Protocol | Discovery Mechanism | Served By |
+|----------|-------------------|-----------|
+| MCP | `tools/list` JSON-RPC | `arc-mcp-edge` |
+| A2A | `GET /.well-known/agent-card.json` | `arc-a2a-edge` |
+| ACP | `initialize` response | `arc-acp-edge` |
+
+An optional unified `GET /arc/discover` endpoint (outside the edge crates)
+can aggregate all surfaces into a single JSON response listing each tool
+and its MCP, A2A, and ACP endpoints.
+
+## 6. Architecture Diagram
+
+```
+                       Outward (edge)                              Inward (adapter)
+
+MCP Client <--stdio/http--> arc-mcp-edge --+              +-- arc-mcp-adapter <--stdio--> MCP Server
+                                           |              |
+A2A Client <--http/json-->  arc-a2a-edge --+-- ARC Kernel-+-- arc-a2a-adapter <--http-->  A2A Agent
+                                           |              |
+ACP Editor <--stdio-->      arc-acp-edge --+              +-- arc-acp-proxy   <--stdio--> ACP Agent
+                                           |
+                                    [guards, budgets,
+                                     receipts, caps]
+```
+
+Request flow (same pattern for all three edges):
+
+```
+Protocol Client          arc-*-edge               ARC Kernel           Tool Server
+    |                        |                        |                     |
+    |-- protocol request --->|                        |                     |
+    |                        |-- resolve binding      |                     |
+    |                        |-- build ToolCallOp     |                     |
+    |                        |-- process_session_op-->|                     |
+    |                        |                        |-- validate cap      |
+    |                        |                        |-- run guards        |
+    |                        |                        |-- invoke ---------->|
+    |                        |                        |<-- result ---------|
+    |                        |                        |-- sign receipt      |
+    |                        |<-- SessionOpResponse---|                     |
+    |<-- protocol response---|                        |                     |
+```
+
+## 7. Implementation Priority
+
+### Build `arc-a2a-edge` first.
+
+1. **Ecosystem demand.** A2A has broad adoption (Google, LangChain,
+   CrewAI). Exposing ARC tools as A2A skills makes them immediately usable
+   by any A2A-compatible framework.
+2. **Adapter symmetry.** `arc-a2a-adapter` already implements the client
+   side. The edge completes the bidirectional bridge; its A2A types and
+   parsing code can be reused.
+3. **HTTP simplicity.** A2A runs over HTTP. No stdio plumbing or subprocess
+   management needed. Simpler to test and deploy.
+4. **Incremental streaming.** Blocking `SendMessage` is sufficient for v1.
+
+| Phase | Scope |
+|-------|-------|
+| 1 | Agent Card generation + `SendMessage` (blocking) |
+| 2 | SSE streaming via `SendStreamingMessage` |
+| 3 | Task lifecycle (`GetTask`, `CancelTask`) |
+| 4 | Authentication scheme validation |
+
+### `arc-acp-edge` second.
+
+ACP is newer; the editor ecosystem is still consolidating. `arc-acp-proxy`
+provides partial coverage. The edge crate is a cleaner design (acts as the
+agent rather than proxying one) but can wait until A2A edge is stable.
+
+| Phase | Scope |
+|-------|-------|
+| 1 | `initialize` + `session/new` + `session/prompt` (blocking) |
+| 2 | `session/update` streaming notifications |
+| 3 | `session/request_permission` backed by ARC capabilities |
+| 4 | Stdio transport with editor integration testing |
