@@ -166,6 +166,14 @@ impl WasmGuardRuntime {
             reason: e.to_string(),
         })?;
 
+        // WGSEC-03: Pre-check module size before passing to the factory
+        if wasm_bytes.len() > config.max_module_size {
+            return Err(WasmGuardError::ModuleTooLarge {
+                size: wasm_bytes.len(),
+                limit: config.max_module_size,
+            });
+        }
+
         let backend = factory(&wasm_bytes, config.fuel_limit)?;
 
         self.guards.push(WasmGuard::new(
@@ -271,6 +279,11 @@ pub mod wasmtime_backend {
     use crate::host::{create_shared_engine, register_host_functions, WasmHostState};
     use wasmtime::{Engine, Linker, Memory, Module, Store};
 
+    use crate::host::MAX_MEMORY_BYTES;
+
+    /// Default maximum module size in bytes (10 MiB).
+    const DEFAULT_MAX_MODULE_SIZE: usize = 10 * 1024 * 1024;
+
     /// WASM guard backend powered by Wasmtime.
     ///
     /// Uses a shared [`Arc<Engine>`] and creates a fresh
@@ -282,6 +295,8 @@ pub mod wasmtime_backend {
         module: Option<Module>,
         fuel_limit: u64,
         config: HashMap<String, String>,
+        max_memory_bytes: usize,
+        max_module_size: usize,
     }
 
     impl WasmtimeBackend {
@@ -296,6 +311,8 @@ pub mod wasmtime_backend {
                 module: None,
                 fuel_limit: 0,
                 config: HashMap::new(),
+                max_memory_bytes: MAX_MEMORY_BYTES,
+                max_module_size: DEFAULT_MAX_MODULE_SIZE,
             })
         }
 
@@ -310,6 +327,8 @@ pub mod wasmtime_backend {
                 module: None,
                 fuel_limit: 0,
                 config: HashMap::new(),
+                max_memory_bytes: MAX_MEMORY_BYTES,
+                max_module_size: DEFAULT_MAX_MODULE_SIZE,
             }
         }
 
@@ -324,7 +343,19 @@ pub mod wasmtime_backend {
                 module: None,
                 fuel_limit: 0,
                 config,
+                max_memory_bytes: MAX_MEMORY_BYTES,
+                max_module_size: DEFAULT_MAX_MODULE_SIZE,
             }
+        }
+
+        /// Set custom resource limits for module size and memory.
+        ///
+        /// Builder-style method for configuring security boundaries.
+        #[must_use]
+        pub fn with_limits(mut self, max_memory_bytes: usize, max_module_size: usize) -> Self {
+            self.max_memory_bytes = max_memory_bytes;
+            self.max_module_size = max_module_size;
+            self
         }
     }
 
@@ -337,6 +368,8 @@ pub mod wasmtime_backend {
                     module: None,
                     fuel_limit: 0,
                     config: HashMap::new(),
+                    max_memory_bytes: MAX_MEMORY_BYTES,
+                    max_module_size: DEFAULT_MAX_MODULE_SIZE,
                 },
             }
         }
@@ -348,8 +381,27 @@ pub mod wasmtime_backend {
             wasm_bytes: &[u8],
             fuel_limit: u64,
         ) -> Result<(), WasmGuardError> {
+            // WGSEC-03: Reject oversized modules before compilation
+            if wasm_bytes.len() > self.max_module_size {
+                return Err(WasmGuardError::ModuleTooLarge {
+                    size: wasm_bytes.len(),
+                    limit: self.max_module_size,
+                });
+            }
+
             let module = Module::new(&self.engine, wasm_bytes)
                 .map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
+
+            // WGSEC-02: Validate that all imports come from the "arc" namespace
+            for import in module.imports() {
+                if import.module() != "arc" {
+                    return Err(WasmGuardError::ImportViolation {
+                        module: import.module().to_string(),
+                        name: import.name().to_string(),
+                    });
+                }
+            }
+
             self.module = Some(module);
             self.fuel_limit = fuel_limit;
             Ok(())
@@ -361,8 +413,11 @@ pub mod wasmtime_backend {
                 .as_ref()
                 .ok_or(WasmGuardError::BackendUnavailable)?;
 
-            // Create a fresh Store with host state per invocation
-            let host_state = WasmHostState::new(self.config.clone());
+            // WGSEC-01: Create a fresh Store with configurable memory limit
+            let host_state = WasmHostState::with_memory_limit(
+                self.config.clone(),
+                self.max_memory_bytes,
+            );
             let mut store = Store::new(&self.engine, host_state);
             store.limiter(|state| &mut state.limits);
             store
@@ -864,6 +919,144 @@ pub mod wasmtime_backend {
                 }
                 _ => panic!("expected Deny verdict, got: {result:?}"),
             }
+        }
+
+        // -------------------------------------------------------------------
+        // Security enforcement tests (WGSEC-01, WGSEC-02, WGSEC-03)
+        // -------------------------------------------------------------------
+
+        #[test]
+        fn module_too_large_rejected() {
+            // Set a very small max_module_size and provide bytes exceeding it
+            let mut backend = WasmtimeBackend::new().unwrap()
+                .with_limits(16 * 1024 * 1024, 100);
+            let big_bytes = vec![0u8; 200];
+            let result = backend.load_module(&big_bytes, 1_000_000);
+            match result {
+                Err(WasmGuardError::ModuleTooLarge { size, limit }) => {
+                    assert_eq!(size, 200);
+                    assert_eq!(limit, 100);
+                }
+                other => panic!("expected ModuleTooLarge, got: {other:?}"),
+            }
+        }
+
+        #[test]
+        fn module_within_size_accepted() {
+            // Use a small valid WAT module with default limits (10 MiB)
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 1)
+                    (func (export "evaluate") (param i32 i32) (result i32)
+                        (i32.const 0)
+                    )
+                )
+            "#;
+            let mut backend = WasmtimeBackend::new().unwrap();
+            let result = backend.load_module(wat.as_bytes(), 1_000_000);
+            assert!(result.is_ok(), "expected Ok, got: {result:?}");
+        }
+
+        #[test]
+        fn import_validation_rejects_wasi() {
+            // WAT module that imports from wasi_snapshot_preview1 (forbidden)
+            let wat = r#"
+                (module
+                    (import "wasi_snapshot_preview1" "fd_write"
+                        (func $fd_write (param i32 i32 i32 i32) (result i32)))
+                    (memory (export "memory") 1)
+                    (func (export "evaluate") (param i32 i32) (result i32)
+                        (i32.const 0)
+                    )
+                )
+            "#;
+            let mut backend = WasmtimeBackend::new().unwrap();
+            let result = backend.load_module(wat.as_bytes(), 1_000_000);
+            match result {
+                Err(WasmGuardError::ImportViolation { module, name }) => {
+                    assert_eq!(module, "wasi_snapshot_preview1");
+                    assert_eq!(name, "fd_write");
+                }
+                other => panic!("expected ImportViolation, got: {other:?}"),
+            }
+        }
+
+        #[test]
+        fn import_validation_accepts_arc_only() {
+            // WAT module that imports only from "arc" namespace
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 1)
+                    (func (export "evaluate") (param i32 i32) (result i32)
+                        (i32.const 0)
+                    )
+                )
+            "#;
+            let mut backend = WasmtimeBackend::new().unwrap();
+            let result = backend.load_module(wat.as_bytes(), 1_000_000);
+            assert!(result.is_ok(), "expected Ok for arc-only imports, got: {result:?}");
+        }
+
+        #[test]
+        fn memory_growth_beyond_limit_traps() {
+            // WAT module that tries to grow memory by 1000 pages (64 MB)
+            // with a very small limit (2 pages = 128 KiB)
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 1)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Try to grow memory by 1000 pages -- should trap
+                        (drop (memory.grow (i32.const 1000)))
+                        (i32.const 0)
+                    )
+                )
+            "#;
+            let mut backend = WasmtimeBackend::new().unwrap()
+                .with_limits(2 * 64 * 1024, 10 * 1024 * 1024);
+            backend.load_module(wat.as_bytes(), 10_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req);
+            assert!(
+                result.is_err(),
+                "expected error (trap) when memory.grow exceeds limit, got: {result:?}"
+            );
+        }
+
+        #[test]
+        fn memory_growth_within_limit_works() {
+            // WAT module that grows memory by 1 page with default 16 MiB limit
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 1)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Grow memory by 1 page (64 KiB) -- should succeed
+                        (drop (memory.grow (i32.const 1)))
+                        (i32.const 0)
+                    )
+                )
+            "#;
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 10_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req);
+            assert!(
+                result.is_ok(),
+                "expected Ok when memory.grow is within limit, got: {result:?}"
+            );
         }
 
         #[test]
