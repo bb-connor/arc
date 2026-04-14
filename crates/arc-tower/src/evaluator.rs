@@ -131,9 +131,7 @@ impl ArcEvaluator {
                 evidence.push(GuardEvidence {
                     guard_name: "CapabilityGuard".to_string(),
                     verdict: false,
-                    details: Some(
-                        "side-effect route requires X-Arc-Capability header".to_string(),
-                    ),
+                    details: Some("side-effect route requires X-Arc-Capability header".to_string()),
                 });
                 Verdict::deny(
                     "side-effect route requires a capability token",
@@ -272,7 +270,10 @@ mod tests {
         let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let mut headers = http::HeaderMap::new();
-        headers.insert("x-arc-capability", http::HeaderValue::from_static("cap-123"));
+        headers.insert(
+            "x-arc-capability",
+            http::HeaderValue::from_static("cap-123"),
+        );
 
         let result = evaluator
             .evaluate("POST", "/pets", caller, &headers, None, 0)

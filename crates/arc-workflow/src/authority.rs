@@ -32,10 +32,7 @@ pub enum WorkflowError {
 
     /// A step is out of order (when strict ordering is required).
     #[error("step {step_index} is out of order (expected step {expected})")]
-    StepOutOfOrder {
-        step_index: usize,
-        expected: usize,
-    },
+    StepOutOfOrder { step_index: usize, expected: usize },
 
     /// The workflow budget has been exceeded.
     #[error("budget exceeded: spent {spent_units} of {limit_units} {currency}")]
@@ -162,9 +159,7 @@ impl WorkflowAuthority {
             .clone()
             .or_else(|| manifest.budget_envelope.clone());
 
-        let time_limit_secs = grant
-            .max_duration_secs
-            .or(manifest.max_duration_secs);
+        let time_limit_secs = grant.max_duration_secs.or(manifest.max_duration_secs);
 
         let now = current_unix_secs();
 
@@ -613,10 +608,7 @@ mod tests {
             None,
             None,
         );
-        assert!(matches!(
-            result,
-            Err(WorkflowError::BudgetExceeded { .. })
-        ));
+        assert!(matches!(result, Err(WorkflowError::BudgetExceeded { .. })));
     }
 
     #[test]
@@ -637,10 +629,7 @@ mod tests {
 
         // Try step 1 before step 0
         let result = authority.validate_step(&execution, &manifest.steps[1], &grant);
-        assert!(matches!(
-            result,
-            Err(WorkflowError::StepOutOfOrder { .. })
-        ));
+        assert!(matches!(result, Err(WorkflowError::StepOutOfOrder { .. })));
     }
 
     #[test]
@@ -677,9 +666,6 @@ mod tests {
 
         // Trying to validate next step should fail
         let result = authority.validate_step(&execution, &manifest.steps[1], &grant);
-        assert!(matches!(
-            result,
-            Err(WorkflowError::InvalidState(_))
-        ));
+        assert!(matches!(result, Err(WorkflowError::InvalidState(_))));
     }
 }

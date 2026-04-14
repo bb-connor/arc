@@ -1755,11 +1755,13 @@ impl ArcKernel {
         charge: &BudgetChargeResult,
     ) -> Result<u64, KernelError> {
         self.with_budget_store(|store| {
-            Ok(store.reverse_charge_cost(
-                capability_id,
-                charge.grant_index,
-                charge.cost_charged,
-            )?)
+            Ok(
+                store.reverse_charge_cost(
+                    capability_id,
+                    charge.grant_index,
+                    charge.cost_charged,
+                )?,
+            )
         })?;
         Ok(self
             .with_budget_store(|store| Ok(store.get_usage(capability_id, charge.grant_index)?))?
@@ -2228,11 +2230,11 @@ impl ArcKernel {
         now: u64,
     ) -> Result<(), KernelError> {
         let Some(bond_row) = self.with_receipt_store(|store| {
-            Ok(store.resolve_credit_bond(bond_id).map_err(|error| {
+            store.resolve_credit_bond(bond_id).map_err(|error| {
                 KernelError::GovernedTransactionDenied(format!(
                     "failed to resolve delegation bond `{bond_id}`: {error}"
                 ))
-            })?)
+            })
         })?
         else {
             return Err(KernelError::GovernedTransactionDenied(
@@ -2708,10 +2710,7 @@ impl ArcKernel {
     }
 
     /// Build a denial response, including FinancialReceiptMetadata when the
-    fn record_child_receipts(
-        &self,
-        receipts: Vec<ChildRequestReceipt>,
-    ) -> Result<(), KernelError> {
+    fn record_child_receipts(&self, receipts: Vec<ChildRequestReceipt>) -> Result<(), KernelError> {
         for receipt in receipts {
             let _ = self.with_receipt_store(|store| Ok(store.append_child_receipt(&receipt)?))?;
             self.child_receipt_log

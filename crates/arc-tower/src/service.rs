@@ -77,8 +77,7 @@ where
                 let status = if let arc_http_core::Verdict::Deny { http_status, .. } =
                     &result.verdict
                 {
-                    http::StatusCode::from_u16(*http_status)
-                        .unwrap_or(http::StatusCode::FORBIDDEN)
+                    http::StatusCode::from_u16(*http_status).unwrap_or(http::StatusCode::FORBIDDEN)
                 } else {
                     http::StatusCode::FORBIDDEN
                 };
@@ -124,9 +123,9 @@ mod tests {
         let (_kp, evaluator) = make_service();
 
         let inner = tower::service_fn(|_req: http::Request<()>| async {
-            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(
-                http::Response::new(()),
-            )
+            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(
+                (),
+            ))
         });
 
         let mut service = ArcService::new(inner, evaluator);
@@ -156,9 +155,9 @@ mod tests {
         let inner = tower::service_fn(|_req: http::Request<()>| async {
             panic!("inner should not be called for denied requests");
             #[allow(unreachable_code)]
-            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(
-                http::Response::new(()),
-            )
+            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(
+                (),
+            ))
         });
 
         let mut service = ArcService::new(inner, evaluator);
@@ -186,9 +185,9 @@ mod tests {
         let (_kp, evaluator) = make_service();
 
         let inner = tower::service_fn(|_req: http::Request<()>| async {
-            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(
-                http::Response::new(()),
-            )
+            Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(
+                (),
+            ))
         });
 
         let mut service = ArcService::new(inner, evaluator);

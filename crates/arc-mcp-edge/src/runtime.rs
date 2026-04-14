@@ -142,6 +142,7 @@ fn arc_protocol_error_payload(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn jsonrpc_protocol_error(
     id: Value,
     jsonrpc_code: i64,

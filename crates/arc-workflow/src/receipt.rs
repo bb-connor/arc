@@ -78,10 +78,7 @@ pub enum WorkflowOutcome {
     /// The workflow was denied before execution started.
     Denied { reason: String },
     /// A step failed, halting the workflow.
-    StepFailed {
-        step_index: usize,
-        reason: String,
-    },
+    StepFailed { step_index: usize, reason: String },
     /// The workflow exceeded its budget envelope.
     BudgetExceeded {
         limit_units: u64,
@@ -89,10 +86,7 @@ pub enum WorkflowOutcome {
         currency: String,
     },
     /// The workflow exceeded its time limit.
-    TimedOut {
-        limit_secs: u64,
-        elapsed_secs: u64,
-    },
+    TimedOut { limit_secs: u64, elapsed_secs: u64 },
     /// The workflow was cancelled by the agent or operator.
     Cancelled { reason: String },
 }

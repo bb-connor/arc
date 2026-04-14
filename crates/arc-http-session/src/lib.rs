@@ -486,9 +486,7 @@ mod tests {
     fn recent_entries_subset() {
         let journal = SessionJournal::new("sess-recent".to_string());
         for i in 0..10 {
-            journal
-                .record(test_params(&format!("tool_{i}")))
-                .unwrap();
+            journal.record(test_params(&format!("tool_{i}"))).unwrap();
         }
 
         let recent = journal.recent_entries(3).unwrap();

@@ -13,6 +13,7 @@ arc-core = { package = "arc-core-types", path = "../../crates/arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../../crates/arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../../crates/arc-guards" }
 serde_json = { workspace = true }
+tokio = { workspace = true }
 
 [lints.clippy]
 unwrap_used = "deny"

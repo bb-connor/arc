@@ -108,11 +108,7 @@ impl AgUiProxy {
         Ok((decision, receipt))
     }
 
-    fn decide(
-        &self,
-        event: &AgUiEvent,
-        capability: Option<&CapabilityToken>,
-    ) -> ProxyDecision {
+    fn decide(&self, event: &AgUiEvent, capability: Option<&CapabilityToken>) -> ProxyDecision {
         // Check if this classification requires a capability
         let requires_capability = self
             .config
@@ -122,10 +118,7 @@ impl AgUiProxy {
         if requires_capability {
             match capability {
                 None => ProxyDecision::Block {
-                    reason: format!(
-                        "capability required for {:?} events",
-                        event.classification
-                    ),
+                    reason: format!("capability required for {:?} events", event.classification),
                 },
                 Some(cap) => {
                     // Validate time bounds
@@ -251,8 +244,11 @@ mod tests {
     fn display_event_blocked_without_capability_by_default() {
         let proxy = AgUiProxy::new(AgUiProxyConfig::default(), Keypair::generate());
         let event = make_event(EventClassification::Display);
-        let mut transport =
-            Transport::new(TransportKind::Sse, "conn-1".to_string(), "agent-1".to_string());
+        let mut transport = Transport::new(
+            TransportKind::Sse,
+            "conn-1".to_string(),
+            "agent-1".to_string(),
+        );
 
         let (decision, receipt) = proxy.evaluate(&event, None, &mut transport).unwrap();
         assert!(matches!(decision, ProxyDecision::Block { .. }));

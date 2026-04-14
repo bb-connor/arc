@@ -47,3 +47,50 @@ fn default_fuel_limit() -> u64 {
 fn default_priority() -> u32 {
     1000
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_deserializes_with_defaults() {
+        let json = r#"{"name": "pii-guard", "path": "/etc/arc/guards/pii.wasm"}"#;
+        let config: WasmGuardConfig =
+            serde_json::from_str(json).expect("deserialize config with defaults");
+        assert_eq!(config.name, "pii-guard");
+        assert_eq!(config.fuel_limit, DEFAULT_FUEL_LIMIT);
+        assert_eq!(config.priority, 1000);
+        assert!(!config.advisory);
+    }
+
+    #[test]
+    fn config_deserializes_with_overrides() {
+        let json = r#"{
+            "name": "custom",
+            "path": "/opt/guard.wasm",
+            "fuel_limit": 5000000,
+            "priority": 50,
+            "advisory": true
+        }"#;
+        let config: WasmGuardConfig =
+            serde_json::from_str(json).expect("deserialize config with overrides");
+        assert_eq!(config.fuel_limit, 5_000_000);
+        assert_eq!(config.priority, 50);
+        assert!(config.advisory);
+    }
+
+    #[test]
+    fn config_round_trips_through_json() {
+        let original = WasmGuardConfig {
+            name: "test".to_string(),
+            path: "/tmp/test.wasm".to_string(),
+            fuel_limit: 1_000_000,
+            priority: 100,
+            advisory: false,
+        };
+        let json = serde_json::to_string(&original).expect("serialize");
+        let recovered: WasmGuardConfig = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(recovered.name, original.name);
+        assert_eq!(recovered.fuel_limit, original.fuel_limit);
+    }
+}

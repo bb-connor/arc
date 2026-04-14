@@ -158,10 +158,7 @@ pub struct ArcAcpEdge {
 
 impl ArcAcpEdge {
     /// Create a new ACP edge from ARC tool manifests.
-    pub fn new(
-        config: AcpEdgeConfig,
-        manifests: Vec<ToolManifest>,
-    ) -> Result<Self, AcpEdgeError> {
+    pub fn new(config: AcpEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, AcpEdgeError> {
         let mut capabilities = Vec::new();
         let mut capability_bindings = BTreeMap::new();
 
@@ -184,10 +181,7 @@ impl ArcAcpEdge {
                     bridge_fidelity: fidelity,
                 });
 
-                capability_bindings.insert(
-                    cap_id,
-                    (manifest.server_id.clone(), tool.name.clone()),
-                );
+                capability_bindings.insert(cap_id, (manifest.server_id.clone(), tool.name.clone()));
             }
         }
 
@@ -217,10 +211,7 @@ impl ArcAcpEdge {
     ///
     /// In the full implementation, this would check the kernel's capability
     /// tokens. For now, it uses the configuration's require_permission flag.
-    pub fn evaluate_permission(
-        &self,
-        request: &PermissionRequest,
-    ) -> PermissionDecision {
+    pub fn evaluate_permission(&self, request: &PermissionRequest) -> PermissionDecision {
         let Some(cap) = self.capability(&request.capability_id) else {
             return PermissionDecision::Deny;
         };
@@ -261,15 +252,8 @@ impl ArcAcpEdge {
     }
 
     /// Handle a JSON-RPC ACP request.
-    pub fn handle_jsonrpc(
-        &self,
-        message: Value,
-        server: &dyn ToolServerConnection,
-    ) -> Value {
-        let method = message
-            .get("method")
-            .and_then(Value::as_str)
-            .unwrap_or("");
+    pub fn handle_jsonrpc(&self, message: Value, server: &dyn ToolServerConnection) -> Value {
+        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
         let id = message.get("id").cloned().unwrap_or(Value::Null);
         let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
 
@@ -370,10 +354,7 @@ fn infer_acp_category(tool: &ToolDefinition, default: AcpCategory) -> AcpCategor
 }
 
 /// Evaluate bridge fidelity for an ARC tool to ACP mapping.
-fn evaluate_bridge_fidelity(
-    tool: &ToolDefinition,
-    category: AcpCategory,
-) -> BridgeFidelity {
+fn evaluate_bridge_fidelity(tool: &ToolDefinition, category: AcpCategory) -> BridgeFidelity {
     match category {
         // Filesystem and terminal tools map well to ACP primitives
         AcpCategory::Filesystem | AcpCategory::Terminal => BridgeFidelity::Full,
@@ -634,7 +615,9 @@ mod tests {
     fn invoke_succeeds() {
         let edge = ArcAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let result = edge.invoke("read_file", json!({"path": "/tmp"}), &server).unwrap();
+        let result = edge
+            .invoke("read_file", json!({"path": "/tmp"}), &server)
+            .unwrap();
         assert!(result.success);
         assert_eq!(result.data["result"], "ok");
     }
@@ -680,12 +663,15 @@ mod tests {
     fn jsonrpc_list_capabilities() {
         let edge = ArcAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "session/list_capabilities",
-            "params": {}
-        }), &server);
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "session/list_capabilities",
+                "params": {}
+            }),
+            &server,
+        );
         let caps = response["result"]["capabilities"].as_array().unwrap();
         assert_eq!(caps.len(), 4);
     }
@@ -694,15 +680,18 @@ mod tests {
     fn jsonrpc_request_permission() {
         let edge = ArcAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "session/request_permission",
-            "params": {
-                "capabilityId": "read_file",
-                "arguments": {"path": "/tmp"}
-            }
-        }), &server);
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "session/request_permission",
+                "params": {
+                    "capabilityId": "read_file",
+                    "arguments": {"path": "/tmp"}
+                }
+            }),
+            &server,
+        );
         assert!(response.get("result").is_some());
     }
 
@@ -710,15 +699,18 @@ mod tests {
     fn jsonrpc_tool_invoke() {
         let edge = ArcAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tool/invoke",
-            "params": {
-                "capabilityId": "search",
-                "arguments": {"query": "test"}
-            }
-        }), &server);
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tool/invoke",
+                "params": {
+                    "capabilityId": "search",
+                    "arguments": {"query": "test"}
+                }
+            }),
+            &server,
+        );
         assert!(response["result"]["success"].as_bool().unwrap_or(false));
     }
 
@@ -726,12 +718,15 @@ mod tests {
     fn jsonrpc_unknown_method() {
         let edge = ArcAcpEdge::new(AcpEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "unknown/method",
-            "params": {}
-        }), &server);
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "unknown/method",
+                "params": {}
+            }),
+            &server,
+        );
         assert_eq!(response["error"]["code"], -32601);
     }
 
@@ -770,22 +765,43 @@ mod tests {
     #[test]
     fn bridge_fidelity_serializes() {
         assert_eq!(serde_json::to_value(BridgeFidelity::Full).unwrap(), "full");
-        assert_eq!(serde_json::to_value(BridgeFidelity::Partial).unwrap(), "partial");
-        assert_eq!(serde_json::to_value(BridgeFidelity::Degraded).unwrap(), "degraded");
+        assert_eq!(
+            serde_json::to_value(BridgeFidelity::Partial).unwrap(),
+            "partial"
+        );
+        assert_eq!(
+            serde_json::to_value(BridgeFidelity::Degraded).unwrap(),
+            "degraded"
+        );
     }
 
     #[test]
     fn acp_category_serializes() {
         assert_eq!(serde_json::to_value(AcpCategory::Tool).unwrap(), "tool");
-        assert_eq!(serde_json::to_value(AcpCategory::Filesystem).unwrap(), "filesystem");
-        assert_eq!(serde_json::to_value(AcpCategory::Terminal).unwrap(), "terminal");
-        assert_eq!(serde_json::to_value(AcpCategory::Browser).unwrap(), "browser");
+        assert_eq!(
+            serde_json::to_value(AcpCategory::Filesystem).unwrap(),
+            "filesystem"
+        );
+        assert_eq!(
+            serde_json::to_value(AcpCategory::Terminal).unwrap(),
+            "terminal"
+        );
+        assert_eq!(
+            serde_json::to_value(AcpCategory::Browser).unwrap(),
+            "browser"
+        );
     }
 
     #[test]
     fn permission_decision_serializes() {
-        assert_eq!(serde_json::to_value(PermissionDecision::Allow).unwrap(), "allow");
-        assert_eq!(serde_json::to_value(PermissionDecision::Deny).unwrap(), "deny");
+        assert_eq!(
+            serde_json::to_value(PermissionDecision::Allow).unwrap(),
+            "allow"
+        );
+        assert_eq!(
+            serde_json::to_value(PermissionDecision::Deny).unwrap(),
+            "deny"
+        );
     }
 
     // ---- Default config tests ----

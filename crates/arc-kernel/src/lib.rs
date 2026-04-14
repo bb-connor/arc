@@ -337,7 +337,6 @@ pub use session::{
 };
 
 /// A string-typed agent identifier.
-
 #[path = "kernel/mod.rs"]
 mod kernel;
 

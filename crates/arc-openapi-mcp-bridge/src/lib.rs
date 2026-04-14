@@ -17,15 +17,13 @@ use std::collections::BTreeMap;
 use arc_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
 use arc_manifest::ToolManifest;
 use arc_mcp_edge::McpToolInfo;
-use arc_openapi::{ManifestGenerator, GeneratorConfig, OpenApiSpec, OpenApiError};
+use arc_openapi::{GeneratorConfig, ManifestGenerator, OpenApiError, OpenApiSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 /// Convert an `arc_core_types` ToolDefinition into the `arc_manifest` ToolDefinition
 /// used by ToolManifest.
-fn convert_tool_definition(
-    tool: arc_core::ToolDefinition,
-) -> arc_manifest::ToolDefinition {
+fn convert_tool_definition(tool: arc_core::ToolDefinition) -> arc_manifest::ToolDefinition {
     arc_manifest::ToolDefinition {
         name: tool.name,
         description: tool.description,
@@ -100,9 +98,8 @@ pub struct BridgedResponse {
 ///
 /// Bridge users provide a function that performs the actual HTTP call.
 /// This allows the bridge to remain transport-agnostic (no reqwest dependency).
-pub type HttpDispatcher = dyn Fn(&str, &str, &Value) -> Result<BridgedResponse, BridgeError>
-    + Send
-    + Sync;
+pub type HttpDispatcher =
+    dyn Fn(&str, &str, &Value) -> Result<BridgedResponse, BridgeError> + Send + Sync;
 
 /// The OpenAPI-MCP bridge.
 ///
@@ -119,29 +116,21 @@ pub struct OpenApiMcpBridge {
 
 impl OpenApiMcpBridge {
     /// Create a new bridge from an OpenAPI spec string.
-    pub fn from_spec(
-        spec_input: &str,
-        config: BridgeConfig,
-    ) -> Result<Self, BridgeError> {
+    pub fn from_spec(spec_input: &str, config: BridgeConfig) -> Result<Self, BridgeError> {
         let spec = OpenApiSpec::parse(spec_input)?;
         Self::from_parsed_spec(&spec, config)
     }
 
     /// Create a new bridge from a pre-parsed OpenAPI spec.
-    pub fn from_parsed_spec(
-        spec: &OpenApiSpec,
-        config: BridgeConfig,
-    ) -> Result<Self, BridgeError> {
+    pub fn from_parsed_spec(spec: &OpenApiSpec, config: BridgeConfig) -> Result<Self, BridgeError> {
         let generator = ManifestGenerator::new(GeneratorConfig {
             server_id: config.server_id.clone(),
             include_output_schemas: true,
             respect_publish_flag: true,
         });
         let raw_tools = generator.generate_tools(spec);
-        let tools: Vec<arc_manifest::ToolDefinition> = raw_tools
-            .into_iter()
-            .map(convert_tool_definition)
-            .collect();
+        let tools: Vec<arc_manifest::ToolDefinition> =
+            raw_tools.into_iter().map(convert_tool_definition).collect();
 
         if tools.is_empty() {
             return Err(BridgeError::Manifest(
@@ -212,11 +201,7 @@ impl OpenApiMcpBridge {
 
     /// List all tool names exposed by this bridge.
     pub fn tool_names(&self) -> Vec<String> {
-        self.manifest
-            .tools
-            .iter()
-            .map(|t| t.name.clone())
-            .collect()
+        self.manifest.tools.iter().map(|t| t.name.clone()).collect()
     }
 
     /// Generate MCP tools/list entries from the manifest.
@@ -240,11 +225,7 @@ impl OpenApiMcpBridge {
 
     /// Invoke a bridged tool. If a dispatcher is set, the actual HTTP call
     /// is made. Otherwise, a simulated response is returned.
-    pub fn invoke_tool(
-        &self,
-        tool_name: &str,
-        arguments: Value,
-    ) -> Result<Value, BridgeError> {
+    pub fn invoke_tool(&self, tool_name: &str, arguments: Value) -> Result<Value, BridgeError> {
         let binding = self
             .route_bindings
             .get(tool_name)
@@ -340,11 +321,7 @@ impl OwnedBridgeToolServer {
         }
     }
 
-    fn invoke_tool(
-        &self,
-        tool_name: &str,
-        arguments: Value,
-    ) -> Result<Value, BridgeError> {
+    fn invoke_tool(&self, tool_name: &str, arguments: Value) -> Result<Value, BridgeError> {
         let binding = self
             .route_bindings
             .get(tool_name)
@@ -399,11 +376,7 @@ impl ToolServerConnection for OwnedBridgeToolServer {
     }
 
     fn tool_names(&self) -> Vec<String> {
-        self.manifest
-            .tools
-            .iter()
-            .map(|t| t.name.clone())
-            .collect()
+        self.manifest.tools.iter().map(|t| t.name.clone()).collect()
     }
 
     fn invoke(
@@ -543,11 +516,15 @@ mod tests {
         assert_eq!(binding.method, "GET");
         assert_eq!(binding.path, "/pets");
 
-        let binding = bridge.route_binding("createPet").expect("createPet binding");
+        let binding = bridge
+            .route_binding("createPet")
+            .expect("createPet binding");
         assert_eq!(binding.method, "POST");
         assert_eq!(binding.path, "/pets");
 
-        let binding = bridge.route_binding("deletePet").expect("deletePet binding");
+        let binding = bridge
+            .route_binding("deletePet")
+            .expect("deletePet binding");
         assert_eq!(binding.method, "DELETE");
         assert_eq!(binding.path, "/pets/{petId}");
     }
@@ -565,7 +542,9 @@ mod tests {
     #[test]
     fn bridge_invoke_simulation_mode() {
         let bridge = OpenApiMcpBridge::from_spec(PETSTORE_SPEC, petstore_config()).unwrap();
-        let result = bridge.invoke_tool("listPets", json!({"limit": 10})).unwrap();
+        let result = bridge
+            .invoke_tool("listPets", json!({"limit": 10}))
+            .unwrap();
         assert_eq!(result["isError"], false);
         assert_eq!(result["structuredContent"]["bridgeMode"], "simulation");
         assert_eq!(result["structuredContent"]["method"], "GET");
@@ -602,7 +581,9 @@ mod tests {
                 is_error: true,
             })
         }));
-        let result = bridge.invoke_tool("getPet", json!({"petId": "999"})).unwrap();
+        let result = bridge
+            .invoke_tool("getPet", json!({"petId": "999"}))
+            .unwrap();
         assert_eq!(result["isError"], true);
         assert_eq!(result["structuredContent"]["httpStatus"], 404);
     }
@@ -674,7 +655,9 @@ mod tests {
             })
         }));
         let owned = OwnedBridgeToolServer::from_bridge(bridge);
-        let result = owned.invoke("createPet", json!({"name": "Buddy"}), None).unwrap();
+        let result = owned
+            .invoke("createPet", json!({"name": "Buddy"}), None)
+            .unwrap();
         assert_eq!(result["structuredContent"]["httpStatus"], 200);
     }
 
@@ -722,7 +705,9 @@ mod tests {
                 is_error: false,
             })
         }));
-        let result = bridge.invoke_tool("getPet", json!({"petId": "42"})).unwrap();
+        let result = bridge
+            .invoke_tool("getPet", json!({"petId": "42"}))
+            .unwrap();
         let url = result["structuredContent"]["body"]["receivedUrl"]
             .as_str()
             .unwrap_or("");

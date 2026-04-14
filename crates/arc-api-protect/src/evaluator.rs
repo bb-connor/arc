@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::GuardEvidence;
 use arc_http_core::{
-    ArcHttpRequest, CallerIdentity, AuthMethod, HttpMethod, HttpReceipt, HttpReceiptBody, Verdict,
+    ArcHttpRequest, AuthMethod, CallerIdentity, HttpMethod, HttpReceipt, HttpReceiptBody, Verdict,
 };
 use arc_openapi::PolicyDecision;
 
@@ -68,7 +68,8 @@ impl RequestEvaluator {
             }
             PolicyDecision::DenyByDefault => {
                 // Check for capability token in headers.
-                let cap_header = headers.get("x-arc-capability")
+                let cap_header = headers
+                    .get("x-arc-capability")
                     .or_else(|| headers.get("X-Arc-Capability"));
                 match cap_header {
                     Some(_token) => {
@@ -102,9 +103,7 @@ impl RequestEvaluator {
         let response_status = if verdict.is_allowed() { 200 } else { 403 };
 
         let caller_identity_hash = caller.identity_hash().map_err(|e| {
-            crate::error::ProtectError::ReceiptSign(format!(
-                "failed to hash caller identity: {e}"
-            ))
+            crate::error::ProtectError::ReceiptSign(format!("failed to hash caller identity: {e}"))
         })?;
 
         let request = ArcHttpRequest {
@@ -123,9 +122,7 @@ impl RequestEvaluator {
         };
 
         let content_hash = request.content_hash().map_err(|e| {
-            crate::error::ProtectError::ReceiptSign(format!(
-                "failed to compute content hash: {e}"
-            ))
+            crate::error::ProtectError::ReceiptSign(format!("failed to compute content hash: {e}"))
         })?;
 
         let receipt_id = uuid::Uuid::now_v7().to_string();
@@ -147,9 +144,8 @@ impl RequestEvaluator {
             kernel_key: self.keypair.public_key(),
         };
 
-        let receipt = HttpReceipt::sign(body, &self.keypair).map_err(|e| {
-            crate::error::ProtectError::ReceiptSign(format!("signing failed: {e}"))
-        })?;
+        let receipt = HttpReceipt::sign(body, &self.keypair)
+            .map_err(|e| crate::error::ProtectError::ReceiptSign(format!("signing failed: {e}")))?;
 
         Ok(EvaluationResult {
             verdict,
@@ -188,15 +184,19 @@ fn path_matches_pattern(path: &str, pattern: &str) -> bool {
         return false;
     }
 
-    path_segments.iter().zip(pattern_segments.iter()).all(|(p, pat)| {
-        pat.starts_with('{') && pat.ends_with('}') || p == pat
-    })
+    path_segments
+        .iter()
+        .zip(pattern_segments.iter())
+        .all(|(p, pat)| pat.starts_with('{') && pat.ends_with('}') || p == pat)
 }
 
 /// Extract caller identity from HTTP headers.
 fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
     // Check for Authorization: Bearer <token>
-    if let Some(auth) = headers.get("authorization").or_else(|| headers.get("Authorization")) {
+    if let Some(auth) = headers
+        .get("authorization")
+        .or_else(|| headers.get("Authorization"))
+    {
         if let Some(token) = auth.strip_prefix("Bearer ") {
             let token_hash = arc_core_types::sha256_hex(token.as_bytes());
             return CallerIdentity {
@@ -306,10 +306,7 @@ mod tests {
         let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
 
         let mut headers = HashMap::new();
-        headers.insert(
-            "X-Arc-Capability".to_string(),
-            "cap-token-123".to_string(),
-        );
+        headers.insert("X-Arc-Capability".to_string(), "cap-token-123".to_string());
 
         let result = evaluator
             .evaluate(HttpMethod::Post, "/pets", &headers, None, 0)

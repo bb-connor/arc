@@ -113,16 +113,16 @@ impl ProtectProxy {
 
         let listener = tokio::net::TcpListener::bind(&self.config.listen_addr)
             .await
-            .map_err(|e| ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr)))?;
+            .map_err(|e| {
+                ProtectError::Config(format!("cannot bind {}: {e}", self.config.listen_addr))
+            })?;
 
         info!(
             "arc api protect: proxying {} routes to {} on {}",
             route_count, self.config.upstream, self.config.listen_addr
         );
 
-        axum::serve(listener, app)
-            .await
-            .map_err(ProtectError::Io)?;
+        axum::serve(listener, app).await.map_err(ProtectError::Io)?;
 
         Ok(())
     }
@@ -134,10 +134,7 @@ impl ProtectProxy {
 }
 
 /// Axum handler that evaluates the request and proxies to upstream.
-async fn proxy_handler(
-    State(state): State<Arc<ProxyState>>,
-    request: Request<Body>,
-) -> Response {
+async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> Response {
     let method = match request.method().as_str() {
         "GET" => HttpMethod::Get,
         "POST" => HttpMethod::Post,
@@ -177,13 +174,10 @@ async fn proxy_handler(
     };
 
     // Evaluate.
-    let result = match state.evaluator.evaluate(
-        method,
-        &path,
-        &headers,
-        body_hash,
-        body_length,
-    ) {
+    let result = match state
+        .evaluator
+        .evaluate(method, &path, &headers, body_hash, body_length)
+    {
         Ok(r) => r,
         Err(e) => {
             warn!("evaluation error: {e}");
@@ -217,11 +211,7 @@ async fn proxy_handler(
     }
 
     // Proxy to upstream.
-    let upstream_url = format!(
-        "{}{}",
-        state.upstream.trim_end_matches('/'),
-        &path
-    );
+    let upstream_url = format!("{}{}", state.upstream.trim_end_matches('/'), &path);
 
     let mut upstream_req = state.http_client.request(
         match method {
@@ -250,8 +240,8 @@ async fn proxy_handler(
 
     match upstream_req.send().await {
         Ok(resp) => {
-            let status = StatusCode::from_u16(resp.status().as_u16())
-                .unwrap_or(StatusCode::BAD_GATEWAY);
+            let status =
+                StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
 
             let mut response_builder = Response::builder().status(status);
 
@@ -266,11 +256,10 @@ async fn proxy_handler(
             match resp.bytes().await {
                 Ok(body) => response_builder
                     .body(Body::from(body))
-                    .unwrap_or_else(|_| {
-                        (StatusCode::BAD_GATEWAY, "bad gateway").into_response()
-                    }),
-                Err(_) => (StatusCode::BAD_GATEWAY, "failed to read upstream response")
-                    .into_response(),
+                    .unwrap_or_else(|_| (StatusCode::BAD_GATEWAY, "bad gateway").into_response()),
+                Err(_) => {
+                    (StatusCode::BAD_GATEWAY, "failed to read upstream response").into_response()
+                }
             }
         }
         Err(e) => {
@@ -346,14 +335,18 @@ paths:
 
         // Should have GET and POST for /pets, GET and DELETE for /pets/{petId}
         let get_pets = routes.iter().find(|r| {
-            r.method == HttpMethod::Get && r.pattern.contains("/pets")
+            r.method == HttpMethod::Get
+                && r.pattern.contains("/pets")
                 && !r.pattern.contains("{petId}")
         });
         assert!(get_pets.is_some());
 
         let post_pets = routes.iter().find(|r| r.method == HttpMethod::Post);
         assert!(post_pets.is_some());
-        assert_eq!(post_pets.map(|r| r.policy.clone()), Some(PolicyDecision::DenyByDefault));
+        assert_eq!(
+            post_pets.map(|r| r.policy.clone()),
+            Some(PolicyDecision::DenyByDefault)
+        );
 
         let delete_pet = routes.iter().find(|r| r.method == HttpMethod::Delete);
         assert!(delete_pet.is_some());
@@ -362,7 +355,10 @@ paths:
     #[test]
     fn get_routes_allowed_by_default() {
         let routes = ProtectProxy::routes_from_spec(PETSTORE_YAML).unwrap();
-        let get_routes: Vec<_> = routes.iter().filter(|r| r.method == HttpMethod::Get).collect();
+        let get_routes: Vec<_> = routes
+            .iter()
+            .filter(|r| r.method == HttpMethod::Get)
+            .collect();
         for route in get_routes {
             assert_eq!(route.policy, PolicyDecision::SessionAllow);
         }

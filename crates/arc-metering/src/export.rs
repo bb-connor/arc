@@ -186,14 +186,8 @@ mod tests {
         assert_eq!(export.record_count, 1);
         assert_eq!(export.records[0].compute_time_ms, 200);
         assert_eq!(export.records[0].cost_units, Some(75));
-        assert_eq!(
-            export.records[0].currency.as_deref(),
-            Some("USD")
-        );
-        assert_eq!(
-            export.records[0].provider.as_deref(),
-            Some("openai")
-        );
+        assert_eq!(export.records[0].currency.as_deref(), Some("USD"));
+        assert_eq!(export.records[0].provider.as_deref(), Some("openai"));
         assert!(export.records[0].timestamp_iso.contains("2023"));
     }
 

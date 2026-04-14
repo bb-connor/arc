@@ -79,8 +79,7 @@ pub trait WasmGuardAbi: Send + Sync {
     ///
     /// The `fuel_limit` controls the maximum number of fuel units the guest
     /// may consume before the runtime terminates it (fail-closed).
-    fn load_module(&mut self, wasm_bytes: &[u8], fuel_limit: u64)
-        -> Result<(), WasmGuardError>;
+    fn load_module(&mut self, wasm_bytes: &[u8], fuel_limit: u64) -> Result<(), WasmGuardError>;
 
     /// Invoke the loaded guard with the given request.
     ///

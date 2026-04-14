@@ -159,9 +159,9 @@ impl ToolServerConnection for EchoServer {
 }
 
 // Test: Happy path -- allowed tool call
-#[test]
-fn full_flow_allowed_tool_call() {
-    let (mut kernel, _ca_kp) = make_kernel_with_guards();
+#[tokio::test]
+async fn full_flow_allowed_tool_call() {
+    let (kernel, _ca_kp) = make_kernel_with_guards();
     let agent_kp = Keypair::generate();
     let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 300);
 
@@ -172,7 +172,7 @@ fn full_flow_allowed_tool_call() {
         serde_json::json!({"message": "hello arc"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     // The call should be allowed.
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -198,9 +198,9 @@ fn full_flow_allowed_tool_call() {
 }
 
 // Test: Denied by guard -- forbidden path
-#[test]
-fn full_flow_denied_by_forbidden_path() {
-    let (mut kernel, _ca_kp) = make_kernel_with_guards();
+#[tokio::test]
+async fn full_flow_denied_by_forbidden_path() {
+    let (kernel, _ca_kp) = make_kernel_with_guards();
     let agent_kp = Keypair::generate();
     let cap = issue_wildcard_cap(&kernel, &agent_kp.public_key());
 
@@ -211,7 +211,7 @@ fn full_flow_denied_by_forbidden_path() {
         serde_json::json!({"path": "/etc/shadow"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     assert_eq!(resp.verdict, Verdict::Deny);
     assert!(resp.output.is_none());
@@ -230,9 +230,9 @@ fn full_flow_denied_by_forbidden_path() {
 }
 
 // Test: Denied by guard -- dangerous shell command
-#[test]
-fn full_flow_denied_shell_command() {
-    let (mut kernel, _ca_kp) = make_kernel_with_guards();
+#[tokio::test]
+async fn full_flow_denied_shell_command() {
+    let (kernel, _ca_kp) = make_kernel_with_guards();
     let agent_kp = Keypair::generate();
     let cap = issue_wildcard_cap(&kernel, &agent_kp.public_key());
 
@@ -243,7 +243,7 @@ fn full_flow_denied_shell_command() {
         serde_json::json!({"command": "rm -rf /"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
@@ -256,9 +256,9 @@ fn full_flow_denied_shell_command() {
 }
 
 // Test: Denied by capability -- wrong tool
-#[test]
-fn full_flow_denied_wrong_tool() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_denied_wrong_tool() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
 
     // Capability grants "echo" only.
@@ -272,7 +272,7 @@ fn full_flow_denied_wrong_tool() {
         serde_json::json!({"path": "/tmp/test"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
@@ -285,9 +285,9 @@ fn full_flow_denied_wrong_tool() {
 }
 
 // Test: Denied by capability -- expired
-#[test]
-fn full_flow_denied_expired_capability() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_denied_expired_capability() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
 
     // TTL=0 means the capability expires at the same second it was issued.
@@ -300,7 +300,7 @@ fn full_flow_denied_expired_capability() {
         serde_json::json!({"message": "too late"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
@@ -313,9 +313,9 @@ fn full_flow_denied_expired_capability() {
 }
 
 // Test: Revocation cascade
-#[test]
-fn full_flow_revocation_cascade() {
-    let (mut kernel, ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_revocation_cascade() {
+    let (kernel, ca_kp) = make_kernel_bare();
     let agent_a_kp = Keypair::generate();
     let agent_b_kp = Keypair::generate();
 
@@ -376,7 +376,7 @@ fn full_flow_revocation_cascade() {
         governed_intent: None,
         approval_token: None,
     };
-    let resp_ok = kernel.evaluate_tool_call(&req_ok).unwrap();
+    let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(
         resp_ok.verdict,
         Verdict::Allow,
@@ -398,7 +398,7 @@ fn full_flow_revocation_cascade() {
         governed_intent: None,
         approval_token: None,
     };
-    let resp_revoked = kernel.evaluate_tool_call(&req_revoked).unwrap();
+    let resp_revoked = kernel.evaluate_tool_call(&req_revoked).await.unwrap();
 
     assert_eq!(resp_revoked.verdict, Verdict::Deny);
     let reason = resp_revoked.reason.as_deref().unwrap_or("");
@@ -411,9 +411,9 @@ fn full_flow_revocation_cascade() {
 }
 
 // Test: Receipt chain integrity
-#[test]
-fn full_flow_receipt_chain() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_receipt_chain() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
     let cap = issue_wildcard_cap(&kernel, &agent_kp.public_key());
 
@@ -425,12 +425,13 @@ fn full_flow_receipt_chain() {
             "echo",
             serde_json::json!({"seq": i}),
         );
-        let resp = kernel.evaluate_tool_call(&req).unwrap();
+        let resp = kernel.evaluate_tool_call(&req).await.unwrap();
         assert_eq!(resp.verdict, Verdict::Allow, "call {i} should succeed");
     }
 
     // Collect all 3 receipts from the kernel's receipt log.
-    let receipts = kernel.receipt_log().receipts();
+    let log = kernel.receipt_log();
+    let receipts = log.receipts();
     assert_eq!(receipts.len(), 3, "should have exactly 3 receipts");
 
     // Verify each receipt.
@@ -462,8 +463,8 @@ fn full_flow_receipt_chain() {
 }
 
 // Test: Guard pipeline fail-closed
-#[test]
-fn full_flow_guard_error_fails_closed() {
+#[tokio::test]
+async fn full_flow_guard_error_fails_closed() {
     let (mut kernel, _ca_kp) = make_kernel_bare();
 
     // Register a guard that always returns an error.
@@ -488,7 +489,7 @@ fn full_flow_guard_error_fails_closed() {
         serde_json::json!({"message": "should be denied"}),
     );
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     // The guard errored, so the kernel must deny (fail-closed).
     assert_eq!(resp.verdict, Verdict::Deny);
@@ -502,8 +503,8 @@ fn full_flow_guard_error_fails_closed() {
 }
 
 // Test: Multiple guard types in pipeline
-#[test]
-fn full_flow_guard_pipeline_mixed_verdicts() {
+#[tokio::test]
+async fn full_flow_guard_pipeline_mixed_verdicts() {
     let kp = Keypair::generate();
     let config = KernelConfig {
         keypair: kp.clone(),
@@ -538,7 +539,7 @@ fn full_flow_guard_pipeline_mixed_verdicts() {
         "echo",
         serde_json::json!({"data": "safe"}),
     );
-    let resp_ok = kernel.evaluate_tool_call(&req_ok).unwrap();
+    let resp_ok = kernel.evaluate_tool_call(&req_ok).await.unwrap();
     assert_eq!(resp_ok.verdict, Verdict::Allow);
     assert!(resp_ok.receipt.verify_signature().unwrap());
 
@@ -549,21 +550,21 @@ fn full_flow_guard_pipeline_mixed_verdicts() {
         "read_file",
         serde_json::json!({"path": "/etc/passwd"}),
     );
-    let resp_bad = kernel.evaluate_tool_call(&req_bad).unwrap();
+    let resp_bad = kernel.evaluate_tool_call(&req_bad).await.unwrap();
     assert_eq!(resp_bad.verdict, Verdict::Deny);
     assert!(resp_bad.receipt.is_denied());
     assert!(resp_bad.receipt.verify_signature().unwrap());
 }
 
 // Test: Receipt signature verified against kernel public key
-#[test]
-fn full_flow_receipt_verified_against_kernel_pk() {
-    let (mut kernel, ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_receipt_verified_against_kernel_pk() {
+    let (kernel, ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
     let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 300);
 
     let req = make_request("req-pk-check", &cap, "echo", serde_json::json!({"x": 1}));
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
 
     // The receipt's embedded kernel_key must match the CA keypair's public key.
     assert_eq!(resp.receipt.kernel_key, ca_kp.public_key());
@@ -573,9 +574,9 @@ fn full_flow_receipt_verified_against_kernel_pk() {
 }
 
 // Test: Invocation budget exhaustion
-#[test]
-fn full_flow_budget_exhaustion() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_budget_exhaustion() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
 
     // Issue a capability with max_invocations = 2.
@@ -607,14 +608,14 @@ fn full_flow_budget_exhaustion() {
             "echo",
             serde_json::json!({"i": i}),
         );
-        let resp = kernel.evaluate_tool_call(&req).unwrap();
+        let resp = kernel.evaluate_tool_call(&req).await.unwrap();
         assert_eq!(resp.verdict, Verdict::Allow, "call {i} should succeed");
         assert!(resp.receipt.verify_signature().unwrap());
     }
 
     // Third call should be denied due to budget exhaustion.
     let req = make_request("req-budget-2", &cap, "echo", serde_json::json!({"i": 2}));
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
     assert!(
@@ -626,9 +627,9 @@ fn full_flow_budget_exhaustion() {
 }
 
 // Test: Direct capability revocation
-#[test]
-fn full_flow_direct_revocation() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_direct_revocation() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let agent_kp = Keypair::generate();
     let cap = issue_tool_cap(&kernel, &agent_kp.public_key(), "echo", 300);
 
@@ -639,7 +640,7 @@ fn full_flow_direct_revocation() {
         "echo",
         serde_json::json!({"msg": "before"}),
     );
-    let resp1 = kernel.evaluate_tool_call(&req1).unwrap();
+    let resp1 = kernel.evaluate_tool_call(&req1).await.unwrap();
     assert_eq!(resp1.verdict, Verdict::Allow);
 
     // Revoke the capability.
@@ -652,7 +653,7 @@ fn full_flow_direct_revocation() {
         "echo",
         serde_json::json!({"msg": "after"}),
     );
-    let resp2 = kernel.evaluate_tool_call(&req2).unwrap();
+    let resp2 = kernel.evaluate_tool_call(&req2).await.unwrap();
     assert_eq!(resp2.verdict, Verdict::Deny);
     let reason = resp2.reason.as_deref().unwrap_or("");
     assert!(
@@ -663,9 +664,9 @@ fn full_flow_direct_revocation() {
 }
 
 // Test: Untrusted issuer rejected
-#[test]
-fn full_flow_untrusted_issuer() {
-    let (mut kernel, _ca_kp) = make_kernel_bare();
+#[tokio::test]
+async fn full_flow_untrusted_issuer() {
+    let (kernel, _ca_kp) = make_kernel_bare();
     let rogue_kp = Keypair::generate();
     let agent_kp = Keypair::generate();
 
@@ -710,7 +711,7 @@ fn full_flow_untrusted_issuer() {
         approval_token: None,
     };
 
-    let resp = kernel.evaluate_tool_call(&req).unwrap();
+    let resp = kernel.evaluate_tool_call(&req).await.unwrap();
     assert_eq!(resp.verdict, Verdict::Deny);
     let reason = resp.reason.as_deref().unwrap_or("");
     assert!(

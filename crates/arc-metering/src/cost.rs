@@ -221,10 +221,7 @@ mod tests {
         });
         meta.compute_total_monetary_cost();
         assert_eq!(meta.total_monetary_cost.as_ref().unwrap().units, 300);
-        assert_eq!(
-            meta.total_monetary_cost.as_ref().unwrap().currency,
-            "USD"
-        );
+        assert_eq!(meta.total_monetary_cost.as_ref().unwrap().currency, "USD");
     }
 
     #[test]

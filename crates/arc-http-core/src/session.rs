@@ -81,10 +81,7 @@ mod tests {
 
     #[test]
     fn new_session_defaults() {
-        let session = SessionContext::new(
-            "sess-001".to_string(),
-            CallerIdentity::anonymous(),
-        );
+        let session = SessionContext::new("sess-001".to_string(), CallerIdentity::anonymous());
         assert_eq!(session.session_id, "sess-001");
         assert_eq!(session.request_count, 0);
         assert_eq!(session.bytes_read, 0);
@@ -94,29 +91,20 @@ mod tests {
 
     #[test]
     fn expired_session() {
-        let mut session = SessionContext::new(
-            "sess-002".to_string(),
-            CallerIdentity::anonymous(),
-        );
+        let mut session = SessionContext::new("sess-002".to_string(), CallerIdentity::anonymous());
         session.expires_at = Some(0); // epoch = long expired
         assert!(session.is_expired());
     }
 
     #[test]
     fn not_expired_when_no_expiry() {
-        let session = SessionContext::new(
-            "sess-003".to_string(),
-            CallerIdentity::anonymous(),
-        );
+        let session = SessionContext::new("sess-003".to_string(), CallerIdentity::anonymous());
         assert!(!session.is_expired());
     }
 
     #[test]
     fn serde_roundtrip() {
-        let session = SessionContext::new(
-            "sess-004".to_string(),
-            CallerIdentity::anonymous(),
-        );
+        let session = SessionContext::new("sess-004".to_string(), CallerIdentity::anonymous());
         let json = serde_json::to_string(&session).unwrap();
         let back: SessionContext = serde_json::from_str(&json).unwrap();
         assert_eq!(back.session_id, "sess-004");

@@ -186,14 +186,10 @@ pub struct A2aMessage {
 pub enum A2aPart {
     /// A text part.
     #[serde(rename = "text")]
-    Text {
-        text: String,
-    },
+    Text { text: String },
     /// A structured data part.
     #[serde(rename = "data")]
-    Data {
-        data: Value,
-    },
+    Data { data: Value },
 }
 
 /// A2A task status.
@@ -235,10 +231,7 @@ pub struct ArcA2aEdge {
 
 impl ArcA2aEdge {
     /// Create a new A2A edge from ARC tool manifests.
-    pub fn new(
-        config: A2aEdgeConfig,
-        manifests: Vec<ToolManifest>,
-    ) -> Result<Self, A2aEdgeError> {
+    pub fn new(config: A2aEdgeConfig, manifests: Vec<ToolManifest>) -> Result<Self, A2aEdgeError> {
         let mut skills = Vec::new();
         let mut skill_bindings = BTreeMap::new();
 
@@ -260,10 +253,7 @@ impl ArcA2aEdge {
                     output_modes: vec!["text".to_string()],
                     bridge_fidelity: fidelity,
                 });
-                skill_bindings.insert(
-                    skill_id,
-                    (manifest.server_id.clone(), tool.name.clone()),
-                );
+                skill_bindings.insert(skill_id, (manifest.server_id.clone(), tool.name.clone()));
             }
         }
 
@@ -363,15 +353,8 @@ impl ArcA2aEdge {
     }
 
     /// Handle a JSON-RPC A2A request.
-    pub fn handle_jsonrpc(
-        &mut self,
-        message: Value,
-        server: &dyn ToolServerConnection,
-    ) -> Value {
-        let method = message
-            .get("method")
-            .and_then(Value::as_str)
-            .unwrap_or("");
+    pub fn handle_jsonrpc(&mut self, message: Value, server: &dyn ToolServerConnection) -> Value {
+        let method = message.get("method").and_then(Value::as_str).unwrap_or("");
         let id = message.get("id").cloned().unwrap_or(Value::Null);
         let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
 
@@ -740,7 +723,9 @@ mod tests {
         let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
         let request = text_message("test");
-        let err = edge.handle_send_message("nonexistent", &request, &server).unwrap_err();
+        let err = edge
+            .handle_send_message("nonexistent", &request, &server)
+            .unwrap_err();
         assert!(matches!(err, A2aEdgeError::ToolNotFound(_)));
     }
 
@@ -769,7 +754,9 @@ mod tests {
         };
         let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![manifest]).unwrap();
         let request = text_message("test");
-        let response = edge.handle_send_message("fail_tool", &request, &server).unwrap();
+        let response = edge
+            .handle_send_message("fail_tool", &request, &server)
+            .unwrap();
         assert_eq!(response.status, TaskStatus::Failed);
         assert!(response.status_message.is_some());
     }
@@ -780,7 +767,9 @@ mod tests {
     fn extract_text_from_parts() {
         let msg = A2aMessage {
             role: "user".to_string(),
-            parts: vec![A2aPart::Text { text: "hello world".to_string() }],
+            parts: vec![A2aPart::Text {
+                text: "hello world".to_string(),
+            }],
             metadata: None,
         };
         let args = extract_arguments_from_message(&msg);
@@ -791,7 +780,9 @@ mod tests {
     fn extract_data_from_parts() {
         let msg = A2aMessage {
             role: "user".to_string(),
-            parts: vec![A2aPart::Data { data: json!({"key": "value"}) }],
+            parts: vec![A2aPart::Data {
+                data: json!({"key": "value"}),
+            }],
             metadata: None,
         };
         let args = extract_arguments_from_message(&msg);
@@ -803,8 +794,12 @@ mod tests {
         let msg = A2aMessage {
             role: "user".to_string(),
             parts: vec![
-                A2aPart::Text { text: "hello".to_string() },
-                A2aPart::Data { data: json!({"priority": "high"}) },
+                A2aPart::Text {
+                    text: "hello".to_string(),
+                },
+                A2aPart::Data {
+                    data: json!({"priority": "high"}),
+                },
             ],
             metadata: None,
         };
@@ -849,23 +844,30 @@ mod tests {
 
     #[test]
     fn jsonrpc_send_message_single_skill() {
-        let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![{
-            let mut m = test_manifest();
-            m.tools.truncate(1); // Only "echo"
-            m
-        }]).unwrap();
+        let mut edge = ArcA2aEdge::new(
+            A2aEdgeConfig::default(),
+            vec![{
+                let mut m = test_manifest();
+                m.tools.truncate(1); // Only "echo"
+                m
+            }],
+        )
+        .unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "message/send",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "hi"}]
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "message/send",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "hi"}]
+                    }
                 }
-            }
-        }), &server);
+            }),
+            &server,
+        );
         assert!(response.get("result").is_some());
     }
 
@@ -873,20 +875,23 @@ mod tests {
     fn jsonrpc_send_message_with_skill_id() {
         let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "message/send",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "hi"}]
-                },
-                "metadata": {
-                    "arc": {"targetSkillId": "echo"}
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "message/send",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "hi"}]
+                    },
+                    "metadata": {
+                        "arc": {"targetSkillId": "echo"}
+                    }
                 }
-            }
-        }), &server);
+            }),
+            &server,
+        );
         assert!(response.get("result").is_some());
     }
 
@@ -894,17 +899,20 @@ mod tests {
     fn jsonrpc_missing_skill_id_with_multiple_skills_errors() {
         let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "message/send",
-            "params": {
-                "message": {
-                    "role": "user",
-                    "parts": [{"type": "text", "text": "hi"}]
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "message/send",
+                "params": {
+                    "message": {
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "hi"}]
+                    }
                 }
-            }
-        }), &server);
+            }),
+            &server,
+        );
         assert!(response.get("error").is_some());
     }
 
@@ -912,12 +920,15 @@ mod tests {
     fn jsonrpc_unknown_method_returns_error() {
         let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).unwrap();
         let server = test_server();
-        let response = edge.handle_jsonrpc(json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "unknown/method",
-            "params": {}
-        }), &server);
+        let response = edge.handle_jsonrpc(
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "unknown/method",
+                "params": {}
+            }),
+            &server,
+        );
         assert_eq!(response["error"]["code"], -32601);
     }
 

@@ -84,9 +84,7 @@ where
                     let resp = http::Response::builder()
                         .status(http::StatusCode::BAD_GATEWAY)
                         .body(Body::from("ARC evaluation error"))
-                        .unwrap_or_else(|_| {
-                            http::Response::new(Body::from("internal error"))
-                        });
+                        .unwrap_or_else(|_| http::Response::new(Body::from("internal error")));
                     Ok(resp)
                 }
             }

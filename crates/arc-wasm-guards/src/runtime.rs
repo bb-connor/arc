@@ -82,9 +82,10 @@ impl Guard for WasmGuard {
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
         let request = Self::build_request(ctx);
 
-        let mut backend = self.backend.lock().map_err(|e| {
-            KernelError::Internal(format!("WASM guard mutex poisoned: {e}"))
-        })?;
+        let mut backend = self
+            .backend
+            .lock()
+            .map_err(|e| KernelError::Internal(format!("WASM guard mutex poisoned: {e}")))?;
 
         match backend.evaluate(&request) {
             Ok(GuardVerdict::Allow) => {
@@ -236,11 +237,7 @@ impl MockWasmBackend {
 }
 
 impl WasmGuardAbi for MockWasmBackend {
-    fn load_module(
-        &mut self,
-        _wasm_bytes: &[u8],
-        _fuel_limit: u64,
-    ) -> Result<(), WasmGuardError> {
+    fn load_module(&mut self, _wasm_bytes: &[u8], _fuel_limit: u64) -> Result<(), WasmGuardError> {
         self.loaded = true;
         Ok(())
     }
@@ -282,8 +279,8 @@ pub mod wasmtime_backend {
         pub fn new() -> Result<Self, WasmGuardError> {
             let mut config = wasmtime::Config::new();
             config.consume_fuel(true);
-            let engine = Engine::new(&config)
-                .map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
+            let engine =
+                Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
             Ok(Self {
                 engine,
                 module: None,
@@ -318,10 +315,7 @@ pub mod wasmtime_backend {
             Ok(())
         }
 
-        fn evaluate(
-            &mut self,
-            request: &GuardRequest,
-        ) -> Result<GuardVerdict, WasmGuardError> {
+        fn evaluate(&mut self, request: &GuardRequest) -> Result<GuardVerdict, WasmGuardError> {
             let module = self
                 .module
                 .as_ref()
@@ -363,9 +357,9 @@ pub mod wasmtime_backend {
                     // Check if this was a fuel exhaustion
                     let msg = e.to_string();
                     if msg.contains("fuel") {
-                        let consumed = self.fuel_limit.saturating_sub(
-                            store.get_fuel().unwrap_or(0),
-                        );
+                        let consumed = self
+                            .fuel_limit
+                            .saturating_sub(store.get_fuel().unwrap_or(0));
                         WasmGuardError::FuelExhausted {
                             consumed,
                             limit: self.fuel_limit,

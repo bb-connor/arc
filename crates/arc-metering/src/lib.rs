@@ -19,6 +19,6 @@ pub mod export;
 pub mod query;
 
 pub use budget::{BudgetEnforcer, BudgetPolicy, BudgetViolation};
-pub use cost::{CostMetadata, CostDimension};
-pub use export::{BillingRecord, BillingExport};
+pub use cost::{CostDimension, CostMetadata};
+pub use export::{BillingExport, BillingRecord};
 pub use query::{CostQuery, CostQueryResult, CostSummary};

@@ -7,8 +7,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::{
     validate_attenuation, validate_delegation_chain, ArcScope, Attenuation, CapabilityToken,
-    CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody,
-    GovernedTransactionIntent, Operation, ToolGrant,
+    CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody, GovernedTransactionIntent,
+    Operation, ToolGrant,
 };
 use arc_core::crypto::Keypair;
 use arc_core::message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
@@ -16,9 +16,7 @@ use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, Decision, GovernedTransactionReceiptMetadata, GuardEvidence,
     ToolCallAction,
 };
-use arc_kernel::dpop::{
-    verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody,
-};
+use arc_kernel::dpop::{verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody};
 use arc_kernel::transport::{read_frame, write_frame, TransportError};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -247,7 +245,10 @@ pub fn run_native_conformance_suite(
             source,
         })?,
     )?;
-    fs::write(&options.report_output, generate_native_markdown_report(&results))?;
+    fs::write(
+        &options.report_output,
+        generate_native_markdown_report(&results),
+    )?;
 
     Ok(NativeConformanceRunSummary {
         scenario_count: results.len(),
@@ -265,6 +266,7 @@ pub fn load_native_scenarios_from_dir(
     Ok(scenarios)
 }
 
+#[allow(clippy::expect_used)]
 pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage> {
     match request {
         AgentMessage::Heartbeat => vec![KernelMessage::Heartbeat],
@@ -461,15 +463,16 @@ fn execute_stdio_scenario(
     options: &NativeConformanceRunOptions,
 ) -> Result<ScenarioOutcome, NativeSuiteError> {
     let fixture = build_fixture(&scenario.fixture)?;
-    let request = fixture.request().ok_or_else(|| NativeSuiteError::UnknownFixture(
-        scenario.fixture.clone(),
-    ))?;
-    let command = options
-        .stdio_command
-        .as_ref()
-        .ok_or_else(|| NativeSuiteError::MissingStdioCommand {
-            scenario: scenario.id.clone(),
-        })?;
+    let request = fixture
+        .request()
+        .ok_or_else(|| NativeSuiteError::UnknownFixture(scenario.fixture.clone()))?;
+    let command =
+        options
+            .stdio_command
+            .as_ref()
+            .ok_or_else(|| NativeSuiteError::MissingStdioCommand {
+                scenario: scenario.id.clone(),
+            })?;
 
     let mut child = Command::new(command)
         .current_dir(&options.repo_root)
@@ -478,15 +481,16 @@ fn execute_stdio_scenario(
         .stderr(Stdio::null())
         .spawn()?;
 
-    let mut child_stdin = child.stdin.take().ok_or_else(|| NativeSuiteError::Io(
-        std::io::Error::other("failed to open child stdin"),
-    ))?;
-    let mut child_stdout = child.stdout.take().ok_or_else(|| NativeSuiteError::Io(
-        std::io::Error::other("failed to open child stdout"),
-    ))?;
+    let mut child_stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| NativeSuiteError::Io(std::io::Error::other("failed to open child stdin")))?;
+    let mut child_stdout = child.stdout.take().ok_or_else(|| {
+        NativeSuiteError::Io(std::io::Error::other("failed to open child stdout"))
+    })?;
 
-    let request_bytes =
-        canonical_json_bytes(&request).map_err(|error| NativeSuiteError::Http(error.to_string()))?;
+    let request_bytes = canonical_json_bytes(&request)
+        .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
     write_frame(&mut child_stdin, &request_bytes)?;
     child_stdin.flush()?;
     drop(child_stdin);
@@ -507,15 +511,16 @@ fn execute_http_scenario(
     options: &NativeConformanceRunOptions,
 ) -> Result<ScenarioOutcome, NativeSuiteError> {
     let fixture = build_fixture(&scenario.fixture)?;
-    let request = fixture.request().ok_or_else(|| NativeSuiteError::UnknownFixture(
-        scenario.fixture.clone(),
-    ))?;
-    let base_url = options
-        .http_base_url
-        .as_ref()
-        .ok_or_else(|| NativeSuiteError::MissingHttpBaseUrl {
-            scenario: scenario.id.clone(),
-        })?;
+    let request = fixture
+        .request()
+        .ok_or_else(|| NativeSuiteError::UnknownFixture(scenario.fixture.clone()))?;
+    let base_url =
+        options
+            .http_base_url
+            .as_ref()
+            .ok_or_else(|| NativeSuiteError::MissingHttpBaseUrl {
+                scenario: scenario.id.clone(),
+            })?;
     let path = scenario
         .http_path
         .clone()
@@ -588,7 +593,10 @@ fn evaluate_artifact_assertion(
 ) -> Result<NativeAssertionResult, NativeSuiteError> {
     match assertion.kind {
         NativeAssertionKind::CapabilitySignatureValid => {
-            let actual = fixture.valid_capability()?.verify_signature().unwrap_or(false);
+            let actual = fixture
+                .valid_capability()?
+                .verify_signature()
+                .unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::DelegationChainValid => {
@@ -606,18 +614,21 @@ fn evaluate_artifact_assertion(
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::ReceiptTamperRejected => {
-            let actual = !fixture.tampered_receipt()?.verify_signature().unwrap_or(false);
+            let actual = !fixture
+                .tampered_receipt()?
+                .verify_signature()
+                .unwrap_or(false);
             compare_bool_assertion(assertion, actual)
         }
         NativeAssertionKind::DpopProofValid => {
             let dpop = fixture.dpop_case()?;
             let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60));
             let actual = verify_dpop_proof(
-                &dpop.proof,
-                &dpop.capability,
-                &dpop.expected_tool_server,
-                &dpop.expected_tool_name,
-                &dpop.expected_action_hash,
+                dpop.proof,
+                dpop.capability,
+                dpop.expected_tool_server,
+                dpop.expected_tool_name,
+                dpop.expected_action_hash,
                 &nonce_store,
                 &DpopConfig::default(),
             )
@@ -692,9 +703,12 @@ fn compare_bool_assertion(
     assertion: &NativeAssertionSpec,
     actual: bool,
 ) -> Result<NativeAssertionResult, NativeSuiteError> {
-    let expected = assertion.expected_bool.ok_or_else(|| NativeSuiteError::Http(
-        format!("assertion {} is missing expectedBool", assertion.name),
-    ))?;
+    let expected = assertion.expected_bool.ok_or_else(|| {
+        NativeSuiteError::Http(format!(
+            "assertion {} is missing expectedBool",
+            assertion.name
+        ))
+    })?;
     Ok(NativeAssertionResult {
         name: assertion.name.clone(),
         status: if actual == expected {
@@ -714,9 +728,12 @@ fn compare_string_assertion(
     assertion: &NativeAssertionSpec,
     actual: String,
 ) -> Result<NativeAssertionResult, NativeSuiteError> {
-    let expected = assertion.expected_string.clone().ok_or_else(|| NativeSuiteError::Http(
-        format!("assertion {} is missing expectedString", assertion.name),
-    ))?;
+    let expected = assertion.expected_string.clone().ok_or_else(|| {
+        NativeSuiteError::Http(format!(
+            "assertion {} is missing expectedString",
+            assertion.name
+        ))
+    })?;
     Ok(NativeAssertionResult {
         name: assertion.name.clone(),
         status: if actual == expected {
@@ -734,7 +751,9 @@ fn compare_string_assertion(
 
 fn terminal_response(messages: &[KernelMessage]) -> Option<(&ToolCallResult, &ArcReceipt)> {
     messages.iter().find_map(|message| match message {
-        KernelMessage::ToolCallResponse { result, receipt, .. } => Some((result, receipt.as_ref())),
+        KernelMessage::ToolCallResponse {
+            result, receipt, ..
+        } => Some((result, receipt.as_ref())),
         _ => None,
     })
 }
@@ -873,28 +892,36 @@ impl NativeFixture {
     fn valid_capability(&self) -> Result<&CapabilityToken, NativeSuiteError> {
         match self {
             Self::Capability(token) => Ok(token),
-            _ => Err(NativeSuiteError::Http("fixture is not a capability".to_string())),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not a capability".to_string(),
+            )),
         }
     }
 
     fn delegation_pair(&self) -> Result<(&CapabilityToken, &CapabilityToken), NativeSuiteError> {
         match self {
             Self::Delegation { parent, child } => Ok((parent, child)),
-            _ => Err(NativeSuiteError::Http("fixture is not a delegation pair".to_string())),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not a delegation pair".to_string(),
+            )),
         }
     }
 
     fn valid_receipt(&self) -> Result<&ArcReceipt, NativeSuiteError> {
         match self {
             Self::Receipt { valid, .. } => Ok(valid),
-            _ => Err(NativeSuiteError::Http("fixture is not a receipt".to_string())),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not a receipt".to_string(),
+            )),
         }
     }
 
     fn tampered_receipt(&self) -> Result<&ArcReceipt, NativeSuiteError> {
         match self {
             Self::Receipt { tampered, .. } => Ok(tampered),
-            _ => Err(NativeSuiteError::Http("fixture is not a receipt".to_string())),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not a receipt".to_string(),
+            )),
         }
     }
 
@@ -913,7 +940,9 @@ impl NativeFixture {
                 expected_tool_name,
                 expected_action_hash,
             }),
-            _ => Err(NativeSuiteError::Http("fixture is not a dpop case".to_string())),
+            _ => Err(NativeSuiteError::Http(
+                "fixture is not a dpop case".to_string(),
+            )),
         }
     }
 
@@ -1028,6 +1057,7 @@ fn build_scope(
     }
 }
 
+#[allow(clippy::expect_used)]
 fn build_capability(
     id: &str,
     subject: &Keypair,
@@ -1067,6 +1097,7 @@ fn build_dpop_capability() -> CapabilityToken {
     )
 }
 
+#[allow(clippy::expect_used)]
 fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
     let parent_subject = capability_subject_keypair();
     let child_subject = delegated_subject_keypair();
@@ -1112,7 +1143,12 @@ fn build_delegation_pair() -> (CapabilityToken, CapabilityToken) {
     )
     .expect("sign deterministic delegation");
 
-    let child = build_capability("cap-child-001", &child_subject, child_scope, vec![delegation]);
+    let child = build_capability(
+        "cap-child-001",
+        &child_subject,
+        child_scope,
+        vec![delegation],
+    );
     (parent, child)
 }
 
@@ -1142,7 +1178,11 @@ fn build_governed_request() -> AgentMessage {
         capability_token: Box::new(build_capability(
             "cap-governed-001",
             &capability_subject_keypair(),
-            build_scope("governed_transfer", None, vec![Constraint::GovernedIntentRequired]),
+            build_scope(
+                "governed_transfer",
+                None,
+                vec![Constraint::GovernedIntentRequired],
+            ),
             vec![],
         )),
         server_id: "conformance".to_string(),
@@ -1170,6 +1210,7 @@ fn build_revoked_request() -> AgentMessage {
     }
 }
 
+#[allow(clippy::expect_used)]
 fn build_receipt(
     receipt_id: &str,
     capability_id: &str,
@@ -1221,9 +1262,9 @@ mod tests {
             load_native_scenarios_from_dir(repo_root.join("tests/conformance/native/scenarios"))
                 .expect("load native scenarios");
         assert_eq!(scenarios.len(), 6);
-        assert!(scenarios.iter().any(|scenario| {
-            scenario.category == NativeScenarioCategory::CapabilityValidation
-        }));
+        assert!(scenarios
+            .iter()
+            .any(|scenario| { scenario.category == NativeScenarioCategory::CapabilityValidation }));
         assert!(scenarios.iter().any(|scenario| {
             scenario.category == NativeScenarioCategory::GovernedTransactionEnforcement
         }));

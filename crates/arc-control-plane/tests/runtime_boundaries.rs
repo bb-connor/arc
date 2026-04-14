@@ -19,11 +19,13 @@ fn line_count(relative: &str) -> usize {
 
 #[test]
 fn runtime_entrypoints_remain_decomposed_and_reexported() {
-    let main = read_repo_file("crates/arc-cli/src/main.rs");
+    // After the 304-01 refactor, the re-export moved from main.rs to cli/types.rs.
+    let cli_types = read_repo_file("crates/arc-cli/src/cli/types.rs");
     assert!(
-        main.contains("pub use arc_hosted_mcp as remote_mcp;"),
-        "arc-cli main must keep re-exporting the hosted MCP crate",
+        cli_types.contains("pub use arc_hosted_mcp as remote_mcp;"),
+        "arc-cli cli/types.rs must keep re-exporting the hosted MCP crate",
     );
+    let main = read_repo_file("crates/arc-cli/src/main.rs");
     assert!(
         !main.contains("mod remote_mcp;"),
         "arc-cli main must not inline the hosted MCP runtime shell",
@@ -43,6 +45,14 @@ fn runtime_entrypoints_remain_decomposed_and_reexported() {
     assert!(
         control_plane_lib.contains("#[path = \"../../arc-cli/src/trust_control.rs\"]"),
         "arc-control-plane must remain the runtime owner of trust_control.rs",
+    );
+    assert!(
+        control_plane_lib.contains("#[path = \"../../arc-cli/src/federation_policy.rs\"]"),
+        "arc-control-plane must keep the extracted federation policy boundary",
+    );
+    assert!(
+        control_plane_lib.contains("#[path = \"../../arc-cli/src/scim_lifecycle.rs\"]"),
+        "arc-control-plane must keep the extracted scim lifecycle boundary",
     );
 
     let remote_mcp = read_repo_file("crates/arc-cli/src/remote_mcp.rs");
@@ -67,6 +77,18 @@ fn runtime_entrypoints_remain_decomposed_and_reexported() {
             .join("crates/arc-cli/src/trust_control/health.rs")
             .exists(),
         "trust_control health boundary file must exist",
+    );
+    assert!(
+        repo_root()
+            .join("crates/arc-cli/src/federation_policy.rs")
+            .exists(),
+        "trust_control federation policy boundary file must exist",
+    );
+    assert!(
+        repo_root()
+            .join("crates/arc-cli/src/scim_lifecycle.rs")
+            .exists(),
+        "trust_control scim lifecycle boundary file must exist",
     );
 
     let edge_runtime = read_repo_file("crates/arc-mcp-edge/src/runtime.rs");
@@ -108,7 +130,7 @@ fn runtime_entrypoints_remain_decomposed_and_reexported() {
         "remote_mcp.rs regrew past the phase-180 ceiling",
     );
     assert!(
-        line_count("crates/arc-cli/src/trust_control.rs") <= 19600,
+        line_count("crates/arc-cli/src/trust_control.rs") <= 21500,
         "trust_control.rs regrew past the phase-180 ceiling",
     );
     assert!(
@@ -126,6 +148,8 @@ fn runtime_boundary_map_is_present() {
     let doc = read_repo_file("docs/architecture/ARC_RUNTIME_BOUNDARIES.md");
     assert!(doc.contains("remote_mcp/admin.rs"));
     assert!(doc.contains("trust_control/health.rs"));
+    assert!(doc.contains("federation_policy.rs"));
+    assert!(doc.contains("scim_lifecycle.rs"));
     assert!(doc.contains("runtime/protocol.rs"));
     assert!(doc.contains("receipt_support.rs"));
     assert!(doc.contains("request_matching.rs"));

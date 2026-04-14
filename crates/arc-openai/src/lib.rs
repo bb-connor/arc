@@ -148,10 +148,8 @@ impl ArcOpenAiAdapter {
                 if function_bindings.contains_key(&func_name) {
                     continue;
                 }
-                function_bindings.insert(
-                    func_name,
-                    (manifest.server_id.clone(), tool.name.clone()),
-                );
+                function_bindings
+                    .insert(func_name, (manifest.server_id.clone(), tool.name.clone()));
                 all_tools.push(tool.clone());
             }
         }
@@ -211,11 +209,7 @@ impl ArcOpenAiAdapter {
 
     /// List all function names.
     pub fn function_names(&self) -> Vec<String> {
-        self.manifest
-            .tools
-            .iter()
-            .map(|t| t.name.clone())
-            .collect()
+        self.manifest.tools.iter().map(|t| t.name.clone()).collect()
     }
 
     /// Get a tool definition by function name.
@@ -226,7 +220,10 @@ impl ArcOpenAiAdapter {
     /// Allocate a receipt reference.
     fn next_receipt_ref(&mut self) -> String {
         self.call_counter += 1;
-        format!("arc-receipt-{}-{}", self.config.server_id, self.call_counter)
+        format!(
+            "arc-receipt-{}-{}",
+            self.config.server_id, self.call_counter
+        )
     }
 
     /// Execute an OpenAI tool call through the ARC kernel.
@@ -246,10 +243,7 @@ impl ArcOpenAiAdapter {
                     return ToolCallResult {
                         tool_call_id: tool_call.id.clone(),
                         name: tool_call.function.name.clone(),
-                        content: format!(
-                            "Error: function '{}' not found",
-                            tool_call.function.name
-                        ),
+                        content: format!("Error: function '{}' not found", tool_call.function.name),
                         denied: true,
                         receipt_ref: None,
                     };

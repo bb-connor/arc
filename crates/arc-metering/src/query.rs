@@ -226,9 +226,7 @@ pub fn execute_cost_query(records: &[CostMetadata], query: &CostQuery) -> CostQu
     // Grouping
     let groups = match query.group_by {
         GroupBy::None => vec![],
-        GroupBy::Session | GroupBy::Agent | GroupBy::Tool => {
-            build_groups(&capped, &query.group_by)
-        }
+        GroupBy::Session | GroupBy::Agent | GroupBy::Tool => build_groups(&capped, &query.group_by),
     };
 
     CostQueryResult {
@@ -254,9 +252,7 @@ fn build_groups(records: &[&CostMetadata], group_by: &GroupBy) -> Vec<CostGroup>
             GroupBy::None => continue,
         };
 
-        let entry = map
-            .entry(key)
-            .or_insert_with(|| (0, 0, 0, None, 0));
+        let entry = map.entry(key).or_insert_with(|| (0, 0, 0, None, 0));
 
         entry.0 += 1;
         entry.1 = entry.1.saturating_add(r.total_compute_time_ms());
@@ -386,10 +382,7 @@ mod tests {
 
         let a1_group = result.groups.iter().find(|g| g.key == "a1").unwrap();
         assert_eq!(a1_group.receipt_count, 2);
-        assert_eq!(
-            a1_group.total_monetary_cost.as_ref().unwrap().units,
-            125
-        );
+        assert_eq!(a1_group.total_monetary_cost.as_ref().unwrap().units, 125);
     }
 
     #[test]

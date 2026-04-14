@@ -175,10 +175,7 @@ impl BudgetEnforcer {
             *self.session_spent.entry(sid.clone()).or_insert(0) += cost_units;
         }
 
-        *self
-            .agent_spent
-            .entry(meta.agent_id.clone())
-            .or_insert(0) += cost_units;
+        *self.agent_spent.entry(meta.agent_id.clone()).or_insert(0) += cost_units;
 
         let tool_key = format!("{}:{}", meta.tool_server, meta.tool_name);
         *self.tool_spent.entry(tool_key).or_insert(0) += cost_units;
@@ -293,10 +290,7 @@ mod tests {
         let meta = make_meta("a1", "s1", "t1");
         enforcer.record(&meta, 900);
         let result = enforcer.check(&meta, 200);
-        assert!(matches!(
-            result,
-            Err(BudgetViolation::Session { .. })
-        ));
+        assert!(matches!(result, Err(BudgetViolation::Session { .. })));
     }
 
     #[test]
