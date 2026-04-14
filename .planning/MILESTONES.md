@@ -432,6 +432,43 @@ and compile/test/package guards with ad-hoc scripts. Without a typed SDK, proc
 macro, and CLI workflow, the WASM guard ecosystem cannot grow beyond Rust
 experts who read the ABI spec. v4.1 makes guard authoring accessible.
 
+### v4.2 WIT Migration and Multi-Language SDKs
+
+**Status:** planned
+**Executable phases:** 381-384
+**Depends on:** v4.1 Guard SDK and Developer Experience (phases 377-380)
+**Goal:** Migrate the WASM guard ABI from raw core-WASM to the Component
+Model with a WIT-defined interface, then ship TypeScript, Python, and Go
+guest SDKs so guard authors can write policy in any major language. A
+cross-language conformance test suite validates all SDKs against the same
+fixtures.
+
+**Key intended outcomes:**
+- WIT interface definition (`arc:guard@0.1.0`) with `evaluate` function,
+  typed request/verdict records, and versioned world published under
+  `wit/arc-guard/`
+- Host runtime supports dual-mode loading: existing raw core-WASM modules
+  (legacy ABI) and new Component Model components (WIT ABI) detected
+  automatically at load time
+- TypeScript guard SDK (`arc-guard-ts`) with jco/ComponentizeJS compilation
+  pipeline producing valid WASM components
+- Python guard SDK (`arc-guard-py`) with componentize-py compilation pipeline
+  producing valid WASM components
+- Go guard SDK (`arc-guard-go`) with TinyGo wasip2 compilation pipeline
+  producing valid WASM components
+- Cross-language conformance test suite with shared YAML fixtures validating
+  that Rust, TypeScript, Python, and Go guards produce identical verdicts and
+  fuel consumption within 2x across languages
+
+**Why this milestone matters:** v4.1 ships the Rust guest SDK and validates
+the raw ABI contract, but the WASM guard ecosystem remains Rust-only.
+TypeScript, Python, and Go are the dominant languages in AI agent and policy
+development. Without multi-language SDKs, guard authoring requires Rust
+expertise. The Component Model with WIT provides type-safe cross-language
+bindings, proper versioning, and eliminates the manual ABI glue that raw
+core-WASM requires. v4.2 transforms WASM guards from a Rust-expert feature
+into a polyglot policy authoring platform.
+
 ## Deferred Milestone
 
 ### v2.71 Web3 Live Activation

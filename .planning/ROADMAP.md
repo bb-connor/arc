@@ -10929,3 +10929,100 @@ crate)
 | 378 | v4.1 | Proc Macro, Example Guards, and Integration Tests | Not started |
 | 379 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
 | 380 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
+
+---
+
+## v4.2 WIT Migration and Multi-Language SDKs (Phases 381-384)
+
+**Milestone Goal:** Migrate the WASM guard ABI from raw core-WASM to the
+Component Model with a WIT-defined interface, then ship TypeScript, Python,
+and Go guest SDKs so guard authors can write policy in any major language.
+A cross-language conformance test suite validates that all four language
+guards (Rust, TypeScript, Python, Go) produce identical verdicts against the
+same fixtures.
+
+**Dependency:** v4.1 Guard SDK and Developer Experience (phases 377-380). The
+Rust guest SDK, proc macro, CLI tooling, and raw ABI must be stable and
+validated before the WIT migration replaces the raw ABI contract. Phase
+numbering overlaps with v3.12 because the v4.x WASM lane executes in parallel
+with the v3.x credibility-closeout chain -- they share no code dependencies.
+
+**Parallelism:** Phase 381 defines the WIT interface and adds Component Model
+host support with dual-mode loading. Phases 382 and 383 can execute in
+parallel: TypeScript SDK (382) and Python + Go SDKs (383) are independent
+language targets that both depend only on Phase 381's WIT foundation. Phase
+384 (conformance suite) depends on all three SDK phases completing.
+
+**New packages:**
+- `wit/arc-guard/` -- WIT interface definition (`arc:guard@0.1.0`)
+- `packages/sdk/arc-guard-ts/` -- TypeScript guard SDK
+- `packages/sdk/arc-guard-py/` -- Python guard SDK
+- `packages/sdk/arc-guard-go/` -- Go guard SDK
+
+**Design authority:** `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
+`docs/guards/03-IMPLEMENTATION-PLAN.md` Phase 4.
+
+### Phases
+
+- [ ] **Phase 381: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package
+- [ ] **Phase 382: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation
+- [ ] **Phase 383: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation
+- [ ] **Phase 384: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
+
+### Phase 381: WIT Interface and Dual-Mode Host
+**Goal**: Guard authors and SDK toolchains target a stable, versioned WIT contract instead of raw pointer/length ABI conventions, and the host runtime transparently loads both legacy core-WASM modules and new Component Model components
+**Depends on**: v4.1 Phase 380 (Rust SDK and raw ABI are stable and validated)
+**Requirements**: WIT-01, WIT-02, WIT-03, WIT-04
+**Success Criteria** (what must be TRUE):
+  1. A WIT package at `wit/arc-guard/world.wit` defines the `arc:guard@0.1.0` world with an `evaluate` function accepting a `guard-request` record and returning a `verdict` variant, and this file is the single source of truth for the guard contract
+  2. The host runtime uses `wasmtime::component::bindgen!` to generate Rust types from the WIT definition and evaluates Component Model guards through the generated bindings without manual ABI glue
+  3. When loading a `.wasm` file, the host detects whether it is a core module (legacy raw ABI) or a Component Model component (WIT ABI) and evaluates it through the correct path, with existing raw-ABI guards continuing to work unchanged
+  4. The WIT package under `wit/arc-guard/` includes a versioned world definition with documentation comments that SDK toolchains (jco, componentize-py, TinyGo) can consume to generate guest bindings
+**Estimated complexity**: L
+**Plans**: TBD
+
+### Phase 382: TypeScript Guard SDK
+**Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the ARC host runtime alongside Rust guards
+**Depends on**: Phase 381 (WIT interface is defined and Component Model host support is working)
+**Requirements**: TSDK-01, TSDK-02, TSDK-03, TSDK-04
+**Success Criteria** (what must be TRUE):
+  1. A TypeScript guard author imports typed `GuardRequest` and `GuardVerdict` interfaces from `arc-guard-ts` and these types are generated from the WIT definition, not hand-maintained
+  2. A TypeScript guard compiles to a WASM component via `jco componentize` and the resulting `.wasm` file is a valid Component Model component that the host loads through the WIT path
+  3. An example TypeScript guard exists with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands
+  4. A TypeScript-compiled guard loaded into the ARC host runtime produces correct Allow and Deny verdicts for the same test inputs that the Rust example guards handle
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 383: Python and Go Guard SDKs
+**Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the ARC host runtime alongside Rust and TypeScript guards
+**Depends on**: Phase 381 (WIT interface is defined and Component Model host support is working)
+**Requirements**: PYDK-01, PYDK-02, PYDK-03, PYDK-04, GODK-01, GODK-02, GODK-03, GODK-04
+**Success Criteria** (what must be TRUE):
+  1. A Python guard author imports typed dataclasses from `arc-guard-py` that match the WIT contract, writes an `evaluate` function, and `componentize-py` compiles it to a WASM component that the host loads through the WIT path
+  2. A Go guard author imports typed structs from `arc-guard-go` that match the WIT contract, writes an `Evaluate` function, and TinyGo compiles it to a WASM component via the `wasip2` target that the host loads through the WIT path
+  3. Example guards exist for both Python and Go with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands per language
+  4. Python-compiled and Go-compiled guards loaded into the ARC host runtime produce correct Allow and Deny verdicts for the same test inputs that the Rust and TypeScript example guards handle
+**Estimated complexity**: L
+**Plans**: TBD
+
+### Phase 384: Cross-Language Conformance Suite
+**Goal**: A single conformance test suite proves that all four language SDKs (Rust, TypeScript, Python, Go) produce identical guard verdicts and comparable fuel consumption for the same policy scenarios
+**Depends on**: Phase 382 (TypeScript SDK) and Phase 383 (Python + Go SDKs)
+**Requirements**: CONF-01, CONF-02, CONF-03
+**Success Criteria** (what must be TRUE):
+  1. A shared YAML fixture set exists with test cases covering Allow verdicts, Deny verdicts with deny-reason content, host function calls (log, get_config, get_time), and enriched request fields (action_type, extracted_path), and all four language guards are tested against every fixture
+  2. The conformance runner loads all four compiled guards (Rust `.wasm`, TypeScript `.wasm`, Python `.wasm`, Go `.wasm`), executes each against the full fixture set, and reports pass/fail per guard per fixture in a single invocation
+  3. The conformance suite measures fuel consumption for each guard on each fixture and fails if any language exceeds 2x the fuel of the most efficient language for the same fixture, ensuring no SDK introduces unreasonable overhead
+**Estimated complexity**: M
+**Plans**: TBD
+
+---
+
+## Phase Summary (v4.2)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 381 | v4.2 | WIT Interface and Dual-Mode Host | Not started |
+| 382 | v4.2 | TypeScript Guard SDK | Not started |
+| 383 | v4.2 | Python and Go Guard SDKs | Not started |
+| 384 | v4.2 | Cross-Language Conformance Suite | Not started |

@@ -56,6 +56,7 @@ Progress: [----------] 0%
 - v3.0-v3.12: 59 phases planned across 13 milestones
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
+- v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
 
 ## Accumulated Context
 
