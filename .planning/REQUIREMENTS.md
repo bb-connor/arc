@@ -3206,10 +3206,10 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 ### Example Guards
 
-- [ ] **GEXM-01**: An example guard using the SDK demonstrates allowing or denying based on tool name inspection
-- [ ] **GEXM-02**: An example guard using the SDK demonstrates reading `action_type` and `extracted_path` from the enriched GuardRequest
-- [ ] **GEXM-03**: An example guard using the SDK demonstrates calling `arc::log` and `arc::get_config` host functions
-- [ ] **GEXM-04**: Example guards compile to `wasm32-unknown-unknown` and produce valid .wasm binaries
+- [x] **GEXM-01**: An example guard using the SDK demonstrates allowing or denying based on tool name inspection
+- [x] **GEXM-02**: An example guard using the SDK demonstrates reading `action_type` and `extracted_path` from the enriched GuardRequest
+- [x] **GEXM-03**: An example guard using the SDK demonstrates calling `arc::log` and `arc::get_config` host functions
+- [x] **GEXM-04**: Example guards compile to `wasm32-unknown-unknown` and produce valid .wasm binaries
 - [ ] **GEXM-05**: Integration test loads an example guard .wasm into WasmtimeBackend, evaluates it against test requests, and verifies correct Allow/Deny verdicts
 
 ### CLI Scaffolding
@@ -3247,10 +3247,10 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GSDK-04 | Phase 377 | Complete |
 | GSDK-05 | Phase 377 | Complete |
 | GSDK-06 | Phase 378 | Complete |
-| GEXM-01 | Phase 378 | Pending |
-| GEXM-02 | Phase 378 | Pending |
-| GEXM-03 | Phase 378 | Pending |
-| GEXM-04 | Phase 378 | Pending |
+| GEXM-01 | Phase 378 | Complete |
+| GEXM-02 | Phase 378 | Complete |
+| GEXM-03 | Phase 378 | Complete |
+| GEXM-04 | Phase 378 | Complete |
 | GEXM-05 | Phase 378 | Pending |
 | GCLI-01 | Phase 379 | Pending |
 | GCLI-02 | Phase 379 | Pending |
