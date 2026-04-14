@@ -9,6 +9,7 @@ members = [
     "crates/arc-settle",
     "crates/arc-web3-bindings",
     "crates/arc-a2a-adapter",
+    "crates/arc-acp-proxy",
     "crates/arc-control-plane",
     "crates/arc-core",
     "crates/arc-core-types",
