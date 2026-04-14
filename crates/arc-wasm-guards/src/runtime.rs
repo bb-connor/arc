@@ -458,8 +458,18 @@ pub mod wasmtime_backend {
             let verdict = match result {
                 crate::abi::VERDICT_ALLOW => Ok(GuardVerdict::Allow),
                 crate::abi::VERDICT_DENY => {
-                    // Try to read deny reason from memory
-                    let reason = read_deny_reason(&memory, &store);
+                    // Probe for structured arc_deny_reason export
+                    let deny_reason_fn = instance
+                        .get_typed_func::<(i32, i32), i32>(&mut store, "arc_deny_reason")
+                        .ok();
+
+                    let reason = if let Some(ref reason_fn) = deny_reason_fn {
+                        read_structured_deny_reason(reason_fn, &memory, &mut store)
+                    } else {
+                        // Fallback to legacy offset-64K NUL-terminated string
+                        read_deny_reason(&memory, &store)
+                    };
+
                     Ok(GuardVerdict::Deny { reason })
                 }
                 _ => {
@@ -487,6 +497,49 @@ pub mod wasmtime_backend {
 
         fn backend_name(&self) -> &str {
             "wasmtime"
+        }
+    }
+
+    /// Read a structured deny reason from the guest via the `arc_deny_reason`
+    /// export. The host calls `arc_deny_reason(buf_ptr, buf_len)` with a
+    /// buffer region in guest memory. The guest writes a JSON-encoded
+    /// [`GuestDenyResponse`](crate::abi::GuestDenyResponse) into the buffer
+    /// and returns the number of bytes written (or a negative/zero value on
+    /// error).
+    ///
+    /// All error paths return `None` (fail closed with no reason rather than
+    /// crashing).
+    fn read_structured_deny_reason(
+        reason_fn: &wasmtime::TypedFunc<(i32, i32), i32>,
+        memory: &Memory,
+        store: &mut Store<WasmHostState>,
+    ) -> Option<String> {
+        const DENY_BUF_OFFSET: i32 = 65536;
+        const DENY_BUF_LEN: i32 = 4096;
+
+        // Call the guest's arc_deny_reason function
+        let bytes_written = match reason_fn.call(&mut *store, (DENY_BUF_OFFSET, DENY_BUF_LEN)) {
+            Ok(n) if n > 0 && n <= DENY_BUF_LEN => n,
+            Ok(_) => return None,  // 0 or negative or too large
+            Err(_) => return None, // call failed -- no reason
+        };
+
+        // Read the response from guest memory
+        let mut buf = vec![0u8; bytes_written as usize];
+        if memory.read(store, DENY_BUF_OFFSET as usize, &mut buf).is_err() {
+            return None;
+        }
+
+        // Try to parse as JSON GuestDenyResponse
+        match serde_json::from_slice::<crate::abi::GuestDenyResponse>(&buf) {
+            Ok(resp) => Some(resp.reason),
+            Err(_) => {
+                // Not valid JSON -- try as plain UTF-8 string
+                std::str::from_utf8(&buf)
+                    .ok()
+                    .map(|s| s.trim_end_matches('\0').to_string())
+                    .filter(|s| !s.is_empty())
+            }
         }
     }
 
