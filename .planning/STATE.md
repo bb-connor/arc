@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: v3.13 is active. The generic cross-protocol orchestrator slice now has
-stopped_at: Completed 374-01-PLAN.md (WASM guard security hardening)
-last_updated: "2026-04-14T21:34:54.562Z"
-last_activity: 2026-04-14 -- created phase 390 context and plan artifacts for
+status: completed
+stopped_at: Completed 374-02-PLAN.md (WASM guard request enrichment)
+last_updated: "2026-04-14T21:52:10.789Z"
+last_activity: 2026-04-14 -- completed phase 390 by landing `arc-cross-protocol`
 progress:
   total_phases: 347
-  completed_phases: 251
+  completed_phases: 253
   total_plans: 728
-  completed_plans: 748
-  percent: 0
+  completed_plans: 750
+  percent: 20
 ---
 
 # Project State
@@ -25,24 +25,24 @@ authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
 **Current focus:** v3.13 Universal Orchestration Closure is now the active
-planning lane. Phase `390` has context and one executable plan, so the
-immediate task is implementation of the shared orchestrator substrate while
-keeping v3.12 in the locally complete pending-archive state and v4.0 as a
-parallel strategic lane.
+execution lane. Phase `390` is complete, so the immediate task is planning and
+executing phase `391` (`Authoritative Edge Unification`) while keeping v3.12
+in the locally complete pending-archive state and v4.0 as a parallel strategic
+lane.
 
 ## Current Position
 
-Phase: 390 (planned, execution not started)
-Plan: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
-Status: v3.13 is active. The generic cross-protocol orchestrator slice now has
-one concrete implementation plan covering shared bridge contracts,
-attenuation, receipt-lineage tracing, and first adoption in the A2A and ACP
-authoritative paths.
-Last activity: 2026-04-14 -- created phase 390 context and plan artifacts for
-the cross-protocol orchestrator, and kept v3.12 explicitly in the locally
-complete pending-archive state.
+Phase: 391 (not started)
+Plan: —
+Status: v3.13 is active. Phase `390` is complete and landed the reusable
+shared orchestrator substrate. The next closure slice is phase `391`, which
+must finish authoritative path unification and compatibility-path quarantine on
+top of that substrate.
+Last activity: 2026-04-14 -- completed phase 390 by landing `arc-cross-protocol`
+and moving default A2A/ACP authoritative execution onto the shared
+orchestrator substrate.
 
-Progress: [----------] 0%
+Progress: [##--------] 20%
 
 ## Performance Metrics
 
@@ -106,17 +106,19 @@ Progress: [----------] 0%
   late-v3 ledger reconciliation.
 - v3.13 exists specifically to close those four remaining gaps even though
   v4.0 was already planned in parallel and v2.83 remains locally unarchived.
-- Phase `390` will introduce a reusable cross-protocol runtime home instead of
-  embedding the orchestrator inside either outward edge crate, because the
-  remaining gap is split authority, not missing edge-local helper methods.
+- Phase `390` is now complete: `arc-cross-protocol` landed as the shared
+  runtime home, and the default authoritative A2A/ACP execution paths now emit
+  orchestrator-labeled lineage metadata instead of edge-local kernel metadata.
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 - [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
 - [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
+- [Phase 374]: build_request() uses function-local import of ToolAction and calls extract_action() for host-side action classification
+- [Phase 374]: GuardRequest session_metadata removed (ABI cleanup); unrecognized tools map to mcp_tool via extract_action fallback
 
 ### Pending Todos
 
-- Execute Phase `390` plan `01` (`Shared Orchestrator Substrate and First Edge
-  Adoption`) as the first v3.13 implementation slice.
+- Plan and execute phase `391` (`Authoritative Edge Unification`) on top of
+  the landed shared orchestrator substrate.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
 - Reconcile the remaining `v3.9`-`v3.11` ledger truth debt under Phase `393`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
@@ -155,7 +157,7 @@ phases 390-394 reserved after the v4.x placeholder ranges
 
 ## Session Continuity
 
-Last session: 2026-04-14T21:34:54.535Z
-Stopped at: Completed 374-01-PLAN.md (WASM guard security hardening)
-Next action: `/gsd:execute-phase 390` to implement the shared cross-protocol orchestrator substrate
+Last session: 2026-04-14T21:52:10.770Z
+Stopped at: Completed 374-02-PLAN.md (WASM guard request enrichment)
+Next action: `/gsd:plan-phase 391` for authoritative edge unification
 Resume file: None

@@ -2973,9 +2973,9 @@ defend.
 
 ### Cross-Protocol Orchestration
 
-- [ ] **ORCH-01**: A reusable `CrossProtocolOrchestrator` exists as the default runtime for bridged protocol execution instead of edge-specific bespoke authority flows
-- [ ] **ORCH-02**: `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
-- [ ] **ORCH-03**: Orchestrated bridge executions emit signed receipts or truthful receipt references that preserve origin protocol and bridge lineage across hops
+- [x] **ORCH-01**: A reusable `CrossProtocolOrchestrator` exists as the default runtime for bridged protocol execution instead of edge-specific bespoke authority flows
+- [x] **ORCH-02**: `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
+- [x] **ORCH-03**: Orchestrated bridge executions emit signed receipts or truthful receipt references that preserve origin protocol and bridge lineage across hops
 
 ### Authoritative Edge Unification
 
@@ -3014,9 +3014,9 @@ defend.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ORCH-01 | Phase 390 | Planned |
-| ORCH-02 | Phase 390 | Planned |
-| ORCH-03 | Phase 390 | Planned |
+| ORCH-01 | Phase 390 | Complete |
+| ORCH-02 | Phase 390 | Complete |
+| ORCH-03 | Phase 390 | Complete |
 | AUTH-01 | Phase 391 | Planned |
 | AUTH-02 | Phase 391 | Planned |
 | AUTH-03 | Phase 391 | Planned |
@@ -3037,7 +3037,7 @@ defend.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after defining milestone v3.13 Universal Orchestration Closure*
+*Last updated: 2026-04-14 after completing phase 390 generic cross-protocol orchestrator*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3063,12 +3063,12 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Guard Request Enrichment
 
-- [ ] **WGREQ-01**: GuardRequest includes `action_type` field pre-extracted by the host via `extract_action()`
-- [ ] **WGREQ-02**: GuardRequest includes `extracted_path` field with normalized file path for filesystem actions
-- [ ] **WGREQ-03**: GuardRequest includes `extracted_target` field with domain string for network egress actions
-- [ ] **WGREQ-04**: GuardRequest includes `filesystem_roots` field from session context
-- [ ] **WGREQ-05**: GuardRequest includes `matched_grant_index` field from capability scope
-- [ ] **WGREQ-06**: `session_metadata` field is removed from GuardRequest (always None, replaced by structured fields)
+- [x] **WGREQ-01**: GuardRequest includes `action_type` field pre-extracted by the host via `extract_action()`
+- [x] **WGREQ-02**: GuardRequest includes `extracted_path` field with normalized file path for filesystem actions
+- [x] **WGREQ-03**: GuardRequest includes `extracted_target` field with domain string for network egress actions
+- [x] **WGREQ-04**: GuardRequest includes `filesystem_roots` field from session context
+- [x] **WGREQ-05**: GuardRequest includes `matched_grant_index` field from capability scope
+- [x] **WGREQ-06**: `session_metadata` field is removed from GuardRequest (always None, replaced by structured fields)
 
 ### Guard Manifest
 
@@ -3126,12 +3126,12 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGSEC-01 | Phase 374 | Complete |
 | WGSEC-02 | Phase 374 | Complete |
 | WGSEC-03 | Phase 374 | Complete |
-| WGREQ-01 | Phase 374 | Pending |
-| WGREQ-02 | Phase 374 | Pending |
-| WGREQ-03 | Phase 374 | Pending |
-| WGREQ-04 | Phase 374 | Pending |
-| WGREQ-05 | Phase 374 | Pending |
-| WGREQ-06 | Phase 374 | Pending |
+| WGREQ-01 | Phase 374 | Complete |
+| WGREQ-02 | Phase 374 | Complete |
+| WGREQ-03 | Phase 374 | Complete |
+| WGREQ-04 | Phase 374 | Complete |
+| WGREQ-05 | Phase 374 | Complete |
+| WGREQ-06 | Phase 374 | Complete |
 | WGMAN-01 | Phase 375 | Pending |
 | WGMAN-02 | Phase 375 | Pending |
 | WGMAN-03 | Phase 375 | Pending |

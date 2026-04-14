@@ -455,7 +455,7 @@ tooling.
 **Success Criteria** (what must be TRUE):
   1. A multi-chain qualification report documents EVM settlement, Bitcoin OTS anchoring, and Solana memo publication all passing with evidence (tx hashes, block numbers)
   2. An operator runbook covers how to enable web3 settlement, configure chain endpoints, monitor transaction status, and handle failures
-**Plans**: 01 (`Shared Orchestrator Substrate and First Edge Adoption`)
+**Plans**: 01 (`Shared Orchestrator Substrate and First Edge Adoption`) -- complete
 
 ---
 
@@ -10755,7 +10755,7 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 373 | 2/2 | Complete    | 2026-04-14 |
-| 374 | 1/2 | In Progress|  |
+| 374 | 2/2 | Complete   | 2026-04-14 |
 | 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
 | 376 | v4.0 | Benchmark Validation | Not started |
 
@@ -10943,7 +10943,7 @@ depends on the authoritative runtime behavior defined by the earlier ones.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 390 | v3.13 | Generic Cross-Protocol Orchestrator | Not started |
+| 390 | v3.13 | Generic Cross-Protocol Orchestrator | Complete |
 | 391 | v3.13 | Authoritative Edge Unification | Not started |
 | 392 | v3.13 | Fidelity Semantics and Publication Gating | Not started |
 | 393 | v3.13 | Ledger and Narrative Reconciliation | Not started |
