@@ -249,15 +249,16 @@ v2.80 (Foundation)
   |--- v2.82 (Spec)           [parallel with v2.81]
 
 v3.0 (Kernel Foundation)
-  |--- v3.1 (Attestation) ---> v3.3 (TypeScript) ---> v3.4 (Guards)
+  |--- v3.1 (Attestation)
   |--- v3.2 (Python)           [parallel with v3.1]
-  v3.4 ---> v3.5 (Protocol) ---> v3.6 (Platform) ---> v3.7 (Strategic)
+  |--- v3.3 (TypeScript)       [parallel with v3.1 and v3.2]
+  v3.1 + v3.2 + v3.3 ---> v3.4 (Guards) ---> v3.5 (Protocol) ---> v3.6 (Platform) ---> v3.7 (Strategic)
 ```
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
-v3.1 and v3.2 can execute in parallel after v3.0.
-v3.3 follows v3.1. v3.4 through v3.7 are sequential.
+v3.1, v3.2, and v3.3 can all execute in parallel after v3.0.
+v3.4 through v3.7 are sequential after v3.1+v3.2+v3.3 converge.
 
 ## Latest Completed Milestone
 

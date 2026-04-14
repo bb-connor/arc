@@ -9982,13 +9982,14 @@ infrastructure via OpenTelemetry export.
 
 ### Phase 325: Session Compliance Certificate
 **Goal**: Implement certificate generation and verification so a single artifact proves an entire session complied with policy
-**Depends on**: Phase 324 (ACP signed receipts are needed for cross-protocol certificates)
+**Depends on**: Phase 323 (ReceiptSigner trait enables kernel-signed receipts; ACP integration is not required for MCP/A2A-only certificates)
 **Requirements**: ATT-09, ATT-10, ATT-11, ATT-12
 **Success Criteria** (what must be TRUE):
-  1. `generate_compliance_certificate(session_id)` produces a signed certificate covering six assertions
-  2. Any anomaly during generation aborts with a typed error instead of issuing a misleading certificate
-  3. Both lightweight and full-bundle verification modes work end-to-end
-  4. `arc cert generate`, `arc cert verify`, and `arc cert inspect` CLI commands work
+  1. `generate_compliance_certificate(session_id)` produces a signed certificate covering six assertions for any protocol with kernel-signed receipts (MCP, A2A today; ACP when Phase 324 lands)
+  2. Certificate includes a `coverage` field listing which protocol surfaces contributed signed receipts and which are pending
+  3. Any anomaly during generation aborts with a typed error instead of issuing a misleading certificate
+  4. Both lightweight and full-bundle verification modes work end-to-end
+  5. `arc cert generate`, `arc cert verify`, and `arc cert inspect` CLI commands work
 **Estimated complexity**: L
 
 ### Phase 326: OpenTelemetry Export
@@ -10059,12 +10060,12 @@ natively.
 
 ### Phase 331: @arc-protocol/node-http Substrate
 **Goal**: Build the common HTTP interception substrate for Node and Bun runtimes
-**Depends on**: Phase 326 (OTel export validates the receipt pipeline TypeScript will use)
+**Depends on**: Phase 322 (arc api protect provides the HTTP kernel surface TypeScript substrates build on)
 **Requirements**: TS-01, TS-02, TS-03
 **Success Criteria** (what must be TRUE):
   1. `@arc-protocol/node-http` handles `(req, res)` and `Request -> Response` interception
   2. Substrate extracts caller identity from Authorization headers, cookies, and API keys
-  3. Substrate produces signed receipts via Rust kernel binding (NAPI-RS or WASM)
+  3. Substrate produces signed receipts via the ARC sidecar over localhost HTTP
 **Estimated complexity**: L
 
 ### Phase 332: Express and Fastify Wrappers
@@ -10115,25 +10116,25 @@ close the gap between "authorized the request" and "governed the outcome."
   3. Journal entries are append-only and hash-chained for tamper detection
 **Estimated complexity**: M
 
-### Phase 336: Deterministic Guards
-**Goal**: Ship InternalNetworkGuard, AgentVelocityGuard, and DataFlowGuard with configurable thresholds and fail-closed semantics
-**Depends on**: Phase 335 (session journal provides data-flow and rate data)
-**Requirements**: GUARD-04, GUARD-05, GUARD-06, GUARD-07
+### Phase 336: Stateless Deterministic Guards
+**Goal**: Ship InternalNetworkGuard and AgentVelocityGuard -- guards that need no session journal
+**Depends on**: Phase 322 (arc api protect provides the HTTP guard pipeline)
+**Requirements**: GUARD-04, GUARD-05
 **Success Criteria** (what must be TRUE):
-  1. `InternalNetworkGuard` blocks SSRF targeting RFC 1918, loopback, link-local, and cloud metadata addresses
-  2. `AgentVelocityGuard` enforces per-agent and per-session rate limits
-  3. `DataFlowGuard` enforces cumulative bytes-read/written limits via the session journal
-  4. All guards produce `GuardEvidence` entries and fail closed on errors
+  1. `InternalNetworkGuard` blocks SSRF targeting RFC 1918, loopback, link-local, and cloud metadata addresses, including DNS rebinding detection
+  2. `AgentVelocityGuard` enforces per-agent and per-session rate limits with token-bucket semantics
+  3. Both guards produce `GuardEvidence` entries and fail closed on errors
 **Estimated complexity**: M
 
-### Phase 337: Post-Invocation Hooks and Response Guards
-**Goal**: Build post-invocation hook pipeline with response inspection, sanitization, and behavioral sequence enforcement
-**Depends on**: Phase 336 (deterministic guards validate the guard pipeline)
-**Requirements**: GUARD-08, GUARD-09, GUARD-10
+### Phase 337: Session-Aware Deterministic Guards
+**Goal**: Ship guards that depend on the session journal -- DataFlowGuard, BehavioralSequenceGuard, and post-invocation hooks
+**Depends on**: Phase 335 (session journal provides data-flow and request history), Phase 336 (stateless guards validate the pipeline)
+**Requirements**: GUARD-06, GUARD-07, GUARD-08, GUARD-09, GUARD-10
 **Success Criteria** (what must be TRUE):
-  1. Post-invocation hook pipeline inspects responses before delivery with block/redact/escalate actions
-  2. `ResponseSanitizationGuard` scans for PII/PHI and redacts based on data classification policy
-  3. `BehavioralSequenceGuard` enforces tool ordering policies using the session journal
+  1. `DataFlowGuard` enforces cumulative bytes-read/written limits via the session journal
+  2. `BehavioralSequenceGuard` enforces tool ordering policies (e.g., read-then-exfil detection) using the session journal
+  3. Post-invocation hook pipeline inspects responses before delivery with block/redact/escalate actions
+  4. `ResponseSanitizationGuard` scans for PII/PHI and redacts based on data classification policy
 **Estimated complexity**: L
 
 ### Phase 338: Advisory Signals

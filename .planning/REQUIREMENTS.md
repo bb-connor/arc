@@ -438,7 +438,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 #### Phase 327: arc-sdk-python Core
 
-- [ ] **PY-01**: `arc-sdk-python` Python package wraps the Rust kernel via PyO3/maturin and exposes typed Python classes for `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict`
+- [ ] **PY-01**: `arc-sdk-python` Python package provides a thin HTTP client that communicates with the ARC sidecar and exposes typed Python classes for `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict`
 - [ ] **PY-02**: Python SDK supports creating, validating, and attenuating capability tokens from Python code
 - [ ] **PY-03**: Python SDK supports verifying receipt signatures and chain continuity from Python code
 - [ ] **PY-04**: Package installs via `pip install arc-sdk-python` with pre-built wheels for Linux x86_64, macOS arm64, and macOS x86_64
@@ -467,7 +467,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 - [ ] **TS-01**: `@arc-protocol/node-http` npm package provides the common HTTP interception substrate handling `(req, res)` and `Request -> Response` patterns for Node and Bun runtimes
 - [ ] **TS-02**: Substrate extracts caller identity from Authorization headers, cookies, and API key headers with configurable extraction strategies
-- [ ] **TS-03**: Substrate evaluates capabilities, runs guards, and produces signed receipts for every request using the Rust kernel via NAPI-RS or WASM binding
+- [ ] **TS-03**: Substrate evaluates capabilities, runs guards, and produces signed receipts for every request by calling the ARC sidecar over localhost HTTP
 
 #### Phase 332: Express and Fastify Wrappers
 
@@ -567,7 +567,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 - [ ] **PLAT-12**: `arc-jvm` provides a Servlet filter and/or Spring Boot auto-configuration that wraps HTTP requests with ARC capability validation and receipt signing
 - [ ] **PLAT-13**: `arc-dotnet` provides ASP.NET Core middleware that wraps HTTP requests with ARC capability validation and receipt signing
-- [ ] **PLAT-14**: Both substrates communicate with the Rust kernel via FFI, sidecar HTTP, or embedded WASM runtime
+- [ ] **PLAT-14**: Both substrates communicate with the Rust kernel via sidecar HTTP (primary model), with FFI or embedded WASM as optional optimization paths
 - [ ] **PLAT-15**: Conformance tests validate JVM and .NET SDK behavior against Rust kernel for shared test vectors
 
 ### v3.7 Strategic Bets
@@ -721,14 +721,14 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | STRAT-15 | Phase 350 | Planned |
 
 **Coverage:**
-- Universal security kernel requirements (v3.0-v3.7): 93 total, 93 mapped, 0 unmapped
+- Universal security kernel requirements (v3.0-v3.7): 114 total, 114 mapped, 0 unmapped
 
 ## Out of Scope (v3.x)
 
 | Feature | Reason |
 |---------|--------|
-| WebSocket transport | HTTP event-stream serves the same role |
-| gRPC transport | Streamable HTTP is the multi-client surface |
+| WebSocket as a primary kernel transport | WebSocket is used where required by upstream protocols (AG-UI in STRAT-10) but is not a general kernel transport surface |
+| gRPC as a primary kernel transport | gRPC is used where required by upstream frameworks (Tonic in PLAT-11) but is not a general kernel transport surface |
 | Agent-framework maintained plugins | Examples only; ARC is transport-layer agnostic by design |
 | Mobile SDK | Web-first, CLI-first; mobile later |
 | GUI admin dashboard | CLI and HTTP admin endpoints sufficient for operators |
