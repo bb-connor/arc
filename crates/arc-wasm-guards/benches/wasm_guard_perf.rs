@@ -372,6 +372,86 @@ fn bench_fuel_overhead(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
+// ResourceLimiter helpers
+// ---------------------------------------------------------------------------
+
+/// Returns a WAT module that loops calling `memory.grow` with large page counts
+/// to exceed the 16 MiB ceiling. With `trap_on_grow_failure(true)`, the first
+/// grow that exceeds the limit traps.
+///
+/// Each `memory.grow(1024)` attempts to add 64 MiB (1024 pages * 64 KiB).
+/// With the default 16 MiB ResourceLimiter, the first call should trap.
+fn build_adversarial_memory_wat() -> &'static str {
+    r#"(module
+    (import "arc" "log" (func $log (param i32 i32 i32)))
+    (import "arc" "get_config" (func $gc (param i32 i32 i32 i32) (result i32)))
+    (import "arc" "get_time_unix_secs" (func $gt (result i64)))
+    (memory (export "memory") 1)
+    (func (export "evaluate") (param i32 i32) (result i32)
+        (local $i i32)
+        (block $done
+            (loop $grow
+                (br_if $done (i32.ge_u (local.get $i) (i32.const 100)))
+                (drop (memory.grow (i32.const 1024)))
+                (local.set $i (i32.add (local.get $i) (i32.const 1)))
+                (br $grow)
+            )
+        )
+        (i32.const 0)
+    )
+)"#
+}
+
+// ---------------------------------------------------------------------------
+// Benchmark group 5: ResourceLimiter validation (WGBENCH-05)
+// ---------------------------------------------------------------------------
+
+/// Validates that the ResourceLimiter actually traps adversarial memory.grow
+/// attempts that exceed the 16 MiB ceiling.
+///
+/// This is a correctness assertion disguised as a benchmark: it measures how
+/// fast the ResourceLimiter detects and traps adversarial allocation, but the
+/// key requirement is that the trap ACTUALLY occurs.
+fn bench_resource_limiter(c: &mut Criterion) {
+    let engine = create_shared_engine().unwrap();
+    let adversarial_wat = build_adversarial_memory_wat();
+    let module = Module::new(&engine, adversarial_wat).unwrap();
+
+    let mut group = c.benchmark_group("wasm_guards/resource_limiter");
+
+    group.bench_function("adversarial_grow_trapped", |b| {
+        b.iter_batched(
+            || {
+                // Use default MAX_MEMORY_BYTES (16 MiB) limit
+                let host_state = WasmHostState::new(HashMap::new());
+                let mut store = Store::new(&engine, host_state);
+                store.limiter(|s| &mut s.limits);
+                store.set_fuel(100_000_000).unwrap(); // high fuel so we hit memory limit first
+                let mut linker = Linker::new(&engine);
+                register_host_functions(&mut linker).unwrap();
+                (store, linker)
+            },
+            |(mut store, linker)| {
+                let instance = linker.instantiate(&mut store, &module).unwrap();
+                let evaluate_fn = instance
+                    .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
+                    .unwrap();
+                // The call MUST fail -- adversarial grow should trap
+                let result = evaluate_fn.call(&mut store, (0, 0));
+                assert!(
+                    result.is_err(),
+                    "ResourceLimiter must trap adversarial memory.grow"
+                );
+                let _ = black_box(result);
+            },
+            criterion::BatchSize::SmallInput,
+        );
+    });
+
+    group.finish();
+}
+
+// ---------------------------------------------------------------------------
 // Criterion entry point
 // ---------------------------------------------------------------------------
 
@@ -381,5 +461,6 @@ criterion_group!(
     bench_instantiation,
     bench_evaluate_latency,
     bench_fuel_overhead,
+    bench_resource_limiter,
 );
 criterion_main!(benches);
