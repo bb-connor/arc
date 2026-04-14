@@ -38,6 +38,16 @@ pub struct WasmGuardConfig {
     /// not blocking). Defaults to `false` (fail-closed).
     #[serde(default)]
     pub advisory: bool,
+
+    /// Maximum linear memory the guest may use, in bytes.
+    /// Defaults to 16 MiB if omitted.
+    #[serde(default = "default_max_memory_bytes")]
+    pub max_memory_bytes: usize,
+
+    /// Maximum module size in bytes. Modules exceeding this limit are
+    /// rejected before compilation. Defaults to 10 MiB if omitted.
+    #[serde(default = "default_max_module_size")]
+    pub max_module_size: usize,
 }
 
 fn default_fuel_limit() -> u64 {
@@ -46,6 +56,14 @@ fn default_fuel_limit() -> u64 {
 
 fn default_priority() -> u32 {
     1000
+}
+
+fn default_max_memory_bytes() -> usize {
+    16 * 1024 * 1024
+}
+
+fn default_max_module_size() -> usize {
+    10 * 1024 * 1024
 }
 
 #[cfg(test)]
@@ -87,11 +105,15 @@ mod tests {
             fuel_limit: 1_000_000,
             priority: 100,
             advisory: false,
+            max_memory_bytes: 8 * 1024 * 1024,
+            max_module_size: 5 * 1024 * 1024,
         };
         let json = serde_json::to_string(&original).expect("serialize");
         let recovered: WasmGuardConfig = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(recovered.name, original.name);
         assert_eq!(recovered.fuel_limit, original.fuel_limit);
+        assert_eq!(recovered.max_memory_bytes, original.max_memory_bytes);
+        assert_eq!(recovered.max_module_size, original.max_module_size);
     }
 
     #[test]
@@ -136,5 +158,28 @@ mod tests {
         let json = r#"{"name": "test", "path": "/test.wasm", "priority": 4294967295}"#;
         let config: WasmGuardConfig = serde_json::from_str(json).expect("deserialize");
         assert_eq!(config.priority, u32::MAX);
+    }
+
+    #[test]
+    fn config_deserializes_with_default_memory_and_module_limits() {
+        let json = r#"{"name": "pii-guard", "path": "/etc/arc/guards/pii.wasm"}"#;
+        let config: WasmGuardConfig =
+            serde_json::from_str(json).expect("deserialize config with default limits");
+        assert_eq!(config.max_memory_bytes, 16 * 1024 * 1024);
+        assert_eq!(config.max_module_size, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn config_deserializes_with_overridden_memory_and_module_limits() {
+        let json = r#"{
+            "name": "custom",
+            "path": "/opt/guard.wasm",
+            "max_memory_bytes": 8388608,
+            "max_module_size": 5242880
+        }"#;
+        let config: WasmGuardConfig =
+            serde_json::from_str(json).expect("deserialize config with overrides");
+        assert_eq!(config.max_memory_bytes, 8_388_608);
+        assert_eq!(config.max_module_size, 5_242_880);
     }
 }

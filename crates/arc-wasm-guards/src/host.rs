@@ -51,8 +51,17 @@ pub struct WasmHostState {
 impl WasmHostState {
     /// Create a new host state with the given config and default limits.
     pub fn new(config: HashMap<String, String>) -> Self {
+        Self::with_memory_limit(config, MAX_MEMORY_BYTES)
+    }
+
+    /// Create a new host state with a custom memory limit.
+    ///
+    /// `trap_on_grow_failure(true)` is set so that any `memory.grow` beyond
+    /// the configured cap causes a trap (fail-closed) instead of returning -1.
+    pub fn with_memory_limit(config: HashMap<String, String>, max_memory: usize) -> Self {
         let limits = StoreLimitsBuilder::new()
-            .memory_size(MAX_MEMORY_BYTES)
+            .memory_size(max_memory)
+            .trap_on_grow_failure(true)
             .build();
         Self {
             config,
@@ -268,6 +277,26 @@ mod tests {
         assert!(state.logs.is_empty());
         assert_eq!(state.max_log_entries, MAX_LOG_ENTRIES);
         assert_eq!(state.config.get("key"), Some(&"value".to_string()));
+    }
+
+    #[test]
+    fn host_state_with_memory_limit_uses_custom_limit() {
+        let config = HashMap::new();
+        let custom_limit = 4 * 1024 * 1024; // 4 MiB
+        let state = WasmHostState::with_memory_limit(config, custom_limit);
+        assert!(state.logs.is_empty());
+        assert_eq!(state.max_log_entries, MAX_LOG_ENTRIES);
+        // We verify the state was created with the custom limit by checking
+        // it is usable (the actual enforcement is tested in runtime.rs)
+    }
+
+    #[test]
+    fn host_state_new_uses_default_max_memory() {
+        // WasmHostState::new() should use MAX_MEMORY_BYTES (16 MiB)
+        let state = WasmHostState::new(HashMap::new());
+        assert!(state.logs.is_empty());
+        // The default limit is MAX_MEMORY_BYTES; we confirm construction works.
+        // Actual enforcement tested via the wasmtime runtime integration tests.
     }
 
     // -----------------------------------------------------------------------

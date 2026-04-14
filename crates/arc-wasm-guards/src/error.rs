@@ -39,7 +39,44 @@ pub enum WasmGuardError {
     #[error("host function error: {0}")]
     HostFunction(String),
 
+    /// The module imports from a forbidden (non-arc) namespace.
+    #[error("module imports from forbidden namespace \"{module}\": import \"{name}\"")]
+    ImportViolation { module: String, name: String },
+
+    /// The module exceeds the configured maximum size.
+    #[error("module size {size} bytes exceeds limit of {limit} bytes")]
+    ModuleTooLarge { size: usize, limit: usize },
+
     /// The runtime backend is not available (feature not enabled).
     #[error("WASM runtime backend not available -- enable the 'wasmtime-runtime' feature")]
     BackendUnavailable,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn error_import_violation_display() {
+        let err = WasmGuardError::ImportViolation {
+            module: "wasi".to_string(),
+            name: "fd_write".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "module imports from forbidden namespace \"wasi\": import \"fd_write\""
+        );
+    }
+
+    #[test]
+    fn error_module_too_large_display() {
+        let err = WasmGuardError::ModuleTooLarge {
+            size: 20_000_000,
+            limit: 10_485_760,
+        };
+        assert_eq!(
+            err.to_string(),
+            "module size 20000000 bytes exceeds limit of 10485760 bytes"
+        );
+    }
 }
