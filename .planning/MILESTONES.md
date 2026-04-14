@@ -401,6 +401,37 @@ no memory or import safety, and lack the benchmarks needed to validate the
 per-call fresh-Store model. v4.0 closes every gap between the skeleton and a
 production-ready WASM guard runtime.
 
+
+### v4.1 Guard SDK and Developer Experience
+
+**Status:** planned
+**Executable phases:** 377-380
+**Depends on:** v4.0 WASM Guard Runtime Completion (phases 373-376)
+**Goal:** Ship the guest-side Rust SDK with proc macro, example guards,
+integration tests, and CLI tooling so guard authors can write, compile, test,
+benchmark, package, and install WASM guards without touching host-side
+internals.
+
+**Key intended outcomes:**
+- `arc-guard-sdk` crate with `GuardRequest`/`GuardVerdict` types, guest-side
+  allocator (`arc_alloc`/`arc_free`), typed host function bindings (`arc::log`,
+  `arc::get_config`, `arc::get_time`), and `arc_deny_reason` export
+- `arc-guard-sdk-macros` crate with `#[arc_guard]` proc macro that generates
+  the `evaluate` ABI export and all boilerplate from a single annotated function
+- Example guards demonstrating tool-name filtering, enriched field inspection,
+  and host function usage, all compiling to valid `wasm32-unknown-unknown`
+  binaries
+- Integration tests loading compiled example guards into WasmtimeBackend and
+  verifying correct Allow/Deny verdicts
+- `arc guard new/build/inspect/test/bench/pack/install` CLI subcommands
+  covering the full guard development lifecycle
+
+**Why this milestone matters:** v4.0 completes the host-side runtime but guard
+authors still have to hand-write raw ABI glue, manually manage linear memory,
+and compile/test/package guards with ad-hoc scripts. Without a typed SDK, proc
+macro, and CLI workflow, the WASM guard ecosystem cannot grow beyond Rust
+experts who read the ABI spec. v4.1 makes guard authoring accessible.
+
 ## Deferred Milestone
 
 ### v2.71 Web3 Live Activation
@@ -429,7 +460,7 @@ v3.0 (Kernel Foundation)
   v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity) ---> v3.12 (Integrity + Truth)
 ```
 
-v4.0 (WASM Guard Runtime)    [parallel strategic lane -- phases reserved earlier, no dependency on the v3.12 credibility-closeout chain]
+v4.0 (WASM Guard Runtime) ---> v4.1 (Guard SDK) ---> v4.2 (WIT + Multi-Language)    [parallel strategic lane -- no dependency on the v3.12 credibility-closeout chain]
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
@@ -445,7 +476,9 @@ credibility gap between the shipped kernel/substrate breakthrough and the
 broader cross-protocol vision by forcing live cryptographic enforcement,
 truthful edge mediation, and repo-wide narrative reconciliation.
 v4.0 runs in parallel as a WASM-guard strategic bet and depends only on the
-Phase 347 skeleton (already shipped in v3.7).
+Phase 347 skeleton (already shipped in v3.7). v4.1 follows v4.0 sequentially
+(guest SDK targets the stable host runtime). v4.2 follows v4.1 (WIT migration
+and multi-language SDKs require the raw ABI to be validated first).
 
 ## Latest Completed Milestone
 

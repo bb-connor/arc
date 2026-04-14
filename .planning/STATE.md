@@ -55,6 +55,7 @@ Progress: [----------] 0%
 - v2.80-v2.83: 16 phases planned across 4 milestones
 - v3.0-v3.12: 59 phases planned across 13 milestones
 - v4.0: 4 phases planned (parallel strategic lane)
+- v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 
 ## Accumulated Context
 
@@ -137,6 +138,16 @@ Status: Roadmap created; phases 373-376 defined; ready for `plan-phase 373`
 Last activity: 2026-04-14 -- v4.0 roadmap created with 4 phases covering 31
 requirements across runtime hardening, security/enrichment, manifest/wiring/
 receipts, and benchmark validation
+
+
+## v4.1 Guard SDK and Developer Experience
+
+Phase: 377 (not started)
+Plan: --
+Status: Roadmap created; phases 377-380 defined; depends on v4.0 completion
+Last activity: 2026-04-14 -- v4.1 roadmap created with 4 phases covering 19
+requirements across guest SDK core, proc macro/examples, CLI scaffolding, and
+CLI test/bench/pack/install
 
 ## Session Continuity
 

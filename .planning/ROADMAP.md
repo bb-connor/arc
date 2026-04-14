@@ -181,6 +181,8 @@
   368-372 (planned)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
+- [ ] **v4.1 Guard SDK and Developer Experience** - Phases 377-380 (planned;
+  depends on v4.0)
 
 ## Ship Readiness Ladder (v2.66-v2.73)
 
@@ -10838,3 +10840,92 @@ narrative corrections are in place.
 | 379 | v3.12 | Operational Parity and Persistence Completion | Not started |
 | 380 | v3.12 | Truth and Narrative Reconciliation | Not started |
 | 381 | v3.12 | Claim-Gate Qualification | Not started |
+
+---
+
+## v4.1 Guard SDK and Developer Experience (Phases 377-380)
+
+**Milestone Goal:** Ship the guest-side Rust SDK, proc macro, example guards,
+and CLI tooling so guard authors can write `fn evaluate(req) -> verdict`,
+compile to `wasm32-unknown-unknown`, test against fixtures, benchmark fuel
+consumption, and package guards for distribution -- all without touching
+host-side internals.
+
+**Dependency:** v4.0 WASM Guard Runtime Completion (phases 373-376). The host
+runtime must be stable (shared Engine, host functions, memory protocol, security
+hardening, guard manifests, startup wiring) before guest SDK targets it. Phase
+numbering overlaps with v3.12 because the v4.x WASM lane executes in parallel
+with the v3.x credibility-closeout chain -- they share no code dependencies.
+
+**Parallelism:** Phase 377 builds the guest SDK foundation (types, allocator,
+host bindings, serde). Phase 378 layers the proc macro on top and validates the
+SDK through example guards and integration tests. Phase 379 adds CLI scaffolding
+commands (new, build, inspect). Phase 380 completes the CLI with test, bench,
+pack, and install. Phases are sequential: each builds on the surface established
+by the previous phase.
+
+**New crates:**
+- `crates/arc-guard-sdk/` -- guest-side library (`#[no_std]`-friendly types,
+  allocator, host bindings, serde)
+- `crates/arc-guard-sdk-macros/` -- proc-macro crate (`#[arc_guard]` attribute)
+
+**CLI location:** `arc-cli/src/cli/guard.rs` (new module in existing `arc-cli`
+crate)
+
+### Phase 377: Guest SDK Core
+**Goal**: Guard authors have a typed Rust SDK that handles the WASM ABI boundary -- types, memory allocation, host function access, serialization, and deny reason reporting -- so they never write raw pointer/length ABI glue
+**Depends on**: v4.0 Phase 376 (host runtime is benchmarked and stable)
+**Requirements**: GSDK-01, GSDK-02, GSDK-03, GSDK-04, GSDK-05
+**Success Criteria** (what must be TRUE):
+  1. A guard author can import `arc_guard_sdk::GuardRequest` and `arc_guard_sdk::GuardVerdict` and these types match the JSON schema the host serializes into linear memory
+  2. The SDK exports `arc_alloc` and `arc_free` functions that the host runtime detects and uses for guest memory allocation instead of the offset-0 fallback
+  3. A guard author can call `arc_guard_sdk::log(level, msg)`, `arc_guard_sdk::get_config(key)`, and `arc_guard_sdk::get_time()` and these resolve to the `arc.log`, `arc.get_config`, and `arc.get_time_unix_secs` host imports
+  4. The SDK deserializes `GuardRequest` from a `(ptr, len)` pair in linear memory and encodes `GuardVerdict` back to the host without the guard author handling raw memory
+  5. When a guard returns `GuardVerdict::deny(reason)`, the SDK exports `arc_deny_reason` with the structured reason string readable by the host
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 378: Proc Macro, Example Guards, and Integration Tests
+**Goal**: Guard authors write a single annotated function and the proc macro generates all ABI exports; example guards demonstrate the SDK surface; integration tests prove the compiled WASM loads and evaluates correctly in the host runtime
+**Depends on**: Phase 377 (guest SDK types, allocator, and host bindings exist)
+**Requirements**: GSDK-06, GEXM-01, GEXM-02, GEXM-03, GEXM-04, GEXM-05
+**Success Criteria** (what must be TRUE):
+  1. A guard author writes `#[arc_guard] fn evaluate(req: GuardRequest) -> GuardVerdict { ... }` and the proc macro generates the `evaluate` ABI export, `arc_alloc`, `arc_free`, and `arc_deny_reason` exports without manual boilerplate
+  2. Example guards exist that demonstrate: tool-name-based allow/deny, reading enriched `action_type`/`extracted_path` fields, and calling `arc::log` and `arc::get_config` host functions
+  3. All example guards compile to `wasm32-unknown-unknown` and produce valid `.wasm` binaries that pass `wasmparser` validation
+  4. An integration test loads a compiled example guard `.wasm` into `WasmtimeBackend`, sends test requests, and verifies correct Allow and Deny verdicts including deny reason content
+**Estimated complexity**: L
+**Plans**: TBD
+
+### Phase 379: CLI Scaffolding -- New, Build, Inspect
+**Goal**: Guard authors can scaffold a new guard project, compile it to WASM, and inspect compiled binaries -- the first three steps of the guard development lifecycle -- without leaving the `arc` CLI
+**Depends on**: Phase 378 (SDK and proc macro are stable; example guards provide the scaffold template)
+**Requirements**: GCLI-01, GCLI-02, GCLI-03
+**Success Criteria** (what must be TRUE):
+  1. `arc guard new my-guard` creates a directory with `Cargo.toml` (depending on `arc-guard-sdk`), `src/lib.rs` (containing a `#[arc_guard]` skeleton), and `guard-manifest.yaml` (with placeholder metadata and SHA-256 field)
+  2. `arc guard build` in a guard project directory compiles to `wasm32-unknown-unknown` in release mode and reports the output path and binary size
+  3. `arc guard inspect path/to/guard.wasm` reads the WASM binary and prints: exported functions, ABI compatibility status (whether `evaluate`, `arc_alloc`, `arc_deny_reason` are present), and linear memory configuration
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 380: CLI Test, Bench, Pack, and Install
+**Goal**: Guard authors can test against fixtures, benchmark fuel consumption, package for distribution, and install from archives -- completing the guard development lifecycle from authoring through deployment
+**Depends on**: Phase 379 (guard projects can be scaffolded and compiled)
+**Requirements**: GCLI-04, GCLI-05, GCLI-06, GCLI-07, GCLI-08
+**Success Criteria** (what must be TRUE):
+  1. `arc guard test` loads a compiled `.wasm` and runs it against YAML fixture files that specify request fields, expected verdict (allow/deny), and optional expected deny reason substring, reporting pass/fail per fixture
+  2. `arc guard bench path/to/guard.wasm` measures fuel consumption and execution time across sample requests and reports p50/p99 latency and fuel statistics
+  3. `arc guard pack` creates a `.arcguard` archive (gzipped tar containing `guard-manifest.yaml` and the `.wasm` binary) and `arc guard install path.arcguard` extracts it to the configured guard directory
+**Estimated complexity**: M
+**Plans**: TBD
+
+---
+
+## Phase Summary (v4.1)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 377 | v4.1 | Guest SDK Core | Not started |
+| 378 | v4.1 | Proc Macro, Example Guards, and Integration Tests | Not started |
+| 379 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
+| 380 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
