@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.13
-milestone_name: Universal Orchestration Closure
-status: active
-stopped_at: Executing phase 394 after landing OpenAPI override enforcement in arc-api-protect
-last_updated: "2026-04-14T23:22:26Z"
-last_activity: 2026-04-14 -- began phase 394 implementation by landing OpenAPI override enforcement and tests in arc-api-protect
+milestone: v2.66
+milestone_name: Test Coverage for Untested Crates
+status: completed
+stopped_at: Completed 382-02-PLAN.md (host bindings, ABI glue, arc_deny_reason)
+last_updated: "2026-04-14T23:39:28.886Z"
+last_activity: 2026-04-14 -- began phase 394 by landing OpenAPI override
 progress:
-  total_phases: 7
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 4
+  total_phases: 349
+  completed_phases: 259
+  total_plans: 740
+  completed_plans: 766
   percent: 57
 ---
 
