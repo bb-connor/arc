@@ -35,6 +35,10 @@ pub enum WasmGuardError {
     #[error("WASM trap: {0}")]
     Trap(String),
 
+    /// A host function call failed.
+    #[error("host function error: {0}")]
+    HostFunction(String),
+
     /// The runtime backend is not available (feature not enabled).
     #[error("WASM runtime backend not available -- enable the 'wasmtime-runtime' feature")]
     BackendUnavailable,

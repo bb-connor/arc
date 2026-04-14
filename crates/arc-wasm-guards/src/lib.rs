@@ -33,9 +33,13 @@
 pub mod abi;
 pub mod config;
 pub mod error;
+#[cfg(feature = "wasmtime-runtime")]
+pub mod host;
 pub mod runtime;
 
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 pub use config::WasmGuardConfig;
 pub use error::WasmGuardError;
+#[cfg(feature = "wasmtime-runtime")]
+pub use host::WasmHostState;
 pub use runtime::{WasmGuard, WasmGuardRuntime};
