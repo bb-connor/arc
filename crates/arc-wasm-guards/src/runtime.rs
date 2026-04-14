@@ -264,28 +264,67 @@ pub mod wasmtime_backend {
     //!
     //! Requires the `wasmtime-runtime` feature.
 
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
     use super::*;
+    use crate::host::{create_shared_engine, register_host_functions, WasmHostState};
     use wasmtime::{Engine, Linker, Memory, Module, Store};
 
     /// WASM guard backend powered by Wasmtime.
+    ///
+    /// Uses a shared [`Arc<Engine>`] and creates a fresh
+    /// [`Store<WasmHostState>`] per `evaluate()` call. Host functions
+    /// (`arc.log`, `arc.get_config`, `arc.get_time_unix_secs`) are registered
+    /// on the Linker before module instantiation.
     pub struct WasmtimeBackend {
-        engine: Engine,
+        engine: Arc<Engine>,
         module: Option<Module>,
         fuel_limit: u64,
+        config: HashMap<String, String>,
     }
 
     impl WasmtimeBackend {
-        /// Create a new Wasmtime backend.
+        /// Create a new Wasmtime backend with its own shared engine.
+        ///
+        /// For backward compatibility; callers that want to share an engine
+        /// across multiple guards should use [`with_engine`] instead.
         pub fn new() -> Result<Self, WasmGuardError> {
-            let mut config = wasmtime::Config::new();
-            config.consume_fuel(true);
-            let engine =
-                Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
+            let engine = create_shared_engine()?;
             Ok(Self {
                 engine,
                 module: None,
                 fuel_limit: 0,
+                config: HashMap::new(),
             })
+        }
+
+        /// Create a Wasmtime backend with a pre-existing shared engine.
+        ///
+        /// This is the recommended constructor when loading multiple guards:
+        /// create one `Arc<Engine>` via [`create_shared_engine()`] and pass it
+        /// to each backend.
+        pub fn with_engine(engine: Arc<Engine>) -> Self {
+            Self {
+                engine,
+                module: None,
+                fuel_limit: 0,
+                config: HashMap::new(),
+            }
+        }
+
+        /// Create a Wasmtime backend with a shared engine and guard-specific
+        /// config that will be accessible to guests via `arc.get_config`.
+        pub fn with_engine_and_config(
+            engine: Arc<Engine>,
+            config: HashMap<String, String>,
+        ) -> Self {
+            Self {
+                engine,
+                module: None,
+                fuel_limit: 0,
+                config,
+            }
         }
     }
 
@@ -294,9 +333,10 @@ pub mod wasmtime_backend {
             match Self::new() {
                 Ok(b) => b,
                 Err(_) => Self {
-                    engine: Engine::default(),
+                    engine: Arc::new(Engine::default()),
                     module: None,
                     fuel_limit: 0,
+                    config: HashMap::new(),
                 },
             }
         }
@@ -321,12 +361,18 @@ pub mod wasmtime_backend {
                 .as_ref()
                 .ok_or(WasmGuardError::BackendUnavailable)?;
 
-            let mut store: Store<()> = Store::new(&self.engine, ());
+            // Create a fresh Store with host state per invocation
+            let host_state = WasmHostState::new(self.config.clone());
+            let mut store = Store::new(&self.engine, host_state);
+            store.limiter(|state| &mut state.limits);
             store
                 .set_fuel(self.fuel_limit)
                 .map_err(|e| WasmGuardError::Trap(e.to_string()))?;
 
-            let linker: Linker<()> = Linker::new(&self.engine);
+            // Create a Linker with host functions registered
+            let mut linker: Linker<WasmHostState> = Linker::new(&self.engine);
+            register_host_functions(&mut linker)?;
+
             let instance = linker
                 .instantiate(&mut store, module)
                 .map_err(|e| WasmGuardError::Trap(e.to_string()))?;
@@ -369,7 +415,7 @@ pub mod wasmtime_backend {
                     }
                 })?;
 
-            match result {
+            let verdict = match result {
                 crate::abi::VERDICT_ALLOW => Ok(GuardVerdict::Allow),
                 crate::abi::VERDICT_DENY => {
                     // Try to read deny reason from memory
@@ -382,7 +428,21 @@ pub mod wasmtime_backend {
                         "unexpected return value from evaluate: {result}"
                     )))
                 }
+            };
+
+            // Drain the log buffer and emit via tracing for host-side visibility
+            for (level, msg) in &store.data().logs {
+                match level {
+                    0 => tracing::trace!(target: "wasm_guard", "{msg}"),
+                    1 => tracing::debug!(target: "wasm_guard", "{msg}"),
+                    2 => tracing::info!(target: "wasm_guard", "{msg}"),
+                    3 => tracing::warn!(target: "wasm_guard", "{msg}"),
+                    4 => tracing::error!(target: "wasm_guard", "{msg}"),
+                    _ => {}
+                }
             }
+
+            verdict
         }
 
         fn backend_name(&self) -> &str {
@@ -393,7 +453,7 @@ pub mod wasmtime_backend {
     /// Try to read a deny reason string from the guest memory region after
     /// the request data. The guest may write a NUL-terminated UTF-8 string
     /// starting at a well-known offset (64 KiB).
-    fn read_deny_reason(memory: &Memory, store: &Store<()>) -> Option<String> {
+    fn read_deny_reason(memory: &Memory, store: &Store<WasmHostState>) -> Option<String> {
         const DENY_REASON_OFFSET: usize = 65536;
         const MAX_REASON_LEN: usize = 4096;
 
