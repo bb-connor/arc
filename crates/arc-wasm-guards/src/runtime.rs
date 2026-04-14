@@ -475,6 +475,167 @@ pub mod wasmtime_backend {
 
         std::str::from_utf8(&region[..end]).ok().map(String::from)
     }
+
+    // -----------------------------------------------------------------------
+    // Tests for wasmtime_backend
+    // -----------------------------------------------------------------------
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::abi::GuardRequest;
+
+        fn make_guard_request() -> GuardRequest {
+            GuardRequest {
+                tool_name: "test_tool".to_string(),
+                server_id: "test_server".to_string(),
+                agent_id: "agent-1".to_string(),
+                arguments: serde_json::json!({"key": "value"}),
+                scopes: vec!["test_server:test_tool".to_string()],
+                session_metadata: None,
+            }
+        }
+
+        // -------------------------------------------------------------------
+        // arc_alloc tests
+        // -------------------------------------------------------------------
+
+        #[test]
+        fn arc_alloc_used_when_exported() {
+            // WAT module with arc_alloc that returns 1024.
+            // evaluate checks that ptr == 1024 and returns ALLOW only if so.
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "arc_alloc") (param $size i32) (result i32)
+                        ;; Always allocate at offset 1024
+                        (i32.const 1024)
+                    )
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return ALLOW (0) only if ptr == 1024, else DENY (1)
+                        (if (result i32) (i32.eq (local.get $ptr) (i32.const 1024))
+                            (then (i32.const 0))
+                            (else (i32.const 1))
+                        )
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            assert!(
+                result.is_allow(),
+                "expected ALLOW (arc_alloc should have been used), got: {result:?}"
+            );
+        }
+
+        #[test]
+        fn no_arc_alloc_uses_offset_zero() {
+            // WAT module WITHOUT arc_alloc.
+            // evaluate checks that ptr == 0 and returns ALLOW only if so.
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return ALLOW (0) only if ptr == 0, else DENY (1)
+                        (if (result i32) (i32.eqz (local.get $ptr))
+                            (then (i32.const 0))
+                            (else (i32.const 1))
+                        )
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            assert!(
+                result.is_allow(),
+                "expected ALLOW (offset 0 fallback should be used without arc_alloc), got: {result:?}"
+            );
+        }
+
+        #[test]
+        fn arc_alloc_oob_falls_back() {
+            // WAT module with arc_alloc that returns 999_999_999 (out-of-bounds).
+            // evaluate checks that ptr == 0 (proving fallback occurred).
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "arc_alloc") (param $size i32) (result i32)
+                        ;; Return absurdly large pointer
+                        (i32.const 999999999)
+                    )
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return ALLOW (0) only if ptr == 0 (fallback), else DENY (1)
+                        (if (result i32) (i32.eqz (local.get $ptr))
+                            (then (i32.const 0))
+                            (else (i32.const 1))
+                        )
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            assert!(
+                result.is_allow(),
+                "expected ALLOW (OOB arc_alloc should fall back to offset 0), got: {result:?}"
+            );
+        }
+
+        #[test]
+        fn arc_alloc_negative_falls_back() {
+            // WAT module with arc_alloc that returns -1 (negative pointer).
+            // evaluate checks that ptr == 0 (proving fallback occurred).
+            let wat = r#"
+                (module
+                    (import "arc" "log" (func $log (param i32 i32 i32)))
+                    (import "arc" "get_config" (func $get_config (param i32 i32 i32 i32) (result i32)))
+                    (import "arc" "get_time_unix_secs" (func $get_time (result i64)))
+                    (memory (export "memory") 2)
+                    (func (export "arc_alloc") (param $size i32) (result i32)
+                        ;; Return negative pointer
+                        (i32.const -1)
+                    )
+                    (func (export "evaluate") (param $ptr i32) (param $len i32) (result i32)
+                        ;; Return ALLOW (0) only if ptr == 0 (fallback), else DENY (1)
+                        (if (result i32) (i32.eqz (local.get $ptr))
+                            (then (i32.const 0))
+                            (else (i32.const 1))
+                        )
+                    )
+                )
+            "#;
+
+            let mut backend = WasmtimeBackend::new().unwrap();
+            backend.load_module(wat.as_bytes(), 1_000_000).unwrap();
+
+            let req = make_guard_request();
+            let result = backend.evaluate(&req).unwrap();
+            assert!(
+                result.is_allow(),
+                "expected ALLOW (negative arc_alloc should fall back to offset 0), got: {result:?}"
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
