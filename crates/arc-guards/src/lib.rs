@@ -18,6 +18,9 @@
 //! | [`PatchIntegrityGuard`] | **Full** | Validates patch safety |
 //! | [`InternalNetworkGuard`] | **Full** | Blocks SSRF targeting private/reserved addresses |
 //! | [`AgentVelocityGuard`] | **Full** | Per-agent and per-session rate limiting |
+//! | [`DataFlowGuard`] | **Full** | Cumulative bytes-read/written limits via session journal |
+//! | [`BehavioralSequenceGuard`] | **Full** | Tool ordering policies via session journal |
+//! | [`ResponseSanitizationGuard`] | **Full** | PII/PHI pattern detection and redaction |
 //!
 //! # Guard pipeline
 //!
@@ -37,6 +40,8 @@ pub mod action;
 mod path_normalization;
 
 pub mod agent_velocity;
+pub mod behavioral_sequence;
+pub mod data_flow;
 mod egress_allowlist;
 mod forbidden_path;
 pub mod internal_network;
@@ -44,11 +49,15 @@ pub mod mcp_tool;
 pub mod patch_integrity;
 pub mod path_allowlist;
 mod pipeline;
+pub mod post_invocation;
+pub mod response_sanitization;
 pub mod secret_leak;
 mod shell_command;
 pub mod velocity;
 
 pub use agent_velocity::{AgentVelocityConfig, AgentVelocityGuard};
+pub use behavioral_sequence::{BehavioralSequenceGuard, SequencePolicy};
+pub use data_flow::{DataFlowConfig, DataFlowGuard};
 pub use egress_allowlist::EgressAllowlistGuard;
 pub use forbidden_path::ForbiddenPathGuard;
 pub use internal_network::InternalNetworkGuard;
@@ -56,6 +65,10 @@ pub use mcp_tool::McpToolGuard;
 pub use patch_integrity::PatchIntegrityGuard;
 pub use path_allowlist::PathAllowlistGuard;
 pub use pipeline::GuardPipeline;
+pub use post_invocation::{PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict};
+pub use response_sanitization::{
+    ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivityLevel,
+};
 pub use secret_leak::SecretLeakGuard;
 pub use shell_command::ShellCommandGuard;
 pub use velocity::VelocityGuard;

@@ -13,6 +13,7 @@ name = "arc_guards"
 [dependencies]
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-core = { package = "arc-core", path = "../arc-core" }
+arc-http-session = { package = "arc-http-session", path = "../arc-http-session" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
