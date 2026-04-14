@@ -10300,7 +10300,113 @@ cases.
 
 ---
 
-## Phase Summary (v3.0-v3.7)
+## v3.8 Normative Specification Alignment (Phases 351-358)
+
+**Milestone Goal:** Bring spec/, docs/protocols/, and JSON Schema artifacts into
+alignment with the shipped v3.x codebase. Every v3.x surface that external
+consumers touch must have normative documentation before the milestone closes.
+
+**Dependency:** v3.7 (all code is shipped; this milestone documents it)
+
+**Parallelism:** Phases 351-353 are P0 (must ship together). Phases 354-356
+are P1 and can run in parallel with each other. Phases 357-358 are P2 and can
+run in parallel after P0 completes.
+
+---
+
+### Phase 351: HTTP Substrate Specification
+**Goal**: Define the normative HTTP substrate surface that all SDKs and middleware consume, including the sidecar evaluation protocol, HttpReceipt schema, and relationship to ArcReceipt
+**Depends on**: Phase 350 (all v3.x code is shipped)
+**Requirements**: SPEC-01, SPEC-02, SPEC-03, SPEC-04, SPEC-05
+**Success Criteria** (what must be TRUE):
+  1. `spec/HTTP-SUBSTRATE.md` defines the sidecar evaluation protocol: `POST /arc/evaluate`, `POST /arc/verify`, `GET /arc/health` with request/response schemas
+  2. `spec/HTTP-SUBSTRATE.md` defines `HttpReceipt` normatively with all fields (request_id, route_pattern, method, caller_identity_hash, session_id, verdict, evidence, response_status, timestamp, content_hash, policy_hash, capability_id, metadata, kernel_key, signature)
+  3. `spec/HTTP-SUBSTRATE.md` defines `ArcHttpRequest`, `CallerIdentity`, `AuthMethod`, `SessionContext`, and `Verdict` (with http_status extension) types
+  4. `spec/HTTP-SUBSTRATE.md` documents the `HttpReceipt.to_arc_receipt()` mapping and its known limitation (signature is not re-signed)
+  5. `spec/schemas/arc-http/v1/` contains JSON Schema documents for HttpReceipt, ArcHttpRequest, CallerIdentity, Verdict, and the sidecar evaluate request/response
+**Estimated complexity**: L
+
+### Phase 352: OpenAPI Integration Specification
+**Goal**: Define how ARC generates tool manifests from OpenAPI specs, the x-arc-* extension vocabulary, default deny-by-method policy, and the arc api protect reverse proxy contract
+**Depends on**: Phase 351 (HTTP substrate types are defined)
+**Requirements**: SPEC-06, SPEC-07, SPEC-08, SPEC-09
+**Success Criteria** (what must be TRUE):
+  1. `spec/OPENAPI-INTEGRATION.md` defines the OpenAPI 3.0/3.1 to ARC manifest pipeline: parsing, tool extraction, input_schema derivation, policy assignment
+  2. `spec/OPENAPI-INTEGRATION.md` defines the `x-arc-*` extension vocabulary: `x-arc-sensitivity`, `x-arc-side-effects`, `x-arc-approval-required`, `x-arc-budget-limit`, `x-arc-publish`
+  3. `spec/OPENAPI-INTEGRATION.md` defines the default policy: GET/HEAD/OPTIONS = session-scoped allow, POST/PUT/PATCH/DELETE = deny-by-default
+  4. `spec/OPENAPI-INTEGRATION.md` defines the `arc api protect` contract: command-line interface, auto-discovery behavior, structured 403 response format, receipt storage
+**Estimated complexity**: M
+
+### Phase 353: PROTOCOL.md v3 Addendum
+**Goal**: Update spec/PROTOCOL.md to acknowledge the v3.x universal security kernel surfaces without breaking the existing v2 contract documentation
+**Depends on**: Phase 351 (HTTP substrate spec exists to reference), Phase 352 (OpenAPI spec exists to reference)
+**Requirements**: SPEC-10, SPEC-11, SPEC-12, SPEC-13
+**Success Criteria** (what must be TRUE):
+  1. PROTOCOL.md version bumped to 3.0 with a "v3 Addendum" section or restructured into v2 and v3 sections
+  2. Section 6 (Receipt Contract) references HttpReceipt alongside ArcReceipt with a clear relationship description
+  3. Section 7 (Manifest Contract) references OpenAPI-derived manifests alongside arc.manifest.v1
+  4. Section 8.1 (CLI) adds `arc api protect` and `arc cert generate/verify/inspect` entrypoints
+**Estimated complexity**: M
+
+### Phase 354: Guard Taxonomy and Security Model Update
+**Goal**: Document the full v3.x guard taxonomy and update the threat model with HTTP-specific threats
+**Depends on**: Phase 351 (HTTP substrate spec provides the context guards operate in)
+**Requirements**: SPEC-14, SPEC-15, SPEC-16, SPEC-17
+**Success Criteria** (what must be TRUE):
+  1. `spec/GUARDS.md` defines the guard taxonomy: stateless deterministic (InternalNetworkGuard, AgentVelocityGuard), session-aware deterministic (DataFlowGuard, BehavioralSequenceGuard, ResponseSanitizationGuard), post-invocation hooks, advisory signals, and WASM custom guards
+  2. `spec/GUARDS.md` defines the advisory signal framework: signed non-blocking evidence, severity levels, operator-configurable promotion to deterministic guards via arc.yaml
+  3. `spec/SECURITY.md` updated with HTTP-specific threats: SSRF (covered by InternalNetworkGuard), PII/PHI exposure (ResponseSanitizationGuard), agent velocity abuse (AgentVelocityGuard), data exfiltration (DataFlowGuard), behavioral sequence attacks (BehavioralSequenceGuard)
+  4. `spec/GUARDS.md` defines the session journal contract: hash-chained entries, cumulative data-flow accounting, delegation depth tracking
+**Estimated complexity**: L
+
+### Phase 355: Configuration and Compliance Specification
+**Goal**: Promote arc.yaml and compliance certificates from design docs to normative spec, document metering and workflow authority
+**Depends on**: Phase 351 (HTTP substrate is the runtime these configure)
+**Requirements**: SPEC-18, SPEC-19, SPEC-20, SPEC-21, SPEC-22
+**Success Criteria** (what must be TRUE):
+  1. `spec/CONFIGURATION.md` defines the arc.yaml schema normatively: kernel, adapters, edges, receipts, logging, telemetry, guards, and wasm_guards sections with validation rules and env var interpolation syntax
+  2. `spec/COMPLIANCE-CERTIFICATE.md` defines the certificate format, six typed abort errors (EmptySession, InvalidReceiptSignature, ChainDiscontinuity, ScopeViolation, BudgetExceeded, GuardBypass), lightweight and full-bundle verification modes, and CLI interface
+  3. `spec/METERING.md` defines cost attribution metadata schema (CostDimension, CostMetadata), budget enforcement semantics, and billing export format
+  4. `spec/WORKFLOW.md` defines SkillGrant, SkillManifest, and WorkflowReceipt types with step ordering, budget envelope, and audit trail semantics
+  5. `docs/protocols/UNIFIED-CONFIGURATION.md`, `docs/protocols/SESSION-COMPLIANCE-CERTIFICATE.md` updated to reference normative specs and marked as "design rationale" rather than active proposals
+**Estimated complexity**: L
+
+### Phase 356: SDK Reference Documentation
+**Goal**: Create reference documentation for the Python, TypeScript, and Go SDKs describing the public API surface, sidecar model, and conformance contract
+**Depends on**: Phase 351 (sidecar protocol is the foundation SDKs consume)
+**Requirements**: SPEC-23, SPEC-24, SPEC-25, SPEC-26
+**Success Criteria** (what must be TRUE):
+  1. `docs/sdk/PYTHON.md` documents arc-sdk-python (client, types), arc-asgi (middleware), arc-fastapi (decorators), arc-django (middleware), and arc-langchain (tool wrapper) with usage examples
+  2. `docs/sdk/TYPESCRIPT.md` documents @arc-protocol/node-http (substrate), express, fastify, elysia (wrappers), and conformance package with usage examples
+  3. `docs/sdk/GO.md` documents arc-go-http middleware with usage examples
+  4. All SDK docs specify the sidecar model explicitly: SDKs communicate with the ARC Rust kernel via localhost HTTP, default URL is 127.0.0.1:9090, configurable via ARC_SIDECAR_URL
+**Estimated complexity**: M
+
+### Phase 357: Protocol Bridge and Edge Documentation
+**Goal**: Document the cross-protocol bridging surfaces and edge crates that the v3.x code ships
+**Depends on**: Phase 353 (PROTOCOL.md v3 addendum provides the framing)
+**Requirements**: SPEC-27, SPEC-28, SPEC-29, SPEC-30
+**Success Criteria** (what must be TRUE):
+  1. `spec/BRIDGES.md` defines the OpenAPI-to-MCP bridge: how HTTP APIs appear as MCP tool surfaces, tools/list generation, invocation flow through kernel
+  2. `spec/BRIDGES.md` defines the A2A edge: Agent Card generation at /.well-known/agent-card.json, SendMessage and streaming support, BridgeFidelity evaluation
+  3. `spec/BRIDGES.md` defines the ACP edge: capability exposure, permission evaluation, BridgeFidelity assessment
+  4. `spec/BRIDGES.md` defines the OpenAI adapter: function-calling interception, Chat Completions and Responses API format support
+**Estimated complexity**: M
+
+### Phase 358: Strategic Vision and Design Doc Reconciliation
+**Goal**: Update strategy documents and design docs to reflect shipped v3.x state, and add platform extension documentation
+**Depends on**: Phase 353 (PROTOCOL.md v3 is the authoritative source)
+**Requirements**: SPEC-31, SPEC-32, SPEC-33, SPEC-34
+**Success Criteria** (what must be TRUE):
+  1. `docs/protocols/STRATEGIC-VISION.md` updated: Tier 1/2/3 items marked as shipped where applicable, new "Tier 4: Next Horizon" section added for post-v3.7 work
+  2. `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated: all 6 build phases marked as shipped, actual crate/package names added
+  3. `docs/sdk/PLATFORM.md` documents arc-tower (Rust middleware), K8s controller/injector (CRD, webhook configs), JVM substrate (Spring Boot), and .NET substrate (ASP.NET Core) with usage examples
+  4. `spec/WIRE_PROTOCOL.md` updated with a Section 7 referencing the HTTP substrate surface and sidecar evaluation protocol as a fourth cooperating surface alongside native, hosted MCP, and trust-control
+**Estimated complexity**: M
+
+---
+
+## Phase Summary (v3.0-v3.8)
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
@@ -10336,3 +10442,11 @@ cases.
 | 348 | v3.7 | Receipt Metering and Economics | Planned |
 | 349 | v3.7 | AG-UI Proxy | Planned |
 | 350 | v3.7 | Skill and Workflow Authority | Planned |
+| 351 | v3.8 | HTTP Substrate Specification | Planned |
+| 352 | v3.8 | OpenAPI Integration Specification | Planned |
+| 353 | v3.8 | PROTOCOL.md v3 Addendum | Planned |
+| 354 | v3.8 | Guard Taxonomy and Security Model Update | Planned |
+| 355 | v3.8 | Configuration and Compliance Specification | Planned |
+| 356 | v3.8 | SDK Reference Documentation | Planned |
+| 357 | v3.8 | Protocol Bridge and Edge Documentation | Planned |
+| 358 | v3.8 | Strategic Vision and Design Doc Reconciliation | Planned |

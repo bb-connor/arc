@@ -600,9 +600,69 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 - [ ] **STRAT-14**: `WorkflowReceipt` type captures the complete execution trace of a multi-step workflow as a single auditable artifact with per-step receipts and an aggregate verdict
 - [ ] **STRAT-15**: Workflow authority validates that each step in a composed skill operates within its declared scope and budget, denying execution when any step would violate the workflow's envelope
 
+### v3.8 Normative Specification Alignment
+
+#### Phase 351: HTTP Substrate Specification
+
+- [ ] **SPEC-01**: `spec/HTTP-SUBSTRATE.md` defines the sidecar evaluation protocol endpoints (`POST /arc/evaluate`, `POST /arc/verify`, `GET /arc/health`) with JSON request/response schemas
+- [ ] **SPEC-02**: `spec/HTTP-SUBSTRATE.md` defines the `HttpReceipt` type normatively with all fields matching the `arc-http-core` crate implementation
+- [ ] **SPEC-03**: `spec/HTTP-SUBSTRATE.md` defines `ArcHttpRequest`, `CallerIdentity`, `AuthMethod` (bearer, api_key, cookie, mtls_certificate, anonymous), `SessionContext`, and `Verdict` (with http_status) types
+- [ ] **SPEC-04**: `spec/HTTP-SUBSTRATE.md` documents the `HttpReceipt` to `ArcReceipt` mapping including the known signature limitation
+- [ ] **SPEC-05**: `spec/schemas/arc-http/v1/` contains JSON Schema documents for HttpReceipt, ArcHttpRequest, CallerIdentity, Verdict, and the sidecar evaluate request/response
+
+#### Phase 352: OpenAPI Integration Specification
+
+- [ ] **SPEC-06**: `spec/OPENAPI-INTEGRATION.md` defines the OpenAPI 3.0/3.1 to ARC manifest pipeline with parsing rules and ToolDefinition derivation from path, query, and body parameters
+- [ ] **SPEC-07**: `spec/OPENAPI-INTEGRATION.md` defines the `x-arc-*` extension vocabulary (`x-arc-sensitivity`, `x-arc-side-effects`, `x-arc-approval-required`, `x-arc-budget-limit`, `x-arc-publish`) with allowed values and policy effects
+- [ ] **SPEC-08**: `spec/OPENAPI-INTEGRATION.md` defines the default deny-by-method policy: safe methods (GET/HEAD/OPTIONS) get session-scoped allow, side-effect methods (POST/PUT/PATCH/DELETE) require explicit capability
+- [ ] **SPEC-09**: `spec/OPENAPI-INTEGRATION.md` defines the `arc api protect` reverse proxy contract including command-line flags, auto-discovery behavior, structured 403 response schema, and receipt storage
+
+#### Phase 353: PROTOCOL.md v3 Addendum
+
+- [ ] **SPEC-10**: `spec/PROTOCOL.md` version bumped to 3.0 with clear v2 and v3 scope boundaries
+- [ ] **SPEC-11**: Receipt contract section references `HttpReceipt` alongside `ArcReceipt` with explicit type relationship and conversion semantics
+- [ ] **SPEC-12**: Manifest contract section references OpenAPI-derived manifests and the `x-arc-*` extension vocabulary alongside `arc.manifest.v1`
+- [ ] **SPEC-13**: Runtime surfaces section adds `arc api protect` and `arc cert generate/verify/inspect` CLI entrypoints
+
+#### Phase 354: Guard Taxonomy and Security Model Update
+
+- [ ] **SPEC-14**: `spec/GUARDS.md` defines the full guard taxonomy: stateless deterministic, session-aware deterministic, post-invocation hooks, advisory signals, and WASM custom guards with their evaluation semantics
+- [ ] **SPEC-15**: `spec/GUARDS.md` defines the advisory signal framework including severity levels, signed evidence, non-blocking semantics, and operator-configurable promotion via arc.yaml
+- [ ] **SPEC-16**: `spec/SECURITY.md` threat register extended with HTTP-specific threats: SSRF, PII/PHI exposure, velocity abuse, data exfiltration, and behavioral sequence attacks, each mapped to the guard that mitigates it
+- [ ] **SPEC-17**: `spec/GUARDS.md` defines the session journal contract: append-only hash-chained entries, cumulative data-flow accounting, delegation depth tracking, and availability to all guards in the pipeline
+
+#### Phase 355: Configuration and Compliance Specification
+
+- [ ] **SPEC-18**: `spec/CONFIGURATION.md` defines the arc.yaml schema normatively with all sections (kernel, adapters, edges, receipts, logging, telemetry, guards, wasm_guards), validation rules, env var interpolation syntax, and minimal valid config requirements
+- [ ] **SPEC-19**: `spec/COMPLIANCE-CERTIFICATE.md` defines the certificate format, six typed abort errors, lightweight and full-bundle verification modes, and `arc cert` CLI interface
+- [ ] **SPEC-20**: `spec/METERING.md` defines cost attribution metadata (CostDimension, CostMetadata), budget enforcement semantics, billing export format, and `arc receipts cost` query interface
+- [ ] **SPEC-21**: `spec/WORKFLOW.md` defines SkillGrant, SkillManifest, WorkflowReceipt types, step ordering semantics, budget envelope enforcement, and the WorkflowAuthority lifecycle (begin, validate_step, record_step, finalize)
+- [ ] **SPEC-22**: Design docs (`UNIFIED-CONFIGURATION.md`, `SESSION-COMPLIANCE-CERTIFICATE.md`) updated to reference normative specs and reclassified as design rationale
+
+#### Phase 356: SDK Reference Documentation
+
+- [ ] **SPEC-23**: `docs/sdk/PYTHON.md` documents all five Python packages (arc-sdk-python, arc-asgi, arc-fastapi, arc-django, arc-langchain) with public API, usage examples, and sidecar model description
+- [ ] **SPEC-24**: `docs/sdk/TYPESCRIPT.md` documents all five TypeScript packages (@arc-protocol/node-http, express, fastify, elysia, conformance) with public API, usage examples, and sidecar model description
+- [ ] **SPEC-25**: `docs/sdk/GO.md` documents arc-go-http middleware with public API, usage examples, and sidecar model description
+- [ ] **SPEC-26**: All SDK docs explicitly state the sidecar communication model: SDKs communicate with the ARC Rust kernel via localhost HTTP at default 127.0.0.1:9090, configurable via ARC_SIDECAR_URL
+
+#### Phase 357: Protocol Bridge and Edge Documentation
+
+- [ ] **SPEC-27**: `spec/BRIDGES.md` defines the OpenAPI-to-MCP bridge: how HTTP APIs appear as MCP tools, tools/list generation from OpenAPI specs, invocation flow through the kernel
+- [ ] **SPEC-28**: `spec/BRIDGES.md` defines the A2A edge: Agent Card generation at /.well-known/agent-card.json, SendMessage and streaming support, BridgeFidelity evaluation and tool suppression semantics
+- [ ] **SPEC-29**: `spec/BRIDGES.md` defines the ACP edge: capability mapping, permission evaluation, category inference, BridgeFidelity assessment
+- [ ] **SPEC-30**: `spec/BRIDGES.md` defines the OpenAI adapter: function-calling interception, receipt generation, Chat Completions and Responses API format support
+
+#### Phase 358: Strategic Vision and Design Doc Reconciliation
+
+- [ ] **SPEC-31**: `docs/protocols/STRATEGIC-VISION.md` updated with shipped status for all Tier 1/2/3 items and new future-horizon section
+- [ ] **SPEC-32**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` updated with shipped status for all 6 build phases, actual crate/package names, and implementation notes
+- [ ] **SPEC-33**: `docs/sdk/PLATFORM.md` documents arc-tower (Rust), K8s controller/injector, JVM Spring Boot, and .NET ASP.NET Core substrates with usage examples
+- [ ] **SPEC-34**: `spec/WIRE_PROTOCOL.md` updated with Section 7 referencing the HTTP substrate as a fourth cooperating protocol surface
+
 ---
 
-## Traceability (v3.0-v3.7)
+## Traceability (v3.0-v3.8)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -720,6 +780,40 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | STRAT-13 | Phase 350 | Planned |
 | STRAT-14 | Phase 350 | Planned |
 | STRAT-15 | Phase 350 | Planned |
+| SPEC-01 | Phase 351 | Planned |
+| SPEC-02 | Phase 351 | Planned |
+| SPEC-03 | Phase 351 | Planned |
+| SPEC-04 | Phase 351 | Planned |
+| SPEC-05 | Phase 351 | Planned |
+| SPEC-06 | Phase 352 | Planned |
+| SPEC-07 | Phase 352 | Planned |
+| SPEC-08 | Phase 352 | Planned |
+| SPEC-09 | Phase 352 | Planned |
+| SPEC-10 | Phase 353 | Planned |
+| SPEC-11 | Phase 353 | Planned |
+| SPEC-12 | Phase 353 | Planned |
+| SPEC-13 | Phase 353 | Planned |
+| SPEC-14 | Phase 354 | Planned |
+| SPEC-15 | Phase 354 | Planned |
+| SPEC-16 | Phase 354 | Planned |
+| SPEC-17 | Phase 354 | Planned |
+| SPEC-18 | Phase 355 | Planned |
+| SPEC-19 | Phase 355 | Planned |
+| SPEC-20 | Phase 355 | Planned |
+| SPEC-21 | Phase 355 | Planned |
+| SPEC-22 | Phase 355 | Planned |
+| SPEC-23 | Phase 356 | Planned |
+| SPEC-24 | Phase 356 | Planned |
+| SPEC-25 | Phase 356 | Planned |
+| SPEC-26 | Phase 356 | Planned |
+| SPEC-27 | Phase 357 | Planned |
+| SPEC-28 | Phase 357 | Planned |
+| SPEC-29 | Phase 357 | Planned |
+| SPEC-30 | Phase 357 | Planned |
+| SPEC-31 | Phase 358 | Planned |
+| SPEC-32 | Phase 358 | Planned |
+| SPEC-33 | Phase 358 | Planned |
+| SPEC-34 | Phase 358 | Planned |
 
 **Coverage:**
 - Universal security kernel requirements (v3.0-v3.7): 114 total, 114 mapped, 0 unmapped

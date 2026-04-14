@@ -59,6 +59,7 @@ receipts across HTTP APIs, agent protocols, and framework middleware.
 | v3.5 | Protocol Breadth | 339-342 | MCP completion, OpenAPI-to-MCP bridge, A2A/ACP edges |
 | v3.6 | Platform Extensions | 343-346 | Go SDK, K8s controller/injector, arc-tower, JVM, .NET |
 | v3.7 | Strategic Bets | 347-350 | WASM guards, economics/metering, AG-UI, skill/workflow authority |
+| v3.8 | Normative Specification Alignment | 351-358 | Spec docs, JSON schemas, SDK refs, design doc reconciliation |
 
 ## Foundation and Adoption Ladder (v2.80-v2.83)
 
