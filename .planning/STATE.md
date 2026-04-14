@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.13
-milestone_name: Universal Orchestration Closure
-status: active
-stopped_at: Completed phase 392 fidelity semantics and publication gating; phase 393 is next
-last_updated: "2026-04-14T23:20:00Z"
-last_activity: 2026-04-14 -- completed phase 392 by landing truthful bridge fidelity semantics, publication gates, and protocol/spec documentation updates
+milestone: v2.66
+milestone_name: Test Coverage for Untested Crates
+status: completed
+stopped_at: Completed 375-02 startup wiring plan -- phase 375 complete
+last_updated: "2026-04-14T22:40:38.811Z"
+last_activity: 2026-04-14 -- completed phase 392 by replacing heuristic edge
 progress:
-  total_phases: 5
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
+  total_phases: 347
+  completed_phases: 256
+  total_plans: 732
+  completed_plans: 754
   percent: 60
 ---
 
