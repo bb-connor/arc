@@ -439,55 +439,56 @@ The current Rust kernel is an asset. A Rust-only packaging story is an
 adoption risk. The sidecar and the first three substrate families are what make
 the kernel reachable for most developers.
 
-### Phase 1: Core + Zero-Code Wedge
+### Phase 1: Core + Zero-Code Wedge [Shipped]
 
-| Package | Purpose | Priority |
-|---------|---------|----------|
-| `arc-http-core` | Normalized request/session/receipt model | 1 |
-| `arc-openapi` | Import/generate manifests from OpenAPI specs | 2 |
-| `arc api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | 3 |
+| Package | Purpose | Crate / CLI |
+|---------|---------|-------------|
+| `arc-http-core` | Normalized request/session/receipt model | `crates/arc-http-core` |
+| `arc-openapi` | Import/generate manifests from OpenAPI specs | `crates/arc-openapi` |
+| `arc api protect` | Reverse-proxy / sidecar entrypoint for any HTTP API | `crates/arc-cli` (`arc-api-protect` subcommand) |
 
-### Phase 2: First Substrates (Python, TypeScript, Go)
+### Phase 2: First Substrates (Python, TypeScript, Go) [Shipped]
 
-| Package | Language | Covers | Priority |
-|---------|----------|--------|----------|
-| `arc-asgi` | Python | FastAPI, Starlette, Litestar | 4 |
-| `arc-node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | 5 |
-| `arc-go-http` | Go | net/http, Gin, Echo, Fiber, chi | 6 |
+| Package | Language | Covers | Package Name |
+|---------|----------|--------|--------------|
+| `arc-sdk-python` / `arc-asgi` | Python | FastAPI, Starlette, Litestar | `sdks/python/arc-sdk-python`, `sdks/python/arc-asgi` |
+| `@arc-protocol/node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | `sdks/typescript/arc-node-http` |
+| `arc-go-http` | Go | net/http, Gin, Echo, Fiber, chi | `sdks/go/arc-go-http` |
 
-### Phase 3: Framework Wrappers (Thin)
+### Phase 3: Framework Wrappers (Thin) [Shipped]
 
-| Package | Wraps | Substrate |
-|---------|-------|-----------|
-| `arc-fastapi` | FastAPI decorator/middleware | `arc-asgi` |
-| `arc-django` | Django/DRF middleware | WSGI-specific |
-| `arc-elysia` | Elysia lifecycle plugin | `arc-node-http` |
-| `arc-fastify` | Fastify plugin | `arc-node-http` |
-| `arc-gin` | Gin middleware | `arc-go-http` |
+| Package | Wraps | Substrate | Package Name |
+|---------|-------|-----------|--------------|
+| `arc-fastapi` | FastAPI decorator/middleware | `arc-asgi` | `sdks/python/arc-fastapi` |
+| `arc-django` | Django/DRF middleware | WSGI-specific | `sdks/python/arc-django` |
+| `@arc-protocol/express` | Express middleware | `@arc-protocol/node-http` | `sdks/typescript/arc-express` |
+| `@arc-protocol/fastify` | Fastify plugin | `@arc-protocol/node-http` | `sdks/typescript/arc-fastify` |
+| `@arc-protocol/elysia` | Elysia lifecycle plugin | `@arc-protocol/node-http` | `sdks/typescript/arc-elysia` |
 
-### Phase 4: Session Journal + Stateful Guards
+### Phase 4: Session Journal + Stateful Guards [Shipped]
 
-| Package / Surface | Purpose |
-|-------------------|---------|
-| `arc-http-session` | Multi-step journal for session-aware deterministic guards |
-| post-invocation hook pipeline | Response inspection, data-flow accounting, escalation signals |
-| signed advisory observations | Emit non-blocking behavioral/risk evidence before default hard-blocking |
+| Package / Surface | Purpose | Package Name |
+|-------------------|---------|--------------|
+| `arc-http-session` | Multi-step journal for session-aware deterministic guards | `crates/arc-http-session` |
+| v3.4 guard suite | All session-aware deterministic guards (delegation depth, data-flow limits, rotation velocity) | `crates/arc-guards` |
+| signed advisory observations | Emit non-blocking behavioral/risk evidence before default hard-blocking | integrated into guard pipeline |
 
-### Phase 5: Remaining Substrates
+### Phase 5: Remaining Substrates [Shipped]
 
-| Package | Language | Covers |
-|---------|----------|--------|
-| `arc-tower` | Rust | Axum, Tonic (tower::Layer) |
-| `arc-jvm` | Java/Kotlin | Spring Boot, Quarkus |
-| `arc-dotnet` | C# | ASP.NET Core |
+| Package | Language | Covers | Package Name |
+|---------|----------|--------|--------------|
+| `arc-tower` | Rust | Axum, Tonic (tower::Layer) | `crates/arc-tower` |
+| `arc-spring-boot` | Java/Kotlin | Spring Boot auto-configuration, ArcFilter servlet filter | `sdks/jvm/arc-spring-boot` |
+| `ArcMiddleware` | C# | ASP.NET Core middleware | `sdks/dotnet/ArcMiddleware` |
 
-### Phase 6: Protocol Adapters and Deep Integrations (Level 3)
+### Phase 6: Protocol Adapters and Deep Integrations (Level 3) [Shipped]
 
-| Package | Protocol |
-|---------|----------|
-| `arc-openai` | OpenAI function calling interception |
-| `arc-langchain` | LangChain Tool wrapper |
-| `arc-ag-ui-proxy` | AG-UI event stream security |
+| Package | Protocol | Package Name |
+|---------|----------|--------------|
+| `arc-openai` | OpenAI function calling interception | `crates/arc-openai` |
+| `arc-openapi-mcp-bridge` | OpenAPI-to-MCP bridging with ARC governance | `crates/arc-openapi-mcp-bridge` |
+| `arc-a2a-edge` | A2A bidirectional bridging | `crates/arc-a2a-edge` |
+| `arc-acp-edge` | ACP bidirectional bridging | `crates/arc-acp-edge` |
 
 ## 9. Important Constraint
 

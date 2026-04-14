@@ -11,13 +11,14 @@ transport-security requirements live in [SECURITY.md](SECURITY.md).
 
 ## 1. Surface Model
 
-ARC ships three cooperating protocol surfaces:
+ARC ships four cooperating protocol surfaces:
 
 | Surface | Transport | Purpose |
 | --- | --- | --- |
 | Native ARC transport | Length-prefixed canonical JSON | Direct agent-to-kernel messaging |
 | Hosted MCP edge | JSON-RPC over HTTP POST plus SSE | Remote session admission and MCP-compatible runtime traffic |
 | Trust-control lifecycle APIs | JSON over HTTP | Capability issuance, delegated issuance, receipt lookup, and revocation |
+| HTTP substrate | JSON over HTTP (localhost sidecar) | Evaluation and receipt signing for arbitrary HTTP API requests (see [Section 7](#7-http-substrate-surface)) |
 
 The native ARC transport does **not** define a session-initialization message.
 Initialization in the shipped stack happens on the hosted MCP surface. Native
@@ -547,7 +548,45 @@ sequenceDiagram
     end
 ```
 
-## 7. Schemas And Conformance
+## 7. HTTP Substrate Surface
+
+The HTTP substrate is a fourth cooperating protocol surface alongside the
+native ARC transport (Section 2), the hosted MCP edge (Section 3), and the
+trust-control lifecycle APIs (Section 4). It enables ARC to evaluate and
+sign receipts for arbitrary HTTP API requests, not only agent-protocol
+traffic.
+
+The normative specification for the HTTP substrate lives in
+[`spec/HTTP-SUBSTRATE.md`](HTTP-SUBSTRATE.md). That document defines the
+sidecar evaluation protocol, the typed request and receipt models, and the
+deterministic mapping from `HttpReceipt` to the core `ArcReceipt` type.
+
+### 7.1 Sidecar Evaluation Protocol
+
+The HTTP substrate uses a sidecar model. An ARC kernel runs as a local
+process and exposes three HTTP endpoints on localhost:
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/arc/evaluate` | POST | Evaluate an HTTP request against loaded policy |
+| `/arc/verify` | POST | Verify a receipt signature |
+| `/arc/health` | GET | Sidecar health check |
+
+Language-specific middleware (arc-tower for Rust, arc-spring-boot for JVM,
+ArcMiddleware for .NET, and the Python/TypeScript/Go substrate SDKs)
+intercepts incoming HTTP requests, constructs an `ArcHttpRequest`, sends it
+to `POST /arc/evaluate`, and enforces the returned verdict.
+
+### 7.2 Relationship to Language SDKs
+
+All language-specific SDKs consume this surface. They are thin HTTP clients
+over the sidecar evaluation protocol, not independent policy engines. The
+kernel remains the single trust anchor for capability validation, guard
+evaluation, and receipt signing.
+
+Platform-level SDK documentation lives in `docs/sdk/PLATFORM.md`.
+
+## 8. Schemas And Conformance
 
 Versioned native message schemas live under:
 

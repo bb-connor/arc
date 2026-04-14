@@ -224,12 +224,12 @@ Three tiers, ordered by impact and dependency.
 These items unblock adoption and close the most visible gaps in the current
 shipping surface.
 
-| Item | Rationale | Crate |
-|------|-----------|-------|
-| ACP kernel integration | Promote arc-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `arc-acp-proxy` |
-| MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `arc-cli` |
-| Unified runtime config (proposed) | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` |
-| Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` |
+| Item | Rationale | Crate | Status |
+|------|-----------|-------|--------|
+| ACP kernel integration | Promote arc-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `arc-acp-proxy` | [Shipped] |
+| MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `arc-cli` | |
+| Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` | [Shipped] |
+| Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` | |
 
 **Why Tier 1 first:** The ACP proxy currently generates unsigned audit entries.
 Promoting those to signed ARC receipts completes the three-protocol attestation
@@ -245,12 +245,12 @@ dynamic or intent-aware governance on day one.
 
 These items extend the protocol surface and complete the compliance story.
 
-| Item | Rationale | Crate |
-|------|-----------|-------|
-| A2A edge crate | Bidirectional bridging: expose ARC tools as A2A Agent Cards | `arc-a2a-edge` (new) |
-| ACP edge crate | Bidirectional bridging: expose ARC tools as ACP capabilities | `arc-acp-edge` (new) |
-| MCP adapter completion | Close coverage from 14 tests to 80+, covering streaming, error paths, and edge cases | `arc-mcp-adapter` |
-| Compliance certificates | Session-scoped, single-artifact proof bundles for auditors (SOC 2, HIPAA, EU AI Act) | `arc-core` |
+| Item | Rationale | Crate | Status |
+|------|-----------|-------|--------|
+| A2A edge crate | Bidirectional bridging: expose ARC tools as A2A Agent Cards | `arc-a2a-edge` | [Shipped] |
+| ACP edge crate | Bidirectional bridging: expose ARC tools as ACP capabilities | `arc-acp-edge` | [Shipped] |
+| MCP adapter completion | Close coverage from 14 tests to 80+, covering streaming, error paths, and edge cases | `arc-mcp-adapter` | [Shipped] |
+| Compliance certificates | Session-scoped, single-artifact proof bundles for auditors (SOC 2, HIPAA, EU AI Act) | `arc-core` | [Shipped] |
 
 **Why Tier 2 second:** Edge symmetry means every protocol gets both inbound
 adaptation (consume external tools) and outbound exposure (publish ARC tools).
@@ -261,19 +261,39 @@ are the artifact that enterprise security and legal teams actually want to see.
 
 These items create new market categories or defensible network effects.
 
-| Item | Rationale | Crate / Surface |
-|------|-----------|-----------------|
-| Capability attenuation SDK | Programmatic sub-agent delegation with provable subset guarantees | `arc-core` |
-| Receipt dashboard expansion | The dashboard ships today; the strategic work is adding cross-protocol traces, compliance views, and certificate inspection | `arc-cli/dashboard` |
-| OpenAI function calling adapter | Fourth protocol edge, capturing the OpenAI ecosystem | `arc-openai-adapter` (new) |
-| WASM guard runtime | Custom guards authored in any language compiled to WASM, sandboxed execution | `arc-guards` |
-| Kubernetes admission controller | Enforce ARC capability policies at pod deployment time | `arc-k8s` (new) |
+| Item | Rationale | Crate / Surface | Status |
+|------|-----------|-----------------|--------|
+| Capability attenuation SDK | Programmatic sub-agent delegation with provable subset guarantees | `arc-core` | |
+| Receipt dashboard expansion | The dashboard ships today; the strategic work is adding cross-protocol traces, compliance views, and certificate inspection | `arc-cli/dashboard` | |
+| OpenAI function calling adapter | Fourth protocol edge, capturing the OpenAI ecosystem | `arc-openai` | [Shipped] |
+| WASM guard runtime | Custom guards authored in any language compiled to WASM, sandboxed execution | `arc-guards` | [Shipped] |
+| Kubernetes admission controller | Enforce ARC capability policies at pod deployment time | `sdks/k8s` | [Shipped] |
 
 **Why Tier 3 last:** These are force multipliers that assume Tier 1 and Tier 2
 are complete. The WASM guard runtime and K8s controller extend ARC into
 infrastructure-level enforcement. The OpenAI adapter captures a major remaining
 agent ecosystem. The dashboard work here is expansion of an existing operator
 surface, not net-new UI creation.
+
+### Tier 4: Next Horizon
+
+These items represent the forward-looking expansion once the current tiers are
+fully landed and battle-tested in production.
+
+| Item | Rationale | Surface |
+|------|-----------|---------|
+| Multi-region consensus | Distributed receipt log replication across geographic regions with consistency guarantees for global deployments | `arc-consensus` |
+| Public certification marketplace | Third-party auditors and tool authors publish ARC compliance certificates that consumers can verify independently | `arc-marketplace` |
+| Synthetic scoring and simulation | Generate synthetic agent workloads to test guard configurations, budget policies, and capability delegation graphs before production deployment | `arc-sim` |
+| Receipt-backed SLA enforcement | Automated SLA compliance checking using receipt chain evidence, with breach detection and escalation | `arc-sla` |
+| Cross-org federated policy negotiation | Organizations exchange and negotiate capability delegation ceilings through a structured protocol, not ad-hoc configuration | `arc-federation` |
+
+**Why Tier 4 is horizon work:** These items assume mature production adoption
+across multiple organizations and protocol surfaces. Multi-region consensus
+requires real geographic distribution. The certification marketplace requires
+a critical mass of tool authors and auditors. Synthetic scoring requires a
+stable guard and budget model to simulate against. These are valuable
+directions, but premature to build before Tier 1-3 are proven at scale.
 
 ### Cross-Language Packaging Constraint
 
@@ -330,7 +350,7 @@ previous receipt in the session, creating an ordered, tamper-evident sequence.
 A gap in the chain is detectable. A reordering is detectable. The chain is
 the foundation for session compliance certificates.
 
-### 5.4 Session Compliance Certificates (In Progress)
+### 5.4 Session Compliance Certificates (Shipped)
 
 A session compliance certificate is a single artifact that proves:
 - Every tool invocation in the session was authorized by a valid capability token
