@@ -10762,7 +10762,7 @@ Plans:
 |-------|-----------|------|--------|
 | 373 | 2/2 | Complete    | 2026-04-14 |
 | 374 | 2/2 | Complete    | 2026-04-14 |
-| 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
+| 375 | 1/2 | In Progress|  |
 | 376 | v4.0 | Benchmark Validation | Not started |
 
 ---
@@ -10922,7 +10922,9 @@ Plans:
   2. Unsupported bridges are not auto-published, and adapted bridges surface caveats in outward metadata and docs
   3. Streaming, cancellation, permission-prompt, and partial-output semantics are tested and mapped through fidelity rules rather than side-effect heuristics alone
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1 plan
+Plans:
+- [x] 392-01-PLAN.md -- shared semantic hints, truthful A2A/ACP publication gates, docs/spec reconciliation, and verification
 
 ### Phase 393: Ledger and Narrative Reconciliation
 **Goal**: Finish the remaining late-v3 milestone truth debt and older overclaim cleanup now that the final runtime shape is explicit
@@ -10954,7 +10956,7 @@ Plans:
 |-------|-----------|------|--------|
 | 390 | v3.13 | Generic Cross-Protocol Orchestrator | Complete |
 | 391 | v3.13 | Authoritative Edge Unification | Complete |
-| 392 | v3.13 | Fidelity Semantics and Publication Gating | Not started |
+| 392 | v3.13 | Fidelity Semantics and Publication Gating | Complete |
 | 393 | v3.13 | Ledger and Narrative Reconciliation | Not started |
 | 394 | v3.13 | Claim Upgrade Qualification | Not started |
 

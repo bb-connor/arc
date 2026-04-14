@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.66
-milestone_name: Test Coverage for Untested Crates
-status: completed
-stopped_at: Completed 374-02-PLAN.md (WASM guard request enrichment)
-last_updated: "2026-04-14T21:55:26.757Z"
-last_activity: 2026-04-14 -- completed phase 390 by landing `arc-cross-protocol`
+milestone: v3.13
+milestone_name: Universal Orchestration Closure
+status: active
+stopped_at: Completed phase 392 fidelity semantics and publication gating; phase 393 is next
+last_updated: "2026-04-14T23:20:00Z"
+last_activity: 2026-04-14 -- completed phase 392 by landing truthful bridge fidelity semantics, publication gates, and protocol/spec documentation updates
 progress:
-  total_phases: 347
-  completed_phases: 253
-  total_plans: 728
-  completed_plans: 750
-  percent: 20
+  total_phases: 5
+  completed_phases: 3
+  total_plans: 3
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -25,24 +25,26 @@ authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
 **Current focus:** v3.13 Universal Orchestration Closure is now the active
-execution lane. Phase `390` is complete, so the immediate task is planning and
-executing phase `391` (`Authoritative Edge Unification`) while keeping v3.12
-in the locally complete pending-archive state and v4.0 as a parallel strategic
-lane.
+execution lane. Phases `390` through `392` are complete, so the immediate task
+is planning and executing phase `393` (`Ledger and Narrative Reconciliation`)
+while keeping v3.12 in the locally complete pending-archive state and v4.0 as
+a parallel strategic lane.
 
 ## Current Position
 
-Phase: 391 (not started)
+Phase: 393 (not started)
 Plan: —
-Status: v3.13 is active. Phase `390` is complete and landed the reusable
-shared orchestrator substrate. The next closure slice is phase `391`, which
-must finish authoritative path unification and compatibility-path quarantine on
-top of that substrate.
-Last activity: 2026-04-14 -- completed phase 390 by landing `arc-cross-protocol`
-and moving default A2A/ACP authoritative execution onto the shared
-orchestrator substrate.
+Status: v3.13 is active. Phases `390` through `392` are complete and landed
+the shared orchestrator substrate, authoritative ACP live-path guarding,
+explicit compatibility-only A2A/ACP passthrough surfaces, and truthful bridge
+publication gates with tested caveats. The next closure slice is phase `393`,
+which must reconcile late-v3 milestone truth and older narrative overclaims to
+the now-explicit runtime behavior.
+Last activity: 2026-04-14 -- completed phase 392 by replacing heuristic edge
+fidelity labels with truthful `Lossless` / `Adapted` / `Unsupported`
+publication semantics, tests, and protocol/spec documentation.
 
-Progress: [##--------] 20%
+Progress: [######----] 60%
 
 ## Performance Metrics
 
@@ -109,16 +111,24 @@ Progress: [##--------] 20%
 - Phase `390` is now complete: `arc-cross-protocol` landed as the shared
   runtime home, and the default authoritative A2A/ACP execution paths now emit
   orchestrator-labeled lineage metadata instead of edge-local kernel metadata.
+- Phase `392` is now complete: A2A and ACP edge discovery surfaces use shared
+  semantic hints and truthful publication gating, unsupported bridges stay
+  unpublished, and adapted bridges carry tested caveats for approval,
+  streaming, cancellation, and partial-output semantics.
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 - [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
 - [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
 - [Phase 374]: build_request() uses function-local import of ToolAction and calls extract_action() for host-side action classification
 - [Phase 374]: GuardRequest session_metadata removed (ABI cleanup); unrecognized tools map to mcp_tool via extract_action fallback
+- [Phase 375]: Manifest parsing deps (sha2, hex, serde_yml) are NOT feature-gated; manifest types work without wasmtime
+- [Phase 375]: WasmGuard::new() extended with manifest_sha256: Option<String>; fuel consumed read within backend lock scope before dropping
+- [Phase 375]: guard_evidence_metadata() returns serde_json::Value for flexible downstream receipt integration
 
 ### Pending Todos
 
-- Plan and execute phase `391` (`Authoritative Edge Unification`) on top of
-  the landed shared orchestrator substrate.
+- Plan and execute phase `393` (`Ledger and Narrative Reconciliation`) on top
+  of the landed shared orchestrator, unified authoritative edge path, and
+  truthful bridge publication semantics.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
 - Reconcile the remaining `v3.9`-`v3.11` ledger truth debt under Phase `393`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
@@ -137,14 +147,14 @@ Progress: [##--------] 20%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 373 (complete)
-Plan: 02 of 2 complete
-Status: Phase 373 complete -- WasmHostState, shared Arc<Engine>, three host
-functions, arc_alloc guest allocator probing with offset-0 fallback, and
-arc_deny_reason structured deny reason extraction with legacy NUL-string
-fallback. All 32 crate tests pass, clippy clean.
-Last activity: 2026-04-14 -- completed 373-02 guest export detection plan with
-8 WAT-based tests covering arc_alloc and arc_deny_reason code paths
+Phase: 375 (plan 01 of 02 complete)
+Plan: 01 of 2 complete
+Status: Phase 375 plan 01 complete -- GuardManifest YAML parsing with SHA-256
+integrity verification, ABI version gating, and per-evaluation fuel/hash
+receipt metadata on WasmGuard. 74 crate tests pass, clippy clean, no
+workspace regressions. Plan 02 (startup wiring) is next.
+Last activity: 2026-04-14 -- completed 375-01 guard manifest and receipt
+metadata plan with 21 new tests across manifest.rs and runtime.rs
 
 
 ## v4.1 Guard SDK and Developer Experience
@@ -157,7 +167,7 @@ phases 390-394 reserved after the v4.x placeholder ranges
 
 ## Session Continuity
 
-Last session: 2026-04-14T21:52:10.770Z
-Stopped at: Completed 374-02-PLAN.md (WASM guard request enrichment)
-Next action: `/gsd:plan-phase 391` for authoritative edge unification
+Last session: 2026-04-14T22:22:20Z
+Stopped at: Completed 375-01 guard manifest and receipt metadata plan
+Next action: execute 375-02 startup wiring plan
 Resume file: None

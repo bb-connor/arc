@@ -2979,15 +2979,15 @@ defend.
 
 ### Authoritative Edge Unification
 
-- [ ] **AUTH-01**: ACP authoritative enforcement routes through a kernel-backed service or guard pipeline rather than local token verification logic alone
-- [ ] **AUTH-02**: A2A and ACP passthrough helpers are quarantined to explicit compatibility/test surfaces and cannot be confused with default authoritative execution
-- [ ] **AUTH-03**: Permission-preview APIs remain explicitly non-authoritative and cannot satisfy receipt-bearing execution claims
+- [x] **AUTH-01**: ACP authoritative enforcement routes through a kernel-backed service or guard pipeline rather than local token verification logic alone
+- [x] **AUTH-02**: A2A and ACP passthrough helpers are quarantined to explicit compatibility/test surfaces and cannot be confused with default authoritative execution
+- [x] **AUTH-03**: Permission-preview APIs remain explicitly non-authoritative and cannot satisfy receipt-bearing execution claims
 
 ### Fidelity and Publication Gating
 
-- [ ] **FID-01**: Bridge fidelity implements `Lossless`, `Adapted { caveats }`, and `Unsupported { reason }` semantics instead of heuristic `Full/Partial/Degraded` labels
-- [ ] **FID-02**: Unsupported bridges are not auto-published, and adapted bridges surface caveats in outward metadata and docs
-- [ ] **FID-03**: Streaming, cancellation, permission-prompt, and partial-output semantics are tested and mapped through fidelity rules rather than side-effect heuristics alone
+- [x] **FID-01**: Bridge fidelity implements `Lossless`, `Adapted { caveats }`, and `Unsupported { reason }` semantics instead of heuristic `Full/Partial/Degraded` labels
+- [x] **FID-02**: Unsupported bridges are not auto-published, and adapted bridges surface caveats in outward metadata and docs
+- [x] **FID-03**: Streaming, cancellation, permission-prompt, and partial-output semantics are tested and mapped through fidelity rules rather than side-effect heuristics alone
 
 ### Ledger and Narrative Reconciliation
 
@@ -3017,9 +3017,9 @@ defend.
 | ORCH-01 | Phase 390 | Complete |
 | ORCH-02 | Phase 390 | Complete |
 | ORCH-03 | Phase 390 | Complete |
-| AUTH-01 | Phase 391 | Planned |
-| AUTH-02 | Phase 391 | Planned |
-| AUTH-03 | Phase 391 | Planned |
+| AUTH-01 | Phase 391 | Complete |
+| AUTH-02 | Phase 391 | Complete |
+| AUTH-03 | Phase 391 | Complete |
 | FID-01 | Phase 392 | Planned |
 | FID-02 | Phase 392 | Planned |
 | FID-03 | Phase 392 | Planned |
@@ -3037,7 +3037,7 @@ defend.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after completing phase 390 generic cross-protocol orchestrator*
+*Last updated: 2026-04-14 after completing phase 391 authoritative edge unification*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3072,10 +3072,10 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Guard Manifest
 
-- [ ] **WGMAN-01**: Guard manifest format (`guard-manifest.yaml`) defines name, version, abi_version, wasm path, config schema, and wasm_sha256
-- [ ] **WGMAN-02**: Host verifies wasm_sha256 against actual .wasm binary content at load time and rejects mismatches
-- [ ] **WGMAN-03**: Host validates abi_version from manifest and rejects unsupported versions
-- [ ] **WGMAN-04**: Guard config values are loaded from manifest config block and made available via `arc.get_config` host function
+- [x] **WGMAN-01**: Guard manifest format (`guard-manifest.yaml`) defines name, version, abi_version, wasm path, config schema, and wasm_sha256
+- [x] **WGMAN-02**: Host verifies wasm_sha256 against actual .wasm binary content at load time and rejects mismatches
+- [x] **WGMAN-03**: Host validates abi_version from manifest and rejects unsupported versions
+- [x] **WGMAN-04**: Guard config values are loaded from manifest config block and made available via `arc.get_config` host function
 
 ### Startup Wiring
 
@@ -3086,8 +3086,8 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Receipt Integration
 
-- [ ] **WGRCPT-01**: When a WASM guard evaluates, fuel consumed is recorded and available for inclusion in receipt metadata
-- [ ] **WGRCPT-02**: When a WASM guard evaluates, the guard manifest SHA-256 hash is recorded and available for inclusion in receipt metadata
+- [x] **WGRCPT-01**: When a WASM guard evaluates, fuel consumed is recorded and available for inclusion in receipt metadata
+- [x] **WGRCPT-02**: When a WASM guard evaluates, the guard manifest SHA-256 hash is recorded and available for inclusion in receipt metadata
 
 ### Benchmarks
 
@@ -3132,16 +3132,16 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGREQ-04 | Phase 374 | Complete |
 | WGREQ-05 | Phase 374 | Complete |
 | WGREQ-06 | Phase 374 | Complete |
-| WGMAN-01 | Phase 375 | Pending |
-| WGMAN-02 | Phase 375 | Pending |
-| WGMAN-03 | Phase 375 | Pending |
-| WGMAN-04 | Phase 375 | Pending |
+| WGMAN-01 | Phase 375 | Complete |
+| WGMAN-02 | Phase 375 | Complete |
+| WGMAN-03 | Phase 375 | Complete |
+| WGMAN-04 | Phase 375 | Complete |
 | WGWIRE-01 | Phase 375 | Pending |
 | WGWIRE-02 | Phase 375 | Pending |
 | WGWIRE-03 | Phase 375 | Pending |
 | WGWIRE-04 | Phase 375 | Pending |
-| WGRCPT-01 | Phase 375 | Pending |
-| WGRCPT-02 | Phase 375 | Pending |
+| WGRCPT-01 | Phase 375 | Complete |
+| WGRCPT-02 | Phase 375 | Complete |
 | WGBENCH-01 | Phase 376 | Pending |
 | WGBENCH-02 | Phase 376 | Pending |
 | WGBENCH-03 | Phase 376 | Pending |
