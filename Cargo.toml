@@ -56,6 +56,7 @@ members = [
     "crates/arc-siem",
     "crates/arc-underwriting",
     "crates/arc-web3",
+    "examples/guards/enriched-inspector",
     "examples/guards/tool-gate",
     "examples/hello-tool",
     "formal/diff-tests",
