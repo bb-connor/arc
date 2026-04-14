@@ -26,10 +26,40 @@ Conformance
 (phases 315-318)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
 Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
-**Planned milestones:** v3.0 through v3.7 (Universal Security Kernel era)
-**Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
-Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
-**Next GSD action:** complete v2.83 phases 316-318, then begin v3.0 phase 319
+**Planned milestones:** v3.0 through v3.11 (Universal Security Kernel era)
+**Planned milestones:** v4.0 through v4.2 (WASM Guard Plugin Ecosystem)
+**Next GSD action:** complete v2.83 phases 316-318; v4.0 can execute in
+parallel (no dependency on v2.83 or v3.x)
+
+## Current Milestone: v4.0 WASM Guard Runtime Completion
+
+**Goal:** Complete the arc-wasm-guards host-side runtime that Phase 347
+scaffolded, turning the WASM guard crate from a working skeleton into a
+production-ready, HushSpec-aware guard execution surface.
+
+**Target features:**
+- Shared wasmtime Engine, host state, and host function imports
+- Guard manifest format with integrity verification
+- Enriched GuardRequest with host-extracted action context
+- Memory limits, import validation, and security hardening
+- Startup wiring via arc-policy compiler with correct pipeline ordering
+- Receipt enrichment with fuel and manifest metadata
+- Benchmark validation of the execution envelope
+
+## v4.x WASM Guard Plugin Ecosystem
+
+**Strategic continuation of v3.7.** Phase 347 shipped the WASM guard scaffold
+(ABI, wasmtime backend, fuel metering, mock tests). v4.x completes the
+"policy-as-code in any language" vision through three milestones.
+
+| Milestone | Name | Phases | Focus |
+|-----------|------|--------|-------|
+| v4.0 | WASM Guard Runtime Completion | 373-376 | Host-side hardening, manifest, enriched request, startup wiring, benchmarks |
+| v4.1 | Guard SDK and Developer Experience | 377-380 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
+| v4.2 | WIT Migration and Multi-Language SDKs | 381-384 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
+
+**Design docs:** `docs/guards/01-05` (current guard system, WASM runtime
+landscape, long-range roadmap, HushSpec/ClawdStrike integration, v1 decisions)
 
 ## Current Milestone Status
 
@@ -46,7 +76,7 @@ implementable spec surface, security analysis, and native conformance lane.
 security kernel for the agent economy. One kernel, many substrates. Signed
 receipts across HTTP APIs, agent protocols, and framework middleware.
 
-**8 milestones:** v3.0 through v3.7, from foundation through strategic bets.
+**12 milestones:** v3.0 through v3.11, from foundation through body-integrity completion.
 **Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 -> v3.5 -> v3.6 -> v3.7
 
 | Milestone | Name | Phases | Focus |
@@ -60,6 +90,9 @@ receipts across HTTP APIs, agent protocols, and framework middleware.
 | v3.6 | Platform Extensions | 343-346 | Go SDK, K8s controller/injector, arc-tower, JVM, .NET |
 | v3.7 | Strategic Bets | 347-350 | WASM guards, economics/metering, AG-UI, skill/workflow authority |
 | v3.8 | Normative Specification Alignment | 351-358 | Spec docs, JSON schemas, SDK refs, design doc reconciliation |
+| v3.9 | Runtime Correctness and Contract Remediation | 359-363 | OpenAI/kernel fix, certificate wire format, adapter validation, flake cleanup |
+| v3.10 | HTTP Sidecar and Cross-SDK Contract Completion | 364-367 | Rust sidecar endpoints, Python substrate migration, cross-SDK capability alignment |
+| v3.11 | Sidecar Entrypoint and Body-Integrity Completion | 368-372 | `arc api protect` CLI, body-preserving middleware, raw-byte hashing, schema cleanup |
 
 ## Foundation and Adoption Ladder (v2.80-v2.83)
 
