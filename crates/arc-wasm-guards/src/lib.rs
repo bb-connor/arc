@@ -37,6 +37,8 @@ pub mod error;
 pub mod host;
 pub mod manifest;
 pub mod runtime;
+#[cfg(feature = "wasmtime-runtime")]
+pub mod wiring;
 
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 pub use config::WasmGuardConfig;
@@ -45,3 +47,5 @@ pub use error::WasmGuardError;
 pub use host::WasmHostState;
 pub use manifest::{GuardManifest, MANIFEST_FILENAME, SUPPORTED_ABI_VERSIONS};
 pub use runtime::{WasmGuard, WasmGuardRuntime};
+#[cfg(feature = "wasmtime-runtime")]
+pub use wiring::{build_guard_pipeline, load_wasm_guards};
