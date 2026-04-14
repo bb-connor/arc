@@ -46,7 +46,9 @@ impl WasmGuard {
         self.advisory
     }
 
-    fn build_request(ctx: &GuardContext<'_>) -> GuardRequest {
+    pub(crate) fn build_request(ctx: &GuardContext<'_>) -> GuardRequest {
+        use arc_guards::ToolAction;
+
         let scopes = ctx
             .scope
             .grants
@@ -54,17 +56,65 @@ impl WasmGuard {
             .map(|g| format!("{}:{}", g.server_id, g.tool_name))
             .collect();
 
+        let action = arc_guards::extract_action(
+            &ctx.request.tool_name,
+            &ctx.request.arguments,
+        );
+
+        let (action_type, extracted_path, extracted_target) = match &action {
+            ToolAction::FileAccess(path) => (
+                Some("file_access".into()),
+                Some(path.clone()),
+                None,
+            ),
+            ToolAction::FileWrite(path, _) => (
+                Some("file_write".into()),
+                Some(path.clone()),
+                None,
+            ),
+            ToolAction::NetworkEgress(host, _) => (
+                Some("network_egress".into()),
+                None,
+                Some(host.clone()),
+            ),
+            ToolAction::ShellCommand(_) => (
+                Some("shell_command".into()),
+                None,
+                None,
+            ),
+            ToolAction::McpTool(_, _) => (
+                Some("mcp_tool".into()),
+                None,
+                None,
+            ),
+            ToolAction::Patch(path, _) => (
+                Some("patch".into()),
+                Some(path.clone()),
+                None,
+            ),
+            ToolAction::Unknown => (
+                Some("unknown".into()),
+                None,
+                None,
+            ),
+        };
+
+        let filesystem_roots = ctx
+            .session_filesystem_roots
+            .map(|roots| roots.to_vec())
+            .unwrap_or_default();
+
         GuardRequest {
             tool_name: ctx.request.tool_name.clone(),
             server_id: ctx.server_id.clone(),
             agent_id: ctx.agent_id.clone(),
             arguments: ctx.request.arguments.clone(),
             scopes,
-            action_type: None,
-            extracted_path: None,
-            extracted_target: None,
-            filesystem_roots: Vec::new(),
-            matched_grant_index: None,
+            action_type,
+            extracted_path,
+            extracted_target,
+            filesystem_roots,
+            matched_grant_index: ctx.matched_grant_index,
         }
     }
 }
@@ -1286,5 +1336,160 @@ mod tests {
         };
         let result = backend.evaluate(&req);
         assert!(result.is_err());
+    }
+
+    // -------------------------------------------------------------------
+    // build_request enrichment tests
+    // -------------------------------------------------------------------
+
+    fn make_test_request_with(tool_name: &str, arguments: serde_json::Value) -> ToolCallRequest {
+        ToolCallRequest {
+            request_id: "req-1".to_string(),
+            capability: arc_core::capability::CapabilityToken::sign(
+                arc_core::capability::CapabilityTokenBody {
+                    id: "cap-1".to_string(),
+                    issuer: arc_core::crypto::Keypair::generate().public_key(),
+                    subject: arc_core::crypto::Keypair::generate().public_key(),
+                    scope: ArcScope::default(),
+                    issued_at: 0,
+                    expires_at: u64::MAX,
+                    delegation_chain: vec![],
+                },
+                &arc_core::crypto::Keypair::generate(),
+            )
+            .unwrap(),
+            tool_name: tool_name.to_string(),
+            server_id: "test_server".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments,
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+        }
+    }
+
+    #[test]
+    fn build_request_action_type_file_access() {
+        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        assert_eq!(req.action_type.as_deref(), Some("file_access"));
+    }
+
+    #[test]
+    fn build_request_extracted_path_for_file_access() {
+        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        assert_eq!(req.extracted_path.as_deref(), Some("/etc/passwd"));
+    }
+
+    #[test]
+    fn build_request_action_type_network_egress() {
+        let request = make_test_request_with("fetch", serde_json::json!({"url": "https://example.com/api"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        assert_eq!(req.action_type.as_deref(), Some("network_egress"));
+        assert_eq!(req.extracted_target.as_deref(), Some("example.com"));
+        assert!(req.extracted_path.is_none(), "network_egress should not set extracted_path");
+    }
+
+    #[test]
+    fn build_request_filesystem_roots_from_context() {
+        let request = make_test_request_with("read_file", serde_json::json!({"path": "/home/user/file.txt"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+        let roots = vec!["/home".to_string(), "/tmp".to_string()];
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: Some(&roots),
+            matched_grant_index: None,
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        assert_eq!(req.filesystem_roots, vec!["/home".to_string(), "/tmp".to_string()]);
+    }
+
+    #[test]
+    fn build_request_matched_grant_index_from_context() {
+        let request = make_test_request_with("read_file", serde_json::json!({"path": "/etc/passwd"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: Some(3),
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        assert_eq!(req.matched_grant_index, Some(3));
+    }
+
+    #[test]
+    fn build_request_action_type_unknown_for_unrecognized_tool() {
+        let request = make_test_request_with("test_tool", serde_json::json!({"key": "value"}));
+        let scope = ArcScope::default();
+        let agent_id = "agent-1".to_string();
+        let server_id = "test_server".to_string();
+
+        let ctx = GuardContext {
+            request: &request,
+            scope: &scope,
+            agent_id: &agent_id,
+            server_id: &server_id,
+            session_filesystem_roots: None,
+            matched_grant_index: None,
+        };
+
+        let req = WasmGuard::build_request(&ctx);
+        // "test_tool" is not a recognized filesystem/network/shell tool,
+        // so extract_action returns McpTool (fallback) which we map to "mcp_tool"
+        assert_eq!(req.action_type.as_deref(), Some("mcp_tool"));
     }
 }
