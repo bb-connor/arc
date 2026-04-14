@@ -1,0 +1,26 @@
+[package]
+name = "arc-openapi-mcp-bridge"
+description = "Bridge that exposes ARC-governed HTTP APIs as MCP tool surfaces via OpenAPI spec"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_openapi_mcp_bridge"
+
+[dependencies]
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
+arc-mcp-edge = { package = "arc-mcp-edge", path = "../arc-mcp-edge" }
+arc-openapi = { package = "arc-openapi", path = "../arc-openapi" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
