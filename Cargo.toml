@@ -33,6 +33,7 @@ members = [
     "crates/arc-wall-core",
     "crates/arc-store-sqlite",
     "crates/arc-reputation",
+    "crates/arc-guard-sdk",
     "crates/arc-guards",
     "crates/arc-http-session",
     "crates/arc-policy",
