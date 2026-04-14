@@ -28,6 +28,8 @@ include!("terminal_guard.rs");
 include!("permission.rs");
 include!("receipt.rs");
 include!("attestation.rs");
+include!("kernel_signer.rs");
+include!("kernel_checker.rs");
 include!("interceptor.rs");
 include!("transport.rs");
 include!("proxy.rs");
