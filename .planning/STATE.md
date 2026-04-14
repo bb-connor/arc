@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
 stopped_at: Completed 374-02-PLAN.md (WASM guard request enrichment)
-last_updated: "2026-04-14T21:52:10.789Z"
+last_updated: "2026-04-14T21:55:26.757Z"
 last_activity: 2026-04-14 -- completed phase 390 by landing `arc-cross-protocol`
 progress:
   total_phases: 347

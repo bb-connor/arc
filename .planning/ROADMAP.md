@@ -10755,7 +10755,7 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 373 | 2/2 | Complete    | 2026-04-14 |
-| 374 | 2/2 | Complete   | 2026-04-14 |
+| 374 | 2/2 | Complete    | 2026-04-14 |
 | 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
 | 376 | v4.0 | Benchmark Validation | Not started |
 
