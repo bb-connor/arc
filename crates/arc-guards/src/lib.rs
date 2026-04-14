@@ -21,6 +21,9 @@
 //! | [`DataFlowGuard`] | **Full** | Cumulative bytes-read/written limits via session journal |
 //! | [`BehavioralSequenceGuard`] | **Full** | Tool ordering policies via session journal |
 //! | [`ResponseSanitizationGuard`] | **Full** | PII/PHI pattern detection and redaction |
+//! | [`AdvisoryPipeline`] | **Full** | Non-blocking advisory signals with optional promotion |
+//! | [`AnomalyAdvisoryGuard`] | **Full** | Flags unusual invocation patterns and delegation depth |
+//! | [`DataTransferAdvisoryGuard`] | **Full** | Flags high data transfer volumes |
 //!
 //! # Guard pipeline
 //!
@@ -39,6 +42,7 @@
 pub mod action;
 mod path_normalization;
 
+pub mod advisory;
 pub mod agent_velocity;
 pub mod behavioral_sequence;
 pub mod data_flow;
@@ -55,6 +59,10 @@ pub mod secret_leak;
 mod shell_command;
 pub mod velocity;
 
+pub use advisory::{
+    AdvisoryGuard, AdvisoryPipeline, AdvisorySignal, AdvisorySeverity, AnomalyAdvisoryGuard,
+    DataTransferAdvisoryGuard, GuardOutput, PromotionPolicy, PromotionRule,
+};
 pub use agent_velocity::{AgentVelocityConfig, AgentVelocityGuard};
 pub use behavioral_sequence::{BehavioralSequenceGuard, SequencePolicy};
 pub use data_flow::{DataFlowConfig, DataFlowGuard};
