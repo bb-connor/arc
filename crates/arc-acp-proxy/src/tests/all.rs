@@ -79,8 +79,8 @@ mod tests {
     fn fs_guard_with_resolve_symlinks_flag() {
         // Verify the builder works (actual symlink resolution depends
         // on filesystem state, so we just test the config path).
-        let guard = FsGuard::new(vec!["/home/user/project".to_string()])
-            .with_resolve_symlinks(true);
+        let guard =
+            FsGuard::new(vec!["/home/user/project".to_string()]).with_resolve_symlinks(true);
         // A non-existent path falls back to textual canonicalization.
         assert!(guard
             .check_read("/home/user/project/nonexistent.txt")
@@ -92,12 +92,8 @@ mod tests {
     #[test]
     fn terminal_guard_allows_listed_command() {
         let guard = TerminalGuard::new(vec!["cargo".to_string(), "npm".to_string()]);
-        assert!(guard
-            .check_command("cargo", &["build".to_string()])
-            .is_ok());
-        assert!(guard
-            .check_command("npm", &["install".to_string()])
-            .is_ok());
+        assert!(guard.check_command("cargo", &["build".to_string()]).is_ok());
+        assert!(guard.check_command("npm", &["install".to_string()]).is_ok());
     }
 
     #[test]
@@ -220,7 +216,7 @@ mod tests {
             kind: Some("fs_read".to_string()),
             status: Some("running".to_string()),
         };
-        let receipt = logger.log_tool_call("session-1", &event);
+        let receipt = logger.log_tool_call("session-1", &event, None);
         assert_eq!(receipt.tool_call_id, "tc-1");
         assert_eq!(receipt.title, "Read file");
         assert_eq!(receipt.kind, Some("fs_read".to_string()));
@@ -229,6 +225,11 @@ mod tests {
         assert_eq!(receipt.server_id, "test-server");
         assert!(!receipt.timestamp.is_empty());
         assert!(!receipt.content_hash.is_empty());
+        assert_eq!(receipt.capability_id, None);
+        assert_eq!(
+            receipt.enforcement_mode,
+            Some(AcpEnforcementMode::AuditOnly)
+        );
         // SHA-256 hex is 64 chars
         assert_eq!(receipt.content_hash.len(), 64);
     }
@@ -240,11 +241,16 @@ mod tests {
             tool_call_id: "tc-2".to_string(),
             status: Some("completed".to_string()),
         };
-        let receipt = logger.log_tool_call_update("session-2", &event);
+        let receipt = logger.log_tool_call_update("session-2", &event, None);
         assert!(receipt.is_some());
         let receipt = receipt.unwrap();
         assert_eq!(receipt.tool_call_id, "tc-2");
         assert_eq!(receipt.status, "completed");
+        assert_eq!(receipt.capability_id, None);
+        assert_eq!(
+            receipt.enforcement_mode,
+            Some(AcpEnforcementMode::AuditOnly)
+        );
         assert!(!receipt.content_hash.is_empty());
         assert_eq!(receipt.content_hash.len(), 64);
     }
@@ -256,7 +262,7 @@ mod tests {
             tool_call_id: "tc-3".to_string(),
             status: None,
         };
-        let receipt = logger.log_tool_call_update("session-3", &event);
+        let receipt = logger.log_tool_call_update("session-3", &event, None);
         assert!(receipt.is_none());
     }
 
@@ -637,7 +643,10 @@ mod tests {
             .unwrap();
         match result {
             InterceptResult::Forward(v) => assert_eq!(v, msg),
-            other => panic!("expected Forward for client->agent direction, got {:?}", other),
+            other => panic!(
+                "expected Forward for client->agent direction, got {:?}",
+                other
+            ),
         }
     }
 
@@ -693,10 +702,7 @@ mod tests {
                 .unwrap();
             match result {
                 InterceptResult::Forward(_) => {}
-                other => panic!(
-                    "expected Forward for method '{}', got {:?}",
-                    method, other
-                ),
+                other => panic!("expected Forward for method '{}', got {:?}", method, other),
             }
         }
     }
@@ -723,7 +729,10 @@ mod tests {
                     .and_then(|e| e.get("code"))
                     .and_then(|c| c.as_i64())
                     .unwrap();
-                assert_eq!(code, -32000, "error code should be -32000 (server error range)");
+                assert_eq!(
+                    code, -32000,
+                    "error code should be -32000 (server error range)"
+                );
             }
             other => panic!("expected Block, got {:?}", other),
         }
@@ -748,7 +757,10 @@ mod tests {
             InterceptResult::Block(v) => {
                 assert!(v.get("error").is_some());
             }
-            other => panic!("expected Block for prefix substring attack, got {:?}", other),
+            other => panic!(
+                "expected Block for prefix substring attack, got {:?}",
+                other
+            ),
         }
     }
 
@@ -758,8 +770,7 @@ mod tests {
     fn proxy_creation_and_shutdown() {
         // Use a command that exists on all platforms and exits immediately.
         // "true" is a shell builtin / coreutils command that always succeeds.
-        let config = AcpProxyConfig::new("true", "deadbeef")
-            .with_allowed_path_prefix("/tmp");
+        let config = AcpProxyConfig::new("true", "deadbeef").with_allowed_path_prefix("/tmp");
 
         let result = AcpProxy::start(config);
         // The proxy should start successfully (the 'true' command is
@@ -787,8 +798,8 @@ mod tests {
             kind: Some("test".to_string()),
             status: Some("running".to_string()),
         };
-        let entry1 = logger.log_tool_call("session-hash", &event);
-        let entry2 = logger.log_tool_call("session-hash", &event);
+        let entry1 = logger.log_tool_call("session-hash", &event, None);
+        let entry2 = logger.log_tool_call("session-hash", &event, None);
         assert_eq!(entry1.content_hash, entry2.content_hash);
     }
 }
@@ -823,7 +834,10 @@ mod extended_tests {
             "params": {}
         });
         let result = serde_json::from_value::<JsonRpcMessage>(raw);
-        assert!(result.is_err(), "missing jsonrpc field should fail deserialization");
+        assert!(
+            result.is_err(),
+            "missing jsonrpc field should fail deserialization"
+        );
     }
 
     #[test]
@@ -895,7 +909,10 @@ mod extended_tests {
         let raw = json!({"type": "some_new_update_type", "payload": 42});
         match parse_session_update(&raw) {
             SessionUpdate::Other(_) => {}
-            other => panic!("expected Other for unknown session update type, got {:?}", other),
+            other => panic!(
+                "expected Other for unknown session update type, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1081,16 +1098,17 @@ mod extended_tests {
     #[test]
     fn fs_guard_path_with_unicode_characters() {
         let guard = FsGuard::new(vec!["/home/user/project".to_string()]);
-        assert!(guard.check_read("/home/user/project/src/\u{00e9}ditor.rs").is_ok());
-        assert!(guard.check_read("/home/user/project/\u{4e16}\u{754c}.txt").is_ok());
+        assert!(guard
+            .check_read("/home/user/project/src/\u{00e9}ditor.rs")
+            .is_ok());
+        assert!(guard
+            .check_read("/home/user/project/\u{4e16}\u{754c}.txt")
+            .is_ok());
     }
 
     #[test]
     fn fs_guard_multiple_prefixes_matches_second() {
-        let guard = FsGuard::new(vec![
-            "/opt/first".to_string(),
-            "/opt/second".to_string(),
-        ]);
+        let guard = FsGuard::new(vec!["/opt/first".to_string(), "/opt/second".to_string()]);
         // Should fail for first prefix but succeed for second.
         assert!(guard.check_read("/opt/second/file.txt").is_ok());
         // Verify the first also works.
@@ -1171,35 +1189,41 @@ mod extended_tests {
     #[test]
     fn terminal_guard_arg_with_dollar_paren() {
         let guard = TerminalGuard::new(vec!["echo".to_string()]);
-        assert!(guard.check_command("echo", &["$(whoami)".to_string()]).is_err());
+        assert!(guard
+            .check_command("echo", &["$(whoami)".to_string()])
+            .is_err());
     }
 
     #[test]
     fn terminal_guard_arg_with_newline_character() {
         let guard = TerminalGuard::new(vec!["echo".to_string()]);
-        assert!(guard.check_command("echo", &["line1\nline2".to_string()]).is_err());
+        assert!(guard
+            .check_command("echo", &["line1\nline2".to_string()])
+            .is_err());
     }
 
     #[test]
     fn terminal_guard_clean_arg_with_equals_sign() {
         let guard = TerminalGuard::new(vec!["cargo".to_string()]);
-        assert!(guard.check_command("cargo", &["--flag=value".to_string()]).is_ok());
+        assert!(guard
+            .check_command("cargo", &["--flag=value".to_string()])
+            .is_ok());
     }
 
     #[test]
     fn terminal_guard_clean_arg_with_dashes_and_numbers() {
         let guard = TerminalGuard::new(vec!["cargo".to_string()]);
-        assert!(
-            guard
-                .check_command("cargo", &["--jobs=4".to_string(), "-j2".to_string()])
-                .is_ok()
-        );
+        assert!(guard
+            .check_command("cargo", &["--jobs=4".to_string(), "-j2".to_string()])
+            .is_ok());
     }
 
     #[test]
     fn terminal_guard_arg_with_carriage_return() {
         let guard = TerminalGuard::new(vec!["echo".to_string()]);
-        assert!(guard.check_command("echo", &["hello\rworld".to_string()]).is_err());
+        assert!(guard
+            .check_command("echo", &["hello\rworld".to_string()])
+            .is_err());
     }
 
     #[test]
@@ -1281,7 +1305,10 @@ mod extended_tests {
                 assert_eq!(v["id"], 100);
                 assert_eq!(v["error"]["code"], -32000);
             }
-            other => panic!("expected Block for fs write outside prefix, got {:?}", other),
+            other => panic!(
+                "expected Block for fs write outside prefix, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1310,7 +1337,10 @@ mod extended_tests {
                     "error message should contain 'denied', got: {msg_str}"
                 );
             }
-            other => panic!("expected Block for unlisted terminal command, got {:?}", other),
+            other => panic!(
+                "expected Block for unlisted terminal command, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1394,7 +1424,10 @@ mod extended_tests {
         assert!(result.is_ok());
         match result {
             Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
-            other => panic!("expected Forward for message without method, got {:?}", other),
+            other => panic!(
+                "expected Forward for message without method, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1407,7 +1440,10 @@ mod extended_tests {
             "method": "fs/read_text_file"
         });
         let result = interceptor.intercept(Direction::AgentToClient, &msg);
-        assert!(result.is_err(), "missing params should produce a protocol error");
+        assert!(
+            result.is_err(),
+            "missing params should produce a protocol error"
+        );
     }
 
     #[test]
@@ -1419,7 +1455,10 @@ mod extended_tests {
             "method": "fs/write_text_file"
         });
         let result = interceptor.intercept(Direction::AgentToClient, &msg);
-        assert!(result.is_err(), "missing params should produce a protocol error");
+        assert!(
+            result.is_err(),
+            "missing params should produce a protocol error"
+        );
     }
 
     #[test]
@@ -1431,7 +1470,10 @@ mod extended_tests {
             "method": "terminal/create"
         });
         let result = interceptor.intercept(Direction::AgentToClient, &msg);
-        assert!(result.is_err(), "missing params should produce a protocol error");
+        assert!(
+            result.is_err(),
+            "missing params should produce a protocol error"
+        );
     }
 
     #[test]
@@ -1500,7 +1542,10 @@ mod extended_tests {
                 assert_eq!(receipt.status, "completed");
                 assert_eq!(receipt.session_id, "s2");
             }
-            other => panic!("expected ForwardWithReceipt for tool_call_update, got {:?}", other),
+            other => panic!(
+                "expected ForwardWithReceipt for tool_call_update, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1651,9 +1696,7 @@ mod extended_tests {
         let mapped = mapper.map_option(&option);
         assert_eq!(
             mapped.arc_decision,
-            PermissionDecision::AllowScoped {
-                duration_secs: 900
-            }
+            PermissionDecision::AllowScoped { duration_secs: 900 }
         );
     }
 
@@ -1670,8 +1713,8 @@ mod extended_tests {
             kind: Some("test".to_string()),
             status: Some("running".to_string()),
         };
-        let entry1 = logger.log_tool_call("session-det", &event);
-        let entry2 = logger.log_tool_call("session-det", &event);
+        let entry1 = logger.log_tool_call("session-det", &event, None);
+        let entry2 = logger.log_tool_call("session-det", &event, None);
         assert_eq!(entry1.content_hash, entry2.content_hash);
         assert_eq!(entry1.content_hash.len(), 64);
     }
@@ -1691,8 +1734,8 @@ mod extended_tests {
             kind: Some("test".to_string()),
             status: Some("running".to_string()),
         };
-        let entry_a = logger.log_tool_call("session-diff", &event_a);
-        let entry_b = logger.log_tool_call("session-diff", &event_b);
+        let entry_a = logger.log_tool_call("session-diff", &event_a, None);
+        let entry_b = logger.log_tool_call("session-diff", &event_b, None);
         assert_ne!(
             entry_a.content_hash, entry_b.content_hash,
             "different events should produce different hashes"
@@ -1708,11 +1751,17 @@ mod extended_tests {
             kind: None,
             status: None,
         };
-        let entry = logger.log_tool_call("session-minimal", &event);
+        let entry = logger.log_tool_call("session-minimal", &event, None);
         assert_eq!(entry.tool_call_id, "tc-minimal");
-        assert_eq!(entry.title, "", "missing title should default to empty string");
+        assert_eq!(
+            entry.title, "",
+            "missing title should default to empty string"
+        );
         assert!(entry.kind.is_none());
-        assert_eq!(entry.status, "started", "missing status should default to 'started'");
+        assert_eq!(
+            entry.status, "started",
+            "missing status should default to 'started'"
+        );
         assert!(!entry.content_hash.is_empty());
         assert_eq!(entry.content_hash.len(), 64);
     }
@@ -1724,7 +1773,7 @@ mod extended_tests {
             tool_call_id: "tc-no-status".to_string(),
             status: None,
         };
-        let result = logger.log_tool_call_update("session-none", &event);
+        let result = logger.log_tool_call_update("session-none", &event, None);
         assert!(result.is_none());
     }
 
@@ -1735,7 +1784,7 @@ mod extended_tests {
             tool_call_id: "tc-with-status".to_string(),
             status: Some("error".to_string()),
         };
-        let result = logger.log_tool_call_update("session-status", &event);
+        let result = logger.log_tool_call_update("session-status", &event, None);
         assert!(result.is_some());
         if let Some(entry) = result {
             assert_eq!(entry.tool_call_id, "tc-with-status");
@@ -1751,8 +1800,8 @@ mod extended_tests {
             tool_call_id: "tc-upd-det".to_string(),
             status: Some("completed".to_string()),
         };
-        let entry1 = logger.log_tool_call_update("session-upd", &event);
-        let entry2 = logger.log_tool_call_update("session-upd", &event);
+        let entry1 = logger.log_tool_call_update("session-upd", &event, None);
+        let entry2 = logger.log_tool_call_update("session-upd", &event, None);
         assert!(entry1.is_some());
         assert!(entry2.is_some());
         if let (Some(e1), Some(e2)) = (entry1, entry2) {
@@ -1769,7 +1818,7 @@ mod extended_tests {
             kind: None,
             status: Some("running".to_string()),
         };
-        let entry = logger.log_tool_call("s1", &event);
+        let entry = logger.log_tool_call("s1", &event, None);
         assert_eq!(entry.server_id, "custom-server-id");
     }
 
@@ -1782,11 +1831,8 @@ mod extended_tests {
             kind: None,
             status: Some("running".to_string()),
         };
-        let entry = logger.log_tool_call("s1", &event);
-        assert!(
-            !entry.timestamp.is_empty(),
-            "timestamp should not be empty"
-        );
+        let entry = logger.log_tool_call("s1", &event, None);
+        assert!(!entry.timestamp.is_empty(), "timestamp should not be empty");
         let parsed: Result<u64, _> = entry.timestamp.parse();
         assert!(
             parsed.is_ok(),
@@ -1831,12 +1877,13 @@ mod extended_tests {
 
     #[test]
     fn proxy_start_with_nonexistent_command_fails() {
-        let config = AcpProxyConfig::new(
-            "/nonexistent/path/to/fake-agent-binary-xyz123",
-            "deadbeef",
-        );
+        let config =
+            AcpProxyConfig::new("/nonexistent/path/to/fake-agent-binary-xyz123", "deadbeef");
         let result = AcpProxy::start(config);
-        assert!(result.is_err(), "starting with a nonexistent command should fail");
+        assert!(
+            result.is_err(),
+            "starting with a nonexistent command should fail"
+        );
     }
 
     #[test]
@@ -1863,6 +1910,8 @@ mod extended_tests {
             timestamp: "1700000000".to_string(),
             server_id: "srv-rt".to_string(),
             content_hash: "a".repeat(64),
+            capability_id: Some("cap-rt".to_string()),
+            enforcement_mode: Some(AcpEnforcementMode::CryptographicallyEnforced),
         };
         let json_result = serde_json::to_string(&entry);
         assert!(json_result.is_ok(), "audit entry should serialize to JSON");
@@ -1928,10 +1977,16 @@ mod extended_tests {
             ("session/prompt", AcpMethod::SessionPrompt),
             ("session/cancel", AcpMethod::SessionCancel),
             ("session/update", AcpMethod::SessionUpdate),
-            ("session/request_permission", AcpMethod::SessionRequestPermission),
+            (
+                "session/request_permission",
+                AcpMethod::SessionRequestPermission,
+            ),
             ("session/load", AcpMethod::SessionLoad),
             ("session/list", AcpMethod::SessionList),
-            ("session/set_config_option", AcpMethod::SessionSetConfigOption),
+            (
+                "session/set_config_option",
+                AcpMethod::SessionSetConfigOption,
+            ),
             ("session/set_mode", AcpMethod::SessionSetMode),
             ("fs/read_text_file", AcpMethod::FsReadTextFile),
             ("fs/write_text_file", AcpMethod::FsWriteTextFile),
@@ -1964,7 +2019,10 @@ mod extended_tests {
         assert!(result.is_ok());
         match result {
             Ok(InterceptResult::Forward(_)) => {}
-            other => panic!("expected Forward for malformed session/update params, got {:?}", other),
+            other => panic!(
+                "expected Forward for malformed session/update params, got {:?}",
+                other
+            ),
         }
     }
 
@@ -1979,7 +2037,10 @@ mod extended_tests {
         assert!(result.is_ok());
         match result {
             Ok(InterceptResult::Forward(_)) => {}
-            other => panic!("expected Forward for session/update with no params, got {:?}", other),
+            other => panic!(
+                "expected Forward for session/update with no params, got {:?}",
+                other
+            ),
         }
     }
 
@@ -2015,7 +2076,10 @@ mod extended_tests {
         assert!(result.is_ok());
         match result {
             Ok(InterceptResult::Forward(v)) => assert_eq!(v, msg),
-            other => panic!("expected Forward for permission without params, got {:?}", other),
+            other => panic!(
+                "expected Forward for permission without params, got {:?}",
+                other
+            ),
         }
     }
 
@@ -2188,6 +2252,8 @@ mod attestation_and_telemetry_tests {
             timestamp: now_secs().to_string(),
             server_id: "acp-proxy".to_string(),
             content_hash: format!("hash-{tool_call_id}"),
+            capability_id: None,
+            enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
         }
     }
 
@@ -2288,6 +2354,61 @@ mod attestation_and_telemetry_tests {
         }
     }
 
+    struct RecordingChecker {
+        requests: Arc<Mutex<Vec<AcpCapabilityRequest>>>,
+        verdict: AcpVerdict,
+    }
+
+    impl RecordingChecker {
+        fn allow(requests: Arc<Mutex<Vec<AcpCapabilityRequest>>>, capability_id: &str) -> Self {
+            Self {
+                requests,
+                verdict: AcpVerdict {
+                    allowed: true,
+                    capability_id: Some(capability_id.to_string()),
+                    reason: "recorded allow".to_string(),
+                },
+            }
+        }
+
+        fn deny(requests: Arc<Mutex<Vec<AcpCapabilityRequest>>>, reason: &str) -> Self {
+            Self {
+                requests,
+                verdict: AcpVerdict {
+                    allowed: false,
+                    capability_id: Some("cap-denied".to_string()),
+                    reason: reason.to_string(),
+                },
+            }
+        }
+    }
+
+    impl CapabilityChecker for RecordingChecker {
+        fn check_access(
+            &self,
+            request: &AcpCapabilityRequest,
+        ) -> Result<AcpVerdict, CapabilityCheckError> {
+            self.requests
+                .lock()
+                .expect("recording checker lock should succeed")
+                .push(request.clone());
+            Ok(self.verdict.clone())
+        }
+    }
+
+    struct ErrorChecker;
+
+    impl CapabilityChecker for ErrorChecker {
+        fn check_access(
+            &self,
+            _request: &AcpCapabilityRequest,
+        ) -> Result<AcpVerdict, CapabilityCheckError> {
+            Err(CapabilityCheckError::Internal(
+                "checker backend unavailable".to_string(),
+            ))
+        }
+    }
+
     #[test]
     fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
         let kernel = Keypair::generate();
@@ -2299,7 +2420,9 @@ mod attestation_and_telemetry_tests {
             token: None,
         };
 
-        let verdict = checker.check_access(&request).expect("check should succeed");
+        let verdict = checker
+            .check_access(&request)
+            .expect("check should succeed");
         assert!(!verdict.allowed);
         assert_eq!(verdict.reason, "no capability token presented");
 
@@ -2337,7 +2460,9 @@ mod attestation_and_telemetry_tests {
             token: Some(serde_json::to_string(&valid).expect("token should serialize")),
         };
 
-        let verdict = checker.check_access(&request).expect("check should succeed");
+        let verdict = checker
+            .check_access(&request)
+            .expect("check should succeed");
         assert!(verdict.allowed);
         assert_eq!(verdict.capability_id.as_deref(), Some(valid.id.as_str()));
 
@@ -2416,9 +2541,271 @@ mod attestation_and_telemetry_tests {
             token: Some(serde_json::to_string(&token).expect("token should serialize")),
         };
 
-        let verdict = checker.check_access(&request).expect("check should succeed");
+        let verdict = checker
+            .check_access(&request)
+            .expect("check should succeed");
         assert!(verdict.allowed);
         assert_eq!(verdict.reason, "capability token authorized access");
+    }
+
+    #[test]
+    fn kernel_capability_checker_rejects_untrusted_and_tampered_tokens() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let now = now_secs();
+        let trusted_checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+
+        let token = make_capability_token(
+            &issuer,
+            &subject,
+            "proxy-server",
+            "fs/read_text_file",
+            vec![Constraint::PathPrefix("/workspace".to_string())],
+            now.saturating_sub(30),
+            now + 3600,
+        );
+
+        let untrusted_checker =
+            KernelCapabilityChecker::new(Keypair::generate().public_key(), "proxy-server");
+        let request = AcpCapabilityRequest {
+            session_id: "session-untrusted".to_string(),
+            operation: "fs_read".to_string(),
+            resource: "/workspace/src/lib.rs".to_string(),
+            token: Some(serde_json::to_string(&token).expect("token should serialize")),
+        };
+        let verdict = untrusted_checker
+            .check_access(&request)
+            .expect("untrusted issuer should fail closed");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("trusted kernel key"));
+
+        let mut tampered = token.clone();
+        tampered.expires_at = tampered.expires_at.saturating_add(60);
+        let tampered_request = AcpCapabilityRequest {
+            token: Some(serde_json::to_string(&tampered).expect("token should serialize")),
+            ..request
+        };
+        let verdict = trusted_checker
+            .check_access(&tampered_request)
+            .expect("tampered token should fail closed");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("token signature is invalid"));
+    }
+
+    #[test]
+    fn interceptor_checker_allow_path_records_capability_context_for_receipts() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo")
+            .with_server_id("proxy-server");
+        let interceptor = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(RecordingChecker::allow(
+                Arc::clone(&requests),
+                "cap-377",
+            ))),
+            AcpAttestationMode::Required,
+        );
+
+        let read = json!({
+            "jsonrpc": "2.0",
+            "id": 377,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-377",
+                "path": "/home/user/project/src/lib.rs",
+                "capabilityToken": "signed-capability-json"
+            }
+        });
+
+        match interceptor
+            .intercept(Direction::AgentToClient, &read)
+            .expect("read should be allowed")
+        {
+            InterceptResult::Forward(value) => assert_eq!(value, read),
+            other => panic!("expected Forward, got {:?}", other),
+        }
+
+        let recorded = requests.lock().expect("recorded requests should lock");
+        assert_eq!(recorded.len(), 1);
+        assert_eq!(recorded[0].session_id, "session-377");
+        assert_eq!(recorded[0].operation, "fs_read");
+        assert_eq!(recorded[0].resource, "/home/user/project/src/lib.rs");
+        assert_eq!(recorded[0].token.as_deref(), Some("signed-capability-json"));
+        drop(recorded);
+
+        let update = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-377",
+                "update": {
+                    "toolCallId": "tool-377",
+                    "title": "Read file",
+                    "kind": "fs_read",
+                    "status": "running"
+                }
+            }
+        });
+
+        match interceptor
+            .intercept(Direction::AgentToClient, &update)
+            .expect("session update should produce a receipt")
+        {
+            InterceptResult::ForwardWithReceipt(_, receipt) => {
+                assert_eq!(receipt.capability_id.as_deref(), Some("cap-377"));
+                assert_eq!(
+                    receipt.enforcement_mode,
+                    Some(AcpEnforcementMode::CryptographicallyEnforced)
+                );
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn interceptor_checker_denies_and_errors_fail_closed_before_builtin_guards() {
+        let deny_requests = Arc::new(Mutex::new(Vec::new()));
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo");
+        let denying = MessageInterceptor::with_kernel(
+            config.clone(),
+            None,
+            Some(Box::new(RecordingChecker::deny(
+                Arc::clone(&deny_requests),
+                "token scope does not cover fs_read on requested path",
+            ))),
+            AcpAttestationMode::Required,
+        );
+        let read = json!({
+            "jsonrpc": "2.0",
+            "id": 378,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-378",
+                "path": "/home/user/project/src/lib.rs",
+                "capability_token": "candidate-token"
+            }
+        });
+
+        match denying
+            .intercept(Direction::AgentToClient, &read)
+            .expect("deny path should still return a block response")
+        {
+            InterceptResult::Block(value) => {
+                assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
+                assert!(value["error"]["message"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("token scope does not cover"));
+            }
+            other => panic!("expected Block for deny verdict, got {:?}", other),
+        }
+
+        let erroring = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(ErrorChecker)),
+            AcpAttestationMode::Required,
+        );
+        match erroring
+            .intercept(Direction::AgentToClient, &read)
+            .expect("error path should still return a block response")
+        {
+            InterceptResult::Block(value) => {
+                assert_eq!(value["error"]["code"], ACP_ERROR_ACCESS_DENIED);
+                assert!(value["error"]["message"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("failed closed"));
+            }
+            other => panic!("expected Block for checker error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn interceptor_clears_capability_context_after_terminal_status_updates() {
+        let config = AcpProxyConfig::new("echo", "deadbeef")
+            .with_allowed_path_prefix("/home/user/project")
+            .with_allowed_command("cargo");
+        let interceptor = MessageInterceptor::with_kernel(
+            config,
+            None,
+            Some(Box::new(RecordingChecker::allow(
+                Arc::new(Mutex::new(Vec::new())),
+                "cap-terminal",
+            ))),
+            AcpAttestationMode::Required,
+        );
+
+        let read = json!({
+            "jsonrpc": "2.0",
+            "id": 379,
+            "method": "fs/read_text_file",
+            "params": {
+                "sessionId": "session-clear",
+                "path": "/home/user/project/src/lib.rs",
+                "capabilityToken": "signed-capability-json"
+            }
+        });
+        interceptor
+            .intercept(Direction::AgentToClient, &read)
+            .expect("read should be allowed");
+
+        let completed = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-clear",
+                "update": {
+                    "toolCallId": "tool-clear",
+                    "status": "completed"
+                }
+            }
+        });
+
+        match interceptor
+            .intercept(Direction::AgentToClient, &completed)
+            .expect("completed update should produce a receipt")
+        {
+            InterceptResult::ForwardWithReceipt(_, receipt) => {
+                assert_eq!(receipt.capability_id.as_deref(), Some("cap-terminal"));
+                assert_eq!(
+                    receipt.enforcement_mode,
+                    Some(AcpEnforcementMode::CryptographicallyEnforced)
+                );
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
+
+        let later_update = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "session-clear",
+                "update": {
+                    "toolCallId": "tool-later",
+                    "status": "running"
+                }
+            }
+        });
+
+        match interceptor
+            .intercept(Direction::AgentToClient, &later_update)
+            .expect("later update should still be forwarded")
+        {
+            InterceptResult::ForwardWithReceipt(_, receipt) => {
+                assert_eq!(receipt.capability_id, None);
+                assert_eq!(
+                    receipt.enforcement_mode,
+                    Some(AcpEnforcementMode::AuditOnly)
+                );
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
     }
 
     #[test]
@@ -2454,12 +2841,8 @@ mod attestation_and_telemetry_tests {
             receipt: invalid_receipt,
             seq: 0,
         }];
-        let invalid = generate_compliance_certificate(
-            "session-invalid",
-            &invalid_entries,
-            &config,
-            &signer,
-        );
+        let invalid =
+            generate_compliance_certificate("session-invalid", &invalid_entries, &config, &signer);
         assert!(matches!(
             invalid,
             Err(ComplianceCertificateError::InvalidReceiptSignature { .. })
@@ -2521,12 +2904,8 @@ mod attestation_and_telemetry_tests {
             ),
             seq: 0,
         }];
-        let scope = generate_compliance_certificate(
-            "session-scope",
-            &scope_entries,
-            &config,
-            &signer,
-        );
+        let scope =
+            generate_compliance_certificate("session-scope", &scope_entries, &config, &signer);
         assert!(matches!(
             scope,
             Err(ComplianceCertificateError::ScopeViolation { .. })
@@ -2549,12 +2928,8 @@ mod attestation_and_telemetry_tests {
                 seq: idx,
             })
             .collect::<Vec<_>>();
-        let budget = generate_compliance_certificate(
-            "session-budget",
-            &budget_entries,
-            &config,
-            &signer,
-        );
+        let budget =
+            generate_compliance_certificate("session-budget", &budget_entries, &config, &signer);
         assert!(matches!(
             budget,
             Err(ComplianceCertificateError::BudgetExceeded { used: 5, limit: 4 })
@@ -2571,12 +2946,8 @@ mod attestation_and_telemetry_tests {
             ),
             seq: 0,
         }];
-        let guard = generate_compliance_certificate(
-            "session-guard",
-            &guard_entries,
-            &config,
-            &signer,
-        );
+        let guard =
+            generate_compliance_certificate("session-guard", &guard_entries, &config, &signer);
         assert!(matches!(
             guard,
             Err(ComplianceCertificateError::GuardBypass { .. })
@@ -2628,20 +2999,14 @@ mod attestation_and_telemetry_tests {
         let cert = generate_compliance_certificate("session-good", &receipts, &config, &signer)
             .expect("certificate should generate");
 
-        let lightweight = verify_compliance_certificate(
-            &cert,
-            VerificationMode::Lightweight,
-            Some(&receipts),
-        );
+        let lightweight =
+            verify_compliance_certificate(&cert, VerificationMode::Lightweight, Some(&receipts));
         assert!(lightweight.passed);
         assert!(lightweight.certificate_signature_valid);
         assert_eq!(lightweight.summary, "lightweight verification passed");
 
-        let full_bundle = verify_compliance_certificate(
-            &cert,
-            VerificationMode::FullBundle,
-            Some(&receipts),
-        );
+        let full_bundle =
+            verify_compliance_certificate(&cert, VerificationMode::FullBundle, Some(&receipts));
         assert!(full_bundle.passed);
         assert_eq!(full_bundle.receipts_reverified, 2);
         assert_eq!(full_bundle.receipt_failures, 0);
@@ -2659,18 +3024,83 @@ mod attestation_and_telemetry_tests {
         assert!(tampered.summary.contains("1 receipt signature(s) failed"));
 
         let mut inconsistent_cert = cert.clone();
-        inconsistent_cert.body.anomalies.push("missing guard".to_string());
+        inconsistent_cert
+            .body
+            .anomalies
+            .push("missing guard".to_string());
         let body_bytes = arc_core::canonical::canonical_json_bytes(&inconsistent_cert.body)
             .expect("certificate body should serialize");
         inconsistent_cert.signature = signer.sign(&body_bytes);
-        let inconsistent = verify_compliance_certificate(
-            &inconsistent_cert,
-            VerificationMode::Lightweight,
-            None,
-        );
+        let inconsistent =
+            verify_compliance_certificate(&inconsistent_cert, VerificationMode::Lightweight, None);
         assert!(!inconsistent.passed);
         assert!(inconsistent.certificate_signature_valid);
         assert!(!inconsistent.body_consistent);
+    }
+
+    #[test]
+    fn compliance_certificate_serializes_snake_case_and_accepts_legacy_aliases() {
+        let signer = Keypair::generate();
+        let now = now_secs();
+        let receipts = vec![ComplianceReceiptEntry {
+            receipt: make_receipt(
+                &signer,
+                "receipt-snake",
+                now,
+                "fs/read_text_file",
+                Decision::Allow,
+                vec![GuardEvidence {
+                    guard_name: "fs_guard".to_string(),
+                    verdict: true,
+                    details: Some("ok".to_string()),
+                }],
+            ),
+            seq: 0,
+        }];
+        let config = ComplianceConfig {
+            budget_limit: 1,
+            required_guards: vec!["fs_guard".to_string()],
+            authorized_scopes: vec!["fs/".to_string()],
+        };
+
+        let cert = generate_compliance_certificate("session-snake", &receipts, &config, &signer)
+            .expect("certificate should generate");
+
+        let json = serde_json::to_value(&cert).expect("certificate should serialize");
+        assert!(json.get("signer_key").is_some());
+        assert!(json.get("signerKey").is_none());
+        let body = json
+            .get("body")
+            .and_then(serde_json::Value::as_object)
+            .expect("body should be an object");
+        assert!(body.get("session_id").is_some());
+        assert!(body.get("receipt_count").is_some());
+        assert!(body.get("kernel_key").is_some());
+        assert!(body.get("sessionId").is_none());
+
+        let legacy = serde_json::json!({
+            "body": {
+                "schema": cert.body.schema,
+                "sessionId": cert.body.session_id,
+                "issuedAt": cert.body.issued_at,
+                "receiptCount": cert.body.receipt_count,
+                "firstReceiptAt": cert.body.first_receipt_at,
+                "lastReceiptAt": cert.body.last_receipt_at,
+                "allSignaturesValid": cert.body.all_signatures_valid,
+                "chainContinuous": cert.body.chain_continuous,
+                "scopeCompliant": cert.body.scope_compliant,
+                "budgetCompliant": cert.body.budget_compliant,
+                "guardsCompliant": cert.body.guards_compliant,
+                "anomalies": cert.body.anomalies,
+                "kernelKey": cert.body.kernel_key,
+            },
+            "signerKey": cert.signer_key,
+            "signature": cert.signature,
+        });
+        let decoded: ComplianceCertificate =
+            serde_json::from_value(legacy).expect("legacy camelCase payload should deserialize");
+        assert_eq!(decoded.body.session_id, "session-snake");
+        assert_eq!(decoded.body.receipt_count, 1);
     }
 
     #[test]
@@ -2681,12 +3111,7 @@ mod attestation_and_telemetry_tests {
             state: Arc::clone(&shared),
             supports_checkpoints: true,
         };
-        let signer = KernelReceiptSigner::new(
-            keypair.clone(),
-            "proxy-server",
-            Box::new(store),
-            2,
-        );
+        let signer = KernelReceiptSigner::new(keypair.clone(), "proxy-server", Box::new(store), 2);
 
         let request_a = AcpReceiptRequest {
             audit_entry: make_audit_entry("call-a", "session-1"),
@@ -2702,12 +3127,16 @@ mod attestation_and_telemetry_tests {
         let receipt_a = signer
             .sign_acp_receipt(&request_a)
             .expect("first receipt should sign");
-        assert!(receipt_a.verify_signature().expect("signature should verify"));
+        assert!(receipt_a
+            .verify_signature()
+            .expect("signature should verify"));
 
         let receipt_b = signer
             .sign_acp_receipt(&request_b)
             .expect("second receipt should sign");
-        assert!(receipt_b.verify_signature().expect("signature should verify"));
+        assert!(receipt_b
+            .verify_signature()
+            .expect("signature should verify"));
 
         let state = shared.lock().expect("shared state should lock");
         assert_eq!(state.appended_receipts.len(), 2);
@@ -2716,6 +3145,56 @@ mod attestation_and_telemetry_tests {
         assert_eq!(state.checkpoints[0].body.batch_start_seq, 0);
         assert_eq!(state.checkpoints[0].body.batch_end_seq, 1);
         assert_eq!(state.checkpoints[0].body.tree_size, 2);
+    }
+
+    #[test]
+    fn kernel_receipt_signer_propagates_capability_metadata_into_receipts() {
+        let keypair = Keypair::generate();
+        let shared = Arc::new(Mutex::new(MockStoreState::default()));
+        let store = MockReceiptStore {
+            state: Arc::clone(&shared),
+            supports_checkpoints: false,
+        };
+        let signer = KernelReceiptSigner::new(keypair, "proxy-server", Box::new(store), 10);
+
+        let mut enforced_entry = make_audit_entry("call-enforced", "session-enforced");
+        enforced_entry.capability_id = Some("cap-377".to_string());
+        enforced_entry.enforcement_mode = Some(AcpEnforcementMode::CryptographicallyEnforced);
+        let enforced = signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: enforced_entry,
+                tool_server: "proxy-server".to_string(),
+                tool_name: "fs/read_text_file".to_string(),
+            })
+            .expect("enforced receipt should sign");
+        assert_eq!(enforced.capability_id, "cap-377");
+        assert_eq!(
+            enforced.metadata.as_ref().and_then(|metadata| {
+                metadata
+                    .get("acp")
+                    .and_then(|acp| acp.get("enforcementMode"))
+                    .and_then(serde_json::Value::as_str)
+            }),
+            Some("cryptographically_enforced")
+        );
+
+        let audit_only = signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: make_audit_entry("call-audit", "session-audit"),
+                tool_server: "proxy-server".to_string(),
+                tool_name: "terminal/create".to_string(),
+            })
+            .expect("audit-only receipt should sign");
+        assert_eq!(audit_only.capability_id, "acp-session:session-audit");
+        assert_eq!(
+            audit_only.metadata.as_ref().and_then(|metadata| {
+                metadata
+                    .get("acp")
+                    .and_then(|acp| acp.get("enforcementMode"))
+                    .and_then(serde_json::Value::as_str)
+            }),
+            Some("audit_only")
+        );
     }
 
     #[test]
@@ -2796,11 +3275,10 @@ mod attestation_and_telemetry_tests {
         assert_eq!(span.verdict, "deny");
         assert_eq!(span.start_time_nanos, 123_000_000_000);
         assert_eq!(span.events.len(), 1);
-        assert!(
-            span.attributes
-                .iter()
-                .any(|attr| attr.key == "arc.deny_reason" && attr.value == "blocked")
-        );
+        assert!(span
+            .attributes
+            .iter()
+            .any(|attr| attr.key == "arc.deny_reason" && attr.value == "blocked"));
         assert_eq!(span.events[0].name, "guard.fs_guard");
 
         let cert_body = ComplianceCertificateBody {
@@ -2821,12 +3299,10 @@ mod attestation_and_telemetry_tests {
         let cert_event = compliance_certificate_event(&cert_body);
         assert_eq!(cert_event.name, "arc.compliance.certificate");
         assert_eq!(cert_event.timestamp_nanos, 456_000_000_000);
-        assert!(
-            cert_event
-                .attributes
-                .iter()
-                .any(|attr| attr.key == "cert.receipt_count" && attr.value == "2")
-        );
+        assert!(cert_event
+            .attributes
+            .iter()
+            .any(|attr| attr.key == "cert.receipt_count" && attr.value == "2"));
 
         let root = session_root_span("session-telemetry", &trace_id, 100, 200);
         assert_eq!(root.tool_name, "arc.session");
@@ -2859,16 +3335,16 @@ mod attestation_and_telemetry_tests {
 
         let logger = LoggingSpanExporter;
         assert_eq!(
-            logger.export(std::slice::from_ref(&span)).expect("logging export should work"),
+            logger
+                .export(std::slice::from_ref(&span))
+                .expect("logging export should work"),
             1
         );
         logger.flush().expect("flush should succeed");
         logger.shutdown().expect("shutdown should succeed");
 
-        let output_path = std::env::temp_dir().join(format!(
-            "arc-acp-proxy-telemetry-{}.jsonl",
-            now_secs()
-        ));
+        let output_path =
+            std::env::temp_dir().join(format!("arc-acp-proxy-telemetry-{}.jsonl", now_secs()));
         let exporter = JsonFileExporter::new(output_path.to_string_lossy().into_owned());
         assert_eq!(
             exporter
@@ -2883,7 +3359,8 @@ mod attestation_and_telemetry_tests {
         assert!(contents.contains("\"toolName\":\"terminal/create\""));
         let _ = fs::remove_file(&output_path);
 
-        let bad_exporter = JsonFileExporter::new(std::env::temp_dir().to_string_lossy().into_owned());
+        let bad_exporter =
+            JsonFileExporter::new(std::env::temp_dir().to_string_lossy().into_owned());
         let error = bad_exporter
             .export(std::slice::from_ref(&span))
             .expect_err("directory path should fail");
@@ -2915,12 +3392,9 @@ mod attestation_and_telemetry_tests {
 
     #[test]
     fn transport_handles_eof_and_invalid_json() {
-        let mut eof_transport = AcpTransport::spawn(
-            "sh",
-            &["-c".to_string(), "exit 0".to_string()],
-            &[],
-        )
-        .expect("transport should spawn");
+        let mut eof_transport =
+            AcpTransport::spawn("sh", &["-c".to_string(), "exit 0".to_string()], &[])
+                .expect("transport should spawn");
         assert_eq!(eof_transport.recv().expect("recv should succeed"), None);
         assert_eq!(eof_transport.wait().expect("wait should succeed"), Some(0));
 
@@ -2934,7 +3408,10 @@ mod attestation_and_telemetry_tests {
             .recv()
             .expect_err("invalid json should return protocol error");
         assert!(matches!(error, AcpProxyError::Protocol(_)));
-        assert_eq!(invalid_transport.wait().expect("wait should succeed"), Some(0));
+        assert_eq!(
+            invalid_transport.wait().expect("wait should succeed"),
+            Some(0)
+        );
     }
 
     #[test]

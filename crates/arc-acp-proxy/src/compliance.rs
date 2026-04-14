@@ -88,43 +88,53 @@ pub struct ComplianceConfig {
 
 /// The body of a compliance certificate (unsigned).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ComplianceCertificateBody {
     /// Schema identifier.
     pub schema: String,
     /// Session ID the certificate covers.
+    #[serde(alias = "sessionId")]
     pub session_id: String,
     /// Unix timestamp when the certificate was generated.
+    #[serde(alias = "issuedAt")]
     pub issued_at: u64,
     /// Number of receipts examined.
+    #[serde(alias = "receiptCount")]
     pub receipt_count: u64,
     /// First receipt timestamp in the session.
+    #[serde(alias = "firstReceiptAt")]
     pub first_receipt_at: u64,
     /// Last receipt timestamp in the session.
+    #[serde(alias = "lastReceiptAt")]
     pub last_receipt_at: u64,
     /// Whether all receipts passed signature verification.
+    #[serde(alias = "allSignaturesValid")]
     pub all_signatures_valid: bool,
     /// Whether the receipt chain is continuous (no gaps).
+    #[serde(alias = "chainContinuous")]
     pub chain_continuous: bool,
     /// Whether all receipts are within authorized scope.
+    #[serde(alias = "scopeCompliant")]
     pub scope_compliant: bool,
     /// Whether the invocation budget was respected.
+    #[serde(alias = "budgetCompliant")]
     pub budget_compliant: bool,
     /// Whether all required guards have evidence in every receipt.
+    #[serde(alias = "guardsCompliant")]
     pub guards_compliant: bool,
     /// Summary of any anomalies detected (empty if fully compliant).
     pub anomalies: Vec<String>,
     /// The kernel public key that signed the session receipts.
+    #[serde(alias = "kernelKey")]
     pub kernel_key: PublicKey,
 }
 
 /// A signed compliance certificate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct ComplianceCertificate {
     /// The unsigned body.
     pub body: ComplianceCertificateBody,
     /// Public key that signed the certificate.
+    #[serde(alias = "signerKey")]
     pub signer_key: PublicKey,
     /// Ed25519 signature over canonical JSON of `body`.
     pub signature: Signature,
@@ -141,15 +151,18 @@ pub enum VerificationMode {
 
 /// Result of certificate verification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CertificateVerificationResult {
     /// Whether the certificate signature is valid.
+    #[serde(alias = "certificateSignatureValid")]
     pub certificate_signature_valid: bool,
     /// Whether the body fields are internally consistent.
+    #[serde(alias = "bodyConsistent")]
     pub body_consistent: bool,
     /// Number of receipt signatures re-verified (full-bundle mode only).
+    #[serde(alias = "receiptsReverified")]
     pub receipts_reverified: u64,
     /// Number of receipt signature failures (full-bundle mode only).
+    #[serde(alias = "receiptFailures")]
     pub receipt_failures: u64,
     /// Overall pass/fail.
     pub passed: bool,
