@@ -181,7 +181,7 @@
   368-372 (planned)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
-- [ ] **v4.1 Guard SDK and Developer Experience** - Phases 377-380 (planned;
+- [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
   depends on v4.0)
 
 ## Ship Readiness Ladder (v2.66-v2.73)
@@ -423,7 +423,7 @@ tooling.
 **Success Criteria** (what must be TRUE):
   1. ARC contracts are deployed to Base Sepolia testnet with verified contract addresses recorded in configuration
   2. An end-to-end flow runs: capability issuance -> tool call -> receipt signing -> on-chain settlement using test tokens, observable in a block explorer
-**Plans**: TBD
+**Plans**: `01` complete -- live checker wiring, trusted signature verification, and receipt-facing capability correlation landed on 2026-04-14
 
 ### Phase 292: Bitcoin OTS Anchoring in Test Suite
 **Goal**: OpenTimestamps super-root aggregation is wired into integration tests so Bitcoin anchoring is exercised automatically
@@ -432,7 +432,7 @@ tooling.
 **Success Criteria** (what must be TRUE):
   1. Integration tests produce an OTS receipt that aggregates multiple ARC receipt hashes into a single Bitcoin-anchored super-root
   2. The OTS proof can be independently verified using the OpenTimestamps toolchain
-**Plans**: TBD
+**Plans**: `01` complete -- explicit kernel-backed A2A/ACP execution helpers and receipt metadata landed on 2026-04-14, and the remaining direct helpers are now explicitly narrowed to compatibility paths
 
 ### Phase 293: Solana Memo Publication
 **Goal**: Solana memo publication is added to the conformance harness and cross-chain proof bundles verify across EVM, Bitcoin, and Solana
@@ -441,7 +441,7 @@ tooling.
 **Success Criteria** (what must be TRUE):
   1. The conformance harness publishes ARC receipt hashes as Solana memo instructions on devnet/testnet
   2. A cross-chain proof bundle containing EVM settlement proof, Bitcoin OTS proof, and Solana memo proof verifies successfully in a single test
-**Plans**: TBD
+**Plans**: `01` in progress -- durable SQLite receipt persistence landed for proxy and `/arc/evaluate` flows on 2026-04-14; `arc-tower` body binding and Kubernetes validation remain
 
 ### Phase 294: Multi-Chain Qualification Report
 **Goal**: A qualification report documents all three chains working and an operator runbook covers enabling and monitoring web3 settlement
@@ -10699,7 +10699,10 @@ runtime surface established by the previous phase.
   4. A WASM guest that exports `arc_deny_reason` can return structured deny reasons; a guest without it falls back to the offset-64K NUL-terminated string convention
   5. The WasmHostState carries per-guard config and a bounded log buffer accessible to host function implementations
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 373-01-PLAN.md -- Shared Arc<Engine>, WasmHostState, host function registration (arc.log, arc.get_config, arc.get_time_unix_secs)
+- [ ] 373-02-PLAN.md -- Guest export detection (arc_alloc, arc_deny_reason) with safe fallbacks
 
 ### Phase 374: Security Hardening and Request Enrichment
 **Goal**: WASM modules are sandboxed against resource abuse and import smuggling, and guards receive host-extracted action context instead of re-deriving it themselves
@@ -10711,7 +10714,7 @@ runtime surface established by the previous phase.
   3. GuardRequest received by a WASM guest contains `action_type`, `extracted_path`, `extracted_target`, `filesystem_roots`, and `matched_grant_index` fields populated by the host, and the `session_metadata` field is removed
   4. Module size is validated at load time and modules exceeding the configurable maximum are rejected before compilation
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 375: Guard Manifest, Startup Wiring, and Receipt Integration
 **Goal**: Guards load from signed manifests with SHA-256 verification, wire into the kernel pipeline in the correct HushSpec-then-WASM-then-advisory order, and produce auditable receipt metadata
@@ -10793,7 +10796,7 @@ narrative corrections are in place.
   2. Allowed, denied, failed, and streaming edge flows expose signed receipt output or truthful receipt references instead of implying kernel mediation without emitting evidence
   3. `arc-acp-edge` capability invocation surfaces are kernel-mediated with signed receipts, or any remaining discovery-only/non-kernel paths are explicitly documented as outside enforcement claims
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 379: Operational Parity and Persistence Completion
 **Goal**: The last weaker runtime surfaces reach the same production bar as the core HTTP substrate
@@ -10804,7 +10807,7 @@ narrative corrections are in place.
   2. `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated on real body-bearing requests
   3. The Kubernetes controller validates ARC capability tokens and scope requirements against kernel-backed logic rather than annotation presence alone
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2/2 plans complete
 
 ### Phase 380: Truth and Narrative Reconciliation
 **Goal**: The repo tells one honest story about what ARC has shipped, what remains partial, and what is still aspirational
@@ -10816,7 +10819,7 @@ narrative corrections are in place.
   3. Planning files consistently represent v3.12 as the corrective credibility lane and v4.0 as a parallel strategic bet rather than the active truth narrative
   4. Crate-level comments and bridge docs no longer claim kernel mediation or signed receipt behavior on live paths that do not implement it
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ### Phase 381: Claim-Gate Qualification
 **Goal**: Prove the narrowed ARC claim with integration tests and operator-facing verification, and explicitly gate any broader claim on concrete evidence
@@ -10827,7 +10830,7 @@ narrative corrections are in place.
   2. Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit prerequisites for any stronger "fully realized universal kernel" claim
   3. Operator-facing verification demonstrates receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 1/1 plan complete
 
 ---
 
@@ -10835,15 +10838,15 @@ narrative corrections are in place.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 377 | v3.12 | ACP Live-Path Cryptographic Enforcement | Not started |
-| 378 | v3.12 | Outward Edge Kernel Mediation and Receipt Parity | Not started |
-| 379 | v3.12 | Operational Parity and Persistence Completion | Not started |
-| 380 | v3.12 | Truth and Narrative Reconciliation | Not started |
-| 381 | v3.12 | Claim-Gate Qualification | Not started |
+| 377 | v3.12 | ACP Live-Path Cryptographic Enforcement | Complete |
+| 378 | v3.12 | Outward Edge Kernel Mediation and Receipt Parity | Complete |
+| 379 | v3.12 | Operational Parity and Persistence Completion | Complete |
+| 380 | v3.12 | Truth and Narrative Reconciliation | Complete |
+| 381 | v3.12 | Claim-Gate Qualification | Complete |
 
 ---
 
-## v4.1 Guard SDK and Developer Experience (Phases 377-380)
+## v4.1 Guard SDK and Developer Experience (Phases 382-385)
 
 **Milestone Goal:** Ship the guest-side Rust SDK, proc macro, example guards,
 and CLI tooling so guard authors can write `fn evaluate(req) -> verdict`,
@@ -10853,14 +10856,15 @@ host-side internals.
 
 **Dependency:** v4.0 WASM Guard Runtime Completion (phases 373-376). The host
 runtime must be stable (shared Engine, host functions, memory protocol, security
-hardening, guard manifests, startup wiring) before guest SDK targets it. Phase
-numbering overlaps with v3.12 because the v4.x WASM lane executes in parallel
-with the v3.x credibility-closeout chain -- they share no code dependencies.
+hardening, guard manifests, startup wiring) before guest SDK targets it. The
+v4.x lane still executes in parallel with the v3.x credibility-closeout chain,
+but its phase numbers are now shifted to avoid colliding with the active v3.12
+milestone.
 
-**Parallelism:** Phase 377 builds the guest SDK foundation (types, allocator,
-host bindings, serde). Phase 378 layers the proc macro on top and validates the
-SDK through example guards and integration tests. Phase 379 adds CLI scaffolding
-commands (new, build, inspect). Phase 380 completes the CLI with test, bench,
+**Parallelism:** Phase 382 builds the guest SDK foundation (types, allocator,
+host bindings, serde). Phase 383 layers the proc macro on top and validates the
+SDK through example guards and integration tests. Phase 384 adds CLI scaffolding
+commands (new, build, inspect). Phase 385 completes the CLI with test, bench,
 pack, and install. Phases are sequential: each builds on the surface established
 by the previous phase.
 
@@ -10872,7 +10876,7 @@ by the previous phase.
 **CLI location:** `arc-cli/src/cli/guard.rs` (new module in existing `arc-cli`
 crate)
 
-### Phase 377: Guest SDK Core
+### Phase 382: Guest SDK Core
 **Goal**: Guard authors have a typed Rust SDK that handles the WASM ABI boundary -- types, memory allocation, host function access, serialization, and deny reason reporting -- so they never write raw pointer/length ABI glue
 **Depends on**: v4.0 Phase 376 (host runtime is benchmarked and stable)
 **Requirements**: GSDK-01, GSDK-02, GSDK-03, GSDK-04, GSDK-05
@@ -10885,9 +10889,9 @@ crate)
 **Estimated complexity**: M
 **Plans**: TBD
 
-### Phase 378: Proc Macro, Example Guards, and Integration Tests
+### Phase 383: Proc Macro, Example Guards, and Integration Tests
 **Goal**: Guard authors write a single annotated function and the proc macro generates all ABI exports; example guards demonstrate the SDK surface; integration tests prove the compiled WASM loads and evaluates correctly in the host runtime
-**Depends on**: Phase 377 (guest SDK types, allocator, and host bindings exist)
+**Depends on**: Phase 382 (guest SDK types, allocator, and host bindings exist)
 **Requirements**: GSDK-06, GEXM-01, GEXM-02, GEXM-03, GEXM-04, GEXM-05
 **Success Criteria** (what must be TRUE):
   1. A guard author writes `#[arc_guard] fn evaluate(req: GuardRequest) -> GuardVerdict { ... }` and the proc macro generates the `evaluate` ABI export, `arc_alloc`, `arc_free`, and `arc_deny_reason` exports without manual boilerplate
@@ -10897,9 +10901,9 @@ crate)
 **Estimated complexity**: L
 **Plans**: TBD
 
-### Phase 379: CLI Scaffolding -- New, Build, Inspect
+### Phase 384: CLI Scaffolding -- New, Build, Inspect
 **Goal**: Guard authors can scaffold a new guard project, compile it to WASM, and inspect compiled binaries -- the first three steps of the guard development lifecycle -- without leaving the `arc` CLI
-**Depends on**: Phase 378 (SDK and proc macro are stable; example guards provide the scaffold template)
+**Depends on**: Phase 383 (SDK and proc macro are stable; example guards provide the scaffold template)
 **Requirements**: GCLI-01, GCLI-02, GCLI-03
 **Success Criteria** (what must be TRUE):
   1. `arc guard new my-guard` creates a directory with `Cargo.toml` (depending on `arc-guard-sdk`), `src/lib.rs` (containing a `#[arc_guard]` skeleton), and `guard-manifest.yaml` (with placeholder metadata and SHA-256 field)
@@ -10908,9 +10912,9 @@ crate)
 **Estimated complexity**: M
 **Plans**: TBD
 
-### Phase 380: CLI Test, Bench, Pack, and Install
+### Phase 385: CLI Test, Bench, Pack, and Install
 **Goal**: Guard authors can test against fixtures, benchmark fuel consumption, package for distribution, and install from archives -- completing the guard development lifecycle from authoring through deployment
-**Depends on**: Phase 379 (guard projects can be scaffolded and compiled)
+**Depends on**: Phase 384 (guard projects can be scaffolded and compiled)
 **Requirements**: GCLI-04, GCLI-05, GCLI-06, GCLI-07, GCLI-08
 **Success Criteria** (what must be TRUE):
   1. `arc guard test` loads a compiled `.wasm` and runs it against YAML fixture files that specify request fields, expected verdict (allow/deny), and optional expected deny reason substring, reporting pass/fail per fixture
@@ -10925,14 +10929,14 @@ crate)
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 377 | v4.1 | Guest SDK Core | Not started |
-| 378 | v4.1 | Proc Macro, Example Guards, and Integration Tests | Not started |
-| 379 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
-| 380 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
+| 382 | v4.1 | Guest SDK Core | Not started |
+| 383 | v4.1 | Proc Macro, Example Guards, and Integration Tests | Not started |
+| 384 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
+| 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
 
 ---
 
-## v4.2 WIT Migration and Multi-Language SDKs (Phases 381-384)
+## v4.2 WIT Migration and Multi-Language SDKs (Phases 386-389)
 
 **Milestone Goal:** Migrate the WASM guard ABI from raw core-WASM to the
 Component Model with a WIT-defined interface, then ship TypeScript, Python,
@@ -10941,17 +10945,18 @@ A cross-language conformance test suite validates that all four language
 guards (Rust, TypeScript, Python, Go) produce identical verdicts against the
 same fixtures.
 
-**Dependency:** v4.1 Guard SDK and Developer Experience (phases 377-380). The
+**Dependency:** v4.1 Guard SDK and Developer Experience (phases 382-385). The
 Rust guest SDK, proc macro, CLI tooling, and raw ABI must be stable and
 validated before the WIT migration replaces the raw ABI contract. Phase
-numbering overlaps with v3.12 because the v4.x WASM lane executes in parallel
-with the v3.x credibility-closeout chain -- they share no code dependencies.
+numbers are shifted so the v4.x WASM lane can still execute in parallel with
+the v3.x credibility-closeout chain without colliding with the active v3.12
+phase numbers.
 
-**Parallelism:** Phase 381 defines the WIT interface and adds Component Model
-host support with dual-mode loading. Phases 382 and 383 can execute in
-parallel: TypeScript SDK (382) and Python + Go SDKs (383) are independent
-language targets that both depend only on Phase 381's WIT foundation. Phase
-384 (conformance suite) depends on all three SDK phases completing.
+**Parallelism:** Phase 386 defines the WIT interface and adds Component Model
+host support with dual-mode loading. Phases 387 and 388 can execute in
+parallel: TypeScript SDK (387) and Python + Go SDKs (388) are independent
+language targets that both depend only on Phase 386's WIT foundation. Phase
+389 (conformance suite) depends on all three SDK phases completing.
 
 **New packages:**
 - `wit/arc-guard/` -- WIT interface definition (`arc:guard@0.1.0`)
@@ -10964,14 +10969,14 @@ language targets that both depend only on Phase 381's WIT foundation. Phase
 
 ### Phases
 
-- [ ] **Phase 381: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package
-- [ ] **Phase 382: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation
-- [ ] **Phase 383: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation
-- [ ] **Phase 384: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
+- [ ] **Phase 386: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package
+- [ ] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation
+- [ ] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation
+- [ ] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
 
-### Phase 381: WIT Interface and Dual-Mode Host
+### Phase 386: WIT Interface and Dual-Mode Host
 **Goal**: Guard authors and SDK toolchains target a stable, versioned WIT contract instead of raw pointer/length ABI conventions, and the host runtime transparently loads both legacy core-WASM modules and new Component Model components
-**Depends on**: v4.1 Phase 380 (Rust SDK and raw ABI are stable and validated)
+**Depends on**: v4.1 Phase 385 (Rust SDK and raw ABI are stable and validated)
 **Requirements**: WIT-01, WIT-02, WIT-03, WIT-04
 **Success Criteria** (what must be TRUE):
   1. A WIT package at `wit/arc-guard/world.wit` defines the `arc:guard@0.1.0` world with an `evaluate` function accepting a `guard-request` record and returning a `verdict` variant, and this file is the single source of truth for the guard contract
@@ -10981,9 +10986,9 @@ language targets that both depend only on Phase 381's WIT foundation. Phase
 **Estimated complexity**: L
 **Plans**: TBD
 
-### Phase 382: TypeScript Guard SDK
+### Phase 387: TypeScript Guard SDK
 **Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the ARC host runtime alongside Rust guards
-**Depends on**: Phase 381 (WIT interface is defined and Component Model host support is working)
+**Depends on**: Phase 386 (WIT interface is defined and Component Model host support is working)
 **Requirements**: TSDK-01, TSDK-02, TSDK-03, TSDK-04
 **Success Criteria** (what must be TRUE):
   1. A TypeScript guard author imports typed `GuardRequest` and `GuardVerdict` interfaces from `arc-guard-ts` and these types are generated from the WIT definition, not hand-maintained
@@ -10993,9 +10998,9 @@ language targets that both depend only on Phase 381's WIT foundation. Phase
 **Estimated complexity**: M
 **Plans**: TBD
 
-### Phase 383: Python and Go Guard SDKs
+### Phase 388: Python and Go Guard SDKs
 **Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the ARC host runtime alongside Rust and TypeScript guards
-**Depends on**: Phase 381 (WIT interface is defined and Component Model host support is working)
+**Depends on**: Phase 386 (WIT interface is defined and Component Model host support is working)
 **Requirements**: PYDK-01, PYDK-02, PYDK-03, PYDK-04, GODK-01, GODK-02, GODK-03, GODK-04
 **Success Criteria** (what must be TRUE):
   1. A Python guard author imports typed dataclasses from `arc-guard-py` that match the WIT contract, writes an `evaluate` function, and `componentize-py` compiles it to a WASM component that the host loads through the WIT path
@@ -11005,9 +11010,9 @@ language targets that both depend only on Phase 381's WIT foundation. Phase
 **Estimated complexity**: L
 **Plans**: TBD
 
-### Phase 384: Cross-Language Conformance Suite
+### Phase 389: Cross-Language Conformance Suite
 **Goal**: A single conformance test suite proves that all four language SDKs (Rust, TypeScript, Python, Go) produce identical guard verdicts and comparable fuel consumption for the same policy scenarios
-**Depends on**: Phase 382 (TypeScript SDK) and Phase 383 (Python + Go SDKs)
+**Depends on**: Phase 387 (TypeScript SDK) and Phase 388 (Python + Go SDKs)
 **Requirements**: CONF-01, CONF-02, CONF-03
 **Success Criteria** (what must be TRUE):
   1. A shared YAML fixture set exists with test cases covering Allow verdicts, Deny verdicts with deny-reason content, host function calls (log, get_config, get_time), and enriched request fields (action_type, extracted_path), and all four language guards are tested against every fixture
@@ -11022,7 +11027,7 @@ language targets that both depend only on Phase 381's WIT foundation. Phase
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 381 | v4.2 | WIT Interface and Dual-Mode Host | Not started |
-| 382 | v4.2 | TypeScript Guard SDK | Not started |
-| 383 | v4.2 | Python and Go Guard SDKs | Not started |
-| 384 | v4.2 | Cross-Language Conformance Suite | Not started |
+| 386 | v4.2 | WIT Interface and Dual-Mode Host | Not started |
+| 387 | v4.2 | TypeScript Guard SDK | Not started |
+| 388 | v4.2 | Python and Go Guard SDKs | Not started |
+| 389 | v4.2 | Cross-Language Conformance Suite | Not started |
