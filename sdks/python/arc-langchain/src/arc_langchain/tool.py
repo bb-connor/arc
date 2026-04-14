@@ -11,7 +11,7 @@ Usage::
 
     toolkit = ArcToolkit(
         capability_id="cap-123",
-        sidecar_url="http://127.0.0.1:4100",
+        sidecar_url="http://127.0.0.1:9090",
     )
     tools = await toolkit.get_tools()
     # tools is a list of LangChain Tool objects
@@ -41,7 +41,7 @@ class ArcTool(BaseTool):
     description: str = ""
     server_id: str = ""
     capability_id: str = ""
-    sidecar_url: str = "http://127.0.0.1:4100"
+    sidecar_url: str = "http://127.0.0.1:9090"
 
     # Store the input schema JSON from the manifest
     input_schema_def: dict[str, Any] = Field(default_factory=dict)
@@ -119,13 +119,13 @@ class ArcToolkit:
     capability_id:
         ARC capability token ID that authorizes tool invocations.
     sidecar_url:
-        Base URL of the ARC sidecar (default ``http://127.0.0.1:4100``).
+        Base URL of the ARC sidecar (default ``http://127.0.0.1:9090``).
     """
 
     def __init__(
         self,
         capability_id: str,
-        sidecar_url: str = "http://127.0.0.1:4100",
+        sidecar_url: str = "http://127.0.0.1:9090",
     ) -> None:
         self._capability_id = capability_id
         self._sidecar_url = sidecar_url

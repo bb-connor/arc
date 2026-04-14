@@ -33,7 +33,7 @@ from arc_sdk.models import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-BASE = "http://127.0.0.1:4100"
+BASE = "http://127.0.0.1:9090"
 
 
 def _make_token_dict() -> dict:

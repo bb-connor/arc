@@ -157,7 +157,7 @@ class TestAllowedRequest:
             instance = MockClient.return_value
             instance.evaluate_http_request = AsyncMock(return_value=receipt)
 
-            config = ArcASGIConfig(sidecar_url="http://mock:4100")
+            config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(_echo_app, config=config)
 
             scope = _make_scope()
@@ -186,7 +186,7 @@ class TestDeniedRequest:
             instance = MockClient.return_value
             instance.evaluate_http_request = AsyncMock(return_value=receipt)
 
-            config = ArcASGIConfig(sidecar_url="http://mock:4100")
+            config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(_echo_app, config=config)
 
             scope = _make_scope()
@@ -216,7 +216,7 @@ class TestSidecarUnavailable:
             )
 
             config = ArcASGIConfig(
-                sidecar_url="http://mock:4100", fail_open=False
+                sidecar_url="http://mock:9090", fail_open=False
             )
             mw = ArcASGIMiddleware(_echo_app, config=config)
 
@@ -239,7 +239,7 @@ class TestSidecarUnavailable:
             )
 
             config = ArcASGIConfig(
-                sidecar_url="http://mock:4100", fail_open=True
+                sidecar_url="http://mock:9090", fail_open=True
             )
             mw = ArcASGIMiddleware(_echo_app, config=config)
 
@@ -264,7 +264,7 @@ class TestReceiptCallback:
             instance = MockClient.return_value
             instance.evaluate_http_request = AsyncMock(return_value=receipt)
 
-            config = ArcASGIConfig(sidecar_url="http://mock:4100")
+            config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(
                 _echo_app, config=config, on_receipt=callback
             )
@@ -300,7 +300,7 @@ class TestCapabilityIdExtraction:
 class TestConfig:
     def test_defaults(self) -> None:
         config = ArcASGIConfig()
-        assert config.sidecar_url == "http://127.0.0.1:4100"
+        assert config.sidecar_url == "http://127.0.0.1:9090"
         assert config.fail_open is False
         assert "OPTIONS" in config.exclude_methods
         assert config.receipt_header == "X-Arc-Receipt"

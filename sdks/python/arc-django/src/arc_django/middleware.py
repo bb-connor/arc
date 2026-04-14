@@ -12,7 +12,7 @@ Usage in settings.py::
         ...
     ]
 
-    ARC_SIDECAR_URL = "http://127.0.0.1:4100"
+    ARC_SIDECAR_URL = "http://127.0.0.1:9090"
     ARC_FAIL_OPEN = False
     ARC_EXCLUDE_PATHS = ["/health", "/ready"]
     ARC_EXCLUDE_METHODS = ["OPTIONS"]
@@ -78,7 +78,7 @@ class ArcDjangoMiddleware:
 
     Reads configuration from Django settings:
 
-    - ``ARC_SIDECAR_URL``: sidecar base URL (default ``http://127.0.0.1:4100``)
+    - ``ARC_SIDECAR_URL``: sidecar base URL (default ``http://127.0.0.1:9090``)
     - ``ARC_FAIL_OPEN``: if True, allow when sidecar is down (default False)
     - ``ARC_EXCLUDE_PATHS``: list of paths to skip (default ``[]``)
     - ``ARC_EXCLUDE_METHODS``: list of methods to skip (default ``["OPTIONS"]``)
@@ -89,7 +89,7 @@ class ArcDjangoMiddleware:
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
         self._sidecar_url = getattr(
-            settings, "ARC_SIDECAR_URL", "http://127.0.0.1:4100"
+            settings, "ARC_SIDECAR_URL", "http://127.0.0.1:9090"
         ).rstrip("/")
         self._fail_open = getattr(settings, "ARC_FAIL_OPEN", False)
         self._exclude_paths: set[str] = set(

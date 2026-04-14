@@ -56,12 +56,12 @@ class ArcClient:
     Parameters
     ----------
     base_url:
-        Base URL of the ARC sidecar (default ``http://127.0.0.1:4100``).
+        Base URL of the ARC sidecar (default ``http://127.0.0.1:9090``).
     timeout:
         Request timeout in seconds (default 10).
     """
 
-    DEFAULT_BASE_URL = "http://127.0.0.1:4100"
+    DEFAULT_BASE_URL = "http://127.0.0.1:9090"
 
     def __init__(
         self,

@@ -14,7 +14,7 @@ from arc_sdk.errors import ArcDeniedError
 from arc_sdk.models import ArcReceipt, Decision, ToolCallAction
 
 
-BASE = "http://127.0.0.1:4100"
+BASE = "http://127.0.0.1:9090"
 
 
 def _make_receipt_dict(allowed: bool = True) -> dict:

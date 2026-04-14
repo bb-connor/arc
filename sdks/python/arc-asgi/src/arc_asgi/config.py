@@ -12,7 +12,7 @@ class ArcASGIConfig:
     Parameters
     ----------
     sidecar_url:
-        Base URL of the ARC sidecar (default ``http://127.0.0.1:4100``).
+        Base URL of the ARC sidecar (default ``http://127.0.0.1:9090``).
     timeout:
         Request timeout in seconds for sidecar calls (default 10).
     exclude_paths:
@@ -26,7 +26,7 @@ class ArcASGIConfig:
         False (fail-closed).
     """
 
-    sidecar_url: str = "http://127.0.0.1:4100"
+    sidecar_url: str = "http://127.0.0.1:9090"
     timeout: float = 10.0
     exclude_paths: frozenset[str] = frozenset()
     exclude_methods: frozenset[str] = frozenset({"OPTIONS"})

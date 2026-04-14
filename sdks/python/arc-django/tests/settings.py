@@ -16,7 +16,7 @@ DATABASES = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ARC settings for tests
-ARC_SIDECAR_URL = "http://127.0.0.1:4100"
+ARC_SIDECAR_URL = "http://127.0.0.1:9090"
 ARC_FAIL_OPEN = False
 ARC_EXCLUDE_PATHS = ["/health"]
 ARC_EXCLUDE_METHODS = ["OPTIONS"]

@@ -38,7 +38,7 @@ class ArcASGIMiddleware:
 
         app.add_middleware(
             ArcASGIMiddleware,
-            config=ArcASGIConfig(sidecar_url="http://127.0.0.1:4100"),
+            config=ArcASGIConfig(sidecar_url="http://127.0.0.1:9090"),
         )
 
     Usage with Litestar::
