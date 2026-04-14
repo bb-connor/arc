@@ -88,8 +88,9 @@ middleware, and LangChain integration so Python developers can adopt ARC with
 one import.
 
 **Key intended outcomes:**
-- `arc-sdk-python` package wrapping the Rust kernel via PyO3/maturin with
-  typed Python bindings for capabilities, receipts, and guard evaluation
+- `arc-sdk-python` thin HTTP client package that communicates with the ARC
+  sidecar and exposes typed Python classes for capabilities, receipts, and
+  guard evaluation
 - `arc-asgi` ASGI middleware that intercepts requests, evaluates capabilities,
   runs guards, and signs receipts
 - `arc-fastapi` wrapper with decorators for per-route scope, approval, and
@@ -249,16 +250,17 @@ v2.80 (Foundation)
   |--- v2.82 (Spec)           [parallel with v2.81]
 
 v3.0 (Kernel Foundation)
-  |--- v3.1 (Attestation)
-  |--- v3.2 (Python)           [parallel with v3.1]
-  |--- v3.3 (TypeScript)       [parallel with v3.1 and v3.2]
-  v3.1 + v3.2 + v3.3 ---> v3.4 (Guards) ---> v3.5 (Protocol) ---> v3.6 (Platform) ---> v3.7 (Strategic)
+  |--- v3.1 (Attestation)       [parallel]
+  |--- v3.2 (Python)            [parallel]
+  |--- v3.3 (TypeScript)        [parallel]
+  |--- v3.4 (Guards)            [parallel -- phases depend on v3.0 only]
+  v3.1 + v3.2 + v3.3 + v3.4 ---> v3.5 (Protocol) ---> v3.6 (Platform) ---> v3.7 (Strategic)
 ```
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
-v3.1, v3.2, and v3.3 can all execute in parallel after v3.0.
-v3.4 through v3.7 are sequential after v3.1+v3.2+v3.3 converge.
+v3.1, v3.2, v3.3, and v3.4 can all execute in parallel after v3.0.
+v3.5 through v3.7 are sequential after the parallel wave converges.
 
 ## Latest Completed Milestone
 

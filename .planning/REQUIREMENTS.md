@@ -495,14 +495,15 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 - [ ] **GUARD-02**: Session journal persists across requests within a session and is available to all guards in the evaluation pipeline
 - [ ] **GUARD-03**: Session journal entries are append-only and hash-chained for tamper detection
 
-#### Phase 336: Deterministic Guards
+#### Phase 336: Stateless Deterministic Guards
 
 - [ ] **GUARD-04**: `InternalNetworkGuard` denies requests targeting RFC 1918, loopback, link-local, or cloud metadata addresses (SSRF prevention) with configurable allowlist
 - [ ] **GUARD-05**: `AgentVelocityGuard` enforces per-agent and per-session rate limits with configurable windows and thresholds
+
+#### Phase 337: Session-Aware Deterministic Guards
+
 - [ ] **GUARD-06**: `DataFlowGuard` enforces cumulative bytes-read and bytes-written limits per session using the session journal, denying when thresholds are exceeded
 - [ ] **GUARD-07**: All new deterministic guards produce `GuardEvidence` entries with verdict, guard name, and evaluation context; all fail closed on errors
-
-#### Phase 337: Post-Invocation Hooks and Response Guards
 
 - [ ] **GUARD-08**: Post-invocation hook pipeline inspects tool responses after execution but before delivery to the caller, with the ability to block, redact, or escalate
 - [ ] **GUARD-09**: `ResponseSanitizationGuard` scans response bodies for PII/PHI patterns and redacts or blocks based on data classification policy
@@ -668,7 +669,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | GUARD-03 | Phase 335 | Planned |
 | GUARD-04 | Phase 336 | Planned |
 | GUARD-05 | Phase 336 | Planned |
-| GUARD-06 | Phase 336 | Planned |
+| GUARD-06 | Phase 337 | Planned |
 | GUARD-07 | Phase 336 | Planned |
 | GUARD-08 | Phase 337 | Planned |
 | GUARD-09 | Phase 337 | Planned |

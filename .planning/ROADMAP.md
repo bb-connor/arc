@@ -10010,14 +10010,14 @@ infrastructure via OpenTelemetry export.
 LangChain integration so Python developers can adopt ARC with one import.
 
 ### Phase 327: arc-sdk-python Core
-**Goal**: Build the Python SDK wrapping the Rust kernel via PyO3/maturin with typed bindings for capabilities, receipts, and guard evaluation
+**Goal**: Build the Python SDK as a thin HTTP client to the ARC sidecar with typed classes for capabilities, receipts, and guard evaluation
 **Depends on**: Phase 322 (arc api protect validates the HTTP receipt model end-to-end)
 **Requirements**: PY-01, PY-02, PY-03, PY-04
 **Success Criteria** (what must be TRUE):
   1. `arc-sdk-python` exposes `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict` as typed Python classes
   2. Python code can create, validate, and attenuate capability tokens
   3. Python code can verify receipt signatures and chain continuity
-  4. `pip install arc-sdk-python` works with pre-built wheels for Linux x86_64 and macOS arm64
+  4. `pip install arc-sdk-python` works as a pure Python package with no native compilation required
 **Estimated complexity**: L
 
 ### Phase 328: arc-asgi Middleware
@@ -10238,12 +10238,12 @@ API surfaces.
 
 ### Phase 346: JVM and .NET Substrates
 **Goal**: Ship Servlet filter and ASP.NET Core middleware for JVM and .NET API surfaces
-**Depends on**: Phase 322 (arc api protect validates the sidecar/FFI model)
+**Depends on**: Phase 322 (arc api protect validates the sidecar HTTP model)
 **Requirements**: PLAT-12, PLAT-13, PLAT-14, PLAT-15
 **Success Criteria** (what must be TRUE):
   1. `arc-jvm` provides Servlet filter or Spring Boot auto-configuration
   2. `arc-dotnet` provides ASP.NET Core middleware
-  3. Both communicate with the Rust kernel via FFI, sidecar HTTP, or WASM
+  3. Both communicate with the Rust kernel via sidecar HTTP as the primary model
   4. Conformance tests validate both against Rust kernel for shared test vectors
 **Estimated complexity**: L
 
