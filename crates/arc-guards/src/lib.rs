@@ -16,6 +16,8 @@
 //! | [`McpToolGuard`] | **Full** | Restricts MCP tool invocations |
 //! | [`SecretLeakGuard`] | **Full** | Detects secrets in file writes |
 //! | [`PatchIntegrityGuard`] | **Full** | Validates patch safety |
+//! | [`InternalNetworkGuard`] | **Full** | Blocks SSRF targeting private/reserved addresses |
+//! | [`AgentVelocityGuard`] | **Full** | Per-agent and per-session rate limiting |
 //!
 //! # Guard pipeline
 //!
@@ -34,8 +36,10 @@
 pub mod action;
 mod path_normalization;
 
+pub mod agent_velocity;
 mod egress_allowlist;
 mod forbidden_path;
+pub mod internal_network;
 pub mod mcp_tool;
 pub mod patch_integrity;
 pub mod path_allowlist;
@@ -44,8 +48,10 @@ pub mod secret_leak;
 mod shell_command;
 pub mod velocity;
 
+pub use agent_velocity::{AgentVelocityConfig, AgentVelocityGuard};
 pub use egress_allowlist::EgressAllowlistGuard;
 pub use forbidden_path::ForbiddenPathGuard;
+pub use internal_network::InternalNetworkGuard;
 pub use mcp_tool::McpToolGuard;
 pub use patch_integrity::PatchIntegrityGuard;
 pub use path_allowlist::PathAllowlistGuard;
