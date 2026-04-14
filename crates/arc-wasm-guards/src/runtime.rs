@@ -386,9 +386,50 @@ pub mod wasmtime_backend {
                 .get_memory(&mut store, "memory")
                 .ok_or_else(|| WasmGuardError::MissingExport("memory".to_string()))?;
 
-            // Write request into guest memory at offset 0
+            // Probe for optional arc_alloc guest export
+            let arc_alloc_fn = instance
+                .get_typed_func::<i32, i32>(&mut store, "arc_alloc")
+                .ok();
+
+            let request_len: i32 = request_json.len() as i32;
+
+            let request_ptr: i32 = if let Some(ref alloc_fn) = arc_alloc_fn {
+                match alloc_fn.call(&mut store, request_len) {
+                    Ok(ptr) => {
+                        // Validate returned pointer is in bounds
+                        let mem_size = memory.data_size(&store);
+                        if ptr >= 0
+                            && (ptr as usize).saturating_add(request_len as usize) <= mem_size
+                        {
+                            ptr
+                        } else {
+                            // Out-of-bounds pointer -- fall back to offset 0
+                            tracing::warn!(
+                                ptr = ptr,
+                                request_len = request_len,
+                                mem_size = mem_size,
+                                "arc_alloc returned out-of-bounds pointer, falling back to offset 0"
+                            );
+                            0
+                        }
+                    }
+                    Err(e) => {
+                        // arc_alloc call failed -- fall back to offset 0
+                        tracing::warn!(
+                            error = %e,
+                            "arc_alloc call failed, falling back to offset 0"
+                        );
+                        0
+                    }
+                }
+            } else {
+                // No arc_alloc export -- use legacy offset-0 protocol
+                0
+            };
+
+            // Write request into guest memory at the resolved offset
             memory
-                .write(&mut store, 0, &request_json)
+                .write(&mut store, request_ptr as usize, &request_json)
                 .map_err(|e| WasmGuardError::Memory(e.to_string()))?;
 
             // Call the evaluate function
@@ -396,9 +437,8 @@ pub mod wasmtime_backend {
                 .get_typed_func::<(i32, i32), i32>(&mut store, "evaluate")
                 .map_err(|e| WasmGuardError::MissingExport(format!("evaluate: {e}")))?;
 
-            let request_len: i32 = request_json.len() as i32;
             let result = evaluate_fn
-                .call(&mut store, (0, request_len))
+                .call(&mut store, (request_ptr, request_len))
                 .map_err(|e| {
                     // Check if this was a fuel exhaustion
                     let msg = e.to_string();
