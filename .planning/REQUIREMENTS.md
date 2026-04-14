@@ -3079,10 +3079,10 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ### Startup Wiring
 
-- [ ] **WGWIRE-01**: Startup code loads HushSpec-compiled guards via `arc_policy::compiler::compile_policy()` and registers them first in the kernel pipeline
-- [ ] **WGWIRE-02**: Startup code sorts `WasmGuardEntry` list by priority field before loading into WasmGuardRuntime
-- [ ] **WGWIRE-03**: Startup code registers WASM guards after HushSpec guards and before the advisory pipeline
-- [ ] **WGWIRE-04**: Startup code loads `guard-manifest.yaml` adjacent to each .wasm path and passes config to WasmHostState
+- [x] **WGWIRE-01**: Startup code loads HushSpec-compiled guards via `arc_policy::compiler::compile_policy()` and registers them first in the kernel pipeline
+- [x] **WGWIRE-02**: Startup code sorts `WasmGuardEntry` list by priority field before loading into WasmGuardRuntime
+- [x] **WGWIRE-03**: Startup code registers WASM guards after HushSpec guards and before the advisory pipeline
+- [x] **WGWIRE-04**: Startup code loads `guard-manifest.yaml` adjacent to each .wasm path and passes config to WasmHostState
 
 ### Receipt Integration
 
@@ -3136,10 +3136,10 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGMAN-02 | Phase 375 | Complete |
 | WGMAN-03 | Phase 375 | Complete |
 | WGMAN-04 | Phase 375 | Complete |
-| WGWIRE-01 | Phase 375 | Pending |
-| WGWIRE-02 | Phase 375 | Pending |
-| WGWIRE-03 | Phase 375 | Pending |
-| WGWIRE-04 | Phase 375 | Pending |
+| WGWIRE-01 | Phase 375 | Complete |
+| WGWIRE-02 | Phase 375 | Complete |
+| WGWIRE-03 | Phase 375 | Complete |
+| WGWIRE-04 | Phase 375 | Complete |
 | WGRCPT-01 | Phase 375 | Complete |
 | WGRCPT-02 | Phase 375 | Complete |
 | WGBENCH-01 | Phase 376 | Pending |

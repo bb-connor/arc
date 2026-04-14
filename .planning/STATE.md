@@ -123,6 +123,9 @@ Progress: [######----] 60%
 - [Phase 375]: Manifest parsing deps (sha2, hex, serde_yml) are NOT feature-gated; manifest types work without wasmtime
 - [Phase 375]: WasmGuard::new() extended with manifest_sha256: Option<String>; fuel consumed read within backend lock scope before dropping
 - [Phase 375]: guard_evidence_metadata() returns serde_json::Value for flexible downstream receipt integration
+- [Phase 375]: load_wasm_guards() sorts by (advisory as u8, priority) for non-advisory-first ordering at equal priority
+- [Phase 375]: arc-config added as direct dependency to arc-wasm-guards for WasmGuardEntry; WasmtimeBackend defaults used for memory/module-size limits
+- [Phase 375]: build_guard_pipeline() takes pre-composed guard vectors to separate pipeline composition from guard creation
 
 ### Pending Todos
 
@@ -147,14 +150,14 @@ Progress: [######----] 60%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 375 (plan 01 of 02 complete)
-Plan: 01 of 2 complete
-Status: Phase 375 plan 01 complete -- GuardManifest YAML parsing with SHA-256
-integrity verification, ABI version gating, and per-evaluation fuel/hash
-receipt metadata on WasmGuard. 74 crate tests pass, clippy clean, no
-workspace regressions. Plan 02 (startup wiring) is next.
-Last activity: 2026-04-14 -- completed 375-01 guard manifest and receipt
-metadata plan with 21 new tests across manifest.rs and runtime.rs
+Phase: 375 (complete -- 02 of 02 plans done)
+Plan: 02 of 2 complete
+Status: Phase 375 complete -- guard manifest YAML parsing, SHA-256 integrity
+verification, ABI version gating, per-evaluation fuel/hash receipt metadata,
+and startup wiring module with manifest-aware pipeline composition. 83 crate
+tests pass, clippy clean, no workspace regressions. Phase 376 is next.
+Last activity: 2026-04-14 -- completed 375-02 startup wiring plan with
+load_wasm_guards() and build_guard_pipeline() plus 9 new tests
 
 
 ## v4.1 Guard SDK and Developer Experience
@@ -167,7 +170,7 @@ phases 390-394 reserved after the v4.x placeholder ranges
 
 ## Session Continuity
 
-Last session: 2026-04-14T22:22:20Z
-Stopped at: Completed 375-01 guard manifest and receipt metadata plan
-Next action: execute 375-02 startup wiring plan
+Last session: 2026-04-14T22:36:18Z
+Stopped at: Completed 375-02 startup wiring plan -- phase 375 complete
+Next action: plan and execute phase 376
 Resume file: None
