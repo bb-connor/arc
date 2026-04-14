@@ -42,6 +42,8 @@ members = [
     "crates/arc-mcp-edge",
     "crates/arc-mcp-adapter",
     "crates/arc-openapi-mcp-bridge",
+    "crates/arc-a2a-edge",
+    "crates/arc-acp-edge",
     "crates/arc-siem",
     "crates/arc-underwriting",
     "crates/arc-web3",

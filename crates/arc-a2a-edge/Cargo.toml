@@ -1,0 +1,24 @@
+[package]
+name = "arc-a2a-edge"
+description = "A2A edge crate that exposes ARC tools as A2A skills with SendMessage and streaming"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_a2a_edge"
+
+[dependencies]
+arc-core = { package = "arc-core-types", path = "../arc-core-types" }
+arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
+arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
