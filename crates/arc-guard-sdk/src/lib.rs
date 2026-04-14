@@ -19,6 +19,7 @@
 //! ```
 
 pub mod alloc;
+pub mod host;
 pub mod types;
 
 // Top-level re-exports for convenience.
