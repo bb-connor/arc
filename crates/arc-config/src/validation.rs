@@ -146,6 +146,8 @@ mod tests {
             receipts: ReceiptsConfig::default(),
             logging: LoggingConfig::default(),
             telemetry: TelemetrySection::default(),
+            guards: GuardsConfig::default(),
+            wasm_guards: Vec::new(),
         }
     }
 

@@ -1891,7 +1891,7 @@ async fn handle_record_lineage_snapshot(
         Ok(None) => {}
         Err(response) => return response,
     }
-    let mut store = match open_receipt_store(&state.config) {
+    let store = match open_receipt_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };

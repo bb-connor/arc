@@ -17,8 +17,8 @@ arc-reputation = { package = "arc-reputation", path = "../arc-reputation" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-chrono = { version = "0.4", features = ["clock"] }
-base64 = "0.22"
+chrono = { workspace = true, features = ["clock"] }
+base64 = { workspace = true }
 rand_core = { workspace = true, features = ["getrandom"] }
 sha2 = { workspace = true }
 

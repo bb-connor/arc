@@ -152,7 +152,7 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         let capability = self.inner.issue_capability(subject, scope, ttl_seconds)?;
 
         if let Some(path) = self.receipt_db_path.as_deref() {
-            let mut store = SqliteReceiptStore::open(path)
+            let store = SqliteReceiptStore::open(path)
                 .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?;
             store
                 .record_capability_snapshot(&capability, None)

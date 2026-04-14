@@ -241,7 +241,7 @@ fn populate_mercury_receipt_store(
     capability_id: &str,
     steps: &[MercuryPilotStep],
 ) -> Result<(), CliError> {
-    let mut store = SqliteReceiptStore::open(receipt_db)?;
+    let store = SqliteReceiptStore::open(receipt_db)?;
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let kernel_keypair = Keypair::generate();

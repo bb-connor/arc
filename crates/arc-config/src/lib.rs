@@ -14,8 +14,8 @@ pub mod validation;
 // Re-export the main entry points for convenience.
 pub use loader::{load_from_file, load_from_str};
 pub use schema::{
-    AdapterAuthConfig, AdapterConfig, ArcConfig, EdgeConfig, KernelConfig, LoggingConfig,
-    ReceiptsConfig, TelemetrySection,
+    AdapterAuthConfig, AdapterConfig, ArcConfig, EdgeConfig, GuardsConfig, KernelConfig,
+    LoggingConfig, ReceiptsConfig, TelemetrySection, WasmGuardEntry,
 };
 
 /// Errors produced during configuration loading.

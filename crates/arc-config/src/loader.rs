@@ -212,4 +212,57 @@ kernel:
             "should be validation error: {err}"
         );
     }
+
+    #[test]
+    fn load_yaml_with_guards_and_wasm() {
+        let yaml = r#"
+kernel:
+  signing_key: "generate"
+
+adapters:
+  - id: "petstore"
+    protocol: "openapi"
+    upstream: "http://localhost:8000"
+
+guards:
+  allow_advisory_promotion: true
+  required:
+    - internal-network
+    - agent-velocity
+
+wasm_guards:
+  - name: custom-pii-guard
+    path: /etc/arc/guards/pii_guard.wasm
+    fuel_limit: 5000000
+    priority: 100
+    advisory: false
+  - name: audit-logger
+    path: /etc/arc/guards/audit.wasm
+    advisory: true
+"#;
+        let config =
+            load_from_str(yaml).unwrap_or_else(|e| panic!("load should work: {e}"));
+        assert!(config.guards.allow_advisory_promotion);
+        assert_eq!(config.guards.required.len(), 2);
+        assert_eq!(config.guards.required[0], "internal-network");
+        assert_eq!(config.wasm_guards.len(), 2);
+        assert_eq!(config.wasm_guards[0].name, "custom-pii-guard");
+        assert_eq!(config.wasm_guards[0].fuel_limit, 5_000_000);
+        assert_eq!(config.wasm_guards[0].priority, 100);
+        assert!(!config.wasm_guards[0].advisory);
+        assert_eq!(config.wasm_guards[1].name, "audit-logger");
+        assert!(config.wasm_guards[1].advisory);
+        // Defaults for second entry
+        assert_eq!(config.wasm_guards[1].fuel_limit, 10_000_000);
+        assert_eq!(config.wasm_guards[1].priority, 1000);
+    }
+
+    #[test]
+    fn guards_default_when_omitted() {
+        let config = load_from_str(minimal_yaml())
+            .unwrap_or_else(|e| panic!("load should work: {e}"));
+        assert!(!config.guards.allow_advisory_promotion);
+        assert!(config.guards.required.is_empty());
+        assert!(config.wasm_guards.is_empty());
+    }
 }

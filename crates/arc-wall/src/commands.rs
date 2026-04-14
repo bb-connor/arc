@@ -357,7 +357,7 @@ fn create_arc_wall_receipt_db(
     denied_access_record: &ArcWallDeniedAccessRecord,
     policy_snapshot: &ArcWallPolicySnapshot,
 ) -> Result<(), CliError> {
-    let mut store = SqliteReceiptStore::open(receipt_db_path)?;
+    let store = SqliteReceiptStore::open(receipt_db_path)?;
     let issuer = Keypair::generate();
     let subject = Keypair::generate();
     let kernel = Keypair::generate();

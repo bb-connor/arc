@@ -14,7 +14,7 @@ name = "arc_mcp_edge"
 arc-core = { package = "arc-core-types", path = "../arc-core-types" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
-chrono = { version = "0.4", features = ["clock"] }
+chrono = { workspace = true, features = ["clock"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
