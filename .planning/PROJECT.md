@@ -62,6 +62,7 @@ the repo/docs/planning stack to tell one truthful story.
 |-----------|------|--------|-------|
 | v4.0 | WASM Guard Runtime Completion | 373-376 | Host-side hardening, manifest, enriched request, startup wiring, benchmarks |
 | v4.1 | Guard SDK and Developer Experience | 377-380 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
+| v4.2 | WIT Migration and Multi-Language SDKs | 381-384 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
 | v4.1 | Guard SDK and Developer Experience | 382-385 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
 | v4.2 | WIT Migration and Multi-Language SDKs | 386-389 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
 

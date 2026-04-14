@@ -3155,6 +3155,90 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 - Mapped to phases: 19
 - Unmapped: 0 ✓
 
+## v4.2 WIT Migration and Multi-Language SDKs
+
+Migrates the WASM guard ABI from raw core-WASM to the Component Model with
+a WIT-defined interface. Ships TypeScript, Python, and Go guest SDKs so
+guard authors can write policy in any major language. Cross-language
+conformance test suite validates all SDKs against the same fixtures.
+Depends on v4.1 (Rust SDK and raw ABI must be stable).
+Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
+`docs/guards/03-IMPLEMENTATION-PLAN.md` Phase 4.
+
+### WIT Interface
+
+- [ ] **WIT-01**: Guard WIT interface defined (`arc:guard@0.1.0`) with `evaluate` function, `guard-request` record, and `verdict` variant types
+- [ ] **WIT-02**: Host implements the WIT interface using `wasmtime::component::bindgen!` with generated Rust types
+- [ ] **WIT-03**: Host supports dual-mode loading: raw core-WASM modules (legacy ABI) and Component Model components (WIT ABI) detected at load time
+- [ ] **WIT-04**: WIT package published in-repo under `wit/arc-guard/` with versioned world definition
+
+### TypeScript SDK
+
+- [ ] **TSDK-01**: TypeScript guard SDK (`packages/sdk/arc-guard-ts`) provides typed `GuardRequest` and `GuardVerdict` interfaces matching the WIT contract
+- [ ] **TSDK-02**: TypeScript guards compile to WASM components via `jco` / ComponentizeJS
+- [ ] **TSDK-03**: TypeScript SDK includes example guard with build instructions
+- [ ] **TSDK-04**: TypeScript-compiled guard loads and evaluates correctly in the host dual-mode runtime
+
+### Python SDK
+
+- [ ] **PYDK-01**: Python guard SDK (`packages/sdk/arc-guard-py`) provides typed dataclasses matching the WIT contract
+- [ ] **PYDK-02**: Python guards compile to WASM components via `componentize-py`
+- [ ] **PYDK-03**: Python SDK includes example guard with build instructions
+- [ ] **PYDK-04**: Python-compiled guard loads and evaluates correctly in the host dual-mode runtime
+
+### Go SDK
+
+- [ ] **GODK-01**: Go guard SDK (`packages/sdk/arc-guard-go`) provides typed structs matching the WIT contract
+- [ ] **GODK-02**: Go guards compile to WASM components via TinyGo with `wasip2` target
+- [ ] **GODK-03**: Go SDK includes example guard with build instructions
+- [ ] **GODK-04**: Go-compiled guard loads and evaluates correctly in the host dual-mode runtime
+
+### Conformance
+
+- [ ] **CONF-01**: Cross-language conformance test suite with shared YAML fixtures exercising Allow, Deny, deny-reason, host function calls, and enriched request fields
+- [ ] **CONF-02**: Conformance suite runs all four language guards (Rust, TypeScript, Python, Go) against the same fixture set and reports pass/fail per guard per fixture
+- [ ] **CONF-03**: Conformance suite validates that fuel consumption is within 2x across languages for the same fixture
+
+## v4.2 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Guard registry / marketplace | v4.3+ -- needs community adoption first |
+| OCI distribution | v4.3+ -- after packaging model validated |
+| Guard signing with key management | v4.3+ -- needs identity story |
+| Async host functions | Requires kernel Guard trait redesign |
+| Persistent per-guard state | Requires state model redesign |
+| WASI capabilities (filesystem, network) | Guards must remain sandboxed |
+
+## v4.2 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| WIT-01 | Phase 381 | Pending |
+| WIT-02 | Phase 381 | Pending |
+| WIT-03 | Phase 381 | Pending |
+| WIT-04 | Phase 381 | Pending |
+| TSDK-01 | Phase 382 | Pending |
+| TSDK-02 | Phase 382 | Pending |
+| TSDK-03 | Phase 382 | Pending |
+| TSDK-04 | Phase 382 | Pending |
+| PYDK-01 | Phase 383 | Pending |
+| PYDK-02 | Phase 383 | Pending |
+| PYDK-03 | Phase 383 | Pending |
+| PYDK-04 | Phase 383 | Pending |
+| GODK-01 | Phase 383 | Pending |
+| GODK-02 | Phase 383 | Pending |
+| GODK-03 | Phase 383 | Pending |
+| GODK-04 | Phase 383 | Pending |
+| CONF-01 | Phase 384 | Pending |
+| CONF-02 | Phase 384 | Pending |
+| CONF-03 | Phase 384 | Pending |
+
+**Coverage:**
+- v4.2 requirements: 19 total
+- Mapped to phases: 19
+- Unmapped: 0 ✓
+
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after defining milestone v4.1 Guard SDK and Developer Experience*
+*Last updated: 2026-04-14 after defining milestone v4.2 WIT Migration and Multi-Language SDKs*
