@@ -1,0 +1,40 @@
+//! Skill and Workflow Authority for ARC.
+//!
+//! This crate extends the ARC capability model with multi-step skill
+//! composition. A *skill* is an ordered sequence of tool invocations with
+//! declared I/O contracts, dependency relationships, and budget envelopes.
+//!
+//! # Core concepts
+//!
+//! - [`SkillGrant`] -- extends capability model for ordered tool sequences
+//! - [`SkillManifest`] -- describes tool dependencies, I/O contracts, budget
+//! - [`WorkflowReceipt`] -- captures complete execution trace as single artifact
+//! - [`WorkflowAuthority`] -- validates each step against declared scope and budget
+//!
+//! # Example
+//!
+//! ```ignore
+//! let manifest = SkillManifest { ... };
+//! let authority = WorkflowAuthority::new(signing_key);
+//! let execution = authority.begin(&manifest, &capability)?;
+//!
+//! for step in &manifest.steps {
+//!     authority.validate_step(&execution, step, &arguments)?;
+//!     // ... invoke tool ...
+//!     authority.record_step_result(&mut execution, step, result)?;
+//! }
+//!
+//! let receipt = authority.finalize(execution)?;
+//! ```
+
+#![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
+
+pub mod authority;
+pub mod grant;
+pub mod manifest;
+pub mod receipt;
+
+pub use authority::{WorkflowAuthority, WorkflowExecution, WorkflowError};
+pub use grant::SkillGrant;
+pub use manifest::{SkillManifest, SkillStep, IoContract};
+pub use receipt::{WorkflowReceipt, WorkflowReceiptBody, StepRecord};

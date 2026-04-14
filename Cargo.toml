@@ -49,6 +49,7 @@ members = [
     "crates/arc-wasm-guards",
     "crates/arc-metering",
     "crates/arc-ag-ui-proxy",
+    "crates/arc-workflow",
     "crates/arc-siem",
     "crates/arc-underwriting",
     "crates/arc-web3",
