@@ -1,103 +1,106 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.69
-milestone_name: CI Gate and Release Qualification
+milestone: v2.83
+milestone_name: Coverage, Hardening, and Production Qualification
 status: active
-stopped_at: v2.69 repo-side evidence complete locally; waiting on hosted GitHub Actions rerun and release-candidate tag
-last_updated: "2026-04-12T23:57:35Z"
-last_activity: 2026-04-12 -- completed local v2.69 repo-side execution, including full release qualification with signed artifacts and conformance evidence; hosted GitHub observation still pending
+stopped_at: phase 315 complete; phase 316 queued
+last_updated: "2026-04-14T00:37:14Z"
+last_activity: 2026-04-13 -- completed phase 315 by closing the workspace integration-test gap, adding security/storage success-failure-edge coverage, and verifying A2A/MCP exchange lanes
 progress:
-  total_phases: 3
-  completed_phases: 3
+  total_phases: 4
+  completed_phases: 1
   total_plans: 3
   completed_plans: 3
-  percent: 100
+  percent: 25
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-12)
+See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v2.69 CI Gate and Release Qualification -- the repo-side
-fixes and signed local qualification bundle are complete, but hosted GitHub
-Actions observation and release-candidate tagging still gate external
-publication.
+**Current focus:** v2.83 Coverage, Hardening, and Production Qualification --
+raise the production bar with crate-level integration tests, higher measured
+coverage, store-layer hardening, API-surface cleanup, and structured errors.
 
 ## Current Position
 
-Phase: 286 of 302 (Release Qualification Observation)
-Plan: 01
-Status: repo-side work complete locally; hosted GitHub rerun and release tag pending
-Last activity: 2026-04-12 -- Completed local v2.69 repo-side fixes, conformance validation, and full release qualification; wrote phase artifacts for 284-286 and kept the milestone active pending hosted observation.
+Phase: 316 (next)
+Plan: 316 discuss/plan next
+Status: v2.83 active locally; `v2.82` is complete and archived locally
+Last activity: 2026-04-13 -- completed `315`, adding integration smoke lanes
+across the previously zero-test crates plus focused credentials/policy/store
+and A2A/MCP exchange coverage.
 
-Progress: [██████████] 100%
+Progress: [###-------] 25%
 
 ## Performance Metrics
 
 **Velocity:**
 - v1.0 completed: 6 phases, 24 plans
 - v2.0 completed: 6 phases, 19 plans
-- v2.1-v2.65: 260 phases completed across 64 milestones
+- v2.1-v2.73: 290 phases completed across 72 milestones
+- v2.80-v2.83: 16 phases planned across 4 milestones
+- v3.0-v3.7: 32 phases planned across 8 milestones
 
 ## Accumulated Context
 
 ### Decisions
 
-- The ship readiness ladder (v2.66-v2.73) was defined from a comprehensive
-  5-agent codebase review that identified: 3 untested crates (arc-hosted-mcp,
-  arc-wall, arc-siem), 22 literal panic assertions inside `arc-kernel/src`,
-  no property-based testing or benchmarks, empty coverage directory, hosted CI
-  observation still required, no Docker packaging, and no agent-framework
-  integration examples.
-- v2.66 is complete locally. Phase 276 was scoped to the real seams the repo
-  exposes today: hosted-mcp/kernel -> siem on the shared receipt DB, plus
-  ARC-Wall companion receipts flowing into siem on the same ARC substrate.
-- v2.67 is complete locally. Phase 277 proved the 22 literal `panic!` sites
-  were all test-only; the real hardening work landed at the canonical JSON
-  transport boundary plus source hygiene inside `arc-kernel/src`.
-- v2.68 is complete locally. Phase 281 added proptest coverage in `arc-core`
-  and `arc-kernel`, Phase 282 added Criterion baselines for core primitives,
-  and Phase 283 wired tarpaulin into CI/release qualification with a measured
-  `67.43%` baseline and a `67%` enforced floor.
-- v2.69 repo-side work is complete locally. Phase 284 repaired the current
-  hosted workflow breakpoints, Phase 285 proved all five conformance waves
-  against the shipped JS/Python and Go live peers in the local release lane,
-  and Phase 286 now emits signed per-wave certification artifacts plus a root
-  checksum/manifest bundle from `scripts/qualify-release.sh`.
-- v2.66+v2.67+v2.68 are independent and can execute in parallel.
-- v2.69 (CI gate) gates on v2.66+v2.67+v2.68.
-- v2.70 (DX/packaging) gates on v2.69.
-- v2.71+v2.72+v2.73 can execute in parallel after v2.70.
+- v2.80-v2.83 milestones were defined from a comprehensive five-agent codebase
+  review (2026-04-13) that identified: 32K-line arc-core gravity well, five
+  files exceeding 6K lines, synchronous &mut self kernel blocking concurrency,
+  deprecated serde_yaml, dual reqwest versions, 12 crates with zero integration
+  tests, naming confusion (ARC vs CHIO), unpublished SDKs, non-implementable
+  protocol spec, and 82 too_many_arguments suppressions.
+- v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
+  v2.83 gates on v2.81.
+- The ship readiness ladder (v2.66-v2.73) is complete locally except for the
+  deferred v2.71 (external web3 prerequisites).
 - All prior MERCURY and ARC-core decisions from v2.65 remain in force.
+- MERCURY and ARC-Wall schema expansion is explicitly paused until the protocol
+  substrate is production-ready.
+- `arc-core-types` stays narrow while heavyweight ARC business domains now live
+  in dedicated crates and the broad consumers declare those domain crates
+  directly.
+- Narrow consumers can migrate without source churn by aliasing
+  `package = "arc-core-types"` under the existing `arc-core` dependency key.
+- `arc init` should stay self-contained: generated starter projects use a
+  standalone Rust MCP stub plus the installed `arc` binary instead of depending
+  on unpublished ARC crates.
+- Phase `308` should keep the official SDK examples aligned to the real
+  `arc trust serve` + `arc mcp serve-http --control-url ...` topology rather
+  than introducing a second demo stack before the Docker milestone lands.
+- Phase `310` anchored the tutorial and framework examples to the same hosted
+  HTTP edge topology rather than reviving the old stdio demo path.
 
 ### Pending Todos
 
-- Publish the v2.69 repo-side fixes and rerun the hosted `CI` and
-  `Release Qualification` workflows on GitHub.
-- Create the release candidate tag only after hosted observation confirms all
-  gates are green.
-- Milestone archive/tag/cleanup for v2.66, v2.67, and v2.68 remains an
-  explicit operator decision.
+- Discuss and plan `316` so coverage push work stays focused on genuinely
+  untested paths while the SQLite layer gains concurrent-access support.
+- Resolve deferred `v2.71` external prerequisites if live-chain activation
+  becomes active again.
+- v3.0-v3.7 universal security kernel milestones are now planned with 32
+  phases and 93 requirements. Execute v2.83 phases 316-318 first, then
+  begin v3.0 phase 319.
 
 ### Blockers/Concerns
 
-- Hosted workflow observation remains outside this local environment.
-- The passing qualification bundle is local-only right now:
-  `target/release-qualification/artifact-manifest.json` records `source:
-  local`, `candidateSha: local`, and no GitHub workflow run identifiers.
-- v2.66, v2.67, and v2.68 archive, git tag, and cleanup were not run
-  automatically because those lifecycle steps require explicit confirmation.
-- Several runtime/domain entrypoints remain too large for comfortable ownership.
+- The live planning pointers for `v2.83` are updated locally, but a clean
+  closeout/tag pass is still outstanding because the top-level planning files
+  carried unrelated local edits before milestone archival.
+- The default web3-enabled graph still carries alloy’s transitive hashbrown
+  split; the core-path no-default-features graph is now the validated slim path.
 
 ## Session Continuity
 
-Last session: 2026-04-12
-Stopped at: v2.69 repo-side execution complete locally; hosted rerun/tag still pending.
-Next action: publish the v2.69 fixes, rerun hosted GitHub Actions, and tag the release candidate only after green observation
+Last session: 2026-04-13
+Stopped at: phase `315` complete; ready to start `316`
+Next action: discuss/plan `316`, then execute the coverage push and store
+hardening work
 Resume file: None

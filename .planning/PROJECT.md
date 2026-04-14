@@ -19,27 +19,61 @@ security, regulatory compliance, and portable trust.
 
 ## Current State
 
-**Latest completed milestone:** v2.65 MERCURY Portfolio Revenue Boundary Qualification,
-Commercial Handoff, and Channel Boundary
-(completed locally 2026-04-04)
-**Audit:** `.planning/v2.65-MILESTONE-AUDIT.md`
-**Active milestone:** v2.66 Test Coverage for Untested Crates
-**Next planned milestones:** v2.67-v2.73 (Ship Readiness Roadmap)
-**Next GSD action:** `/gsd:plan-phase 273`
+**Latest completed milestone:** v2.82 Normative Protocol Specification and
+Conformance
+(completed locally 2026-04-13)
+**Active milestone:** v2.83 Coverage, Hardening, and Production Qualification
+(phases 315-318)
+**Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
+Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
+**Planned milestones:** v3.0 through v3.7 (Universal Security Kernel era)
+**Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
+Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
+**Next GSD action:** complete v2.83 phases 316-318, then begin v3.0 phase 319
 
-## Current Milestone: v2.66 Test Coverage for Untested Crates
+## Current Milestone Status
 
-**Goal:** Add meaningful unit and integration tests to the three untested crates
-(arc-hosted-mcp, arc-wall, arc-siem) and create cross-crate integration tests
-exercising the hosted-mcp -> kernel -> wall -> siem workflow path.
+`v2.83 Coverage, Hardening, and Production Qualification` is active. Phase
+`315` is complete locally and phases `316` through `318` remain queued. This
+milestone follows the completed
+deployable/onboarding push from `v2.81` and the archived normative protocol
+package from `v2.82`, which now leaves the repo with a third-party
+implementable spec surface, security analysis, and native conformance lane.
 
-**Target features:**
-- Unit tests for arc-hosted-mcp: session lifecycle, multi-tenant isolation, auth flows, error paths
-- Unit tests for arc-wall: validation rule enforcement, edge cases, barrier review logic
-- Unit tests for arc-siem: Splunk HEC export, Elasticsearch bulk export, DLQ behavior, rate limiting
-- Cross-crate integration tests: hosted-mcp -> kernel -> wall -> siem paths
+## v3.x Universal Security Kernel Era
 
-## Ship Readiness Roadmap (v2.66-v2.73)
+**Strategic pivot:** ARC expands from protocol adapter collection to universal
+security kernel for the agent economy. One kernel, many substrates. Signed
+receipts across HTTP APIs, agent protocols, and framework middleware.
+
+**8 milestones:** v3.0 through v3.7, from foundation through strategic bets.
+**Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 -> v3.5 -> v3.6 -> v3.7
+
+| Milestone | Name | Phases | Focus |
+|-----------|------|--------|-------|
+| v3.0 | Universal Security Kernel Foundation | 319-322 | arc-http-core, arc-openapi, arc.yaml, arc api protect |
+| v3.1 | Attestation Completion | 323-326 | ACP kernel integration, compliance certs, OTel export |
+| v3.2 | Python Adoption | 327-330 | arc-sdk-python, arc-asgi, arc-fastapi, arc-langchain |
+| v3.3 | TypeScript Adoption | 331-334 | @arc-protocol/node-http, Express/Fastify/Elysia wrappers |
+| v3.4 | Guard Expansion | 335-338 | Session journal, post-invocation hooks, deterministic guards |
+| v3.5 | Protocol Breadth | 339-342 | MCP completion, OpenAPI-to-MCP bridge, A2A/ACP edges |
+| v3.6 | Platform Extensions | 343-346 | Go SDK, K8s controller/injector, arc-tower, JVM, .NET |
+| v3.7 | Strategic Bets | 347-350 | WASM guards, economics/metering, AG-UI, skill/workflow authority |
+
+## Foundation and Adoption Ladder (v2.80-v2.83)
+
+Four milestones shifting focus from internal feature expansion to structural
+quality, external usability, protocol specification, and production hardening.
+Dependencies: v2.80 -> v2.81 + v2.82 (parallel) -> v2.83.
+
+| Milestone | Name | Phases | Focus |
+|-----------|------|--------|-------|
+| v2.80 | Core Decomposition and Async Kernel | 303-306 | Split arc-core, decompose mega-files, async kernel, dep hygiene |
+| v2.81 | Deployable ARC and Developer Onboarding | 307-310 | Naming fix, SDKs, Docker experience, tutorial |
+| v2.82 | Normative Protocol Specification and Conformance | 311-314 | Wire spec, error taxonomy, threat model, conformance |
+| v2.83 | Coverage, Hardening, and Production Qualification | 315-318 | Integration tests, 80% coverage, store hardening, structured errors |
+
+## Ship Readiness Ladder (v2.66-v2.73)
 
 Eight milestones closing the gap between production-candidate and production release.
 Dependencies: v2.66+v2.67+v2.68 parallel -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 parallel.

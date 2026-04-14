@@ -146,11 +146,32 @@
 - [x] **v2.67 Kernel Panic Hardening** - Phases 277-280 (completed locally 2026-04-12)
 - [x] **v2.68 Quality Infrastructure** - Phases 281-283 (completed locally
   2026-04-12)
-- [ ] **v2.69 CI Gate and Release Qualification** - Phases 284-286
-- [ ] **v2.70 Developer Experience and Packaging** - Phases 287-290
-- [ ] **v2.71 Web3 Live Activation** - Phases 291-294
-- [ ] **v2.72 Distributed Systems and Federation** - Phases 295-298
-- [ ] **v2.73 Formal Verification** - Phases 299-302
+- [x] **v2.69 CI Gate and Release Qualification** - Phases 284-286
+  (completed locally 2026-04-12; hosted release gaps accepted)
+- [x] **v2.70 Developer Experience and Packaging** - Phases 287-290 (completed locally 2026-04-12)
+- [ ] **v2.71 Web3 Live Activation** - Phases 291-294 (deferred locally
+  2026-04-12 pending external operator prerequisites)
+- [x] **v2.72 Distributed Systems and Federation** - Phases 295-298
+  (completed locally 2026-04-13)
+- [x] **v2.73 Formal Verification** - Phases 299-302 (completed locally
+  2026-04-13)
+- [x] **v2.80 Core Decomposition and Async Kernel** - Phases 303-306
+  (completed locally 2026-04-13)
+- [x] **v2.81 Deployable ARC and Developer Onboarding** - Phases 307-310
+  (completed locally 2026-04-13; archived locally)
+- [x] **v2.82 Normative Protocol Specification and Conformance** - Phases
+  311-314 (completed locally 2026-04-13; archived locally)
+- [ ] **v2.83 Coverage, Hardening, and Production Qualification** - Phases
+  315-318 (active locally 2026-04-13 after `v2.82` archive)
+- [ ] **v3.0 Universal Security Kernel Foundation** - Phases 319-322
+  (planned)
+- [ ] **v3.1 Attestation Completion** - Phases 323-326 (planned)
+- [ ] **v3.2 Python Adoption** - Phases 327-330 (planned)
+- [ ] **v3.3 TypeScript Adoption** - Phases 331-334 (planned)
+- [ ] **v3.4 Guard Expansion** - Phases 335-338 (planned)
+- [ ] **v3.5 Protocol Breadth** - Phases 339-342 (planned)
+- [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
+- [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
 
 ## Ship Readiness Ladder (v2.66-v2.73)
 
@@ -343,7 +364,7 @@ go from zero to ARC-governed tool access in under 5 minutes.
 **Success Criteria** (what must be TRUE):
   1. A multi-stage Dockerfile produces a minimal Alpine-based image containing the arc CLI binary and nothing else unnecessary
   2. A Docker Compose example file wraps an MCP server with ARC policy enforcement -- `docker compose up` starts both the MCP server and the ARC kernel with a working policy
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 288: Anthropic SDK Integration Example
 **Goal**: Developers can see how to use arc mcp serve as a tool provider for Claude via the Anthropic SDK
@@ -352,7 +373,7 @@ go from zero to ARC-governed tool access in under 5 minutes.
 **Success Criteria** (what must be TRUE):
   1. A working example in examples/ shows arc mcp serve providing tools to Claude via the Anthropic SDK
   2. The example includes a README explaining setup, prerequisites, and expected output
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 289: LangChain/LlamaIndex Example
 **Goal**: Developers can see how to wrap an ARC-governed tool server as a LangChain tool
@@ -361,7 +382,7 @@ go from zero to ARC-governed tool access in under 5 minutes.
 **Success Criteria** (what must be TRUE):
   1. A working example in examples/ wraps an ARC-governed tool server as a LangChain tool with policy enforcement intact
   2. The example includes a README explaining setup, prerequisites, and expected output
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ### Phase 290: Quickstart Guide Refresh
 **Goal**: The project README provides a clear 5-minute path from zero to ARC-governed tool access using container or source builds
@@ -371,7 +392,7 @@ go from zero to ARC-governed tool access in under 5 minutes.
   1. README contains a container quickstart section showing docker pull, docker run, and first policy-enforced tool call
   2. README contains a framework examples section pointing to the Anthropic SDK and LangChain examples
   3. A developer following the README can go from zero to a working ARC-governed tool call in under 5 minutes
-**Plans**: TBD
+**Plans**: 1/1 plans complete
 
 ---
 
@@ -380,6 +401,9 @@ go from zero to ARC-governed tool access in under 5 minutes.
 **Milestone Goal:** Activate ARC's web3 settlement, Bitcoin OTS anchoring,
 and Solana memo publication on live testnets so the multi-chain proof story
 is exercised against real external infrastructure.
+**Status:** deferred locally on 2026-04-12 pending external Base Sepolia
+credentials, reviewed live-chain rollout artifacts, and OpenTimestamps
+tooling.
 
 ### Phase 291: Web3 Settlement E2E on Testnet
 **Goal**: ARC smart contracts are deployed to a live testnet and the full capability-to-settlement flow runs with real test tokens
@@ -425,6 +449,7 @@ is exercised against real external infrastructure.
 consensus, enable permissionless federation with anti-sybil controls, and
 automate identity lifecycle via SCIM so ARC can operate in multi-region
 production deployments.
+**Status:** complete locally 2026-04-13.
 
 ### Phase 295: Raft Consensus for Trust-Control
 **Goal**: Trust-control supports Raft-based consensus replication so the service can tolerate node failures without losing state
@@ -433,7 +458,7 @@ production deployments.
 **Success Criteria** (what must be TRUE):
   1. Trust-control can be started as a 3-node Raft cluster where leader election completes within a bounded timeout
   2. The Raft implementation handles split-brain (network partition heals with consistent state), log compaction (log does not grow unbounded), and snapshot transfer (new node catches up from snapshot)
-**Plans**: TBD
+**Plans**: [295-01-PLAN.md](./phases/295-raft-consensus-for-trust-control/295-01-PLAN.md), [295-01-SUMMARY.md](./phases/295-raft-consensus-for-trust-control/295-01-SUMMARY.md)
 
 ### Phase 296: Permissionless Federation Policy
 **Goal**: Operators can publish open-admission federation policies with anti-sybil controls and reputation-gated entry
@@ -442,7 +467,7 @@ production deployments.
 **Success Criteria** (what must be TRUE):
   1. An operator can publish an open-admission federation policy that allows any peer to join, subject to configurable anti-sybil controls (rate limits, proof-of-work, deposit bonds)
   2. Federation entry can be gated on minimum reputation score so that peers below the threshold are rejected
-**Plans**: TBD
+**Plans**: [296-01-PLAN.md](./phases/296-permissionless-federation-policy/296-01-PLAN.md), [296-01-SUMMARY.md](./phases/296-permissionless-federation-policy/296-01-SUMMARY.md)
 
 ### Phase 297: SCIM Lifecycle Automation
 **Goal**: External identity providers can automatically provision and deprovision ARC identities via SCIM 2.0
@@ -451,7 +476,7 @@ production deployments.
 **Success Criteria** (what must be TRUE):
   1. A SCIM 2.0 POST /Users request from an external IdP creates a corresponding ARC identity with correct attributes and entitlements
   2. A SCIM 2.0 DELETE /Users request from an external IdP deactivates the corresponding ARC identity, revokes active capabilities, and emits a deprovisioning receipt
-**Plans**: TBD
+**Plans**: [297-01-PLAN.md](./phases/297-scim-lifecycle-automation/297-01-PLAN.md), [297-01-SUMMARY.md](./phases/297-scim-lifecycle-automation/297-01-SUMMARY.md)
 
 ### Phase 298: Multi-Region Qualification
 **Goal**: Trust-control deployed across 3 regions proves consistency under network partition and replication lag is measured
@@ -460,7 +485,7 @@ production deployments.
 **Success Criteria** (what must be TRUE):
   1. A 3-region trust-control deployment maintains consistency (no split-brain decisions) when one region is network-partitioned and then restored
   2. Replication lag under partition scenarios is measured and documented with p50, p95, and p99 latency numbers
-**Plans**: TBD
+**Plans**: [298-01-PLAN.md](./phases/298-multi-region-qualification/298-01-PLAN.md), [298-MULTI-REGION-QUALIFICATION.md](./phases/298-multi-region-qualification/298-MULTI-REGION-QUALIFICATION.md), [298-01-SUMMARY.md](./phases/298-multi-region-qualification/298-01-SUMMARY.md)
 
 ---
 
@@ -470,6 +495,8 @@ production deployments.
 all sorry placeholders, proving core capability and receipt invariants, and
 wiring the proof build into CI so no future change can silently break a
 proven theorem.
+**Status:** complete locally 2026-04-13; phases `299` through `302` are
+implemented, verified, and audited locally.
 
 ### Phase 299: Sorry Placeholder Audit
 **Goal**: Every sorry placeholder in the Lean 4 tree is inventoried and classified so proof completion work targets the right gaps
@@ -478,7 +505,7 @@ proven theorem.
 **Success Criteria** (what must be TRUE):
   1. A published audit document lists every sorry placeholder with file, theorem name, and classification (straightforward / needs-lemma / needs-redesign)
   2. Each sorry is assigned to either Phase 300 (capability proofs) or Phase 301 (receipt proofs) based on the theorem's domain
-**Plans**: TBD
+**Plans**: [299-01-PLAN.md](./milestones/v2.73-phases/299-sorry-placeholder-audit/299-01-PLAN.md), [299-SORRY-AUDIT.md](./milestones/v2.73-phases/299-sorry-placeholder-audit/299-SORRY-AUDIT.md), [299-01-SUMMARY.md](./milestones/v2.73-phases/299-sorry-placeholder-audit/299-01-SUMMARY.md)
 
 ### Phase 300: Core Capability Proofs
 **Goal**: Attenuation monotonicity, delegation chain integrity, and budget non-negative invariant are proven in Lean 4 with no sorry
@@ -488,7 +515,7 @@ proven theorem.
   1. The theorem stating attenuation always produces a strict subset of the parent capability's scope is proven (no sorry) and lake build passes
   2. The theorem stating delegation chains preserve integrity (no capability in a chain exceeds its parent's authority) is proven (no sorry) and lake build passes
   3. The theorem stating budget values are always non-negative after any sequence of operations is proven (no sorry) and lake build passes
-**Plans**: TBD
+**Plans**: [300-01-PLAN.md](./milestones/v2.73-phases/300-core-capability-proofs/300-01-PLAN.md), [300-01-SUMMARY.md](./milestones/v2.73-phases/300-core-capability-proofs/300-01-SUMMARY.md)
 
 ### Phase 301: Receipt Proof Completion
 **Goal**: Merkle inclusion soundness, checkpoint consistency, and receipt immutability are proven in Lean 4 with no sorry
@@ -498,7 +525,7 @@ proven theorem.
   1. The theorem stating Merkle inclusion proofs are sound (a valid proof implies the receipt exists in the committed tree) is proven (no sorry) and lake build passes
   2. The theorem stating checkpoint consistency (no two checkpoints for the same epoch with different roots) is proven (no sorry) and lake build passes
   3. The theorem stating receipt immutability (a signed receipt's content hash cannot be altered without invalidating the signature) is proven (no sorry) and lake build passes
-**Plans**: TBD
+**Plans**: [301-01-PLAN.md](./milestones/v2.73-phases/301-receipt-proof-completion/301-01-PLAN.md), [301-01-SUMMARY.md](./milestones/v2.73-phases/301-receipt-proof-completion/301-01-SUMMARY.md)
 
 ### Phase 302: Lean 4 CI Integration
 **Goal**: The Lean 4 proof build runs in CI and fails on any new sorry in proven modules so proofs cannot regress
@@ -507,7 +534,7 @@ proven theorem.
 **Success Criteria** (what must be TRUE):
   1. A CI job runs `lake build` on the Lean 4 tree and fails if any sorry appears in a module that was previously sorry-free
   2. The CI job completes in reasonable time (under 10 minutes) and is wired into the same gate as the Rust CI
-**Plans**: TBD
+**Plans**: [302-01-PLAN.md](./milestones/v2.73-phases/302-lean-4-ci-integration/302-01-PLAN.md), [302-01-SUMMARY.md](./milestones/v2.73-phases/302-lean-4-ci-integration/302-01-SUMMARY.md)
 
 ---
 
@@ -529,25 +556,25 @@ v2.66+v2.67+v2.68 (parallel) -> v2.69 -> v2.70 -> v2.71+v2.72+v2.73 (parallel)
 | 281 | v2.68 | Property-Based Testing with proptest | 1/1 | Complete |
 | 282 | v2.68 | Criterion Benchmark Suite | 1/1 | Complete |
 | 283 | v2.68 | Code Coverage with cargo-tarpaulin | 1/1 | Complete |
-| 284 | v2.69 | CI Workflow Audit and Fixes | 1/1 | Blocked on hosted |
-| 285 | v2.69 | Conformance Wave Validation | 1/1 | Blocked on hosted |
-| 286 | v2.69 | Release Qualification Observation | 1/1 | Blocked on hosted |
-| 287 | v2.70 | Dockerfile and Container Images | TBD | Not started |
-| 288 | v2.70 | Anthropic SDK Integration Example | TBD | Not started |
-| 289 | v2.70 | LangChain/LlamaIndex Example | TBD | Not started |
-| 290 | v2.70 | Quickstart Guide Refresh | TBD | Not started |
-| 291 | v2.71 | Web3 Settlement E2E on Testnet | TBD | Not started |
-| 292 | v2.71 | Bitcoin OTS Anchoring in Test Suite | TBD | Not started |
-| 293 | v2.71 | Solana Memo Publication | TBD | Not started |
-| 294 | v2.71 | Multi-Chain Qualification Report | TBD | Not started |
-| 295 | v2.72 | Raft Consensus for Trust-Control | TBD | Not started |
-| 296 | v2.72 | Permissionless Federation Policy | TBD | Not started |
-| 297 | v2.72 | SCIM Lifecycle Automation | TBD | Not started |
-| 298 | v2.72 | Multi-Region Qualification | TBD | Not started |
-| 299 | v2.73 | Sorry Placeholder Audit | TBD | Not started |
-| 300 | v2.73 | Core Capability Proofs | TBD | Not started |
-| 301 | v2.73 | Receipt Proof Completion | TBD | Not started |
-| 302 | v2.73 | Lean 4 CI Integration | TBD | Not started |
+| 284 | v2.69 | CI Workflow Audit and Fixes | 1/1 | Complete |
+| 285 | v2.69 | Conformance Wave Validation | 1/1 | Complete |
+| 286 | v2.69 | Release Qualification Observation | 1/1 | Complete |
+| 287 | v2.70 | Dockerfile and Container Images | 1/1 | Complete |
+| 288 | v2.70 | Anthropic SDK Integration Example | 1/1 | Complete |
+| 289 | v2.70 | LangChain/LlamaIndex Example | 1/1 | Complete |
+| 290 | v2.70 | Quickstart Guide Refresh | 1/1 | Complete |
+| 291 | v2.71 | Web3 Settlement E2E on Testnet | TBD | Deferred |
+| 292 | v2.71 | Bitcoin OTS Anchoring in Test Suite | TBD | Deferred |
+| 293 | v2.71 | Solana Memo Publication | TBD | Deferred |
+| 294 | v2.71 | Multi-Chain Qualification Report | TBD | Deferred |
+| 295 | v2.72 | Raft Consensus for Trust-Control | 1/1 | Complete |
+| 296 | v2.72 | Permissionless Federation Policy | 1/1 | Complete |
+| 297 | v2.72 | SCIM Lifecycle Automation | 1/1 | Complete |
+| 298 | v2.72 | Multi-Region Qualification | 1/1 | Complete |
+| 299 | v2.73 | Sorry Placeholder Audit | 1/1 | Complete |
+| 300 | v2.73 | Core Capability Proofs | 1/1 | Complete |
+| 301 | v2.73 | Receipt Proof Completion | 1/1 | Complete |
+| 302 | v2.73 | Lean 4 CI Integration | 1/1 | Complete |
 
 ## Milestone Status
 
@@ -9657,3 +9684,654 @@ remain planned as the rest of the research-completion ladder.
 | 90 | v2.20 | Quote Requests, Placement, and Bound Coverage Artifacts | Complete |
 | 91 | v2.20 | Claim Packages, Disputes, and Liability Adjudication | Complete |
 | 92 | v2.20 | Marketplace Qualification, Partner Proof, and Boundary Update | Complete |
+
+---
+
+## Foundation and Adoption Ladder (v2.80-v2.83)
+
+Four milestones shifting focus from internal feature expansion to structural
+quality, external usability, protocol specification, and production hardening.
+
+Dependencies: v2.80 -> v2.81 + v2.82 (parallel) -> v2.83.
+
+Research basis: Five-agent codebase audit (2026-04-13) reviewing technical
+debt, developer experience, protocol/standards alignment, product/market
+readiness, and architecture/performance.
+
+---
+
+### v2.80 Core Decomposition and Async Kernel (Phases 303-306)
+
+**Milestone Goal:** Break the `arc-core` gravity well into focused crates,
+decompose the five mega-files into proper module trees, migrate the kernel
+from synchronous `&mut self` to async `&self` with interior mutability, and
+clean up deprecated and duplicated dependencies. This is the structural
+prerequisite for concurrent multi-agent operation and faster development
+iteration.
+
+### Phase 303: arc-core Crate Decomposition
+**Goal**: Split the 32K-line `arc-core` into `arc-core-types` (capabilities, receipts, crypto, canonical JSON) plus domain crates so dependent crates only compile what they need
+**Depends on**: Nothing (first phase of v2.80)
+**Requirements**: DECOMP-01, DECOMP-02, DECOMP-03, DECOMP-04
+**Success Criteria** (what must be TRUE):
+  1. `arc-core-types` exists as a standalone crate containing capabilities, receipts, cryptographic signing, canonical JSON, and scope types
+  2. Domain types (credit, exposure, facility, bond, liability, market, governance, listing, appraisal, federation) live in separate domain crates that depend on `arc-core-types`
+  3. All 25 dependent crates compile and their existing tests pass against the decomposed structure
+  4. A single-file change in `arc-core-types` triggers a measurably faster incremental rebuild than the same change in monolithic `arc-core`
+**Plans**: [303-01-PLAN.md](./phases/303-arc-core-crate-decomposition/303-01-PLAN.md), [303-01-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-01-SUMMARY.md), [303-02-PLAN.md](./phases/303-arc-core-crate-decomposition/303-02-PLAN.md), [303-02-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-02-SUMMARY.md), [303-03-PLAN.md](./phases/303-arc-core-crate-decomposition/303-03-PLAN.md), [303-03-SUMMARY.md](./phases/303-arc-core-crate-decomposition/303-03-SUMMARY.md)
+
+### Phase 304: Mega-File Module Decomposition
+**Goal**: Decompose the five files exceeding 6,000 lines into focused module trees so no non-test source file exceeds 3,000 lines
+**Depends on**: Phase 303 (decomposed core types simplify imports)
+**Requirements**: DECOMP-05, DECOMP-06, DECOMP-07, DECOMP-08, DECOMP-09
+**Success Criteria** (what must be TRUE):
+  1. `trust_control.rs` is split into focused modules (federation, passport, settlement, SCIM, HTTP routes, types) with no public API changes
+  2. `arc-kernel/src/lib.rs` has its test module in a separate file and kernel subsystems in dedicated modules
+  3. `arc-cli/src/main.rs` is a thin dispatch entry point with per-subcommand modules
+  4. `receipt_store.rs` and `runtime.rs` are decomposed into focused modules
+  5. `find crates/ -name '*.rs' ! -path '*/tests/*' | xargs wc -l | awk '$1 > 3000'` returns no results
+**Plans**: [304-CONTEXT.md](./phases/304-mega-file-module-decomposition/304-CONTEXT.md), [304-RESEARCH.md](./phases/304-mega-file-module-decomposition/304-RESEARCH.md), [304-VALIDATION.md](./phases/304-mega-file-module-decomposition/304-VALIDATION.md), [304-01-PLAN.md](./phases/304-mega-file-module-decomposition/304-01-PLAN.md), [304-01-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-01-SUMMARY.md), [304-02-PLAN.md](./phases/304-mega-file-module-decomposition/304-02-PLAN.md), [304-02-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-02-SUMMARY.md), [304-03-PLAN.md](./phases/304-mega-file-module-decomposition/304-03-PLAN.md), [304-03-SUMMARY.md](./phases/304-mega-file-module-decomposition/304-03-SUMMARY.md)
+
+### Phase 305: Async Kernel Migration
+**Goal**: The ARC kernel evaluates tool calls asynchronously on `&self` so multiple agents can be served concurrently without exclusive borrowing
+**Depends on**: Phase 304 (decomposed kernel modules are easier to migrate)
+**Requirements**: ASYNC-01, ASYNC-02, ASYNC-03, ASYNC-04
+**Success Criteria** (what must be TRUE):
+  1. `ArcKernel::evaluate_tool_call` is `async fn` taking `&self`
+  2. Session state, receipt log, and budget stores use interior mutability (`RwLock`, `DashMap`, or equivalent)
+  3. A test spawns two concurrent tool evaluations from different agents and both complete without deadlock or serialization
+  4. The full existing test suite passes with no behavior changes beyond concurrency enablement
+**Plans**: [305-CONTEXT.md](./phases/305-async-kernel-migration/305-CONTEXT.md), [305-RESEARCH.md](./phases/305-async-kernel-migration/305-RESEARCH.md), [305-VALIDATION.md](./phases/305-async-kernel-migration/305-VALIDATION.md), [305-01-PLAN.md](./phases/305-async-kernel-migration/305-01-PLAN.md), [305-01-SUMMARY.md](./phases/305-async-kernel-migration/305-01-SUMMARY.md), [305-02-PLAN.md](./phases/305-async-kernel-migration/305-02-PLAN.md), [305-02-SUMMARY.md](./phases/305-async-kernel-migration/305-02-SUMMARY.md), [305-03-PLAN.md](./phases/305-async-kernel-migration/305-03-PLAN.md), [305-03-SUMMARY.md](./phases/305-async-kernel-migration/305-03-SUMMARY.md)
+
+### Phase 306: Dependency Hygiene and Feature Gating
+**Goal**: Remove deprecated dependencies, eliminate duplicate crate versions, and feature-gate the web3/alloy stack so it does not inflate core compilation
+**Depends on**: Phase 303 (domain crate split enables cleaner feature gating)
+**Requirements**: DEPS-01, DEPS-02, DEPS-03, DEPS-04
+**Success Criteria** (what must be TRUE):
+  1. `serde_yaml` is replaced with `serde_yml` in all dependent crates and all YAML round-trip tests pass
+  2. Only one major version of `reqwest` appears in `cargo tree`
+  3. `cargo build --workspace --no-default-features` (with `web3` feature disabled) compiles without alloy, ethers, or Solidity-related crates
+  4. `cargo tree -d` shows no duplicates for `reqwest`, `serde_yaml`, or `hashbrown`
+**Plans**: [306-CONTEXT.md](./phases/306-dependency-hygiene-and-feature-gating/306-CONTEXT.md), [306-RESEARCH.md](./phases/306-dependency-hygiene-and-feature-gating/306-RESEARCH.md), [306-VALIDATION.md](./phases/306-dependency-hygiene-and-feature-gating/306-VALIDATION.md), [306-01-PLAN.md](./phases/306-dependency-hygiene-and-feature-gating/306-01-PLAN.md), [306-01-SUMMARY.md](./phases/306-dependency-hygiene-and-feature-gating/306-01-SUMMARY.md), [306-02-PLAN.md](./phases/306-dependency-hygiene-and-feature-gating/306-02-PLAN.md), [306-02-SUMMARY.md](./phases/306-dependency-hygiene-and-feature-gating/306-02-SUMMARY.md)
+
+---
+
+### v2.81 Deployable ARC and Developer Onboarding (Phases 307-310)
+
+**Milestone Goal:** Make ARC usable by developers who are not building from
+Rust source. Resolve the naming split, publish stable SDKs, provide a
+one-command Docker experience, and write a progressive tutorial that takes a
+developer from zero to a governed tool call in five minutes.
+
+### Phase 307: Identity Resolution and Scaffolding
+**Goal**: Every user-facing artifact says "ARC" consistently and `arc init` scaffolds a working project
+**Depends on**: Phase 306 (clean dependency tree for scaffolded projects)
+**Requirements**: ONBOARD-01, ONBOARD-02, ONBOARD-03
+**Success Criteria** (what must be TRUE):
+  1. `grep -ri "chio" README.md docs/ crates/*/src/*.rs` returns zero matches
+  2. `arc init my-project` creates a directory with a working policy file, tool server stub, and build instructions
+  3. The scaffolded project compiles and runs a governed hello-world tool call without manual intervention
+**Plans**: 2/2 plans complete
+
+### Phase 308: SDK Publication
+**Goal**: TypeScript and Python SDKs are published to npm and PyPI as stable releases with typed clients and end-to-end examples
+**Depends on**: Phase 305 (async kernel enables the SDK client protocol)
+**Requirements**: SDK-01, SDK-02, SDK-03, SDK-04
+**Success Criteria** (what must be TRUE):
+  1. `npm install @arc-protocol/sdk` installs a stable release with TypeScript types
+  2. `pip install arc-sdk` installs a stable release with typed Python classes
+  3. Both SDKs include a working example that connects to a running ARC kernel, requests a capability, invokes a governed tool, and reads the receipt
+  4. SDK README files document installation, quickstart, and API reference
+**Plans**: 3/3 plans complete
+
+### Phase 309: Deployable Experience
+**Goal**: A developer can go from `git clone` to seeing a governed receipt in a viewer within 5 minutes using Docker
+**Depends on**: Phase 307, Phase 308
+**Requirements**: DEPLOY-01, DEPLOY-02, DEPLOY-03
+**Success Criteria** (what must be TRUE):
+  1. `docker compose up` in the examples directory starts kernel, tool server, and receipt viewer
+  2. The receipt viewer renders receipts with capability chain, guard decisions, and timestamps
+  3. A curl command or SDK script triggers a governed tool call and the receipt appears in the viewer within seconds
+**Plans**: 2/2 plans complete
+
+### Phase 310: Progressive Tutorial and Framework Integration
+**Goal**: Documentation guides a developer from ARC concepts through their first delegation, and framework examples use official SDKs
+**Depends on**: Phase 308, Phase 309
+**Requirements**: TUTORIAL-01, TUTORIAL-02, TUTORIAL-03, TUTORIAL-04
+**Success Criteria** (what must be TRUE):
+  1. A tutorial document walks through: ARC concepts, writing a policy, wrapping a tool, executing a governed call, reading a receipt, and delegating a capability
+  2. The Anthropic SDK example imports `@arc-protocol/sdk` and exercises the typed client
+  3. The LangChain example imports `arc-sdk` and exercises the typed client
+  4. An OpenAI-compatible example demonstrates ARC governance over function calling
+**Plans**: 2/2 plans complete
+
+---
+
+### v2.82 Normative Protocol Specification and Conformance (Phases 311-314)
+
+Archived locally on 2026-04-13. See
+`.planning/milestones/v2.82-ROADMAP.md` for the archived milestone snapshot and
+`.planning/milestones/v2.82-phases/` for the full phase artifacts.
+
+---
+
+### v2.83 Coverage, Hardening, and Production Qualification (Phases 315-318)
+
+**Milestone Goal:** Bring every crate to integration-test coverage, push
+workspace coverage to 80%+, harden the storage layer for concurrency, clean
+up API surface debt, and ship structured error output that helps developers
+debug policy and capability issues.
+
+### Phase 315: Integration Test Coverage Expansion
+**Goal**: Every crate has integration tests exercising its public API so cross-boundary regressions are caught
+**Depends on**: Phase 305 (async kernel enables realistic integration test scenarios)
+**Requirements**: PROD-01, PROD-02, PROD-03
+**Success Criteria** (what must be TRUE):
+  1. Every crate under `crates/` has at least one file in `tests/` exercising its public API
+  2. arc-credentials, arc-policy, and arc-store-sqlite each have success-path, failure-path, and edge-case integration tests
+  3. arc-a2a-adapter, arc-mcp-adapter, and arc-mcp-edge integration tests exercise real protocol exchanges
+**Plans**: 3/3 plans complete
+
+### Phase 316: Coverage Push and Store Hardening
+**Goal**: Coverage reaches 80%+ and the SQLite layer supports concurrent access
+**Depends on**: Phase 315
+**Requirements**: PROD-04, PROD-05, PROD-06
+**Success Criteria** (what must be TRUE):
+  1. `cargo tarpaulin` reports workspace line coverage at or above 80%
+  2. Coverage gains come from previously untested crates, not trivial additions to well-covered code
+  3. `SqliteReceiptStore` uses connection pooling or an async store trait; a concurrent-write test confirms no serialization bottleneck
+**Plans**: 0/2 plans (to be created)
+
+### Phase 317: Dead Code and API Surface Audit
+**Goal**: Remove dead code, refactor oversized function signatures, and tighten public API visibility
+**Depends on**: Phase 304 (decomposed modules enable visibility audit)
+**Requirements**: PROD-07, PROD-08, PROD-09, PROD-10
+**Success Criteria** (what must be TRUE):
+  1. No `#[allow(dead_code)]` remains in non-test code without an explicit justification comment
+  2. No `#[allow(clippy::too_many_arguments)]` remains -- all sites use config/builder/request structs
+  3. No internal implementation types are re-exported from crate root modules
+  4. `cargo +nightly udeps` reports no unused dependencies
+**Plans**: 0/2 plans (to be created)
+
+### Phase 318: Structured Errors and Production Qualification
+**Goal**: Errors guide developers to fixes and a qualification bundle documents production readiness
+**Depends on**: Phase 316, Phase 317
+**Requirements**: PROD-11, PROD-12, PROD-13
+**Success Criteria** (what must be TRUE):
+  1. CLI and kernel errors include: error code, context, and suggested fix
+  2. `--format json` flag outputs machine-readable error objects
+  3. A qualification bundle documents: test count, coverage %, benchmark baselines, conformance results, and known gaps
+**Plans**: 0/2 plans (to be created)
+
+---
+
+## Phase Summary (v2.80-v2.83)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 303 | v2.80 | arc-core Crate Decomposition | Complete |
+| 304 | v2.80 | Mega-File Module Decomposition | Complete |
+| 305 | v2.80 | Async Kernel Migration | Complete |
+| 306 | v2.80 | Dependency Hygiene and Feature Gating | Complete |
+| 307 | v2.81 | Identity Resolution and Scaffolding | Complete |
+| 308 | v2.81 | SDK Publication | Complete |
+| 309 | v2.81 | Deployable Experience | Complete |
+| 310 | v2.81 | Progressive Tutorial and Framework Integration | Complete |
+| 311 | v2.82 | Wire Protocol Specification | Complete |
+| 312 | v2.82 | Version Negotiation and Error Taxonomy | Complete |
+| 313 | v2.82 | Threat Model and Security Specification | Complete |
+| 314 | v2.82 | Native Protocol Conformance and Standards Track | Complete |
+| 315 | v2.83 | Integration Test Coverage Expansion | Complete |
+| 316 | v2.83 | Coverage Push and Store Hardening | Pending |
+| 317 | v2.83 | Dead Code and API Surface Audit | Pending |
+| 318 | v2.83 | Structured Errors and Production Qualification | Pending |
+
+---
+
+## v3.x Universal Security Kernel Era
+
+**Strategic pivot:** ARC expands from protocol adapter collection to universal
+security kernel for the agent economy. One kernel, many substrates. Signed
+receipts across HTTP APIs, agent protocols, and framework middleware.
+
+**Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 -> v3.5 -> v3.6 -> v3.7
+
+---
+
+## v3.0 Universal Security Kernel Foundation (Phases 319-322)
+
+**Milestone Goal:** Build the shared HTTP security types, OpenAPI import,
+unified configuration schema, and zero-code reverse-proxy entry point that
+all later substrates, SDKs, and framework wrappers depend on.
+
+### Phase 319: arc-http-core Types and Request Model
+**Goal**: Define the protocol-agnostic HTTP request, session, receipt, and verdict types that every substrate adapter shares
+**Depends on**: Phase 318 (v2.83 production qualification provides the stable kernel foundation)
+**Requirements**: CORE-01, CORE-02, CORE-03, CORE-04
+**Success Criteria** (what must be TRUE):
+  1. `arc-http-core` crate exists with `ArcHttpRequest`, `HttpMethod`, `CallerIdentity`, `AuthMethod`, `SessionContext`, `HttpReceipt`, and `Verdict` types
+  2. All types implement `Serialize` and `Deserialize` with canonical JSON for signed payloads
+  3. `HttpReceipt` carries Ed25519 signature, request binding, verdict, and guard evidence
+  4. Existing kernel crates compile without changes -- `arc-http-core` is additive
+**Estimated complexity**: M
+
+### Phase 320: arc-openapi Parsing and Manifest Generation
+**Goal**: Parse OpenAPI 3.x specs and generate ARC tool manifests with default deny-by-default policies for side-effect routes
+**Depends on**: Phase 319 (arc-http-core types define the request/receipt model)
+**Requirements**: CORE-05, CORE-06, CORE-07, CORE-08, CORE-09
+**Success Criteria** (what must be TRUE):
+  1. `arc-openapi` crate parses OpenAPI 3.0 and 3.1 specs in both YAML and JSON
+  2. Each route becomes a `ToolDefinition` with input_schema from path/query/body params
+  3. GET routes default to session-scoped allow; POST/PUT/PATCH/DELETE default to deny without capability
+  4. `x-arc-*` extension fields override default policy per route
+  5. Running against PetStore spec produces a valid ToolManifest
+**Estimated complexity**: M
+
+### Phase 321: arc.yaml Unified Configuration
+**Goal**: Implement the arc.yaml configuration schema with env-var interpolation and fail-fast validation
+**Depends on**: Phase 319 (arc-http-core types are referenced in config structs)
+**Requirements**: CORE-10, CORE-11, CORE-12, CORE-13
+**Success Criteria** (what must be TRUE):
+  1. `arc-config` module parses `arc.yaml` with kernel, adapters, edges, receipts, and logging sections
+  2. `${VAR}` and `${VAR:-default}` resolve in string fields before typed deserialization
+  3. Duplicate IDs, broken references, and missing required fields produce clear error messages at parse time
+  4. Minimal config (kernel + one adapter) is accepted; all other sections default sensibly
+**Estimated complexity**: M
+
+### Phase 322: arc api protect CLI
+**Goal**: Ship the zero-code reverse-proxy entry point that reads an OpenAPI spec and produces signed receipts for every request
+**Depends on**: Phase 320 (arc-openapi provides manifest generation), Phase 321 (arc.yaml provides config)
+**Requirements**: CORE-14, CORE-15, CORE-16, CORE-17, CORE-18
+**Success Criteria** (what must be TRUE):
+  1. `arc api protect --upstream URL --spec openapi.yaml` starts a reverse proxy
+  2. Side-effect routes without capability tokens receive structured 403 responses
+  3. Every proxied request produces a signed `HttpReceipt` in the local SQLite store
+  4. Auto-discovery reads `/openapi.json` when `--spec` is omitted
+  5. GET requests pass with session-scoped audit receipts
+**Estimated complexity**: L
+
+---
+
+## v3.1 Attestation Completion (Phases 323-326)
+
+**Milestone Goal:** Close the ACP attestation gap, implement session
+compliance certificates, and connect ARC to existing observability
+infrastructure via OpenTelemetry export.
+
+### Phase 323: ReceiptSigner and CapabilityChecker Traits
+**Goal**: Define the injection traits that let the ACP proxy produce signed receipts and validate capabilities without hard-coupling to the kernel
+**Depends on**: Phase 319 (arc-http-core receipt model informs trait design)
+**Requirements**: ATT-01, ATT-02, ATT-03, ATT-04
+**Success Criteria** (what must be TRUE):
+  1. `ReceiptSigner` and `CapabilityChecker` traits are defined in `arc-acp-proxy`
+  2. Both traits are `Option`-wrapped in `MessageInterceptor`
+  3. `AcpProxy::start_with_kernel` accepts injected signer and checker
+  4. `AcpProxy::start` continues to work in standalone mode
+**Estimated complexity**: S
+
+### Phase 324: ACP Kernel Integration
+**Goal**: Implement kernel-backed signer and checker so ACP events produce signed receipts in the same receipt store as MCP and A2A
+**Depends on**: Phase 323 (traits define the injection surface)
+**Requirements**: ATT-05, ATT-06, ATT-07, ATT-08
+**Success Criteria** (what must be TRUE):
+  1. Kernel-backed `ReceiptSigner` signs ACP events into `ArcReceipt` with Ed25519 signatures
+  2. Kernel-backed `CapabilityChecker` validates tokens for file and terminal operations with fail-closed semantics
+  3. Signed ACP receipts appear in the kernel's `ReceiptStore` and Merkle checkpoint batches
+  4. `AcpAttestationMode::Required` marks sessions non-compliant when signing fails
+**Estimated complexity**: M
+
+### Phase 325: Session Compliance Certificate
+**Goal**: Implement certificate generation and verification so a single artifact proves an entire session complied with policy
+**Depends on**: Phase 324 (ACP signed receipts are needed for cross-protocol certificates)
+**Requirements**: ATT-09, ATT-10, ATT-11, ATT-12
+**Success Criteria** (what must be TRUE):
+  1. `generate_compliance_certificate(session_id)` produces a signed certificate covering six assertions
+  2. Any anomaly during generation aborts with a typed error instead of issuing a misleading certificate
+  3. Both lightweight and full-bundle verification modes work end-to-end
+  4. `arc cert generate`, `arc cert verify`, and `arc cert inspect` CLI commands work
+**Estimated complexity**: L
+
+### Phase 326: OpenTelemetry Export
+**Goal**: Export receipt data as OTel spans so ARC integrates with existing observability infrastructure
+**Depends on**: Phase 325 (compliance certificates generate the span events to export)
+**Requirements**: ATT-13, ATT-14, ATT-15
+**Success Criteria** (what must be TRUE):
+  1. Receipts export as OTel spans with trace_id, span_id, tool_name, verdict, and capability_id
+  2. OTel export is configurable in `arc.yaml` with endpoint and protocol settings
+  3. Compliance certificate events attach as span events to the session root span
+**Estimated complexity**: M
+
+---
+
+## v3.2 Python Adoption (Phases 327-330)
+
+**Milestone Goal:** Ship Python SDK, ASGI middleware, framework wrappers, and
+LangChain integration so Python developers can adopt ARC with one import.
+
+### Phase 327: arc-sdk-python Core
+**Goal**: Build the Python SDK wrapping the Rust kernel via PyO3/maturin with typed bindings for capabilities, receipts, and guard evaluation
+**Depends on**: Phase 322 (arc api protect validates the HTTP receipt model end-to-end)
+**Requirements**: PY-01, PY-02, PY-03, PY-04
+**Success Criteria** (what must be TRUE):
+  1. `arc-sdk-python` exposes `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict` as typed Python classes
+  2. Python code can create, validate, and attenuate capability tokens
+  3. Python code can verify receipt signatures and chain continuity
+  4. `pip install arc-sdk-python` works with pre-built wheels for Linux x86_64 and macOS arm64
+**Estimated complexity**: L
+
+### Phase 328: arc-asgi Middleware
+**Goal**: Build ASGI middleware that intercepts requests, evaluates capabilities, and signs receipts for any ASGI-compliant framework
+**Depends on**: Phase 327 (Python SDK provides the kernel binding)
+**Requirements**: PY-05, PY-06, PY-07
+**Success Criteria** (what must be TRUE):
+  1. `arc-asgi` middleware extracts caller identity, evaluates capabilities, runs guards, and signs receipts
+  2. Middleware works via `app.add_middleware()` on FastAPI, Starlette, and Litestar
+  3. Every request produces a signed `HttpReceipt` in the configured receipt store
+**Estimated complexity**: M
+
+### Phase 329: arc-fastapi and arc-django Wrappers
+**Goal**: Build framework-specific wrappers with decorators and native error responses
+**Depends on**: Phase 328 (ASGI middleware provides the interception layer)
+**Requirements**: PY-08, PY-09, PY-10
+**Success Criteria** (what must be TRUE):
+  1. `arc-fastapi` provides `@arc_requires`, `@arc_approval`, and `@arc_budget` decorators
+  2. `arc-django` middleware works with Django WSGI and DRF
+  3. Both wrappers return framework-native error responses with ARC error codes
+**Estimated complexity**: M
+
+### Phase 330: arc-langchain Integration and Conformance
+**Goal**: Wrap ARC-governed tools as LangChain Tool objects and validate cross-language conformance
+**Depends on**: Phase 329 (FastAPI wrapper validates the end-to-end Python path)
+**Requirements**: PY-11, PY-12, PY-13
+**Success Criteria** (what must be TRUE):
+  1. `arc-langchain` wraps ARC tools as LangChain `Tool` objects with kernel-mediated invocation
+  2. Conformance tests produce byte-identical results between Python SDK and Rust kernel
+  3. End-to-end test: FastAPI app with `arc-fastapi` produces receipts that pass `arc cert verify`
+**Estimated complexity**: M
+
+---
+
+## v3.3 TypeScript Adoption (Phases 331-334)
+
+**Milestone Goal:** Ship Node/Bun HTTP substrate, Express/Fastify/Elysia
+wrappers, and conformance tests so TypeScript developers can adopt ARC
+natively.
+
+### Phase 331: @arc-protocol/node-http Substrate
+**Goal**: Build the common HTTP interception substrate for Node and Bun runtimes
+**Depends on**: Phase 326 (OTel export validates the receipt pipeline TypeScript will use)
+**Requirements**: TS-01, TS-02, TS-03
+**Success Criteria** (what must be TRUE):
+  1. `@arc-protocol/node-http` handles `(req, res)` and `Request -> Response` interception
+  2. Substrate extracts caller identity from Authorization headers, cookies, and API keys
+  3. Substrate produces signed receipts via Rust kernel binding (NAPI-RS or WASM)
+**Estimated complexity**: L
+
+### Phase 332: Express and Fastify Wrappers
+**Goal**: Build thin wrappers for Express and Fastify over the node-http substrate
+**Depends on**: Phase 331 (node-http substrate provides the interception layer)
+**Requirements**: TS-04, TS-05, TS-06
+**Success Criteria** (what must be TRUE):
+  1. `@arc-protocol/express` provides `app.use(arc(...))` middleware
+  2. `@arc-protocol/fastify` provides `fastify.register(arc, ...)` plugin
+  3. Both wrappers return framework-native error responses with ARC error codes
+**Estimated complexity**: M
+
+### Phase 333: Elysia Wrapper and npm Packaging
+**Goal**: Build Elysia lifecycle hook and publish all packages to npm with TypeScript types
+**Depends on**: Phase 332 (Express/Fastify validate the wrapper pattern)
+**Requirements**: TS-07, TS-08, TS-09
+**Success Criteria** (what must be TRUE):
+  1. `@arc-protocol/elysia` provides `.use(arc(...))` lifecycle hook
+  2. All four packages publish with TypeScript type definitions
+  3. Packages support both ESM and CommonJS
+**Estimated complexity**: S
+
+### Phase 334: TypeScript Conformance
+**Goal**: Validate TypeScript SDK behavior matches Rust kernel via shared test vectors
+**Depends on**: Phase 333 (all TS packages are built)
+**Requirements**: TS-10, TS-11, TS-12
+**Success Criteria** (what must be TRUE):
+  1. Conformance tests produce byte-identical results between TypeScript SDK and Rust kernel
+  2. Express end-to-end test produces receipts that pass `arc cert verify`
+  3. Fastify end-to-end test produces receipts that pass `arc cert verify`
+**Estimated complexity**: M
+
+---
+
+## v3.4 Guard Expansion (Phases 335-338)
+
+**Milestone Goal:** Add session journal for multi-step context,
+post-invocation hooks, new deterministic guards, and advisory signals to
+close the gap between "authorized the request" and "governed the outcome."
+
+### Phase 335: Session Journal
+**Goal**: Build the per-session journal that tracks request history, data flow, and delegation depth for session-aware guards
+**Depends on**: Phase 322 (arc api protect provides the HTTP request pipeline)
+**Requirements**: GUARD-01, GUARD-02, GUARD-03
+**Success Criteria** (what must be TRUE):
+  1. `arc-http-session` maintains per-session journal with request history, data-flow accounting, and delegation depth
+  2. Journal is available to all guards in the evaluation pipeline
+  3. Journal entries are append-only and hash-chained for tamper detection
+**Estimated complexity**: M
+
+### Phase 336: Deterministic Guards
+**Goal**: Ship InternalNetworkGuard, AgentVelocityGuard, and DataFlowGuard with configurable thresholds and fail-closed semantics
+**Depends on**: Phase 335 (session journal provides data-flow and rate data)
+**Requirements**: GUARD-04, GUARD-05, GUARD-06, GUARD-07
+**Success Criteria** (what must be TRUE):
+  1. `InternalNetworkGuard` blocks SSRF targeting RFC 1918, loopback, link-local, and cloud metadata addresses
+  2. `AgentVelocityGuard` enforces per-agent and per-session rate limits
+  3. `DataFlowGuard` enforces cumulative bytes-read/written limits via the session journal
+  4. All guards produce `GuardEvidence` entries and fail closed on errors
+**Estimated complexity**: M
+
+### Phase 337: Post-Invocation Hooks and Response Guards
+**Goal**: Build post-invocation hook pipeline with response inspection, sanitization, and behavioral sequence enforcement
+**Depends on**: Phase 336 (deterministic guards validate the guard pipeline)
+**Requirements**: GUARD-08, GUARD-09, GUARD-10
+**Success Criteria** (what must be TRUE):
+  1. Post-invocation hook pipeline inspects responses before delivery with block/redact/escalate actions
+  2. `ResponseSanitizationGuard` scans for PII/PHI and redacts based on data classification policy
+  3. `BehavioralSequenceGuard` enforces tool ordering policies using the session journal
+**Estimated complexity**: L
+
+### Phase 338: Advisory Signals
+**Goal**: Ship the advisory signal framework for non-blocking behavioral observations that can be promoted to deterministic guards
+**Depends on**: Phase 337 (post-invocation hooks provide the response pipeline)
+**Requirements**: GUARD-11, GUARD-12, GUARD-13
+**Success Criteria** (what must be TRUE):
+  1. Advisory signals emit signed, non-blocking evidence (drift, volume spikes, exfiltration hints)
+  2. Advisory signals are clearly distinguished from deterministic guard verdicts in receipt evidence
+  3. Operators can promote advisory signals to deterministic guards via `arc.yaml` without code changes
+**Estimated complexity**: M
+
+---
+
+## v3.5 Protocol Breadth (Phases 339-342)
+
+**Milestone Goal:** Complete MCP adapter coverage, build the OpenAPI-to-MCP
+bridge, ship A2A and ACP outward edge crates, and add an OpenAI
+function-calling adapter.
+
+### Phase 339: MCP Adapter Completion
+**Goal**: Raise MCP adapter test coverage from 14 to 80+ and close the streaming, error, and nested flow gaps
+**Depends on**: Phase 322 (stable HTTP receipt model)
+**Requirements**: PROTO-01, PROTO-02, PROTO-03
+**Success Criteria** (what must be TRUE):
+  1. MCP adapter has 80+ tests covering streaming, errors, templates, nested flows, and OAuth refresh
+  2. Partial/chunked tool output generates proper receipts per chunk
+  3. Error paths produce structured denial receipts matching the ARC error taxonomy
+**Estimated complexity**: M
+
+### Phase 340: OpenAPI-to-MCP Bridge
+**Goal**: Let MCP-speaking agents discover and invoke ARC-governed HTTP APIs as MCP tools
+**Depends on**: Phase 320 (arc-openapi generates manifests), Phase 339 (MCP adapter is complete)
+**Requirements**: PROTO-04, PROTO-05, PROTO-06
+**Success Criteria** (what must be TRUE):
+  1. ARC-governed HTTP APIs appear as MCP tool surfaces for MCP clients
+  2. Bridge generates `tools/list` entries from the OpenAPI spec
+  3. Bridge invocations flow through the kernel with capability validation and receipt signing
+**Estimated complexity**: M
+
+### Phase 341: A2A and ACP Edge Crates
+**Goal**: Ship arc-a2a-edge and arc-acp-edge so ARC-native tools are consumable via A2A Agent Cards and ACP sessions
+**Depends on**: Phase 324 (ACP kernel integration provides signed receipts)
+**Requirements**: PROTO-07, PROTO-08, PROTO-09, PROTO-10
+**Success Criteria** (what must be TRUE):
+  1. `arc-a2a-edge` exposes tools as A2A skills with SendMessage and streaming support
+  2. A2A Agent Card is served at `/.well-known/agent-card.json`
+  3. `arc-acp-edge` exposes tools as ACP capabilities with session/prompt and permission gating
+  4. Both edges evaluate `BridgeFidelity` and suppress `Unsupported` tools
+**Estimated complexity**: L
+
+### Phase 342: arc-openai Adapter
+**Goal**: Intercept OpenAI-style function calls through the ARC kernel
+**Depends on**: Phase 339 (MCP adapter completion validates the adapter pattern)
+**Requirements**: PROTO-11, PROTO-12, PROTO-13
+**Success Criteria** (what must be TRUE):
+  1. `arc-openai` intercepts `tool_use` / function-calling requests through the kernel
+  2. Every function call produces a signed receipt
+  3. Adapter supports Chat Completions and Responses API formats
+**Estimated complexity**: M
+
+---
+
+## v3.6 Platform Extensions (Phases 343-346)
+
+**Milestone Goal:** Ship Go SDK, Kubernetes controller/injector, Rust tower
+middleware, and JVM/.NET substrates to cover the remaining major production
+API surfaces.
+
+### Phase 343: Go SDK and net/http Middleware
+**Goal**: Ship Go module with http.Handler middleware for net/http, Gin, Echo, Fiber, and chi
+**Depends on**: Phase 322 (arc api protect validates the HTTP receipt model)
+**Requirements**: PLAT-01, PLAT-02, PLAT-03, PLAT-04
+**Success Criteria** (what must be TRUE):
+  1. `arc.Protect(handler, arc.ConfigFile("arc.yaml"))` wraps any `http.Handler`
+  2. Middleware extracts caller identity and produces signed receipts
+  3. Conformance tests validate Go SDK against Rust kernel for shared test vectors
+  4. Module publishes to pkg.go.dev
+**Estimated complexity**: L
+
+### Phase 344: Kubernetes Controller and Injector
+**Goal**: Ship admission controller and sidecar injector for infrastructure-level ARC enforcement
+**Depends on**: Phase 322 (arc api protect is the sidecar binary)
+**Requirements**: PLAT-05, PLAT-06, PLAT-07, PLAT-08
+**Success Criteria** (what must be TRUE):
+  1. Admission controller rejects pods without valid ARC capability token annotations
+  2. Sidecar injector automatically adds `arc api protect` as a sidecar container
+  3. `ArcPolicy` CRD configures required scopes per namespace or label
+  4. Sidecar configures upstream URL, spec path, and receipt store from pod annotations
+**Estimated complexity**: L
+
+### Phase 345: arc-tower Rust Middleware
+**Goal**: Ship tower::Layer implementation for Axum and Tonic
+**Depends on**: Phase 319 (arc-http-core provides the types arc-tower wraps)
+**Requirements**: PLAT-09, PLAT-10, PLAT-11
+**Success Criteria** (what must be TRUE):
+  1. `arc-tower` implements `tower::Layer` with capability validation and receipt signing
+  2. Axum integration test produces signed receipts
+  3. Tonic gRPC integration test produces signed receipts
+**Estimated complexity**: M
+
+### Phase 346: JVM and .NET Substrates
+**Goal**: Ship Servlet filter and ASP.NET Core middleware for JVM and .NET API surfaces
+**Depends on**: Phase 322 (arc api protect validates the sidecar/FFI model)
+**Requirements**: PLAT-12, PLAT-13, PLAT-14, PLAT-15
+**Success Criteria** (what must be TRUE):
+  1. `arc-jvm` provides Servlet filter or Spring Boot auto-configuration
+  2. `arc-dotnet` provides ASP.NET Core middleware
+  3. Both communicate with the Rust kernel via FFI, sidecar HTTP, or WASM
+  4. Conformance tests validate both against Rust kernel for shared test vectors
+**Estimated complexity**: L
+
+---
+
+## v3.7 Strategic Bets (Phases 347-350)
+
+**Milestone Goal:** Ship WASM guard runtime, receipt metering, AG-UI proxy,
+and skill/workflow authority for advanced economic and orchestration use
+cases.
+
+### Phase 347: WASM Guard Runtime
+**Goal**: Ship sandboxed WASM runtime for custom guards authored in any WASM-compilable language
+**Depends on**: Phase 338 (advisory signals establish the guard extension model)
+**Requirements**: STRAT-01, STRAT-02, STRAT-03, STRAT-04
+**Success Criteria** (what must be TRUE):
+  1. WASM runtime loads `.wasm` guard files and executes them with fuel metering
+  2. Guards receive read-only request and session context, return `GuardVerdict`
+  3. Resource exhaustion triggers fail-closed behavior
+  4. Developer can author a guard in Rust, AssemblyScript, or Go and load it via arc.yaml
+**Estimated complexity**: L
+
+### Phase 348: Receipt Metering and Economics
+**Goal**: Attach per-receipt cost attribution and monetary budget enforcement for managed service scenarios
+**Depends on**: Phase 326 (OTel export provides the telemetry pipeline metering extends)
+**Requirements**: STRAT-05, STRAT-06, STRAT-07, STRAT-08
+**Success Criteria** (what must be TRUE):
+  1. Receipts carry per-receipt cost attribution metadata (compute, data volume, API cost)
+  2. `arc receipts cost` CLI queries cumulative cost by session, agent, tool, or time range
+  3. Monetary budget enforcement uses denominated currency via arc-link oracle
+  4. Cost metadata is billing-export compatible
+**Estimated complexity**: L
+
+### Phase 349: AG-UI Proxy
+**Goal**: Secure Agent-to-UI event streams with capability validation and signed receipts
+**Depends on**: Phase 341 (edge crate pattern validated by A2A/ACP edges)
+**Requirements**: STRAT-09, STRAT-10, STRAT-11
+**Success Criteria** (what must be TRUE):
+  1. `arc-ag-ui-proxy` validates capability tokens for UI-facing actions
+  2. Proxy supports SSE and WebSocket transports
+  3. UI-facing receipts include event type, target component, and action classification
+**Estimated complexity**: M
+
+### Phase 350: Skill and Workflow Authority
+**Goal**: Extend the capability model to multi-step skill composition and workflow-level receipts
+**Depends on**: Phase 348 (metering provides the budget envelope workflow authority enforces)
+**Requirements**: STRAT-12, STRAT-13, STRAT-14, STRAT-15
+**Success Criteria** (what must be TRUE):
+  1. `SkillGrant` represents multi-step skill composition with ordered tool sequences
+  2. `SkillManifest` describes tool dependencies, I/O contracts, and budget envelope
+  3. `WorkflowReceipt` captures complete execution trace as a single auditable artifact
+  4. Workflow authority validates each step against the declared scope and budget
+**Estimated complexity**: L
+
+---
+
+## Phase Summary (v3.0-v3.7)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 319 | v3.0 | arc-http-core Types and Request Model | Planned |
+| 320 | v3.0 | arc-openapi Parsing and Manifest Generation | Planned |
+| 321 | v3.0 | arc.yaml Unified Configuration | Planned |
+| 322 | v3.0 | arc api protect CLI | Planned |
+| 323 | v3.1 | ReceiptSigner and CapabilityChecker Traits | Planned |
+| 324 | v3.1 | ACP Kernel Integration | Planned |
+| 325 | v3.1 | Session Compliance Certificate | Planned |
+| 326 | v3.1 | OpenTelemetry Export | Planned |
+| 327 | v3.2 | arc-sdk-python Core | Planned |
+| 328 | v3.2 | arc-asgi Middleware | Planned |
+| 329 | v3.2 | arc-fastapi and arc-django Wrappers | Planned |
+| 330 | v3.2 | arc-langchain Integration and Conformance | Planned |
+| 331 | v3.3 | @arc-protocol/node-http Substrate | Planned |
+| 332 | v3.3 | Express and Fastify Wrappers | Planned |
+| 333 | v3.3 | Elysia Wrapper and npm Packaging | Planned |
+| 334 | v3.3 | TypeScript Conformance | Planned |
+| 335 | v3.4 | Session Journal | Planned |
+| 336 | v3.4 | Deterministic Guards | Planned |
+| 337 | v3.4 | Post-Invocation Hooks and Response Guards | Planned |
+| 338 | v3.4 | Advisory Signals | Planned |
+| 339 | v3.5 | MCP Adapter Completion | Planned |
+| 340 | v3.5 | OpenAPI-to-MCP Bridge | Planned |
+| 341 | v3.5 | A2A and ACP Edge Crates | Planned |
+| 342 | v3.5 | arc-openai Adapter | Planned |
+| 343 | v3.6 | Go SDK and net/http Middleware | Planned |
+| 344 | v3.6 | Kubernetes Controller and Injector | Planned |
+| 345 | v3.6 | arc-tower Rust Middleware | Planned |
+| 346 | v3.6 | JVM and .NET Substrates | Planned |
+| 347 | v3.7 | WASM Guard Runtime | Planned |
+| 348 | v3.7 | Receipt Metering and Economics | Planned |
+| 349 | v3.7 | AG-UI Proxy | Planned |
+| 350 | v3.7 | Skill and Workflow Authority | Planned |

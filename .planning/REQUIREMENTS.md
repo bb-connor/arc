@@ -1,10 +1,12 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v2.68 Quality Infrastructure
-(completed locally 2026-04-12)
-**Active milestone:** v2.69 CI Gate and Release Qualification
-**Planned milestones:** v2.70-v2.73 (Ship Readiness Roadmap)
+**Latest completed milestone:** v2.82 Normative Protocol Specification and
+Conformance
+(completed locally 2026-04-13)
+**Active milestone:** v2.83 Coverage, Hardening, and Production Qualification
+**Planned milestones:** v3.0 through v3.7 (Universal Security Kernel era)
+**Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
@@ -53,12 +55,12 @@ trust across organizational boundaries.
 
 ### v2.69 CI Gate and Release Qualification
 
-Hosted-observation note: the repo-side fixes and local signed qualification
-bundle now exist, but these checkboxes remain open until the updated commit is
-rerun in GitHub Actions and the release candidate is tagged from a green
-hosted run.
+Closeout note: on 2026-04-12 the pushed `origin/main` commit was
+operator-confirmed to have passed hosted `CI`, while hosted `Release
+Qualification` still failed. The remaining release-qualification and tagging
+requirements were explicitly accepted as known gaps to unblock `v2.70`.
 
-- [ ] **CI-01**: ci.yml runs green in hosted GitHub Actions on stable Rust and MSRV
+- [x] **CI-01**: ci.yml runs green in hosted GitHub Actions on stable Rust and MSRV
 - [ ] **CI-02**: release-qualification.yml runs green in hosted GitHub Actions
 - [ ] **CI-03**: Conformance wave 1-5 all pass across JS, Python, Go peers in hosted environment
 - [ ] **CI-04**: qualify-release.sh produces signed qualification artifacts in hosted CI
@@ -66,13 +68,17 @@ hosted run.
 
 ### v2.70 Developer Experience and Packaging
 
-- [ ] **DX-01**: Multi-stage Dockerfile produces minimal Alpine-based arc CLI image
-- [ ] **DX-02**: Docker Compose example wraps an MCP server with ARC policy enforcement
-- [ ] **DX-03**: Working example shows arc mcp serve as tool provider for Claude via Anthropic SDK
-- [ ] **DX-04**: Working example wraps ARC-governed tool server as a LangChain tool
-- [ ] **DX-05**: README updated with container quickstart, framework examples, and 5-minute-to-production path
+- [x] **DX-01**: Multi-stage Dockerfile produces minimal Alpine-based arc CLI image
+- [x] **DX-02**: Docker Compose example wraps an MCP server with ARC policy enforcement
+- [x] **DX-03**: Working example shows arc mcp serve as tool provider for Claude via Anthropic SDK
+- [x] **DX-04**: Working example wraps ARC-governed tool server as a LangChain tool
+- [x] **DX-05**: README updated with container quickstart, framework examples, and 5-minute-to-production path
 
 ### v2.71 Web3 Live Activation
+
+Deferral note: on 2026-04-12 this milestone was deferred because repo-local
+execution remains blocked on external Base Sepolia operator credentials,
+reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 - [ ] **WEB3-01**: ARC contracts deployed to Base Sepolia testnet
 - [ ] **WEB3-02**: End-to-end flow runs: capability -> tool call -> receipt -> settlement with test tokens
@@ -84,25 +90,25 @@ hosted run.
 
 ### v2.72 Distributed Systems and Federation
 
-- [ ] **DIST-01**: Trust-control service supports Raft-based consensus replication
-- [ ] **DIST-02**: Raft implementation handles split-brain, log compaction, and snapshot transfer
-- [ ] **DIST-03**: Operators can publish open-admission federation policies with anti-sybil controls
-- [ ] **DIST-04**: Reputation-gated federation entry is supported
-- [ ] **DIST-05**: SCIM 2.0 endpoint supports automatic provisioning from external IdP
-- [ ] **DIST-06**: SCIM 2.0 endpoint supports automatic deprovisioning from external IdP
-- [ ] **DIST-07**: Trust-control deployed across 3 regions proves consistency under network partition
-- [ ] **DIST-08**: Replication lag is measured and documented under partition scenarios
+- [x] **DIST-01**: Trust-control service supports Raft-based consensus replication
+- [x] **DIST-02**: Raft implementation handles split-brain, log compaction, and snapshot transfer
+- [x] **DIST-03**: Operators can publish open-admission federation policies with anti-sybil controls
+- [x] **DIST-04**: Reputation-gated federation entry is supported
+- [x] **DIST-05**: SCIM 2.0 endpoint supports automatic provisioning from external IdP
+- [x] **DIST-06**: SCIM 2.0 endpoint supports automatic deprovisioning from external IdP
+- [x] **DIST-07**: Trust-control deployed across 3 regions proves consistency under network partition
+- [x] **DIST-08**: Replication lag is measured and documented under partition scenarios
 
 ### v2.73 Formal Verification
 
-- [ ] **FORMAL-01**: Every sorry placeholder in Lean 4 tree is inventoried and classified
-- [ ] **FORMAL-02**: Attenuation monotonicity is proven in Lean 4
-- [ ] **FORMAL-03**: Delegation chain integrity is proven in Lean 4
-- [ ] **FORMAL-04**: Budget non-negative invariant is proven in Lean 4
-- [ ] **FORMAL-05**: Merkle inclusion soundness is proven in Lean 4
-- [ ] **FORMAL-06**: Checkpoint consistency is proven in Lean 4
-- [ ] **FORMAL-07**: Receipt immutability is proven in Lean 4
-- [ ] **FORMAL-08**: Lean 4 lake build runs in CI and fails on any new sorry in proven modules
+- [x] **FORMAL-01**: Every sorry placeholder in Lean 4 tree is inventoried and classified
+- [x] **FORMAL-02**: Attenuation monotonicity is proven in Lean 4
+- [x] **FORMAL-03**: Delegation chain integrity is proven in Lean 4
+- [x] **FORMAL-04**: Budget non-negative invariant is proven in Lean 4
+- [x] **FORMAL-05**: Merkle inclusion soundness is proven in Lean 4
+- [x] **FORMAL-06**: Checkpoint consistency is proven in Lean 4
+- [x] **FORMAL-07**: Receipt immutability is proven in Lean 4
+- [x] **FORMAL-08**: Lean 4 lake build runs in CI and fails on any new sorry in proven modules
 
 ## Traceability
 
@@ -138,46 +144,586 @@ hosted run.
 | QUAL-08 | Phase 283 | Complete |
 | QUAL-09 | Phase 283 | Complete |
 | QUAL-10 | Phase 283 | Complete |
-| CI-01 | Phase 284 | Blocked on hosted |
-| CI-02 | Phase 284 | Blocked on hosted |
-| CI-03 | Phase 285 | Blocked on hosted |
-| CI-04 | Phase 286 | Blocked on hosted |
-| CI-05 | Phase 286 | Blocked on hosted |
-| DX-01 | Phase 287 | Pending |
-| DX-02 | Phase 287 | Pending |
-| DX-03 | Phase 288 | Pending |
-| DX-04 | Phase 289 | Pending |
-| DX-05 | Phase 290 | Pending |
-| WEB3-01 | Phase 291 | Pending |
-| WEB3-02 | Phase 291 | Pending |
-| WEB3-03 | Phase 292 | Pending |
-| WEB3-04 | Phase 293 | Pending |
-| WEB3-05 | Phase 293 | Pending |
-| WEB3-06 | Phase 294 | Pending |
-| WEB3-07 | Phase 294 | Pending |
-| DIST-01 | Phase 295 | Pending |
-| DIST-02 | Phase 295 | Pending |
-| DIST-03 | Phase 296 | Pending |
-| DIST-04 | Phase 296 | Pending |
-| DIST-05 | Phase 297 | Pending |
-| DIST-06 | Phase 297 | Pending |
-| DIST-07 | Phase 298 | Pending |
-| DIST-08 | Phase 298 | Pending |
-| FORMAL-01 | Phase 299 | Pending |
-| FORMAL-02 | Phase 300 | Pending |
-| FORMAL-03 | Phase 300 | Pending |
-| FORMAL-04 | Phase 300 | Pending |
-| FORMAL-05 | Phase 301 | Pending |
-| FORMAL-06 | Phase 301 | Pending |
-| FORMAL-07 | Phase 301 | Pending |
+| CI-01 | Phase 284 | Complete |
+| CI-02 | Phase 284 | Accepted gap |
+| CI-03 | Phase 285 | Accepted gap |
+| CI-04 | Phase 286 | Accepted gap |
+| CI-05 | Phase 286 | Accepted gap |
+| DX-01 | Phase 287 | Complete |
+| DX-02 | Phase 287 | Complete |
+| DX-03 | Phase 288 | Complete |
+| DX-04 | Phase 289 | Complete |
+| DX-05 | Phase 290 | Complete |
+| WEB3-01 | Phase 291 | Deferred |
+| WEB3-02 | Phase 291 | Deferred |
+| WEB3-03 | Phase 292 | Deferred |
+| WEB3-04 | Phase 293 | Deferred |
+| WEB3-05 | Phase 293 | Deferred |
+| WEB3-06 | Phase 294 | Deferred |
+| WEB3-07 | Phase 294 | Deferred |
+| DIST-01 | Phase 295 | Complete |
+| DIST-02 | Phase 295 | Complete |
+| DIST-03 | Phase 296 | Complete |
+| DIST-04 | Phase 296 | Complete |
+| DIST-05 | Phase 297 | Complete |
+| DIST-06 | Phase 297 | Complete |
+| DIST-07 | Phase 298 | Complete |
+| DIST-08 | Phase 298 | Complete |
+| FORMAL-01 | Phase 299 | Complete |
+| FORMAL-02 | Phase 300 | Complete |
+| FORMAL-03 | Phase 300 | Complete |
+| FORMAL-04 | Phase 300 | Complete |
+| FORMAL-05 | Phase 301 | Complete |
+| FORMAL-06 | Phase 301 | Complete |
+| FORMAL-07 | Phase 301 | Complete |
 | FORMAL-08 | Phase 302 | Pending |
 
 **Coverage:**
-- Ship readiness requirements: 63 total
-- Mapped to phases: 63
-- Unmapped: 0
+- Ship readiness requirements (v2.66-v2.73): 63 total, 63 mapped, 0 unmapped
+- Foundation and adoption requirements (v2.80-v2.83): 52 total, 52 mapped, 0 unmapped
 
-## Out of Scope
+---
+
+## v2.80 Core Decomposition and Async Kernel
+
+### Phase 303: arc-core Crate Decomposition
+
+- [x] **DECOMP-01**: A new `arc-core-types` crate contains capabilities, receipts, cryptographic signing, canonical JSON, and scope types -- the minimal set every ARC crate needs
+- [x] **DECOMP-02**: Domain types (credit, exposure, facility, bond, liability, market, governance, listing, appraisal, federation) are extracted into separate domain crates that depend on `arc-core-types` rather than living in `arc-core`
+- [x] **DECOMP-03**: All 25 dependent crates compile and pass tests against the decomposed `arc-core-types` without behavior changes
+- [x] **DECOMP-04**: Incremental compile time for a single-file change in `arc-core-types` is measurably faster than the same change in the monolithic `arc-core`
+
+### Phase 304: Mega-File Module Decomposition
+
+- [x] **DECOMP-05**: `trust_control.rs` (21K lines) is decomposed into focused modules (federation, passport, settlement, SCIM, HTTP routes, types) with no public API changes
+- [x] **DECOMP-06**: `arc-kernel/src/lib.rs` (11.7K lines) is split so the test module lives in its own file and kernel subsystems are in separate modules
+- [x] **DECOMP-07**: `arc-cli/src/main.rs` (10.3K lines) is decomposed into per-subcommand modules with a thin dispatch entry point
+- [x] **DECOMP-08**: `receipt_store.rs` (9.8K lines) and `runtime.rs` (6.4K lines) are decomposed into focused modules
+- [x] **DECOMP-09**: No file under `crates/` exceeds 3,000 lines of non-test code after decomposition
+
+### Phase 305: Async Kernel Migration
+
+- [x] **ASYNC-01**: `ArcKernel::evaluate_tool_call` is an async function taking `&self` instead of `&mut self`
+- [x] **ASYNC-02**: Session state, receipt log, and budget stores use interior mutability (`RwLock` or equivalent) so multiple tool calls can be evaluated concurrently
+- [x] **ASYNC-03**: Two concurrent tool calls from different agents complete without serialization -- verified by a test that runs parallel evaluations
+- [x] **ASYNC-04**: Existing synchronous test suite passes against the async kernel with no behavior changes beyond concurrency enablement
+
+### Phase 306: Dependency Hygiene and Feature Gating
+
+- [x] **DEPS-01**: `serde_yaml` (deprecated) is replaced with `serde_yml` across all three dependent crates (arc-cli, arc-control-plane, arc-policy)
+- [x] **DEPS-02**: The workspace uses a single major version of `reqwest` (no dual 0.12 + 0.13 copies)
+- [x] **DEPS-03**: Web3/alloy dependencies are gated behind a `web3` cargo feature flag so the kernel and core crates compile without the EVM stack when the feature is disabled
+- [x] **DEPS-04**: `cargo tree -d` shows no duplicate crate versions for `reqwest`, `serde_yaml`, or `hashbrown`
+
+---
+
+## v2.81 Deployable ARC and Developer Onboarding
+
+### Phase 307: Identity Resolution and Scaffolding
+
+- [x] **ONBOARD-01**: README.md, CLI help text, crate doc comments, and all user-facing strings use "ARC" consistently -- no references to "CHIO" or conflicting name expansions
+- [x] **ONBOARD-02**: `arc init` creates a working project scaffold with a default policy file, a hello-world tool server stub, and a Makefile/justfile that builds and runs the example
+- [x] **ONBOARD-03**: `arc init` output includes next-step instructions that guide the developer to their first governed tool call
+
+### Phase 308: SDK Publication
+
+- [x] **SDK-01**: TypeScript SDK is published to npm as a stable release with typed client for capability requests, tool invocations, and receipt queries
+- [x] **SDK-02**: Python SDK is published to PyPI as a stable release with typed client for capability requests, tool invocations, and receipt queries
+- [x] **SDK-03**: Both SDKs include end-to-end examples that connect to a running ARC kernel and execute a governed tool call
+- [x] **SDK-04**: SDK README files document installation, quickstart, and API reference with code samples
+
+### Phase 309: Deployable Experience
+
+- [x] **DEPLOY-01**: `docker compose up` in the examples directory starts an ARC kernel, a sample tool server, and a receipt viewer accessible at localhost
+- [x] **DEPLOY-02**: The receipt viewer displays signed receipts with capability chain, guard decisions, and timestamps in a human-readable format
+- [x] **DEPLOY-03**: A developer can execute `docker compose up`, call a governed tool via curl or SDK, and see the receipt appear in the viewer within 5 minutes of cloning the repo
+
+### Phase 310: Progressive Tutorial and Framework Integration
+
+- [x] **TUTORIAL-01**: A progressive tutorial exists covering: ARC concepts, writing a policy, wrapping a tool server, executing a governed call, reading a receipt, and delegating a capability
+- [x] **TUTORIAL-02**: The Anthropic SDK example is rewritten to use the official TypeScript SDK instead of raw JSON-RPC
+- [x] **TUTORIAL-03**: The LangChain example is rewritten to use the official Python SDK instead of raw subprocess invocation
+- [x] **TUTORIAL-04**: An OpenAI-compatible example demonstrates ARC governance over function calling with the official SDK
+
+---
+
+## v2.82 Normative Protocol Specification and Conformance
+
+### Phase 311: Wire Protocol Specification
+
+- [x] **SPEC-01**: A normative protocol specification document defines the wire framing format (length-prefix encoding, byte order, maximum message size)
+- [x] **SPEC-02**: JSON Schema definitions exist for every message type in the agent-kernel protocol (capability request, tool invocation, receipt, error, handshake)
+- [x] **SPEC-03**: Sequence diagrams document the core protocol flows: initialization/handshake, capability issuance, tool invocation with receipt, delegation, and revocation
+- [x] **SPEC-04**: The spec is written so a competent engineer could implement a compatible agent or kernel client without reading the Rust source code
+
+### Phase 312: Version Negotiation and Error Taxonomy
+
+- [x] **SPEC-05**: The protocol defines version negotiation rules: how client and server exchange supported versions, how disagreements are resolved, and when connections are rejected
+- [x] **SPEC-06**: A normative error code taxonomy defines numeric codes, human-readable names, whether errors are transient or permanent, and retry guidance for each
+- [x] **SPEC-07**: The error taxonomy covers at minimum: capability denied, capability expired, capability revoked, guard denied (with guard identity), budget exceeded, tool server error, internal error, version mismatch, and rate limited
+
+### Phase 313: Threat Model and Security Specification
+
+- [x] **SPEC-08**: A standalone threat model document enumerates attack vectors against the agent-kernel-tool trust boundary including: token theft, kernel impersonation, tool server escape, replay attacks, and denial of service
+- [x] **SPEC-09**: Each identified threat maps to a mitigation (existing or planned) with an explicit residual-risk statement for threats that are not fully addressed
+- [x] **SPEC-10**: Transport security requirements are specified: when TLS is required, when mTLS is required, and what happens when transport security is absent
+
+### Phase 314: Native Protocol Conformance and Standards Track
+
+- [x] **SPEC-11**: The conformance suite includes scenario categories for native ARC protocol behavior: capability validation, delegation chain attenuation, receipt integrity, and revocation propagation
+- [x] **SPEC-12**: A third-party implementation can run the conformance suite against their kernel or agent and get a pass/fail report without depending on ARC Rust crates
+- [x] **SPEC-13**: An IETF Internet-Draft is prepared that captures the normative protocol specification in standards-track format
+- [x] **SPEC-14**: A standards alignment matrix maps ARC concepts to IETF/W3C/OpenID equivalents (GNAP, SCITT, RATS, RFC 9449, W3C VC, OID4VCI/VP, RFC 8785)
+
+---
+
+## v2.83 Coverage, Hardening, and Production Qualification
+
+### Phase 315: Integration Test Coverage Expansion
+
+- [x] **PROD-01**: Every crate under `crates/` has at least one integration test that exercises its public API against a realistic scenario (not just unit tests of internal functions)
+- [x] **PROD-02**: Security-critical crates (arc-credentials, arc-policy, arc-store-sqlite) each have integration tests covering their primary success path, primary failure path, and at least one edge case
+- [x] **PROD-03**: Integration tests for arc-a2a-adapter, arc-mcp-adapter, and arc-mcp-edge exercise the real protocol exchange, not just struct construction
+
+### Phase 316: Coverage Push and Store Hardening
+
+- [ ] **PROD-04**: Workspace code coverage measured by cargo-tarpaulin is at or above 80%, up from the current 67% baseline
+- [ ] **PROD-05**: Coverage improvement is concentrated in the previously untested crates, not inflated by adding trivial tests to already well-covered code
+- [ ] **PROD-06**: The SQLite receipt store uses connection pooling (r2d2, deadpool, or equivalent) or an async store trait so concurrent reads and writes do not serialize on a single connection
+
+### Phase 317: Dead Code and API Surface Audit
+
+- [ ] **PROD-07**: All `#[allow(dead_code)]` attributes in non-test code are resolved: the dead code is either removed or the attribute is justified with a comment explaining why the code must exist
+- [ ] **PROD-08**: All 82 `#[allow(clippy::too_many_arguments)]` sites are refactored to accept config/builder/request structs instead of long parameter lists
+- [ ] **PROD-09**: A `pub` visibility audit ensures no internal implementation types are exported from crate root modules unless they are part of the intended public API
+- [ ] **PROD-10**: `cargo +nightly udeps` (or equivalent) confirms no unused dependencies remain in any workspace crate
+
+### Phase 318: Structured Errors and Production Qualification
+
+- [ ] **PROD-11**: CLI and kernel errors include a machine-readable error code, human-readable context, and a suggested fix or next step (e.g., "guard `forbidden_path` denied access to `/etc/passwd` -- add this path to your policy's `path_allowlist` or remove the `forbidden_path` guard")
+- [ ] **PROD-12**: Error output supports both human-readable (default) and JSON-structured (via `--format json` flag) modes for programmatic consumption
+- [ ] **PROD-13**: A production qualification bundle documents: test count, coverage percentage, benchmark baselines, conformance results, and known gaps for evaluators
+
+---
+
+## Traceability (v2.80-v2.83)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DECOMP-01 | Phase 303 | Complete |
+| DECOMP-02 | Phase 303 | Complete |
+| DECOMP-03 | Phase 303 | Complete |
+| DECOMP-04 | Phase 303 | Complete |
+| DECOMP-05 | Phase 304 | Complete |
+| DECOMP-06 | Phase 304 | Complete |
+| DECOMP-07 | Phase 304 | Complete |
+| DECOMP-08 | Phase 304 | Complete |
+| DECOMP-09 | Phase 304 | Complete |
+| ASYNC-01 | Phase 305 | Complete |
+| ASYNC-02 | Phase 305 | Complete |
+| ASYNC-03 | Phase 305 | Complete |
+| ASYNC-04 | Phase 305 | Complete |
+| DEPS-01 | Phase 306 | Complete |
+| DEPS-02 | Phase 306 | Complete |
+| DEPS-03 | Phase 306 | Complete |
+| DEPS-04 | Phase 306 | Complete |
+| ONBOARD-01 | Phase 307 | Complete |
+| ONBOARD-02 | Phase 307 | Complete |
+| ONBOARD-03 | Phase 307 | Complete |
+| SDK-01 | Phase 308 | Complete |
+| SDK-02 | Phase 308 | Complete |
+| SDK-03 | Phase 308 | Complete |
+| SDK-04 | Phase 308 | Complete |
+| DEPLOY-01 | Phase 309 | Complete |
+| DEPLOY-02 | Phase 309 | Complete |
+| DEPLOY-03 | Phase 309 | Complete |
+| TUTORIAL-01 | Phase 310 | Complete |
+| TUTORIAL-02 | Phase 310 | Complete |
+| TUTORIAL-03 | Phase 310 | Complete |
+| TUTORIAL-04 | Phase 310 | Complete |
+| SPEC-01 | Phase 311 | Complete |
+| SPEC-02 | Phase 311 | Complete |
+| SPEC-03 | Phase 311 | Complete |
+| SPEC-04 | Phase 311 | Complete |
+| SPEC-05 | Phase 312 | Complete |
+| SPEC-06 | Phase 312 | Complete |
+| SPEC-07 | Phase 312 | Complete |
+| SPEC-08 | Phase 313 | Complete |
+| SPEC-09 | Phase 313 | Complete |
+| SPEC-10 | Phase 313 | Complete |
+| SPEC-11 | Phase 314 | Complete |
+| SPEC-12 | Phase 314 | Complete |
+| SPEC-13 | Phase 314 | Complete |
+| SPEC-14 | Phase 314 | Complete |
+| PROD-01 | Phase 315 | Complete |
+| PROD-02 | Phase 315 | Complete |
+| PROD-03 | Phase 315 | Complete |
+| PROD-04 | Phase 316 | Pending |
+| PROD-05 | Phase 316 | Pending |
+| PROD-06 | Phase 316 | Pending |
+| PROD-07 | Phase 317 | Pending |
+| PROD-08 | Phase 317 | Pending |
+| PROD-09 | Phase 317 | Pending |
+| PROD-10 | Phase 317 | Pending |
+| PROD-11 | Phase 318 | Pending |
+| PROD-12 | Phase 318 | Pending |
+| PROD-13 | Phase 318 | Pending |
+
+---
+
+## v3.x Universal Security Kernel Requirements
+
+### v3.0 Universal Security Kernel Foundation
+
+#### Phase 319: arc-http-core Types and Request Model
+
+- [ ] **CORE-01**: `arc-http-core` crate exists with `ArcHttpRequest`, `HttpMethod`, `CallerIdentity`, `AuthMethod`, and `SessionContext` types that represent any HTTP request ARC needs to evaluate
+- [ ] **CORE-02**: `arc-http-core` defines `HttpReceipt` type that carries request_id, route_pattern, method, caller_identity_hash, session_id, verdict, guard_evidence, response_status, timestamp, content_hash, and Ed25519 signature
+- [ ] **CORE-03**: `arc-http-core` defines `Verdict` enum (Allow, Deny, Cancel, Incomplete) consistent with existing ARC receipt decisions
+- [ ] **CORE-04**: All `arc-http-core` types implement `Serialize`, `Deserialize`, and use canonical JSON (RFC 8785) for signed payloads
+
+#### Phase 320: arc-openapi Parsing and Manifest Generation
+
+- [ ] **CORE-05**: `arc-openapi` crate parses OpenAPI 3.0 and 3.1 specs (YAML and JSON) and extracts routes, methods, parameters, response schemas, and tags
+- [ ] **CORE-06**: `arc-openapi` generates an ARC `ToolManifest` from a parsed OpenAPI spec where each route becomes a candidate `ToolDefinition` with input_schema derived from path/query/body params
+- [ ] **CORE-07**: `arc-openapi` applies default policy: GET routes get session-scoped allow, POST/PUT/PATCH/DELETE routes require explicit capability grants (deny-by-default for side effects)
+- [ ] **CORE-08**: `arc-openapi` supports `x-arc-*` extension fields (`x-arc-sensitivity`, `x-arc-side-effects`, `x-arc-approval-required`, `x-arc-budget-limit`, `x-arc-publish`) for per-route policy overrides
+- [ ] **CORE-09**: Developer can run `arc-openapi` against a real OpenAPI spec (e.g., PetStore) and receive a valid ToolManifest with correct route coverage
+
+#### Phase 321: arc.yaml Unified Configuration
+
+- [ ] **CORE-10**: `arc-config` crate (or module) parses `arc.yaml` with kernel, adapters, edges, receipts, and logging sections using `serde::Deserialize` with `deny_unknown_fields`
+- [ ] **CORE-11**: Environment variable interpolation (`${VAR}` and `${VAR:-default}`) resolves in all string-typed YAML fields before typed deserialization
+- [ ] **CORE-12**: Validation rejects duplicate adapter IDs, broken edge `expose_from` references, missing required fields per protocol, and incomplete auth blocks at parse time with clear error messages
+- [ ] **CORE-13**: A minimal valid `arc.yaml` requires only the kernel section and at least one adapter entry; all other sections default to sensible values
+
+#### Phase 322: arc api protect CLI
+
+- [ ] **CORE-14**: Developer can run `arc api protect --upstream http://localhost:8000 --spec openapi.yaml` and ARC starts a reverse proxy that intercepts all requests
+- [ ] **CORE-15**: The reverse proxy reads the OpenAPI spec, generates a default manifest and policy, and applies deny-by-default for side-effect routes without a capability token
+- [ ] **CORE-16**: Every proxied request produces a signed `HttpReceipt` stored in the local SQLite receipt store
+- [ ] **CORE-17**: `arc api protect` auto-discovers the OpenAPI spec from `/openapi.json` or a file path when `--spec` is omitted
+- [ ] **CORE-18**: GET requests pass through with session-scoped audit receipts; POST/PUT/DELETE requests without a capability token receive a structured 403 response with error code and suggested fix
+
+### v3.1 Attestation Completion
+
+#### Phase 323: ReceiptSigner and CapabilityChecker Traits
+
+- [ ] **ATT-01**: `ReceiptSigner` trait is defined in `arc-acp-proxy` with `sign_acp_receipt(&self, request: &AcpReceiptRequest) -> Result<ArcReceipt, ReceiptSignError>` signature
+- [ ] **ATT-02**: `CapabilityChecker` trait is defined in `arc-acp-proxy` with `check_access(&self, request: &AcpCapabilityRequest) -> Result<AcpVerdict, CapabilityCheckError>` signature
+- [ ] **ATT-03**: Both traits are `Option`-wrapped in `MessageInterceptor` so standalone proxy mode (unsigned) remains available but is explicitly labeled as outside full attestation claims
+- [ ] **ATT-04**: `AcpProxy::start_with_kernel` constructor accepts injected signer and checker; `AcpProxy::start` remains unchanged for standalone mode
+
+#### Phase 324: ACP Kernel Integration
+
+- [ ] **ATT-05**: Kernel-backed `ReceiptSigner` implementation signs ACP tool-call events into `ArcReceipt` objects with Ed25519 signatures, capability_id, policy_hash, and content_hash
+- [ ] **ATT-06**: Kernel-backed `CapabilityChecker` implementation validates session capability tokens for file read, file write, and terminal execute operations with fail-closed semantics
+- [ ] **ATT-07**: Signed ACP receipts are appended to the kernel's `ReceiptStore` and included in Merkle checkpoint batches alongside MCP and A2A receipts
+- [ ] **ATT-08**: `AcpAttestationMode::Required` causes signer failure to produce an explicit attestation-gap artifact and mark the session non-compliant; unsigned events are only permitted in `UnsignedCompatibility` mode
+
+#### Phase 325: Session Compliance Certificate
+
+- [ ] **ATT-09**: `generate_compliance_certificate(session_id)` walks the complete receipt log for a session, verifying signatures, chain continuity, scope containment, budget compliance, guard passage, and delegation monotonicity
+- [ ] **ATT-10**: Any anomaly during certificate generation aborts with a typed error (EmptySession, InvalidReceiptSignature, ChainDiscontinuity, ScopeViolation, BudgetExceeded, GuardBypass) rather than issuing a misleading certificate
+- [ ] **ATT-11**: Certificate verification API supports lightweight mode (trusts kernel assertions) and full-bundle mode (independently reconstructs Merkle root from receipt bundle)
+- [ ] **ATT-12**: `arc cert generate --session <id>`, `arc cert verify --cert <path>`, and `arc cert inspect --cert <path>` CLI commands work end-to-end
+
+#### Phase 326: OpenTelemetry Export
+
+- [ ] **ATT-13**: Receipt data exports as OpenTelemetry spans with trace_id, span_id, tool_name, verdict, duration, and capability_id attributes
+- [ ] **ATT-14**: OTel export is configurable in `arc.yaml` under a `telemetry` or `exporters` section with endpoint URL and protocol (gRPC or HTTP)
+- [ ] **ATT-15**: Compliance certificate events export as OTel span events attached to the session's root span
+
+### v3.2 Python Adoption
+
+#### Phase 327: arc-sdk-python Core
+
+- [ ] **PY-01**: `arc-sdk-python` Python package wraps the Rust kernel via PyO3/maturin and exposes typed Python classes for `CapabilityToken`, `ArcReceipt`, `GuardEvidence`, and `Verdict`
+- [ ] **PY-02**: Python SDK supports creating, validating, and attenuating capability tokens from Python code
+- [ ] **PY-03**: Python SDK supports verifying receipt signatures and chain continuity from Python code
+- [ ] **PY-04**: Package installs via `pip install arc-sdk-python` with pre-built wheels for Linux x86_64, macOS arm64, and macOS x86_64
+
+#### Phase 328: arc-asgi Middleware
+
+- [ ] **PY-05**: `arc-asgi` ASGI middleware intercepts requests, extracts caller identity (JWT, session cookie, API key), evaluates capabilities, runs guards, and signs receipts
+- [ ] **PY-06**: `arc-asgi` middleware integrates with any ASGI-compliant framework (FastAPI, Starlette, Litestar) via standard `app.add_middleware()` pattern
+- [ ] **PY-07**: `arc-asgi` middleware produces signed `HttpReceipt` objects for every request, stored in the configured receipt store
+
+#### Phase 329: arc-fastapi and arc-django Wrappers
+
+- [ ] **PY-08**: `arc-fastapi` provides `@arc_requires(scope=...)`, `@arc_approval(reason=...)`, and `@arc_budget(calls=..., cost_usd=...)` decorators for per-route ARC policy
+- [ ] **PY-09**: `arc-django` middleware works with Django WSGI and Django REST Framework, extracting identity from Django's auth system and producing receipts
+- [ ] **PY-10**: Both wrappers return framework-native error responses (FastAPI JSONResponse, Django HttpResponse) with ARC error codes and suggested fixes
+
+#### Phase 330: arc-langchain Integration and Conformance
+
+- [ ] **PY-11**: `arc-langchain` wraps ARC-governed tools as LangChain `Tool` objects so agents using LangChain invoke tools through ARC's capability and guard pipeline
+- [ ] **PY-12**: Conformance tests validate that the Python SDK's capability validation, receipt signing, and guard evaluation produce byte-identical results to the Rust kernel for a shared test vector set
+- [ ] **PY-13**: End-to-end test demonstrates a FastAPI app protected by `arc-fastapi` producing signed receipts that pass `arc cert verify`
+
+### v3.3 TypeScript Adoption
+
+#### Phase 331: @arc-protocol/node-http Substrate
+
+- [ ] **TS-01**: `@arc-protocol/node-http` npm package provides the common HTTP interception substrate handling `(req, res)` and `Request -> Response` patterns for Node and Bun runtimes
+- [ ] **TS-02**: Substrate extracts caller identity from Authorization headers, cookies, and API key headers with configurable extraction strategies
+- [ ] **TS-03**: Substrate evaluates capabilities, runs guards, and produces signed receipts for every request using the Rust kernel via NAPI-RS or WASM binding
+
+#### Phase 332: Express and Fastify Wrappers
+
+- [ ] **TS-04**: `@arc-protocol/express` provides `app.use(arc({ config: 'arc.yaml' }))` middleware for Express apps
+- [ ] **TS-05**: `@arc-protocol/fastify` provides a Fastify plugin with `fastify.register(arc, { config: 'arc.yaml' })` integration
+- [ ] **TS-06**: Both wrappers return framework-native error responses with ARC error codes, suggested fixes, and proper HTTP status codes
+
+#### Phase 333: Elysia Wrapper and npm Packaging
+
+- [ ] **TS-07**: `@arc-protocol/elysia` provides an Elysia lifecycle hook via `.use(arc({ config: 'arc.yaml' }))` integration
+- [ ] **TS-08**: All four npm packages (`node-http`, `express`, `fastify`, `elysia`) publish with TypeScript type definitions and pass `tsc --strict` type checking
+- [ ] **TS-09**: Packages support both ESM and CommonJS module systems
+
+#### Phase 334: TypeScript Conformance
+
+- [ ] **TS-10**: Conformance tests validate that the TypeScript SDK's capability validation and receipt signing produce byte-identical results to the Rust kernel for a shared test vector set
+- [ ] **TS-11**: End-to-end test demonstrates an Express app protected by `@arc-protocol/express` producing signed receipts that pass `arc cert verify`
+- [ ] **TS-12**: End-to-end test demonstrates a Fastify app protected by `@arc-protocol/fastify` producing signed receipts that pass `arc cert verify`
+
+### v3.4 Guard Expansion
+
+#### Phase 335: Session Journal
+
+- [ ] **GUARD-01**: `arc-http-session` crate (or module) maintains a per-session journal tracking request history, cumulative data flow (bytes read/written), delegation depth, and tool invocation sequence
+- [ ] **GUARD-02**: Session journal persists across requests within a session and is available to all guards in the evaluation pipeline
+- [ ] **GUARD-03**: Session journal entries are append-only and hash-chained for tamper detection
+
+#### Phase 336: Deterministic Guards
+
+- [ ] **GUARD-04**: `InternalNetworkGuard` denies requests targeting RFC 1918, loopback, link-local, or cloud metadata addresses (SSRF prevention) with configurable allowlist
+- [ ] **GUARD-05**: `AgentVelocityGuard` enforces per-agent and per-session rate limits with configurable windows and thresholds
+- [ ] **GUARD-06**: `DataFlowGuard` enforces cumulative bytes-read and bytes-written limits per session using the session journal, denying when thresholds are exceeded
+- [ ] **GUARD-07**: All new deterministic guards produce `GuardEvidence` entries with verdict, guard name, and evaluation context; all fail closed on errors
+
+#### Phase 337: Post-Invocation Hooks and Response Guards
+
+- [ ] **GUARD-08**: Post-invocation hook pipeline inspects tool responses after execution but before delivery to the caller, with the ability to block, redact, or escalate
+- [ ] **GUARD-09**: `ResponseSanitizationGuard` scans response bodies for PII/PHI patterns and redacts or blocks based on data classification policy
+- [ ] **GUARD-10**: `BehavioralSequenceGuard` evaluates tool invocation order against a declared sequence policy (e.g., "read before write", "approve before deploy") using the session journal
+
+#### Phase 338: Advisory Signals
+
+- [ ] **GUARD-11**: Advisory signal framework emits signed, non-blocking evidence observations (drift detection, unusual data-volume spikes, cross-tool exfiltration pattern hints) attached to receipts
+- [ ] **GUARD-12**: Advisory signals are clearly distinguished from deterministic guard verdicts in receipt evidence -- they never block requests unless explicitly promoted to deterministic guards by operator configuration
+- [ ] **GUARD-13**: Operator can promote an advisory signal to a deterministic guard via `arc.yaml` configuration without code changes
+
+### v3.5 Protocol Breadth
+
+#### Phase 339: MCP Adapter Completion
+
+- [ ] **PROTO-01**: MCP adapter test count reaches 80+, up from 14, covering streaming responses, error propagation, resource template resolution, nested flows, and OAuth token refresh
+- [ ] **PROTO-02**: MCP adapter handles partial/chunked tool output with proper receipt generation for each chunk
+- [ ] **PROTO-03**: MCP adapter error paths produce structured denial receipts with error codes matching the ARC error taxonomy
+
+#### Phase 340: OpenAPI-to-MCP Bridge
+
+- [ ] **PROTO-04**: An ARC-governed HTTP API (protected by `arc api protect` or framework middleware) can appear as an MCP tool surface so MCP-speaking agents can discover and invoke its routes
+- [ ] **PROTO-05**: The bridge generates MCP `tools/list` entries from the API's OpenAPI spec with correct input schemas derived from path, query, and body parameters
+- [ ] **PROTO-06**: Bridge invocations flow through the ARC kernel with full capability validation, guard evaluation, and receipt signing
+
+#### Phase 341: A2A and ACP Edge Crates
+
+- [ ] **PROTO-07**: `arc-a2a-edge` crate exposes ARC-native tools as A2A Agent Card skills, handling `SendMessage` (blocking) and `SendStreamingMessage` (SSE) with kernel-mediated receipts
+- [ ] **PROTO-08**: `arc-a2a-edge` generates a valid A2A Agent Card at `/.well-known/agent-card.json` from loaded tool manifests
+- [ ] **PROTO-09**: `arc-acp-edge` crate exposes ARC-native tools as ACP capabilities with `session/prompt` invocation, `session/request_permission` backed by ARC capabilities, and stdio transport
+- [ ] **PROTO-10**: Both edge crates evaluate `BridgeFidelity` per tool and suppress publication for tools with `Unsupported` fidelity
+
+#### Phase 342: arc-openai Adapter
+
+- [ ] **PROTO-11**: `arc-openai` adapter intercepts OpenAI-style `tool_use` / function-calling requests and routes them through the ARC kernel
+- [ ] **PROTO-12**: Adapter produces signed receipts for every function call, with the OpenAI function name as tool_name and arguments as the receipt's parameter content
+- [ ] **PROTO-13**: Adapter supports both the Chat Completions API function-calling format and the Responses API tool_use format
+
+### v3.6 Platform Extensions
+
+#### Phase 343: Go SDK and net/http Middleware
+
+- [ ] **PLAT-01**: `arc-go-http` Go module provides `arc.Protect(handler, arc.ConfigFile("arc.yaml"))` that wraps any `http.Handler` with ARC capability validation, guard evaluation, and receipt signing
+- [ ] **PLAT-02**: Go middleware extracts caller identity from Authorization headers, cookies, and API key headers with configurable strategies
+- [ ] **PLAT-03**: Go middleware produces signed `HttpReceipt` objects stored in the configured receipt store
+- [ ] **PLAT-04**: Conformance tests validate Go SDK behavior against Rust kernel for shared test vectors
+
+#### Phase 344: Kubernetes Controller and Injector
+
+- [ ] **PLAT-05**: `arc-k8s-admission` admission controller rejects pod deployments that lack a valid ARC capability token annotation or label
+- [ ] **PLAT-06**: `arc-k8s-injector` mutating webhook automatically injects `arc api protect` as a sidecar container for annotated deployments
+- [ ] **PLAT-07**: Operator can configure admission policies via a `ArcPolicy` CRD specifying required capability scopes per namespace or deployment label
+- [ ] **PLAT-08**: Sidecar injector configures the proxy's upstream URL, OpenAPI spec path, and receipt store from pod annotations
+
+#### Phase 345: arc-tower Rust Middleware
+
+- [ ] **PLAT-09**: `arc-tower` crate implements `tower::Layer` that wraps any `tower::Service` with ARC capability validation, guard evaluation, and receipt signing
+- [ ] **PLAT-10**: Axum integration test demonstrates `arc-tower` as a middleware layer producing signed receipts for every request
+- [ ] **PLAT-11**: Tonic (gRPC) integration test demonstrates `arc-tower` producing signed receipts for gRPC service calls
+
+#### Phase 346: JVM and .NET Substrates
+
+- [ ] **PLAT-12**: `arc-jvm` provides a Servlet filter and/or Spring Boot auto-configuration that wraps HTTP requests with ARC capability validation and receipt signing
+- [ ] **PLAT-13**: `arc-dotnet` provides ASP.NET Core middleware that wraps HTTP requests with ARC capability validation and receipt signing
+- [ ] **PLAT-14**: Both substrates communicate with the Rust kernel via FFI, sidecar HTTP, or embedded WASM runtime
+- [ ] **PLAT-15**: Conformance tests validate JVM and .NET SDK behavior against Rust kernel for shared test vectors
+
+### v3.7 Strategic Bets
+
+#### Phase 347: WASM Guard Runtime
+
+- [ ] **STRAT-01**: WASM guard runtime loads custom guards compiled to WASM (`.wasm` files) and executes them in a sandboxed runtime with deterministic fuel metering
+- [ ] **STRAT-02**: Guard WASM API provides the guard with read-only access to `ArcHttpRequest`, `SessionContext`, and `GuardConfig`, and expects a `GuardVerdict` return value
+- [ ] **STRAT-03**: WASM guards have bounded execution time (configurable fuel limit) and bounded memory (configurable page limit) with fail-closed behavior on resource exhaustion
+- [ ] **STRAT-04**: Developer can author a custom guard in Rust, AssemblyScript, or Go, compile to WASM, and load it via `arc.yaml` guard configuration
+
+#### Phase 348: Receipt Metering and Economics
+
+- [ ] **STRAT-05**: Receipt metering surface attaches per-receipt cost attribution (compute time, data volume, external API cost) as structured metadata
+- [ ] **STRAT-06**: Operator can query cumulative cost by session, agent, tool, or time range via `arc receipts cost` CLI and programmatic API
+- [ ] **STRAT-07**: Monetary budget enforcement per grant uses denominated currency (via arc-link oracle) with fail-closed deny when the budget is exhausted
+- [ ] **STRAT-08**: Receipt cost metadata is compatible with billing export for managed service scenarios
+
+#### Phase 349: AG-UI Proxy
+
+- [ ] **STRAT-09**: `arc-ag-ui-proxy` intercepts Agent-to-UI event streams, validates capability tokens for UI-facing actions, and signs receipts for every delivered event
+- [ ] **STRAT-10**: Proxy supports SSE and WebSocket transport modes for agent-to-UI event delivery
+- [ ] **STRAT-11**: UI-facing receipts include event type, target component, and action classification for audit trail
+
+#### Phase 350: Skill and Workflow Authority
+
+- [ ] **STRAT-12**: `SkillGrant` type extends the capability model to represent multi-step skill composition with ordered tool sequences and intermediate checkpoints
+- [ ] **STRAT-13**: `SkillManifest` type describes a composed skill's tool dependencies, input/output contracts, and budget envelope
+- [ ] **STRAT-14**: `WorkflowReceipt` type captures the complete execution trace of a multi-step workflow as a single auditable artifact with per-step receipts and an aggregate verdict
+- [ ] **STRAT-15**: Workflow authority validates that each step in a composed skill operates within its declared scope and budget, denying execution when any step would violate the workflow's envelope
+
+---
+
+## Traceability (v3.0-v3.7)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CORE-01 | Phase 319 | Planned |
+| CORE-02 | Phase 319 | Planned |
+| CORE-03 | Phase 319 | Planned |
+| CORE-04 | Phase 319 | Planned |
+| CORE-05 | Phase 320 | Planned |
+| CORE-06 | Phase 320 | Planned |
+| CORE-07 | Phase 320 | Planned |
+| CORE-08 | Phase 320 | Planned |
+| CORE-09 | Phase 320 | Planned |
+| CORE-10 | Phase 321 | Planned |
+| CORE-11 | Phase 321 | Planned |
+| CORE-12 | Phase 321 | Planned |
+| CORE-13 | Phase 321 | Planned |
+| CORE-14 | Phase 322 | Planned |
+| CORE-15 | Phase 322 | Planned |
+| CORE-16 | Phase 322 | Planned |
+| CORE-17 | Phase 322 | Planned |
+| CORE-18 | Phase 322 | Planned |
+| ATT-01 | Phase 323 | Planned |
+| ATT-02 | Phase 323 | Planned |
+| ATT-03 | Phase 323 | Planned |
+| ATT-04 | Phase 323 | Planned |
+| ATT-05 | Phase 324 | Planned |
+| ATT-06 | Phase 324 | Planned |
+| ATT-07 | Phase 324 | Planned |
+| ATT-08 | Phase 324 | Planned |
+| ATT-09 | Phase 325 | Planned |
+| ATT-10 | Phase 325 | Planned |
+| ATT-11 | Phase 325 | Planned |
+| ATT-12 | Phase 325 | Planned |
+| ATT-13 | Phase 326 | Planned |
+| ATT-14 | Phase 326 | Planned |
+| ATT-15 | Phase 326 | Planned |
+| PY-01 | Phase 327 | Planned |
+| PY-02 | Phase 327 | Planned |
+| PY-03 | Phase 327 | Planned |
+| PY-04 | Phase 327 | Planned |
+| PY-05 | Phase 328 | Planned |
+| PY-06 | Phase 328 | Planned |
+| PY-07 | Phase 328 | Planned |
+| PY-08 | Phase 329 | Planned |
+| PY-09 | Phase 329 | Planned |
+| PY-10 | Phase 329 | Planned |
+| PY-11 | Phase 330 | Planned |
+| PY-12 | Phase 330 | Planned |
+| PY-13 | Phase 330 | Planned |
+| TS-01 | Phase 331 | Planned |
+| TS-02 | Phase 331 | Planned |
+| TS-03 | Phase 331 | Planned |
+| TS-04 | Phase 332 | Planned |
+| TS-05 | Phase 332 | Planned |
+| TS-06 | Phase 332 | Planned |
+| TS-07 | Phase 333 | Planned |
+| TS-08 | Phase 333 | Planned |
+| TS-09 | Phase 333 | Planned |
+| TS-10 | Phase 334 | Planned |
+| TS-11 | Phase 334 | Planned |
+| TS-12 | Phase 334 | Planned |
+| GUARD-01 | Phase 335 | Planned |
+| GUARD-02 | Phase 335 | Planned |
+| GUARD-03 | Phase 335 | Planned |
+| GUARD-04 | Phase 336 | Planned |
+| GUARD-05 | Phase 336 | Planned |
+| GUARD-06 | Phase 336 | Planned |
+| GUARD-07 | Phase 336 | Planned |
+| GUARD-08 | Phase 337 | Planned |
+| GUARD-09 | Phase 337 | Planned |
+| GUARD-10 | Phase 337 | Planned |
+| GUARD-11 | Phase 338 | Planned |
+| GUARD-12 | Phase 338 | Planned |
+| GUARD-13 | Phase 338 | Planned |
+| PROTO-01 | Phase 339 | Planned |
+| PROTO-02 | Phase 339 | Planned |
+| PROTO-03 | Phase 339 | Planned |
+| PROTO-04 | Phase 340 | Planned |
+| PROTO-05 | Phase 340 | Planned |
+| PROTO-06 | Phase 340 | Planned |
+| PROTO-07 | Phase 341 | Planned |
+| PROTO-08 | Phase 341 | Planned |
+| PROTO-09 | Phase 341 | Planned |
+| PROTO-10 | Phase 341 | Planned |
+| PROTO-11 | Phase 342 | Planned |
+| PROTO-12 | Phase 342 | Planned |
+| PROTO-13 | Phase 342 | Planned |
+| PLAT-01 | Phase 343 | Planned |
+| PLAT-02 | Phase 343 | Planned |
+| PLAT-03 | Phase 343 | Planned |
+| PLAT-04 | Phase 343 | Planned |
+| PLAT-05 | Phase 344 | Planned |
+| PLAT-06 | Phase 344 | Planned |
+| PLAT-07 | Phase 344 | Planned |
+| PLAT-08 | Phase 344 | Planned |
+| PLAT-09 | Phase 345 | Planned |
+| PLAT-10 | Phase 345 | Planned |
+| PLAT-11 | Phase 345 | Planned |
+| PLAT-12 | Phase 346 | Planned |
+| PLAT-13 | Phase 346 | Planned |
+| PLAT-14 | Phase 346 | Planned |
+| PLAT-15 | Phase 346 | Planned |
+| STRAT-01 | Phase 347 | Planned |
+| STRAT-02 | Phase 347 | Planned |
+| STRAT-03 | Phase 347 | Planned |
+| STRAT-04 | Phase 347 | Planned |
+| STRAT-05 | Phase 348 | Planned |
+| STRAT-06 | Phase 348 | Planned |
+| STRAT-07 | Phase 348 | Planned |
+| STRAT-08 | Phase 348 | Planned |
+| STRAT-09 | Phase 349 | Planned |
+| STRAT-10 | Phase 349 | Planned |
+| STRAT-11 | Phase 349 | Planned |
+| STRAT-12 | Phase 350 | Planned |
+| STRAT-13 | Phase 350 | Planned |
+| STRAT-14 | Phase 350 | Planned |
+| STRAT-15 | Phase 350 | Planned |
+
+**Coverage:**
+- Universal security kernel requirements (v3.0-v3.7): 93 total, 93 mapped, 0 unmapped
+
+## Out of Scope (v3.x)
 
 | Feature | Reason |
 |---------|--------|
@@ -186,10 +732,15 @@ hosted run.
 | Agent-framework maintained plugins | Examples only; ARC is transport-layer agnostic by design |
 | Mobile SDK | Web-first, CLI-first; mobile later |
 | GUI admin dashboard | CLI and HTTP admin endpoints sufficient for operators |
+| MERCURY domain depth | Finance-specific constructs (FIX, FpML, regulatory formats) are product-layer work, not protocol-layer |
+| ARC-Wall expansion | ARC-Wall remains schema-level until the protocol substrate is production-ready |
+| Ruby/PHP/Elixir substrates | Cover dominant languages first (Python, TypeScript, Go, Rust, JVM, .NET); niche languages follow demand |
+| Multi-tenant SaaS UI | Focus is kernel, SDK, and middleware; hosted management console is a product-layer concern |
+| Cross-kernel federation for HTTP substrates | Federation exists for protocol adapters; HTTP substrate federation follows after single-kernel adoption |
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-12 after local v2.69 repo-side verification; hosted observation still pending*
+*Last updated: 2026-04-13 after defining v3.0-v3.7 universal security kernel requirements*
 
 ## Historical Milestone Requirement Snapshots
 
