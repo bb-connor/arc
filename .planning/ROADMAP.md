@@ -10745,3 +10745,96 @@ runtime surface established by the previous phase.
 | 374 | v4.0 | Security Hardening and Request Enrichment | Not started |
 | 375 | v4.0 | Guard Manifest, Startup Wiring, and Receipt Integration | Not started |
 | 376 | v4.0 | Benchmark Validation | Not started |
+
+---
+
+## v3.12 Cross-Protocol Integrity and Truth Completion (Phases 377-381)
+
+**Milestone Goal:** Close the remaining credibility gap between ARC's shipped
+kernel/substrate breakthrough and the broader cross-protocol governance vision.
+Finish ACP live-path cryptographic enforcement, make A2A/ACP outward edges
+genuinely kernel-mediated, complete the last operational parity gaps, and
+reconcile docs/planning/comments with code reality.
+
+**Dependency:** Follows the shipped v3.0-v3.11 kernel/substrate lane. Created
+after the v4.0 roadmap already reserved phases 373-376, so this corrective
+lane begins at phase 377. Can execute in parallel with v4.0 because the work
+targets different runtime surfaces, with only the truth-pass documentation
+touching shared narrative assets.
+
+**Parallelism:** Phase 377 establishes the ACP cryptographic enforcement floor.
+Phase 378 extends truthful kernel mediation to the outward A2A/ACP edges.
+Phase 379 closes the remaining operator/runtime parity gaps on sidecar,
+`arc-tower`, and Kubernetes surfaces. Phase 380 reconciles docs, comments, and
+planning to the real implementation state. Phase 381 qualifies the resulting
+claim surface with integration tests and operator-facing verification. The
+phases are sequential because each later phase assumes the prior live-path and
+narrative corrections are in place.
+
+### Phase 377: ACP Live-Path Cryptographic Enforcement
+**Goal**: ACP filesystem and terminal operations enforce kernel-validated capability tokens with real signature verification and fail-closed behavior
+**Depends on**: v3.1 groundwork and the current `arc-acp-proxy` signer/checker extension points already present in-tree
+**Requirements**: ACPX-01, ACPX-02, ACPX-03
+**Success Criteria** (what must be TRUE):
+  1. Filesystem and terminal interception paths call the installed `CapabilityChecker` before built-in allow logic and deny or error closed when validation fails
+  2. `KernelCapabilityChecker` verifies token signatures, time validity, server binding, and scope coverage using configured trust material rather than parse/time/scope checks alone
+  3. ACP live-path receipts or equivalent compliance artifacts record the validated `capability_id` and make it obvious which operations were cryptographically enforced
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 378: Outward Edge Kernel Mediation and Receipt Parity
+**Goal**: A2A and ACP edge crates stop overstating kernel mediation and either route live authority through the kernel with signed receipts or narrow their claims explicitly
+**Depends on**: Phase 377 (ACP cryptographic enforcement baseline exists)
+**Requirements**: EDGE-01, EDGE-02, EDGE-03
+**Success Criteria** (what must be TRUE):
+  1. `arc-a2a-edge` live send/invoke paths route authority decisions through the ARC kernel instead of directly invoking adapter connections
+  2. Allowed, denied, failed, and streaming edge flows expose signed receipt output or truthful receipt references instead of implying kernel mediation without emitting evidence
+  3. `arc-acp-edge` capability invocation surfaces are kernel-mediated with signed receipts, or any remaining discovery-only/non-kernel paths are explicitly documented as outside enforcement claims
+**Estimated complexity**: L
+**Plans**: TBD
+
+### Phase 379: Operational Parity and Persistence Completion
+**Goal**: The last weaker runtime surfaces reach the same production bar as the core HTTP substrate
+**Depends on**: Phase 378 (truthful live authority path is established at the protocol edges)
+**Requirements**: OPER-01, OPER-02, OPER-03
+**Success Criteria** (what must be TRUE):
+  1. `arc-api-protect` persists signed receipts when `receipt_db` is configured and the persisted history is available across sidecar evaluation/proxy flows
+  2. `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated on real body-bearing requests
+  3. The Kubernetes controller validates ARC capability tokens and scope requirements against kernel-backed logic rather than annotation presence alone
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 380: Truth and Narrative Reconciliation
+**Goal**: The repo tells one honest story about what ARC has shipped, what remains partial, and what is still aspirational
+**Depends on**: Phase 379 (live runtime truth exists to document)
+**Requirements**: TRUTH-01, TRUTH-02, TRUTH-03, TRUTH-04
+**Success Criteria** (what must be TRUE):
+  1. Strategic/protocol docs distinguish the shipped kernel/substrate breakthrough from future generic cross-protocol orchestration ideas
+  2. HTTP/framework/platform docs reflect the actual shipped crates/packages, capability semantics, and remaining gaps
+  3. Planning files consistently represent v3.12 as the corrective credibility lane and v4.0 as a parallel strategic bet rather than the active truth narrative
+  4. Crate-level comments and bridge docs no longer claim kernel mediation or signed receipt behavior on live paths that do not implement it
+**Estimated complexity**: M
+**Plans**: TBD
+
+### Phase 381: Claim-Gate Qualification
+**Goal**: Prove the narrowed ARC claim with integration tests and operator-facing verification, and explicitly gate any broader claim on concrete evidence
+**Depends on**: Phase 380 (implementation and narrative reconciliation are complete)
+**Requirements**: QUAL-01, QUAL-02, QUAL-03
+**Success Criteria** (what must be TRUE):
+  1. Integration tests cover ACP live-path cryptographic enforcement and A2A/ACP edge mediation with allow, deny, invalid-token, and receipt-emission cases
+  2. Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit prerequisites for any stronger "fully realized universal kernel" claim
+  3. Operator-facing verification demonstrates receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
+**Estimated complexity**: M
+**Plans**: TBD
+
+---
+
+## Phase Summary (v3.12)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 377 | v3.12 | ACP Live-Path Cryptographic Enforcement | Not started |
+| 378 | v3.12 | Outward Edge Kernel Mediation and Receipt Parity | Not started |
+| 379 | v3.12 | Operational Parity and Persistence Completion | Not started |
+| 380 | v3.12 | Truth and Narrative Reconciliation | Not started |
+| 381 | v3.12 | Claim-Gate Qualification | Not started |

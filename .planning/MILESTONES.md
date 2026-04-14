@@ -2,30 +2,35 @@
 
 ## Active Milestone
 
-### v2.83 Coverage, Hardening, and Production Qualification
+### v3.12 Cross-Protocol Integrity and Truth Completion
 
-**Status:** active locally -- phase `315` is complete and phases `316` through
-`318` are the next queued execution target set
-**Executable phases:** 315-318
-**Goal:** Close the integration-test gap across every workspace crate, push
-coverage from 67% to 80%+, introduce connection pooling or an async store
-trait for the SQLite layer, audit dead code and over-exported APIs, refactor
-the 82 `too_many_arguments` sites, and add structured error output with codes
-and suggested fixes.
+**Status:** active locally -- phases `377` through `381` are now defined and
+phase `377` is the next queued execution target; `v4.0` remains parallel and
+`v2.83` remains an unresolved local closeout lane
+**Executable phases:** 377-381
+**Goal:** Close the gap between ARC's shipped kernel/substrate breakthrough and
+the repo's broader cross-protocol claims by finishing ACP live-path
+cryptographic enforcement, making outward A2A/ACP edges genuinely
+kernel-mediated, closing the remaining operational parity gaps, and
+reconciling docs/planning/comments with code reality.
 
-**Why this milestone matters:** Security-conscious adopters evaluating ARC for
-production will audit test coverage, error quality, and API surface. Half the
-crates have no integration tests, the store layer uses a single unpooled
-connection, and 82 clippy suppressions indicate API design debt. This is the
-"prove it works" milestone that earns enterprise trust.
+**Why this milestone matters:** The cross-protocol debate concluded that ARC
+has a real security-kernel breakthrough, but not yet the full universal
+cross-protocol governance claim. The missing pieces are concrete: ACP
+signature enforcement on live paths, truthful kernel mediation at the A2A/ACP
+edges, persistent/operator-ready parity on the remaining platform surfaces,
+and one internally consistent repo narrative. This milestone turns that
+finding into an executable closure lane.
 
 **Key intended outcomes:**
-- Integration tests for all workspace crates
-- Coverage at 80%+ with focus on security-critical paths
-- SQLite connection pooling or async store trait
-- Dead code removed, pub visibility audited
-- Config/builder structs replace too_many_arguments call sites
-- Structured error output with error codes and fix suggestions
+- ACP filesystem and terminal operations enforce kernel-validated capability
+  tokens with real signature verification and fail-closed behavior
+- `arc-a2a-edge` and `arc-acp-edge` route live authority decisions through the
+  kernel and emit truthful signed receipt outputs or explicitly narrowed claims
+- `arc-api-protect`, `arc-tower`, and the Kubernetes controller reach the same
+  operational parity expected from the broader HTTP substrate
+- Docs, crate comments, and planning artifacts converge on the narrower
+  truthful breakthrough claim and stop overstating unimplemented bridges
 
 ## Planned Milestones
 
@@ -253,7 +258,8 @@ This milestone makes the v3.x kernel consumable by external implementers.
 
 ### v3.9 Runtime Correctness and Contract Remediation
 
-**Status:** active locally
+**Status:** complete locally -- verification is green and the follow-on truth /
+credibility work now lives in `v3.12`
 **Executable phases:** 359-363
 **Goal:** Close the highest-severity v3.x review gaps by restoring
 kernel-mediated OpenAI execution, aligning certificate serialization with the
@@ -278,7 +284,8 @@ claims.
 
 ### v3.10 HTTP Sidecar and Cross-SDK Contract Completion
 
-**Status:** active locally
+**Status:** complete locally -- verification is green and the follow-on truth /
+credibility work now lives in `v3.12`
 **Executable phases:** 364-367
 **Goal:** Finish the residual v3.x HTTP substrate work by exposing the
 normative `/arc/*` sidecar interface in Rust, migrating Python onto that
@@ -304,7 +311,8 @@ the last external-consumption blockers in the HTTP/kernel adoption path.
 
 ### v3.11 Sidecar Entrypoint and Body-Integrity Completion
 
-**Status:** active locally
+**Status:** complete locally -- verification is green and the follow-on truth /
+credibility work now lives in `v3.12`
 **Executable phases:** 368-372
 **Goal:** Finish the final shippability and request-integrity gaps by
 shipping the documented `arc api protect` operator entrypoint, preserving
@@ -331,6 +339,33 @@ contract gaps, but ARC still could not honestly claim that the documented
 request semantics while binding content cryptographically. v3.11 closes the
 remaining body-integrity and operator-surface gaps that would undermine real
 deployments.
+
+### v3.12 Cross-Protocol Integrity and Truth Completion
+
+**Status:** planned
+**Executable phases:** 377-381
+**Goal:** Finish the remaining work needed for ARC's cross-protocol vision to
+be stated honestly: ACP live-path cryptographic enforcement, kernel-mediated
+outward edges, operational parity on the last weak surfaces, and a repo-wide
+truth pass.
+
+**Key intended outcomes:**
+- ACP proxy filesystem and terminal operations enforce kernel-validated
+  capability tokens with signature verification instead of audit-only hooks
+- A2A and ACP edge crates route authority decisions through the kernel and
+  expose signed receipt parity on live paths
+- Sidecar receipt persistence, `arc-tower` body binding, and Kubernetes
+  capability validation reach the same bar as the rest of the substrate
+- Protocol/design docs, crate comments, and planning files align to what is
+  truly shipped versus still aspirational
+- Qualification artifacts define the narrow breakthrough claim ARC can defend
+  today and the explicit conditions for any broader claim
+
+**Why this milestone matters:** The debate outcome was useful precisely because
+it separated what is already strong from what is still overclaimed. ARC has a
+real reusable security kernel for HTTP/API surfaces and adjacent integrations.
+What remains is the credibility-closeout work that makes the cross-protocol
+story cryptographically true, operationally complete, and narratively honest.
 
 ### v4.0 WASM Guard Runtime Completion
 
@@ -391,10 +426,10 @@ v3.0 (Kernel Foundation)
   |--- v3.3 (TypeScript)        [parallel]
   |--- v3.4 (Guards)            [parallel]
   |--- v3.5 (Protocol)          [mostly parallel -- most phases need v3.0 only; edge crates need v3.1]
-  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity)
+  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity) ---> v3.12 (Integrity + Truth)
 ```
 
-v4.0 (WASM Guard Runtime)    [parallel with v2.83 -- no dependency on v3.x chain]
+v4.0 (WASM Guard Runtime)    [parallel strategic lane -- phases reserved earlier, no dependency on the v3.12 credibility-closeout chain]
 
 v2.80 gates v2.81 and v2.82. v2.81 and v2.82 can execute in parallel.
 v2.83 follows v2.81. v3.0 follows v2.83.
@@ -405,8 +440,11 @@ surface. v3.9 remediates the first wave of correctness and contract gaps
 surfaced by the post-implementation audit. v3.10 closes the remaining HTTP
 sidecar and cross-SDK substrate gaps that still blocked external adoption.
 v3.11 ships the missing operator entrypoint and closes the remaining
-request-body integrity and schema consistency gaps.
-v4.0 runs in parallel with v2.83 and the v3.x chain. It depends only on the
+request-body integrity and schema consistency gaps. v3.12 closes the remaining
+credibility gap between the shipped kernel/substrate breakthrough and the
+broader cross-protocol vision by forcing live cryptographic enforcement,
+truthful edge mediation, and repo-wide narrative reconciliation.
+v4.0 runs in parallel as a WASM-guard strategic bet and depends only on the
 Phase 347 skeleton (already shipped in v3.7).
 
 ## Latest Completed Milestone

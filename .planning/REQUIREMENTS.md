@@ -4,8 +4,8 @@
 **Latest completed milestone:** v2.82 Normative Protocol Specification and
 Conformance
 (completed locally 2026-04-13)
-**Active milestone:** v2.83 Coverage, Hardening, and Production Qualification
-**Planned milestones:** v3.0 through v3.11 (Universal Security Kernel era)
+**Active milestone:** v3.12 Cross-Protocol Integrity and Truth Completion
+**Planned milestones:** v3.0 through v3.12 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -938,7 +938,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 | FINAL-11 | Phase 372 | Planned |
 
 **Coverage:**
-- Universal security kernel requirements (v3.0-v3.11): 148 total, 148 mapped, 0 unmapped
+- Universal security kernel requirements (v3.0-v3.12): 164 total, 164 mapped, 0 unmapped
 
 ## Out of Scope (v3.x)
 
@@ -957,7 +957,7 @@ reviewed live-chain rollout artifacts, and OpenTimestamps tooling.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after adding v3.11 sidecar entrypoint and body-integrity completion requirements*
+*Last updated: 2026-04-14 after adding v3.12 cross-protocol integrity and truth completion requirements*
 
 ## Historical Milestone Requirement Snapshots
 
@@ -2880,9 +2880,87 @@ Nyquist artifacts, and ownership boundaries that future work depends on.
 
 **Coverage:**
 - Completed requirements tracked here: 225
-- Active requirements: 5
-- Mapped to phases: 230
+- Active requirements: 21
+- Mapped to phases: 246
 - Unmapped: 0
+
+## v3.12 Cross-Protocol Integrity and Truth Completion
+
+Closes the remaining credibility gap between ARC's shipped kernel/substrate
+breakthrough and the broader cross-protocol governance claim. This milestone
+finishes ACP live-path cryptographic enforcement, makes outward A2A/ACP edges
+truthfully kernel-mediated, closes the last operational parity gaps, and
+forces the repo/docs/planning story to match the live code.
+
+### ACP Live-Path Cryptographic Enforcement
+
+- [ ] **ACPX-01**: `arc-acp-proxy` filesystem and terminal interception paths invoke the configured `CapabilityChecker` before built-in allow logic and fail closed on deny or validation error
+- [ ] **ACPX-02**: `KernelCapabilityChecker` verifies capability token signatures, time validity, server binding, and scope coverage using configured kernel trust material instead of parse/time/scope checks alone
+- [ ] **ACPX-03**: ACP live-path receipts or equivalent compliance artifacts record the validated `capability_id` and clearly distinguish cryptographically enforced operations from audit-only permission mapping
+
+### Outward Edge Kernel Mediation
+
+- [ ] **EDGE-01**: `arc-a2a-edge` live send/invoke paths route authority decisions through the ARC kernel instead of directly invoking adapter connections
+- [ ] **EDGE-02**: `arc-a2a-edge` allowed, denied, failed, and streaming flows expose signed receipt output or truthful receipt references rather than implying kernel mediation without evidence
+- [ ] **EDGE-03**: `arc-acp-edge` capability invocation and permission surfaces are kernel-mediated with signed receipts, or any remaining non-kernel discovery-only paths are explicitly documented and excluded from enforcement claims
+
+### Operational Parity
+
+- [ ] **OPER-01**: `arc-api-protect` persists signed receipts when `receipt_db` is configured and exposes the same persisted receipts across proxy and `/arc/evaluate` flows
+- [ ] **OPER-02**: `arc-tower` binds raw request bodies into evaluation inputs so `body_hash` and `body_length` are populated instead of always `None` / `0`
+- [ ] **OPER-03**: The Kubernetes controller validates ARC capability tokens and required scopes against kernel-backed logic rather than annotation presence alone
+
+### Truth and Narrative Reconciliation
+
+- [ ] **TRUTH-01**: `docs/protocols/STRATEGIC-VISION.md` distinguishes the shipped kernel/substrate breakthrough from future generic cross-protocol orchestration and aligns shipped-status tables with code reality
+- [ ] **TRUTH-02**: `docs/protocols/HTTP-FRAMEWORK-INTEGRATION-STRATEGY.md` and `docs/sdk/PLATFORM.md` reflect the actual shipped crates/packages, remaining gaps, and precise capability/receipt semantics
+- [ ] **TRUTH-03**: Planning docs (`PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`) consistently represent `v3.12` as the corrective credibility lane and `v4.0` as a parallel strategic bet rather than the active truth narrative
+- [ ] **TRUTH-04**: Crate-level doc comments and bridge docs no longer state kernel mediation or signed receipt behavior where the live path does not implement it
+
+### Qualification
+
+- [ ] **QUAL-01**: Integration tests cover ACP live-path cryptographic enforcement and A2A/ACP outward-edge kernel mediation, including allow, deny, invalid-token, and receipt-emission cases
+- [ ] **QUAL-02**: Milestone closeout artifacts state the narrow truthful breakthrough claim ARC can defend today and the explicit conditions for any broader "fully realized universal kernel" claim
+- [ ] **QUAL-03**: Operator-facing verification proves receipt persistence, `arc-tower` body binding, and Kubernetes token/scope enforcement on real runtime paths
+
+## v3.12 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Generic `CrossProtocolOrchestrator` / `CapabilityBridge` architecture | Remains future work; this milestone closes truth and enforcement gaps on existing in-tree surfaces |
+| Net-new protocol adapters beyond current HTTP/MCP/A2A/ACP/OpenAI lanes | Finish credibility on shipped surfaces before expanding protocol breadth again |
+| New economic / marketplace claims around "comptroller of the agent economy" | Marketing posture must follow cryptographically proven runtime behavior, not precede it |
+| WASM guard runtime completion | Covered by parallel `v4.0` lane |
+
+## v3.12 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| ACPX-01 | Phase 377 | Pending |
+| ACPX-02 | Phase 377 | Pending |
+| ACPX-03 | Phase 377 | Pending |
+| EDGE-01 | Phase 378 | Pending |
+| EDGE-02 | Phase 378 | Pending |
+| EDGE-03 | Phase 378 | Pending |
+| OPER-01 | Phase 379 | Pending |
+| OPER-02 | Phase 379 | Pending |
+| OPER-03 | Phase 379 | Pending |
+| TRUTH-01 | Phase 380 | Pending |
+| TRUTH-02 | Phase 380 | Pending |
+| TRUTH-03 | Phase 380 | Pending |
+| TRUTH-04 | Phase 380 | Pending |
+| QUAL-01 | Phase 381 | Pending |
+| QUAL-02 | Phase 381 | Pending |
+| QUAL-03 | Phase 381 | Pending |
+
+**Coverage:**
+- v3.12 requirements: 16 total
+- Mapped to phases: 16
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-14*
+*Last updated: 2026-04-14 after starting milestone v3.12 Cross-Protocol Integrity and Truth Completion*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3000,4 +3078,4 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-04-14 after starting milestone v4.0 WASM Guard Runtime Completion*
+*Last updated: 2026-04-14 after starting milestone v3.12 Cross-Protocol Integrity and Truth Completion*

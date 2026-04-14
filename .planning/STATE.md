@@ -1,49 +1,50 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.83
-milestone_name: Coverage, Hardening, and Production Qualification
+milestone: v3.12
+milestone_name: Cross-Protocol Integrity and Truth Completion
 status: active
-stopped_at: phase 317 refreshed with wave 05 verified; milestone still blocked by phase 316 coverage gap plus the remaining phase 317 signature/API gaps
-last_updated: "2026-04-14T18:06:20Z"
-last_activity: 2026-04-14 -- local verification blockers are closed: the JVM package now has a Gradle wrapper and passes under Gradle 8.7, Python SDK packages resolve locally via uv sources and dev extras, and the full v3.9-v3.11 remediation matrix passes across Rust, TypeScript, Go, .NET, JVM, and Python
+stopped_at: v3.12 roadmap and requirements created; phases 377-381 are defined while v4.0 remains parallel and v2.83 remains an unarchived local closeout lane
+last_updated: "2026-04-14T18:47:52Z"
+last_activity: 2026-04-14 -- created v3.12 from the cross-protocol debate findings to close ACP cryptographic enforcement, outward-edge kernel mediation, operational parity gaps, and repo-truth drift
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 10
-  completed_plans: 8
-  percent: 50
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-13)
+See: .planning/PROJECT.md (updated 2026-04-14)
 
 **Core value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v2.83 Coverage, Hardening, and Production Qualification --
-raise the production bar with crate-level integration tests, higher measured
-coverage, store-layer hardening, API-surface cleanup, and structured errors.
+**Current focus:** v3.12 Cross-Protocol Integrity and Truth Completion --
+finish ACP live-path cryptographic enforcement, kernel-mediated outward edges,
+operational parity on the remaining weak surfaces, and a repo-wide truth pass
+that aligns the vision narrative to shipped code.
 
 ## Current Position
 
-Phase: 317 (gaps_found refreshed)
-Plan: `317-03` completed; return next to the remaining `317` API-surface /
-signature cleanup or resume the `316` coverage closure lane
-Status: v2.83 remains active locally because phase `316` is still
-`gaps_found` at `72.42%` comparable workspace coverage and phase `317` is still
-`gaps_found` with `63` remaining non-test `too_many_arguments` suppressions and
-the wildcard-export audit now narrowed to `arc-core-types` / `arc-core`
-compatibility facades; the `udeps` gate is satisfied locally.
-Last activity: 2026-04-14 -- phase `317` wave `05` landed typed evaluator
-result inputs, converted the streamable-HTTP OAuth session-auth helper to a
-typed input struct, converted workflow step recording to a typed input struct,
-and reduced the live non-test `too_many_arguments` inventory to `63`.
+Phase: 377 (not started)
+Plan: --
+Status: v3.12 is now the active planning lane because the cross-protocol
+debate concluded ARC's kernel/substrate breakthrough is real, but the broader
+vision still depends on ACP live-path cryptographic enforcement, truthful
+kernel mediation at the A2A/ACP edges, operational parity on the last weak
+runtime surfaces, and repo/doc reconciliation. `v4.0` remains a parallel
+strategic bet, and `v2.83` remains locally unarchived rather than silently
+treated as complete.
+Last activity: 2026-04-14 -- defined phases 377-381 for ACP enforcement,
+edge-kernel mediation, operational parity, truth reconciliation, and
+claim-gate qualification.
 
-Progress: [#####-----] 50%
+Progress: [----------] 0%
 
 ## Performance Metrics
 
@@ -52,8 +53,8 @@ Progress: [#####-----] 50%
 - v2.0 completed: 6 phases, 19 plans
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
-- v3.0-v3.11: 54 phases planned across 12 milestones
-- v4.0: 4 phases planned (parallel with v2.83)
+- v3.0-v3.12: 59 phases planned across 13 milestones
+- v4.0: 4 phases planned (parallel strategic lane)
 
 ## Accumulated Context
 
@@ -85,49 +86,48 @@ Progress: [#####-----] 50%
   than introducing a second demo stack before the Docker milestone lands.
 - Phase `310` anchored the tutorial and framework examples to the same hosted
   HTTP edge topology rather than reviving the old stdio demo path.
-- v4.0 WASM Guard Runtime Completion runs in parallel with v2.83 (no code
-  dependency). Design authority is `docs/guards/05-V1-DECISION.md`. ABI is raw
-  core-WASM (not WIT), stateless per-call Store, HushSpec-first pipeline order.
+- v4.0 WASM Guard Runtime Completion runs in parallel with the v3.12
+  corrective lane (and remains independent from the unfinished v2.83 closeout).
+  Design authority is `docs/guards/05-V1-DECISION.md`. ABI is raw core-WASM
+  (not WIT), stateless per-call Store, HushSpec-first pipeline order.
+- The 2026-04-14 cross-protocol debate established the correct ARC claim:
+  the kernel/substrate breakthrough is real, but the broader "fully realized
+  universal cross-protocol governance kernel" claim still requires ACP
+  cryptographic enforcement, truthful outward-edge mediation, operational
+  parity, and repo-wide truth reconciliation.
+- v3.12 exists specifically to close that credibility gap. It is the active
+  corrective lane even though v4.0 was already planned in parallel and v2.83
+  remains locally unarchived.
 
 ### Pending Todos
 
-- Close the remaining `316` coverage gap by targeting the next weakest crates
-  and files until the full-workspace coverage lane exceeds `80%`.
-- Continue `317`: remove more non-test `too_many_arguments` suppressions and
-  finish the crate-root `pub use` surface audit now that the dependency-audit
-  gate is closed locally.
-- Decide whether to refresh the checked-in conformance reports as part of the
-  final `v2.83` closeout, since the qualification bundle currently references
-  the latest generated reports from `2026-03-19`.
-- Resolve deferred `v2.71` external prerequisites if live-chain activation
-  becomes active again.
-- v3.9 runtime correctness remediation is now defined locally for the
-  post-implementation audit findings; fold the validated fixes back into the
-  v3.x planning lane once the current patch set is verified.
-- v3.10 HTTP sidecar and cross-SDK contract completion is now defined locally
-  for the remaining HTTP substrate gaps surfaced by the follow-up audit.
-- v3.11 sidecar entrypoint and body-integrity completion is now defined
-  locally for the remaining operator-surface, request-body preservation, and
-  HTTP schema drift gaps surfaced by the latest audit.
-- Archive or annotate the v3.9-v3.11 remediation lane in the planning docs now
-  that the cross-language verification matrix is green locally.
+- Plan and execute phase `377` to wire ACP live-path capability checking all
+  the way through signature verification and fail-closed enforcement.
+- Plan and execute phase `378` to make the A2A/ACP outward edges truthfully
+  kernel-mediated with signed receipt parity or explicitly narrowed claims.
+- Plan and execute phase `379` to close sidecar receipt persistence,
+  `arc-tower` body binding, and Kubernetes kernel-validation gaps.
+- Plan and execute phase `380` to reconcile protocol docs, crate comments, and
+  planning artifacts with what the live code actually ships.
+- Plan and execute phase `381` to qualify the narrowed ARC claim with
+  integration tests and operator-facing verification artifacts.
+- Close or explicitly defer the remaining `v2.83` coverage / qualification
+  loose ends once the repo's top-level truth narrative is stable.
+- Resume `v4.0` planning/execution after the v3.12 corrective lane no longer
+  competes with the repo's active truth narrative.
 
 ### Blockers/Concerns
 
-- The live planning pointers for `v2.83` are updated locally, but a clean
-  closeout/tag pass is still outstanding because the top-level planning files
-  carried unrelated local edits before milestone archival.
-- Phase `316` remains open because the refreshed full-workspace `llvm-cov` run
-  landed at `72.42%` on the comparable filtered lane, still materially below
-  the `80%+` target.
-- The new qualification bundle now includes one fresh `arc-core` microbenchmark
-  baseline, but there is still no broader end-to-end CLI/kernel latency
-  baseline captured for `v2.83`.
+- ACP and outward-edge surfaces still contain partial or overstated
+  cryptographic/kernel claims in live code and docs; phase `380` must treat
+  comment/doc truth as part of the product surface, not cleanup polish.
+- `v2.83` is still locally incomplete, so it should be explicitly archived or
+  deferred later instead of silently remaining the repo's "active" milestone.
+- `v4.0` already reserved phases `373-376`, so `v3.12` begins at `377`; future
+  v4.x placeholders must stay shifted to avoid roadmap collisions.
 - The default web3-enabled graph still carries alloy's transitive hashbrown
-  split; the core-path no-default-features graph is now the validated slim path.
-- The planning/state pointers still describe the older `v2.83` lane as the
-  active milestone even though the v3.9-v3.11 remediation patch set is now
-  implemented and verified locally.
+  split; the core-path no-default-features graph remains the validated slim
+  path when `v2.71` eventually resumes.
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -141,6 +141,8 @@ receipts, and benchmark validation
 ## Session Continuity
 
 Last session: 2026-04-14
-Stopped at: v4.0 roadmap created; phases 373-376 defined in ROADMAP.md
-Next action: `/gsd:plan-phase 373` to begin WASM runtime host foundation
+Stopped at: v3.12 roadmap created; phases 377-381 defined in ROADMAP.md and
+REQUIREMENTS.md
+Next action: `/gsd:plan-phase 377` to begin ACP live-path cryptographic
+enforcement
 Resume file: None
