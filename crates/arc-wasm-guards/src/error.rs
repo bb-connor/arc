@@ -50,6 +50,22 @@ pub enum WasmGuardError {
     /// The runtime backend is not available (feature not enabled).
     #[error("WASM runtime backend not available -- enable the 'wasmtime-runtime' feature")]
     BackendUnavailable,
+
+    /// The guard manifest YAML could not be parsed.
+    #[error("failed to parse guard manifest: {0}")]
+    ManifestParse(String),
+
+    /// The guard manifest could not be read from disk.
+    #[error("failed to load guard manifest for {path}: {reason}")]
+    ManifestLoad { path: String, reason: String },
+
+    /// SHA-256 hash of the .wasm binary does not match the manifest declaration.
+    #[error("wasm hash mismatch: expected {expected}, got {actual}")]
+    HashMismatch { expected: String, actual: String },
+
+    /// The manifest declares an unsupported ABI version.
+    #[error("unsupported abi_version \"{version}\" (supported: {supported})")]
+    UnsupportedAbiVersion { version: String, supported: String },
 }
 
 #[cfg(test)]
