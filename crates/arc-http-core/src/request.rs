@@ -182,7 +182,10 @@ mod tests {
 
         let h1 = req1.content_hash().unwrap();
         let h2 = req2.content_hash().unwrap();
-        assert_ne!(h1, h2, "different query params should produce different hashes");
+        assert_ne!(
+            h1, h2,
+            "different query params should produce different hashes"
+        );
     }
 
     #[test]
@@ -201,7 +204,10 @@ mod tests {
 
         let h1 = req1.content_hash().unwrap();
         let h2 = req2.content_hash().unwrap();
-        assert_ne!(h1, h2, "different body hashes should produce different content hashes");
+        assert_ne!(
+            h1, h2,
+            "different body hashes should produce different content hashes"
+        );
     }
 
     #[test]
@@ -223,6 +229,9 @@ mod tests {
 
         let h1 = req_get.content_hash().unwrap();
         let h2 = req_post.content_hash().unwrap();
-        assert_ne!(h1, h2, "different methods should produce different content hashes");
+        assert_ne!(
+            h1, h2,
+            "different methods should produce different content hashes"
+        );
     }
 }

@@ -1,4 +1,4 @@
-pub use arc_core_types::{capability, crypto, receipt, canonical_json_bytes};
+pub use arc_core_types::{canonical_json_bytes, capability, crypto, receipt};
 pub use arc_governance as governance;
 pub use arc_listing as listing;
 
@@ -1298,6 +1298,44 @@ mod tests {
         SignedOpenMarketFeeSchedule::sign(artifact, signing_keypair).expect("sign fee schedule")
     }
 
+    fn sample_penalty_issue_request(
+        owner_id: &str,
+        fee_schedule: SignedOpenMarketFeeSchedule,
+        charter: SignedGenericGovernanceCharter,
+        case: SignedGenericGovernanceCase,
+        listing: SignedGenericListing,
+        activation: Option<SignedGenericTrustActivation>,
+    ) -> OpenMarketPenaltyIssueRequest {
+        OpenMarketPenaltyIssueRequest {
+            fee_schedule,
+            charter,
+            case,
+            listing,
+            activation,
+            abuse_class: OpenMarketAbuseClass::UnverifiableListingBehavior,
+            bond_class: OpenMarketBondClass::Listing,
+            action: OpenMarketPenaltyAction::SlashBond,
+            state: OpenMarketPenaltyState::Enforced,
+            penalty_amount: MonetaryAmount {
+                units: 2500,
+                currency: "USD".to_string(),
+            },
+            evidence_refs: vec![OpenMarketEvidenceReference {
+                kind: OpenMarketEvidenceKind::GovernanceCase,
+                reference_id: "case-ref".to_string(),
+                uri: None,
+                sha256: None,
+            }],
+            subject_operator_id: Some(owner_id.to_string()),
+            supersedes_penalty_id: None,
+            issued_by: "market@arc.example".to_string(),
+            opened_at: Some(204),
+            updated_at: Some(204),
+            expires_at: Some(500),
+            note: None,
+        }
+    }
+
     #[test]
     fn open_market_evaluation_applies_fee_schedule_and_slash_penalty() {
         let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
@@ -1691,6 +1729,280 @@ mod tests {
         assert_eq!(
             evaluation.findings[0].code,
             OpenMarketFindingCode::ActivationMismatch
+        );
+    }
+
+    #[test]
+    fn open_market_scope_rejects_blank_operator_ids() {
+        let error = OpenMarketEconomicsScope {
+            namespace: "https://registry.arc.example".to_string(),
+            allowed_listing_operator_ids: vec!["   ".to_string()],
+            allowed_actor_kinds: Vec::new(),
+            allowed_admission_classes: Vec::new(),
+            policy_reference: None,
+        }
+        .validate()
+        .expect_err("blank operator ids rejected");
+
+        assert!(error.contains("scope.allowed_listing_operator_ids[0]"));
+    }
+
+    #[test]
+    fn open_market_fee_schedule_validate_rejects_namespace_mismatch() {
+        let error = OpenMarketFeeScheduleArtifact {
+            schema: OPEN_MARKET_FEE_SCHEDULE_ARTIFACT_SCHEMA.to_string(),
+            fee_schedule_id: "fee-1".to_string(),
+            namespace: "https://registry.arc.example".to_string(),
+            governing_operator_id: "https://registry.arc.example".to_string(),
+            governing_operator_name: Some("Registry Operator".to_string()),
+            scope: OpenMarketEconomicsScope {
+                namespace: "https://different.arc.example".to_string(),
+                allowed_listing_operator_ids: vec!["https://registry.arc.example".to_string()],
+                allowed_actor_kinds: vec![GenericListingActorKind::ToolServer],
+                allowed_admission_classes: vec![GenericTrustAdmissionClass::BondBacked],
+                policy_reference: None,
+            },
+            publication_fee: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            },
+            dispute_fee: MonetaryAmount {
+                units: 2500,
+                currency: "USD".to_string(),
+            },
+            market_participation_fee: MonetaryAmount {
+                units: 500,
+                currency: "USD".to_string(),
+            },
+            bond_requirements: vec![OpenMarketBondRequirement {
+                bond_class: OpenMarketBondClass::Listing,
+                required_amount: MonetaryAmount {
+                    units: 5000,
+                    currency: "USD".to_string(),
+                },
+                collateral_reference_kind: OpenMarketCollateralReferenceKind::CreditBond,
+                slashable: true,
+            }],
+            issued_at: 100,
+            expires_at: Some(200),
+            issued_by: "market@arc.example".to_string(),
+            note: None,
+        }
+        .validate()
+        .expect_err("namespace mismatch rejected");
+
+        assert!(error.contains("namespace must match scope namespace"));
+    }
+
+    #[test]
+    fn open_market_fee_schedule_issue_request_requires_bond_requirements() {
+        let error = OpenMarketFeeScheduleIssueRequest {
+            scope: OpenMarketEconomicsScope {
+                namespace: "https://registry.arc.example".to_string(),
+                allowed_listing_operator_ids: vec!["https://registry.arc.example".to_string()],
+                allowed_actor_kinds: vec![GenericListingActorKind::ToolServer],
+                allowed_admission_classes: vec![GenericTrustAdmissionClass::BondBacked],
+                policy_reference: None,
+            },
+            publication_fee: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            },
+            dispute_fee: MonetaryAmount {
+                units: 2500,
+                currency: "USD".to_string(),
+            },
+            market_participation_fee: MonetaryAmount {
+                units: 500,
+                currency: "USD".to_string(),
+            },
+            bond_requirements: Vec::new(),
+            issued_by: "market@arc.example".to_string(),
+            issued_at: Some(202),
+            expires_at: Some(600),
+            note: None,
+        }
+        .validate()
+        .expect_err("bond requirements required");
+
+        assert!(error.contains("bond_requirements must not be empty"));
+    }
+
+    #[test]
+    fn open_market_penalty_validate_requires_reverse_slash_metadata() {
+        let error = OpenMarketPenaltyArtifact {
+            schema: OPEN_MARKET_PENALTY_ARTIFACT_SCHEMA.to_string(),
+            penalty_id: "penalty-1".to_string(),
+            fee_schedule_id: "fee-1".to_string(),
+            charter_id: "charter-1".to_string(),
+            case_id: "case-1".to_string(),
+            governing_operator_id: "https://registry.arc.example".to_string(),
+            namespace: "https://registry.arc.example".to_string(),
+            listing_id: "listing-demo".to_string(),
+            activation_id: Some("activation-1".to_string()),
+            subject_operator_id: Some("https://registry.arc.example".to_string()),
+            abuse_class: OpenMarketAbuseClass::UnverifiableListingBehavior,
+            bond_class: OpenMarketBondClass::Listing,
+            action: OpenMarketPenaltyAction::ReverseSlash,
+            state: OpenMarketPenaltyState::Enforced,
+            penalty_amount: MonetaryAmount {
+                units: 2500,
+                currency: "USD".to_string(),
+            },
+            opened_at: 100,
+            updated_at: 100,
+            expires_at: Some(200),
+            evidence_refs: vec![OpenMarketEvidenceReference {
+                kind: OpenMarketEvidenceKind::GovernanceCase,
+                reference_id: "case-1".to_string(),
+                uri: None,
+                sha256: None,
+            }],
+            supersedes_penalty_id: None,
+            issued_by: "market@arc.example".to_string(),
+            note: None,
+        }
+        .validate()
+        .expect_err("reverse slash metadata required");
+
+        assert!(error.contains("requires supersedes_penalty_id"));
+    }
+
+    #[test]
+    fn open_market_penalty_issue_request_rejects_invalid_fee_schedule_signature() {
+        let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
+        let owner_id = "https://registry.arc.example";
+        let listing = sample_listing(owner_id, &signing_keypair);
+        let activation = sample_activation(owner_id, &signing_keypair, &listing);
+        let charter = sample_charter(owner_id, &signing_keypair);
+        let governance_case =
+            sample_sanction_case(owner_id, &signing_keypair, &listing, &activation, &charter);
+        let fee_schedule = sample_fee_schedule(owner_id, &signing_keypair);
+        let mut tampered_fee_schedule = fee_schedule.clone();
+        tampered_fee_schedule.body.publication_fee.units += 1;
+
+        let error = sample_penalty_issue_request(
+            owner_id,
+            tampered_fee_schedule,
+            charter,
+            governance_case,
+            listing,
+            Some(activation),
+        )
+        .validate()
+        .expect_err("tampered fee schedule rejected");
+
+        assert!(error.contains("fee schedule signature is invalid"));
+    }
+
+    #[test]
+    fn build_open_market_fee_schedule_artifact_uses_request_issued_at() {
+        let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
+        let owner_id = "https://registry.arc.example";
+        let mut request = OpenMarketFeeScheduleIssueRequest {
+            scope: OpenMarketEconomicsScope {
+                namespace: "https://registry.arc.example".to_string(),
+                allowed_listing_operator_ids: vec![owner_id.to_string()],
+                allowed_actor_kinds: vec![GenericListingActorKind::ToolServer],
+                allowed_admission_classes: vec![GenericTrustAdmissionClass::BondBacked],
+                policy_reference: Some("policy/open-market/default".to_string()),
+            },
+            publication_fee: MonetaryAmount {
+                units: 100,
+                currency: "USD".to_string(),
+            },
+            dispute_fee: MonetaryAmount {
+                units: 2500,
+                currency: "USD".to_string(),
+            },
+            market_participation_fee: MonetaryAmount {
+                units: 500,
+                currency: "USD".to_string(),
+            },
+            bond_requirements: vec![OpenMarketBondRequirement {
+                bond_class: OpenMarketBondClass::Listing,
+                required_amount: MonetaryAmount {
+                    units: 5000,
+                    currency: "USD".to_string(),
+                },
+                collateral_reference_kind: OpenMarketCollateralReferenceKind::CreditBond,
+                slashable: true,
+            }],
+            issued_by: "market@arc.example".to_string(),
+            issued_at: Some(777),
+            expires_at: Some(900),
+            note: None,
+        };
+        let artifact = build_open_market_fee_schedule_artifact(
+            owner_id,
+            Some("Registry Operator".to_string()),
+            &request,
+            202,
+        )
+        .expect("build fee schedule");
+
+        assert_eq!(artifact.issued_at, 777);
+        assert_eq!(artifact.governing_operator_id, owner_id);
+        assert!(artifact.fee_schedule_id.starts_with("market-fee-"));
+        request.issued_at = Some(778);
+        let changed = build_open_market_fee_schedule_artifact(
+            owner_id,
+            Some("Registry Operator".to_string()),
+            &request,
+            202,
+        )
+        .expect("build changed fee schedule");
+        assert_ne!(artifact.fee_schedule_id, changed.fee_schedule_id);
+        let _ = signing_keypair;
+    }
+
+    #[test]
+    fn open_market_evaluation_rejects_invalid_penalty_signature() {
+        let signing_keypair = Keypair::from_seed(&[7_u8; 32]);
+        let owner_id = "https://registry.arc.example";
+        let listing = sample_listing(owner_id, &signing_keypair);
+        let activation = sample_activation(owner_id, &signing_keypair, &listing);
+        let charter = sample_charter(owner_id, &signing_keypair);
+        let governance_case =
+            sample_sanction_case(owner_id, &signing_keypair, &listing, &activation, &charter);
+        let fee_schedule = sample_fee_schedule(owner_id, &signing_keypair);
+        let penalty_artifact = build_open_market_penalty_artifact(
+            owner_id,
+            &sample_penalty_issue_request(
+                owner_id,
+                fee_schedule.clone(),
+                charter.clone(),
+                governance_case.clone(),
+                listing.clone(),
+                Some(activation.clone()),
+            ),
+            204,
+        )
+        .expect("build penalty");
+        let penalty = SignedOpenMarketPenalty::sign(penalty_artifact, &signing_keypair)
+            .expect("sign penalty");
+        let mut tampered_penalty = penalty.clone();
+        tampered_penalty.body.note = Some("tampered".to_string());
+
+        let evaluation = evaluate_open_market_penalty(
+            &OpenMarketPenaltyEvaluationRequest {
+                fee_schedule,
+                listing,
+                current_publisher: sample_publisher(owner_id),
+                activation: Some(activation),
+                charter,
+                case: governance_case,
+                penalty: tampered_penalty,
+                prior_penalty: None,
+                evaluated_at: Some(205),
+            },
+            205,
+        )
+        .expect("evaluate open market");
+
+        assert_eq!(
+            evaluation.findings[0].code,
+            OpenMarketFindingCode::PenaltyUnverifiable
         );
     }
 }

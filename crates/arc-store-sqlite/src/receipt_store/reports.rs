@@ -37,7 +37,7 @@ impl SqliteReceiptStore {
               AND (?5 IS NULL OR r.timestamp <= ?5)
               AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)
         "#;
-        let summary = self.connection.query_row(
+        let summary = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -84,7 +84,7 @@ impl SqliteReceiptStore {
             LIMIT ?7
         "#;
         let by_agent = self
-            .connection
+            .connection()?
             .prepare(by_agent_sql)?
             .query_map(
                 params![
@@ -137,7 +137,7 @@ impl SqliteReceiptStore {
             LIMIT ?7
         "#;
         let by_tool = self
-            .connection
+            .connection()?
             .prepare(by_tool_sql)?
             .query_map(
                 params![
@@ -190,7 +190,7 @@ impl SqliteReceiptStore {
             LIMIT ?8
         "#;
         let by_time = self
-            .connection
+            .connection()?
             .prepare(by_time_sql)?
             .query_map(
                 params![
@@ -261,7 +261,7 @@ impl SqliteReceiptStore {
         "#;
 
         let matching_receipts = self
-            .connection
+            .connection()?
             .query_row(
                 count_sql,
                 params![
@@ -291,7 +291,7 @@ impl SqliteReceiptStore {
         "#;
 
         let rows = self
-            .connection
+            .connection()?
             .prepare(data_sql)?
             .query_map(
                 params![
@@ -496,7 +496,7 @@ impl SqliteReceiptStore {
         let partner = query.partner.as_deref();
 
         let rows = self
-            .connection
+            .connection()?
             .prepare(
                 r#"
                 SELECT r.receipt_id, r.timestamp, r.capability_id, r.decision_kind
@@ -735,7 +735,7 @@ impl SqliteReceiptStore {
             lineage_covered_receipts,
             pending_settlement_receipts,
             failed_settlement_receipts,
-        ) = self.connection.query_row(
+        ) = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -785,7 +785,7 @@ impl SqliteReceiptStore {
         note: Option<&str>,
     ) -> Result<i64, ReceiptStoreError> {
         let exists = self
-            .connection
+            .connection()?
             .query_row(
                 "SELECT 1 FROM arc_tool_receipts WHERE receipt_id = ?1",
                 params![receipt_id],
@@ -799,7 +799,7 @@ impl SqliteReceiptStore {
         }
 
         let updated_at = unix_timestamp_now_i64();
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT INTO settlement_reconciliations (
                 receipt_id,
@@ -831,7 +831,7 @@ impl SqliteReceiptStore {
         note: Option<&str>,
     ) -> Result<i64, ReceiptStoreError> {
         let raw_json = self
-            .connection
+            .connection()?
             .query_row(
                 "SELECT raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
                 params![receipt_id],
@@ -854,7 +854,7 @@ impl SqliteReceiptStore {
         }
 
         let existing_receipt = self
-            .connection
+            .connection()?
             .query_row(
                 r#"
                 SELECT receipt_id
@@ -880,7 +880,7 @@ impl SqliteReceiptStore {
         }
 
         let updated_at = unix_timestamp_now_i64();
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT INTO metered_billing_reconciliations (
                 receipt_id,
@@ -967,7 +967,8 @@ impl SqliteReceiptStore {
             LIMIT ?7
         "#;
 
-        let mut stmt = self.connection.prepare(rows_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(rows_sql)?;
         let rows = stmt.query_map(
             params![
                 capability_id,
@@ -1148,7 +1149,7 @@ impl SqliteReceiptStore {
             failed_receipts,
             actionable_receipts,
             reconciled_receipts,
-        ) = self.connection.query_row(
+        ) = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -1198,7 +1199,8 @@ impl SqliteReceiptStore {
             LIMIT ?7
         "#;
 
-        let mut stmt = self.connection.prepare(rows_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(rows_sql)?;
         let rows = stmt.query_map(
             params![
                 capability_id,
@@ -1361,7 +1363,7 @@ impl SqliteReceiptStore {
             runtime_assurance_receipts,
             call_chain_receipts,
             max_amount_receipts,
-        ) = self.connection.query_row(
+        ) = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -1406,7 +1408,8 @@ impl SqliteReceiptStore {
             ORDER BY r.timestamp DESC, r.seq DESC
         "#;
 
-        let mut stmt = self.connection.prepare(rows_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(rows_sql)?;
         let rows = stmt.query_map(
             params![
                 capability_id,
@@ -1589,7 +1592,7 @@ impl SqliteReceiptStore {
         let mut records = Vec::with_capacity(authorization_context.receipts.len());
 
         for row in authorization_context.receipts {
-            let raw_json = self.connection.query_row(
+            let raw_json = self.connection()?.query_row(
                 "SELECT raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
                 params![row.receipt_id.as_str()],
                 |db_row| db_row.get::<_, String>(0),
@@ -1733,7 +1736,7 @@ impl SqliteReceiptStore {
               AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)
         "#;
 
-        let (settlements, governed_actions) = self.connection.query_row(
+        let (settlements, governed_actions) = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -1778,7 +1781,7 @@ impl SqliteReceiptStore {
               AND (?6 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?6)
         "#;
         let matching_receipts = self
-            .connection
+            .connection()?
             .query_row(
                 count_sql,
                 params![
@@ -1806,7 +1809,8 @@ impl SqliteReceiptStore {
             ORDER BY r.timestamp DESC, r.seq DESC
             LIMIT ?7
         "#;
-        let mut stmt = self.connection.prepare(rows_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(rows_sql)?;
         let rows = stmt.query_map(
             params![
                 capability_id,
@@ -1872,7 +1876,7 @@ impl SqliteReceiptStore {
         "#;
 
         let matching_loss_events = self
-            .connection
+            .connection()?
             .query_row(
                 count_sql,
                 params![
@@ -1909,7 +1913,8 @@ impl SqliteReceiptStore {
             LIMIT ?7
         "#;
 
-        let mut stmt = self.connection.prepare(rows_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(rows_sql)?;
         let rows = stmt.query_map(
             params![
                 capability_id,
@@ -1951,7 +1956,7 @@ impl SqliteReceiptStore {
             .map(|metered| {
                 let evidence = self.load_metered_billing_evidence_record(&receipt.id)?;
                 let reconciliation_state = self
-                    .connection
+                    .connection()?
                     .query_row(
                         r#"
                         SELECT COALESCE(reconciliation_state, 'open')
@@ -1990,7 +1995,7 @@ impl SqliteReceiptStore {
             .map(|metadata| metadata.settlement_status.clone())
             .unwrap_or(SettlementStatus::NotApplicable);
         let reconciliation_state = self
-            .connection
+            .connection()?
             .query_row(
                 r#"
                 SELECT COALESCE(reconciliation_state, 'open')
@@ -2145,7 +2150,7 @@ impl SqliteReceiptStore {
             financial_mismatch_receipts,
             reconciled_receipts,
             actionable_receipts,
-        ) = self.connection.query_row(
+        ) = self.connection()?.query_row(
             summary_sql,
             params![
                 capability_id,
@@ -2187,7 +2192,7 @@ impl SqliteReceiptStore {
         &self,
         receipt_id: &str,
     ) -> Result<Option<MeteredBillingEvidenceRecord>, ReceiptStoreError> {
-        self.connection
+        self.connection()?
             .query_row(
                 r#"
                 SELECT

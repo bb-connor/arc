@@ -1182,6 +1182,35 @@ mod tests {
         }
     }
 
+    fn sample_qualification_matrix() -> ExtensionQualificationMatrix {
+        ExtensionQualificationMatrix {
+            schema: ARC_EXTENSION_QUALIFICATION_MATRIX_SCHEMA.to_string(),
+            official_stack_package_id: "arc.official-stack".to_string(),
+            arc_contract_version: "2.0".to_string(),
+            cases: vec![ExtensionQualificationCase {
+                id: "tool-server-pass".to_string(),
+                name: "Supported tool-server extension remains bounded".to_string(),
+                extension_point_id: "arc.kernel.tool_server_connection".to_string(),
+                supported_component_id: "arc.native-arc-service".to_string(),
+                candidate_extension_id: "sample.tool-server".to_string(),
+                mode: QualificationMode::OfficialToCustom,
+                expected_outcome: QualificationOutcome::Pass,
+                observed_outcome: QualificationOutcome::Pass,
+                rejection_codes: vec![],
+                invariants: vec![
+                    QualificationInvariant::PreservesCanonicalTruth,
+                    QualificationInvariant::RequiresLocalPolicyActivation,
+                ],
+            }],
+        }
+    }
+
+    fn rejection_codes(
+        report: &ExtensionNegotiationReport,
+    ) -> HashSet<ExtensionNegotiationRejectionCode> {
+        report.reasons.iter().map(|reason| reason.code).collect()
+    }
+
     #[test]
     fn rejects_duplicate_inventory_ids() {
         let mut inventory = sample_inventory();
@@ -1195,6 +1224,141 @@ mod tests {
     }
 
     #[test]
+    fn inventory_validation_rejects_remaining_shape_and_guardrail_errors() {
+        let mut inventory = sample_inventory();
+        inventory.schema = "arc.extension-inventory.v9".to_string();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::UnsupportedSchema(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.arc_contract_version.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField("arc_contract_version"))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.canonical_truth.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField("canonical_truth"))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField("extension_points"))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.canonical_truth[0].artifact_schemas.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField(
+                "canonical_truth.artifact_schemas"
+            ))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.canonical_truth[0].extensions_may_write = true;
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.canonical_truth[0]
+            .artifact_schemas
+            .push("arc.receipt.v1".to_string());
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].allowed_isolations.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField(
+                "extension_points.allowed_isolations"
+            ))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].allowed_evidence_modes.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField(
+                "extension_points.allowed_evidence_modes"
+            ))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].allowed_privileges.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField(
+                "extension_points.allowed_privileges"
+            ))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].official_component_ids.clear();
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::MissingField(
+                "extension_points.official_component_ids"
+            ))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0]
+            .allowed_isolations
+            .push(ExtensionIsolation::InProcess);
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0]
+            .allowed_evidence_modes
+            .push(ExtensionEvidenceMode::None);
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0]
+            .allowed_privileges
+            .push(ExtensionPrivilege::FilesystemRead);
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0]
+            .official_component_ids
+            .push("arc.sqlite-receipt-store".to_string());
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[1].allowed_evidence_modes = vec![ExtensionEvidenceMode::None];
+        assert!(matches!(
+            validate_extension_inventory(&inventory),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+    }
+
+    #[test]
     fn accepts_supported_custom_store_extension() {
         let report = negotiate_extension(
             &sample_inventory(),
@@ -1203,6 +1367,292 @@ mod tests {
         );
         assert_eq!(report.outcome, ExtensionNegotiationOutcome::Accepted);
         assert!(report.reasons.is_empty());
+    }
+
+    #[test]
+    fn official_stack_validation_rejects_remaining_reference_and_profile_errors() {
+        let inventory = sample_inventory();
+
+        let mut package = sample_official_stack();
+        package.schema = "arc.official-stack.v9".to_string();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::UnsupportedSchema(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.package_id.clear();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::MissingField(
+                "official_stack.package_id"
+            ))
+        ));
+
+        let mut package = sample_official_stack();
+        package.components.clear();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::MissingField(
+                "official_stack.components"
+            ))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles.clear();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::MissingField(
+                "official_stack.profiles"
+            ))
+        ));
+
+        let mut package = sample_official_stack();
+        package.components[0].extension_point_ids.clear();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::MissingField(
+                "official_stack.components.extension_point_ids"
+            ))
+        ));
+
+        let mut package = sample_official_stack();
+        package.components[0]
+            .extension_point_ids
+            .push("arc.kernel.receipt_store".to_string());
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.components[0].extension_point_ids = vec!["arc.kernel.unknown".to_string()];
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::UnknownReference(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.components[1].id = package.components[0].id.clone();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles[0].component_ids.clear();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::MissingField(
+                "official_stack.profiles.component_ids"
+            ))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles[1].id = package.profiles[0].id.clone();
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles[0]
+            .component_ids
+            .push("arc.sqlite-receipt-store".to_string());
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles[0].component_ids = vec!["arc.unknown-component".to_string()];
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::UnknownReference(_))
+        ));
+
+        let mut package = sample_official_stack();
+        package.profiles[0]
+            .component_ids
+            .push("arc.remote-receipt-store".to_string());
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &package),
+            Err(ExtensionContractError::InvalidProfile(_))
+        ));
+
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0]
+            .official_component_ids
+            .push("arc.unknown-component".to_string());
+        assert!(matches!(
+            validate_official_stack_package(&inventory, &sample_official_stack()),
+            Err(ExtensionContractError::UnknownReference(_))
+        ));
+    }
+
+    #[test]
+    fn manifest_validation_rejects_remaining_shape_and_runtime_guardrails() {
+        let mut manifest = sample_manifest();
+        manifest.schema = "arc.extension-manifest.v9".to_string();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::UnsupportedSchema(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.extension_id.clear();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::MissingField(
+                "extension_manifest.extension_id"
+            ))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.capabilities.clear();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::MissingField(
+                "extension_manifest.capabilities"
+            ))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.supported_profiles.clear();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::MissingField(
+                "extension_manifest.supported_profiles"
+            ))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.capabilities.push("receipt_append".to_string());
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest
+            .supported_profiles
+            .push("shared_control_plane".to_string());
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.compatibility.supported_component_ids.clear();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::MissingField(
+                "extension_manifest.compatibility.supported_component_ids"
+            ))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.compatibility.supported_contract_schemas.clear();
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::MissingField(
+                "extension_manifest.compatibility.supported_contract_schemas"
+            ))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest
+            .compatibility
+            .supported_component_ids
+            .push("arc.remote-receipt-store".to_string());
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest
+            .compatibility
+            .supported_contract_schemas
+            .push("arc.receipt.v1".to_string());
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.compatibility.supported_contract_schemas = vec![
+            "arc.receipt.v1".to_string(),
+            "arc.checkpoint.v1".to_string(),
+        ];
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest
+            .runtime
+            .allowed_privileges
+            .push(ExtensionPrivilege::FilesystemRead);
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.allows_truth_mutation = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.allows_trust_widening = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        manifest.runtime.requires_signer_verification = true;
+        manifest.runtime.requires_freshness_check = true;
+        manifest.runtime.requires_local_policy_activation = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        manifest.runtime.requires_subject_binding = true;
+        manifest.runtime.requires_freshness_check = true;
+        manifest.runtime.requires_local_policy_activation = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        manifest.runtime.requires_subject_binding = true;
+        manifest.runtime.requires_signer_verification = true;
+        manifest.runtime.requires_local_policy_activation = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
+
+        let mut manifest = sample_manifest();
+        manifest.runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        manifest.runtime.requires_subject_binding = true;
+        manifest.runtime.requires_signer_verification = true;
+        manifest.runtime.requires_freshness_check = true;
+        assert!(matches!(
+            validate_extension_manifest(&manifest),
+            Err(ExtensionContractError::InvalidGuardrail(_))
+        ));
     }
 
     #[test]
@@ -1230,6 +1680,73 @@ mod tests {
     }
 
     #[test]
+    fn negotiation_rejects_malformed_and_mismatched_inputs() {
+        let mut inventory = sample_inventory();
+        inventory.canonical_truth.clear();
+        let mut package = sample_official_stack();
+        package.components.clear();
+        let mut manifest = sample_manifest();
+        manifest.capabilities.clear();
+
+        let report = negotiate_extension(&inventory, &package, &manifest);
+        let codes = rejection_codes(&report);
+        assert_eq!(report.outcome, ExtensionNegotiationOutcome::Rejected);
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::MalformedInventory));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::MalformedOfficialStack));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::MalformedManifest));
+
+        let mut manifest = sample_manifest();
+        manifest.compatibility.official_stack_package_id = "arc.other-stack".to_string();
+        manifest.compatibility.arc_contract_version = "9.9".to_string();
+        let report = negotiate_extension(&sample_inventory(), &sample_official_stack(), &manifest);
+        let codes = rejection_codes(&report);
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedOfficialStack));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedArcContract));
+
+        let mut manifest = sample_manifest();
+        manifest.extension_point_id = "arc.kernel.unknown".to_string();
+        let report = negotiate_extension(&sample_inventory(), &sample_official_stack(), &manifest);
+        let codes = rejection_codes(&report);
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnknownExtensionPoint));
+    }
+
+    #[test]
+    fn negotiation_rejects_reserved_and_incompatible_extension_claims() {
+        let mut inventory = sample_inventory();
+        inventory.extension_points[0].custom_implementations_allowed = false;
+        inventory.extension_points[0].stability = ExtensionStability::Internal;
+        let report = negotiate_extension(&inventory, &sample_official_stack(), &sample_manifest());
+        let codes = rejection_codes(&report);
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::OfficialOnlyPoint));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::InternalOnlyPoint));
+
+        let mut manifest = sample_manifest();
+        manifest.supported_profiles = vec!["missing-profile".to_string()];
+        manifest.compatibility.supported_component_ids = vec![
+            "arc.native-arc-service".to_string(),
+            "arc.unknown-component".to_string(),
+        ];
+        manifest.runtime.isolation = ExtensionIsolation::Subprocess;
+        manifest.runtime.evidence_mode = ExtensionEvidenceMode::ImportOnly;
+        manifest
+            .runtime
+            .allowed_privileges
+            .push(ExtensionPrivilege::OperatorSecrets);
+        manifest.runtime.requires_subject_binding = true;
+        manifest.runtime.requires_signer_verification = true;
+        manifest.runtime.requires_freshness_check = true;
+        manifest.runtime.requires_local_policy_activation = true;
+
+        let report = negotiate_extension(&sample_inventory(), &sample_official_stack(), &manifest);
+        let codes = rejection_codes(&report);
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedProfile));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedComponent));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedIsolation));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedEvidenceMode));
+        assert!(codes.contains(&ExtensionNegotiationRejectionCode::UnsupportedPrivilege));
+    }
+
+    #[test]
     fn qualification_matrix_requires_rejection_codes_for_fail_closed_cases() {
         let matrix = ExtensionQualificationMatrix {
             schema: ARC_EXTENSION_QUALIFICATION_MATRIX_SCHEMA.to_string(),
@@ -1248,6 +1765,131 @@ mod tests {
                 invariants: vec![QualificationInvariant::RejectsVersionMismatch],
             }],
         };
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::InvalidQualificationCase(_))
+        ));
+    }
+
+    #[test]
+    fn qualification_matrix_rejects_remaining_shape_and_outcome_errors() {
+        let mut matrix = sample_qualification_matrix();
+        matrix.schema = "arc.extension-qualification-matrix.v9".to_string();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::UnsupportedSchema(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.official_stack_package_id.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.official_stack_package_id"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.arc_contract_version.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.arc_contract_version"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.cases"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].id.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.case.id"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].name.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.case.name"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].extension_point_id.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.case.extension_point_id"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].supported_component_id.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.case.supported_component_id"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].candidate_extension_id.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::MissingField(
+                "qualification_matrix.case.candidate_extension_id"
+            ))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases.push(matrix.cases[0].clone());
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].invariants.clear();
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0]
+            .invariants
+            .push(QualificationInvariant::PreservesCanonicalTruth);
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].expected_outcome = QualificationOutcome::FailClosed;
+        matrix.cases[0].observed_outcome = QualificationOutcome::FailClosed;
+        matrix.cases[0].rejection_codes = vec![
+            ExtensionNegotiationRejectionCode::UnsupportedProfile,
+            ExtensionNegotiationRejectionCode::UnsupportedProfile,
+        ];
+        assert!(matches!(
+            validate_qualification_matrix(&matrix),
+            Err(ExtensionContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].rejection_codes =
+            vec![ExtensionNegotiationRejectionCode::UnsupportedProfile];
         assert!(matches!(
             validate_qualification_matrix(&matrix),
             Err(ExtensionContractError::InvalidQualificationCase(_))

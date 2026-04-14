@@ -2083,3 +2083,927 @@ mod extended_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod attestation_and_telemetry_tests {
+    use super::*;
+    use std::fs;
+    use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use arc_core::capability::{
+        ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, Operation, ToolGrant,
+    };
+    use arc_core::crypto::Keypair;
+    use arc_core::receipt::{
+        ArcReceipt, ArcReceiptBody, ChildRequestReceipt, Decision, GuardEvidence, ToolCallAction,
+    };
+    use arc_kernel::checkpoint::KernelCheckpoint;
+    use arc_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
+    use serde_json::json;
+
+    fn now_secs() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+    }
+
+    fn make_capability_token(
+        issuer: &Keypair,
+        subject: &Keypair,
+        server_id: &str,
+        tool_name: &str,
+        constraints: Vec<Constraint>,
+        issued_at: u64,
+        expires_at: u64,
+    ) -> CapabilityToken {
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: format!("cap-{tool_name}-{issued_at}"),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ArcScope {
+                    grants: vec![ToolGrant {
+                        server_id: server_id.to_string(),
+                        tool_name: tool_name.to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints,
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at,
+                expires_at,
+                delegation_chain: Vec::new(),
+            },
+            issuer,
+        )
+        .expect("capability token should sign")
+    }
+
+    fn make_receipt(
+        signer: &Keypair,
+        id: &str,
+        timestamp: u64,
+        tool_name: &str,
+        decision: Decision,
+        evidence: Vec<GuardEvidence>,
+    ) -> ArcReceipt {
+        ArcReceipt::sign(
+            ArcReceiptBody {
+                id: id.to_string(),
+                timestamp,
+                capability_id: "capability-1".to_string(),
+                tool_server: "acp-proxy".to_string(),
+                tool_name: tool_name.to_string(),
+                action: ToolCallAction {
+                    parameters: json!({"tool": tool_name}),
+                    parameter_hash: "hash-1".to_string(),
+                },
+                decision,
+                content_hash: "content-hash".to_string(),
+                policy_hash: "policy-hash".to_string(),
+                evidence,
+                metadata: None,
+                kernel_key: signer.public_key(),
+            },
+            signer,
+        )
+        .expect("receipt should sign")
+    }
+
+    fn make_audit_entry(tool_call_id: &str, session_id: &str) -> AcpToolCallAuditEntry {
+        AcpToolCallAuditEntry {
+            tool_call_id: tool_call_id.to_string(),
+            title: "Test tool".to_string(),
+            kind: Some("terminal".to_string()),
+            status: "completed".to_string(),
+            session_id: session_id.to_string(),
+            timestamp: now_secs().to_string(),
+            server_id: "acp-proxy".to_string(),
+            content_hash: format!("hash-{tool_call_id}"),
+        }
+    }
+
+    #[derive(Default)]
+    struct MockStoreState {
+        appended_receipts: Vec<ArcReceipt>,
+        canonical_ranges: Vec<(u64, u64)>,
+        checkpoints: Vec<KernelCheckpoint>,
+        return_empty_bytes: bool,
+    }
+
+    struct MockReceiptStore {
+        state: Arc<Mutex<MockStoreState>>,
+        supports_checkpoints: bool,
+    }
+
+    impl ReceiptStore for MockReceiptStore {
+        fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+            let mut state = self.state.lock().expect("mock store lock should hold");
+            state.appended_receipts.push(receipt.clone());
+            Ok(())
+        }
+
+        fn append_child_receipt(
+            &mut self,
+            _receipt: &ChildRequestReceipt,
+        ) -> Result<(), ReceiptStoreError> {
+            Ok(())
+        }
+
+        fn receipts_canonical_bytes_range(
+            &self,
+            start_seq: u64,
+            end_seq: u64,
+        ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+            let mut state = self.state.lock().expect("mock store lock should hold");
+            state.canonical_ranges.push((start_seq, end_seq));
+            if state.return_empty_bytes {
+                return Ok(Vec::new());
+            }
+
+            Ok(state
+                .appended_receipts
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, receipt)| {
+                    let seq = idx as u64;
+                    ((start_seq..end_seq).contains(&seq))
+                        .then(|| (seq, receipt.id.as_bytes().to_vec()))
+                })
+                .collect())
+        }
+
+        fn store_checkpoint(
+            &mut self,
+            checkpoint: &KernelCheckpoint,
+        ) -> Result<(), ReceiptStoreError> {
+            let mut state = self.state.lock().expect("mock store lock should hold");
+            state.checkpoints.push(checkpoint.clone());
+            Ok(())
+        }
+
+        fn supports_kernel_signed_checkpoints(&self) -> bool {
+            self.supports_checkpoints
+        }
+    }
+
+    struct DummySigner(Keypair);
+
+    impl ReceiptSigner for DummySigner {
+        fn sign_acp_receipt(
+            &self,
+            request: &AcpReceiptRequest,
+        ) -> Result<ArcReceipt, ReceiptSignError> {
+            Ok(make_receipt(
+                &self.0,
+                &format!("signed-{}", request.audit_entry.tool_call_id),
+                now_secs(),
+                &request.tool_name,
+                Decision::Allow,
+                Vec::new(),
+            ))
+        }
+    }
+
+    struct DummyChecker;
+
+    impl CapabilityChecker for DummyChecker {
+        fn check_access(
+            &self,
+            request: &AcpCapabilityRequest,
+        ) -> Result<AcpVerdict, CapabilityCheckError> {
+            Ok(AcpVerdict {
+                allowed: true,
+                capability_id: Some(format!("cap:{}", request.session_id)),
+                reason: "dummy allow".to_string(),
+            })
+        }
+    }
+
+    #[test]
+    fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
+        let kernel = Keypair::generate();
+        let checker = KernelCapabilityChecker::new(kernel.public_key(), "proxy-server");
+        let request = AcpCapabilityRequest {
+            session_id: "session-1".to_string(),
+            operation: "fs_read".to_string(),
+            resource: "/workspace/src/lib.rs".to_string(),
+            token: None,
+        };
+
+        let verdict = checker.check_access(&request).expect("check should succeed");
+        assert!(!verdict.allowed);
+        assert_eq!(verdict.reason, "no capability token presented");
+
+        let malformed = AcpCapabilityRequest {
+            token: Some("{".to_string()),
+            ..request
+        };
+        let verdict = checker
+            .check_access(&malformed)
+            .expect("malformed token should fail closed");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("failed to parse token"));
+    }
+
+    #[test]
+    fn kernel_capability_checker_enforces_time_bounds_and_scope() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let now = now_secs();
+        let checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+
+        let valid = make_capability_token(
+            &issuer,
+            &subject,
+            "proxy-server",
+            "fs/read_text_file",
+            vec![Constraint::PathPrefix("/workspace".to_string())],
+            now.saturating_sub(60),
+            now + 3600,
+        );
+        let request = AcpCapabilityRequest {
+            session_id: "session-1".to_string(),
+            operation: "fs_read".to_string(),
+            resource: "/workspace/src/lib.rs".to_string(),
+            token: Some(serde_json::to_string(&valid).expect("token should serialize")),
+        };
+
+        let verdict = checker.check_access(&request).expect("check should succeed");
+        assert!(verdict.allowed);
+        assert_eq!(verdict.capability_id.as_deref(), Some(valid.id.as_str()));
+
+        let out_of_scope = AcpCapabilityRequest {
+            resource: "/tmp/escape.txt".to_string(),
+            ..request.clone()
+        };
+        let verdict = checker
+            .check_access(&out_of_scope)
+            .expect("scope mismatch should deny");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("token scope does not cover"));
+
+        let future_token = make_capability_token(
+            &issuer,
+            &subject,
+            "proxy-server",
+            "fs/read_text_file",
+            vec![Constraint::PathPrefix("/workspace".to_string())],
+            now + 600,
+            now + 3600,
+        );
+        let future_request = AcpCapabilityRequest {
+            token: Some(
+                serde_json::to_string(&future_token).expect("future token should serialize"),
+            ),
+            ..request.clone()
+        };
+        let verdict = checker
+            .check_access(&future_request)
+            .expect("future token should fail closed");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("token not yet valid"));
+
+        let expired_token = make_capability_token(
+            &issuer,
+            &subject,
+            "proxy-server",
+            "fs/read_text_file",
+            vec![Constraint::PathPrefix("/workspace".to_string())],
+            now.saturating_sub(600),
+            now.saturating_sub(1),
+        );
+        let expired_request = AcpCapabilityRequest {
+            token: Some(
+                serde_json::to_string(&expired_token).expect("expired token should serialize"),
+            ),
+            ..request
+        };
+        let verdict = checker
+            .check_access(&expired_request)
+            .expect("expired token should fail closed");
+        assert!(!verdict.allowed);
+        assert!(verdict.reason.contains("capability expired"));
+    }
+
+    #[test]
+    fn kernel_capability_checker_supports_wildcard_terminal_grants() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let now = now_secs();
+        let checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+        let token = make_capability_token(
+            &issuer,
+            &subject,
+            "*",
+            "terminal/*",
+            Vec::new(),
+            now.saturating_sub(30),
+            now + 3600,
+        );
+        let request = AcpCapabilityRequest {
+            session_id: "session-2".to_string(),
+            operation: "terminal".to_string(),
+            resource: "cargo".to_string(),
+            token: Some(serde_json::to_string(&token).expect("token should serialize")),
+        };
+
+        let verdict = checker.check_access(&request).expect("check should succeed");
+        assert!(verdict.allowed);
+        assert_eq!(verdict.reason, "capability token authorized access");
+    }
+
+    #[test]
+    fn compliance_certificate_rejects_empty_invalid_and_non_compliant_receipts() {
+        let signer = Keypair::generate();
+        let now = now_secs();
+        let config = ComplianceConfig {
+            budget_limit: 4,
+            required_guards: vec!["fs_guard".to_string()],
+            authorized_scopes: vec!["fs/".to_string()],
+        };
+
+        let empty = generate_compliance_certificate("session-empty", &[], &config, &signer);
+        assert!(matches!(
+            empty,
+            Err(ComplianceCertificateError::EmptySession(ref id)) if id == "session-empty"
+        ));
+
+        let mut invalid_receipt = make_receipt(
+            &signer,
+            "receipt-invalid",
+            now,
+            "fs/read_text_file",
+            Decision::Allow,
+            vec![GuardEvidence {
+                guard_name: "fs_guard".to_string(),
+                verdict: true,
+                details: Some("ok".to_string()),
+            }],
+        );
+        invalid_receipt.tool_name = "tampered".to_string();
+        let invalid_entries = vec![ComplianceReceiptEntry {
+            receipt: invalid_receipt,
+            seq: 0,
+        }];
+        let invalid = generate_compliance_certificate(
+            "session-invalid",
+            &invalid_entries,
+            &config,
+            &signer,
+        );
+        assert!(matches!(
+            invalid,
+            Err(ComplianceCertificateError::InvalidReceiptSignature { .. })
+        ));
+
+        let gap_entries = vec![
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer,
+                    "receipt-gap-1",
+                    now,
+                    "fs/read_text_file",
+                    Decision::Allow,
+                    vec![GuardEvidence {
+                        guard_name: "fs_guard".to_string(),
+                        verdict: true,
+                        details: None,
+                    }],
+                ),
+                seq: 0,
+            },
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer,
+                    "receipt-gap-2",
+                    now + 1,
+                    "fs/read_text_file",
+                    Decision::Allow,
+                    vec![GuardEvidence {
+                        guard_name: "fs_guard".to_string(),
+                        verdict: true,
+                        details: None,
+                    }],
+                ),
+                seq: 2,
+            },
+        ];
+        let gap = generate_compliance_certificate("session-gap", &gap_entries, &config, &signer);
+        assert!(matches!(
+            gap,
+            Err(ComplianceCertificateError::ChainDiscontinuity {
+                expected: 1,
+                found: 2
+            })
+        ));
+
+        let scope_entries = vec![ComplianceReceiptEntry {
+            receipt: make_receipt(
+                &signer,
+                "receipt-scope",
+                now,
+                "terminal/create",
+                Decision::Allow,
+                vec![GuardEvidence {
+                    guard_name: "fs_guard".to_string(),
+                    verdict: true,
+                    details: None,
+                }],
+            ),
+            seq: 0,
+        }];
+        let scope = generate_compliance_certificate(
+            "session-scope",
+            &scope_entries,
+            &config,
+            &signer,
+        );
+        assert!(matches!(
+            scope,
+            Err(ComplianceCertificateError::ScopeViolation { .. })
+        ));
+
+        let budget_entries = (0..5)
+            .map(|idx| ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer,
+                    &format!("receipt-budget-{idx}"),
+                    now + idx,
+                    "fs/read_text_file",
+                    Decision::Allow,
+                    vec![GuardEvidence {
+                        guard_name: "fs_guard".to_string(),
+                        verdict: true,
+                        details: None,
+                    }],
+                ),
+                seq: idx,
+            })
+            .collect::<Vec<_>>();
+        let budget = generate_compliance_certificate(
+            "session-budget",
+            &budget_entries,
+            &config,
+            &signer,
+        );
+        assert!(matches!(
+            budget,
+            Err(ComplianceCertificateError::BudgetExceeded { used: 5, limit: 4 })
+        ));
+
+        let guard_entries = vec![ComplianceReceiptEntry {
+            receipt: make_receipt(
+                &signer,
+                "receipt-guard",
+                now,
+                "fs/read_text_file",
+                Decision::Allow,
+                Vec::new(),
+            ),
+            seq: 0,
+        }];
+        let guard = generate_compliance_certificate(
+            "session-guard",
+            &guard_entries,
+            &config,
+            &signer,
+        );
+        assert!(matches!(
+            guard,
+            Err(ComplianceCertificateError::GuardBypass { .. })
+        ));
+    }
+
+    #[test]
+    fn compliance_certificate_round_trips_and_detects_full_bundle_tampering() {
+        let signer = Keypair::generate();
+        let now = now_secs();
+        let receipts = vec![
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer,
+                    "receipt-1",
+                    now,
+                    "fs/read_text_file",
+                    Decision::Allow,
+                    vec![GuardEvidence {
+                        guard_name: "fs_guard".to_string(),
+                        verdict: true,
+                        details: Some("read ok".to_string()),
+                    }],
+                ),
+                seq: 0,
+            },
+            ComplianceReceiptEntry {
+                receipt: make_receipt(
+                    &signer,
+                    "receipt-2",
+                    now + 1,
+                    "fs/write_text_file",
+                    Decision::Allow,
+                    vec![GuardEvidence {
+                        guard_name: "fs_guard".to_string(),
+                        verdict: true,
+                        details: Some("write ok".to_string()),
+                    }],
+                ),
+                seq: 1,
+            },
+        ];
+        let config = ComplianceConfig {
+            budget_limit: 2,
+            required_guards: vec!["fs_guard".to_string()],
+            authorized_scopes: vec!["fs/".to_string()],
+        };
+
+        let cert = generate_compliance_certificate("session-good", &receipts, &config, &signer)
+            .expect("certificate should generate");
+
+        let lightweight = verify_compliance_certificate(
+            &cert,
+            VerificationMode::Lightweight,
+            Some(&receipts),
+        );
+        assert!(lightweight.passed);
+        assert!(lightweight.certificate_signature_valid);
+        assert_eq!(lightweight.summary, "lightweight verification passed");
+
+        let full_bundle = verify_compliance_certificate(
+            &cert,
+            VerificationMode::FullBundle,
+            Some(&receipts),
+        );
+        assert!(full_bundle.passed);
+        assert_eq!(full_bundle.receipts_reverified, 2);
+        assert_eq!(full_bundle.receipt_failures, 0);
+
+        let mut tampered_entries = receipts.clone();
+        tampered_entries[1].receipt.tool_name = "fs/tampered".to_string();
+        let tampered = verify_compliance_certificate(
+            &cert,
+            VerificationMode::FullBundle,
+            Some(&tampered_entries),
+        );
+        assert!(!tampered.passed);
+        assert_eq!(tampered.receipts_reverified, 2);
+        assert_eq!(tampered.receipt_failures, 1);
+        assert!(tampered.summary.contains("1 receipt signature(s) failed"));
+
+        let mut inconsistent_cert = cert.clone();
+        inconsistent_cert.body.anomalies.push("missing guard".to_string());
+        let body_bytes = arc_core::canonical::canonical_json_bytes(&inconsistent_cert.body)
+            .expect("certificate body should serialize");
+        inconsistent_cert.signature = signer.sign(&body_bytes);
+        let inconsistent = verify_compliance_certificate(
+            &inconsistent_cert,
+            VerificationMode::Lightweight,
+            None,
+        );
+        assert!(!inconsistent.passed);
+        assert!(inconsistent.certificate_signature_valid);
+        assert!(!inconsistent.body_consistent);
+    }
+
+    #[test]
+    fn kernel_receipt_signer_appends_and_checkpoints_batches() {
+        let keypair = Keypair::generate();
+        let shared = Arc::new(Mutex::new(MockStoreState::default()));
+        let store = MockReceiptStore {
+            state: Arc::clone(&shared),
+            supports_checkpoints: true,
+        };
+        let signer = KernelReceiptSigner::new(
+            keypair.clone(),
+            "proxy-server",
+            Box::new(store),
+            2,
+        );
+
+        let request_a = AcpReceiptRequest {
+            audit_entry: make_audit_entry("call-a", "session-1"),
+            tool_server: "proxy-server".to_string(),
+            tool_name: "terminal/create".to_string(),
+        };
+        let request_b = AcpReceiptRequest {
+            audit_entry: make_audit_entry("call-b", "session-1"),
+            tool_server: "proxy-server".to_string(),
+            tool_name: "terminal/create".to_string(),
+        };
+
+        let receipt_a = signer
+            .sign_acp_receipt(&request_a)
+            .expect("first receipt should sign");
+        assert!(receipt_a.verify_signature().expect("signature should verify"));
+
+        let receipt_b = signer
+            .sign_acp_receipt(&request_b)
+            .expect("second receipt should sign");
+        assert!(receipt_b.verify_signature().expect("signature should verify"));
+
+        let state = shared.lock().expect("shared state should lock");
+        assert_eq!(state.appended_receipts.len(), 2);
+        assert_eq!(state.canonical_ranges, vec![(0, 2)]);
+        assert_eq!(state.checkpoints.len(), 1);
+        assert_eq!(state.checkpoints[0].body.batch_start_seq, 0);
+        assert_eq!(state.checkpoints[0].body.batch_end_seq, 1);
+        assert_eq!(state.checkpoints[0].body.tree_size, 2);
+    }
+
+    #[test]
+    fn kernel_receipt_signer_skips_unsupported_or_empty_checkpoint_batches() {
+        let keypair = Keypair::generate();
+
+        let unsupported_state = Arc::new(Mutex::new(MockStoreState::default()));
+        let unsupported_store = MockReceiptStore {
+            state: Arc::clone(&unsupported_state),
+            supports_checkpoints: false,
+        };
+        let unsupported_signer = KernelReceiptSigner::new(
+            keypair.clone(),
+            "proxy-server",
+            Box::new(unsupported_store),
+            1,
+        );
+        unsupported_signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: make_audit_entry("unsupported", "session-unsupported"),
+                tool_server: "proxy-server".to_string(),
+                tool_name: "terminal/create".to_string(),
+            })
+            .expect("receipt should sign");
+        let state = unsupported_state.lock().expect("shared state should lock");
+        assert_eq!(state.appended_receipts.len(), 1);
+        assert!(state.checkpoints.is_empty());
+        drop(state);
+
+        let empty_state = Arc::new(Mutex::new(MockStoreState {
+            return_empty_bytes: true,
+            ..MockStoreState::default()
+        }));
+        let empty_store = MockReceiptStore {
+            state: Arc::clone(&empty_state),
+            supports_checkpoints: true,
+        };
+        let empty_signer =
+            KernelReceiptSigner::new(keypair, "proxy-server", Box::new(empty_store), 1);
+        empty_signer
+            .sign_acp_receipt(&AcpReceiptRequest {
+                audit_entry: make_audit_entry("empty", "session-empty"),
+                tool_server: "proxy-server".to_string(),
+                tool_name: "terminal/create".to_string(),
+            })
+            .expect("receipt should sign");
+        let state = empty_state.lock().expect("shared state should lock");
+        assert_eq!(state.appended_receipts.len(), 1);
+        assert_eq!(state.canonical_ranges, vec![(0, 1)]);
+        assert!(state.checkpoints.is_empty());
+    }
+
+    #[test]
+    fn telemetry_helpers_map_receipts_and_certificates() {
+        let signer = Keypair::generate();
+        let receipt = make_receipt(
+            &signer,
+            "receipt-telemetry",
+            123,
+            "fs/write_text_file",
+            Decision::Deny {
+                reason: "blocked".to_string(),
+                guard: "fs_guard".to_string(),
+            },
+            vec![GuardEvidence {
+                guard_name: "fs_guard".to_string(),
+                verdict: false,
+                details: Some("denied".to_string()),
+            }],
+        );
+        let trace_id = derive_trace_id("session-telemetry");
+        let span = receipt_to_span(&receipt, &trace_id);
+
+        assert_eq!(trace_id.len(), 32);
+        assert_eq!(span.trace_id, trace_id);
+        assert_eq!(span.span_id.len(), 16);
+        assert_eq!(span.tool_name, "fs/write_text_file");
+        assert_eq!(span.verdict, "deny");
+        assert_eq!(span.start_time_nanos, 123_000_000_000);
+        assert_eq!(span.events.len(), 1);
+        assert!(
+            span.attributes
+                .iter()
+                .any(|attr| attr.key == "arc.deny_reason" && attr.value == "blocked")
+        );
+        assert_eq!(span.events[0].name, "guard.fs_guard");
+
+        let cert_body = ComplianceCertificateBody {
+            schema: COMPLIANCE_CERTIFICATE_SCHEMA.to_string(),
+            session_id: "session-telemetry".to_string(),
+            issued_at: 456,
+            receipt_count: 2,
+            first_receipt_at: 123,
+            last_receipt_at: 124,
+            all_signatures_valid: true,
+            chain_continuous: true,
+            scope_compliant: true,
+            budget_compliant: true,
+            guards_compliant: true,
+            anomalies: Vec::new(),
+            kernel_key: signer.public_key(),
+        };
+        let cert_event = compliance_certificate_event(&cert_body);
+        assert_eq!(cert_event.name, "arc.compliance.certificate");
+        assert_eq!(cert_event.timestamp_nanos, 456_000_000_000);
+        assert!(
+            cert_event
+                .attributes
+                .iter()
+                .any(|attr| attr.key == "cert.receipt_count" && attr.value == "2")
+        );
+
+        let root = session_root_span("session-telemetry", &trace_id, 100, 200);
+        assert_eq!(root.tool_name, "arc.session");
+        assert_eq!(root.verdict, "session");
+        assert_eq!(root.start_time_nanos, 100_000_000_000);
+        assert_eq!(root.end_time_nanos, 200_000_000_000);
+
+        let config = TelemetryConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.service_name, "arc-acp-proxy");
+    }
+
+    #[test]
+    fn telemetry_exporters_write_and_fail_cleanly() {
+        let span = ReceiptSpan {
+            trace_id: derive_trace_id("session-export"),
+            span_id: "0123456789abcdef".to_string(),
+            parent_span_id: String::new(),
+            tool_name: "terminal/create".to_string(),
+            verdict: "allow".to_string(),
+            capability_id: "capability-1".to_string(),
+            start_time_nanos: 1,
+            end_time_nanos: 1,
+            attributes: vec![SpanAttribute {
+                key: "arc.test".to_string(),
+                value: "true".to_string(),
+            }],
+            events: Vec::new(),
+        };
+
+        let logger = LoggingSpanExporter;
+        assert_eq!(
+            logger.export(std::slice::from_ref(&span)).expect("logging export should work"),
+            1
+        );
+        logger.flush().expect("flush should succeed");
+        logger.shutdown().expect("shutdown should succeed");
+
+        let output_path = std::env::temp_dir().join(format!(
+            "arc-acp-proxy-telemetry-{}.jsonl",
+            now_secs()
+        ));
+        let exporter = JsonFileExporter::new(output_path.to_string_lossy().into_owned());
+        assert_eq!(
+            exporter
+                .export(std::slice::from_ref(&span))
+                .expect("json export should work"),
+            1
+        );
+        exporter.flush().expect("flush should succeed");
+        exporter.shutdown().expect("shutdown should succeed");
+
+        let contents = fs::read_to_string(&output_path).expect("jsonl output should exist");
+        assert!(contents.contains("\"toolName\":\"terminal/create\""));
+        let _ = fs::remove_file(&output_path);
+
+        let bad_exporter = JsonFileExporter::new(std::env::temp_dir().to_string_lossy().into_owned());
+        let error = bad_exporter
+            .export(std::slice::from_ref(&span))
+            .expect_err("directory path should fail");
+        assert!(matches!(error, TelemetryExportError::ExportFailed(_)));
+    }
+
+    #[test]
+    fn transport_round_trips_json_and_lifecycle() {
+        let mut transport = AcpTransport::spawn(
+            "sh",
+            &["-c".to_string(), "cat".to_string()],
+            &[("ARC_PROXY_TEST_ENV".to_string(), "1".to_string())],
+        )
+        .expect("transport should spawn");
+
+        let message = json!({
+            "jsonrpc": "2.0",
+            "method": "ping",
+            "params": {"ok": true}
+        });
+        transport.send(&message).expect("send should succeed");
+        let received = transport.recv().expect("recv should succeed");
+        assert_eq!(received, Some(message));
+
+        transport.kill().expect("kill should succeed");
+        let status = transport.wait().expect("wait should succeed");
+        assert!(status.is_none());
+    }
+
+    #[test]
+    fn transport_handles_eof_and_invalid_json() {
+        let mut eof_transport = AcpTransport::spawn(
+            "sh",
+            &["-c".to_string(), "exit 0".to_string()],
+            &[],
+        )
+        .expect("transport should spawn");
+        assert_eq!(eof_transport.recv().expect("recv should succeed"), None);
+        assert_eq!(eof_transport.wait().expect("wait should succeed"), Some(0));
+
+        let mut invalid_transport = AcpTransport::spawn(
+            "sh",
+            &["-c".to_string(), "printf 'not-json\\n'".to_string()],
+            &[],
+        )
+        .expect("transport should spawn");
+        let error = invalid_transport
+            .recv()
+            .expect_err("invalid json should return protocol error");
+        assert!(matches!(error, AcpProxyError::Protocol(_)));
+        assert_eq!(invalid_transport.wait().expect("wait should succeed"), Some(0));
+    }
+
+    #[test]
+    fn proxy_with_kernel_wraps_transport_and_interceptor() {
+        let config = AcpProxyConfig::new("sh", "deadbeef")
+            .with_agent_args(vec!["-c".to_string(), "cat".to_string()])
+            .with_allowed_path_prefix("/workspace")
+            .with_allowed_command("cargo")
+            .with_server_id("proxy-test");
+
+        let mut proxy = AcpProxy::start_with_kernel(
+            config.clone(),
+            Some(Box::new(DummySigner(Keypair::generate()))),
+            Some(Box::new(DummyChecker)),
+            AcpAttestationMode::Required,
+        )
+        .expect("proxy should start");
+
+        assert_eq!(proxy.config().server_id(), "proxy-test");
+        let _ = proxy.interceptor();
+
+        let client_message = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        });
+        match proxy
+            .process_client_message(&client_message)
+            .expect("client message should process")
+        {
+            InterceptResult::Forward(value) => assert_eq!(value, client_message),
+            other => panic!("expected Forward, got {:?}", other),
+        }
+
+        let agent_message = json!({
+            "jsonrpc": "2.0",
+            "method": "session/update",
+            "params": {
+                "sessionId": "s1",
+                "update": {
+                    "toolCallId": "tool-1",
+                    "title": "Build",
+                    "kind": "terminal",
+                    "status": "running"
+                }
+            }
+        });
+        match proxy
+            .process_agent_message(&agent_message)
+            .expect("agent message should process")
+        {
+            InterceptResult::ForwardWithReceipt(value, receipt) => {
+                assert_eq!(value, agent_message);
+                assert_eq!(receipt.tool_call_id, "tool-1");
+            }
+            other => panic!("expected ForwardWithReceipt, got {:?}", other),
+        }
+
+        let echoed = json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "echo",
+            "params": {"value": 1}
+        });
+        proxy.send_to_agent(&echoed).expect("send should succeed");
+        let received = proxy.recv_from_agent().expect("recv should succeed");
+        assert_eq!(received, Some(echoed));
+
+        proxy.shutdown().expect("shutdown should succeed");
+    }
+}

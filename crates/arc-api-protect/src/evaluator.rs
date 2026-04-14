@@ -336,8 +336,14 @@ mod tests {
 
     #[test]
     fn path_matching_multiple_params() {
-        assert!(path_matches_pattern("/orgs/123/members/456", "/orgs/{orgId}/members/{memberId}"));
-        assert!(!path_matches_pattern("/orgs/123/members", "/orgs/{orgId}/members/{memberId}"));
+        assert!(path_matches_pattern(
+            "/orgs/123/members/456",
+            "/orgs/{orgId}/members/{memberId}"
+        ));
+        assert!(!path_matches_pattern(
+            "/orgs/123/members",
+            "/orgs/{orgId}/members/{memberId}"
+        ));
     }
 
     #[test]

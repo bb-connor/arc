@@ -909,21 +909,21 @@ mod tests {
                 ARC_PUBLIC_IDENTITY_PROFILE_SCHEMA,
                 "pip-1",
                 "arc",
-                'g',
+                'a',
             ),
             directory_entry_ref: sample_reference(
                 IdentityArtifactKind::PublicWalletDirectoryEntry,
                 ARC_PUBLIC_WALLET_DIRECTORY_ENTRY_SCHEMA,
                 "wde-1",
                 "wallet-operator-1",
-                'h',
+                'b',
             ),
             routing_manifest_ref: sample_reference(
                 IdentityArtifactKind::PublicWalletRoutingManifest,
                 ARC_PUBLIC_WALLET_ROUTING_MANIFEST_SCHEMA,
                 "wrm-1",
                 "wallet-operator-1",
-                'i',
+                'c',
             ),
             cases: vec![
                 IdentityInteropQualificationCase {
@@ -979,6 +979,132 @@ mod tests {
     }
 
     #[test]
+    fn profile_validation_rejects_remaining_schema_reference_and_policy_errors() {
+        let mut profile = sample_profile();
+        profile.schema = "arc.public-identity-profile.v9".to_string();
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::UnsupportedSchema(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.profile_id.clear();
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::MissingField("profile_id"))
+        ));
+
+        let mut profile = sample_profile();
+        profile
+            .supported_subject_methods
+            .push(IdentityDidMethod::DidArc);
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile
+            .supported_credential_families
+            .push(IdentityCredentialFamily::DcSdJwt);
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile
+            .supported_proof_families
+            .push(IdentityProofFamily::DcSdJwt);
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile
+            .supported_transports
+            .push(WalletTransportMode::Oid4vpRelay);
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.basis_refs.clear();
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::MissingField("basis_refs"))
+        ));
+
+        let mut profile = sample_profile();
+        profile.binding_policy.requires_arc_issuer_provenance = false;
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile
+            .binding_policy
+            .requires_same_subject_across_credentials = false;
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.binding_policy.manual_subject_rebinding_required = false;
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.binding_policy.unsupported_mappings_fail_closed = false;
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.supported_subject_methods = vec![IdentityDidMethod::DidWeb];
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.supported_credential_families = vec![IdentityCredentialFamily::DcSdJwt];
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.supported_credential_families =
+            vec![IdentityCredentialFamily::ArcAgentPassportJson];
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.basis_refs.remove(0);
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidProfile(_))
+        ));
+
+        let mut profile = sample_profile();
+        profile.basis_refs[0].sha256 = "abcd".to_string();
+        assert!(matches!(
+            validate_public_identity_profile(&profile),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+    }
+
+    #[test]
     fn profile_requires_arc_anchor_and_broader_support() {
         let mut profile = sample_profile();
         profile.binding_policy.requires_arc_subject_provenance = false;
@@ -1012,6 +1138,97 @@ mod tests {
     }
 
     #[test]
+    fn wallet_directory_validation_rejects_remaining_reference_url_and_guardrail_errors() {
+        let mut entry = sample_directory_entry();
+        entry.schema = "arc.public-wallet-directory-entry.v9".to_string();
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::UnsupportedSchema(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.entry_id.clear();
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::MissingField("entry_id"))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry
+            .supported_subject_methods
+            .push(IdentityDidMethod::DidArc);
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.discovery_ref.kind = IdentityArtifactKind::PublicIdentityProfile;
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.profile_ref.kind = IdentityArtifactKind::PortableTrustProfile;
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.metadata_url = "http://wallet.example/metadata".to_string();
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.request_uri_prefix = "https://".to_string();
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry
+            .lookup_guardrails
+            .requires_manual_subject_binding_review = false;
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.lookup_guardrails.reject_ambient_directory_trust = false;
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.lookup_guardrails.fail_closed_on_unknown_wallet_family = false;
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.supported_subject_methods = vec![IdentityDidMethod::DidArc];
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+
+        let mut entry = sample_directory_entry();
+        entry.supported_credential_families = vec![IdentityCredentialFamily::ArcAgentPassportJson];
+        assert!(matches!(
+            validate_public_wallet_directory_entry(&entry),
+            Err(IdentityNetworkContractError::InvalidDirectoryEntry(_))
+        ));
+    }
+
+    #[test]
     fn routing_manifest_requires_all_transports() {
         let mut manifest = sample_routing_manifest();
         manifest.transport_modes = vec![
@@ -1027,11 +1244,276 @@ mod tests {
     }
 
     #[test]
+    fn routing_manifest_validation_rejects_remaining_guardrails_and_reference_errors() {
+        let mut manifest = sample_routing_manifest();
+        manifest.schema = "arc.public-wallet-routing-manifest.v9".to_string();
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::UnsupportedSchema(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.route_id.clear();
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::MissingField("route_id"))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.directory_entry_ref.kind = IdentityArtifactKind::PublicIdentityProfile;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.verifier_id = "not-a-url".to_string();
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.response_uri_prefix = "http://verifier.example.com/response".to_string();
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.relay_url = "https://".to_string();
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.routing_guardrails.requires_replay_safe_exchange = false;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.routing_guardrails.fail_closed_on_subject_mismatch = false;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest
+            .routing_guardrails
+            .fail_closed_on_cross_operator_issuer_mismatch = false;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.requires_signed_request_object = false;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+
+        let mut manifest = sample_routing_manifest();
+        manifest.requires_replay_anchors = false;
+        assert!(matches!(
+            validate_public_wallet_routing_manifest(&manifest),
+            Err(IdentityNetworkContractError::InvalidRouting(_))
+        ));
+    }
+
+    #[test]
     fn qualification_matrix_requires_requirement_coverage() {
         let mut matrix = sample_matrix();
         matrix.cases.pop();
         validate_identity_interop_qualification_matrix(&matrix)
             .expect_err("missing requirement coverage");
+    }
+
+    #[test]
+    fn qualification_matrix_rejects_remaining_reference_and_case_errors() {
+        let mut matrix = sample_matrix();
+        matrix.schema = "arc.identity-interop-qualification-matrix.v9".to_string();
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::UnsupportedSchema(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.profile_ref.kind = IdentityArtifactKind::PublicWalletDirectoryEntry;
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.directory_entry_ref.kind = IdentityArtifactKind::PortableTrustProfile;
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.routing_manifest_ref.kind = IdentityArtifactKind::PublicIdentityProfile;
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases.clear();
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::MissingField("cases"))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases[0].id.clear();
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::MissingField("case.id"))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases[0].name.clear();
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::MissingField("case.name"))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases[0].observed_outcome = IdentityQualificationOutcome::Pass;
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases[0].requirement_ids.push("IDMAX-01".to_string());
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases[0].notes.push(" ".to_string());
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::MissingField("case.notes"))
+        ));
+
+        let mut matrix = sample_matrix();
+        matrix.cases.push(matrix.cases[0].clone());
+        assert!(matches!(
+            validate_identity_interop_qualification_matrix(&matrix),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+    }
+
+    #[test]
+    fn identity_helper_validators_cover_remaining_reference_edges() {
+        let mut reference = sample_reference(
+            IdentityArtifactKind::PublicIdentityProfile,
+            ARC_PUBLIC_IDENTITY_PROFILE_SCHEMA,
+            "pip-1",
+            "arc",
+            'j',
+        );
+        reference.schema.clear();
+        assert!(matches!(
+            validate_identity_artifact_reference(&reference),
+            Err(IdentityNetworkContractError::MissingField(
+                "reference.schema"
+            ))
+        ));
+
+        let mut reference = sample_reference(
+            IdentityArtifactKind::PublicIdentityProfile,
+            ARC_PUBLIC_IDENTITY_PROFILE_SCHEMA,
+            "pip-1",
+            "arc",
+            'k',
+        );
+        reference.artifact_id.clear();
+        assert!(matches!(
+            validate_identity_artifact_reference(&reference),
+            Err(IdentityNetworkContractError::MissingField(
+                "reference.artifact_id"
+            ))
+        ));
+
+        let mut reference = sample_reference(
+            IdentityArtifactKind::PublicIdentityProfile,
+            ARC_PUBLIC_IDENTITY_PROFILE_SCHEMA,
+            "pip-1",
+            "arc",
+            'l',
+        );
+        reference.operator_id.clear();
+        assert!(matches!(
+            validate_identity_artifact_reference(&reference),
+            Err(IdentityNetworkContractError::MissingField(
+                "reference.operator_id"
+            ))
+        ));
+
+        assert!(matches!(
+            validate_https_url("mailto:test@example.com", "reference.uri"),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+        assert!(matches!(
+            validate_https_url("https://", "reference.uri"),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+        assert!(matches!(
+            validate_hex_digest("zzzz", "reference.sha256"),
+            Err(IdentityNetworkContractError::InvalidReference(_))
+        ));
+        assert!(!contains_non_arc_method(&[IdentityDidMethod::DidArc]));
+        assert!(contains_non_arc_method(&[
+            IdentityDidMethod::DidArc,
+            IdentityDidMethod::DidWeb,
+        ]));
+
+        assert!(matches!(
+            ensure_required_transports(
+                &[
+                    WalletTransportMode::Oid4vpSameDevice,
+                    WalletTransportMode::Oid4vpSameDevice,
+                    WalletTransportMode::Oid4vpRelay,
+                ],
+                "transport_modes",
+            ),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
+        assert!(matches!(
+            ensure_refs_present(&[], "basis_refs"),
+            Err(IdentityNetworkContractError::MissingField("basis_refs"))
+        ));
+
+        let duplicate_refs = vec![
+            sample_reference(
+                IdentityArtifactKind::PublicIdentityProfile,
+                ARC_PUBLIC_IDENTITY_PROFILE_SCHEMA,
+                "pip-1",
+                "arc",
+                'm',
+            ),
+            sample_reference(
+                IdentityArtifactKind::PublicWalletDirectoryEntry,
+                ARC_PUBLIC_WALLET_DIRECTORY_ENTRY_SCHEMA,
+                "pip-1",
+                "arc",
+                'n',
+            ),
+        ];
+        assert!(matches!(
+            ensure_refs_present(&duplicate_refs, "basis_refs"),
+            Err(IdentityNetworkContractError::DuplicateValue(_))
+        ));
     }
 
     #[test]

@@ -398,3 +398,454 @@ fn merge_threat_intel(
         (None, None) => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        DefaultAction, DetectionLevel, EgressRule, ForbiddenPathsRule, OriginProfile, PostureState,
+        PostureTransition, ReputationTier, ReputationTierScope, RuntimeAssuranceExtension,
+        RuntimeAssuranceVerifierRule, ToolAccessRule, TransitionTrigger,
+    };
+    use arc_core::capability::RuntimeAssuranceTier;
+    use std::collections::BTreeMap;
+
+    fn sample_posture_state(label: &str) -> PostureState {
+        PostureState {
+            description: Some(label.to_string()),
+            capabilities: vec![label.to_string()],
+            budgets: BTreeMap::new(),
+        }
+    }
+
+    fn sample_profile(id: &str, explanation: &str) -> OriginProfile {
+        OriginProfile {
+            id: id.to_string(),
+            match_rules: None,
+            posture: Some(id.to_string()),
+            tool_access: None,
+            egress: None,
+            data: None,
+            budgets: None,
+            bridge: None,
+            explanation: Some(explanation.to_string()),
+        }
+    }
+
+    fn sample_scope(ttl_seconds: u64) -> ReputationTierScope {
+        ReputationTierScope {
+            operations: vec!["tool_call".to_string()],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            max_delegation_depth: None,
+            ttl_seconds,
+            constraints_required: None,
+        }
+    }
+
+    fn sample_tier(ttl_seconds: u64) -> ReputationTier {
+        ReputationTier {
+            score_range: [0.0, 1.0],
+            max_scope: sample_scope(ttl_seconds),
+            promotion: None,
+            demotion: None,
+        }
+    }
+
+    fn sample_verifier(name: &str) -> RuntimeAssuranceVerifierRule {
+        RuntimeAssuranceVerifierRule {
+            schema: format!("{name}.schema"),
+            verifier: name.to_string(),
+            effective_tier: RuntimeAssuranceTier::Attested,
+            verifier_family: None,
+            max_evidence_age_seconds: Some(60),
+            allowed_attestation_types: vec!["quote".to_string()],
+            required_assertions: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn replace_strategy_discards_base_fields_and_extends() {
+        let base = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("base".to_string()),
+            description: Some("base description".to_string()),
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules {
+                forbidden_paths: Some(ForbiddenPathsRule {
+                    enabled: true,
+                    patterns: vec!["/etc".to_string()],
+                    exceptions: Vec::new(),
+                }),
+                ..Rules::default()
+            }),
+            extensions: None,
+            metadata: None,
+        };
+        let child = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("child".to_string()),
+            description: None,
+            extends: Some("base.yaml".to_string()),
+            merge_strategy: Some(MergeStrategy::Replace),
+            rules: None,
+            extensions: None,
+            metadata: None,
+        };
+
+        let merged = merge(&base, &child);
+        assert_eq!(merged.name.as_deref(), Some("child"));
+        assert_eq!(merged.description, None);
+        assert_eq!(merged.extends, None);
+        assert_eq!(merged.rules, None);
+    }
+
+    #[test]
+    fn merge_rules_and_slot_level_extensions_preserve_base_fallbacks() {
+        let base_rules = Rules {
+            forbidden_paths: Some(ForbiddenPathsRule {
+                enabled: true,
+                patterns: vec!["/etc".to_string()],
+                exceptions: Vec::new(),
+            }),
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: vec!["mail.send".to_string()],
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Allow,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: None,
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        };
+        let child_rules = Rules {
+            egress: Some(EgressRule {
+                enabled: true,
+                allow: vec!["api.arc.test".to_string()],
+                block: Vec::new(),
+                default: DefaultAction::Block,
+            }),
+            tool_access: Some(ToolAccessRule {
+                enabled: true,
+                allow: vec!["calendar.read".to_string()],
+                block: Vec::new(),
+                require_confirmation: Vec::new(),
+                default: DefaultAction::Block,
+                max_args_size: None,
+                require_runtime_assurance_tier: None,
+                prefer_runtime_assurance_tier: None,
+                require_workload_identity: None,
+                prefer_workload_identity: None,
+            }),
+            ..Rules::default()
+        };
+
+        let merged_rules = merge_rules(&Some(base_rules.clone()), &Some(child_rules.clone()))
+            .expect("merged rules");
+        assert_eq!(merged_rules.forbidden_paths, base_rules.forbidden_paths);
+        assert_eq!(merged_rules.egress, child_rules.egress);
+        assert_eq!(merged_rules.tool_access, child_rules.tool_access);
+        assert_eq!(
+            merge_rules(&Some(base_rules.clone()), &None),
+            Some(base_rules)
+        );
+        assert_eq!(merge_rules(&None, &None), None);
+
+        let base_extensions = Extensions {
+            posture: Some(PostureExtension {
+                initial: "base".to_string(),
+                states: BTreeMap::from([("base".to_string(), sample_posture_state("base"))]),
+                transitions: Vec::new(),
+            }),
+            origins: None,
+            detection: Some(DetectionExtension {
+                prompt_injection: Some(PromptInjectionDetection {
+                    enabled: Some(true),
+                    warn_at_or_above: Some(DetectionLevel::Suspicious),
+                    block_at_or_above: None,
+                    max_scan_bytes: Some(4096),
+                }),
+                jailbreak: None,
+                threat_intel: None,
+            }),
+            reputation: Some(ReputationExtension {
+                scoring: None,
+                tiers: BTreeMap::from([("bronze".to_string(), sample_tier(60))]),
+            }),
+            runtime_assurance: Some(RuntimeAssuranceExtension {
+                tiers: BTreeMap::new(),
+                trusted_verifiers: BTreeMap::from([("base".to_string(), sample_verifier("base"))]),
+            }),
+        };
+        let child_extensions = Extensions {
+            posture: Some(PostureExtension {
+                initial: "child".to_string(),
+                states: BTreeMap::from([("child".to_string(), sample_posture_state("child"))]),
+                transitions: Vec::new(),
+            }),
+            origins: Some(OriginsExtension {
+                default_behavior: None,
+                profiles: vec![sample_profile("child", "child profile")],
+            }),
+            detection: Some(DetectionExtension {
+                prompt_injection: Some(PromptInjectionDetection {
+                    enabled: Some(false),
+                    warn_at_or_above: None,
+                    block_at_or_above: Some(DetectionLevel::Critical),
+                    max_scan_bytes: None,
+                }),
+                jailbreak: Some(JailbreakDetection {
+                    enabled: Some(true),
+                    block_threshold: Some(4),
+                    warn_threshold: None,
+                    max_input_bytes: None,
+                }),
+                threat_intel: None,
+            }),
+            reputation: None,
+            runtime_assurance: None,
+        };
+
+        let merged_extensions = merge_extensions_merge(
+            &Some(base_extensions.clone()),
+            &Some(child_extensions.clone()),
+        )
+        .expect("merged extensions");
+        assert_eq!(merged_extensions.posture, child_extensions.posture);
+        assert_eq!(merged_extensions.origins, child_extensions.origins);
+        assert_eq!(merged_extensions.detection, child_extensions.detection);
+        assert_eq!(merged_extensions.reputation, base_extensions.reputation);
+        assert_eq!(
+            merged_extensions.runtime_assurance,
+            base_extensions.runtime_assurance
+        );
+    }
+
+    #[test]
+    fn deep_merge_combines_nested_extension_maps_and_profiles() {
+        let base_extensions = Extensions {
+            posture: Some(PostureExtension {
+                initial: "base".to_string(),
+                states: BTreeMap::from([("base".to_string(), sample_posture_state("base"))]),
+                transitions: vec![PostureTransition {
+                    from: "base".to_string(),
+                    to: "child".to_string(),
+                    on: TransitionTrigger::UserApproval,
+                    after: None,
+                }],
+            }),
+            origins: Some(OriginsExtension {
+                default_behavior: Some(crate::models::OriginDefaultBehavior::Deny),
+                profiles: vec![
+                    sample_profile("shared", "base explanation"),
+                    sample_profile("base-only", "base only"),
+                ],
+            }),
+            detection: Some(DetectionExtension {
+                prompt_injection: Some(PromptInjectionDetection {
+                    enabled: Some(true),
+                    warn_at_or_above: Some(DetectionLevel::Suspicious),
+                    block_at_or_above: None,
+                    max_scan_bytes: Some(4096),
+                }),
+                jailbreak: None,
+                threat_intel: Some(ThreatIntelDetection {
+                    enabled: Some(true),
+                    pattern_db: Some("base.db".to_string()),
+                    similarity_threshold: Some(0.7),
+                    top_k: None,
+                }),
+            }),
+            reputation: Some(ReputationExtension {
+                scoring: Some(ReputationScoringConfig {
+                    weights: Some(ReputationWeights {
+                        boundary_pressure: Some(0.1),
+                        resource_stewardship: None,
+                        least_privilege: None,
+                        history_depth: None,
+                        tool_diversity: None,
+                        delegation_hygiene: None,
+                        reliability: Some(0.8),
+                        incident_correlation: None,
+                    }),
+                    temporal_decay_half_life_days: Some(30),
+                    probationary_receipt_count: None,
+                    probationary_score_ceiling: None,
+                    probationary_min_days: None,
+                }),
+                tiers: BTreeMap::from([("bronze".to_string(), sample_tier(60))]),
+            }),
+            runtime_assurance: Some(RuntimeAssuranceExtension {
+                tiers: BTreeMap::new(),
+                trusted_verifiers: BTreeMap::from([("base".to_string(), sample_verifier("base"))]),
+            }),
+        };
+        let child_extensions = Extensions {
+            posture: Some(PostureExtension {
+                initial: "child".to_string(),
+                states: BTreeMap::from([("child".to_string(), sample_posture_state("child"))]),
+                transitions: vec![PostureTransition {
+                    from: "child".to_string(),
+                    to: "review".to_string(),
+                    on: TransitionTrigger::Timeout,
+                    after: Some("5m".to_string()),
+                }],
+            }),
+            origins: Some(OriginsExtension {
+                default_behavior: Some(crate::models::OriginDefaultBehavior::MinimalProfile),
+                profiles: vec![
+                    sample_profile("shared", "child explanation"),
+                    sample_profile("child-only", "child only"),
+                ],
+            }),
+            detection: Some(DetectionExtension {
+                prompt_injection: Some(PromptInjectionDetection {
+                    enabled: None,
+                    warn_at_or_above: None,
+                    block_at_or_above: Some(DetectionLevel::Critical),
+                    max_scan_bytes: None,
+                }),
+                jailbreak: Some(JailbreakDetection {
+                    enabled: Some(true),
+                    block_threshold: Some(4),
+                    warn_threshold: Some(2),
+                    max_input_bytes: Some(2048),
+                }),
+                threat_intel: Some(ThreatIntelDetection {
+                    enabled: None,
+                    pattern_db: None,
+                    similarity_threshold: Some(0.9),
+                    top_k: Some(5),
+                }),
+            }),
+            reputation: Some(ReputationExtension {
+                scoring: Some(ReputationScoringConfig {
+                    weights: Some(ReputationWeights {
+                        boundary_pressure: None,
+                        resource_stewardship: None,
+                        least_privilege: Some(0.3),
+                        history_depth: None,
+                        tool_diversity: None,
+                        delegation_hygiene: None,
+                        reliability: None,
+                        incident_correlation: None,
+                    }),
+                    temporal_decay_half_life_days: None,
+                    probationary_receipt_count: Some(10),
+                    probationary_score_ceiling: None,
+                    probationary_min_days: Some(7),
+                }),
+                tiers: BTreeMap::from([
+                    ("bronze".to_string(), sample_tier(120)),
+                    ("silver".to_string(), sample_tier(300)),
+                ]),
+            }),
+            runtime_assurance: None,
+        };
+
+        let base = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("base".to_string()),
+            description: Some("base description".to_string()),
+            extends: None,
+            merge_strategy: None,
+            rules: None,
+            extensions: Some(base_extensions.clone()),
+            metadata: None,
+        };
+        let child = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: None,
+            description: Some("child description".to_string()),
+            extends: Some("base.yaml".to_string()),
+            merge_strategy: None,
+            rules: None,
+            extensions: Some(child_extensions),
+            metadata: None,
+        };
+
+        let merged = merge(&base, &child);
+        assert_eq!(merged.name.as_deref(), Some("base"));
+        assert_eq!(merged.description.as_deref(), Some("child description"));
+        assert_eq!(merged.extends, None);
+
+        let merged_extensions = merged.extensions.expect("merged extensions");
+        let posture = merged_extensions.posture.expect("merged posture");
+        assert_eq!(posture.initial, "child");
+        assert_eq!(posture.states.len(), 2);
+        assert!(posture.states.contains_key("base"));
+        assert!(posture.states.contains_key("child"));
+        assert_eq!(posture.transitions.len(), 1);
+        assert_eq!(posture.transitions[0].from, "child");
+
+        let origins = merged_extensions.origins.expect("merged origins");
+        assert_eq!(
+            origins.default_behavior,
+            Some(crate::models::OriginDefaultBehavior::MinimalProfile)
+        );
+        assert_eq!(origins.profiles.len(), 3);
+        assert_eq!(
+            origins
+                .profiles
+                .iter()
+                .find(|profile| profile.id == "shared")
+                .and_then(|profile| profile.explanation.as_deref()),
+            Some("child explanation")
+        );
+
+        let detection = merged_extensions.detection.expect("merged detection");
+        let prompt = detection.prompt_injection.expect("merged prompt injection");
+        assert_eq!(prompt.enabled, Some(true));
+        assert_eq!(prompt.warn_at_or_above, Some(DetectionLevel::Suspicious));
+        assert_eq!(prompt.block_at_or_above, Some(DetectionLevel::Critical));
+        assert_eq!(prompt.max_scan_bytes, Some(4096));
+        assert!(detection.jailbreak.is_some());
+        assert_eq!(
+            detection
+                .threat_intel
+                .as_ref()
+                .and_then(|threat| threat.pattern_db.as_deref()),
+            Some("base.db")
+        );
+        assert_eq!(
+            detection
+                .threat_intel
+                .as_ref()
+                .and_then(|threat| threat.similarity_threshold),
+            Some(0.9)
+        );
+
+        let reputation = merged_extensions.reputation.expect("merged reputation");
+        let scoring = reputation.scoring.expect("merged scoring");
+        let weights = scoring.weights.expect("merged weights");
+        assert_eq!(weights.boundary_pressure, Some(0.1));
+        assert_eq!(weights.least_privilege, Some(0.3));
+        assert_eq!(weights.reliability, Some(0.8));
+        assert_eq!(scoring.temporal_decay_half_life_days, Some(30));
+        assert_eq!(scoring.probationary_receipt_count, Some(10));
+        assert_eq!(scoring.probationary_min_days, Some(7));
+        assert_eq!(
+            reputation
+                .tiers
+                .get("bronze")
+                .map(|tier| tier.max_scope.ttl_seconds),
+            Some(120)
+        );
+        assert!(reputation.tiers.contains_key("silver"));
+
+        assert_eq!(
+            merged_extensions.runtime_assurance,
+            base_extensions.runtime_assurance
+        );
+        assert_eq!(
+            merge_extensions_deep(&Some(base_extensions.clone()), &None),
+            Some(base_extensions)
+        );
+    }
+}

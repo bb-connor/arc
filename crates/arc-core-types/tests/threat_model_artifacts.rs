@@ -74,7 +74,11 @@ fn threat_model_register_lists_required_threats_with_mitigations() {
 
     let mut seen = BTreeSet::new();
     for threat in threat_model.threats {
-        assert!(seen.insert(threat.id.clone()), "duplicate threat {}", threat.id);
+        assert!(
+            seen.insert(threat.id.clone()),
+            "duplicate threat {}",
+            threat.id
+        );
         assert!(
             !threat.mitigations.is_empty(),
             "threat {} is missing mitigations",
@@ -124,7 +128,10 @@ fn threat_model_transport_requirements_cover_required_surfaces() {
 
     let native = profiles.get("native_arc_direct").expect("native profile");
     assert_eq!(native.tls, "required_on_cross_host_or_untrusted_networks");
-    assert_eq!(native.dpop, "required_when_matched_grant_sets_dpop_required");
+    assert_eq!(
+        native.dpop,
+        "required_when_matched_grant_sets_dpop_required"
+    );
     assert!(
         native
             .without_transport_security

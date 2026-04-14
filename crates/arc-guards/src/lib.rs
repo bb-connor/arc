@@ -60,7 +60,7 @@ mod shell_command;
 pub mod velocity;
 
 pub use advisory::{
-    AdvisoryGuard, AdvisoryPipeline, AdvisorySignal, AdvisorySeverity, AnomalyAdvisoryGuard,
+    AdvisoryGuard, AdvisoryPipeline, AdvisorySeverity, AdvisorySignal, AnomalyAdvisoryGuard,
     DataTransferAdvisoryGuard, GuardOutput, PromotionPolicy, PromotionRule,
 };
 pub use agent_velocity::{AgentVelocityConfig, AgentVelocityGuard};

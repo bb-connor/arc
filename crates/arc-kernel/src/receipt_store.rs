@@ -35,6 +35,9 @@ pub enum ReceiptStoreError {
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 
+    #[error("sqlite pool error: {0}")]
+    Pool(String),
+
     #[error("serialization error: {0}")]
     Json(#[from] serde_json::Error),
 

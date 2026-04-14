@@ -108,12 +108,12 @@ impl PostInvocationPipeline {
         }
 
         if current_response != *response {
+            (PostInvocationVerdict::Redact(current_response), escalations)
+        } else if !escalations.is_empty() {
             (
-                PostInvocationVerdict::Redact(current_response),
+                PostInvocationVerdict::Escalate(escalations.join("; ")),
                 escalations,
             )
-        } else if !escalations.is_empty() {
-            (PostInvocationVerdict::Escalate(escalations.join("; ")), escalations)
         } else {
             (PostInvocationVerdict::Allow, escalations)
         }

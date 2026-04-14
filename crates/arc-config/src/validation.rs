@@ -357,7 +357,9 @@ mod tests {
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
-                    errors.iter().any(|e| e.contains("adapter ID must not be empty")),
+                    errors
+                        .iter()
+                        .any(|e| e.contains("adapter ID must not be empty")),
                     "should mention empty ID: {errors:?}"
                 );
             }
@@ -377,7 +379,9 @@ mod tests {
         match err {
             ConfigError::Validation(errors) => {
                 assert!(
-                    errors.iter().any(|e| e.contains("edge ID must not be empty")),
+                    errors
+                        .iter()
+                        .any(|e| e.contains("edge ID must not be empty")),
                     "should mention empty edge ID: {errors:?}"
                 );
             }

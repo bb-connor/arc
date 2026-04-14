@@ -15,7 +15,8 @@ impl SqliteReceiptStore {
         }
 
         let artifact = &decision.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT decision_id FROM underwriting_decisions WHERE decision_id = ?1",
@@ -108,7 +109,8 @@ impl SqliteReceiptStore {
         &mut self,
         request: &UnderwritingAppealCreateRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let exists = tx
             .query_row(
                 "SELECT decision_id FROM underwriting_decisions WHERE decision_id = ?1",
@@ -191,7 +193,8 @@ impl SqliteReceiptStore {
         &mut self,
         request: &UnderwritingAppealResolveRequest,
     ) -> Result<UnderwritingAppealRecord, ReceiptStoreError> {
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let mut record = query_underwriting_appeal(&tx, &request.appeal_id)?.ok_or_else(|| {
             ReceiptStoreError::NotFound(format!(
                 "underwriting appeal `{}` not found",
@@ -265,7 +268,8 @@ impl SqliteReceiptStore {
     ) -> Result<UnderwritingDecisionListReport, ReceiptStoreError> {
         let normalized = query.normalized();
         let appeals = self.load_underwriting_appeals_by_decision()?;
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state
              FROM underwriting_decisions
              ORDER BY issued_at DESC, decision_id DESC",
@@ -390,7 +394,8 @@ impl SqliteReceiptStore {
         }
 
         let artifact = &facility.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT facility_id FROM credit_facilities WHERE facility_id = ?1",
@@ -485,7 +490,8 @@ impl SqliteReceiptStore {
     ) -> Result<CreditFacilityListReport, ReceiptStoreError> {
         let normalized = query.normalized();
         let now = unix_now();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_facility_id
              FROM credit_facilities
              ORDER BY issued_at DESC, facility_id DESC",
@@ -573,7 +579,8 @@ impl SqliteReceiptStore {
         }
 
         let artifact = &bond.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT bond_id FROM credit_bonds WHERE bond_id = ?1",
@@ -666,7 +673,8 @@ impl SqliteReceiptStore {
     ) -> Result<CreditBondListReport, ReceiptStoreError> {
         let normalized = query.normalized();
         let now = unix_now();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_bond_id
              FROM credit_bonds
              ORDER BY issued_at DESC, bond_id DESC",
@@ -760,7 +768,8 @@ impl SqliteReceiptStore {
         }
 
         let artifact = &event.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT event_id FROM credit_loss_lifecycle WHERE event_id = ?1",
@@ -831,7 +840,8 @@ impl SqliteReceiptStore {
         query: &CreditLossLifecycleListQuery,
     ) -> Result<CreditLossLifecycleListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json
              FROM credit_loss_lifecycle
              ORDER BY issued_at DESC, event_id DESC",

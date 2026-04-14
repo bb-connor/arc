@@ -5,6 +5,11 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_control_plane::enterprise_federation::EnterpriseProviderRecord;
+use arc_control_plane::scim_lifecycle::{
+    build_scim_user_record, derive_enterprise_subject_key, ScimLifecycleRegistry, ScimUserResource,
+    ARC_SCIM_USER_EXTENSION_SCHEMA, SCIM_CORE_USER_SCHEMA,
+};
 use arc_core::capability::{ArcScope, MonetaryAmount, Operation, ToolGrant};
 use arc_core::crypto::Keypair;
 use arc_core::receipt::{
@@ -69,6 +74,7 @@ fn spawn_trust_service(
         enterprise_providers_file,
         None,
         None,
+        None,
     )
 }
 
@@ -81,6 +87,7 @@ fn spawn_trust_service_with_verifier(
     authority_seed_path: &PathBuf,
     budget_db_path: &PathBuf,
     enterprise_providers_file: Option<&PathBuf>,
+    scim_lifecycle_file: Option<&PathBuf>,
     verifier_policies_file: Option<&PathBuf>,
     verifier_challenge_db: Option<&PathBuf>,
 ) -> ServerGuard {
@@ -107,6 +114,12 @@ fn spawn_trust_service_with_verifier(
         command.args([
             "--enterprise-providers-file",
             path.to_str().expect("enterprise providers file path"),
+        ]);
+    }
+    if let Some(path) = scim_lifecycle_file {
+        command.args([
+            "--scim-lifecycle-file",
+            path.to_str().expect("scim lifecycle file path"),
         ]);
     }
     if let Some(path) = verifier_policies_file {
@@ -536,6 +549,38 @@ fn enterprise_provider_record(
     })
 }
 
+fn scim_enterprise_provider_record(
+    provider_id: &str,
+    enabled: bool,
+    organization_id: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "provider_id": provider_id,
+        "kind": "scim",
+        "enabled": enabled,
+        "provenance": {
+            "configured_from": "manual",
+            "source_ref": "operator",
+            "trust_material_ref": "scim:enterprise-login",
+            "subject_mapping_source": "manual"
+        },
+        "trust_boundary": {
+            "allowed_tenants": ["tenant-123"],
+            "allowed_organizations": [organization_id]
+        },
+        "scim_base_url": "https://issuer.enterprise.example/scim/v2",
+        "tenant_id": "tenant-123",
+        "organization_id": organization_id,
+        "subject_mapping": {
+            "principal_source": "userName",
+            "tenant_id_field": "tenantId",
+            "organization_id_field": "organizationId",
+            "groups_field": "groups",
+            "roles_field": "roles"
+        }
+    })
+}
+
 fn write_enterprise_identity(
     path: &PathBuf,
     provider_record_id: Option<&str>,
@@ -568,6 +613,76 @@ fn write_enterprise_identity(
         .expect("serialize enterprise identity"),
     )
     .expect("write enterprise identity");
+}
+
+fn write_scim_enterprise_identity(
+    path: &PathBuf,
+    provider_record_id: Option<&str>,
+    organization_id: &str,
+    groups: &[&str],
+    roles: &[&str],
+) {
+    let principal = "alice@example.com";
+    let subject_key = derive_enterprise_subject_key("enterprise-login", principal);
+    fs::write(
+        path,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "providerId": "enterprise-login",
+            "providerRecordId": provider_record_id,
+            "providerKind": "scim",
+            "federationMethod": "scim",
+            "principal": principal,
+            "subjectKey": subject_key,
+            "tenantId": "tenant-123",
+            "organizationId": organization_id,
+            "groups": groups,
+            "roles": roles,
+            "attributeSources": {
+                "principal": "userName",
+                "tenantId": "tenantId",
+                "organizationId": "organizationId",
+                "groups": "groups",
+                "roles": "roles"
+            },
+            "trustMaterialRef": "scim:enterprise-login"
+        }))
+        .expect("serialize scim enterprise identity"),
+    )
+    .expect("write scim enterprise identity");
+}
+
+fn write_scim_lifecycle_registry(
+    path: &PathBuf,
+    provider_id: &str,
+    organization_id: &str,
+    groups: &[&str],
+    roles: &[&str],
+) {
+    let provider: EnterpriseProviderRecord = serde_json::from_value(
+        scim_enterprise_provider_record(provider_id, true, organization_id),
+    )
+    .expect("parse scim provider record");
+    let user: ScimUserResource = serde_json::from_value(serde_json::json!({
+        "schemas": [SCIM_CORE_USER_SCHEMA, ARC_SCIM_USER_EXTENSION_SCHEMA],
+        "externalId": "ext-user-123",
+        "userName": "alice@example.com",
+        "active": true,
+        "groups": groups.iter().map(|group| serde_json::json!({ "value": group })).collect::<Vec<_>>(),
+        "roles": roles.iter().map(|role| serde_json::json!({ "value": role })).collect::<Vec<_>>(),
+        ARC_SCIM_USER_EXTENSION_SCHEMA: {
+            "providerId": provider_id,
+            "tenantId": "tenant-123",
+            "organizationId": organization_id
+        }
+    }))
+    .expect("parse scim user");
+    let record = build_scim_user_record(&provider, user, 1_700_000_000, None)
+        .expect("build scim lifecycle record");
+    let mut registry = ScimLifecycleRegistry::default();
+    registry
+        .insert(record)
+        .expect("insert scim lifecycle record");
+    registry.save(path).expect("save scim lifecycle registry");
 }
 
 struct EnterpriseFederatedIssueHarness {
@@ -1049,6 +1164,7 @@ fn trust_service_federated_issue_supports_stored_verifier_policy_references_and_
         &revocation_db_path,
         &authority_seed_path,
         &budget_db_path,
+        None,
         None,
         Some(&verifier_policies_path),
         Some(&verifier_challenge_db_path),
@@ -1778,6 +1894,175 @@ fn federated_issue_enterprise_policy_allows_and_returns_enterprise_audit() {
         body["enterpriseAudit"]["trustMaterialRef"],
         serde_json::json!("jwks:enterprise-login")
     );
+}
+
+#[test]
+fn federated_issue_scim_deprovisioned_identity_fails_closed() {
+    let dir = unique_dir("arc-cli-enterprise-federated-scim-deprovision");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_seed_path = dir.join("authority-seed.txt");
+    let budget_db_path = dir.join("budgets.sqlite3");
+    let passport_path = dir.join("passport.json");
+    let issuer_seed_path = dir.join("issuer-seed.txt");
+    let holder_seed_path = dir.join("holder-seed.txt");
+    let verifier_policy_path = dir.join("verifier-policy.yaml");
+    let challenge_path = dir.join("challenge.json");
+    let response_path = dir.join("presentation-response.json");
+    let capability_policy_path = dir.join("enterprise-capability-policy.yaml");
+    let enterprise_identity_path = dir.join("enterprise-identity.json");
+    let enterprise_providers_path = dir.join("enterprise-providers.json");
+    let scim_lifecycle_path = dir.join("scim-lifecycle.json");
+
+    let subject_kp = Keypair::generate();
+    fs::write(&holder_seed_path, format!("{}\n", subject_kp.seed_hex()))
+        .expect("write holder seed");
+    let subject_hex = seed_subject_history(&receipt_db_path, &budget_db_path, &subject_kp);
+    write_scim_enterprise_identity(
+        &enterprise_identity_path,
+        Some("enterprise-login"),
+        "org-789",
+        &["eng", "ops"],
+        &["operator"],
+    );
+    create_passport_with_enterprise_identity(
+        &receipt_db_path,
+        &budget_db_path,
+        &subject_hex,
+        &passport_path,
+        &issuer_seed_path,
+        Some(&enterprise_identity_path),
+    );
+
+    let passport: serde_json::Value =
+        serde_json::from_slice(&fs::read(&passport_path).expect("read passport"))
+            .expect("parse passport");
+    let issuer_did = passport["credentials"][0]["issuer"]
+        .as_str()
+        .expect("issuer did");
+    let composite_score = passport["credentials"][0]["credentialSubject"]["metrics"]
+        ["composite_score"]["value"]
+        .as_f64()
+        .expect("composite score");
+    fs::write(
+        &verifier_policy_path,
+        format!(
+            "issuerAllowlist:\n  - \"{issuer_did}\"\nminCompositeScore: {}\nminReceiptCount: 2\nminLineageRecords: 1\n",
+            (composite_score - 0.01).max(0.0)
+        ),
+    )
+    .expect("write verifier policy");
+
+    let listen = reserve_listen_addr();
+    let base_url = format!("http://{listen}");
+    let service_token = "federated-issue-scim-token";
+    create_challenge(&challenge_path, &base_url, Some(&verifier_policy_path));
+    create_challenge_response(
+        &passport_path,
+        &challenge_path,
+        &holder_seed_path,
+        &response_path,
+    );
+    write_enterprise_capability_policy(
+        &capability_policy_path,
+        "org-789",
+        &["eng", "ops"],
+        &["operator"],
+    );
+    write_enterprise_provider_registry(
+        &enterprise_providers_path,
+        &[scim_enterprise_provider_record(
+            "enterprise-login",
+            true,
+            "org-789",
+        )],
+    );
+    write_scim_lifecycle_registry(
+        &scim_lifecycle_path,
+        "enterprise-login",
+        "org-789",
+        &["eng", "ops"],
+        &["operator"],
+    );
+    let user_id = ScimLifecycleRegistry::load(&scim_lifecycle_path)
+        .expect("load scim lifecycle registry")
+        .users
+        .keys()
+        .next()
+        .expect("scim lifecycle user id")
+        .to_string();
+
+    let service = spawn_trust_service_with_verifier(
+        listen,
+        &base_url,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_seed_path,
+        &budget_db_path,
+        Some(&enterprise_providers_path),
+        Some(&scim_lifecycle_path),
+        None,
+        None,
+    );
+
+    let client = Client::builder().build().expect("build reqwest client");
+    wait_for_trust_service(&client, &base_url);
+
+    let harness = EnterpriseFederatedIssueHarness {
+        _service: service,
+        base_url: base_url.clone(),
+        service_token: service_token.to_string(),
+        challenge_path,
+        response_path,
+        capability_policy_path,
+        enterprise_identity_path,
+    };
+
+    let first = run_enterprise_federated_issue(&harness);
+    assert!(
+        first.status.success(),
+        "stdout={}\nstderr={}",
+        String::from_utf8_lossy(&first.stdout),
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let registry_after_issue =
+        ScimLifecycleRegistry::load(&scim_lifecycle_path).expect("reload scim lifecycle registry");
+    let issued_user = registry_after_issue
+        .get(&user_id)
+        .expect("scim lifecycle user");
+    assert_eq!(issued_user.tracked_capability_ids.len(), 1);
+
+    let delete_response = client
+        .delete(format!("{base_url}/scim/v2/Users/{user_id}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send scim delete request");
+    assert_eq!(delete_response.status(), reqwest::StatusCode::OK);
+
+    let registry_after_delete =
+        ScimLifecycleRegistry::load(&scim_lifecycle_path).expect("reload scim lifecycle registry");
+    let deleted_user = registry_after_delete
+        .get(&user_id)
+        .expect("deleted scim lifecycle user");
+    assert!(!deleted_user.active());
+    assert_eq!(deleted_user.revoked_capability_ids.len(), 1);
+
+    let second = run_enterprise_federated_issue(&harness);
+    assert!(
+        !second.status.success(),
+        "expected deprovisioned scim identity to fail"
+    );
+    let stderr = String::from_utf8_lossy(&second.stderr);
+    assert!(
+        stderr.contains("scim lifecycle identity"),
+        "stderr={stderr}"
+    );
+    assert!(stderr.contains("inactive"), "stderr={stderr}");
 }
 
 #[test]

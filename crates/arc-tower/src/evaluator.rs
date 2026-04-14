@@ -304,10 +304,7 @@ mod tests {
             let result = evaluator
                 .evaluate(method, "/test", caller, &headers, None, 0)
                 .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
-            assert!(
-                result.verdict.is_allowed(),
-                "{method} should be allowed"
-            );
+            assert!(result.verdict.is_allowed(), "{method} should be allowed");
         }
     }
 
@@ -343,8 +340,8 @@ mod tests {
             path.trim_end_matches('/').to_string()
         }
         let keypair = Keypair::generate();
-        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string())
-            .with_route_resolver(resolver);
+        let evaluator =
+            ArcEvaluator::new(keypair, "test-policy".to_string()).with_route_resolver(resolver);
 
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();

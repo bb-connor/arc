@@ -112,7 +112,11 @@ fn protocol_error_registry_has_unique_codes_and_complete_categories() {
     let mut seen_codes = BTreeSet::new();
     let mut seen_entry_categories = BTreeSet::new();
     for entry in registry.codes {
-        assert!(seen_codes.insert(entry.code), "duplicate code {}", entry.code);
+        assert!(
+            seen_codes.insert(entry.code),
+            "duplicate code {}",
+            entry.code
+        );
         assert!(
             expected_categories.contains(&entry.category),
             "unknown category {}",
@@ -145,13 +149,20 @@ fn protocol_error_registry_has_unique_codes_and_complete_categories() {
 #[test]
 fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
     let registry: ErrorRegistry = load_json("spec/errors/arc-error-registry.v1.json");
-    let negotiation: NegotiationArtifact = load_json("spec/versions/arc-protocol-negotiation.v1.json");
+    let negotiation: NegotiationArtifact =
+        load_json("spec/versions/arc-protocol-negotiation.v1.json");
 
     assert_eq!(negotiation.schema, "arc.protocol-negotiation.v1");
     assert_eq!(negotiation.surfaces.native_arc.wire_version, "arc-wire-v1");
-    assert_eq!(negotiation.surfaces.native_arc.exchange_format, "out_of_band");
+    assert_eq!(
+        negotiation.surfaces.native_arc.exchange_format,
+        "out_of_band"
+    );
     assert_eq!(negotiation.surfaces.native_arc.compatibility, "exact_match");
-    assert_eq!(negotiation.surfaces.native_arc.downgrade_behavior, "not_supported");
+    assert_eq!(
+        negotiation.surfaces.native_arc.downgrade_behavior,
+        "not_supported"
+    );
     assert_eq!(
         negotiation.surfaces.hosted_mcp.initialize_request_field,
         "params.protocolVersion"
@@ -172,13 +183,11 @@ fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
         negotiation.surfaces.hosted_mcp.downgrade_behavior,
         "current implementation publishes one supported version and rejects mismatches"
     );
-    assert!(
-        !negotiation
-            .surfaces
-            .hosted_mcp
-            .supported_protocol_versions
-            .is_empty()
-    );
+    assert!(!negotiation
+        .surfaces
+        .hosted_mcp
+        .supported_protocol_versions
+        .is_empty());
     assert!(negotiation
         .surfaces
         .hosted_mcp
@@ -195,7 +204,11 @@ fn protocol_error_registry_version_negotiation_artifact_is_consistent() {
         "not_applicable"
     );
 
-    let registry_codes = registry.codes.into_iter().map(|entry| entry.code).collect::<BTreeSet<_>>();
+    let registry_codes = registry
+        .codes
+        .into_iter()
+        .map(|entry| entry.code)
+        .collect::<BTreeSet<_>>();
     assert!(registry_codes.contains(
         &negotiation
             .surfaces

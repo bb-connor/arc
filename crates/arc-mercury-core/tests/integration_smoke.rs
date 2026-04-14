@@ -1,6 +1,6 @@
 use arc_mercury_core::{
-    sample_mercury_bundle_manifest, sample_mercury_receipt_metadata, MERCURY_BUNDLE_MANIFEST_SCHEMA,
-    MERCURY_RECEIPT_METADATA_SCHEMA,
+    sample_mercury_bundle_manifest, sample_mercury_receipt_metadata,
+    MERCURY_BUNDLE_MANIFEST_SCHEMA, MERCURY_RECEIPT_METADATA_SCHEMA,
 };
 
 #[test]

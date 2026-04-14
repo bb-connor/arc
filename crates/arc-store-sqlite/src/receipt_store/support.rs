@@ -1556,6 +1556,45 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
     Ok(())
 }
 
+impl SqliteReceiptStore {
+    pub fn append_child_receipt_record(
+        &self,
+        receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        let raw_json = serde_json::to_string(receipt)?;
+        self.connection()?.execute(
+            r#"
+            INSERT INTO arc_child_receipts (
+                receipt_id,
+                timestamp,
+                session_id,
+                parent_request_id,
+                request_id,
+                operation_kind,
+                terminal_state,
+                policy_hash,
+                outcome_hash,
+                raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(receipt_id) DO NOTHING
+            "#,
+            params![
+                receipt.id,
+                sqlite_i64(receipt.timestamp, "child receipt timestamp")?,
+                receipt.session_id.as_str(),
+                receipt.parent_request_id.as_str(),
+                receipt.request_id.as_str(),
+                receipt.operation_kind.as_str(),
+                terminal_state_kind(&receipt.terminal_state),
+                receipt.policy_hash,
+                receipt.outcome_hash,
+                raw_json,
+            ],
+        )?;
+        Ok(())
+    }
+}
+
 impl ReceiptStore for SqliteReceiptStore {
     fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt).map(|_| ())
@@ -1593,6 +1632,7 @@ impl ReceiptStore for SqliteReceiptStore {
     ) -> Result<(), ReceiptStoreError> {
         SqliteReceiptStore::record_capability_snapshot(self, token, parent_capability_id).map_err(
             |error| match error {
+                arc_kernel::CapabilityLineageError::ReceiptStore(error) => error,
                 arc_kernel::CapabilityLineageError::Sqlite(error) => {
                     ReceiptStoreError::Sqlite(error)
                 }
@@ -1627,37 +1667,7 @@ impl ReceiptStore for SqliteReceiptStore {
         &mut self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
-        let raw_json = serde_json::to_string(receipt)?;
-        self.connection.execute(
-            r#"
-            INSERT INTO arc_child_receipts (
-                receipt_id,
-                timestamp,
-                session_id,
-                parent_request_id,
-                request_id,
-                operation_kind,
-                terminal_state,
-                policy_hash,
-                outcome_hash,
-                raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(receipt_id) DO NOTHING
-            "#,
-            params![
-                receipt.id,
-                sqlite_i64(receipt.timestamp, "child receipt timestamp")?,
-                receipt.session_id.as_str(),
-                receipt.parent_request_id.as_str(),
-                receipt.request_id.as_str(),
-                receipt.operation_kind.as_str(),
-                terminal_state_kind(&receipt.terminal_state),
-                receipt.policy_hash,
-                receipt.outcome_hash,
-                raw_json,
-            ],
-        )?;
-        Ok(())
+        SqliteReceiptStore::append_child_receipt_record(self, receipt)
     }
 }
 

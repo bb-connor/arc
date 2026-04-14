@@ -168,24 +168,44 @@ async fn read_chainlink_rate(
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{ChainlinkFeedConfig, PairConfig, PairPolicy, BASE_MAINNET_CHAIN_ID};
+    use crate::config::{
+        ChainlinkFeedConfig, ChainlinkNetworkConfig, PairConfig, PairPolicy, BASE_MAINNET_CAIP2,
+        BASE_MAINNET_CHAIN_ID,
+    };
+    use crate::OracleBackend;
 
-    use super::read_chainlink_rate;
+    use super::{read_chainlink_rate, ChainlinkFeedReader};
 
-    #[tokio::test]
-    async fn rejects_invalid_rpc_endpoints() {
-        let pair = PairConfig {
+    fn pair_with_chainlink(address: &str) -> PairConfig {
+        PairConfig {
             base: "ETH".to_string(),
             quote: "USD".to_string(),
             chain_id: BASE_MAINNET_CHAIN_ID,
             chainlink: Some(ChainlinkFeedConfig {
-                address: "0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70".to_string(),
+                address: address.to_string(),
                 decimals: 8,
                 heartbeat_seconds: 300,
             }),
             pyth: None,
             policy: PairPolicy::volatile_default(),
-        };
+        }
+    }
+
+    fn base_network(rpc_endpoint: &str) -> ChainlinkNetworkConfig {
+        ChainlinkNetworkConfig {
+            chain_id: BASE_MAINNET_CHAIN_ID,
+            label: "base-mainnet".to_string(),
+            caip2: BASE_MAINNET_CAIP2.to_string(),
+            rpc_endpoint: rpc_endpoint.to_string(),
+            enabled: true,
+            sequencer_uptime_feed: None,
+            sequencer_grace_period_seconds: 300,
+        }
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_rpc_endpoints() {
+        let pair = pair_with_chainlink("0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70");
         let error = read_chainlink_rate(
             "not a url",
             &pair,
@@ -197,6 +217,62 @@ mod tests {
         assert!(matches!(
             error,
             crate::PriceOracleError::InvalidConfiguration(_)
+        ));
+    }
+
+    #[test]
+    fn rejects_pairs_without_a_configured_network() {
+        let reader = ChainlinkFeedReader::new(vec![base_network("https://rpc.example")]);
+        let mut pair = pair_with_chainlink("0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70");
+        pair.chain_id = 1;
+
+        let error = reader.network_for_pair(&pair).expect_err("missing network");
+
+        assert!(matches!(
+            error,
+            crate::PriceOracleError::InvalidConfiguration(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_feed_addresses() {
+        let pair = pair_with_chainlink("not-an-address");
+
+        let error = read_chainlink_rate(
+            "https://rpc.example",
+            &pair,
+            pair.chainlink.as_ref().expect("feed"),
+            1_743_292_780,
+        )
+        .await
+        .expect_err("invalid feed address");
+
+        assert!(matches!(
+            error,
+            crate::PriceOracleError::InvalidConfiguration(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn backend_rejects_pairs_without_chainlink_feeds() {
+        let reader = ChainlinkFeedReader::new(vec![base_network("https://rpc.example")]);
+        let pair = PairConfig {
+            base: "ETH".to_string(),
+            quote: "USD".to_string(),
+            chain_id: BASE_MAINNET_CHAIN_ID,
+            chainlink: None,
+            pyth: None,
+            policy: PairPolicy::volatile_default(),
+        };
+
+        let error = reader
+            .read_rate(&pair, 1_743_292_780)
+            .await
+            .expect_err("missing feed");
+
+        assert!(matches!(
+            error,
+            crate::PriceOracleError::NoPairAvailable { .. }
         ));
     }
 }

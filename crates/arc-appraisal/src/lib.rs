@@ -2025,6 +2025,727 @@ mod tests {
         }
     }
 
+    fn sample_descriptor_document() -> RuntimeAttestationVerifierDescriptorDocument {
+        RuntimeAttestationVerifierDescriptorDocument {
+            schema: RUNTIME_ATTESTATION_VERIFIER_DESCRIPTOR_SCHEMA.to_string(),
+            descriptor_id: "azure-prod".to_string(),
+            verifier: "https://maa.contoso.test".to_string(),
+            verifier_family: AttestationVerifierFamily::AzureMaa,
+            adapter: AZURE_MAA_VERIFIER_ADAPTER.to_string(),
+            attestation_schemas: vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
+            appraisal_artifact_schema: RUNTIME_ATTESTATION_APPRAISAL_ARTIFACT_SCHEMA.to_string(),
+            appraisal_result_schema: RUNTIME_ATTESTATION_APPRAISAL_RESULT_SCHEMA.to_string(),
+            signing_key_fingerprints: vec!["sha256:azure-key-1".to_string()],
+            reference_values_uri: Some("https://maa.contoso.test/reference-values".to_string()),
+            issued_at: 100,
+            expires_at: 300,
+        }
+    }
+
+    fn sample_reference_value_set() -> RuntimeAttestationReferenceValueSet {
+        RuntimeAttestationReferenceValueSet {
+            schema: RUNTIME_ATTESTATION_REFERENCE_VALUE_SET_SCHEMA.to_string(),
+            reference_value_id: "azure-rv-1".to_string(),
+            descriptor_id: "azure-prod".to_string(),
+            verifier_family: AttestationVerifierFamily::AzureMaa,
+            attestation_schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+            source_uri: Some("https://maa.contoso.test/reference-values/1".to_string()),
+            issued_at: 100,
+            expires_at: 300,
+            state: RuntimeAttestationReferenceValueState::Active,
+            superseded_by: None,
+            revoked_reason: None,
+            measurements: BTreeMap::from([("mrEnclave".to_string(), json!("abc123"))]),
+        }
+    }
+
+    fn sample_signed_descriptor(
+        signer: &crate::crypto::Keypair,
+    ) -> SignedRuntimeAttestationVerifierDescriptor {
+        SignedExportEnvelope::sign(sample_descriptor_document(), signer).expect("sign descriptor")
+    }
+
+    fn sample_signed_reference_value_set(
+        signer: &crate::crypto::Keypair,
+    ) -> SignedRuntimeAttestationReferenceValueSet {
+        SignedExportEnvelope::sign(sample_reference_value_set(), signer)
+            .expect("sign reference values")
+    }
+
+    fn sample_trust_bundle_document(
+        signer: &crate::crypto::Keypair,
+    ) -> RuntimeAttestationTrustBundleDocument {
+        RuntimeAttestationTrustBundleDocument {
+            schema: RUNTIME_ATTESTATION_TRUST_BUNDLE_SCHEMA.to_string(),
+            bundle_id: "bundle-1".to_string(),
+            publisher: "https://trust.contoso.test".to_string(),
+            version: 1,
+            issued_at: 100,
+            expires_at: 300,
+            descriptors: vec![sample_signed_descriptor(signer)],
+            reference_values: vec![sample_signed_reference_value_set(signer)],
+        }
+    }
+
+    fn empty_import_policy() -> RuntimeAttestationImportedAppraisalPolicy {
+        RuntimeAttestationImportedAppraisalPolicy {
+            trusted_issuers: Vec::new(),
+            trusted_signer_keys: Vec::new(),
+            allowed_verifier_families: Vec::new(),
+            max_result_age_seconds: None,
+            max_evidence_age_seconds: None,
+            maximum_effective_tier: None,
+            required_claims: BTreeMap::new(),
+        }
+    }
+
+    fn sample_appraisal_result() -> RuntimeAttestationAppraisalResult {
+        let appraisal = derive_runtime_attestation_appraisal(&sample_evidence())
+            .expect("derive sample appraisal");
+        let report = RuntimeAttestationAppraisalReport {
+            schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
+            generated_at: 150,
+            appraisal,
+            policy_outcome: RuntimeAttestationPolicyOutcome {
+                trust_policy_configured: false,
+                accepted: true,
+                effective_tier: RuntimeAssuranceTier::Attested,
+                reason: None,
+            },
+        };
+        RuntimeAttestationAppraisalResult::from_report("did:arc:test:issuer", &report)
+            .expect("result from sample report")
+    }
+
+    #[test]
+    fn verifier_descriptor_validation_and_verification_reject_invalid_variants() {
+        let mut descriptor = sample_descriptor_document();
+        descriptor.schema = "arc.runtime-attestation.verifier-descriptor.v0".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("invalid descriptor schema")
+                .to_string()
+                .contains("schema must be")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.descriptor_id = "  ".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty descriptor id")
+                .to_string()
+                .contains("descriptor_id")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.verifier = " ".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty verifier")
+                .to_string()
+                .contains("non-empty verifier")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.adapter = " ".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty adapter")
+                .to_string()
+                .contains("non-empty adapter")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.issued_at = 301;
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("inverted descriptor window")
+                .to_string()
+                .contains("must not expire before it is issued")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.attestation_schemas.clear();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("missing schemas")
+                .to_string()
+                .contains("at least one attestation schema")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.attestation_schemas = vec![
+            GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA.to_string(),
+            AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+        ];
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("unsorted schemas")
+                .to_string()
+                .contains("sorted unique order")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.attestation_schemas = vec![String::new()];
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty schema entry")
+                .to_string()
+                .contains("cannot contain empty values")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.appraisal_artifact_schema = "arc.runtime-attestation.other.v1".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("wrong artifact schema")
+                .to_string()
+                .contains("canonical appraisal artifact schema")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.appraisal_result_schema = "arc.runtime-attestation.other-result.v1".to_string();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("wrong result schema")
+                .to_string()
+                .contains("canonical appraisal result schema")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.signing_key_fingerprints.clear();
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("missing signing keys")
+                .to_string()
+                .contains("at least one signing-key fingerprint")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.signing_key_fingerprints =
+            vec!["sha256:key-b".to_string(), "sha256:key-a".to_string()];
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("unsorted signing keys")
+                .to_string()
+                .contains("sorted unique order")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.signing_key_fingerprints = vec![" ".to_string()];
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty signing key")
+                .to_string()
+                .contains("cannot contain empty values")
+        );
+
+        let mut descriptor = sample_descriptor_document();
+        descriptor.reference_values_uri = Some(" ".to_string());
+        assert!(
+            validate_runtime_attestation_verifier_descriptor(&descriptor)
+                .expect_err("empty reference_values_uri")
+                .to_string()
+                .contains("reference_values_uri")
+        );
+
+        let signer = crate::crypto::Keypair::generate();
+        let signed = sample_signed_descriptor(&signer);
+        assert!(
+            verify_signed_runtime_attestation_verifier_descriptor(&signed, 50)
+                .expect_err("descriptor not yet valid")
+                .to_string()
+                .contains("not yet valid")
+        );
+        assert!(
+            verify_signed_runtime_attestation_verifier_descriptor(&signed, 400)
+                .expect_err("descriptor expired")
+                .to_string()
+                .contains("has expired")
+        );
+
+        let mut tampered = signed.clone();
+        tampered.body.verifier = "https://maa.other.example".to_string();
+        assert!(
+            verify_signed_runtime_attestation_verifier_descriptor(&tampered, 150)
+                .expect_err("descriptor signature failure")
+                .to_string()
+                .contains("signature verification failed")
+        );
+    }
+
+    #[test]
+    fn reference_value_validation_and_verification_reject_invalid_variants() {
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.schema = "arc.runtime-attestation.reference-values.v0".to_string();
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("invalid reference-value schema")
+                .to_string()
+                .contains("schema must be")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.reference_value_id = " ".to_string();
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("empty reference_value_id")
+                .to_string()
+                .contains("reference_value_id")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.descriptor_id = " ".to_string();
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("empty descriptor_id")
+                .to_string()
+                .contains("descriptor_id")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.attestation_schema = " ".to_string();
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("empty attestation schema")
+                .to_string()
+                .contains("attestation_schema")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.issued_at = 301;
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("inverted reference-value window")
+                .to_string()
+                .contains("must not expire before it is issued")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.source_uri = Some(" ".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("empty source uri")
+                .to_string()
+                .contains("source_uri")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.measurements.clear();
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("missing measurements")
+                .to_string()
+                .contains("at least one measurement")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.superseded_by = Some("azure-rv-2".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("active state with supersession")
+                .to_string()
+                .contains("cannot include supersession or revocation fields")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.state = RuntimeAttestationReferenceValueState::Superseded;
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("superseded without successor")
+                .to_string()
+                .contains("must include superseded_by")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.state = RuntimeAttestationReferenceValueState::Superseded;
+        reference_value_set.superseded_by = Some("azure-rv-1".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("self supersession")
+                .to_string()
+                .contains("cannot supersede itself")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.state = RuntimeAttestationReferenceValueState::Superseded;
+        reference_value_set.superseded_by = Some("azure-rv-2".to_string());
+        reference_value_set.revoked_reason = Some("compromised".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("superseded with revoked_reason")
+                .to_string()
+                .contains("cannot include revoked_reason")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.state = RuntimeAttestationReferenceValueState::Revoked;
+        reference_value_set.superseded_by = Some("azure-rv-2".to_string());
+        reference_value_set.revoked_reason = Some("compromised".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("revoked with superseded_by")
+                .to_string()
+                .contains("cannot include superseded_by")
+        );
+
+        let mut reference_value_set = sample_reference_value_set();
+        reference_value_set.state = RuntimeAttestationReferenceValueState::Revoked;
+        reference_value_set.revoked_reason = Some(" ".to_string());
+        assert!(
+            validate_runtime_attestation_reference_value_set(&reference_value_set)
+                .expect_err("revoked without reason")
+                .to_string()
+                .contains("must include revoked_reason")
+        );
+
+        let signer = crate::crypto::Keypair::generate();
+        let signed = sample_signed_reference_value_set(&signer);
+        assert!(
+            verify_signed_runtime_attestation_reference_value_set(&signed, 50)
+                .expect_err("reference values not yet valid")
+                .to_string()
+                .contains("not yet valid")
+        );
+        assert!(
+            verify_signed_runtime_attestation_reference_value_set(&signed, 400)
+                .expect_err("reference values expired")
+                .to_string()
+                .contains("has expired")
+        );
+
+        let mut tampered = signed.clone();
+        tampered.body.source_uri = Some("https://maa.other.example/reference-values".to_string());
+        assert!(
+            verify_signed_runtime_attestation_reference_value_set(&tampered, 150)
+                .expect_err("reference-value signature failure")
+                .to_string()
+                .contains("signature verification failed")
+        );
+    }
+
+    #[test]
+    fn trust_bundle_validation_and_verification_reject_remaining_invalid_states() {
+        let signer = crate::crypto::Keypair::generate();
+        let descriptor = sample_signed_descriptor(&signer);
+        let reference_value = sample_signed_reference_value_set(&signer);
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.schema = "arc.runtime-attestation.trust-bundle.v0".to_string();
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("invalid bundle schema")
+            .to_string()
+            .contains("schema must be"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.bundle_id = " ".to_string();
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("empty bundle id")
+            .to_string()
+            .contains("bundle_id"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.publisher = " ".to_string();
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("empty bundle publisher")
+            .to_string()
+            .contains("non-empty publisher"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.version = 0;
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("bundle version zero")
+            .to_string()
+            .contains("non-zero version"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.issued_at = 301;
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("inverted bundle window")
+            .to_string()
+            .contains("must not expire before it is issued"));
+
+        let bundle = sample_trust_bundle_document(&signer);
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 50)
+            .expect_err("bundle not yet valid")
+            .to_string()
+            .contains("not yet valid"));
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 400)
+            .expect_err("bundle expired")
+            .to_string()
+            .contains("has expired"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.descriptors.clear();
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("bundle without descriptors")
+            .to_string()
+            .contains("at least one verifier descriptor"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.descriptors = vec![descriptor.clone(), descriptor.clone()];
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("duplicate descriptor ids")
+            .to_string()
+            .contains("duplicate verifier descriptor"));
+
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.reference_values = vec![reference_value.clone(), reference_value.clone()];
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("duplicate reference-value ids")
+            .to_string()
+            .contains("duplicate reference-value set"));
+
+        let mut unknown_reference = sample_reference_value_set();
+        unknown_reference.descriptor_id = "azure-other".to_string();
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.reference_values =
+            vec![SignedExportEnvelope::sign(unknown_reference, &signer)
+                .expect("sign unknown reference")];
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("unknown descriptor")
+            .to_string()
+            .contains("unknown verifier descriptor"));
+
+        let mut schema_mismatch_reference = sample_reference_value_set();
+        schema_mismatch_reference.attestation_schema =
+            GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA.to_string();
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.reference_values =
+            vec![
+                SignedExportEnvelope::sign(schema_mismatch_reference, &signer)
+                    .expect("sign schema mismatch reference"),
+            ];
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("schema outside descriptor")
+            .to_string()
+            .contains("outside descriptor"));
+
+        let mut superseded_reference = sample_reference_value_set();
+        superseded_reference.reference_value_id = "azure-rv-old".to_string();
+        superseded_reference.state = RuntimeAttestationReferenceValueState::Superseded;
+        superseded_reference.superseded_by = Some("azure-rv-next".to_string());
+        let mut bundle = sample_trust_bundle_document(&signer);
+        bundle.reference_values = vec![SignedExportEnvelope::sign(superseded_reference, &signer)
+            .expect("sign superseded reference")];
+        assert!(validate_runtime_attestation_trust_bundle(&bundle, 150)
+            .expect_err("missing superseded successor")
+            .to_string()
+            .contains("unknown successor"));
+
+        let signed_bundle =
+            SignedExportEnvelope::sign(sample_trust_bundle_document(&signer), &signer)
+                .expect("sign trust bundle");
+        let mut tampered = signed_bundle.clone();
+        tampered.body.publisher = "https://trust.other.example".to_string();
+        assert!(
+            verify_signed_runtime_attestation_trust_bundle(&tampered, 150)
+                .expect_err("bundle signature failure")
+                .to_string()
+                .contains("signature verification failed")
+        );
+    }
+
+    #[test]
+    fn runtime_attestation_import_reasons_cover_remaining_policy_fail_closed_paths() {
+        let signed_result = SignedRuntimeAttestationAppraisalResult::sign(
+            sample_appraisal_result(),
+            &crate::crypto::Keypair::generate(),
+        )
+        .expect("sign result");
+
+        let import = evaluate_imported_runtime_attestation_appraisal(
+            &RuntimeAttestationAppraisalImportRequest {
+                signed_result,
+                local_policy: empty_import_policy(),
+            },
+            160,
+        );
+
+        assert_eq!(
+            import.local_policy_outcome.reason_codes,
+            vec![RuntimeAttestationImportReasonCode::NoLocalPolicy]
+        );
+        assert_eq!(
+            import.local_policy_outcome.reasons[0].description,
+            RuntimeAttestationImportReasonCode::NoLocalPolicy.description()
+        );
+    }
+
+    #[test]
+    fn imported_runtime_attestation_rejects_untrusted_exporters_and_claim_policy_failures() {
+        let mut result = sample_appraisal_result();
+        result.exporter_policy_outcome.accepted = false;
+        let signer = crate::crypto::Keypair::generate();
+        let signed_result =
+            SignedRuntimeAttestationAppraisalResult::sign(result, &signer).expect("sign result");
+
+        let import = evaluate_imported_runtime_attestation_appraisal(
+            &RuntimeAttestationAppraisalImportRequest {
+                signed_result,
+                local_policy: RuntimeAttestationImportedAppraisalPolicy {
+                    trusted_issuers: vec!["did:arc:test:trusted".to_string()],
+                    trusted_signer_keys: vec!["sha256:not-the-real-signer".to_string()],
+                    allowed_verifier_families: vec![AttestationVerifierFamily::GoogleAttestation],
+                    max_result_age_seconds: None,
+                    max_evidence_age_seconds: None,
+                    maximum_effective_tier: None,
+                    required_claims: BTreeMap::from([
+                        (
+                            RuntimeAttestationNormalizedClaimCode::ModuleId,
+                            "module-1".to_string(),
+                        ),
+                        (
+                            RuntimeAttestationNormalizedClaimCode::AttestationType,
+                            "sev".to_string(),
+                        ),
+                    ]),
+                },
+            },
+            160,
+        );
+
+        assert_eq!(
+            import.local_policy_outcome.disposition,
+            RuntimeAttestationImportDisposition::Reject
+        );
+        for code in [
+            RuntimeAttestationImportReasonCode::ExporterPolicyRejected,
+            RuntimeAttestationImportReasonCode::UntrustedIssuer,
+            RuntimeAttestationImportReasonCode::UntrustedSigner,
+            RuntimeAttestationImportReasonCode::UnsupportedVerifierFamily,
+            RuntimeAttestationImportReasonCode::MissingRequiredClaim,
+            RuntimeAttestationImportReasonCode::ClaimMismatch,
+        ] {
+            assert!(import.local_policy_outcome.reason_codes.contains(&code));
+            assert!(import
+                .local_policy_outcome
+                .reasons
+                .iter()
+                .any(|reason| reason.code == code && reason.description == code.description()));
+        }
+    }
+
+    #[test]
+    fn normalized_claim_values_and_result_guards_cover_remaining_branch_paths() {
+        assert_eq!(
+            normalized_claim_value_string(&RuntimeAttestationNormalizedClaim::new(
+                RuntimeAttestationNormalizedClaimCode::SecureBootState,
+                Value::Bool(true),
+            )),
+            Some("true".to_string())
+        );
+        assert_eq!(
+            normalized_claim_value_string(&RuntimeAttestationNormalizedClaim::new(
+                RuntimeAttestationNormalizedClaimCode::ModuleId,
+                Value::Number(serde_json::Number::from(7)),
+            )),
+            Some("7".to_string())
+        );
+        assert_eq!(
+            normalized_claim_value_string(&RuntimeAttestationNormalizedClaim::new(
+                RuntimeAttestationNormalizedClaimCode::MeasurementRegisters,
+                json!({"0": "abcd"}),
+            )),
+            Some("{\"0\":\"abcd\"}".to_string())
+        );
+
+        let appraisal = derive_runtime_attestation_appraisal(&sample_evidence())
+            .expect("derive appraisal for result guard test");
+        let report = RuntimeAttestationAppraisalReport {
+            schema: RUNTIME_ATTESTATION_APPRAISAL_REPORT_SCHEMA.to_string(),
+            generated_at: 150,
+            appraisal,
+            policy_outcome: RuntimeAttestationPolicyOutcome {
+                trust_policy_configured: false,
+                accepted: true,
+                effective_tier: RuntimeAssuranceTier::Attested,
+                reason: None,
+            },
+        };
+
+        assert!(
+            RuntimeAttestationAppraisalResult::from_report("  ", &report)
+                .expect_err("empty issuer")
+                .to_string()
+                .contains("issuer must not be empty")
+        );
+
+        let mut missing_artifact_report = report.clone();
+        missing_artifact_report.appraisal.artifact = None;
+        assert!(RuntimeAttestationAppraisalResult::from_report(
+            "did:arc:test:issuer",
+            &missing_artifact_report,
+        )
+        .expect_err("missing artifact")
+        .to_string()
+        .contains("missing the nested artifact"));
+
+        assert_eq!(
+            verifier_family_for_attestation_schema(ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA),
+            Some(AttestationVerifierFamily::EnterpriseVerifier)
+        );
+        assert_eq!(
+            verifier_family_for_attestation_schema("urn:arc:unknown"),
+            None
+        );
+    }
+
+    #[test]
+    fn derive_runtime_attestation_appraisal_supports_aws_nitro_and_rejects_unknown_schema() {
+        let evidence = RuntimeAttestationEvidence {
+            schema: AWS_NITRO_ATTESTATION_SCHEMA.to_string(),
+            verifier: "https://nitro.aws.example".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "aws-digest".to_string(),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: Some(json!({
+                "awsNitro": {
+                    "moduleId": "nitro-enclave-1",
+                    "digest": "sha384:aws-measurement",
+                    "pcrs": {"0": "0123"}
+                }
+            })),
+        };
+
+        let appraisal = derive_runtime_attestation_appraisal(&evidence)
+            .expect("aws nitro evidence should derive");
+        assert_eq!(
+            appraisal.verifier_family,
+            AttestationVerifierFamily::AwsNitro
+        );
+        assert_eq!(
+            appraisal.normalized_assertions["moduleId"],
+            "nitro-enclave-1"
+        );
+        assert_eq!(
+            appraisal.normalized_assertions["digest"],
+            "sha384:aws-measurement"
+        );
+        assert_eq!(
+            appraisal.normalized_assertions["pcrs"],
+            json!({"0": "0123"})
+        );
+        let artifact = appraisal.artifact.expect("aws appraisal artifact");
+        assert!(artifact.claims.normalized_claims.iter().any(|claim| {
+            claim.code == RuntimeAttestationNormalizedClaimCode::MeasurementRegisters
+                && claim.value == json!({"0": "0123"})
+        }));
+
+        let mut unsupported = sample_evidence();
+        unsupported.schema = "arc.runtime-attestation.unknown.v1".to_string();
+        let error = derive_runtime_attestation_appraisal(&unsupported)
+            .expect_err("unsupported schema should fail");
+        assert!(matches!(
+            error,
+            RuntimeAttestationAppraisalError::UnsupportedSchema { schema }
+            if schema == "arc.runtime-attestation.unknown.v1"
+        ));
+    }
+
     #[test]
     fn runtime_attestation_appraisal_copies_evidence_descriptor_fields() {
         let evidence = sample_evidence();

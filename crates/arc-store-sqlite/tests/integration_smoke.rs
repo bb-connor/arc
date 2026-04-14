@@ -2,9 +2,7 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_kernel::{AuthoritySnapshot, BudgetStore, RevocationRecord};
-use arc_store_sqlite::{
-    SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevocationStore,
-};
+use arc_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevocationStore};
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
     let nonce = SystemTime::now()
@@ -56,9 +54,7 @@ fn sqlite_capability_authority_rejects_snapshot_with_mismatched_public_key() {
     let error = authority
         .apply_snapshot(&snapshot)
         .expect_err("mismatched public key should fail closed");
-    assert!(error
-        .to_string()
-        .contains("public key does not match seed"));
+    assert!(error.to_string().contains("public key does not match seed"));
 
     cleanup_sqlite_files(&path);
 }

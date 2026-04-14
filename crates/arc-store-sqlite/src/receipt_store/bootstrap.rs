@@ -1,5 +1,16 @@
 use super::*;
 
+fn configure_sqlite_connection(connection: &mut Connection) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        r#"
+        PRAGMA journal_mode = WAL;
+        PRAGMA synchronous = FULL;
+        PRAGMA busy_timeout = 5000;
+        "#,
+    )?;
+    Ok(())
+}
+
 impl SqliteReceiptStore {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, ReceiptStoreError> {
         let path = path.as_ref();
@@ -7,13 +18,10 @@ impl SqliteReceiptStore {
             fs::create_dir_all(parent)?;
         }
 
-        let connection = Connection::open(path)?;
+        let mut connection = Connection::open(path)?;
+        configure_sqlite_connection(&mut connection)?;
         connection.execute_batch(
             r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
             CREATE TABLE IF NOT EXISTS arc_tool_receipts (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
                 receipt_id TEXT NOT NULL UNIQUE,
@@ -586,12 +594,25 @@ impl SqliteReceiptStore {
         ensure_tool_receipt_attribution_columns(&connection)?;
         backfill_tool_receipt_attribution_columns(&connection)?;
 
-        Ok(Self { connection })
+        drop(connection);
+
+        let manager = SqliteConnectionManager::file(path).with_init(|connection| {
+            configure_sqlite_connection(connection).map_err(|error| match error {
+                ReceiptStoreError::Sqlite(error) => error,
+                other => rusqlite::Error::InvalidParameterName(other.to_string()),
+            })
+        });
+        let pool = Pool::builder()
+            .max_size(8)
+            .build(manager)
+            .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
+
+        Ok(Self { pool })
     }
 
     pub fn tool_receipt_count(&self) -> Result<u64, ReceiptStoreError> {
         let count =
-            self.connection
+            self.connection()?
                 .query_row("SELECT COUNT(*) FROM arc_tool_receipts", [], |row| {
                     row.get::<_, i64>(0)
                 })?;
@@ -600,7 +621,7 @@ impl SqliteReceiptStore {
 
     pub fn child_receipt_count(&self) -> Result<u64, ReceiptStoreError> {
         let count =
-            self.connection
+            self.connection()?
                 .query_row("SELECT COUNT(*) FROM arc_child_receipts", [], |row| {
                     row.get::<_, i64>(0)
                 })?;
@@ -611,7 +632,8 @@ impl SqliteReceiptStore {
         &self,
     ) -> Result<BTreeMap<String, Vec<UnderwritingAppealRecord>>, ReceiptStoreError> {
         let mut appeals_by_decision = BTreeMap::new();
-        for appeal in load_underwriting_appeal_rows(&self.connection)? {
+        let connection = self.connection()?;
+        for appeal in load_underwriting_appeal_rows(&connection)? {
             appeals_by_decision
                 .entry(appeal.decision_id.clone())
                 .or_insert_with(Vec::new)
@@ -628,7 +650,8 @@ impl SqliteReceiptStore {
         tool_name: Option<&str>,
         decision_kind: Option<&str>,
     ) -> Result<Vec<ArcReceipt>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT raw_json
             FROM arc_tool_receipts
@@ -666,7 +689,8 @@ impl SqliteReceiptStore {
         &self,
         subject_key: &str,
     ) -> Result<Vec<ArcReceipt>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT r.raw_json
             FROM arc_tool_receipts r
@@ -689,7 +713,8 @@ impl SqliteReceiptStore {
         after_seq: u64,
         limit: usize,
     ) -> Result<Vec<StoredToolReceipt>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT seq, raw_json
             FROM arc_tool_receipts
@@ -720,7 +745,8 @@ impl SqliteReceiptStore {
         operation_kind: Option<&str>,
         terminal_state: Option<&str>,
     ) -> Result<Vec<ChildRequestReceipt>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT raw_json
             FROM arc_child_receipts
@@ -757,7 +783,8 @@ impl SqliteReceiptStore {
         after_seq: u64,
         limit: usize,
     ) -> Result<Vec<StoredChildReceipt>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT seq, raw_json
             FROM arc_child_receipts
@@ -787,7 +814,8 @@ impl SqliteReceiptStore {
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_secs())
             .unwrap_or(0);
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         tx.execute(
             r#"
             INSERT INTO federated_evidence_shares (
@@ -934,7 +962,7 @@ impl SqliteReceiptStore {
     ) -> Result<Option<(FederatedEvidenceShareSummary, CapabilitySnapshot)>, ReceiptStoreError>
     {
         let row = self
-            .connection
+            .connection()?
             .query_row(
                 r#"
                 SELECT
@@ -1001,7 +1029,7 @@ impl SqliteReceiptStore {
         until: Option<u64>,
     ) -> Result<Vec<FederatedShareSubjectCorpus>, ReceiptStoreError> {
         let mut share_ids = self
-            .connection
+            .connection()?
             .prepare(
                 r#"
                 SELECT DISTINCT share_id
@@ -1026,7 +1054,7 @@ impl SqliteReceiptStore {
         let mut results = Vec::new();
         for share_id in share_ids {
             let summary = self
-                .connection
+                .connection()?
                 .query_row(
                     r#"
                     SELECT
@@ -1061,7 +1089,7 @@ impl SqliteReceiptStore {
                 )?;
 
             let receipts = self
-                .connection
+                .connection()?
                 .prepare(
                     r#"
                     SELECT seq, raw_json
@@ -1097,7 +1125,7 @@ impl SqliteReceiptStore {
                 .collect::<Result<Vec<_>, _>>()?;
 
             let capabilities = self
-                .connection
+                .connection()?
                 .prepare(
                     r#"
                     SELECT
@@ -1141,7 +1169,7 @@ impl SqliteReceiptStore {
         parent_capability_id: &str,
         share_id: Option<&str>,
     ) -> Result<(), ReceiptStoreError> {
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT INTO federated_lineage_bridges (
                 local_capability_id,
@@ -1161,7 +1189,7 @@ impl SqliteReceiptStore {
         &self,
         local_capability_id: &str,
     ) -> Result<Option<String>, ReceiptStoreError> {
-        self.connection
+        self.connection()?
             .query_row(
                 r#"
                 SELECT parent_capability_id
@@ -1182,6 +1210,7 @@ impl SqliteReceiptStore {
         if let Some(mut snapshot) =
             self.get_lineage(capability_id)
                 .map_err(|error| match error {
+                    arc_kernel::CapabilityLineageError::ReceiptStore(error) => error,
                     arc_kernel::CapabilityLineageError::Sqlite(error) => {
                         ReceiptStoreError::Sqlite(error)
                     }

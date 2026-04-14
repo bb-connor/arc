@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::receipt_store::ReceiptStoreError;
+
 /// A point-in-time snapshot of a capability token persisted at issuance.
 ///
 /// Stored in the `capability_lineage` table alongside `arc_tool_receipts`
@@ -40,6 +42,9 @@ pub struct StoredCapabilitySnapshot {
 /// Errors from capability lineage operations.
 #[derive(Debug, thiserror::Error)]
 pub enum CapabilityLineageError {
+    #[error("receipt store error: {0}")]
+    ReceiptStore(#[from] ReceiptStoreError),
+
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
 

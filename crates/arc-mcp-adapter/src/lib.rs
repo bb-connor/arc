@@ -602,10 +602,7 @@ mod tests {
             self
         }
 
-        fn with_resource_templates(
-            mut self,
-            templates: Vec<ResourceTemplateDefinition>,
-        ) -> Self {
+        fn with_resource_templates(mut self, templates: Vec<ResourceTemplateDefinition>) -> Self {
             self.resource_templates = templates;
             self
         }
@@ -798,9 +795,12 @@ mod tests {
             text_tool_info("beta"),
             text_tool_info("gamma"),
         ];
-        let transport = MockTransport::simple(tools, MockCallBehavior::Success(success_result("ok")));
+        let transport =
+            MockTransport::simple(tools, MockCallBehavior::Success(success_result("ok")));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let manifest = adapter.generate_manifest().unwrap_or_else(|e| panic!("{e}"));
+        let manifest = adapter
+            .generate_manifest()
+            .unwrap_or_else(|e| panic!("{e}"));
         let names: Vec<&str> = manifest.tools.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, vec!["alpha", "beta", "gamma"]);
     }
@@ -839,15 +839,27 @@ mod tests {
             MockCallBehavior::Success(success_result("ok")),
         );
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let manifest = adapter.generate_manifest().unwrap_or_else(|e| panic!("{e}"));
-        assert!(!manifest.tools[0].has_side_effects, "readOnly=true should be no side effects");
-        assert!(manifest.tools[1].has_side_effects, "readOnly=false should have side effects");
-        assert!(manifest.tools[2].has_side_effects, "missing annotations defaults to side effects (fail-closed)");
+        let manifest = adapter
+            .generate_manifest()
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(
+            !manifest.tools[0].has_side_effects,
+            "readOnly=true should be no side effects"
+        );
+        assert!(
+            manifest.tools[1].has_side_effects,
+            "readOnly=false should have side effects"
+        );
+        assert!(
+            manifest.tools[2].has_side_effects,
+            "missing annotations defaults to side effects (fail-closed)"
+        );
     }
 
     #[test]
     fn manifest_empty_tools_list_rejected() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let err = adapter.generate_manifest().unwrap_err();
         assert!(matches!(err, AdapterError::ManifestError(_)));
@@ -860,7 +872,9 @@ mod tests {
             MockCallBehavior::Success(success_result("ok")),
         );
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let manifest = adapter.generate_manifest().unwrap_or_else(|e| panic!("{e}"));
+        let manifest = adapter
+            .generate_manifest()
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(manifest.schema, "arc.manifest.v1");
     }
 
@@ -877,7 +891,9 @@ mod tests {
             MockCallBehavior::Success(success_result("ok")),
         );
         let adapter = McpAdapter::new(config, Box::new(transport));
-        let manifest = adapter.generate_manifest().unwrap_or_else(|e| panic!("{e}"));
+        let manifest = adapter
+            .generate_manifest()
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(manifest.server_id, "my-server");
         assert_eq!(manifest.name, "My Server");
         assert_eq!(manifest.version, "2.0.0");
@@ -913,7 +929,9 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("t", serde_json::json!({})).unwrap_or_else(|e| panic!("{e}"));
+        let output = adapter
+            .invoke("t", serde_json::json!({}))
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(output["structuredContent"]["weather"], "sunny");
     }
 
@@ -926,7 +944,9 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("t", serde_json::json!({})).unwrap_or_else(|e| panic!("{e}"));
+        let output = adapter
+            .invoke("t", serde_json::json!({}))
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(output["isError"], true);
     }
 
@@ -939,7 +959,9 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("t", serde_json::json!({})).unwrap_or_else(|e| panic!("{e}"));
+        let output = adapter
+            .invoke("t", serde_json::json!({}))
+            .unwrap_or_else(|e| panic!("{e}"));
         assert!(output.get("isError").is_none());
     }
 
@@ -956,8 +978,12 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("t", serde_json::json!({})).unwrap_or_else(|e| panic!("{e}"));
-        let content = output["content"].as_array().unwrap_or_else(|| panic!("content"));
+        let output = adapter
+            .invoke("t", serde_json::json!({}))
+            .unwrap_or_else(|e| panic!("{e}"));
+        let content = output["content"]
+            .as_array()
+            .unwrap_or_else(|| panic!("content"));
         assert_eq!(content.len(), 3);
         assert_eq!(content[2]["text"], "chunk3");
     }
@@ -1015,7 +1041,10 @@ mod tests {
             reason: "user cancelled".into(),
         });
         match err {
-            KernelError::RequestCancelled { request_id: id, reason } => {
+            KernelError::RequestCancelled {
+                request_id: id,
+                reason,
+            } => {
                 assert_eq!(id, request_id);
                 assert_eq!(reason, "user cancelled");
             }
@@ -1139,7 +1168,8 @@ mod tests {
         );
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let result = adapted.invoke("echo", serde_json::json!({}), None)
+        let result = adapted
+            .invoke("echo", serde_json::json!({}), None)
             .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(result["content"][0]["text"], "echoed");
     }
@@ -1222,12 +1252,19 @@ mod tests {
         }]);
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.resource_provider().unwrap_or_else(|| panic!("provider"));
-        let content = provider.read_resource("test://readme")
+        let provider = adapted
+            .resource_provider()
+            .unwrap_or_else(|| panic!("provider"));
+        let content = provider
+            .read_resource("test://readme")
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected content"));
         assert_eq!(content.len(), 1);
-        assert!(content[0].text.as_deref().unwrap_or("").contains("test://readme"));
+        assert!(content[0]
+            .text
+            .as_deref()
+            .unwrap_or("")
+            .contains("test://readme"));
     }
 
     #[test]
@@ -1251,7 +1288,9 @@ mod tests {
         }]);
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.resource_provider().unwrap_or_else(|| panic!("provider"));
+        let provider = adapted
+            .resource_provider()
+            .unwrap_or_else(|| panic!("provider"));
         let templates = provider.list_resource_templates();
         assert_eq!(templates.len(), 1);
         assert_eq!(templates[0].uri_template, "test://docs/{slug}");
@@ -1269,9 +1308,16 @@ mod tests {
         });
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.resource_provider().unwrap_or_else(|| panic!("provider"));
+        let provider = adapted
+            .resource_provider()
+            .unwrap_or_else(|| panic!("provider"));
         let result = provider
-            .complete_resource_argument("test://docs/{slug}", "slug", "read", &serde_json::json!({}))
+            .complete_resource_argument(
+                "test://docs/{slug}",
+                "slug",
+                "read",
+                &serde_json::json!({}),
+            )
             .unwrap_or_else(|e| panic!("{e}"));
         let result = result.unwrap_or_else(|| panic!("expected completion"));
         assert_eq!(result.values, vec!["read-res-completed".to_string()]);
@@ -1309,7 +1355,9 @@ mod tests {
         }]);
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.prompt_provider().unwrap_or_else(|| panic!("prompt provider"));
+        let provider = adapted
+            .prompt_provider()
+            .unwrap_or_else(|| panic!("prompt provider"));
         let prompts = provider.list_prompts();
         assert_eq!(prompts.len(), 1);
         assert_eq!(prompts[0].name, "greet");
@@ -1334,8 +1382,11 @@ mod tests {
         }]);
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.prompt_provider().unwrap_or_else(|| panic!("prompt provider"));
-        let result = provider.get_prompt("greet", serde_json::json!({}))
+        let provider = adapted
+            .prompt_provider()
+            .unwrap_or_else(|| panic!("prompt provider"));
+        let result = provider
+            .get_prompt("greet", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected prompt"));
         assert_eq!(result.messages.len(), 1);
@@ -1353,8 +1404,11 @@ mod tests {
         });
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.prompt_provider().unwrap_or_else(|| panic!("prompt provider"));
-        let result = provider.get_prompt("nonexistent", serde_json::json!({}))
+        let provider = adapted
+            .prompt_provider()
+            .unwrap_or_else(|| panic!("prompt provider"));
+        let result = provider
+            .get_prompt("nonexistent", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"));
         assert!(result.is_none());
     }
@@ -1371,7 +1425,9 @@ mod tests {
         });
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let provider = adapted.prompt_provider().unwrap_or_else(|| panic!("prompt provider"));
+        let provider = adapted
+            .prompt_provider()
+            .unwrap_or_else(|| panic!("prompt provider"));
         let result = provider
             .complete_prompt_argument("greet", "name", "Al", &serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"));
@@ -1433,7 +1489,9 @@ mod tests {
                 icons: None,
             }]);
         let serialized = SerializedMcpTransport::from_arc(Arc::new(inner));
-        let resources = serialized.list_resources().unwrap_or_else(|e| panic!("{e}"));
+        let resources = serialized
+            .list_resources()
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(resources.len(), 1);
     }
 
@@ -1477,9 +1535,11 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("chunked_tool", serde_json::json!({}))
+        let output = adapter
+            .invoke("chunked_tool", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"));
-        let content = output["content"].as_array()
+        let content = output["content"]
+            .as_array()
             .unwrap_or_else(|| panic!("expected content array"));
         assert_eq!(content.len(), 5);
         for (i, chunk) in content.iter().enumerate() {
@@ -1499,9 +1559,11 @@ mod tests {
         };
         let transport = MockTransport::simple(vec![], MockCallBehavior::Success(result));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let output = adapter.invoke("mixed", serde_json::json!({}))
+        let output = adapter
+            .invoke("mixed", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"));
-        let content = output["content"].as_array()
+        let content = output["content"]
+            .as_array()
             .unwrap_or_else(|| panic!("expected content array"));
         assert_eq!(content.len(), 2);
         assert_eq!(content[0]["type"], "text");
@@ -1522,8 +1584,14 @@ mod tests {
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let err = adapter.invoke("t", serde_json::json!({})).unwrap_err();
         let display = format!("{err}");
-        assert!(display.contains("-32600"), "error display should contain code");
-        assert!(display.contains("invalid request shape"), "error display should contain message");
+        assert!(
+            display.contains("-32600"),
+            "error display should contain code"
+        );
+        assert!(
+            display.contains("invalid request shape"),
+            "error display should contain message"
+        );
     }
 
     #[test]
@@ -1537,7 +1605,9 @@ mod tests {
         );
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let err = adapted.invoke("t", serde_json::json!({}), None).unwrap_err();
+        let err = adapted
+            .invoke("t", serde_json::json!({}), None)
+            .unwrap_err();
         assert!(matches!(err, KernelError::ToolServerError(_)));
     }
 
@@ -1549,7 +1619,9 @@ mod tests {
         );
         let adapted = AdaptedMcpServer::new(McpAdapter::new(default_config(), Box::new(transport)))
             .unwrap_or_else(|e| panic!("{e}"));
-        let err = adapted.invoke("t", serde_json::json!({}), None).unwrap_err();
+        let err = adapted
+            .invoke("t", serde_json::json!({}), None)
+            .unwrap_err();
         assert!(matches!(err, KernelError::RequestIncomplete(_)));
     }
 
@@ -1595,8 +1667,9 @@ mod tests {
             resources_list_changed: true,
             prompts_list_changed: true,
         };
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_capabilities(caps.clone());
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_capabilities(caps.clone());
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let result = adapter.capabilities();
         assert_eq!(result, caps);
@@ -1671,17 +1744,18 @@ mod tests {
 
     #[test]
     fn adapter_list_resources_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_resources(vec![ResourceDefinition {
-                uri: "test://r1".into(),
-                name: "R1".into(),
-                title: None,
-                description: None,
-                mime_type: None,
-                size: None,
-                annotations: None,
-                icons: None,
-            }]);
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_resources(vec![ResourceDefinition {
+                    uri: "test://r1".into(),
+                    name: "R1".into(),
+                    title: None,
+                    description: None,
+                    mime_type: None,
+                    size: None,
+                    annotations: None,
+                    icons: None,
+                }]);
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let resources = adapter.list_resources().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(resources.len(), 1);
@@ -1689,36 +1763,41 @@ mod tests {
 
     #[test]
     fn adapter_list_resource_templates_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_resource_templates(vec![ResourceTemplateDefinition {
-                uri_template: "test://{id}".into(),
-                name: "T".into(),
-                title: None,
-                description: None,
-                mime_type: None,
-                annotations: None,
-                icons: None,
-            }]);
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_resource_templates(vec![ResourceTemplateDefinition {
+                    uri_template: "test://{id}".into(),
+                    name: "T".into(),
+                    title: None,
+                    description: None,
+                    mime_type: None,
+                    annotations: None,
+                    icons: None,
+                }]);
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let templates = adapter.list_resource_templates().unwrap_or_else(|e| panic!("{e}"));
+        let templates = adapter
+            .list_resource_templates()
+            .unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(templates.len(), 1);
     }
 
     #[test]
     fn adapter_read_resource_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_resources(vec![ResourceDefinition {
-                uri: "test://doc".into(),
-                name: "Doc".into(),
-                title: None,
-                description: None,
-                mime_type: Some("text/plain".into()),
-                size: None,
-                annotations: None,
-                icons: None,
-            }]);
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_resources(vec![ResourceDefinition {
+                    uri: "test://doc".into(),
+                    name: "Doc".into(),
+                    title: None,
+                    description: None,
+                    mime_type: Some("text/plain".into()),
+                    size: None,
+                    annotations: None,
+                    icons: None,
+                }]);
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let content = adapter.read_resource("test://doc")
+        let content = adapter
+            .read_resource("test://doc")
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected content"));
         assert_eq!(content.len(), 1);
@@ -1726,14 +1805,15 @@ mod tests {
 
     #[test]
     fn adapter_list_prompts_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_prompts(vec![arc_core::PromptDefinition {
-                name: "p1".into(),
-                title: None,
-                description: None,
-                arguments: vec![],
-                icons: None,
-            }]);
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_prompts(vec![arc_core::PromptDefinition {
+                    name: "p1".into(),
+                    title: None,
+                    description: None,
+                    arguments: vec![],
+                    icons: None,
+                }]);
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
         let prompts = adapter.list_prompts().unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(prompts.len(), 1);
@@ -1741,16 +1821,18 @@ mod tests {
 
     #[test]
     fn adapter_get_prompt_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
-            .with_prompts(vec![arc_core::PromptDefinition {
-                name: "p1".into(),
-                title: None,
-                description: None,
-                arguments: vec![],
-                icons: None,
-            }]);
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")))
+                .with_prompts(vec![arc_core::PromptDefinition {
+                    name: "p1".into(),
+                    title: None,
+                    description: None,
+                    arguments: vec![],
+                    icons: None,
+                }]);
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let result = adapter.get_prompt("p1", serde_json::json!({}))
+        let result = adapter
+            .get_prompt("p1", serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected prompt"));
         assert_eq!(result.messages.len(), 1);
@@ -1758,9 +1840,11 @@ mod tests {
 
     #[test]
     fn adapter_complete_prompt_argument_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let result = adapter.complete_prompt_argument("p", "arg", "val", &serde_json::json!({}))
+        let result = adapter
+            .complete_prompt_argument("p", "arg", "val", &serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected completion"));
         assert_eq!(result.values, vec!["val-completed"]);
@@ -1768,9 +1852,11 @@ mod tests {
 
     #[test]
     fn adapter_complete_resource_argument_delegates() {
-        let transport = MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
+        let transport =
+            MockTransport::simple(vec![], MockCallBehavior::Success(success_result("ok")));
         let adapter = McpAdapter::new(default_config(), Box::new(transport));
-        let result = adapter.complete_resource_argument("u", "arg", "val", &serde_json::json!({}))
+        let result = adapter
+            .complete_resource_argument("u", "arg", "val", &serde_json::json!({}))
             .unwrap_or_else(|e| panic!("{e}"))
             .unwrap_or_else(|| panic!("expected completion"));
         assert_eq!(result.values, vec!["val-res-completed"]);

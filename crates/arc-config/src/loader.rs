@@ -240,8 +240,7 @@ wasm_guards:
     path: /etc/arc/guards/audit.wasm
     advisory: true
 "#;
-        let config =
-            load_from_str(yaml).unwrap_or_else(|e| panic!("load should work: {e}"));
+        let config = load_from_str(yaml).unwrap_or_else(|e| panic!("load should work: {e}"));
         assert!(config.guards.allow_advisory_promotion);
         assert_eq!(config.guards.required.len(), 2);
         assert_eq!(config.guards.required[0], "internal-network");
@@ -259,8 +258,8 @@ wasm_guards:
 
     #[test]
     fn guards_default_when_omitted() {
-        let config = load_from_str(minimal_yaml())
-            .unwrap_or_else(|e| panic!("load should work: {e}"));
+        let config =
+            load_from_str(minimal_yaml()).unwrap_or_else(|e| panic!("load should work: {e}"));
         assert!(!config.guards.allow_advisory_promotion);
         assert!(config.guards.required.is_empty());
         assert!(config.wasm_guards.is_empty());

@@ -97,3 +97,57 @@ pub async fn read_sequencer_status(
         availability,
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{ChainlinkNetworkConfig, BASE_MAINNET_CAIP2, BASE_MAINNET_CHAIN_ID};
+
+    fn base_chain(rpc_endpoint: &str, feed: Option<&str>) -> ChainlinkNetworkConfig {
+        ChainlinkNetworkConfig {
+            chain_id: BASE_MAINNET_CHAIN_ID,
+            label: "base-mainnet".to_string(),
+            caip2: BASE_MAINNET_CAIP2.to_string(),
+            rpc_endpoint: rpc_endpoint.to_string(),
+            enabled: true,
+            sequencer_uptime_feed: feed.map(ToString::to_string),
+            sequencer_grace_period_seconds: 300,
+        }
+    }
+
+    #[tokio::test]
+    async fn returns_none_when_no_sequencer_feed_is_configured() {
+        let result = read_sequencer_status(&base_chain("https://rpc.example", None), 1_743_292_780)
+            .await
+            .expect("no feed configured");
+
+        assert_eq!(result, None);
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_rpc_endpoints() {
+        let error = read_sequencer_status(
+            &base_chain(
+                "not a url",
+                Some("0xFdB631F5EE196F0ed6FAa767959853A9F217697D"),
+            ),
+            1_743_292_780,
+        )
+        .await
+        .expect_err("invalid rpc endpoint");
+
+        assert!(matches!(error, PriceOracleError::InvalidConfiguration(_)));
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_feed_addresses() {
+        let error = read_sequencer_status(
+            &base_chain("https://rpc.example", Some("not-an-address")),
+            1_743_292_780,
+        )
+        .await
+        .expect_err("invalid sequencer feed");
+
+        assert!(matches!(error, PriceOracleError::InvalidConfiguration(_)));
+    }
+}

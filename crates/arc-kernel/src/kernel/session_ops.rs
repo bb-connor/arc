@@ -74,7 +74,9 @@ impl ArcKernel {
         &self,
         session_id: &SessionId,
     ) -> Result<Vec<NormalizedRoot>, KernelError> {
-        self.with_session(session_id, |session| Ok(session.normalized_roots().to_vec()))
+        self.with_session(session_id, |session| {
+            Ok(session.normalized_roots().to_vec())
+        })
     }
 
     /// Return only the enforceable filesystem root paths for a session.
@@ -257,7 +259,10 @@ impl ArcKernel {
         session_id: &SessionId,
         uri: &str,
     ) -> Result<bool, KernelError> {
-        self.with_session(session_id, |session| Ok(session.is_resource_subscribed(uri)))
+        self.with_session(
+            session_id,
+            |session| Ok(session.is_resource_subscribed(uri)),
+        )
     }
 
     /// Mark a session as draining. New tool calls are rejected after this point.
@@ -502,7 +507,7 @@ impl ArcKernel {
                     &request,
                     Some(session_roots.as_slice()),
                 )
-                    .map(SessionOperationResponse::ToolCall)
+                .map(SessionOperationResponse::ToolCall)
             }
             SessionOperation::CreateMessage(_) => Err(KernelError::Internal(
                 "sampling/createMessage must be evaluated by an MCP edge with a client transport"

@@ -2,6 +2,11 @@ use std::fs;
 use std::path::Path;
 
 use crate::enterprise_federation::{EnterpriseProviderRecord, EnterpriseProviderRegistry};
+use crate::federation_policy::{
+    FederationAdmissionEvaluationRequest, FederationAdmissionPolicyDeleteResponse,
+    FederationAdmissionPolicyListResponse, FederationAdmissionPolicyRecord,
+    FederationAdmissionPolicyRegistry,
+};
 use crate::policy::{load_policy, DefaultCapability};
 use crate::{
     certify, load_or_create_authority_keypair, require_control_token, trust_control, CliError,
@@ -25,6 +30,15 @@ fn require_certification_registry_file(path: Option<&Path>) -> Result<&Path, Cli
     })
 }
 
+fn require_federation_policies_file(path: Option<&Path>) -> Result<&Path, CliError> {
+    path.ok_or_else(|| {
+        CliError::Other(
+            "federation policy commands require --federation-policies-file when --control-url is not set"
+                .to_string(),
+        )
+    })
+}
+
 fn load_enterprise_provider_registry_local(
     path: &Path,
 ) -> Result<EnterpriseProviderRegistry, CliError> {
@@ -32,6 +46,16 @@ fn load_enterprise_provider_registry_local(
         EnterpriseProviderRegistry::load(path)
     } else {
         Ok(EnterpriseProviderRegistry::default())
+    }
+}
+
+fn load_federation_policy_registry_local(
+    path: &Path,
+) -> Result<FederationAdmissionPolicyRegistry, CliError> {
+    if path.exists() {
+        FederationAdmissionPolicyRegistry::load(path)
+    } else {
+        Ok(FederationAdmissionPolicyRegistry::default())
     }
 }
 
@@ -187,6 +211,195 @@ pub(crate) fn cmd_trust_provider_delete(
     } else {
         println!("provider_deleted: {}", response.deleted);
         println!("provider_id:      {}", response.provider_id);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn cmd_trust_federation_policy_list(
+    json_output: bool,
+    federation_policies_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.list_federation_policies()?
+    } else {
+        let path = require_federation_policies_file(federation_policies_file)?;
+        let registry = load_federation_policy_registry_local(path)?;
+        FederationAdmissionPolicyListResponse {
+            configured: true,
+            count: registry.policies.len(),
+            policies: registry.policies.into_values().collect(),
+        }
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("federation_policies: {}", response.count);
+        for policy in response.policies {
+            println!(
+                "- {} operator={} min_score={}",
+                policy.policy.body.policy_id,
+                policy.policy.body.governing_operator_id,
+                policy
+                    .minimum_reputation_score
+                    .map(|value| format!("{value:.3}"))
+                    .unwrap_or_else(|| "none".to_string())
+            );
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn cmd_trust_federation_policy_get(
+    policy_id: &str,
+    json_output: bool,
+    federation_policies_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let record = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.get_federation_policy(policy_id)?
+    } else {
+        let path = require_federation_policies_file(federation_policies_file)?;
+        let registry = load_federation_policy_registry_local(path)?;
+        registry.get(policy_id).cloned().ok_or_else(|| {
+            CliError::Other(format!("federation policy `{policy_id}` was not found"))
+        })?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&record)?);
+    } else {
+        println!("policy_id:               {}", record.policy.body.policy_id);
+        println!(
+            "governing_operator_id:   {}",
+            record.policy.body.governing_operator_id
+        );
+        println!("published_at:            {}", record.published_at);
+        println!(
+            "minimum_reputation_score: {}",
+            record
+                .minimum_reputation_score
+                .map(|value| format!("{value:.3}"))
+                .unwrap_or_else(|| "none".to_string())
+        );
+    }
+
+    Ok(())
+}
+
+pub(crate) fn cmd_trust_federation_policy_upsert(
+    input_path: &Path,
+    json_output: bool,
+    federation_policies_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let record: FederationAdmissionPolicyRecord = serde_json::from_slice(&fs::read(input_path)?)?;
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?
+            .upsert_federation_policy(&record.policy.body.policy_id, &record)?
+    } else {
+        let path = require_federation_policies_file(federation_policies_file)?;
+        let mut registry = load_federation_policy_registry_local(path)?;
+        registry.upsert(record.clone())?;
+        registry.save(path)?;
+        registry
+            .get(&record.policy.body.policy_id)
+            .cloned()
+            .ok_or_else(|| {
+                CliError::Other(
+                    "federation policy upsert did not persist the requested record".to_string(),
+                )
+            })?
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("federation policy upserted: {}", response.policy.body.policy_id);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn cmd_trust_federation_policy_delete(
+    policy_id: &str,
+    json_output: bool,
+    federation_policies_file: Option<&Path>,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let response = if let Some(url) = control_url {
+        let token = require_control_token(control_token)?;
+        trust_control::build_client(url, token)?.delete_federation_policy(policy_id)?
+    } else {
+        let path = require_federation_policies_file(federation_policies_file)?;
+        let mut registry = load_federation_policy_registry_local(path)?;
+        let deleted = registry.remove(policy_id);
+        registry.save(path)?;
+        FederationAdmissionPolicyDeleteResponse {
+            policy_id: policy_id.to_string(),
+            deleted,
+        }
+    };
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("policy_deleted: {}", response.deleted);
+        println!("policy_id:      {}", response.policy_id);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn cmd_trust_federation_policy_evaluate(
+    input_path: &Path,
+    json_output: bool,
+    control_url: Option<&str>,
+    control_token: Option<&str>,
+) -> Result<(), CliError> {
+    let control_url = control_url.ok_or_else(|| {
+        CliError::Other(
+            "federation policy evaluation requires --control-url so trust-control can enforce centralized anti-sybil state"
+                .to_string(),
+        )
+    })?;
+    let token = require_control_token(control_token)?;
+    let request: FederationAdmissionEvaluationRequest =
+        serde_json::from_slice(&fs::read(input_path)?)?;
+    let response =
+        trust_control::build_client(control_url, token)?.evaluate_federation_policy(&request)?;
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&response)?);
+    } else {
+        println!("policy_id:               {}", response.policy_id);
+        println!("subject_key:             {}", response.subject_key);
+        println!("accepted:                {}", response.accepted);
+        println!("decision_reason:         {}", response.decision_reason);
+        println!(
+            "minimum_reputation_score: {}",
+            response
+                .minimum_reputation_score
+                .map(|value| format!("{value:.3}"))
+                .unwrap_or_else(|| "none".to_string())
+        );
+        println!(
+            "observed_reputation_score: {}",
+            response
+                .observed_reputation_score
+                .map(|value| format!("{value:.3}"))
+                .unwrap_or_else(|| "none".to_string())
+        );
     }
 
     Ok(())

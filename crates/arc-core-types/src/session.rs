@@ -1150,6 +1150,20 @@ mod tests {
     }
 
     #[test]
+    fn operation_context_new_sets_default_lineage_fields() {
+        let context = OperationContext::new(
+            SessionId::new("sess-001"),
+            RequestId::new("req-001"),
+            "agent-123".to_string(),
+        );
+        assert_eq!(context.session_id.as_str(), "sess-001");
+        assert_eq!(context.request_id.as_str(), "req-001");
+        assert_eq!(context.agent_id, "agent-123");
+        assert_eq!(context.parent_request_id, None);
+        assert_eq!(context.progress_token, None);
+    }
+
+    #[test]
     fn operation_context_roundtrip_preserves_lineage() {
         let context = OperationContext {
             session_id: SessionId::new("sess-001"),
@@ -1301,6 +1315,71 @@ mod tests {
             normalized,
             NormalizedRoot::NonFileSystem { ref scheme, .. } if scheme == "repo"
         ));
+    }
+
+    #[test]
+    fn root_and_resource_normalization_cover_remaining_helper_edges() {
+        let localhost_root = RootDefinition {
+            uri: "file://localhost/workspace/project/docs".to_string(),
+            name: None,
+        };
+        let normalized = localhost_root.normalize_for_runtime();
+        assert!(normalized.is_enforceable_filesystem());
+        assert_eq!(normalized.uri(), "file://localhost/workspace/project/docs");
+
+        let invalid_file_root = RootDefinition {
+            uri: "file:relative/path".to_string(),
+            name: None,
+        };
+        let normalized = invalid_file_root.normalize_for_runtime();
+        assert!(matches!(
+            normalized,
+            NormalizedRoot::EnforceableFileSystem { ref normalized_path, .. }
+                if normalized_path == "/relative/path"
+        ));
+
+        let invalid_utf8_root = RootDefinition {
+            uri: "file:///workspace/%FF".to_string(),
+            name: None,
+        };
+        assert!(matches!(
+            invalid_utf8_root.normalize_for_runtime(),
+            NormalizedRoot::UnenforceableFileSystem { ref reason, .. }
+                if reason == "invalid_utf8_path"
+        ));
+
+        let read = ReadResourceOperation {
+            capability: make_token(&Keypair::generate()),
+            uri: "file:///workspace/project/docs/../docs/spec.md".to_string(),
+        };
+        let classified = read.classify_uri_for_runtime();
+        assert!(classified.is_enforceable_filesystem());
+        assert_eq!(
+            classified.normalized_filesystem_path(),
+            Some("/workspace/project/docs/spec.md")
+        );
+
+        assert_eq!(
+            normalize_absolute_filesystem_path("/workspace/project/../docs"),
+            Some("/workspace/docs".to_string())
+        );
+        assert_eq!(
+            normalize_absolute_filesystem_path("C:\\Workspace\\ARC\\..\\arc"),
+            Some("C:/Workspace/arc".to_string())
+        );
+        assert_eq!(normalize_absolute_filesystem_path("relative/path"), None);
+        assert_eq!(
+            split_windows_drive("c:/Workspace/arc"),
+            Some(('C', "Workspace/arc"))
+        );
+        assert_eq!(split_windows_drive("D:"), Some(('D', "")));
+        assert_eq!(split_windows_drive("1:/not-a-drive"), None);
+        assert_eq!(
+            extract_uri_scheme("repo+docs://roadmap"),
+            Some("repo+docs".to_string())
+        );
+        assert_eq!(extract_uri_scheme("1repo://roadmap"), None);
+        assert_eq!(extract_uri_scheme("repo^docs://roadmap"), None);
     }
 
     #[test]
@@ -1487,6 +1566,26 @@ mod tests {
     }
 
     #[test]
+    fn session_auth_context_helpers_cover_in_process_and_oauth_without_principal() {
+        let in_process = SessionAuthContext::in_process_anonymous();
+        assert_eq!(in_process.transport, SessionTransport::InProcess);
+        assert!(!in_process.is_authenticated());
+        assert_eq!(in_process.principal(), None);
+
+        let oauth = SessionAuthContext::streamable_http_oauth_bearer(
+            None,
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("arc-mcp".to_string()),
+            vec!["mcp:invoke".to_string()],
+            Some("cafebabe".to_string()),
+            Some("https://app.example".to_string()),
+        );
+        assert!(oauth.is_authenticated());
+        assert_eq!(oauth.principal(), None);
+    }
+
+    #[test]
     fn oauth_session_auth_context_roundtrips_with_federated_claims() {
         let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
             Some("oidc:https://issuer.example#sub:user-123".to_string()),
@@ -1567,6 +1666,32 @@ mod tests {
     }
 
     #[test]
+    fn operation_terminal_state_and_kind_helpers_cover_all_variants() {
+        let completed = OperationTerminalState::Completed;
+        let cancelled = OperationTerminalState::Cancelled {
+            reason: "operator_cancelled".to_string(),
+        };
+        let incomplete = OperationTerminalState::Incomplete {
+            reason: "stream_closed".to_string(),
+        };
+        assert!(completed.is_completed());
+        assert!(!completed.is_cancelled());
+        assert!(cancelled.is_cancelled());
+        assert!(!cancelled.is_incomplete());
+        assert!(incomplete.is_incomplete());
+
+        assert_eq!(OperationKind::ToolCall.as_str(), "tool_call");
+        assert_eq!(OperationKind::ReadResource.as_str(), "read_resource");
+        assert_eq!(
+            OperationKind::ListResourceTemplates.as_str(),
+            "list_resource_templates"
+        );
+        assert_eq!(OperationKind::ListPrompts.as_str(), "list_prompts");
+        assert_eq!(OperationKind::GetPrompt.as_str(), "get_prompt");
+        assert_eq!(OperationKind::Complete.as_str(), "complete");
+    }
+
+    #[test]
     fn arc_identity_assertion_roundtrips_and_validates() {
         let assertion = ArcIdentityAssertion {
             verifier_id: "https://verifier.example.com".to_string(),
@@ -1614,5 +1739,62 @@ mod tests {
             .validate()
             .unwrap_err()
             .contains("identityAssertion.subject"));
+    }
+
+    #[test]
+    fn arc_identity_assertion_rejects_remaining_invalid_fields() {
+        let mut assertion = ArcIdentityAssertion {
+            verifier_id: "https://verifier.example.com".to_string(),
+            subject: "alice@example.com".to_string(),
+            continuity_id: "session-123".to_string(),
+            issued_at: 200,
+            expires_at: 100,
+            provider: Some("oidc".to_string()),
+            session_hint: Some("resume".to_string()),
+            bound_request_id: Some("req-123".to_string()),
+        };
+        assert!(assertion.validate().unwrap_err().contains("issuedAt"));
+
+        assertion = ArcIdentityAssertion {
+            verifier_id: "".to_string(),
+            subject: "alice@example.com".to_string(),
+            continuity_id: "session-123".to_string(),
+            issued_at: 100,
+            expires_at: 200,
+            provider: None,
+            session_hint: None,
+            bound_request_id: None,
+        };
+        assert!(assertion.validate().unwrap_err().contains("verifierId"));
+
+        assertion = ArcIdentityAssertion {
+            verifier_id: "https://verifier.example.com".to_string(),
+            subject: "alice@example.com".to_string(),
+            continuity_id: "".to_string(),
+            issued_at: 100,
+            expires_at: 200,
+            provider: None,
+            session_hint: None,
+            bound_request_id: None,
+        };
+        assert!(assertion.validate().unwrap_err().contains("continuityId"));
+
+        let mut assertion = ArcIdentityAssertion {
+            verifier_id: "https://verifier.example.com".to_string(),
+            subject: "alice@example.com".to_string(),
+            continuity_id: "session-123".to_string(),
+            issued_at: 100,
+            expires_at: 200,
+            provider: Some(" ".to_string()),
+            session_hint: Some("resume".to_string()),
+            bound_request_id: Some("req-123".to_string()),
+        };
+        assert!(assertion.validate().unwrap_err().contains("provider"));
+        assertion.provider = Some("oidc".to_string());
+        assertion.session_hint = Some(" ".to_string());
+        assert!(assertion.validate().unwrap_err().contains("sessionHint"));
+        assertion.session_hint = Some("resume".to_string());
+        assertion.bound_request_id = Some(" ".to_string());
+        assert!(assertion.validate().unwrap_err().contains("boundRequestId"));
     }
 }

@@ -79,12 +79,13 @@ fn native_conformance_suite_runs_against_fixture() {
     let summary = run_native_conformance_suite(&options).expect("run native suite");
     assert_eq!(summary.scenario_count, 6);
 
-    let results: Vec<NativeScenarioResult> = serde_json::from_str(
-        &fs::read_to_string(summary.results_output).expect("read results"),
-    )
-    .expect("parse results");
+    let results: Vec<NativeScenarioResult> =
+        serde_json::from_str(&fs::read_to_string(summary.results_output).expect("read results"))
+            .expect("parse results");
     assert_eq!(results.len(), 6);
-    assert!(results.iter().all(|result| result.status == NativeStatus::Pass));
+    assert!(results
+        .iter()
+        .all(|result| result.status == NativeStatus::Pass));
 
     let report = fs::read_to_string(summary.report_output).expect("read report");
     assert!(report.contains("ARC Native Conformance Report"));
@@ -122,15 +123,11 @@ fn native_standards_artifacts_cover_required_categories_and_references() {
         fs::read_to_string(repo_root.join("docs/standards/ARC_PROTOCOL_ALIGNMENT_MATRIX.md"))
             .expect("read alignment matrix");
     for needle in [
-        "GNAP",
-        "SCITT",
-        "RATS",
-        "RFC 9449",
-        "W3C VC",
-        "OID4VCI",
-        "OID4VP",
-        "RFC 8785",
+        "GNAP", "SCITT", "RATS", "RFC 9449", "W3C VC", "OID4VCI", "OID4VP", "RFC 8785",
     ] {
-        assert!(matrix.contains(needle), "missing standards mapping for {needle}");
+        assert!(
+            matrix.contains(needle),
+            "missing standards mapping for {needle}"
+        );
     }
 }

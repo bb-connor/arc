@@ -159,8 +159,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap =
-            arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+        let cap = arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
 
         let request = arc_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),

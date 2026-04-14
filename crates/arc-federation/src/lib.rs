@@ -1620,6 +1620,17 @@ mod tests {
         }
     }
 
+    fn sample_conflict() -> FederationConflictEvidence {
+        FederationConflictEvidence {
+            divergence_key: "listing-liability-provider-1:hash-mismatch".to_string(),
+            publisher_operator_ids: vec![
+                "origin-operator".to_string(),
+                "mirror-operator-a".to_string(),
+            ],
+            reason: "origin and mirror observed different listing bodies".to_string(),
+        }
+    }
+
     #[test]
     fn activation_exchange_requires_local_policy_import() {
         let mut exchange = sample_activation_exchange();
@@ -1697,6 +1708,766 @@ mod tests {
         assert!(matches!(
             validate_federation_qualification_matrix(&matrix),
             Err(FederationContractError::InvalidQualificationCase(_))
+        ));
+    }
+
+    #[test]
+    fn activation_exchange_rejects_schema_reference_and_operator_mismatches() {
+        let mut exchange = sample_activation_exchange();
+        exchange.schema = "arc.federation-activation-exchange.v0".to_string();
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::UnsupportedSchema(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.target_operator_id = exchange.source_operator_id.clone();
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.expires_at = exchange.issued_at;
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.activation_ref.kind = FederationArtifactKind::Listing;
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.listing_ref.kind = FederationArtifactKind::TrustActivation;
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange
+            .governing_charter_ref
+            .as_mut()
+            .expect("charter")
+            .kind = FederationArtifactKind::Listing;
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.delegation_control.delegator_operator_id = "other-operator".to_string();
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut exchange = sample_activation_exchange();
+        exchange.delegation_control.delegate_operator_id = "other-operator".to_string();
+        assert!(matches!(
+            validate_federation_activation_exchange(&exchange),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+    }
+
+    #[test]
+    fn federation_helper_validators_reject_invalid_boundary_inputs() {
+        let mut reference = sample_reference(
+            FederationArtifactKind::Listing,
+            "arc.registry.listing.v1",
+            "listing-1",
+            "origin-operator",
+            'a',
+        );
+        reference.sha256 = "deadbeef".to_string();
+        assert!(matches!(
+            validate_federation_artifact_reference(&reference, "reference"),
+            Err(FederationContractError::InvalidReference(_))
+        ));
+
+        let mut scope = sample_activation_exchange().scope;
+        scope.allowed_actor_kinds.clear();
+        assert!(matches!(
+            validate_federation_scope(&scope),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut scope = sample_activation_exchange().scope;
+        scope.allowed_admission_classes.clear();
+        assert!(matches!(
+            validate_federation_scope(&scope),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut scope = sample_activation_exchange().scope;
+        scope.policy_reference = Some("   ".to_string());
+        assert!(matches!(
+            validate_federation_scope(&scope),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut control = sample_activation_exchange().delegation_control;
+        control.delegate_operator_id = control.delegator_operator_id.clone();
+        assert!(matches!(
+            validate_delegation_control(&control),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut control = sample_activation_exchange().delegation_control;
+        control.max_hops = 0;
+        assert!(matches!(
+            validate_delegation_control(&control),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut control = sample_activation_exchange().delegation_control;
+        control.attenuation_required = false;
+        assert!(matches!(
+            validate_delegation_control(&control),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut control = sample_activation_exchange().delegation_control;
+        control.visibility_only_until_local_activation = false;
+        assert!(matches!(
+            validate_delegation_control(&control),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut import = FederationImportControl::default();
+        import.manual_review_required = false;
+        assert!(matches!(
+            validate_import_control(&import),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut import = FederationImportControl::default();
+        import.reject_stale_inputs = false;
+        assert!(matches!(
+            validate_import_control(&import),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut import = FederationImportControl::default();
+        import.allow_visibility_without_runtime_trust = false;
+        assert!(matches!(
+            validate_import_control(&import),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut import = FederationImportControl::default();
+        import.prohibit_ambient_runtime_admission = false;
+        assert!(matches!(
+            validate_import_control(&import),
+            Err(FederationContractError::InvalidExchange(_))
+        ));
+
+        let mut anti_eclipse = FederationAntiEclipsePolicy::default();
+        anti_eclipse.minimum_distinct_operators = 0;
+        assert!(matches!(
+            validate_anti_eclipse_policy(&anti_eclipse),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        assert!(matches!(
+            validate_positive_money(
+                &MonetaryAmount {
+                    units: 0,
+                    currency: "USD".to_string(),
+                },
+                "bond"
+            ),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        assert!(matches!(
+            validate_positive_money(
+                &MonetaryAmount {
+                    units: 10,
+                    currency: "US".to_string(),
+                },
+                "bond"
+            ),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        assert!(matches!(
+            validate_hex_digest("", "digest"),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        assert!(matches!(
+            validate_hex_digest("xyz", "digest"),
+            Err(FederationContractError::InvalidReference(_))
+        ));
+
+        assert!(matches!(
+            ensure_unique_strings(&["origin".to_string(), "origin".to_string()], "operators"),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        assert!(matches!(
+            ensure_unique_copy_values(
+                &[
+                    GenericTrustAdmissionClass::Reviewable,
+                    GenericTrustAdmissionClass::Reviewable,
+                ],
+                "classes"
+            ),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+    }
+
+    #[test]
+    fn quorum_report_rejects_invalid_observations_and_policy_failures() {
+        let mut report = sample_quorum_report();
+        report.schema = "arc.federation-quorum-report.v0".to_string();
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::UnsupportedSchema(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.quorum_threshold = 0;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.max_replica_age_secs = 0;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers.clear();
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[0].report_ref.kind = FederationArtifactKind::Listing;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[0].report_ref.operator_id = "other-operator".to_string();
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[0].observed_listing_sha256 = "bad-digest".to_string();
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidReference(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[1].upstream_hop_count = 2;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[1].publisher.operator_id =
+            report.publishers[0].publisher.operator_id.clone();
+        report.publishers[1].report_ref.operator_id =
+            report.publishers[0].publisher.operator_id.clone();
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report
+            .publishers
+            .retain(|publisher| publisher.publisher.role != GenericRegistryPublisherRole::Indexer);
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.anti_eclipse_policy.minimum_distinct_operators = 4;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+    }
+
+    #[test]
+    fn quorum_report_rejects_invalid_conflict_and_state_combinations() {
+        let mut report = sample_quorum_report();
+        report.conflicts = vec![sample_conflict(), sample_conflict()];
+        report.final_state = FederationQuorumState::Conflicting;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.conflicts.push(sample_conflict());
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.publishers[0].freshness.state = GenericListingFreshnessState::Stale;
+        report.publishers[0].freshness.age_secs = 400;
+        report.publishers[1].freshness.state = GenericListingFreshnessState::Stale;
+        report.publishers[1].freshness.age_secs = 400;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.final_state = FederationQuorumState::Conflicting;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.final_state = FederationQuorumState::InsufficientQuorum;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+
+        let mut report = sample_quorum_report();
+        report.final_state = FederationQuorumState::Stale;
+        report.publishers[0].freshness.state = GenericListingFreshnessState::Fresh;
+        assert!(matches!(
+            validate_federation_quorum_report(&report),
+            Err(FederationContractError::InvalidQuorum(_))
+        ));
+    }
+
+    #[test]
+    fn open_admission_policy_and_stake_rules_reject_invalid_configurations() {
+        let mut policy = sample_open_admission_policy();
+        policy.schema = "arc.federation-open-admission-policy.v0".to_string();
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::UnsupportedSchema(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.allowed_admission_classes.clear();
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy
+            .allowed_admission_classes
+            .push(GenericTrustAdmissionClass::Reviewable);
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.governing_charter_ref.kind = FederationArtifactKind::Listing;
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.fee_schedule_ref.kind = FederationArtifactKind::GovernanceCharter;
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.explicit_local_review_required = false;
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.visibility_only_without_activation = false;
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        policy.stake_requirements[0].admission_class = GenericTrustAdmissionClass::RoleGated;
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut policy = sample_open_admission_policy();
+        let duplicate = policy.stake_requirements[0].clone();
+        policy.stake_requirements.push(duplicate);
+        assert!(matches!(
+            validate_federated_open_admission_policy(&policy),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.minimum_bond_amount = None;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.required_bond_class = None;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.slashable = false;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.minimum_bond_amount = Some(MonetaryAmount {
+            units: 0,
+            currency: "USD".to_string(),
+        });
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.minimum_bond_amount = Some(MonetaryAmount {
+            units: 10,
+            currency: "US".to_string(),
+        });
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.admission_class = GenericTrustAdmissionClass::PublicUntrusted;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.admission_class = GenericTrustAdmissionClass::RoleGated;
+        requirement.required_bond_class = None;
+        requirement.minimum_bond_amount = None;
+        requirement.governance_case_required = false;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+
+        let mut requirement = sample_open_admission_policy().stake_requirements[0].clone();
+        requirement.admission_class = GenericTrustAdmissionClass::RoleGated;
+        requirement.governance_case_required = true;
+        assert!(matches!(
+            validate_stake_requirement(&requirement),
+            Err(FederationContractError::InvalidAdmission(_))
+        ));
+    }
+
+    #[test]
+    fn reputation_input_and_sybil_helpers_reject_invalid_values() {
+        let clearing = sample_reputation_clearing();
+
+        let mut input = clearing.inputs[0].clone();
+        input.subject_key = "someone-else".to_string();
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.weight_bps = 0;
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.published_at = clearing.generated_at + 1;
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.expires_at = Some(input.published_at);
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.blocking = true;
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.artifact_ref.kind = FederationArtifactKind::PortableNegativeEvent;
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[2].clone();
+        input.artifact_ref.kind = FederationArtifactKind::PortableReputationSummary;
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut sybil = FederatedSybilControl::default();
+        sybil.minimum_independent_issuers = 0;
+        assert!(matches!(
+            validate_sybil_control(&sybil),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut sybil = FederatedSybilControl::default();
+        sybil.maximum_inputs_per_issuer = 0;
+        assert!(matches!(
+            validate_sybil_control(&sybil),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut sybil = FederatedSybilControl::default();
+        sybil.oracle_cap_bps = 10_001;
+        assert!(matches!(
+            validate_sybil_control(&sybil),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut sybil = FederatedSybilControl::default();
+        sybil.local_weighting_required = false;
+        assert!(matches!(
+            validate_sybil_control(&sybil),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+    }
+
+    #[test]
+    fn reputation_clearing_rejects_invalid_classification_and_sybil_outcomes() {
+        let mut clearing = sample_reputation_clearing();
+        clearing.schema = "arc.federation-reputation-clearing.v0".to_string();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::UnsupportedSchema(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.participating_operator_ids.clear();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.participating_operator_ids[1] = clearing.participating_operator_ids[0].clone();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.inputs.clear();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing
+            .accepted_input_ids
+            .push("summary-origin-1".to_string());
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.rejected_input_ids = vec![
+            "negative-origin-1".to_string(),
+            "negative-origin-1".to_string(),
+        ];
+        clearing
+            .accepted_input_ids
+            .retain(|id| id != "negative-origin-1");
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing
+            .rejected_input_ids
+            .push("summary-origin-1".to_string());
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.accepted_input_ids.pop();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.inputs[1].issuer_operator_id = "origin-operator".to_string();
+        clearing.inputs[1].artifact_ref.operator_id = "origin-operator".to_string();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.inputs[0].weight_bps = 4_001;
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.accepted_input_ids = vec![
+            "summary-origin-1".to_string(),
+            "negative-origin-1".to_string(),
+        ];
+        clearing.rejected_input_ids = vec![
+            "summary-mirror-a-1".to_string(),
+            "negative-indexer-a-1".to_string(),
+        ];
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.accepted_input_ids = vec![
+            "summary-origin-1".to_string(),
+            "summary-mirror-a-1".to_string(),
+            "negative-indexer-a-1".to_string(),
+        ];
+        clearing.rejected_input_ids = vec!["negative-origin-1".to_string()];
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.accepted_input_ids.clear();
+        clearing.rejected_input_ids = clearing
+            .inputs
+            .iter()
+            .map(|input| input.artifact_ref.artifact_id.clone())
+            .collect();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+    }
+
+    #[test]
+    fn qualification_matrix_rejects_case_level_misconfigurations() {
+        let mut matrix = sample_qualification_matrix();
+        matrix.schema = "arc.federation-qualification-matrix.v0".to_string();
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::UnsupportedSchema(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases.clear();
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].requirement_ids.clear();
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::InvalidQualificationCase(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0]
+            .requirement_ids
+            .push("TRUSTMAX-01".to_string());
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[1].id = matrix.cases[0].id.clone();
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::DuplicateValue(_))
+        ));
+
+        let mut matrix = sample_qualification_matrix();
+        matrix.cases[0].notes.clear();
+        assert!(matches!(
+            validate_federation_qualification_matrix(&matrix),
+            Err(FederationContractError::MissingField(_))
         ));
     }
 }

@@ -202,3 +202,174 @@ fn push_workload_identity_assertions(
         );
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::capability::{RuntimeAssuranceTier, WorkloadCredentialKind, WorkloadIdentityScheme};
+    use serde_json::json;
+
+    fn sample_workload_identity() -> WorkloadIdentity {
+        WorkloadIdentity {
+            scheme: WorkloadIdentityScheme::Spiffe,
+            credential_kind: WorkloadCredentialKind::Uri,
+            uri: "spiffe://prod.arc/payments/worker".to_string(),
+            trust_domain: "prod.arc".to_string(),
+            path: "/payments/worker".to_string(),
+        }
+    }
+
+    fn sample_evidence(schema: &str, claims: serde_json::Value) -> RuntimeAttestationEvidence {
+        RuntimeAttestationEvidence {
+            schema: schema.to_string(),
+            verifier: "verifier.arc".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: Some("spiffe://prod.arc/payments/worker".to_string()),
+            workload_identity: Some(sample_workload_identity()),
+            claims: Some(claims),
+        }
+    }
+
+    #[test]
+    fn verifier_family_mapping_covers_supported_and_unknown_schemas() {
+        assert_eq!(
+            verifier_family_for_attestation_schema(AZURE_MAA_ATTESTATION_SCHEMA),
+            Some(AttestationVerifierFamily::AzureMaa)
+        );
+        assert_eq!(
+            verifier_family_for_attestation_schema(AWS_NITRO_ATTESTATION_SCHEMA),
+            Some(AttestationVerifierFamily::AwsNitro)
+        );
+        assert_eq!(
+            verifier_family_for_attestation_schema(GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA),
+            Some(AttestationVerifierFamily::GoogleAttestation)
+        );
+        assert_eq!(
+            verifier_family_for_attestation_schema(ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA),
+            Some(AttestationVerifierFamily::EnterpriseVerifier)
+        );
+        assert_eq!(
+            verifier_family_for_attestation_schema("arc.unknown.v1"),
+            None
+        );
+    }
+
+    #[test]
+    fn derive_runtime_attestation_trust_material_normalizes_vendor_specific_claims() {
+        let azure = derive_runtime_attestation_trust_material(&sample_evidence(
+            AZURE_MAA_ATTESTATION_SCHEMA,
+            json!({
+                "azureMaa": {
+                    "attestationType": "sgx"
+                }
+            }),
+        ))
+        .expect("azure trust material");
+        assert_eq!(azure.verifier_family, AttestationVerifierFamily::AzureMaa);
+        assert_eq!(
+            azure.normalized_assertions.get("attestationType"),
+            Some(&json!("sgx"))
+        );
+        assert_eq!(
+            azure.normalized_assertions.get("runtimeIdentity"),
+            Some(&json!("spiffe://prod.arc/payments/worker"))
+        );
+        assert_eq!(
+            azure.normalized_assertions.get("workloadIdentityScheme"),
+            Some(&json!("spiffe"))
+        );
+
+        let aws = derive_runtime_attestation_trust_material(&sample_evidence(
+            AWS_NITRO_ATTESTATION_SCHEMA,
+            json!({
+                "awsNitro": {
+                    "moduleId": "mod-1",
+                    "digest": "sha384",
+                    "pcrs": {"0": "abcd"}
+                }
+            }),
+        ))
+        .expect("aws trust material");
+        assert_eq!(aws.verifier_family, AttestationVerifierFamily::AwsNitro);
+        assert_eq!(
+            aws.normalized_assertions.get("moduleId"),
+            Some(&json!("mod-1"))
+        );
+        assert_eq!(
+            aws.normalized_assertions.get("digest"),
+            Some(&json!("sha384"))
+        );
+        assert_eq!(
+            aws.normalized_assertions.get("pcrs"),
+            Some(&json!({"0": "abcd"}))
+        );
+
+        let google = derive_runtime_attestation_trust_material(&sample_evidence(
+            GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
+            json!({
+                "googleAttestation": {
+                    "attestationType": "confidential_vm",
+                    "hardwareModel": "GCP_AMD_SEV",
+                    "secureBoot": "enabled"
+                }
+            }),
+        ))
+        .expect("google trust material");
+        assert_eq!(
+            google.verifier_family,
+            AttestationVerifierFamily::GoogleAttestation
+        );
+        assert_eq!(
+            google.normalized_assertions.get("hardwareModel"),
+            Some(&json!("GCP_AMD_SEV"))
+        );
+        assert_eq!(
+            google.normalized_assertions.get("secureBoot"),
+            Some(&json!("enabled"))
+        );
+
+        let enterprise = derive_runtime_attestation_trust_material(&sample_evidence(
+            ENTERPRISE_VERIFIER_ATTESTATION_SCHEMA,
+            json!({
+                "enterpriseVerifier": {
+                    "attestationType": "enterprise",
+                    "moduleId": "module-x",
+                    "digest": "sha256",
+                    "pcrs": {"8": "beef"},
+                    "hardwareModel": "nitro",
+                    "secureBoot": true
+                }
+            }),
+        ))
+        .expect("enterprise trust material");
+        assert_eq!(
+            enterprise.verifier_family,
+            AttestationVerifierFamily::EnterpriseVerifier
+        );
+        assert_eq!(
+            enterprise.normalized_assertions.get("moduleId"),
+            Some(&json!("module-x"))
+        );
+        assert_eq!(
+            enterprise.normalized_assertions.get("workloadIdentityUri"),
+            Some(&json!("spiffe://prod.arc/payments/worker"))
+        );
+    }
+
+    #[test]
+    fn derive_runtime_attestation_trust_material_rejects_unsupported_schema() {
+        let error = derive_runtime_attestation_trust_material(&sample_evidence(
+            "arc.runtime-attestation.unknown.v1",
+            json!({}),
+        ))
+        .expect_err("unsupported schema should fail");
+        assert!(matches!(
+            error,
+            RuntimeAttestationTrustMaterialError::UnsupportedSchema { .. }
+        ));
+    }
+}

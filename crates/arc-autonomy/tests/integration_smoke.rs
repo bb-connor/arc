@@ -1,4 +1,6 @@
-use arc_autonomy::{AutonomousEvidenceKind, AutonomousEvidenceReference, AutonomousPricingSupportBoundary};
+use arc_autonomy::{
+    AutonomousEvidenceKind, AutonomousEvidenceReference, AutonomousPricingSupportBoundary,
+};
 
 #[test]
 fn autonomy_support_boundary_defaults_fail_closed() {

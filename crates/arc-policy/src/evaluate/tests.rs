@@ -1,17 +1,22 @@
 #[cfg(test)]
 mod tests {
+    use std::collections::{BTreeMap, HashMap};
+
     use arc_core::capability::{
         RuntimeAssuranceTier, WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityScheme,
     };
 
     use crate::models::{
-        DefaultAction, Extensions, HushSpec, OriginMatch, OriginProfile, OriginsExtension, Rules,
-        ToolAccessRule, WorkloadIdentityMatch,
+        ComputerUseMode, ComputerUseRule, DefaultAction, EgressRule, Extensions,
+        ForbiddenPathsRule, HushSpec, InputInjectionRule, OriginMatch, OriginProfile,
+        OriginsExtension, PatchIntegrityRule, PostureExtension, PostureState, PostureTransition,
+        RemoteDesktopChannelsRule, Rules, SecretPattern, SecretPatternsRule, Severity,
+        ShellCommandsRule, ToolAccessRule, WorkloadIdentityMatch,
     };
 
     use super::{
-        evaluate, selected_origin_profile_id, Decision, EvaluationAction, OriginContext,
-        RuntimeAttestationContext,
+        evaluate, evaluate_with_context, selected_origin_profile_id, Condition, Decision,
+        EvaluationAction, OriginContext, PostureContext, RuntimeAttestationContext, RuntimeContext,
     };
 
     fn origin_profile(id: &str, match_rules: OriginMatch) -> OriginProfile {
@@ -83,6 +88,31 @@ mod tests {
                 runtime_assurance: None,
             }),
             metadata: None,
+        }
+    }
+
+    fn spec_with_rules(rules: Rules) -> HushSpec {
+        HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("evaluate-branch-tests".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(rules),
+            extensions: Some(Extensions::default()),
+            metadata: None,
+        }
+    }
+
+    fn action(action_type: &str, target: &str) -> EvaluationAction {
+        EvaluationAction {
+            action_type: action_type.to_string(),
+            target: Some(target.to_string()),
+            content: None,
+            origin: None,
+            posture: None,
+            args_size: None,
+            runtime_attestation: None,
         }
     }
 
@@ -577,6 +607,346 @@ mod tests {
                 .as_deref()
                 .is_some_and(|reason| reason.contains("workload identity")),
             "expected workload-identity warning reason"
+        );
+    }
+
+    #[test]
+    fn evaluate_with_context_disables_rule_blocks_when_condition_is_false() {
+        let spec = spec_with_rules(Rules {
+            egress: Some(EgressRule {
+                enabled: true,
+                allow: Vec::new(),
+                block: vec!["api.example.com".to_string()],
+                default: DefaultAction::Allow,
+            }),
+            ..Rules::default()
+        });
+        let conditions = HashMap::from([(
+            "egress".to_string(),
+            Condition {
+                context: Some(HashMap::from([(
+                    "environment".to_string(),
+                    serde_json::json!("prod"),
+                )])),
+                ..Condition::default()
+            },
+        )]);
+
+        let dev_result = evaluate_with_context(
+            &spec,
+            &action("egress", "api.example.com"),
+            &RuntimeContext {
+                environment: Some("dev".to_string()),
+                ..RuntimeContext::default()
+            },
+            &conditions,
+        );
+        assert_eq!(dev_result.decision, Decision::Allow);
+
+        let prod_result = evaluate_with_context(
+            &spec,
+            &action("egress", "api.example.com"),
+            &RuntimeContext {
+                environment: Some("prod".to_string()),
+                ..RuntimeContext::default()
+            },
+            &conditions,
+        );
+        assert_eq!(prod_result.decision, Decision::Deny);
+        assert_eq!(
+            prod_result.matched_rule.as_deref(),
+            Some("rules.egress.block")
+        );
+    }
+
+    #[test]
+    fn file_read_forbidden_path_exception_allows_the_target() {
+        let spec = spec_with_rules(Rules {
+            forbidden_paths: Some(ForbiddenPathsRule {
+                enabled: true,
+                patterns: vec!["/secret/**".to_string()],
+                exceptions: vec!["/secret/public.txt".to_string()],
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("file_read", "/secret/public.txt"));
+
+        assert_eq!(result.decision, Decision::Allow);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.forbidden_paths.exceptions")
+        );
+    }
+
+    #[test]
+    fn file_write_secret_scanning_denies_matching_content() {
+        let spec = spec_with_rules(Rules {
+            secret_patterns: Some(SecretPatternsRule {
+                enabled: true,
+                patterns: vec![SecretPattern {
+                    name: "api_key".to_string(),
+                    pattern: "API_KEY=".to_string(),
+                    severity: Severity::Critical,
+                    description: None,
+                }],
+                skip_paths: Vec::new(),
+            }),
+            ..Rules::default()
+        });
+
+        let mut write_action = action("file_write", "/workspace/.env");
+        write_action.content = Some("API_KEY=secret".to_string());
+
+        let result = evaluate(&spec, &write_action);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.secret_patterns.patterns.api_key")
+        );
+    }
+
+    #[test]
+    fn patch_integrity_rejects_forbidden_patterns() {
+        let spec = spec_with_rules(Rules {
+            patch_integrity: Some(PatchIntegrityRule {
+                enabled: true,
+                max_additions: 20,
+                max_deletions: 20,
+                forbidden_patterns: vec!["TODO".to_string()],
+                require_balance: false,
+                max_imbalance_ratio: 2.0,
+            }),
+            ..Rules::default()
+        });
+        let mut patch = action("patch_apply", "src/lib.rs");
+        patch.content = Some("--- a/src/lib.rs\n+++ b/src/lib.rs\n+// TODO: remove".to_string());
+
+        let result = evaluate(&spec, &patch);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.patch_integrity.forbidden_patterns[0]")
+        );
+    }
+
+    #[test]
+    fn patch_integrity_rejects_imbalanced_changes() {
+        let spec = spec_with_rules(Rules {
+            patch_integrity: Some(PatchIntegrityRule {
+                enabled: true,
+                max_additions: 20,
+                max_deletions: 20,
+                forbidden_patterns: Vec::new(),
+                require_balance: true,
+                max_imbalance_ratio: 1.5,
+            }),
+            ..Rules::default()
+        });
+        let mut patch = action("patch_apply", "src/lib.rs");
+        patch.content =
+            Some("--- a/src/lib.rs\n+++ b/src/lib.rs\n+one\n+two\n+three\n-old".to_string());
+
+        let result = evaluate(&spec, &patch);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.patch_integrity.max_imbalance_ratio")
+        );
+    }
+
+    #[test]
+    fn shell_commands_deny_forbidden_patterns() {
+        let spec = spec_with_rules(Rules {
+            shell_commands: Some(ShellCommandsRule {
+                enabled: true,
+                forbidden_patterns: vec!["rm\\s+-rf".to_string()],
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("shell_command", "rm -rf /tmp/cache"));
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.shell_commands.forbidden_patterns[0]")
+        );
+    }
+
+    #[test]
+    fn remote_desktop_controls_can_override_guardrail_computer_use() {
+        let spec = spec_with_rules(Rules {
+            computer_use: Some(ComputerUseRule {
+                enabled: true,
+                mode: ComputerUseMode::Guardrail,
+                allowed_actions: Vec::new(),
+            }),
+            remote_desktop_channels: Some(RemoteDesktopChannelsRule {
+                enabled: true,
+                clipboard: false,
+                file_transfer: false,
+                audio: true,
+                drive_mapping: false,
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("computer_use", "remote.clipboard"));
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.remote_desktop_channels.clipboard")
+        );
+    }
+
+    #[test]
+    fn input_injection_requires_explicit_allowed_types() {
+        let spec = spec_with_rules(Rules {
+            input_injection: Some(InputInjectionRule {
+                enabled: true,
+                allowed_types: Vec::new(),
+                require_postcondition_probe: false,
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("input_inject", "paste"));
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.input_injection.allowed_types")
+        );
+    }
+
+    #[test]
+    fn input_injection_allows_whitelisted_types() {
+        let spec = spec_with_rules(Rules {
+            input_injection: Some(InputInjectionRule {
+                enabled: true,
+                allowed_types: vec!["paste".to_string()],
+                require_postcondition_probe: false,
+            }),
+            ..Rules::default()
+        });
+
+        let result = evaluate(&spec, &action("input_inject", "paste"));
+
+        assert_eq!(result.decision, Decision::Allow);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("rules.input_injection.allowed_types")
+        );
+    }
+
+    #[test]
+    fn posture_transitions_track_the_next_state_when_capability_is_allowed() {
+        let spec = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("posture-transition".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules::default()),
+            extensions: Some(Extensions {
+                posture: Some(PostureExtension {
+                    initial: "review".to_string(),
+                    states: BTreeMap::from([
+                        (
+                            "review".to_string(),
+                            PostureState {
+                                description: None,
+                                capabilities: vec!["shell".to_string()],
+                                budgets: BTreeMap::new(),
+                            },
+                        ),
+                        (
+                            "locked".to_string(),
+                            PostureState {
+                                description: None,
+                                capabilities: Vec::new(),
+                                budgets: BTreeMap::new(),
+                            },
+                        ),
+                    ]),
+                    transitions: vec![PostureTransition {
+                        from: "review".to_string(),
+                        to: "locked".to_string(),
+                        on: crate::models::TransitionTrigger::Timeout,
+                        after: None,
+                    }],
+                }),
+                origins: None,
+                detection: None,
+                reputation: None,
+                runtime_assurance: None,
+            }),
+            metadata: None,
+        };
+        let mut shell = action("shell_command", "echo ok");
+        shell.posture = Some(PostureContext {
+            current: Some("review".to_string()),
+            signal: Some("timeout".to_string()),
+        });
+
+        let result = evaluate(&spec, &shell);
+
+        assert_eq!(result.decision, Decision::Allow);
+        assert_eq!(
+            result.posture,
+            Some(super::PostureResult {
+                current: "review".to_string(),
+                next: "locked".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn posture_capability_guard_denies_missing_capabilities() {
+        let spec = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("posture-guard".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules::default()),
+            extensions: Some(Extensions {
+                posture: Some(PostureExtension {
+                    initial: "review".to_string(),
+                    states: BTreeMap::from([(
+                        "review".to_string(),
+                        PostureState {
+                            description: None,
+                            capabilities: vec!["file_access".to_string()],
+                            budgets: BTreeMap::new(),
+                        },
+                    )]),
+                    transitions: Vec::new(),
+                }),
+                origins: None,
+                detection: None,
+                reputation: None,
+                runtime_assurance: None,
+            }),
+            metadata: None,
+        };
+        let mut shell = action("shell_command", "echo blocked");
+        shell.posture = Some(PostureContext {
+            current: Some("review".to_string()),
+            signal: None,
+        });
+
+        let result = evaluate(&spec, &shell);
+
+        assert_eq!(result.decision, Decision::Deny);
+        assert_eq!(
+            result.matched_rule.as_deref(),
+            Some("extensions.posture.states.review.capabilities")
         );
     }
 }

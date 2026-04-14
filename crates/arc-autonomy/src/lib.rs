@@ -2011,4 +2011,141 @@ mod tests {
         validate_autonomous_drift_report(&drift).unwrap();
         validate_autonomous_qualification_matrix(&matrix).unwrap();
     }
+
+    #[test]
+    fn pricing_input_requires_capital_book_evidence() {
+        let mut input = sample_input();
+        input
+            .evidence_refs
+            .retain(|evidence| evidence.kind != AutonomousEvidenceKind::CapitalBook);
+        assert!(matches!(
+            validate_autonomous_pricing_input(&input),
+            Err(AutonomyContractError::UnknownReference(_))
+        ));
+    }
+
+    #[test]
+    fn pricing_input_requires_web3_evidence_when_settlement_state_present() {
+        let mut input = sample_input();
+        input
+            .evidence_refs
+            .retain(|evidence| evidence.kind != AutonomousEvidenceKind::Web3SettlementReceipt);
+        assert!(matches!(
+            validate_autonomous_pricing_input(&input),
+            Err(AutonomyContractError::UnknownReference(_))
+        ));
+    }
+
+    #[test]
+    fn delegated_authority_requires_reference() {
+        let mut envelope = sample_authority_envelope();
+        envelope.delegated_authority_reference = None;
+        assert!(matches!(
+            validate_autonomous_pricing_authority_envelope(&envelope),
+            Err(AutonomyContractError::MissingField(
+                "autonomous_authority_envelope.delegated_authority_reference"
+            ))
+        ));
+    }
+
+    #[test]
+    fn non_active_authority_cannot_permit_bind() {
+        let mut envelope = sample_authority_envelope();
+        envelope.automation_mode = AutonomousAutomationMode::Advisory;
+        assert!(matches!(
+            validate_autonomous_pricing_authority_envelope(&envelope),
+            Err(AutonomyContractError::InvalidEnvelope(_))
+        ));
+    }
+
+    #[test]
+    fn pricing_decision_rejects_duplicate_explanation_codes() {
+        let mut decision = sample_decision();
+        decision
+            .explanation_factors
+            .push(decision.explanation_factors[0].clone());
+        assert!(matches!(
+            validate_autonomous_pricing_decision(&decision),
+            Err(AutonomyContractError::DuplicateValue(_))
+        ));
+    }
+
+    #[test]
+    fn bind_decision_cannot_auto_approve_when_human_review_required() {
+        let mut decision = sample_decision();
+        decision.authority_envelope.requires_human_review_for_bind = true;
+        assert!(matches!(
+            validate_autonomous_pricing_decision(&decision),
+            Err(AutonomyContractError::InvalidDecision(_))
+        ));
+    }
+
+    #[test]
+    fn optimization_shift_capacity_requires_destination_ref() {
+        let mut optimization = sample_optimization();
+        optimization.recommendations[1].destination_ref = None;
+        assert!(matches!(
+            validate_capital_pool_optimization(&optimization),
+            Err(AutonomyContractError::InvalidOptimization(_))
+        ));
+    }
+
+    #[test]
+    fn capital_pool_simulation_requires_scenario_comparison_support() {
+        let mut report = sample_simulation();
+        report
+            .candidate_optimization
+            .support_boundary
+            .scenario_comparison_supported = false;
+        assert!(matches!(
+            validate_capital_pool_simulation_report(&report),
+            Err(AutonomyContractError::InvalidOptimization(_))
+        ));
+    }
+
+    #[test]
+    fn comparison_report_manual_override_requires_reference() {
+        let mut report = sample_comparison_report();
+        report.disposition = AutonomousComparisonDisposition::ManualOverride;
+        report.override_reference = None;
+        assert!(matches!(
+            validate_autonomous_comparison_report(&report),
+            Err(AutonomyContractError::MissingField(
+                "autonomous_comparison.override_reference"
+            ))
+        ));
+    }
+
+    #[test]
+    fn rollback_plan_rejects_duplicate_triggers() {
+        let mut plan = sample_rollback_plan();
+        plan.triggers.push(plan.triggers[0]);
+        assert!(matches!(
+            validate_autonomous_rollback_plan(&plan),
+            Err(AutonomyContractError::DuplicateValue(_))
+        ));
+    }
+
+    #[test]
+    fn qualification_matrix_requires_requirement_ids() {
+        let mut matrix: AutonomousQualificationMatrix = serde_json::from_str(include_str!(
+            "../../../docs/standards/ARC_AUTONOMOUS_QUALIFICATION_MATRIX.json"
+        ))
+        .unwrap();
+        matrix.cases[0].requirement_ids.clear();
+        assert!(matches!(
+            validate_autonomous_qualification_matrix(&matrix),
+            Err(AutonomyContractError::InvalidQualificationCase(_))
+        ));
+    }
+
+    #[test]
+    fn pricing_decision_rejects_future_training_cutoff() {
+        let mut decision = sample_decision();
+        decision.model.training_cutoff = decision.model.published_at + 1;
+        assert!(matches!(
+            validate_autonomous_pricing_decision(&decision),
+            Err(AutonomyContractError::InvalidDecision(_))
+        ));
+    }
 }

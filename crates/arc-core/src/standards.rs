@@ -269,3 +269,73 @@ fn ensure_string_list(label: &str, values: &[String]) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn portable_claim_catalog_defaults_and_validation_guards_hold() {
+        let catalog = ArcPortableClaimCatalog::default();
+        catalog.validate().expect("default portable claim catalog");
+        assert!(catalog.supports_selective_disclosure("arc_issuer_dids"));
+        assert!(!catalog.supports_selective_disclosure("unknown_claim"));
+
+        let mut invalid = catalog.clone();
+        invalid.schema = "arc.portable-claim-catalog.v9".to_string();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = catalog.clone();
+        invalid.status_reference_kind = " ".to_string();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = catalog;
+        invalid.always_disclosed_claims = vec!["iss".to_string(), "iss".to_string()];
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn portable_identity_binding_validation_rejects_schema_and_empty_fields() {
+        let binding = ArcPortableIdentityBinding::default();
+        binding
+            .validate()
+            .expect("default portable identity binding");
+
+        let mut invalid = binding.clone();
+        invalid.schema = "arc.portable-identity-binding.v9".to_string();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = binding.clone();
+        invalid.subject_binding.clear();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = binding;
+        invalid.arc_provenance_anchor = " ".to_string();
+        assert!(invalid.validate().is_err());
+    }
+
+    #[test]
+    fn governed_authorization_binding_validation_rejects_schema_and_list_errors() {
+        let binding = ArcGovernedAuthorizationBinding::default();
+        binding
+            .validate()
+            .expect("default governed authorization binding");
+
+        let mut invalid = binding.clone();
+        invalid.schema = "arc.governed-auth-binding.v9".to_string();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = binding.clone();
+        invalid.intent_binding_fields.clear();
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = binding.clone();
+        invalid.approval_binding_fields =
+            vec!["approvalTokenId".to_string(), "approvalTokenId".to_string()];
+        assert!(invalid.validate().is_err());
+
+        let mut invalid = binding;
+        invalid.delegated_call_chain_field = " ".to_string();
+        assert!(invalid.validate().is_err());
+    }
+}

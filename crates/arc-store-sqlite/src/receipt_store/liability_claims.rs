@@ -16,7 +16,8 @@ impl SqliteReceiptStore {
         claim.body.validate().map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &claim.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT claim_id FROM liability_claim_packages WHERE claim_id = ?1",
@@ -187,7 +188,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &response.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT claim_response_id
@@ -279,7 +281,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &dispute.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT dispute_id FROM liability_claim_disputes WHERE dispute_id = ?1",
@@ -371,7 +374,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &adjudication.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT adjudication_id
@@ -458,7 +462,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &payout_instruction.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT payout_instruction_id
@@ -552,7 +557,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &payout_receipt.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT payout_receipt_id
@@ -646,7 +652,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &settlement_instruction.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT settlement_instruction_id
@@ -750,7 +757,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &settlement_receipt.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT settlement_receipt_id
@@ -846,7 +854,8 @@ impl SqliteReceiptStore {
         query: &LiabilityClaimWorkflowQuery,
     ) -> Result<LiabilityClaimWorkflowReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json
              FROM liability_claim_packages
              ORDER BY issued_at DESC, claim_id DESC",
@@ -879,7 +888,7 @@ impl SqliteReceiptStore {
             matching_claims += 1;
 
             let provider_response = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_responses
@@ -902,7 +911,7 @@ impl SqliteReceiptStore {
             }
 
             let dispute = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_disputes
@@ -920,7 +929,7 @@ impl SqliteReceiptStore {
             }
 
             let adjudication = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_adjudications
@@ -938,7 +947,7 @@ impl SqliteReceiptStore {
             }
 
             let payout_instruction = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_payout_instructions
@@ -958,7 +967,7 @@ impl SqliteReceiptStore {
             }
 
             let payout_receipt = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_payout_receipts
@@ -986,7 +995,7 @@ impl SqliteReceiptStore {
             }
 
             let settlement_instruction = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_settlement_instructions
@@ -1006,7 +1015,7 @@ impl SqliteReceiptStore {
             }
 
             let settlement_receipt = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_claim_settlement_receipts

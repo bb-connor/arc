@@ -878,7 +878,10 @@ fn initialize_unsupported_protocol_version_rejected() {
         response["error"]["data"]["arcError"]["name"],
         "protocol_version_unsupported"
     );
-    assert_eq!(response["error"]["data"]["arcError"]["category"], "protocol");
+    assert_eq!(
+        response["error"]["data"]["arcError"]["category"],
+        "protocol"
+    );
     assert_eq!(response["error"]["data"]["arcError"]["transient"], false);
     assert_eq!(
         response["error"]["data"]["arcError"]["retry"]["strategy"],

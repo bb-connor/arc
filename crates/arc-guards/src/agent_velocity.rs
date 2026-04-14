@@ -158,9 +158,7 @@ impl Guard for AgentVelocityGuard {
             })?;
             let bucket = buckets
                 .entry(session_key)
-                .or_insert_with(|| {
-                    TokenBucket::new(capacity, max_per_session as u64, window_secs)
-                });
+                .or_insert_with(|| TokenBucket::new(capacity, max_per_session as u64, window_secs));
             if !bucket.try_consume(1) {
                 return Ok(Verdict::Deny);
             }

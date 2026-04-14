@@ -40,7 +40,12 @@ fn assert_schema_accepts(relative_path: &str, instance: &Value) {
     let validator = jsonschema::validator_for(&schema).expect("schema compiles");
     if let Err(error) = validator.validate(instance) {
         let mut details = vec![error.to_string()];
-        details.extend(validator.iter_errors(instance).skip(1).map(|entry| entry.to_string()));
+        details.extend(
+            validator
+                .iter_errors(instance)
+                .skip(1)
+                .map(|entry| entry.to_string()),
+        );
         panic!(
             "schema `{relative_path}` rejected instance:\ninstance={}\nerrors={}",
             serde_json::to_string_pretty(instance).expect("instance pretty prints"),
@@ -180,7 +185,10 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
             "agent/list_capabilities.schema.json",
             to_json(&AgentMessage::ListCapabilities),
         ),
-        ("agent/heartbeat.schema.json", to_json(&AgentMessage::Heartbeat)),
+        (
+            "agent/heartbeat.schema.json",
+            to_json(&AgentMessage::Heartbeat),
+        ),
         (
             "kernel/tool_call_chunk.schema.json",
             to_json(&KernelMessage::ToolCallChunk {
@@ -327,7 +335,10 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
                 id: "cap-wire-001".to_string(),
             }),
         ),
-        ("kernel/heartbeat.schema.json", to_json(&KernelMessage::Heartbeat)),
+        (
+            "kernel/heartbeat.schema.json",
+            to_json(&KernelMessage::Heartbeat),
+        ),
         ("result/ok.schema.json", to_json(&result_ok)),
         (
             "result/stream_complete.schema.json",
@@ -335,13 +346,12 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
         ),
         ("result/cancelled.schema.json", to_json(&result_cancelled)),
         ("result/incomplete.schema.json", to_json(&result_incomplete)),
-        (
-            "result/err.schema.json",
-            to_json(&result_err_policy_denied),
-        ),
+        ("result/err.schema.json", to_json(&result_err_policy_denied)),
         (
             "error/capability_denied.schema.json",
-            to_json(&ToolCallError::CapabilityDenied("signature mismatch".to_string())),
+            to_json(&ToolCallError::CapabilityDenied(
+                "signature mismatch".to_string(),
+            )),
         ),
         (
             "error/capability_expired.schema.json",
@@ -364,7 +374,9 @@ fn wire_protocol_schema_cases_validate_live_serialization() {
         ),
         (
             "error/internal_error.schema.json",
-            to_json(&ToolCallError::InternalError("receipt signing failed".to_string())),
+            to_json(&ToolCallError::InternalError(
+                "receipt signing failed".to_string(),
+            )),
         ),
     ];
 

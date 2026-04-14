@@ -180,9 +180,7 @@ mod tests {
             arc_core_types::Decision::Incomplete { .. }
         ));
         let v2 = Verdict::from(decision);
-        assert!(
-            matches!(v2, Verdict::Incomplete { reason } if reason == "partial evaluation")
-        );
+        assert!(matches!(v2, Verdict::Incomplete { reason } if reason == "partial evaluation"));
     }
 
     #[test]

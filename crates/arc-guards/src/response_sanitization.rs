@@ -98,9 +98,7 @@ fn default_patterns() -> Vec<SensitivePattern> {
     }
 
     // Date of birth patterns: MM/DD/YYYY or YYYY-MM-DD
-    if let Ok(regex) =
-        Regex::new(r"\b(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})\b")
-    {
+    if let Ok(regex) = Regex::new(r"\b(?:\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})\b") {
         patterns.push(SensitivePattern {
             name: "date-of-birth".to_string(),
             regex,
@@ -307,13 +305,15 @@ mod tests {
 
     #[test]
     fn guard_name() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
         assert_eq!(guard.name(), "response-sanitization");
     }
 
     #[test]
     fn detects_ssn() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
         let findings = guard.scan("My SSN is 123-45-6789");
         assert!(!findings.is_empty());
         assert!(findings.iter().any(|(name, _)| name == "SSN"));
@@ -321,21 +321,24 @@ mod tests {
 
     #[test]
     fn detects_email() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
         let findings = guard.scan("Contact john@example.com for info");
         assert!(findings.iter().any(|(name, _)| name == "email"));
     }
 
     #[test]
     fn detects_mrn() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
         let findings = guard.scan("Patient MRN: 123456789");
         assert!(findings.iter().any(|(name, _)| name == "MRN"));
     }
 
     #[test]
     fn no_findings_on_clean_text() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
         let findings = guard.scan("This is perfectly clean text with no PII.");
         assert!(findings.is_empty());
     }
@@ -343,7 +346,8 @@ mod tests {
     #[test]
     fn respects_minimum_sensitivity() {
         // Only detect High-level patterns.
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
         // Email is Medium, should not be detected.
         let findings = guard.scan("Contact john@example.com");
         assert!(
@@ -376,7 +380,8 @@ mod tests {
 
     #[test]
     fn scan_response_clean() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
         let response = serde_json::json!({"status": "ok", "data": "nothing sensitive"});
         let result = guard.scan_response(&response);
         assert!(matches!(result, ScanResult::Clean));
@@ -384,7 +389,8 @@ mod tests {
 
     #[test]
     fn scan_response_blocked() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
         let response = serde_json::json!({"patient": "SSN: 123-45-6789"});
         let result = guard.scan_response(&response);
         assert!(matches!(result, ScanResult::Blocked(_)));
@@ -406,7 +412,8 @@ mod tests {
 
     #[test]
     fn guard_evaluate_denies_args_with_pii() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
 
         let kp = arc_core::crypto::Keypair::generate();
         let scope = arc_core::capability::ArcScope::default();
@@ -422,8 +429,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap =
-            arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+        let cap = arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
 
         let request = arc_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),
@@ -451,7 +457,8 @@ mod tests {
 
     #[test]
     fn guard_evaluate_allows_clean_args() {
-        let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+        let guard =
+            ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
 
         let kp = arc_core::crypto::Keypair::generate();
         let scope = arc_core::capability::ArcScope::default();
@@ -467,8 +474,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap =
-            arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+        let cap = arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
 
         let request = arc_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),

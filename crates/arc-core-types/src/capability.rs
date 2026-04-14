@@ -1812,6 +1812,38 @@ mod tests {
     }
 
     #[test]
+    fn workload_identity_rejects_invalid_spiffe_variants() {
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri(" "),
+            Err(WorkloadIdentityError::EmptyUri)
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("spiffe://prod.arc/payments/worker?version=1"),
+            Err(WorkloadIdentityError::InvalidSuffix)
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("https://prod.arc/payments/worker"),
+            Err(WorkloadIdentityError::UnsupportedScheme(_))
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("spiffe://user@prod.arc/payments/worker"),
+            Err(WorkloadIdentityError::InvalidAuthority)
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("spiffe:///payments/worker"),
+            Err(WorkloadIdentityError::MissingTrustDomain)
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("spiffe://prod.arc/payments//worker"),
+            Err(WorkloadIdentityError::InvalidPath(_))
+        ));
+        assert!(matches!(
+            WorkloadIdentity::parse_spiffe_uri("%%%"),
+            Err(WorkloadIdentityError::MalformedUri(_))
+        ));
+    }
+
+    #[test]
     fn runtime_attestation_normalizes_spiffe_runtime_identity() {
         let attestation = RuntimeAttestationEvidence {
             schema: "arc.runtime-attestation.v1".to_string(),
@@ -1857,6 +1889,82 @@ mod tests {
             .validate_workload_identity_binding()
             .expect_err("conflicting workload identities should fail");
         assert!(error.to_string().contains("trust_domain"));
+    }
+
+    #[test]
+    fn workload_identity_validation_and_runtime_identity_conflicts_cover_remaining_paths() {
+        let identity = WorkloadIdentity {
+            scheme: WorkloadIdentityScheme::Spiffe,
+            credential_kind: WorkloadCredentialKind::Uri,
+            uri: "spiffe://prod.arc/payments/worker".to_string(),
+            trust_domain: "prod.arc".to_string(),
+            path: "/payments/other".to_string(),
+        };
+        assert!(matches!(
+            identity.validate(),
+            Err(WorkloadIdentityError::Conflict { field: "path", .. })
+        ));
+
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.v1".to_string(),
+            verifier: "verifier.arc".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: Some("   ".to_string()),
+            workload_identity: None,
+            claims: None,
+        };
+        assert!(matches!(
+            attestation.normalized_workload_identity(),
+            Err(WorkloadIdentityError::EmptyRuntimeIdentity)
+        ));
+
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.v1".to_string(),
+            verifier: "verifier.arc".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: Some("//compute.googleapis.com/projects/demo".to_string()),
+            workload_identity: Some(WorkloadIdentity {
+                scheme: WorkloadIdentityScheme::Spiffe,
+                credential_kind: WorkloadCredentialKind::Uri,
+                uri: "spiffe://prod.arc/payments/worker".to_string(),
+                trust_domain: "prod.arc".to_string(),
+                path: "/payments/worker".to_string(),
+            }),
+            claims: None,
+        };
+        assert!(matches!(
+            attestation.normalized_workload_identity(),
+            Err(WorkloadIdentityError::OpaqueRuntimeIdentityConflict(_))
+        ));
+
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.v1".to_string(),
+            verifier: "verifier.arc".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: None,
+            workload_identity: Some(WorkloadIdentity {
+                scheme: WorkloadIdentityScheme::Spiffe,
+                credential_kind: WorkloadCredentialKind::Uri,
+                uri: "spiffe://prod.arc/payments/worker".to_string(),
+                trust_domain: "prod.arc".to_string(),
+                path: "/payments/worker".to_string(),
+            }),
+            claims: None,
+        };
+        let normalized = attestation
+            .normalized_workload_identity()
+            .expect("explicit workload identity should normalize")
+            .expect("workload identity should exist");
+        assert_eq!(normalized.trust_domain, "prod.arc");
     }
 
     #[test]
@@ -2098,6 +2206,115 @@ mod tests {
         assert!(matches!(
             error,
             AttestationTrustError::MissingAssertion { .. }
+        ));
+    }
+
+    #[test]
+    fn runtime_attestation_trust_policy_covers_remaining_fail_closed_paths() {
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
+            verifier: "https://maa.contoso.test".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: Some(serde_json::json!({
+                "azureMaa": {
+                    "secureBoot": "enabled"
+                }
+            })),
+        };
+        let policy = AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "azure-contoso".to_string(),
+                schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(AttestationVerifierFamily::AzureMaa),
+                max_evidence_age_seconds: None,
+                allowed_attestation_types: vec!["sgx".to_string()],
+                required_assertions: BTreeMap::new(),
+            }],
+        };
+        let error = attestation
+            .resolve_effective_runtime_assurance(Some(&policy), 150)
+            .expect_err("missing attestationType should fail closed");
+        assert!(matches!(
+            error,
+            AttestationTrustError::MissingAttestationType { .. }
+        ));
+
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
+            verifier: "https://confidentialcomputing.googleapis.com".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest-google".to_string(),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: Some(serde_json::json!({
+                "googleAttestation": {
+                    "attestationType": "confidential_vm",
+                    "hardwareModel": "GCP_INTEL_TDX",
+                    "secureBoot": "enabled"
+                }
+            })),
+        };
+        let policy = AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "google-confidential".to_string(),
+                schema: "arc.runtime-attestation.google-confidential-vm.jwt.v1".to_string(),
+                verifier: "https://confidentialcomputing.googleapis.com".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(AttestationVerifierFamily::GoogleAttestation),
+                max_evidence_age_seconds: None,
+                allowed_attestation_types: vec!["confidential_vm".to_string()],
+                required_assertions: BTreeMap::from([(
+                    "hardwareModel".to_string(),
+                    "GCP_AMD_SEV".to_string(),
+                )]),
+            }],
+        };
+        let error = attestation
+            .resolve_effective_runtime_assurance(Some(&policy), 150)
+            .expect_err("mismatched required assertion should fail closed");
+        assert!(matches!(
+            error,
+            AttestationTrustError::AssertionMismatch { .. }
+        ));
+
+        let attestation = RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.unsupported.v1".to_string(),
+            verifier: "https://maa.contoso.test".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "digest".to_string(),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: None,
+        };
+        let policy = AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "unsupported".to_string(),
+                schema: "arc.runtime-attestation.unsupported.v1".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: None,
+                max_evidence_age_seconds: None,
+                allowed_attestation_types: Vec::new(),
+                required_assertions: BTreeMap::new(),
+            }],
+        };
+        let error = attestation
+            .resolve_effective_runtime_assurance(Some(&policy), 150)
+            .expect_err("unsupported evidence schema should fail closed");
+        assert!(matches!(
+            error,
+            AttestationTrustError::UnsupportedEvidence { .. }
         ));
     }
 

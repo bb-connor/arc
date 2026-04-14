@@ -1,4 +1,6 @@
-use arc_web3::{Web3DisputePolicy, Web3DisputeWindow, Web3SettlementPath, ARC_WEB3_TRUST_PROFILE_SCHEMA};
+use arc_web3::{
+    Web3DisputePolicy, Web3DisputeWindow, Web3SettlementPath, ARC_WEB3_TRUST_PROFILE_SCHEMA,
+};
 
 #[test]
 fn web3_public_types_capture_dispute_window_shape() {

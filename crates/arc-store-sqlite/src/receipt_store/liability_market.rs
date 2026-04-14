@@ -20,7 +20,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &provider.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT provider_record_id FROM liability_providers WHERE provider_record_id = ?1",
@@ -119,7 +120,8 @@ impl SqliteReceiptStore {
         query: &LiabilityProviderListQuery,
     ) -> Result<LiabilityProviderListReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state, superseded_by_provider_record_id
              FROM liability_providers
              ORDER BY issued_at DESC, provider_record_id DESC",
@@ -191,7 +193,8 @@ impl SqliteReceiptStore {
     ) -> Result<LiabilityProviderResolutionReport, ReceiptStoreError> {
         query.validate().map_err(ReceiptStoreError::Conflict)?;
         let normalized = query.normalized();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json, lifecycle_state
              FROM liability_providers
              WHERE provider_id = ?1
@@ -279,7 +282,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &request.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT quote_request_id FROM liability_quote_requests WHERE quote_request_id = ?1",
@@ -382,7 +386,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &response.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT quote_response_id FROM liability_quote_responses WHERE quote_response_id = ?1",
@@ -525,7 +530,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &placement.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT placement_id FROM liability_placements WHERE placement_id = ?1",
@@ -684,7 +690,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &authority.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT authority_id FROM liability_pricing_authorities WHERE authority_id = ?1",
@@ -780,7 +787,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &coverage.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT bound_coverage_id FROM liability_bound_coverages WHERE bound_coverage_id = ?1",
@@ -895,7 +903,8 @@ impl SqliteReceiptStore {
             .map_err(ReceiptStoreError::Conflict)?;
 
         let artifact = &decision.body;
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let existing = tx
             .query_row(
                 "SELECT decision_id FROM liability_auto_bind_decisions WHERE decision_id = ?1",
@@ -1155,7 +1164,8 @@ impl SqliteReceiptStore {
         query: &LiabilityMarketWorkflowQuery,
     ) -> Result<LiabilityMarketWorkflowReport, ReceiptStoreError> {
         let normalized = query.normalized();
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             "SELECT raw_json
              FROM liability_quote_requests
              ORDER BY issued_at DESC, quote_request_id DESC",
@@ -1184,7 +1194,7 @@ impl SqliteReceiptStore {
             matching_requests += 1;
 
             let latest_quote_response = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_quote_responses
@@ -1206,7 +1216,7 @@ impl SqliteReceiptStore {
             }
 
             let pricing_authority = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_pricing_authorities
@@ -1224,7 +1234,7 @@ impl SqliteReceiptStore {
             }
 
             let latest_auto_bind_decision = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_auto_bind_decisions
@@ -1247,7 +1257,7 @@ impl SqliteReceiptStore {
             }
 
             let placement = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_placements
@@ -1265,7 +1275,7 @@ impl SqliteReceiptStore {
             }
 
             let bound_coverage = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT raw_json
                      FROM liability_bound_coverages

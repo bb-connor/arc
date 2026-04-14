@@ -74,7 +74,10 @@ fn hushspec_denies_blocked_tool_call() {
     );
 
     assert_eq!(result.decision, Decision::Deny);
-    assert_eq!(result.matched_rule.as_deref(), Some("rules.tool_access.block"));
+    assert_eq!(
+        result.matched_rule.as_deref(),
+        Some("rules.tool_access.block")
+    );
 }
 
 #[test]

@@ -7,8 +7,12 @@ pub(super) fn install_health_routes(
 }
 
 async fn handle_health(State(state): State<TrustServiceState>) -> Response {
-    let leader_url = current_leader_url(&state);
-    let self_url = cluster_self_url(&state);
+    let consensus = cluster_consensus_view(&state);
+    let leader_url = consensus.as_ref().and_then(|view| view.leader_url.clone());
+    let self_url = consensus
+        .as_ref()
+        .map(|view| view.self_url.clone())
+        .or_else(|| cluster_self_url(&state));
     Json(json!({
         "ok": true,
         "leaderUrl": leader_url.clone(),
@@ -17,7 +21,7 @@ async fn handle_health(State(state): State<TrustServiceState>) -> Response {
         "authority": trust_authority_health_snapshot(&state.config),
         "stores": trust_store_health_snapshot(&state.config),
         "federation": trust_federation_health_snapshot(&state),
-        "cluster": trust_cluster_health_snapshot(&state, leader_url, self_url),
+        "cluster": trust_cluster_health_snapshot(&state, consensus, leader_url, self_url),
     }))
     .into_response()
 }
@@ -201,6 +205,105 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
         })
     };
 
+    let federation_policy_summary =
+        if let Some(path) = state.config.federation_policies_file.as_deref() {
+            match FederationAdmissionPolicyRegistry::load(path) {
+                Ok(registry) => {
+                    let reputation_gated_count = registry
+                        .policies
+                        .values()
+                        .filter(|record| record.minimum_reputation_score.is_some())
+                        .count();
+                    let proof_of_work_count = registry
+                        .policies
+                        .values()
+                        .filter(|record| record.anti_sybil.proof_of_work_bits.is_some())
+                        .count();
+                    let rate_limited_count = registry
+                        .policies
+                        .values()
+                        .filter(|record| record.anti_sybil.rate_limit.is_some())
+                        .count();
+                    let bond_backed_only_count = registry
+                        .policies
+                        .values()
+                        .filter(|record| record.anti_sybil.bond_backed_only)
+                        .count();
+                    json!({
+                        "configured": true,
+                        "available": true,
+                        "count": registry.policies.len(),
+                        "reputationGatedCount": reputation_gated_count,
+                        "proofOfWorkCount": proof_of_work_count,
+                        "rateLimitedCount": rate_limited_count,
+                        "bondBackedOnlyCount": bond_backed_only_count,
+                    })
+                }
+                Err(_) => json!({
+                    "configured": true,
+                    "available": false,
+                    "count": 0,
+                    "reputationGatedCount": 0,
+                    "proofOfWorkCount": 0,
+                    "rateLimitedCount": 0,
+                    "bondBackedOnlyCount": 0,
+                }),
+            }
+        } else {
+            json!({
+                "configured": false,
+                "available": false,
+                "count": 0,
+                "reputationGatedCount": 0,
+                "proofOfWorkCount": 0,
+                "rateLimitedCount": 0,
+                "bondBackedOnlyCount": 0,
+            })
+        };
+
+    let scim_lifecycle_summary = if let Some(path) = state.config.scim_lifecycle_file.as_deref() {
+        match ScimLifecycleRegistry::load(path) {
+            Ok(registry) => {
+                let active_count = registry
+                    .users
+                    .values()
+                    .filter(|record| record.active())
+                    .count();
+                let inactive_count = registry.users.len().saturating_sub(active_count);
+                let tracked_capability_count = registry
+                    .users
+                    .values()
+                    .map(|record| record.tracked_capability_ids.len())
+                    .sum::<usize>();
+                json!({
+                    "configured": true,
+                    "available": true,
+                    "count": registry.users.len(),
+                    "activeCount": active_count,
+                    "inactiveCount": inactive_count,
+                    "trackedCapabilityCount": tracked_capability_count,
+                })
+            }
+            Err(_) => json!({
+                "configured": true,
+                "available": false,
+                "count": 0,
+                "activeCount": 0,
+                "inactiveCount": 0,
+                "trackedCapabilityCount": 0,
+            }),
+        }
+    } else {
+        json!({
+            "configured": false,
+            "available": false,
+            "count": 0,
+            "activeCount": 0,
+            "inactiveCount": 0,
+            "trackedCapabilityCount": 0,
+        })
+    };
+
     let certification_summary =
         if let Some(path) = state.config.certification_registry_file.as_deref() {
             match CertificationRegistry::load(path) {
@@ -293,6 +396,8 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
 
     json!({
         "enterpriseProviders": enterprise_provider_summary,
+        "openAdmissionPolicies": federation_policy_summary,
+        "scimLifecycle": scim_lifecycle_summary,
         "verifierPolicies": verifier_policy_summary,
         "certifications": certification_summary,
         "certificationDiscovery": certification_discovery_summary,
@@ -303,6 +408,7 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Value {
 
 fn trust_cluster_health_snapshot(
     state: &TrustServiceState,
+    consensus: Option<ClusterConsensusView>,
     leader_url: Option<String>,
     self_url: Option<String>,
 ) -> Value {
@@ -312,9 +418,15 @@ fn trust_cluster_health_snapshot(
             "healthyPeers": 0,
             "unhealthyPeers": 0,
             "unknownPeers": 0,
+            "partitionedPeers": 0,
             "lastErrorCount": 0,
             "leaderUrl": leader_url,
             "selfUrl": self_url,
+            "hasQuorum": false,
+            "quorumSize": 1,
+            "reachableNodes": 1,
+            "electionTerm": 0,
+            "role": "standalone",
         });
     };
 
@@ -326,25 +438,44 @@ fn trust_cluster_health_snapshot(
     let mut healthy = 0usize;
     let mut unhealthy = 0usize;
     let mut unknown = 0usize;
+    let mut partitioned = 0usize;
     let mut last_error_count = 0usize;
     for peer in peers.values() {
         match peer.health {
             PeerHealth::Healthy => healthy += 1,
-            PeerHealth::Unhealthy(_) => unhealthy += 1,
+            PeerHealth::Unhealthy => unhealthy += 1,
             PeerHealth::Unknown => unknown += 1,
+        }
+        if peer.partitioned {
+            partitioned += 1;
         }
         if peer.last_error.is_some() {
             last_error_count += 1;
         }
     }
+    let consensus = consensus.unwrap_or(ClusterConsensusView {
+        self_url: self_url.clone().unwrap_or_default(),
+        leader_url: leader_url.clone(),
+        role: "candidate",
+        has_quorum: false,
+        quorum_size: peers.len().div_ceil(2) + 1,
+        reachable_nodes: 1,
+        election_term: 0,
+    });
 
     json!({
         "peerCount": peers.len(),
         "healthyPeers": healthy,
         "unhealthyPeers": unhealthy,
         "unknownPeers": unknown,
+        "partitionedPeers": partitioned,
         "lastErrorCount": last_error_count,
-        "leaderUrl": leader_url,
-        "selfUrl": self_url,
+        "leaderUrl": consensus.leader_url,
+        "selfUrl": consensus.self_url,
+        "hasQuorum": consensus.has_quorum,
+        "quorumSize": consensus.quorum_size,
+        "reachableNodes": consensus.reachable_nodes,
+        "electionTerm": consensus.election_term,
+        "role": consensus.role,
     })
 }

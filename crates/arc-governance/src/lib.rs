@@ -1,4 +1,4 @@
-pub use arc_core_types::{crypto, receipt, canonical_json_bytes};
+pub use arc_core_types::{canonical_json_bytes, crypto, receipt};
 pub use arc_listing as listing;
 
 use serde::{Deserialize, Serialize};
@@ -986,6 +986,61 @@ mod tests {
         }
     }
 
+    fn sample_charter(
+        local_operator_id: &str,
+        authority_keypair: &Keypair,
+    ) -> SignedGenericGovernanceCharter {
+        SignedGenericGovernanceCharter::sign(
+            build_generic_governance_charter_artifact(
+                local_operator_id,
+                Some(format!("Operator {local_operator_id}")),
+                &sample_charter_request(),
+                130,
+            )
+            .expect("build charter"),
+            authority_keypair,
+        )
+        .expect("sign charter")
+    }
+
+    fn sample_case_issue_request(
+        charter: SignedGenericGovernanceCharter,
+        listing: SignedGenericListing,
+        activation: Option<SignedGenericTrustActivation>,
+    ) -> GenericGovernanceCaseIssueRequest {
+        let evidence_kind = if activation.is_some() {
+            GenericGovernanceEvidenceKind::TrustActivation
+        } else {
+            GenericGovernanceEvidenceKind::Listing
+        };
+        let reference_id = activation.as_ref().map_or_else(
+            || listing.body.listing_id.clone(),
+            |activation| activation.body.activation_id.clone(),
+        );
+        GenericGovernanceCaseIssueRequest {
+            charter,
+            listing,
+            activation,
+            kind: GenericGovernanceCaseKind::Freeze,
+            state: GenericGovernanceCaseState::Enforced,
+            subject_operator_id: Some("origin-a".to_string()),
+            escalated_to_operator_ids: Vec::new(),
+            evidence_refs: vec![GenericGovernanceEvidenceReference {
+                kind: evidence_kind,
+                reference_id,
+                uri: None,
+                sha256: None,
+            }],
+            appeal_of_case_id: None,
+            supersedes_case_id: None,
+            issued_by: "governance@arc.example".to_string(),
+            opened_at: Some(140),
+            updated_at: Some(140),
+            expires_at: Some(500),
+            note: Some("freeze".to_string()),
+        }
+    }
+
     #[test]
     fn generic_governance_freeze_requires_activation() {
         let listing_keypair = Keypair::generate();
@@ -1401,6 +1456,285 @@ mod tests {
         assert_eq!(
             evaluation.findings[0].code,
             GenericGovernanceFindingCode::AppealTargetMissing
+        );
+    }
+
+    #[test]
+    fn generic_governance_authority_scope_rejects_blank_operator_ids() {
+        let error = GenericGovernanceAuthorityScope {
+            namespace: "https://registry.arc.example".to_string(),
+            allowed_listing_operator_ids: vec!["   ".to_string()],
+            allowed_actor_kinds: Vec::new(),
+            policy_reference: None,
+        }
+        .validate()
+        .expect_err("blank operator ids rejected");
+
+        assert!(error.contains("authority_scope.allowed_listing_operator_ids[0]"));
+    }
+
+    #[test]
+    fn generic_governance_charter_validate_rejects_expired_artifact() {
+        let error = GenericGovernanceCharterArtifact {
+            schema: GENERIC_GOVERNANCE_CHARTER_ARTIFACT_SCHEMA.to_string(),
+            charter_id: "charter-1".to_string(),
+            governing_operator_id: "origin-a".to_string(),
+            governing_operator_name: Some("Origin A".to_string()),
+            authority_scope: GenericGovernanceAuthorityScope {
+                namespace: "https://registry.arc.example".to_string(),
+                allowed_listing_operator_ids: vec!["origin-a".to_string()],
+                allowed_actor_kinds: vec![GenericListingActorKind::ToolServer],
+                policy_reference: None,
+            },
+            allowed_case_kinds: vec![GenericGovernanceCaseKind::Freeze],
+            escalation_operator_ids: vec!["network-audit.arc.example".to_string()],
+            issued_at: 200,
+            expires_at: Some(199),
+            issued_by: "governance@arc.example".to_string(),
+            note: None,
+        }
+        .validate()
+        .expect_err("expired charters rejected");
+
+        assert!(error.contains("expires_at must be greater than issued_at"));
+    }
+
+    #[test]
+    fn generic_governance_case_validate_requires_escalation_targets() {
+        let error = GenericGovernanceCaseArtifact {
+            schema: GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA.to_string(),
+            case_id: "case-1".to_string(),
+            charter_id: "charter-1".to_string(),
+            governing_operator_id: "origin-a".to_string(),
+            kind: GenericGovernanceCaseKind::Freeze,
+            state: GenericGovernanceCaseState::Escalated,
+            namespace: "https://registry.arc.example".to_string(),
+            listing_id: "listing-1".to_string(),
+            activation_id: Some("activation-1".to_string()),
+            subject_operator_id: Some("origin-a".to_string()),
+            opened_at: 100,
+            updated_at: 100,
+            expires_at: Some(200),
+            escalated_to_operator_ids: Vec::new(),
+            evidence_refs: vec![GenericGovernanceEvidenceReference {
+                kind: GenericGovernanceEvidenceKind::External,
+                reference_id: "incident-1".to_string(),
+                uri: None,
+                sha256: None,
+            }],
+            appeal_of_case_id: None,
+            supersedes_case_id: None,
+            issued_by: "governance@arc.example".to_string(),
+            note: None,
+        }
+        .validate()
+        .expect_err("escalated cases require operator targets");
+
+        assert!(error.contains("escalated case requires escalated_to_operator_ids"));
+    }
+
+    #[test]
+    fn generic_governance_case_validate_rejects_appeal_id_on_non_appeal_case() {
+        let error = GenericGovernanceCaseArtifact {
+            schema: GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA.to_string(),
+            case_id: "case-1".to_string(),
+            charter_id: "charter-1".to_string(),
+            governing_operator_id: "origin-a".to_string(),
+            kind: GenericGovernanceCaseKind::Sanction,
+            state: GenericGovernanceCaseState::Open,
+            namespace: "https://registry.arc.example".to_string(),
+            listing_id: "listing-1".to_string(),
+            activation_id: None,
+            subject_operator_id: Some("origin-a".to_string()),
+            opened_at: 100,
+            updated_at: 100,
+            expires_at: Some(200),
+            escalated_to_operator_ids: Vec::new(),
+            evidence_refs: vec![GenericGovernanceEvidenceReference {
+                kind: GenericGovernanceEvidenceKind::External,
+                reference_id: "incident-1".to_string(),
+                uri: None,
+                sha256: None,
+            }],
+            appeal_of_case_id: Some("case-0".to_string()),
+            supersedes_case_id: None,
+            issued_by: "governance@arc.example".to_string(),
+            note: None,
+        }
+        .validate()
+        .expect_err("appeal target only valid for appeal cases");
+
+        assert!(error.contains("only valid for appeal cases"));
+    }
+
+    #[test]
+    fn generic_governance_case_issue_request_rejects_invalid_listing_signature() {
+        let listing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing("origin-a", &listing_keypair);
+        let charter = sample_charter("origin-a", &authority_keypair);
+        let mut tampered_listing = listing.clone();
+        tampered_listing.body.subject.actor_id = "tool-server-b".to_string();
+
+        let error = sample_case_issue_request(charter, tampered_listing, None)
+            .validate()
+            .expect_err("tampered listing signature rejected");
+
+        assert!(error.contains("listing signature is invalid"));
+    }
+
+    #[test]
+    fn generic_governance_case_issue_request_rejects_invalid_activation_signature() {
+        let listing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing("origin-a", &listing_keypair);
+        let charter = sample_charter("origin-a", &authority_keypair);
+        let activation = sample_activation(&listing);
+        let mut tampered_activation = activation.clone();
+        tampered_activation.body.local_operator_id = "remote-b".to_string();
+
+        let error = sample_case_issue_request(charter, listing, Some(tampered_activation))
+            .validate()
+            .expect_err("tampered activation signature rejected");
+
+        assert!(error.contains("trust activation signature is invalid"));
+    }
+
+    #[test]
+    fn build_generic_governance_charter_artifact_uses_request_issued_at() {
+        let mut request = sample_charter_request();
+        request.issued_at = Some(777);
+
+        let charter = build_generic_governance_charter_artifact(
+            "origin-a",
+            Some("Origin A".to_string()),
+            &request,
+            130,
+        )
+        .expect("build charter");
+
+        assert_eq!(charter.issued_at, 777);
+        assert_eq!(charter.governing_operator_id, "origin-a");
+        assert!(charter.charter_id.starts_with("charter-"));
+    }
+
+    #[test]
+    fn generic_governance_evaluation_rejects_invalid_case_signature() {
+        let listing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing("origin-a", &listing_keypair);
+        let activation = sample_activation(&listing);
+        let charter = sample_charter("origin-a", &authority_keypair);
+        let case = SignedGenericGovernanceCase::sign(
+            build_generic_governance_case_artifact(
+                "origin-a",
+                &sample_case_issue_request(
+                    charter.clone(),
+                    listing.clone(),
+                    Some(activation.clone()),
+                ),
+                140,
+            )
+            .expect("build case"),
+            &authority_keypair,
+        )
+        .expect("sign case");
+        let mut tampered_case = case.clone();
+        tampered_case.body.note = Some("tampered".to_string());
+
+        let evaluation = evaluate_generic_governance_case(
+            &GenericGovernanceCaseEvaluationRequest {
+                listing,
+                current_publisher: sample_publisher(
+                    GenericRegistryPublisherRole::Origin,
+                    "origin-a",
+                ),
+                activation: Some(activation),
+                charter,
+                case: tampered_case,
+                prior_case: None,
+                evaluated_at: Some(150),
+            },
+            150,
+        )
+        .expect("evaluate governance");
+
+        assert_eq!(
+            evaluation.findings[0].code,
+            GenericGovernanceFindingCode::CaseUnverifiable
+        );
+    }
+
+    #[test]
+    fn generic_governance_supersession_target_mismatch_fails_closed() {
+        let listing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing("origin-a", &listing_keypair);
+        let activation = sample_activation(&listing);
+        let charter = sample_charter("origin-a", &authority_keypair);
+        let mut case_request =
+            sample_case_issue_request(charter.clone(), listing.clone(), Some(activation.clone()));
+        case_request.kind = GenericGovernanceCaseKind::Sanction;
+        case_request.supersedes_case_id = Some("prior-case-1".to_string());
+        case_request.evidence_refs[0].kind = GenericGovernanceEvidenceKind::External;
+        case_request.evidence_refs[0].reference_id = "incident-1".to_string();
+        let case = SignedGenericGovernanceCase::sign(
+            build_generic_governance_case_artifact("origin-a", &case_request, 140)
+                .expect("build case"),
+            &authority_keypair,
+        )
+        .expect("sign case");
+        let prior_case = SignedGenericGovernanceCase::sign(
+            GenericGovernanceCaseArtifact {
+                schema: GENERIC_GOVERNANCE_CASE_ARTIFACT_SCHEMA.to_string(),
+                case_id: "prior-case-1".to_string(),
+                charter_id: charter.body.charter_id.clone(),
+                governing_operator_id: "origin-a".to_string(),
+                kind: GenericGovernanceCaseKind::Freeze,
+                state: GenericGovernanceCaseState::Resolved,
+                namespace: "https://registry.arc.example".to_string(),
+                listing_id: "different-listing".to_string(),
+                activation_id: Some(activation.body.activation_id.clone()),
+                subject_operator_id: Some("origin-a".to_string()),
+                opened_at: 120,
+                updated_at: 121,
+                expires_at: Some(500),
+                escalated_to_operator_ids: Vec::new(),
+                evidence_refs: vec![GenericGovernanceEvidenceReference {
+                    kind: GenericGovernanceEvidenceKind::External,
+                    reference_id: "prior-incident".to_string(),
+                    uri: None,
+                    sha256: None,
+                }],
+                appeal_of_case_id: None,
+                supersedes_case_id: None,
+                issued_by: "governance@arc.example".to_string(),
+                note: None,
+            },
+            &authority_keypair,
+        )
+        .expect("sign prior case");
+
+        let evaluation = evaluate_generic_governance_case(
+            &GenericGovernanceCaseEvaluationRequest {
+                listing,
+                current_publisher: sample_publisher(
+                    GenericRegistryPublisherRole::Origin,
+                    "origin-a",
+                ),
+                activation: Some(activation),
+                charter,
+                case,
+                prior_case: Some(prior_case),
+                evaluated_at: Some(150),
+            },
+            150,
+        )
+        .expect("evaluate governance");
+
+        assert_eq!(
+            evaluation.findings[0].code,
+            GenericGovernanceFindingCode::SupersessionTargetInvalid
         );
     }
 }

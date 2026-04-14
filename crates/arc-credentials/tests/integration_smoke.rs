@@ -2,9 +2,9 @@ use arc_core::crypto::Keypair;
 use arc_credentials::{
     build_agent_passport, create_passport_presentation_challenge,
     create_signed_passport_verifier_policy, ensure_signed_passport_verifier_policy_active,
-    issue_reputation_credential, respond_to_passport_presentation_challenge,
-    verify_agent_passport, verify_passport_presentation_response, ArcCredentialEvidence,
-    AttestationWindow, CredentialError, PassportPresentationOptions, PassportVerifierPolicy,
+    issue_reputation_credential, respond_to_passport_presentation_challenge, verify_agent_passport,
+    verify_passport_presentation_response, ArcCredentialEvidence, AttestationWindow,
+    CredentialError, PassportPresentationOptions, PassportVerifierPolicy,
 };
 use arc_did::DidArc;
 use arc_reputation::{
@@ -119,19 +119,12 @@ fn passport_issue_verify_and_present_round_trip() {
         }),
     )
     .expect("build challenge");
-    let response = respond_to_passport_presentation_challenge(
-        &holder,
-        &passport,
-        &challenge,
-        1_710_000_120,
-    )
-    .expect("respond to challenge");
-    let verification = verify_passport_presentation_response(
-        &response,
-        Some(&challenge),
-        1_710_000_120,
-    )
-    .expect("verify presentation response");
+    let response =
+        respond_to_passport_presentation_challenge(&holder, &passport, &challenge, 1_710_000_120)
+            .expect("respond to challenge");
+    let verification =
+        verify_passport_presentation_response(&response, Some(&challenge), 1_710_000_120)
+            .expect("verify presentation response");
 
     assert!(verification.accepted);
     assert!(verification.policy_evaluated);

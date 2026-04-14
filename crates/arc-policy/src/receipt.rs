@@ -133,3 +133,175 @@ pub fn compute_policy_hash(spec: &HushSpec) -> String {
     hasher.update(json.as_bytes());
     format!("{:x}", hasher.finalize())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{DefaultAction, HushSpec, Rules, ToolAccessRule};
+
+    fn allow_spec() -> HushSpec {
+        HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("receipt-tests".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules {
+                tool_access: Some(ToolAccessRule {
+                    enabled: true,
+                    allow: vec!["mail.send".to_string()],
+                    block: Vec::new(),
+                    require_confirmation: Vec::new(),
+                    default: DefaultAction::Block,
+                    max_args_size: None,
+                    require_runtime_assurance_tier: None,
+                    prefer_runtime_assurance_tier: None,
+                    require_workload_identity: None,
+                    prefer_workload_identity: None,
+                }),
+                ..Rules::default()
+            }),
+            extensions: None,
+            metadata: None,
+        }
+    }
+
+    #[test]
+    fn audited_receipts_hash_policies_and_redact_content() {
+        let spec = allow_spec();
+        let receipt = evaluate_audited(
+            &spec,
+            &EvaluationAction {
+                action_type: "tool_call".to_string(),
+                target: Some("mail.send".to_string()),
+                content: Some("secret payload".to_string()),
+                origin: None,
+                posture: None,
+                args_size: None,
+                runtime_attestation: None,
+            },
+            &AuditConfig::default(),
+        );
+
+        assert_eq!(receipt.decision, Decision::Allow);
+        assert!(receipt.action.content_redacted);
+        assert_eq!(receipt.policy.content_hash, compute_policy_hash(&spec));
+        assert!(!receipt.receipt_id.is_empty());
+        assert!(receipt.timestamp.ends_with('Z'));
+    }
+
+    #[test]
+    fn disabled_audit_skips_timing_and_policy_hashes() {
+        let receipt = evaluate_audited(
+            &allow_spec(),
+            &EvaluationAction {
+                action_type: "tool_call".to_string(),
+                target: Some("mail.send".to_string()),
+                content: Some("visible payload".to_string()),
+                origin: None,
+                posture: None,
+                args_size: None,
+                runtime_attestation: None,
+            },
+            &AuditConfig {
+                enabled: false,
+                redact_content: false,
+            },
+        );
+
+        assert_eq!(receipt.evaluation_duration_us, 0);
+        assert!(receipt.policy.content_hash.is_empty());
+        assert!(!receipt.action.content_redacted);
+    }
+
+    #[test]
+    fn policy_summary_helpers_are_stable_and_defaults_are_enabled() {
+        let spec = allow_spec();
+        let summary = build_policy_summary(&spec);
+
+        assert!(AuditConfig::default().enabled);
+        assert!(AuditConfig::default().redact_content);
+        assert_eq!(summary.name.as_deref(), Some("receipt-tests"));
+        assert_eq!(summary.version, "1.0");
+        assert_eq!(summary.content_hash, compute_policy_hash(&spec));
+        assert_eq!(compute_policy_hash(&spec), compute_policy_hash(&spec));
+    }
+
+    #[test]
+    fn disabled_audit_still_preserves_policy_metadata_and_targets() {
+        let receipt = evaluate_audited(
+            &allow_spec(),
+            &EvaluationAction {
+                action_type: "tool_call".to_string(),
+                target: Some("mail.send".to_string()),
+                content: None,
+                origin: None,
+                posture: None,
+                args_size: None,
+                runtime_attestation: None,
+            },
+            &AuditConfig {
+                enabled: false,
+                redact_content: true,
+            },
+        );
+
+        assert_eq!(receipt.action.target.as_deref(), Some("mail.send"));
+        assert!(!receipt.action.content_redacted);
+        assert_eq!(receipt.policy.name.as_deref(), Some("receipt-tests"));
+        assert_eq!(receipt.policy.version, "1.0");
+        assert!(receipt.policy.content_hash.is_empty());
+    }
+
+    #[test]
+    fn audited_receipts_preserve_policy_denials() {
+        let spec = HushSpec {
+            hushspec: "1.0".to_string(),
+            name: Some("deny-tests".to_string()),
+            description: None,
+            extends: None,
+            merge_strategy: None,
+            rules: Some(Rules {
+                tool_access: Some(ToolAccessRule {
+                    enabled: true,
+                    allow: Vec::new(),
+                    block: Vec::new(),
+                    require_confirmation: Vec::new(),
+                    default: DefaultAction::Block,
+                    max_args_size: None,
+                    require_runtime_assurance_tier: None,
+                    prefer_runtime_assurance_tier: None,
+                    require_workload_identity: None,
+                    prefer_workload_identity: None,
+                }),
+                ..Rules::default()
+            }),
+            extensions: None,
+            metadata: None,
+        };
+
+        let receipt = evaluate_audited(
+            &spec,
+            &EvaluationAction {
+                action_type: "tool_call".to_string(),
+                target: Some("mail.send".to_string()),
+                content: None,
+                origin: None,
+                posture: None,
+                args_size: None,
+                runtime_attestation: None,
+            },
+            &AuditConfig::default(),
+        );
+
+        assert_eq!(receipt.decision, Decision::Deny);
+        assert_eq!(
+            receipt.matched_rule.as_deref(),
+            Some("rules.tool_access.default")
+        );
+        assert!(receipt
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("default block")));
+    }
+}

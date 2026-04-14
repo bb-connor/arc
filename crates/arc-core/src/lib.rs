@@ -372,5 +372,5 @@ pub use web3::{
     ARC_WEB3_SETTLEMENT_RECEIPT_SCHEMA, ARC_WEB3_TRUST_PROFILE_SCHEMA,
 };
 
-pub use capability::{validate_attenuation, validate_delegation_chain};
 pub use arc_core_types::{AgentId, CapabilityId, ServerId};
+pub use capability::{validate_attenuation, validate_delegation_chain};

@@ -824,15 +824,13 @@ impl ArcKernel {
     }
 
     /// Trigger a Merkle checkpoint for all receipts in [last_checkpoint_seq+1, batch_end_seq].
-    pub(crate) fn maybe_trigger_checkpoint(
-        &self,
-        batch_end_seq: u64,
-    ) -> Result<(), KernelError> {
+    pub(crate) fn maybe_trigger_checkpoint(&self, batch_end_seq: u64) -> Result<(), KernelError> {
         let batch_start_seq = self.last_checkpoint_seq.load(Ordering::SeqCst) + 1;
 
         let Some(receipt_bytes_with_seqs) = self.with_receipt_store(|store| {
             Ok(store.receipts_canonical_bytes_range(batch_start_seq, batch_end_seq)?)
-        })? else {
+        })?
+        else {
             return Ok(());
         };
 
@@ -857,7 +855,8 @@ impl ArcKernel {
         .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
 
         let _ = self.with_receipt_store(|store| Ok(store.store_checkpoint(&checkpoint)?))?;
-        self.last_checkpoint_seq.store(batch_end_seq, Ordering::SeqCst);
+        self.last_checkpoint_seq
+            .store(batch_end_seq, Ordering::SeqCst);
         Ok(())
     }
 }

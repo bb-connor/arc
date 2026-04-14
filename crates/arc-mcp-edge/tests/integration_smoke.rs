@@ -134,7 +134,10 @@ fn edge_handles_initialize_list_and_call_round_trip() {
         }))
         .expect("tools/list response");
     assert_eq!(listed["result"]["tools"][0]["name"], "echo_json");
-    assert_eq!(listed["result"]["tools"][0]["inputSchema"]["type"], "object");
+    assert_eq!(
+        listed["result"]["tools"][0]["inputSchema"]["type"],
+        "object"
+    );
 
     let called = edge
         .handle_jsonrpc(json!({

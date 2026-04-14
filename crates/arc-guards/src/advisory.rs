@@ -200,10 +200,7 @@ impl AdvisoryPipeline {
     /// Return the GuardOutput entries for the last evaluation.
     pub fn last_outputs(&self) -> Result<Vec<GuardOutput>, KernelError> {
         let signals = self.last_signals()?;
-        Ok(signals
-            .into_iter()
-            .map(GuardOutput::Advisory)
-            .collect())
+        Ok(signals.into_iter().map(GuardOutput::Advisory).collect())
     }
 }
 
@@ -228,9 +225,10 @@ impl Guard for AdvisoryPipeline {
         }
 
         // Store collected signals for evidence export.
-        let mut stored = self.signals.lock().map_err(|_| {
-            KernelError::Internal("advisory pipeline lock poisoned".to_string())
-        })?;
+        let mut stored = self
+            .signals
+            .lock()
+            .map_err(|_| KernelError::Internal("advisory pipeline lock poisoned".to_string()))?;
         *stored = collected;
 
         if should_deny {
@@ -281,9 +279,10 @@ impl AdvisoryGuard for AnomalyAdvisoryGuard {
     fn evaluate(&self, ctx: &GuardContext) -> Result<Vec<AdvisorySignal>, KernelError> {
         let mut signals = Vec::new();
 
-        let tool_counts = self.journal.tool_counts().map_err(|e| {
-            KernelError::Internal(format!("anomaly advisory journal error: {e}"))
-        })?;
+        let tool_counts = self
+            .journal
+            .tool_counts()
+            .map_err(|e| KernelError::Internal(format!("anomaly advisory journal error: {e}")))?;
 
         // Check if current tool has been invoked excessively.
         if let Some(count) = tool_counts.get(&ctx.request.tool_name) {
@@ -310,9 +309,10 @@ impl AdvisoryGuard for AnomalyAdvisoryGuard {
         }
 
         // Check delegation depth.
-        let data_flow = self.journal.data_flow().map_err(|e| {
-            KernelError::Internal(format!("anomaly advisory journal error: {e}"))
-        })?;
+        let data_flow = self
+            .journal
+            .data_flow()
+            .map_err(|e| KernelError::Internal(format!("anomaly advisory journal error: {e}")))?;
 
         if data_flow.max_delegation_depth >= self.depth_threshold {
             signals.push(AdvisorySignal {
@@ -343,10 +343,7 @@ pub struct DataTransferAdvisoryGuard {
 
 impl DataTransferAdvisoryGuard {
     /// Create a new data transfer advisory guard.
-    pub fn new(
-        journal: Arc<arc_http_session::SessionJournal>,
-        bytes_threshold: u64,
-    ) -> Self {
+    pub fn new(journal: Arc<arc_http_session::SessionJournal>, bytes_threshold: u64) -> Self {
         Self {
             journal,
             bytes_threshold,
@@ -445,8 +442,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap =
-            arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+        let cap = arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
 
         let request = arc_kernel::ToolCallRequest {
             request_id: "req-test".to_string(),
@@ -747,9 +743,7 @@ mod tests {
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);
         let signals = guard.evaluate(&ctx).expect("ok");
         assert!(!signals.is_empty());
-        assert!(signals
-            .iter()
-            .any(|s| s.description.contains("read_file")));
+        assert!(signals.iter().any(|s| s.description.contains("read_file")));
     }
 
     #[test]
@@ -828,9 +822,7 @@ mod tests {
         });
 
         let mut pipeline = AdvisoryPipeline::new(policy);
-        pipeline.add(Box::new(AnomalyAdvisoryGuard::new(
-            journal, 5, 10,
-        )));
+        pipeline.add(Box::new(AnomalyAdvisoryGuard::new(journal, 5, 10)));
 
         let (request, scope, agent_id, server_id) = make_ctx();
         let ctx = guard_ctx(&request, &scope, &agent_id, &server_id);

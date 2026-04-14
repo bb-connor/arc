@@ -96,7 +96,8 @@ impl SqliteReceiptStore {
 
         let since = query.since.map(|value| value as i64);
         let until = query.until.map(|value| value as i64);
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT seq, raw_json
             FROM arc_child_receipts
@@ -130,7 +131,8 @@ impl SqliteReceiptStore {
             return Ok(Vec::new());
         };
 
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT checkpoint_seq
             FROM kernel_checkpoints

@@ -1583,6 +1583,7 @@ fn u256_to_bytes32(value: U256) -> [u8; 32] {
 mod tests {
     use super::*;
     use crate::SettlementPolicyConfig;
+    use arc_core::web3::{Web3SettlementDispatchArtifact, Web3SettlementLifecycleState};
     use secp256k1::ecdsa::RecoveryId;
     use secp256k1::PublicKey as SecpPublicKey;
 
@@ -1602,6 +1603,23 @@ mod tests {
             evidence_substrate: crate::SettlementEvidenceConfig::default(),
             policy: SettlementPolicyConfig::default(),
         }
+    }
+
+    fn sample_dispatch() -> Web3SettlementDispatchArtifact {
+        serde_json::from_str(include_str!(
+            "../../../docs/standards/ARC_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
+        ))
+        .unwrap()
+    }
+
+    fn hex_dispatch() -> Web3SettlementDispatchArtifact {
+        let mut dispatch = sample_dispatch();
+        dispatch.escrow_id =
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        dispatch.settlement_path = Web3SettlementPath::DualSignature;
+        dispatch.support_boundary.anchor_proof_required = false;
+        dispatch.support_boundary.oracle_evidence_required_for_fx = false;
+        dispatch
     }
 
     #[test]
@@ -1665,5 +1683,204 @@ mod tests {
             .unwrap(),
         );
         assert_eq!(recovered, expected);
+    }
+
+    #[test]
+    fn prepares_erc20_approval_call_payloads() {
+        let prepared = prepare_erc20_approval(
+            "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8",
+            "0x1000000000000000000000000000000000000001",
+            "0x1000000000000000000000000000000000000002",
+            42_000,
+        )
+        .unwrap();
+
+        assert_eq!(prepared.amount_minor_units, 42_000);
+        assert_eq!(prepared.call.from_address, prepared.owner_address);
+        assert_eq!(prepared.call.to_address, prepared.token_address);
+        assert!(prepared.call.data.starts_with("0x095ea7b3"));
+    }
+
+    #[test]
+    fn prepares_refund_and_bond_expiry_calls() {
+        let config = sample_config();
+        let dispatch = hex_dispatch();
+
+        let refund = prepare_escrow_refund(
+            &config,
+            &dispatch,
+            "0x1000000000000000000000000000000000000009",
+        )
+        .unwrap();
+        assert_eq!(refund.escrow_id, dispatch.escrow_id);
+        assert_eq!(refund.call.to_address, config.escrow_contract);
+        assert!(refund.call.data.starts_with("0x"));
+
+        let expiry = prepare_bond_expiry(
+            &config,
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "0x1000000000000000000000000000000000000009",
+        )
+        .unwrap();
+        assert_eq!(expiry.chain_id, config.chain_id);
+        assert_eq!(expiry.call.to_address, config.bond_vault_contract);
+    }
+
+    #[test]
+    fn builds_failure_and_reversal_receipts() {
+        let dispatch = hex_dispatch();
+
+        let failure = build_failure_receipt(
+            &dispatch,
+            "exec-failed".to_string(),
+            "settlement-ref".to_string(),
+            "tx-failed".to_string(),
+            "node rejected tx".to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            failure.lifecycle_state,
+            Web3SettlementLifecycleState::Failed
+        );
+        assert_eq!(failure.failure_reason.as_deref(), Some("node rejected tx"));
+
+        let reversal = build_reversal_receipt(
+            &dispatch,
+            "exec-reversed".to_string(),
+            "settlement-ref".to_string(),
+            "tx-reverse".to_string(),
+            dispatch.settlement_amount.clone(),
+            "exec-failed".to_string(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(
+            reversal.lifecycle_state,
+            Web3SettlementLifecycleState::ChargedBack
+        );
+        assert_eq!(reversal.reversal_of.as_deref(), Some("exec-failed"));
+    }
+
+    #[test]
+    fn finalize_escrow_dispatch_reads_the_created_id_from_receipt_logs() {
+        let dispatch = hex_dispatch();
+        let prepared = PreparedEscrowCreate {
+            expected_escrow_id: "0xdeadbeef".to_string(),
+            capability_commitment: "0xfeedface".to_string(),
+            settlement_amount_minor_units: 1_500_000,
+            dispatch: dispatch.clone(),
+            call: PreparedEvmCall {
+                from_address: dispatch
+                    .capital_instruction
+                    .body
+                    .rail
+                    .destination_account_ref
+                    .clone()
+                    .unwrap_or_default(),
+                to_address: dispatch.escrow_contract.clone(),
+                data: "0x".to_string(),
+                gas_limit: None,
+            },
+        };
+        let observed_id = "0x1111111111111111111111111111111111111111111111111111111111111111";
+        let receipt = EvmTransactionReceipt {
+            tx_hash: "0xabc".to_string(),
+            block_number: 1,
+            block_hash: "0x01".to_string(),
+            status: true,
+            from_address: "0x1000000000000000000000000000000000000001".to_string(),
+            to_address: dispatch.escrow_contract.clone(),
+            gas_used: 21_000,
+            observed_at: 1_744_000_000,
+            logs: vec![EvmLogEntry {
+                address: dispatch.escrow_contract.clone(),
+                topics: vec![
+                    event_signature_hash(
+                        "EscrowCreated(bytes32,bytes32,address,address,address,uint256,uint256,address)",
+                    ),
+                    observed_id.to_string(),
+                ],
+                data: "0x".to_string(),
+                log_index: Some(0),
+            }],
+        };
+
+        let finalized = finalize_escrow_dispatch(&prepared, &receipt).unwrap();
+
+        assert_eq!(finalized.expected_escrow_id, observed_id);
+        assert_eq!(finalized.dispatch.escrow_id, observed_id);
+    }
+
+    #[test]
+    fn finalize_bond_lock_reads_identity_topics_from_receipt_logs() {
+        let bond_id_hash = format_b256(hash_string_id("bond-1"));
+        let facility_id_hash = format_b256(hash_string_id("facility-1"));
+        let prepared = PreparedBondLock {
+            vault_id: "0xold".to_string(),
+            bond_id_hash: bond_id_hash.clone(),
+            facility_id_hash: facility_id_hash.clone(),
+            collateral_minor_units: 5,
+            reserve_requirement_minor_units: 2,
+            call: PreparedEvmCall {
+                from_address: "0x1000000000000000000000000000000000000001".to_string(),
+                to_address: "0x621c302d6EC93b7186bEF18dF5D6436C6ea30125".to_string(),
+                data: "0x".to_string(),
+                gas_limit: None,
+            },
+        };
+        let vault_id = "0x2222222222222222222222222222222222222222222222222222222222222222";
+        let receipt = EvmTransactionReceipt {
+            tx_hash: "0xdef".to_string(),
+            block_number: 1,
+            block_hash: "0x02".to_string(),
+            status: true,
+            from_address: "0x1000000000000000000000000000000000000001".to_string(),
+            to_address: prepared.call.to_address.clone(),
+            gas_used: 21_000,
+            observed_at: 1_744_000_000,
+            logs: vec![EvmLogEntry {
+                address: prepared.call.to_address.clone(),
+                topics: vec![
+                    event_signature_hash(
+                        "BondLocked(bytes32,bytes32,bytes32,address,address,uint256,uint256)",
+                    ),
+                    vault_id.to_string(),
+                    bond_id_hash,
+                    facility_id_hash,
+                ],
+                data: "0x".to_string(),
+                log_index: Some(0),
+            }],
+        };
+
+        let finalized = finalize_bond_lock(&prepared, &receipt).unwrap();
+
+        assert_eq!(finalized.vault_id, vault_id);
+    }
+
+    #[test]
+    fn helper_parsers_and_request_serialization_fail_closed() {
+        let request = request_value(&PreparedEvmCall {
+            from_address: "0x1000000000000000000000000000000000000001".to_string(),
+            to_address: "0x1000000000000000000000000000000000000002".to_string(),
+            data: "0xdeadbeef".to_string(),
+            gas_limit: Some(21_000),
+        });
+        assert_eq!(request["gas"], serde_json::json!("0x5208"));
+
+        let chain_error = parse_eip155_chain_id("solana:mainnet").expect_err("unsupported id");
+        assert!(matches!(chain_error, SettlementError::Unsupported(_)));
+
+        let log_error = parse_log_entry(&serde_json::json!({
+            "address": "0x1000000000000000000000000000000000000001",
+            "topics": ["0x1111111111111111111111111111111111111111111111111111111111111111"],
+            "data": "not-hex"
+        }))
+        .expect_err("bad log payload");
+        assert!(matches!(log_error, SettlementError::Serialization(_)));
+
+        let overflow =
+            u256_to_u128(U256::from_limbs([0, 0, 1, 0]), "field").expect_err("overflowed u128");
+        assert!(matches!(overflow, SettlementError::InvalidInput(_)));
     }
 }

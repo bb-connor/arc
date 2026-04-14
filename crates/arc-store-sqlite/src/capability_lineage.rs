@@ -29,7 +29,7 @@ impl SqliteReceiptStore {
     /// present in the lineage table. If it is `Some` but the parent is missing,
     /// the depth defaults to 1 (the minimum delegation depth).
     pub fn record_capability_snapshot(
-        &mut self,
+        &self,
         token: &CapabilityToken,
         parent_capability_id: Option<&str>,
     ) -> Result<(), CapabilityLineageError> {
@@ -40,7 +40,7 @@ impl SqliteReceiptStore {
         // Compute delegation depth from parent if present.
         let delegation_depth: u64 = if let Some(parent_id) = parent_capability_id {
             let parent_depth: Option<u64> = self
-                .connection
+                .connection()?
                 .query_row(
                     "SELECT delegation_depth FROM capability_lineage WHERE capability_id = ?1",
                     params![parent_id],
@@ -54,7 +54,7 @@ impl SqliteReceiptStore {
             0
         };
 
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT OR IGNORE INTO capability_lineage (
                 capability_id,
@@ -90,7 +90,7 @@ impl SqliteReceiptStore {
         &mut self,
         snapshot: &CapabilitySnapshot,
     ) -> Result<(), CapabilityLineageError> {
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT INTO capability_lineage (
                 capability_id,
@@ -133,7 +133,7 @@ impl SqliteReceiptStore {
         capability_id: &str,
     ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
         let row = self
-            .connection
+            .connection()?
             .query_row(
                 r#"
                 SELECT
@@ -168,7 +168,8 @@ impl SqliteReceiptStore {
         &self,
         capability_id: &str,
     ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
-        let mut stmt = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(
             r#"
             WITH RECURSIVE chain(
                 capability_id,
@@ -254,7 +255,8 @@ impl SqliteReceiptStore {
         subject_key: Option<&str>,
         issuer_key: Option<&str>,
     ) -> Result<Vec<CapabilitySnapshot>, CapabilityLineageError> {
-        let mut stmt = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(
             r#"
             SELECT
                 capability_id,
@@ -291,7 +293,8 @@ impl SqliteReceiptStore {
         after_seq: u64,
         limit: usize,
     ) -> Result<Vec<StoredCapabilitySnapshot>, CapabilityLineageError> {
-        let mut stmt = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(
             r#"
             SELECT
                 rowid,
@@ -393,7 +396,7 @@ mod tests {
     #[test]
     fn record_and_get_lineage_returns_matching_fields() {
         let path = unique_db_path("cl-persist");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
@@ -416,7 +419,7 @@ mod tests {
     #[test]
     fn record_capability_snapshot_is_idempotent() {
         let path = unique_db_path("cl-idempotent");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
@@ -427,8 +430,8 @@ mod tests {
         store.record_capability_snapshot(&token, None).unwrap();
 
         // Only one row should exist.
-        let count: i64 = store
-            .connection
+        let connection = store.connection().unwrap();
+        let count: i64 = connection
             .query_row(
                 "SELECT COUNT(*) FROM capability_lineage WHERE capability_id = ?1",
                 params!["cap-idem-001"],
@@ -443,7 +446,7 @@ mod tests {
     #[test]
     fn grants_json_round_trips_without_field_loss() {
         let path = unique_db_path("cl-json-rt");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         let subject_kp = Keypair::generate();
         let issuer_kp = Keypair::generate();
@@ -475,7 +478,7 @@ mod tests {
     #[test]
     fn get_delegation_chain_returns_root_first_for_three_level_chain() {
         let path = unique_db_path("cl-chain-3");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         let kp_root = Keypair::generate();
         let kp_mid = Keypair::generate();
@@ -510,7 +513,7 @@ mod tests {
     #[test]
     fn get_delegation_chain_returns_single_entry_for_root_capability() {
         let path = unique_db_path("cl-chain-root");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         let kp = Keypair::generate();
         let root = make_token("cap-solo", &kp, &kp, 1000, 9000);
@@ -527,7 +530,7 @@ mod tests {
     #[test]
     fn get_delegation_chain_enforces_max_depth_guard() {
         let path = unique_db_path("cl-depth-guard");
-        let mut store = SqliteReceiptStore::open(&path).unwrap();
+        let store = SqliteReceiptStore::open(&path).unwrap();
 
         // Build a chain of 25 entries (exceeds the level < 20 guard).
         let kp = Keypair::generate();
@@ -559,8 +562,8 @@ mod tests {
         let store = SqliteReceiptStore::open(&path).unwrap();
 
         // Query the table to verify it exists; COUNT(*) fails if the table is absent.
-        let count: i64 = store
-            .connection
+        let connection = store.connection().unwrap();
+        let count: i64 = connection
             .query_row("SELECT COUNT(*) FROM capability_lineage", [], |row| {
                 row.get(0)
             })
@@ -576,8 +579,8 @@ mod tests {
         let store = SqliteReceiptStore::open(&path).unwrap();
 
         // PRAGMA index_list returns rows for each index on the table.
-        let mut stmt = store
-            .connection
+        let connection = store.connection().unwrap();
+        let mut stmt = connection
             .prepare("PRAGMA index_list(capability_lineage)")
             .unwrap();
         let index_names: Vec<String> = stmt

@@ -5,8 +5,8 @@ use arc_core::crypto::Keypair;
 use arc_kernel::{ArcKernel, KernelConfig, KernelError, ToolServerConnection};
 use arc_manifest::{ToolDefinition, ToolManifest};
 use arc_mcp_adapter::{
-    AdapterError, ArcMcpEdge, McpAdapter, McpAdapterConfig, McpEdgeConfig,
-    McpServerCapabilities, McpToolInfo, McpToolResult, McpTransport,
+    AdapterError, ArcMcpEdge, McpAdapter, McpAdapterConfig, McpEdgeConfig, McpServerCapabilities,
+    McpToolInfo, McpToolResult, McpTransport,
 };
 use serde_json::{json, Value};
 
@@ -189,11 +189,7 @@ impl McpTransport for LoopbackEdgeTransport {
             .map_err(|error| AdapterError::ParseError(error.to_string()))
     }
 
-    fn call_tool(
-        &self,
-        tool_name: &str,
-        arguments: Value,
-    ) -> Result<McpToolResult, AdapterError> {
+    fn call_tool(&self, tool_name: &str, arguments: Value) -> Result<McpToolResult, AdapterError> {
         let result = self.request(
             "tools/call",
             json!({

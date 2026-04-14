@@ -250,9 +250,7 @@ fn looks_like_encoded_ip(host: &str) -> bool {
     // Octal components: starts with 0 followed by octal digits and dots
     if host.starts_with('0')
         && host.len() > 1
-        && host
-            .chars()
-            .all(|c| c.is_ascii_digit() || c == '.')
+        && host.chars().all(|c| c.is_ascii_digit() || c == '.')
         && host.contains('.')
     {
         // Could be octal IP notation like 0177.0.0.1
@@ -368,8 +366,7 @@ mod tests {
 
     #[test]
     fn extra_blocked_hosts() {
-        let guard =
-            InternalNetworkGuard::with_config(vec!["evil.internal".to_string()], true);
+        let guard = InternalNetworkGuard::with_config(vec!["evil.internal".to_string()], true);
         assert!(guard.check_host("evil.internal").is_some());
         assert!(guard.check_host("safe.external.com").is_none());
     }
@@ -424,8 +421,7 @@ mod tests {
             expires_at: u64::MAX,
             delegation_chain: vec![],
         };
-        let cap =
-            arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
+        let cap = arc_core::capability::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
 
         let request = arc_kernel::ToolCallRequest {
             request_id: "req-1".to_string(),

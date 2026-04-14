@@ -504,3 +504,569 @@ fn parse_hex_u64(value: &str) -> Result<u64, AnchorError> {
     u64::from_str_radix(value.trim_start_matches("0x"), 16)
         .map_err(|error| AnchorError::Rpc(error.to_string()))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::time::Duration;
+
+    use alloy_sol_types::SolCall;
+    use arc_core::web3::{AnchorInclusionProof, SignedWeb3IdentityBinding, Web3KeyBindingPurpose};
+    use arc_kernel::checkpoint::KernelCheckpoint;
+    use arc_web3_bindings::IArcRootRegistry;
+    use serde_json::{json, Value};
+
+    use super::{
+        build_chain_anchor_record, confirm_root_publication, ensure_publication_ready,
+        hash_to_b256, inspect_publication_guard, operator_key_hash, prepare_delegate_registration,
+        prepare_root_publication, publish_root, verify_inclusion_onchain, EvmAnchorTarget,
+        EvmPublicationReceipt,
+    };
+
+    struct MockJsonRpcServer {
+        base_url: String,
+        requests: Arc<Mutex<Vec<Value>>>,
+        handle: thread::JoinHandle<()>,
+    }
+
+    impl MockJsonRpcServer {
+        fn spawn(envelopes: Vec<Value>) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock JSON-RPC listener");
+            let address = listener.local_addr().expect("listener address");
+            let base_url = format!("http://127.0.0.1:{}", address.port());
+            let requests = Arc::new(Mutex::new(Vec::new()));
+            let requests_for_thread = Arc::clone(&requests);
+
+            let handle = thread::spawn(move || {
+                for envelope in envelopes {
+                    let (mut stream, _) = listener.accept().expect("accept mock request");
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .expect("set read timeout");
+                    let request = read_http_request(&mut stream);
+                    requests_for_thread
+                        .lock()
+                        .expect("lock request log")
+                        .push(parse_json_request(&request));
+                    write_http_json_response(&mut stream, 200, &envelope);
+                    stream.flush().expect("flush mock response");
+                }
+            });
+
+            Self {
+                base_url,
+                requests,
+                handle,
+            }
+        }
+
+        fn base_url(&self) -> &str {
+            &self.base_url
+        }
+
+        fn requests(&self) -> Vec<Value> {
+            self.requests.lock().expect("lock request log").clone()
+        }
+
+        fn join(self) {
+            self.handle.join().expect("join mock JSON-RPC server");
+        }
+    }
+
+    fn sample_primary_proof() -> AnchorInclusionProof {
+        serde_json::from_str(include_str!(
+            "../../../docs/standards/ARC_ANCHOR_INCLUSION_PROOF_EXAMPLE.json"
+        ))
+        .expect("parse primary proof example")
+    }
+
+    fn sample_binding() -> SignedWeb3IdentityBinding {
+        sample_primary_proof().key_binding_certificate
+    }
+
+    fn sample_checkpoint() -> KernelCheckpoint {
+        crate::kernel_checkpoint_from_statement(&sample_primary_proof().checkpoint_statement)
+    }
+
+    fn sample_target(rpc_url: &str) -> EvmAnchorTarget {
+        let binding = sample_binding();
+        EvmAnchorTarget {
+            chain_id: "eip155:8453".to_string(),
+            rpc_url: rpc_url.to_string(),
+            contract_address: "0x1000000000000000000000000000000000000003".to_string(),
+            operator_address: binding.certificate.settlement_address.clone(),
+            publisher_address: binding.certificate.settlement_address,
+        }
+    }
+
+    fn sample_delegate_target(rpc_url: &str) -> EvmAnchorTarget {
+        let mut target = sample_target(rpc_url);
+        target.publisher_address = "0x1000000000000000000000000000000000000004".to_string();
+        target
+    }
+
+    fn rpc_result(result: Value) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": result,
+        })
+    }
+
+    fn rpc_error(code: i64, message: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": code,
+                "message": message,
+            }
+        })
+    }
+
+    fn encode_hex(data: Vec<u8>) -> String {
+        format!("0x{}", hex::encode(data))
+    }
+
+    fn read_http_request<R: Read>(stream: &mut R) -> String {
+        let mut request = Vec::new();
+        let mut chunk = [0_u8; 1024];
+        let mut header_end = None;
+        let mut content_length = 0_usize;
+
+        loop {
+            let read = stream.read(&mut chunk).expect("read request");
+            if read == 0 {
+                break;
+            }
+            request.extend_from_slice(&chunk[..read]);
+            if header_end.is_none() {
+                header_end = find_header_end(&request);
+                if let Some(end) = header_end {
+                    content_length = parse_content_length(&request[..end]);
+                }
+            }
+            if let Some(end) = header_end {
+                if request.len() >= end + content_length {
+                    break;
+                }
+            }
+        }
+
+        String::from_utf8(request).expect("request should be valid UTF-8")
+    }
+
+    fn find_header_end(request: &[u8]) -> Option<usize> {
+        request
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|position| position + 4)
+    }
+
+    fn parse_content_length(headers: &[u8]) -> usize {
+        String::from_utf8_lossy(headers)
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                if name.eq_ignore_ascii_case("content-length") {
+                    value.trim().parse::<usize>().ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0)
+    }
+
+    fn parse_json_request(request: &str) -> Value {
+        let body = request
+            .split_once("\r\n\r\n")
+            .map(|(_, body)| body)
+            .unwrap_or_default();
+        serde_json::from_str(body).expect("request body should be JSON")
+    }
+
+    fn write_http_json_response<W: Write>(stream: &mut W, status: u16, body: &Value) {
+        let body_text = body.to_string();
+        let response = format!(
+            "HTTP/1.1 {status} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            http_status_text(status),
+            body_text.len(),
+            body_text
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write mock response");
+    }
+
+    fn http_status_text(status: u16) -> &'static str {
+        match status {
+            200 => "OK",
+            500 => "Internal Server Error",
+            _ => "Unknown",
+        }
+    }
+
+    #[test]
+    fn prepare_root_publication_rejects_missing_anchor_purpose() {
+        let checkpoint = sample_checkpoint();
+        let target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        binding.certificate.purpose = vec![Web3KeyBindingPurpose::Settle];
+
+        let error = prepare_root_publication(&target, &checkpoint, &binding)
+            .expect_err("binding without anchor purpose should fail");
+
+        assert!(matches!(error, crate::AnchorError::InvalidBinding(_)));
+        assert!(error.to_string().contains("anchor purpose"));
+    }
+
+    #[test]
+    fn prepare_root_publication_rejects_out_of_scope_chain() {
+        let checkpoint = sample_checkpoint();
+        let target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        binding.certificate.chain_scope = vec!["eip155:1".to_string()];
+
+        let error = prepare_root_publication(&target, &checkpoint, &binding)
+            .expect_err("binding should reject uncovered chain");
+
+        assert!(matches!(error, crate::AnchorError::InvalidBinding(_)));
+        assert!(error.to_string().contains("does not cover"));
+    }
+
+    #[test]
+    fn prepare_root_publication_rejects_settlement_address_mismatch() {
+        let checkpoint = sample_checkpoint();
+        let target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        binding.certificate.settlement_address =
+            "0x1000000000000000000000000000000000000009".to_string();
+
+        let error = prepare_root_publication(&target, &checkpoint, &binding)
+            .expect_err("binding should reject settlement mismatch");
+
+        assert!(matches!(error, crate::AnchorError::InvalidBinding(_)));
+        assert!(error
+            .to_string()
+            .contains("does not match operator address"));
+    }
+
+    #[test]
+    fn prepare_root_publication_rejects_invalid_operator_address() {
+        let checkpoint = sample_checkpoint();
+        let mut target = sample_target("http://127.0.0.1:8545");
+        let mut binding = sample_binding();
+        target.operator_address = "not-an-address".to_string();
+        binding.certificate.settlement_address = target.operator_address.clone();
+
+        let error = prepare_root_publication(&target, &checkpoint, &binding)
+            .expect_err("invalid operator address should fail");
+
+        assert!(matches!(error, crate::AnchorError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn prepare_delegate_registration_rejects_invalid_delegate_inputs() {
+        let target = sample_target("http://127.0.0.1:8545");
+
+        let blank = prepare_delegate_registration(&target, "   ", 30)
+            .expect_err("blank delegate should fail");
+        assert!(blank.to_string().contains("delegate address is required"));
+
+        let zero = prepare_delegate_registration(&target, &target.publisher_address, 0)
+            .expect_err("zero delegate expiry should fail");
+        assert!(zero.to_string().contains("must be non-zero"));
+
+        let invalid = prepare_delegate_registration(&target, "invalid-address", 30)
+            .expect_err("invalid delegate address should fail");
+        assert!(matches!(invalid, crate::AnchorError::InvalidInput(_)));
+    }
+
+    #[tokio::test]
+    async fn publish_root_estimates_gas_and_submits_transaction() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!("0x5208")),
+            rpc_result(json!("0xabc123")),
+        ]);
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let publication =
+            prepare_root_publication(&sample_target(server.base_url()), &checkpoint, &binding)
+                .expect("prepare publication");
+
+        let tx_hash = publish_root(&publication).await.expect("publish root");
+
+        assert_eq!(tx_hash, "0xabc123");
+        let requests = server.requests();
+        server.join();
+
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0]["method"], "eth_estimateGas");
+        assert_eq!(requests[1]["method"], "eth_sendTransaction");
+        assert_eq!(
+            requests[1]["params"][0]["gas"],
+            json!(format!("0x{:x}", 21_000_u64 * 12 / 10 + 50_000))
+        );
+    }
+
+    #[tokio::test]
+    async fn publish_root_rejects_non_string_transaction_hash() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!("0x5208")),
+            rpc_result(json!({ "txHash": "0xabc123" })),
+        ]);
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let publication =
+            prepare_root_publication(&sample_target(server.base_url()), &checkpoint, &binding)
+                .expect("prepare publication");
+
+        let error = publish_root(&publication)
+            .await
+            .expect_err("non-string tx hash should fail");
+
+        server.join();
+        assert!(error.to_string().contains("did not return a tx hash"));
+    }
+
+    #[tokio::test]
+    async fn publish_root_surfaces_rpc_error_envelope() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!("0x5208")),
+            rpc_error(-32000, "denied"),
+        ]);
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let publication =
+            prepare_root_publication(&sample_target(server.base_url()), &checkpoint, &binding)
+                .expect("prepare publication");
+
+        let error = publish_root(&publication)
+            .await
+            .expect_err("RPC error should fail");
+
+        server.join();
+        assert!(error.to_string().contains("denied"));
+        assert!(error.to_string().contains("-32000"));
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_decodes_matching_registry_entry() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let stored = encode_hex(IArcRootRegistry::getRootCall::abi_encode_returns(
+            &IArcRootRegistry::RootEntry {
+                merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
+                checkpointSeq: checkpoint.body.checkpoint_seq,
+                batchStartSeq: checkpoint.body.batch_start_seq,
+                batchEndSeq: checkpoint.body.batch_end_seq,
+                treeSize: checkpoint.body.tree_size as u64,
+                publishedAt: 1_744_000_123_u64,
+                operatorKeyHash: operator_key_hash(&binding),
+            },
+        ));
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({
+                "blockNumber": "0x2a",
+                "blockHash": "0xabc",
+                "status": "0x1",
+            })),
+            rpc_result(json!(stored)),
+        ]);
+        let target = sample_target(server.base_url());
+
+        let receipt = confirm_root_publication(&target, &checkpoint, &binding, "0xdeadbeef")
+            .await
+            .expect("confirm publication");
+
+        let requests = server.requests();
+        server.join();
+
+        assert_eq!(receipt.tx_hash, "0xdeadbeef");
+        assert_eq!(receipt.block_number, 42);
+        assert_eq!(receipt.published_at, 1_744_000_123);
+        assert_eq!(requests[0]["method"], "eth_getTransactionReceipt");
+        assert_eq!(requests[1]["method"], "eth_call");
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_rejects_failed_transaction_status() {
+        let server = MockJsonRpcServer::spawn(vec![rpc_result(json!({
+            "blockNumber": "0x2a",
+            "blockHash": "0xabc",
+            "status": "0x0",
+        }))]);
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let target = sample_target(server.base_url());
+
+        let error = confirm_root_publication(&target, &checkpoint, &binding, "0xdeadbeef")
+            .await
+            .expect_err("failed tx status should fail");
+
+        server.join();
+        assert!(error.to_string().contains("failed with status 0x0"));
+    }
+
+    #[tokio::test]
+    async fn confirm_root_publication_rejects_registry_mismatch() {
+        let checkpoint = sample_checkpoint();
+        let binding = sample_binding();
+        let stored = encode_hex(IArcRootRegistry::getRootCall::abi_encode_returns(
+            &IArcRootRegistry::RootEntry {
+                merkleRoot: hash_to_b256(&checkpoint.body.merkle_root),
+                checkpointSeq: checkpoint.body.checkpoint_seq,
+                batchStartSeq: checkpoint.body.batch_start_seq,
+                batchEndSeq: checkpoint.body.batch_end_seq,
+                treeSize: checkpoint.body.tree_size as u64 + 1,
+                publishedAt: 1_744_000_123_u64,
+                operatorKeyHash: operator_key_hash(&binding),
+            },
+        ));
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({
+                "blockNumber": "0x2a",
+                "blockHash": "0xabc",
+                "status": "0x1",
+            })),
+            rpc_result(json!(stored)),
+        ]);
+        let target = sample_target(server.base_url());
+
+        let error = confirm_root_publication(&target, &checkpoint, &binding, "0xdeadbeef")
+            .await
+            .expect_err("mismatched registry entry should fail");
+
+        server.join();
+        assert!(error
+            .to_string()
+            .contains("root registry entry does not match"));
+    }
+
+    #[tokio::test]
+    async fn inspect_publication_guard_decodes_authorization_and_sequence() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+            ))),
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+        ]);
+        let target = sample_delegate_target(server.base_url());
+
+        let guard = inspect_publication_guard(&target)
+            .await
+            .expect("inspect guard");
+
+        server.join();
+        assert!(guard.publisher_authorized);
+        assert_eq!(guard.latest_checkpoint_seq, 41);
+        assert_eq!(guard.next_checkpoint_seq_min, 42);
+        assert!(guard.requires_delegate_authorization);
+    }
+
+    #[tokio::test]
+    async fn ensure_publication_ready_rejects_unauthorized_publisher() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&false)
+            ))),
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+        ]);
+        let target = sample_delegate_target(server.base_url());
+
+        let error = ensure_publication_ready(&target, 42)
+            .await
+            .expect_err("unauthorized publisher should fail");
+
+        server.join();
+        assert!(error.to_string().contains("not authorized"));
+    }
+
+    #[tokio::test]
+    async fn ensure_publication_ready_rejects_checkpoint_regression() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+            ))),
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+        ]);
+        let target = sample_delegate_target(server.base_url());
+
+        let error = ensure_publication_ready(&target, 41)
+            .await
+            .expect_err("checkpoint regression should fail");
+
+        server.join();
+        assert!(error.to_string().contains("must be >="));
+    }
+
+    #[tokio::test]
+    async fn ensure_publication_ready_accepts_next_checkpoint() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
+            ))),
+            rpc_result(json!(encode_hex(
+                IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
+            ))),
+        ]);
+        let target = sample_delegate_target(server.base_url());
+
+        let guard = ensure_publication_ready(&target, 42)
+            .await
+            .expect("checkpoint 42 should be accepted");
+
+        server.join();
+        assert_eq!(guard.next_checkpoint_seq_min, 42);
+    }
+
+    #[tokio::test]
+    async fn verify_inclusion_onchain_decodes_registry_verdict() {
+        let server = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
+            IArcRootRegistry::verifyInclusionDetailedCall::abi_encode_returns(&true)
+        )))]);
+        let target = sample_target(server.base_url());
+        let proof = sample_primary_proof();
+
+        let verified = verify_inclusion_onchain(&target, &proof)
+            .await
+            .expect("verify inclusion");
+
+        let requests = server.requests();
+        server.join();
+
+        assert!(verified);
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["method"], "eth_call");
+    }
+
+    #[test]
+    fn build_chain_anchor_record_copies_confirmation_metadata() {
+        let checkpoint = sample_checkpoint();
+        let target = sample_target("http://127.0.0.1:8545");
+        let confirmed = EvmPublicationReceipt {
+            tx_hash: "0xdeadbeef".to_string(),
+            block_number: 42,
+            block_hash: "0xabc".to_string(),
+            published_at: 1_744_000_123,
+        };
+
+        let record = build_chain_anchor_record(&target, &checkpoint, &confirmed);
+
+        assert_eq!(record.chain_id, target.chain_id);
+        assert_eq!(record.contract_address, target.contract_address);
+        assert_eq!(record.operator_address, target.operator_address);
+        assert_eq!(record.tx_hash, confirmed.tx_hash);
+        assert_eq!(record.block_number, confirmed.block_number);
+        assert_eq!(record.anchored_merkle_root, checkpoint.body.merkle_root);
+    }
+}

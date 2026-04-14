@@ -2,12 +2,13 @@ use super::*;
 
 impl SqliteReceiptStore {
     pub fn append_arc_receipt_returning_seq(
-        &mut self,
+        &self,
         receipt: &ArcReceipt,
     ) -> Result<u64, ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
-        let tx = self.connection.transaction()?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
         let inserted = tx.execute(
             r#"
             INSERT INTO arc_tool_receipts (
@@ -51,12 +52,9 @@ impl SqliteReceiptStore {
     }
 
     /// Store a signed KernelCheckpoint in the kernel_checkpoints table.
-    pub fn store_checkpoint(
-        &mut self,
-        checkpoint: &KernelCheckpoint,
-    ) -> Result<(), ReceiptStoreError> {
+    pub fn store_checkpoint(&self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
         let statement_json = serde_json::to_string(&checkpoint.body)?;
-        self.connection.execute(
+        self.connection()?.execute(
             r#"
             INSERT INTO kernel_checkpoints (
                 checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
@@ -84,7 +82,7 @@ impl SqliteReceiptStore {
         checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
         let row = self
-            .connection
+            .connection()?
             .query_row(
                 r#"
                 SELECT statement_json, signature
@@ -115,7 +113,8 @@ impl SqliteReceiptStore {
         start_seq: u64,
         end_seq: u64,
     ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
-        let mut statement = self.connection.prepare(
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
             r#"
             SELECT seq, raw_json
             FROM arc_tool_receipts
@@ -143,10 +142,10 @@ impl SqliteReceiptStore {
     /// without requiring a filesystem stat, which is consistent in WAL mode.
     pub fn db_size_bytes(&self) -> Result<u64, ReceiptStoreError> {
         let page_count: i64 = self
-            .connection
+            .connection()?
             .query_row("PRAGMA page_count", [], |row| row.get(0))?;
         let page_size: i64 = self
-            .connection
+            .connection()?
             .query_row("PRAGMA page_size", [], |row| row.get(0))?;
         Ok((page_count.max(0) as u64) * (page_size.max(0) as u64))
     }
@@ -154,7 +153,7 @@ impl SqliteReceiptStore {
     /// Return the Unix timestamp (seconds) of the oldest receipt in the live
     /// database, or `None` if there are no receipts.
     pub fn oldest_receipt_timestamp(&self) -> Result<Option<u64>, ReceiptStoreError> {
-        let ts = self.connection.query_row(
+        let ts = self.connection()?.query_row(
             "SELECT MIN(timestamp) FROM arc_tool_receipts",
             [],
             |row| row.get::<_, Option<i64>>(0),
@@ -179,11 +178,11 @@ impl SqliteReceiptStore {
         let escaped_path = archive_path.replace('\'', "''");
 
         // Attach the archive database.
-        self.connection
+        self.connection()?
             .execute_batch(&format!("ATTACH DATABASE '{escaped_path}' AS archive"))?;
 
         // Create archive tables with the same schema as the main database.
-        self.connection.execute_batch(
+        self.connection()?.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS archive.arc_tool_receipts (
                 seq INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -244,17 +243,17 @@ impl SqliteReceiptStore {
         let cutoff = cutoff_unix_secs as i64;
 
         // Copy qualifying receipts to the archive (ignore duplicates from prior runs).
-        self.connection.execute(
+        self.connection()?.execute(
             "INSERT OR IGNORE INTO archive.arc_tool_receipts \
              SELECT * FROM main.arc_tool_receipts WHERE timestamp < ?1",
             params![cutoff],
         )?;
-        self.connection.execute(
+        self.connection()?.execute(
             "INSERT OR IGNORE INTO archive.arc_child_receipts \
              SELECT * FROM main.arc_child_receipts WHERE timestamp < ?1",
             params![cutoff],
         )?;
-        self.connection.execute(
+        self.connection()?.execute(
             "INSERT OR IGNORE INTO archive.capability_lineage
              SELECT DISTINCT cl.*
              FROM main.capability_lineage cl
@@ -264,7 +263,7 @@ impl SqliteReceiptStore {
         )?;
 
         // Find the maximum seq among archived receipts (for checkpoint filtering).
-        let max_archived_seq: Option<i64> = self.connection.query_row(
+        let max_archived_seq: Option<i64> = self.connection()?.query_row(
             "SELECT MAX(seq) FROM main.arc_tool_receipts WHERE timestamp < ?1",
             params![cutoff],
             |row| row.get(0),
@@ -274,7 +273,7 @@ impl SqliteReceiptStore {
             // Copy checkpoint rows whose full batch is covered by the archived receipts.
             // Never archive a checkpoint whose batch_end_seq exceeds the max archived seq
             // because that would leave a partial batch in the archive.
-            self.connection.execute(
+            self.connection()?.execute(
                 "INSERT OR IGNORE INTO archive.kernel_checkpoints \
                  SELECT * FROM main.kernel_checkpoints WHERE batch_end_seq <= ?1",
                 params![max_seq],
@@ -283,12 +282,12 @@ impl SqliteReceiptStore {
             // Verify that every checkpoint covering the archived range is now present
             // in the archive. If any checkpoint failed to transfer, refuse to delete the
             // receipts from the live database to preserve inclusion-proof integrity.
-            let live_count: i64 = self.connection.query_row(
+            let live_count: i64 = self.connection()?.query_row(
                 "SELECT COUNT(*) FROM main.kernel_checkpoints WHERE batch_end_seq <= ?1",
                 params![max_seq],
                 |row| row.get(0),
             )?;
-            let archive_count: i64 = self.connection.query_row(
+            let archive_count: i64 = self.connection()?.query_row(
                 "SELECT COUNT(*) FROM archive.kernel_checkpoints WHERE batch_end_seq <= ?1",
                 params![max_seq],
                 |row| row.get(0),
@@ -296,7 +295,7 @@ impl SqliteReceiptStore {
             if archive_count < live_count {
                 // Detach the archive before returning the error to avoid leaving
                 // the database in an attached state.
-                let _ = self.connection.execute_batch("DETACH DATABASE archive");
+                let _ = self.connection()?.execute_batch("DETACH DATABASE archive");
                 return Err(ReceiptStoreError::Canonical(format!(
                     "checkpoint co-archival incomplete: {live_count} checkpoints in live, \
                      only {archive_count} transferred to archive; aborting receipt deletion \
@@ -306,18 +305,19 @@ impl SqliteReceiptStore {
         }
 
         // Delete archived receipts from the live database.
-        let deleted = self.connection.execute(
+        let deleted = self.connection()?.execute(
             "DELETE FROM main.arc_tool_receipts WHERE timestamp < ?1",
             params![cutoff],
         )? as u64;
-        self.connection.execute(
+        self.connection()?.execute(
             "DELETE FROM main.arc_child_receipts WHERE timestamp < ?1",
             params![cutoff],
         )?;
 
         // Detach the archive and checkpoint WAL.
-        self.connection.execute_batch("DETACH DATABASE archive")?;
-        self.connection
+        self.connection()?
+            .execute_batch("DETACH DATABASE archive")?;
+        self.connection()?
             .execute_batch("PRAGMA wal_checkpoint(TRUNCATE)")?;
 
         Ok(deleted)
@@ -350,7 +350,7 @@ impl SqliteReceiptStore {
         if size > config.max_size_bytes {
             // Use the median timestamp as the cutoff to archive roughly half the receipts.
             let median_cutoff: Option<i64> = self
-                .connection
+                .connection()?
                 .query_row(
                     r#"
                     SELECT timestamp FROM arc_tool_receipts
@@ -467,7 +467,7 @@ impl SqliteReceiptStore {
                     // cursor > i64::MAX: no AUTOINCREMENT seq can exceed it.
                     // Run only the count query (no cursor applied) and return empty.
                     let total_count: u64 = self
-                        .connection
+                        .connection()?
                         .query_row(
                             count_sql,
                             params![
@@ -487,7 +487,8 @@ impl SqliteReceiptStore {
         };
 
         // Execute data query.
-        let mut stmt = self.connection.prepare(data_sql)?;
+        let connection = self.connection()?;
+        let mut stmt = connection.prepare(data_sql)?;
         let rows = stmt.query_map(
             params![
                 cap_id,
@@ -517,7 +518,7 @@ impl SqliteReceiptStore {
 
         // Execute count query (same filters, no cursor, no limit).
         let total_count: u64 = self
-            .connection
+            .connection()?
             .query_row(
                 count_sql,
                 params![

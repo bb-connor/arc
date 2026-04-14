@@ -1,4 +1,6 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
+use std::sync::{Arc, Barrier};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::capability::{
@@ -154,8 +156,8 @@ fn open_creates_kernel_checkpoints_table() {
     let path = unique_db_path("arc-receipts-cp-table");
     let store = SqliteReceiptStore::open(&path).unwrap();
     // Query the table to confirm it exists.
-    let count: i64 = store
-        .connection
+    let connection = store.connection().unwrap();
+    let count: i64 = connection
         .query_row("SELECT COUNT(*) FROM kernel_checkpoints", [], |row| {
             row.get(0)
         })
@@ -167,7 +169,7 @@ fn open_creates_kernel_checkpoints_table() {
 #[test]
 fn append_arc_receipt_returning_seq_returns_seq() {
     let path = unique_db_path("arc-receipts-seq");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
     let receipt = sample_receipt_with_id("rcpt-seq-001");
     let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
     assert!(seq > 0, "seq should be non-zero for a new insert");
@@ -177,7 +179,7 @@ fn append_arc_receipt_returning_seq_returns_seq() {
 #[test]
 fn append_100_receipts_seqs_span_1_to_100() {
     let path = unique_db_path("arc-receipts-100");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
     let mut seqs = Vec::new();
     for i in 0..100usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-{i:04}"));
@@ -190,9 +192,50 @@ fn append_100_receipts_seqs_span_1_to_100() {
 }
 
 #[test]
+fn append_arc_receipt_returning_seq_supports_concurrent_writers() {
+    let path = unique_db_path("arc-receipts-concurrent");
+    let store = Arc::new(SqliteReceiptStore::open(&path).unwrap());
+    let thread_count = 8usize;
+    let receipts_per_thread = 24usize;
+    let barrier = Arc::new(Barrier::new(thread_count));
+    let mut handles = Vec::new();
+
+    for worker in 0..thread_count {
+        let store = Arc::clone(&store);
+        let barrier = Arc::clone(&barrier);
+        handles.push(thread::spawn(move || {
+            barrier.wait();
+            let mut seqs = Vec::new();
+            for receipt_index in 0..receipts_per_thread {
+                let receipt =
+                    sample_receipt_with_id(&format!("rcpt-concurrent-{worker}-{receipt_index}"));
+                seqs.push(store.append_arc_receipt_returning_seq(&receipt).unwrap());
+            }
+            seqs
+        }));
+    }
+
+    let mut seqs = Vec::new();
+    for handle in handles {
+        seqs.extend(handle.join().unwrap());
+    }
+
+    assert_eq!(seqs.len(), thread_count * receipts_per_thread);
+    assert!(seqs.iter().all(|seq| *seq > 0));
+
+    let mut deduped = seqs.clone();
+    deduped.sort_unstable();
+    deduped.dedup();
+    assert_eq!(deduped.len(), seqs.len());
+    assert_eq!(store.tool_receipt_count().unwrap(), seqs.len() as u64);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn store_and_load_checkpoint_by_seq() {
     let path = unique_db_path("arc-receipts-cp-store");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
 
     // Append 5 receipts.
     let mut seqs = Vec::new();
@@ -239,7 +282,7 @@ fn load_checkpoint_by_seq_returns_none_for_missing() {
 #[test]
 fn receipts_canonical_bytes_range_returns_correct_count() {
     let path = unique_db_path("arc-receipts-canon-range");
-    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let store = SqliteReceiptStore::open(&path).unwrap();
 
     for i in 0..10usize {
         let receipt = sample_receipt_with_id(&format!("rcpt-canon-{i}"));

@@ -339,3 +339,254 @@ fn match_value(actual: &Option<serde_json::Value>, expected: &serde_json::Value)
         _ => false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn context_at(current_time: &str) -> RuntimeContext {
+        RuntimeContext {
+            current_time: Some(current_time.to_string()),
+            ..RuntimeContext::default()
+        }
+    }
+
+    fn nested_all_of_condition(depth: usize) -> Condition {
+        if depth == 0 {
+            Condition::default()
+        } else {
+            Condition {
+                all_of: Some(vec![nested_all_of_condition(depth - 1)]),
+                ..Condition::default()
+            }
+        }
+    }
+
+    #[test]
+    fn overnight_windows_resolve_the_previous_day_after_midnight() {
+        let condition = Condition {
+            time_window: Some(TimeWindowCondition {
+                start: "22:00".to_string(),
+                end: "02:00".to_string(),
+                timezone: Some("UTC".to_string()),
+                days: vec!["tue".to_string()],
+            }),
+            ..Condition::default()
+        };
+
+        assert!(evaluate_condition(
+            &condition,
+            &context_at("2026-04-15T01:30:00Z")
+        ));
+    }
+
+    #[test]
+    fn context_matching_supports_scalars_membership_and_environment() {
+        let mut context = RuntimeContext {
+            environment: Some("prod".to_string()),
+            ..RuntimeContext::default()
+        };
+        context
+            .user
+            .insert("role".to_string(), serde_json::json!("admin"));
+        context
+            .request
+            .insert("scopes".to_string(), serde_json::json!(["read", "write"]));
+        context
+            .request
+            .insert("retries".to_string(), serde_json::json!(3));
+        context
+            .custom
+            .insert("enabled".to_string(), serde_json::json!(true));
+
+        let expected = HashMap::from([
+            ("environment".to_string(), serde_json::json!("prod")),
+            ("user.role".to_string(), serde_json::json!("admin")),
+            (
+                "request.scopes".to_string(),
+                serde_json::json!(["execute", "write"]),
+            ),
+            ("request.retries".to_string(), serde_json::json!(3)),
+            ("custom.enabled".to_string(), serde_json::json!(true)),
+        ]);
+
+        assert!(evaluate_condition(
+            &Condition {
+                context: Some(expected),
+                ..Condition::default()
+            },
+            &context
+        ));
+    }
+
+    #[test]
+    fn invalid_timezones_and_missing_fields_fail_closed() {
+        let invalid_timezone = Condition {
+            time_window: Some(TimeWindowCondition {
+                start: "09:00".to_string(),
+                end: "17:00".to_string(),
+                timezone: Some("+25:00".to_string()),
+                days: Vec::new(),
+            }),
+            ..Condition::default()
+        };
+        assert!(!evaluate_condition(
+            &invalid_timezone,
+            &context_at("2026-04-15T12:00:00Z")
+        ));
+
+        let expected = HashMap::from([("user.team".to_string(), serde_json::json!("ops"))]);
+        assert!(!evaluate_condition(
+            &Condition {
+                context: Some(expected),
+                ..Condition::default()
+            },
+            &RuntimeContext::default()
+        ));
+    }
+
+    #[test]
+    fn excessive_condition_nesting_is_rejected() {
+        assert!(!evaluate_condition(
+            &nested_all_of_condition(MAX_NESTING_DEPTH + 2),
+            &RuntimeContext::default()
+        ));
+    }
+
+    #[test]
+    fn compound_conditions_cover_any_of_not_and_full_day_windows() {
+        let mut context = RuntimeContext {
+            environment: Some("prod".to_string()),
+            current_time: Some("2026-04-15T12:00:00Z".to_string()),
+            ..RuntimeContext::default()
+        };
+        context
+            .user
+            .insert("role".to_string(), serde_json::json!("admin"));
+        context
+            .session
+            .insert("flags".to_string(), serde_json::json!(["trusted", "beta"]));
+
+        let condition = Condition {
+            time_window: Some(TimeWindowCondition {
+                start: "00:00".to_string(),
+                end: "00:00".to_string(),
+                timezone: Some("UTC".to_string()),
+                days: Vec::new(),
+            }),
+            all_of: Some(vec![Condition {
+                context: Some(HashMap::from([(
+                    "user.role".to_string(),
+                    serde_json::json!("admin"),
+                )])),
+                ..Condition::default()
+            }]),
+            any_of: Some(vec![
+                Condition {
+                    context: Some(HashMap::from([(
+                        "environment".to_string(),
+                        serde_json::json!("dev"),
+                    )])),
+                    ..Condition::default()
+                },
+                Condition {
+                    context: Some(HashMap::from([(
+                        "session.flags".to_string(),
+                        serde_json::json!("trusted"),
+                    )])),
+                    ..Condition::default()
+                },
+            ]),
+            not: Some(Box::new(Condition {
+                context: Some(HashMap::from([(
+                    "custom.blocked".to_string(),
+                    serde_json::json!(true),
+                )])),
+                ..Condition::default()
+            })),
+            ..Condition::default()
+        };
+
+        assert!(evaluate_condition(&condition, &context));
+        assert!(evaluate_condition(
+            &Condition {
+                any_of: Some(Vec::new()),
+                ..Condition::default()
+            },
+            &context
+        ));
+        assert!(!evaluate_condition(
+            &Condition {
+                time_window: Some(TimeWindowCondition {
+                    start: "09:00".to_string(),
+                    end: "17:00".to_string(),
+                    timezone: Some("UTC".to_string()),
+                    days: vec!["thu".to_string()],
+                }),
+                ..Condition::default()
+            },
+            &context
+        ));
+    }
+
+    #[test]
+    fn helper_parsers_and_matchers_cover_remaining_edges() {
+        assert_eq!(parse_hhmm("23:59"), Some((23, 59)));
+        assert_eq!(parse_hhmm("24:00"), None);
+        assert_eq!(day_abbreviation(6), "sun");
+        assert_eq!(day_abbreviation(99), "mon");
+
+        assert_eq!(parse_timezone_offset("UTC"), Some(0));
+        assert_eq!(parse_timezone_offset("+05:30"), Some(5 * 60 + 30));
+        assert_eq!(parse_timezone_offset("-8"), Some(-8 * 60));
+        assert_eq!(parse_timezone_offset("+24:00"), None);
+        assert_eq!(parse_offset_value("7"), Some(7 * 60));
+        assert_eq!(parse_offset_value("12:60"), None);
+
+        let actual = Some(serde_json::json!(["read", "write"]));
+        assert!(match_value(&actual, &serde_json::json!("write")));
+        assert!(match_value(
+            &Some(serde_json::json!("east")),
+            &serde_json::json!(["west", "east"])
+        ));
+        assert!(match_value(
+            &Some(serde_json::json!(1.5)),
+            &serde_json::json!(1.5)
+        ));
+        assert!(!match_value(
+            &Some(serde_json::json!({"nested": true})),
+            &serde_json::json!({"nested": true})
+        ));
+    }
+
+    #[test]
+    fn current_time_and_context_resolution_cover_naive_and_root_map_paths() {
+        assert_eq!(
+            resolve_current_time(&context_at("2026-04-15T07:45:00"), Some("US/Pacific")),
+            Some((0, 45, 2))
+        );
+        assert_eq!(
+            resolve_current_time(&context_at("2026-04-15T12:15:00+02:00"), Some("UTC")),
+            Some((10, 15, 2))
+        );
+        assert_eq!(
+            resolve_current_time(&context_at("not-a-timestamp"), Some("UTC")),
+            None
+        );
+
+        let mut context = RuntimeContext::default();
+        context
+            .deployment
+            .insert("region".to_string(), serde_json::json!("us-east-1"));
+
+        assert_eq!(
+            resolve_context_value("deployment.region", &context),
+            Some(serde_json::json!("us-east-1"))
+        );
+        assert_eq!(
+            resolve_context_value("deployment", &context),
+            Some(serde_json::json!({"region": "us-east-1"}))
+        );
+        assert_eq!(resolve_context_value("unknown.field", &context), None);
+    }
+}

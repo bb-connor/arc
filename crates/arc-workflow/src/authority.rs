@@ -761,13 +761,7 @@ mod tests {
 
         // First execution should work
         let mut execution = authority
-            .begin(
-                &manifest,
-                &grant,
-                "a".to_string(),
-                "c".to_string(),
-                None,
-            )
+            .begin(&manifest, &grant, "a".to_string(), "c".to_string(), None)
             .unwrap();
         authority
             .record_step(
@@ -783,13 +777,7 @@ mod tests {
         authority.finalize(execution).unwrap();
 
         // Second execution should be rejected
-        let result = authority.begin(
-            &manifest,
-            &grant,
-            "a".to_string(),
-            "c".to_string(),
-            None,
-        );
+        let result = authority.begin(&manifest, &grant, "a".to_string(), "c".to_string(), None);
         assert!(matches!(
             result,
             Err(WorkflowError::ExecutionLimitReached { .. })

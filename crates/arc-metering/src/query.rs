@@ -490,7 +490,12 @@ mod tests {
         let result = execute_cost_query(&records, &query);
         assert_eq!(result.summary.receipt_count, 1);
         assert_eq!(
-            result.summary.total_monetary_cost.as_ref().unwrap().currency,
+            result
+                .summary
+                .total_monetary_cost
+                .as_ref()
+                .unwrap()
+                .currency,
             "EUR"
         );
     }

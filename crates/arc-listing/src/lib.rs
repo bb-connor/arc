@@ -1563,6 +1563,67 @@ mod tests {
         }
     }
 
+    fn issue_request_for(
+        listing: SignedGenericListing,
+        admission_class: GenericTrustAdmissionClass,
+        disposition: GenericTrustActivationDisposition,
+    ) -> GenericTrustActivationIssueRequest {
+        GenericTrustActivationIssueRequest {
+            reviewed_by: match disposition {
+                GenericTrustActivationDisposition::PendingReview => None,
+                GenericTrustActivationDisposition::Approved
+                | GenericTrustActivationDisposition::Denied => {
+                    Some("reviewer@arc.example".to_string())
+                }
+            },
+            reviewed_at: match disposition {
+                GenericTrustActivationDisposition::PendingReview => None,
+                GenericTrustActivationDisposition::Approved
+                | GenericTrustActivationDisposition::Denied => Some(130),
+            },
+            ..sample_activation_issue_request(listing, admission_class, disposition)
+        }
+    }
+
+    fn signed_activation(
+        listing: SignedGenericListing,
+        admission_class: GenericTrustAdmissionClass,
+        disposition: GenericTrustActivationDisposition,
+    ) -> SignedGenericTrustActivation {
+        let authority_keypair = Keypair::generate();
+        let artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(listing, admission_class, disposition),
+            130,
+        )
+        .expect("build activation artifact");
+        SignedGenericTrustActivation::sign(artifact, &authority_keypair).expect("sign activation")
+    }
+
+    fn evaluation_request(
+        listing: SignedGenericListing,
+        activation: Option<SignedGenericTrustActivation>,
+        freshness_state: GenericListingFreshnessState,
+        publisher_role: GenericRegistryPublisherRole,
+        publisher_operator_id: &str,
+        evaluated_at: u64,
+    ) -> GenericTrustActivationEvaluationRequest {
+        GenericTrustActivationEvaluationRequest {
+            listing,
+            current_publisher: sample_publisher(publisher_role, publisher_operator_id),
+            current_freshness: GenericListingReplicaFreshness {
+                state: freshness_state,
+                age_secs: 5,
+                max_age_secs: 300,
+                valid_until: 400,
+                generated_at: 100,
+            },
+            activation,
+            evaluated_at: Some(evaluated_at),
+        }
+    }
+
     #[test]
     fn generic_listing_boundary_rejects_automatic_trust_admission() {
         let boundary = GenericListingBoundary {
@@ -1577,6 +1638,36 @@ mod tests {
     }
 
     #[test]
+    fn generic_listing_boundary_rejects_missing_explicit_activation_gate() {
+        let boundary = GenericListingBoundary {
+            visibility_only: true,
+            explicit_trust_activation_required: false,
+            automatic_trust_admission: false,
+        };
+        assert!(boundary
+            .validate()
+            .expect_err("missing explicit trust activation gate rejected")
+            .contains("must require explicit trust activation"));
+    }
+
+    #[test]
+    fn generic_namespace_artifact_rejects_wrong_schema() {
+        let keypair = Keypair::generate();
+        let artifact = GenericNamespaceArtifact {
+            schema: "arc.registry.namespace.v0".to_string(),
+            namespace_id: "registry.arc.example".to_string(),
+            lifecycle_state: GenericNamespaceLifecycleState::Active,
+            ownership: sample_namespace("operator-a", &keypair),
+            boundary: GenericListingBoundary::default(),
+        };
+
+        assert!(artifact
+            .validate()
+            .expect_err("wrong namespace schema rejected")
+            .contains("unsupported generic namespace schema"));
+    }
+
+    #[test]
     fn generic_listing_rejects_namespace_mismatch() {
         let keypair = Keypair::generate();
         let mut listing = sample_listing("operator-a", &keypair, "artifact-1", "deadbeef");
@@ -1585,6 +1676,282 @@ mod tests {
             .validate()
             .expect_err("namespace mismatch rejected")
             .contains("does not match namespace ownership"));
+    }
+
+    #[test]
+    fn generic_listing_rejects_non_increasing_expiry() {
+        let keypair = Keypair::generate();
+        let mut listing = sample_listing("operator-a", &keypair, "artifact-1", "deadbeef");
+        listing.expires_at = Some(listing.published_at);
+
+        assert!(listing
+            .validate()
+            .expect_err("non-increasing expiry rejected")
+            .contains("expiry must be greater"));
+    }
+
+    #[test]
+    fn generic_listing_query_normalizes_namespace_actor_and_limit() {
+        let normalized = GenericListingQuery {
+            namespace: Some(" https://registry.arc.example/ ".to_string()),
+            actor_kind: Some(GenericListingActorKind::ToolServer),
+            actor_id: Some("   ".to_string()),
+            status: Some(GenericListingStatus::Active),
+            limit: Some(999),
+        }
+        .normalized();
+
+        assert_eq!(
+            normalized.namespace.as_deref(),
+            Some("https://registry.arc.example")
+        );
+        assert_eq!(normalized.actor_id, None);
+        assert_eq!(normalized.limit, Some(MAX_GENERIC_LISTING_LIMIT));
+    }
+
+    #[test]
+    fn generic_listing_freshness_window_rejects_invalid_bounds_and_assesses_stale() {
+        assert!(GenericListingFreshnessWindow {
+            max_age_secs: 0,
+            valid_until: 200,
+        }
+        .validate(100)
+        .expect_err("zero max age rejected")
+        .contains("greater than zero"));
+
+        assert!(GenericListingFreshnessWindow {
+            max_age_secs: 30,
+            valid_until: 100,
+        }
+        .validate(100)
+        .expect_err("non-increasing valid_until rejected")
+        .contains("greater than generated_at"));
+
+        let freshness = GenericListingFreshnessWindow {
+            max_age_secs: 30,
+            valid_until: 150,
+        }
+        .assess(100, 200);
+        assert_eq!(freshness.state, GenericListingFreshnessState::Stale);
+        assert_eq!(freshness.age_secs, 100);
+    }
+
+    #[test]
+    fn generic_listing_search_policy_rejects_non_reproducible_modes() {
+        let mut policy = GenericListingSearchPolicy::default();
+        policy.reproducible_ordering = false;
+        assert!(policy
+            .validate()
+            .expect_err("non-reproducible policy rejected")
+            .contains("must remain reproducible"));
+
+        let mut policy = GenericListingSearchPolicy::default();
+        policy.visibility_only = false;
+        assert!(policy
+            .validate()
+            .expect_err("non-visibility-only policy rejected")
+            .contains("must remain visibility-only"));
+
+        let mut policy = GenericListingSearchPolicy::default();
+        policy.explicit_trust_activation_required = false;
+        assert!(policy
+            .validate()
+            .expect_err("missing explicit trust activation rejected")
+            .contains("must require explicit trust activation"));
+    }
+
+    #[test]
+    fn generic_listing_replica_freshness_rejects_invalid_window() {
+        let freshness = GenericListingReplicaFreshness {
+            state: GenericListingFreshnessState::Fresh,
+            age_secs: 5,
+            max_age_secs: 0,
+            valid_until: 100,
+            generated_at: 100,
+        };
+        assert!(freshness
+            .validate()
+            .expect_err("invalid freshness rejected")
+            .contains("greater than zero"));
+    }
+
+    #[test]
+    fn generic_trust_activation_eligibility_rejects_invalid_role_and_bond_rules() {
+        assert!(GenericTrustActivationEligibility {
+            required_listing_operator_ids: vec![],
+            ..GenericTrustActivationEligibility {
+                allowed_actor_kinds: vec![],
+                allowed_publisher_roles: vec![],
+                allowed_statuses: vec![],
+                require_fresh_listing: true,
+                require_bond_backing: false,
+                required_listing_operator_ids: vec![],
+                policy_reference: None,
+            }
+        }
+        .validate(GenericTrustAdmissionClass::RoleGated)
+        .expect_err("role-gated operators required")
+        .contains("requires required_listing_operator_ids"));
+
+        assert!(GenericTrustActivationEligibility {
+            require_bond_backing: false,
+            ..GenericTrustActivationEligibility {
+                allowed_actor_kinds: vec![],
+                allowed_publisher_roles: vec![],
+                allowed_statuses: vec![],
+                require_fresh_listing: true,
+                require_bond_backing: false,
+                required_listing_operator_ids: vec![],
+                policy_reference: None,
+            }
+        }
+        .validate(GenericTrustAdmissionClass::BondBacked)
+        .expect_err("bond-backed admission must require bonds")
+        .contains("must require bond backing"));
+
+        assert!(GenericTrustActivationEligibility {
+            require_bond_backing: true,
+            ..GenericTrustActivationEligibility {
+                allowed_actor_kinds: vec![],
+                allowed_publisher_roles: vec![],
+                allowed_statuses: vec![],
+                require_fresh_listing: true,
+                require_bond_backing: true,
+                required_listing_operator_ids: vec![],
+                policy_reference: None,
+            }
+        }
+        .validate(GenericTrustAdmissionClass::Reviewable)
+        .expect_err("non-bond admission cannot require bonds")
+        .contains("only valid for bond_backed"));
+    }
+
+    #[test]
+    fn generic_trust_activation_artifact_validate_rejects_review_field_misconfigurations() {
+        let keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.reviewed_at = Some(100);
+        assert!(artifact
+            .validate()
+            .expect_err("reviewed_at before requested_at rejected")
+            .contains("reviewed_at must be greater"));
+
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.expires_at = Some(120);
+        assert!(artifact
+            .validate()
+            .expect_err("expiry before requested_at rejected")
+            .contains("expires_at must be greater"));
+
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.disposition = GenericTrustActivationDisposition::PendingReview;
+        artifact.reviewed_by = Some("reviewer@arc.example".to_string());
+        artifact.reviewed_at = Some(130);
+        assert!(artifact
+            .validate()
+            .expect_err("pending review cannot carry review completion")
+            .contains("must not carry review completion fields"));
+
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing,
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.reviewed_by = None;
+        assert!(artifact
+            .validate()
+            .expect_err("approved activation requires reviewer")
+            .contains("requires reviewed_at and reviewed_by"));
+    }
+
+    #[test]
+    fn generic_trust_activation_issue_request_validate_rejects_stale_approved_context() {
+        let signing_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut request = issue_request_for(
+            listing,
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Approved,
+        );
+        request.review_context.freshness.state = GenericListingFreshnessState::Stale;
+
+        assert!(request
+            .validate()
+            .expect_err("approved activation requires fresh context")
+            .contains("requires fresh listing review context"));
+    }
+
+    #[test]
+    fn build_generic_trust_activation_artifact_defaults_reviewed_at_for_approved() {
+        let signing_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut request = issue_request_for(
+            listing,
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Approved,
+        );
+        request.reviewed_at = None;
+        let artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &request,
+            130,
+        )
+        .expect("build activation");
+
+        assert_eq!(artifact.reviewed_at, Some(130));
     }
 
     #[test]
@@ -1943,6 +2310,475 @@ mod tests {
         assert_eq!(
             report.findings[0].code,
             GenericTrustActivationFindingCode::AdmissionClassUntrusted
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_flags_unverifiable_listing_signature() {
+        let signing_keypair = Keypair::generate();
+        let mut listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        listing.body.status = GenericListingStatus::Revoked;
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                None,
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate invalid listing signature");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::ListingUnverifiable
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_flags_unverifiable_activation_signature() {
+        let signing_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut activation = signed_activation(
+            listing.clone(),
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Approved,
+        );
+        activation.body.local_operator_id = "https://tampered.arc.example".to_string();
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate invalid activation signature");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::ActivationUnverifiable
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_flags_invalid_activation_body() {
+        let signing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.reviewed_by = None;
+        let activation = SignedGenericTrustActivation::sign(artifact, &authority_keypair)
+            .expect("sign activation");
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate invalid activation body");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::ActivationUnverifiable
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_rejects_listing_mismatch() {
+        let signing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        artifact.listing_sha256 = "different".to_string();
+        let activation = SignedGenericTrustActivation::sign(artifact, &authority_keypair)
+            .expect("sign activation");
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate mismatched activation");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::ListingMismatch
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_rejects_divergent_listing_context() {
+        let signing_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let activation = signed_activation(
+            listing.clone(),
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Approved,
+        );
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(activation),
+                GenericListingFreshnessState::Divergent,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate divergent listing");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::ListingDivergent
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_rejects_expired_pending_and_denied_activations() {
+        let signing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+
+        let mut expired_artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        expired_artifact.expires_at = Some(140);
+        let expired = SignedGenericTrustActivation::sign(expired_artifact, &authority_keypair)
+            .expect("sign expired activation");
+        let expired_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing.clone(),
+                Some(expired),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate expired activation");
+        assert_eq!(
+            expired_report.findings[0].code,
+            GenericTrustActivationFindingCode::ActivationExpired
+        );
+
+        let pending = signed_activation(
+            listing.clone(),
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::PendingReview,
+        );
+        let pending_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing.clone(),
+                Some(pending),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate pending activation");
+        assert_eq!(
+            pending_report.findings[0].code,
+            GenericTrustActivationFindingCode::ActivationPendingReview
+        );
+
+        let denied = signed_activation(
+            listing,
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Denied,
+        );
+        let denied_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                signed_sample_listing(
+                    "https://registry.arc.example",
+                    &signing_keypair,
+                    "artifact-1",
+                    "deadbeef",
+                ),
+                Some(denied),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate denied activation");
+        assert_eq!(
+            denied_report.findings[0].code,
+            GenericTrustActivationFindingCode::ActivationDenied
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_rejects_ineligible_actor_publisher_status_and_operator() {
+        let signing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+
+        let mut actor_artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        actor_artifact.eligibility.allowed_actor_kinds =
+            vec![GenericListingActorKind::CredentialIssuer];
+        let actor_activation =
+            SignedGenericTrustActivation::sign(actor_artifact, &authority_keypair)
+                .expect("sign actor-limited activation");
+        let actor_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing.clone(),
+                Some(actor_activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate actor ineligible");
+        assert_eq!(
+            actor_report.findings[0].code,
+            GenericTrustActivationFindingCode::ActorKindIneligible
+        );
+
+        let mut publisher_artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        publisher_artifact.eligibility.allowed_publisher_roles =
+            vec![GenericRegistryPublisherRole::Mirror];
+        let publisher_activation =
+            SignedGenericTrustActivation::sign(publisher_artifact, &authority_keypair)
+                .expect("sign publisher-limited activation");
+        let publisher_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing.clone(),
+                Some(publisher_activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate publisher ineligible");
+        assert_eq!(
+            publisher_report.findings[0].code,
+            GenericTrustActivationFindingCode::PublisherRoleIneligible
+        );
+
+        let status_listing = SignedGenericListing::sign(
+            GenericListingArtifact {
+                status: GenericListingStatus::Suspended,
+                ..sample_listing(
+                    "https://registry.arc.example",
+                    &signing_keypair,
+                    "artifact-1",
+                    "deadbeef",
+                )
+            },
+            &signing_keypair,
+        )
+        .expect("sign suspended listing");
+        let status_activation = signed_activation(
+            status_listing.clone(),
+            GenericTrustAdmissionClass::Reviewable,
+            GenericTrustActivationDisposition::Approved,
+        );
+        let status_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                status_listing,
+                Some(status_activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate status ineligible");
+        assert_eq!(
+            status_report.findings[0].code,
+            GenericTrustActivationFindingCode::ListingStatusIneligible
+        );
+
+        let mut operator_artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &issue_request_for(
+                listing.clone(),
+                GenericTrustAdmissionClass::Reviewable,
+                GenericTrustActivationDisposition::Approved,
+            ),
+            130,
+        )
+        .expect("build activation");
+        operator_artifact.eligibility.required_listing_operator_ids = vec!["mirror-a".to_string()];
+        let operator_activation =
+            SignedGenericTrustActivation::sign(operator_artifact, &authority_keypair)
+                .expect("sign operator-limited activation");
+        let operator_report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(operator_activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate operator ineligible");
+        assert_eq!(
+            operator_report.findings[0].code,
+            GenericTrustActivationFindingCode::ListingOperatorIneligible
+        );
+    }
+
+    #[test]
+    fn generic_trust_activation_bond_backed_policy_remains_review_visible_only() {
+        let signing_keypair = Keypair::generate();
+        let authority_keypair = Keypair::generate();
+        let listing = signed_sample_listing(
+            "https://registry.arc.example",
+            &signing_keypair,
+            "artifact-1",
+            "deadbeef",
+        );
+        let mut request = issue_request_for(
+            listing.clone(),
+            GenericTrustAdmissionClass::BondBacked,
+            GenericTrustActivationDisposition::Approved,
+        );
+        request.eligibility.require_bond_backing = true;
+        let artifact = build_generic_trust_activation_artifact(
+            "https://operator.arc.example",
+            Some("ARC Operator".to_string()),
+            &request,
+            130,
+        )
+        .expect("build activation");
+        let activation = SignedGenericTrustActivation::sign(artifact, &authority_keypair)
+            .expect("sign activation");
+
+        let report = evaluate_generic_trust_activation(
+            &evaluation_request(
+                listing,
+                Some(activation),
+                GenericListingFreshnessState::Fresh,
+                GenericRegistryPublisherRole::Origin,
+                "origin-a",
+                150,
+            ),
+            150,
+        )
+        .expect("evaluate bond-backed activation");
+
+        assert_eq!(
+            report.findings[0].code,
+            GenericTrustActivationFindingCode::BondBackingRequired
         );
     }
 }

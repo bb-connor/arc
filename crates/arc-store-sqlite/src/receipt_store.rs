@@ -77,10 +77,12 @@ use arc_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct SqliteReceiptStore {
-    pub(crate) connection: Connection,
+    pub(crate) pool: Pool<SqliteConnectionManager>,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -88,6 +90,7 @@ type FederatedShareSubjectCorpus = (
     Vec<StoredToolReceipt>,
     Vec<CapabilitySnapshot>,
 );
+pub(crate) type SqliteStoreConnection = PooledConnection<SqliteConnectionManager>;
 
 #[path = "receipt_store/bootstrap.rs"]
 mod bootstrap;
@@ -108,3 +111,11 @@ mod tests;
 mod underwriting_credit;
 
 use support::*;
+
+impl SqliteReceiptStore {
+    pub(crate) fn connection(&self) -> Result<SqliteStoreConnection, ReceiptStoreError> {
+        self.pool
+            .get()
+            .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+    }
+}
