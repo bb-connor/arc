@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 376-01-PLAN.md
-last_updated: "2026-04-14T22:59:40.258Z"
-last_activity: 2026-04-14 -- completed phase 392 by replacing heuristic edge
+stopped_at: Completed 376-02-PLAN.md
+last_updated: "2026-04-14T23:04:16.007Z"
+last_activity: 2026-04-14 -- began phase 393 by extending v3.13 from phases
 progress:
-  total_phases: 347
-  completed_phases: 256
-  total_plans: 734
-  completed_plans: 757
-  percent: 60
+  total_phases: 349
+  completed_phases: 257
+  total_plans: 735
+  completed_plans: 759
+  percent: 43
 ---
 
 # Project State
@@ -32,19 +32,20 @@ a parallel strategic lane.
 
 ## Current Position
 
-Phase: 393 (not started)
-Plan: —
+Phase: 393 (in progress)
+Plan: 01 (in progress)
 Status: v3.13 is active. Phases `390` through `392` are complete and landed
 the shared orchestrator substrate, authoritative ACP live-path guarding,
 explicit compatibility-only A2A/ACP passthrough surfaces, and truthful bridge
 publication gates with tested caveats. The next closure slice is phase `393`,
-which must reconcile late-v3 milestone truth and older narrative overclaims to
-the now-explicit runtime behavior.
-Last activity: 2026-04-14 -- completed phase 392 by replacing heuristic edge
-fidelity labels with truthful `Lossless` / `Adapted` / `Unsupported`
-publication semantics, tests, and protocol/spec documentation.
+which now also owns the newly documented remaining gaps: v3.0-v3.11 ledger
+truth, stale planning metadata, and docs that still overclaim or understate
+the shipped runtime. Later v3.13 phases now explicitly own HTTP convergence,
+protocol lifecycle closure, and final claim qualification.
+Last activity: 2026-04-14 -- began phase 393 by extending v3.13 from phases
+`390-394` to `390-396` so every audited gap has an explicit owner.
 
-Progress: [######----] 60%
+Progress: [####------] 43%
 
 ## Performance Metrics
 
@@ -53,7 +54,7 @@ Progress: [######----] 60%
 - v2.0 completed: 6 phases, 19 plans
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
-- v3.0-v3.13: 64 phases planned across 14 milestones
+- v3.0-v3.13: 66 phases planned across 14 milestones
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 - v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
@@ -115,6 +116,11 @@ Progress: [######----] 60%
   semantic hints and truthful publication gating, unsupported bridges stay
   unpublished, and adapted bridges carry tested caveats for approval,
   streaming, cancellation, and partial-output semantics.
+- Phase `393` was expanded before execution to explicitly own late-v3 ledger
+  truth, stale planning metadata, and doc/runtime claim mismatches; the
+  remaining implementation gaps now live in phase `394` (HTTP convergence),
+  phase `395` (protocol lifecycle and authority-surface closure), and phase
+  `396` (claim upgrade qualification).
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 - [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
 - [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
@@ -127,11 +133,13 @@ Progress: [######----] 60%
 - [Phase 375]: arc-config added as direct dependency to arc-wasm-guards for WasmGuardEntry; WasmtimeBackend defaults used for memory/module-size limits
 - [Phase 375]: build_guard_pipeline() takes pre-composed guard vectors to separate pipeline composition from guard creation
 - [Phase 376]: File-level lint suppression (#![allow(clippy::unwrap_used, clippy::expect_used)]) required for benchmark binaries since cfg_attr(test) does not apply to bench targets
+- [Phase 376]: Full production hot path (Store + Linker + host functions + instantiate + serialize + write + call) measured in evaluate latency benchmarks to match runtime.rs::evaluate()
+- [Phase 376]: ResourceLimiter benchmark uses assert!(result.is_err()) as correctness gate; benchmark failure means ResourceLimiter is misconfigured
 
 ### Pending Todos
 
-- Plan and execute phase `393` (`Ledger and Narrative Reconciliation`) on top
-  of the landed shared orchestrator, unified authoritative edge path, and
+- Continue executing phase `393` (`Ledger and Narrative Reconciliation`) on
+  top of the landed shared orchestrator, unified authoritative edge path, and
   truthful bridge publication semantics.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
 - Reconcile the remaining `v3.9`-`v3.11` ledger truth debt under Phase `393`.
@@ -151,13 +159,14 @@ Progress: [######----] 60%
 
 ## v4.0 WASM Guard Runtime Completion
 
-Phase: 376 (in progress -- 01 of 02 plans done)
-Plan: 01 of 2 complete
-Status: Phase 376 plan 01 complete -- Criterion benchmark harness with
-compilation (50 KiB + 5 MiB WAT modules) and instantiation overhead benchmarks.
-All 83 crate tests pass, clippy clean, bench dry-run succeeds. Plan 02 is next.
-Last activity: 2026-04-14 -- completed 376-01 benchmark harness with
-compilation and instantiation benchmark groups
+Phase: 376 (complete -- 02 of 02 plans done)
+Plan: 02 of 2 complete
+Status: Phase 376 complete -- all 5 WGBENCH requirements validated: module
+compilation timing, instantiation overhead, evaluate latency (trivial + realistic),
+fuel metering overhead comparison, and ResourceLimiter adversarial trap validation.
+All 83 crate tests pass, clippy clean, 8 bench_functions pass in dry-run mode.
+Last activity: 2026-04-14 -- completed 376-02 with evaluate latency, fuel
+overhead, and ResourceLimiter benchmarks
 
 
 ## v4.1 Guard SDK and Developer Experience
@@ -165,12 +174,12 @@ compilation and instantiation benchmark groups
 Phase: 382 (not started)
 Plan: --
 Status: Roadmap created; phases 382-385 defined; depends on v4.0 completion
-Last activity: 2026-04-14 -- v3.13 was started from the post-v3 review, with
-phases 390-394 reserved after the v4.x placeholder ranges
+Last activity: 2026-04-14 -- v3.13 remains active after expanding to phases
+390-396 so the remaining audited gaps have explicit owners
 
 ## Session Continuity
 
-Last session: 2026-04-14T22:59:40.214Z
-Stopped at: Completed 376-01-PLAN.md
-Next action: execute phase 376 plan 02
+Last session: 2026-04-14T23:04:06.341Z
+Stopped at: Completed 376-02-PLAN.md
+Next action: continue phase 393 reconciliation work, then move to phase 394
 Resume file: None

@@ -2992,13 +2992,29 @@ defend.
 ### Ledger and Narrative Reconciliation
 
 - [ ] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
-- [ ] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, and true plan counts
+- [ ] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
+- [ ] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
 - [ ] **TRUTH-05**: Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
+- [ ] **TRUTH-06**: Protocol/design docs no longer describe the shipped cross-protocol substrate or current A2A/ACP edge baseline as unimplemented
 
-### Qualification
+### HTTP Authority and Evidence Convergence
+
+- [ ] **HTTP-01**: `HttpReceipt.response_status` and corresponding SDK/runtime receipt fields reflect actual downstream response evidence, or are explicitly renamed/documented as evaluation-time semantics instead of proxied response evidence
+- [ ] **HTTP-02**: `arc-api-protect` honors OpenAPI extension-aware policy overrides (`x-arc-side-effects`, `x-arc-approval-required`, and related runtime policy inputs) during evaluation instead of method defaults alone
+- [ ] **HTTP-03**: `arc-api-protect` forwards the headers required for real protected reverse-proxy operation rather than a minimal demo subset, with any intentional exclusions documented and tested
+- [ ] **HTTP-04**: `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator with divergent receipt semantics
+
+### Protocol Lifecycle and Authority-Surface Closure
+
+- [ ] **SURFACE-01**: A2A either implements distinct lifecycle semantics for the streamed/task surface it advertises or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
+- [ ] **SURFACE-02**: ACP either implements the richer session/update/cancel lifecycle it advertises in design material or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
+- [ ] **SURFACE-03**: Public non-authoritative compatibility APIs are isolated strongly enough that default/public authority surfaces cannot reasonably be mistaken for receipt-bearing mediation
+- [ ] **SURFACE-04**: Outward discovery handles duplicate tool/capability names and similar publication collisions deterministically and truthfully rather than by silent dropping
+
+### Claim Upgrade Qualification
 
 - [ ] **UPGRADE-01**: End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops
-- [ ] **UPGRADE-02**: Operator-facing claim-gate docs state the upgraded claim ARC can make after orchestration and edge unification land, plus the remaining non-goals
+- [ ] **UPGRADE-02**: Operator-facing claim-gate docs state the strongest honest post-v3 claim ARC can make, explicitly distinguishing the shipped edge-to-native substrate from future full protocol-to-protocol orchestration and broader economic thesis
 - [ ] **UPGRADE-03**: Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, and receipt continuity under real runtime flows
 
 ## v3.13 Out of Scope
@@ -3020,24 +3036,34 @@ defend.
 | AUTH-01 | Phase 391 | Complete |
 | AUTH-02 | Phase 391 | Complete |
 | AUTH-03 | Phase 391 | Complete |
-| FID-01 | Phase 392 | Planned |
-| FID-02 | Phase 392 | Planned |
-| FID-03 | Phase 392 | Planned |
+| FID-01 | Phase 392 | Complete |
+| FID-02 | Phase 392 | Complete |
+| FID-03 | Phase 392 | Complete |
 | LEDGER-01 | Phase 393 | Planned |
 | LEDGER-02 | Phase 393 | Planned |
+| LEDGER-03 | Phase 393 | Planned |
 | TRUTH-05 | Phase 393 | Planned |
-| UPGRADE-01 | Phase 394 | Planned |
-| UPGRADE-02 | Phase 394 | Planned |
-| UPGRADE-03 | Phase 394 | Planned |
+| TRUTH-06 | Phase 393 | Planned |
+| HTTP-01 | Phase 394 | Planned |
+| HTTP-02 | Phase 394 | Planned |
+| HTTP-03 | Phase 394 | Planned |
+| HTTP-04 | Phase 394 | Planned |
+| SURFACE-01 | Phase 395 | Planned |
+| SURFACE-02 | Phase 395 | Planned |
+| SURFACE-03 | Phase 395 | Planned |
+| SURFACE-04 | Phase 395 | Planned |
+| UPGRADE-01 | Phase 396 | Planned |
+| UPGRADE-02 | Phase 396 | Planned |
+| UPGRADE-03 | Phase 396 | Planned |
 
 **Coverage:**
-- v3.13 requirements: 15 total
-- Mapped to phases: 15
+- v3.13 requirements: 25 total
+- Mapped to phases: 25
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after completing phase 391 authoritative edge unification*
+*Last updated: 2026-04-14 after completing phase 392 and extending v3.13 to capture the remaining audited gaps explicitly*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3093,9 +3119,9 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 
 - [x] **WGBENCH-01**: Benchmark measures wasmtime Module::new() compilation time for representative .wasm guard binaries (50 KiB Rust, 5 MiB Python-via-componentize-py)
 - [x] **WGBENCH-02**: Benchmark measures Linker::instantiate() per-call overhead
-- [ ] **WGBENCH-03**: Benchmark measures p50/p99 evaluate latency for a trivial guard (immediate Allow) and a realistic guard (JSON parse + pattern match + Deny)
-- [ ] **WGBENCH-04**: Benchmark measures fuel metering overhead percentage (fuel enabled vs disabled)
-- [ ] **WGBENCH-05**: Benchmark verifies ResourceLimiter actually caps memory growth under adversarial guest allocation
+- [x] **WGBENCH-03**: Benchmark measures p50/p99 evaluate latency for a trivial guard (immediate Allow) and a realistic guard (JSON parse + pattern match + Deny)
+- [x] **WGBENCH-04**: Benchmark measures fuel metering overhead percentage (fuel enabled vs disabled)
+- [x] **WGBENCH-05**: Benchmark verifies ResourceLimiter actually caps memory growth under adversarial guest allocation
 
 ## v4.0 Out of Scope
 
@@ -3144,9 +3170,9 @@ guard execution surface. Design docs: `docs/guards/01-05`.
 | WGRCPT-02 | Phase 375 | Complete |
 | WGBENCH-01 | Phase 376 | Complete |
 | WGBENCH-02 | Phase 376 | Complete |
-| WGBENCH-03 | Phase 376 | Pending |
-| WGBENCH-04 | Phase 376 | Pending |
-| WGBENCH-05 | Phase 376 | Pending |
+| WGBENCH-03 | Phase 376 | Complete |
+| WGBENCH-04 | Phase 376 | Complete |
+| WGBENCH-05 | Phase 376 | Complete |
 
 **Coverage:**
 - v4.0 requirements: 31 total

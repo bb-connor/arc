@@ -10773,7 +10773,7 @@ Plans:
 | 373 | 2/2 | Complete    | 2026-04-14 |
 | 374 | 2/2 | Complete    | 2026-04-14 |
 | 375 | 2/2 | Complete    | 2026-04-14 |
-| 376 | 1/2 | In Progress|  |
+| 376 | 2/2 | Complete   | 2026-04-14 |
 
 ---
 
@@ -10875,7 +10875,7 @@ narrative corrections are in place.
 
 ---
 
-## v3.13 Universal Orchestration Closure (Phases 390-394)
+## v3.13 Universal Orchestration Closure (Phases 390-396)
 
 **Milestone Goal:** Close the remaining gap between ARC's shipped
 kernel/substrate breakthrough and the full original vision by implementing the
@@ -10894,9 +10894,11 @@ contract. Phase 391 moves A2A and ACP authoritative execution onto that path
 and quarantines passthrough helpers. Phase 392 upgrades fidelity semantics and
 publication gating once the orchestrator exists. Phase 393 reconciles the
 late-v3 milestone ledger and older overclaiming docs to the final runtime
-truth. Phase 394 qualifies the upgraded claim with orchestrated end-to-end
-tests and operator evidence. The phases are sequential because each later phase
-depends on the authoritative runtime behavior defined by the earlier ones.
+truth. Phase 394 closes the remaining HTTP authority/evidence gaps. Phase 395
+closes the remaining A2A/ACP lifecycle and authority-surface gaps. Phase 396
+qualifies the upgraded claim with orchestrated end-to-end tests and operator
+evidence. The phases are sequential because each later phase depends on the
+authoritative runtime behavior defined by the earlier ones.
 
 ### Phase 390: Generic Cross-Protocol Orchestrator
 **Goal**: Implement `CrossProtocolOrchestrator` and `CapabilityBridge` as reusable runtime architecture so bridged protocol execution no longer depends on bespoke per-edge authority flow
@@ -10907,10 +10909,9 @@ depends on the authoritative runtime behavior defined by the earlier ones.
   2. `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
   3. Orchestrated bridge executions emit signed receipts or truthful receipt references that preserve origin protocol and bridge lineage
 **Estimated complexity**: L
-**Plans**: 2 plans
+**Plans**: 1 plan
 Plans:
-- [ ] 375-01-PLAN.md -- Guard manifest parsing, SHA-256 verification, ABI gating, and receipt metadata tracking
-- [ ] 375-02-PLAN.md -- Startup wiring with HushSpec-first pipeline composition and manifest-aware WASM loading
+- [x] 390-01-PLAN.md -- shared cross-protocol contracts, orchestrator runtime, and default A2A/ACP adoption
 
 ### Phase 391: Authoritative Edge Unification
 **Goal**: Move ACP and outward A2A/ACP authority onto the orchestrated kernel path and quarantine non-authoritative compatibility helpers
@@ -10939,22 +10940,49 @@ Plans:
 ### Phase 393: Ledger and Narrative Reconciliation
 **Goal**: Finish the remaining late-v3 milestone truth debt and older overclaim cleanup now that the final runtime shape is explicit
 **Depends on**: Phase 392 (final bridge/runtime behavior exists to document honestly)
-**Requirements**: LEDGER-01, LEDGER-02, TRUTH-05
+**Requirements**: LEDGER-01, LEDGER-02, LEDGER-03, TRUTH-05, TRUTH-06
 **Success Criteria** (what must be TRUE):
   1. v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
-  2. Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, and true plan counts
+  2. Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and early/mid-v3 implementation qualification state
   3. Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
+  4. Protocol/design docs no longer describe the shipped cross-protocol substrate or edge baseline as unimplemented
+**Estimated complexity**: M
+**Plans**: 1 plan
+Plans:
+- [ ] 393-01-PLAN.md -- ledger truth repair, stale planning metadata fixes, and narrative/doc reconciliation
+
+### Phase 394: HTTP Authority and Evidence Convergence
+**Goal**: Close the remaining HTTP-side authority, evidence, and proxy/runtime convergence gaps that still block the strongest production-ready ARC claim
+**Depends on**: Phase 393 (ledger and docs reflect the current truth before runtime closure resumes)
+**Requirements**: HTTP-01, HTTP-02, HTTP-03, HTTP-04
+**Success Criteria** (what must be TRUE):
+  1. HTTP receipt semantics reflect actual downstream response evidence or are explicitly renamed and documented as evaluation-time semantics across the runtime and SDK surfaces
+  2. `arc-api-protect` honors OpenAPI extension-aware policy overrides and forwards the request headers needed for real protected reverse-proxy behavior
+  3. `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator
+  4. The Rust HTTP lane can be described as one coherent authority story rather than a sidecar path plus a divergent in-process path
+**Estimated complexity**: L
+**Plans**: TBD
+
+### Phase 395: Protocol Lifecycle and Authority-Surface Closure
+**Goal**: Make A2A and ACP lifecycle claims as truthful as their execution authority by either implementing missing lifecycle semantics or narrowing the public surface and docs to what really exists
+**Depends on**: Phase 394 (HTTP authority/evidence gaps no longer undermine the shared kernel story)
+**Requirements**: SURFACE-01, SURFACE-02, SURFACE-03, SURFACE-04
+**Success Criteria** (what must be TRUE):
+  1. A2A lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
+  2. ACP lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
+  3. Non-authoritative compatibility APIs are isolated strongly enough that public/default authority surfaces cannot be confused with receipt-bearing mediation
+  4. Discovery collisions and outward publication edge cases are handled deterministically and truthfully rather than by silent dropping
 **Estimated complexity**: M
 **Plans**: TBD
 
-### Phase 394: Claim Upgrade Qualification
-**Goal**: Qualify the upgraded ARC claim with real orchestrated end-to-end tests and operator-facing evidence
-**Depends on**: Phase 393 (runtime and narrative truth are reconciled)
+### Phase 396: Claim Upgrade Qualification
+**Goal**: Qualify the strongest honest post-v3 ARC claim with orchestrated end-to-end tests and operator-facing evidence after ledger, HTTP, and lifecycle closure
+**Depends on**: Phase 395 (runtime and docs now reflect the strongest truthful implementation state)
 **Requirements**: UPGRADE-01, UPGRADE-02, UPGRADE-03
 **Success Criteria** (what must be TRUE):
-  1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops
-  2. Operator-facing claim-gate docs state the upgraded claim ARC can make after orchestration and edge unification land, plus the remaining non-goals
-  3. Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, and receipt continuity under real runtime flows
+  1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops and the lifecycle/evidence semantics ARC still advertises
+  2. Operator-facing claim-gate docs state the strongest honest claim ARC can make after orchestration and explicitly distinguish the shipped edge-to-native substrate from future full protocol-to-protocol fabric
+  3. Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, receipt continuity, and non-misleading protocol claims under real runtime flows
 **Estimated complexity**: M
 **Plans**: TBD
 
@@ -10967,8 +10995,10 @@ Plans:
 | 390 | v3.13 | Generic Cross-Protocol Orchestrator | Complete |
 | 391 | v3.13 | Authoritative Edge Unification | Complete |
 | 392 | v3.13 | Fidelity Semantics and Publication Gating | Complete |
-| 393 | v3.13 | Ledger and Narrative Reconciliation | Not started |
-| 394 | v3.13 | Claim Upgrade Qualification | Not started |
+| 393 | v3.13 | Ledger and Narrative Reconciliation | In progress |
+| 394 | v3.13 | HTTP Authority and Evidence Convergence | Not started |
+| 395 | v3.13 | Protocol Lifecycle and Authority-Surface Closure | Not started |
+| 396 | v3.13 | Claim Upgrade Qualification | Not started |
 
 ---
 
