@@ -1,0 +1,16 @@
+[package]
+name = "arc-example-tool-gate"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+arc-guard-sdk = { path = "../../../crates/arc-guard-sdk" }
+arc-guard-sdk-macros = { path = "../../../crates/arc-guard-sdk-macros" }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
