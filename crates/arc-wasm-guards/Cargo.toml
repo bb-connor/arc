@@ -30,8 +30,14 @@ tracing = { workspace = true }
 wasmtime = { version = "29", optional = true }
 
 [dev-dependencies]
+criterion = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+
+[[bench]]
+name = "wasm_guard_perf"
+harness = false
+required-features = ["wasmtime-runtime"]
 
 [lints.clippy]
 unwrap_used = "deny"
