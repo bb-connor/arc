@@ -15,7 +15,7 @@ pub mod validation;
 pub use loader::{load_from_file, load_from_str};
 pub use schema::{
     AdapterAuthConfig, AdapterConfig, ArcConfig, EdgeConfig, KernelConfig, LoggingConfig,
-    ReceiptsConfig,
+    ReceiptsConfig, TelemetrySection,
 };
 
 /// Errors produced during configuration loading.

@@ -27,6 +27,10 @@ pub struct ArcConfig {
     /// Logging configuration (optional, defaults applied).
     #[serde(default)]
     pub logging: LoggingConfig,
+
+    /// Telemetry configuration for OpenTelemetry export (optional).
+    #[serde(default)]
+    pub telemetry: TelemetrySection,
 }
 
 /// Kernel section -- the only section that is always required.
@@ -141,6 +145,48 @@ impl Default for LoggingConfig {
             format: default_log_format(),
         }
     }
+}
+
+/// Telemetry configuration for OpenTelemetry span export.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TelemetrySection {
+    /// Whether OTel export is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// OTel collector endpoint (e.g., "http://localhost:4317").
+    #[serde(default)]
+    pub endpoint: String,
+
+    /// Service name reported to the collector.
+    #[serde(default = "default_telemetry_service_name")]
+    pub service_name: String,
+
+    /// Whether to include receipt parameters in span attributes.
+    /// Disabled by default to avoid leaking sensitive data.
+    #[serde(default)]
+    pub include_parameters: bool,
+
+    /// Batch size for span export. 0 = export each span immediately.
+    #[serde(default)]
+    pub batch_size: usize,
+}
+
+impl Default for TelemetrySection {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: String::new(),
+            service_name: default_telemetry_service_name(),
+            include_parameters: false,
+            batch_size: 0,
+        }
+    }
+}
+
+fn default_telemetry_service_name() -> String {
+    "arc-acp-proxy".to_string()
 }
 
 // -- Default value functions --

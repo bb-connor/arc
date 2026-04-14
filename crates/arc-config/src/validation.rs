@@ -145,6 +145,7 @@ mod tests {
             edges: Vec::new(),
             receipts: ReceiptsConfig::default(),
             logging: LoggingConfig::default(),
+            telemetry: TelemetrySection::default(),
         }
     }
 
