@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARC CallerIdentity",
+  "description": "The identity of the caller as extracted from the HTTP request, including the authentication method.",
+  "type": "object",
+  "required": ["subject", "auth_method"],
+  "properties": {
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identifier for the caller (e.g., user ID, service account, agent ID)."
+    },
+    "auth_method": {
+      "description": "How the caller authenticated. Tagged union with 'method' as discriminator.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "token_hash"],
+          "properties": {
+            "method": {
+              "const": "bearer"
+            },
+            "token_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 hex hash of the bearer token value."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "key_name", "key_hash"],
+          "properties": {
+            "method": {
+              "const": "api_key"
+            },
+            "key_name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the header or query parameter carrying the API key."
+            },
+            "key_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 hex hash of the API key value."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "cookie_name", "cookie_hash"],
+          "properties": {
+            "method": {
+              "const": "cookie"
+            },
+            "cookie_name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Cookie name."
+            },
+            "cookie_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "description": "SHA-256 hex hash of the cookie value."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "subject_dn", "fingerprint"],
+          "properties": {
+            "method": {
+              "const": "mtls_certificate"
+            },
+            "subject_dn": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Subject DN from the client certificate."
+            },
+            "fingerprint": {
+              "type": "string",
+              "minLength": 1,
+              "description": "SHA-256 fingerprint of the certificate."
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method"],
+          "properties": {
+            "method": {
+              "const": "anonymous"
+            }
+          }
+        }
+      ]
+    },
+    "verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this identity has been cryptographically verified."
+    },
+    "tenant": {
+      "type": "string",
+      "description": "Optional tenant or organization the caller belongs to."
+    },
+    "agent_id": {
+      "type": "string",
+      "description": "Optional agent identifier when the caller is an AI agent."
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ARC Evaluate Response",
+  "description": "Response body for POST /arc/evaluate. Contains the verdict, signed receipt, and per-guard evidence.",
+  "type": "object",
+  "required": ["verdict", "receipt", "evidence"],
+  "properties": {
+    "verdict": {
+      "$ref": "verdict.schema.json",
+      "description": "The evaluation verdict."
+    },
+    "receipt": {
+      "$ref": "http-receipt.schema.json",
+      "description": "Signed receipt proving the evaluation."
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["guard_name", "verdict"],
+        "properties": {
+          "guard_name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the guard."
+          },
+          "verdict": {
+            "type": "boolean",
+            "description": "Whether the guard passed (true) or denied (false)."
+          },
+          "details": {
+            "type": "string",
+            "description": "Human-readable details about the guard's decision."
+          }
+        }
+      },
+      "description": "Per-guard evidence collected during evaluation."
+    }
+  }
+}
