@@ -4,17 +4,15 @@
 // Fail-closed: any error during validation results in deny.
 
 use arc_core::capability::CapabilityToken;
-#[allow(unused_imports)]
 use arc_core::crypto::PublicKey;
 
 /// Kernel-backed capability checker.
 ///
 /// Validates ACP operations against presented capability tokens.
-/// Uses the kernel's public key for signature verification and
-/// checks time bounds and scope.
+/// Uses the kernel's public key for trusted-issuer verification,
+/// verifies the token signature, and checks time bounds and scope.
 pub struct KernelCapabilityChecker {
     /// Trusted kernel public key for verifying token signatures.
-    #[allow(dead_code)]
     kernel_public_key: PublicKey,
     /// Server ID this checker is bound to.
     server_id: String,
@@ -29,14 +27,29 @@ impl KernelCapabilityChecker {
         }
     }
 
-    /// Validate a capability token's structure and time bounds.
-    fn validate_token(
-        &self,
-        token_json: &str,
-    ) -> Result<CapabilityToken, CapabilityCheckError> {
+    /// Validate a capability token's structure, trust binding, signature, and
+    /// time bounds.
+    fn validate_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
         let token: CapabilityToken = serde_json::from_str(token_json).map_err(|e| {
             CapabilityCheckError::InvalidToken(format!("failed to parse token: {e}"))
         })?;
+
+        if token.issuer != self.kernel_public_key {
+            return Err(CapabilityCheckError::SignatureVerificationFailed(
+                "token issuer does not match the trusted kernel key".to_string(),
+            ));
+        }
+
+        let signature_valid = token.verify_signature().map_err(|e| {
+            CapabilityCheckError::SignatureVerificationFailed(format!(
+                "failed to verify token signature: {e}"
+            ))
+        })?;
+        if !signature_valid {
+            return Err(CapabilityCheckError::SignatureVerificationFailed(
+                "token signature is invalid".to_string(),
+            ));
+        }
 
         // Check time bounds.
         let now = std::time::SystemTime::now()
@@ -59,12 +72,7 @@ impl KernelCapabilityChecker {
     }
 
     /// Check whether a token's scope covers the requested operation.
-    fn check_scope(
-        &self,
-        token: &CapabilityToken,
-        operation: &str,
-        resource: &str,
-    ) -> bool {
+    fn check_scope(&self, token: &CapabilityToken, operation: &str, resource: &str) -> bool {
         // Check each tool grant in the token's scope for a match.
         for grant in &token.scope.grants {
             // Match the tool name against the operation type.
@@ -92,8 +100,7 @@ impl KernelCapabilityChecker {
             }
 
             // Check server scope.
-            let server_matches = grant.server_id == "*"
-                || grant.server_id == self.server_id;
+            let server_matches = grant.server_id == "*" || grant.server_id == self.server_id;
 
             if !server_matches {
                 continue;
