@@ -60,7 +60,11 @@ impl WasmGuard {
             agent_id: ctx.agent_id.clone(),
             arguments: ctx.request.arguments.clone(),
             scopes,
-            session_metadata: None,
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
         }
     }
 }
@@ -640,7 +644,11 @@ pub mod wasmtime_backend {
                 agent_id: "agent-1".to_string(),
                 arguments: serde_json::json!({"key": "value"}),
                 scopes: vec!["test_server:test_tool".to_string()],
-                session_metadata: None,
+                action_type: None,
+                extracted_path: None,
+                extracted_target: None,
+                filesystem_roots: Vec::new(),
+                matched_grant_index: None,
             }
         }
 
@@ -1234,7 +1242,11 @@ mod tests {
             agent_id: "agent-42".to_string(),
             arguments: serde_json::json!({"path": "/etc/passwd"}),
             scopes: vec!["fs-server:read_file".to_string()],
-            session_metadata: None,
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
         };
 
         let json = serde_json::to_string(&req).unwrap();
@@ -1266,7 +1278,11 @@ mod tests {
             agent_id: "a".to_string(),
             arguments: serde_json::Value::Null,
             scopes: vec![],
-            session_metadata: None,
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
         };
         let result = backend.evaluate(&req);
         assert!(result.is_err());

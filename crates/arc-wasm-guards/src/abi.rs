@@ -38,9 +38,23 @@ pub struct GuardRequest {
     /// Capability scopes granted (serialized scope names).
     #[serde(default)]
     pub scopes: Vec<String>,
-    /// Optional session metadata for stateful guards.
+    /// Host-extracted action type from extract_action().
+    /// One of: "file_access", "file_write", "network_egress", "shell_command",
+    /// "mcp_tool", "patch", "unknown".
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session_metadata: Option<serde_json::Value>,
+    pub action_type: Option<String>,
+    /// Normalized file path for filesystem actions (FileAccess, FileWrite, Patch).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_path: Option<String>,
+    /// Target domain string for network egress actions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extracted_target: Option<String>,
+    /// Session-scoped filesystem roots from the kernel context.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub filesystem_roots: Vec<String>,
+    /// Index of the matched grant in the capability scope.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_grant_index: Option<usize>,
 }
 
 /// Verdict returned by a WASM guard.
@@ -106,4 +120,82 @@ pub trait WasmGuardAbi: Send + Sync {
 pub struct GuestDenyResponse {
     /// Human-readable reason for the denial.
     pub reason: String,
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn guard_request_serializes_with_enrichment() {
+        let req = GuardRequest {
+            tool_name: "read_file".to_string(),
+            server_id: "fs-server".to_string(),
+            agent_id: "agent-42".to_string(),
+            arguments: serde_json::json!({"path": "/etc/passwd"}),
+            scopes: vec!["fs-server:read_file".to_string()],
+            action_type: Some("file_access".to_string()),
+            extracted_path: Some("/etc/passwd".to_string()),
+            extracted_target: None,
+            filesystem_roots: vec!["/home".to_string(), "/tmp".to_string()],
+            matched_grant_index: Some(0),
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&req).unwrap();
+        assert_eq!(json["action_type"], "file_access");
+        assert_eq!(json["extracted_path"], "/etc/passwd");
+        assert!(json.get("extracted_target").is_none(), "None fields with skip_serializing_if should be absent");
+        assert_eq!(json["filesystem_roots"][0], "/home");
+        assert_eq!(json["filesystem_roots"][1], "/tmp");
+        assert_eq!(json["matched_grant_index"], 0);
+    }
+
+    #[test]
+    fn guard_request_deserializes_without_enrichment() {
+        // JSON with only the original 5 fields (no enrichment)
+        let json = serde_json::json!({
+            "tool_name": "test_tool",
+            "server_id": "test_server",
+            "agent_id": "agent-1",
+            "arguments": {"key": "value"},
+            "scopes": ["test_server:test_tool"]
+        });
+
+        let req: GuardRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(req.tool_name, "test_tool");
+        assert!(req.action_type.is_none(), "action_type should default to None");
+        assert!(req.extracted_path.is_none(), "extracted_path should default to None");
+        assert!(req.extracted_target.is_none(), "extracted_target should default to None");
+        assert!(req.filesystem_roots.is_empty(), "filesystem_roots should default to empty Vec");
+        assert!(req.matched_grant_index.is_none(), "matched_grant_index should default to None");
+    }
+
+    #[test]
+    fn guard_request_no_session_metadata() {
+        // This test proves session_metadata field is gone.
+        // If session_metadata were still on GuardRequest, this would need it.
+        // The fact that this compiles without session_metadata is the assertion.
+        let req = GuardRequest {
+            tool_name: "t".to_string(),
+            server_id: "s".to_string(),
+            agent_id: "a".to_string(),
+            arguments: serde_json::Value::Null,
+            scopes: vec![],
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
+        };
+        // Serialize and verify no session_metadata key
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(
+            !json.contains("session_metadata"),
+            "session_metadata should not appear in serialized output"
+        );
+    }
 }
