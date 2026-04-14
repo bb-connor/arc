@@ -18,6 +18,7 @@ use arc_kernel::receipt_store::ReceiptStore;
 /// batch threshold is reached, a Merkle checkpoint is produced.
 pub struct KernelReceiptSigner {
     keypair: Keypair,
+    // Kept for receipt-provenance parity once signer metadata is surfaced.
     #[allow(dead_code)]
     server_id: String,
     store: Mutex<Box<dyn ReceiptStore>>,
@@ -49,27 +50,31 @@ impl KernelReceiptSigner {
 
     /// Attempt a Merkle checkpoint if the batch threshold has been reached.
     fn maybe_checkpoint(&self) -> Result<Option<KernelCheckpoint>, ReceiptSignError> {
-        let current = *self.current_seq.lock().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-        })?;
-        let batch_start = *self.batch_start_seq.lock().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-        })?;
+        let current = *self
+            .current_seq
+            .lock()
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
+        let batch_start = *self
+            .batch_start_seq
+            .lock()
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
 
         let batch_count = current.saturating_sub(batch_start);
         if batch_count < self.checkpoint_batch_size {
             return Ok(None);
         }
 
-        let mut store = self.store.lock().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("store lock poisoned: {e}"))
-        })?;
+        let mut store = self
+            .store
+            .lock()
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("store lock poisoned: {e}")))?;
 
         if !store.supports_kernel_signed_checkpoints() {
             // Store does not support checkpoints -- reset batch tracking.
-            let mut bs = self.batch_start_seq.lock().map_err(|e| {
-                ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-            })?;
+            let mut bs = self
+                .batch_start_seq
+                .lock()
+                .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
             *bs = current;
             return Ok(None);
         }
@@ -89,9 +94,10 @@ impl KernelReceiptSigner {
 
         let leaves: Vec<Vec<u8>> = batch_bytes.into_iter().map(|(_, b)| b).collect();
 
-        let mut cs = self.checkpoint_seq.lock().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-        })?;
+        let mut cs = self
+            .checkpoint_seq
+            .lock()
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
 
         let checkpoint = build_checkpoint(
             *cs,
@@ -100,9 +106,7 @@ impl KernelReceiptSigner {
             &leaves,
             &self.keypair,
         )
-        .map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("checkpoint build failed: {e}"))
-        })?;
+        .map_err(|e| ReceiptSignError::SigningFailed(format!("checkpoint build failed: {e}")))?;
 
         store.store_checkpoint(&checkpoint).map_err(|e| {
             ReceiptSignError::SigningFailed(format!("checkpoint store failed: {e}"))
@@ -112,9 +116,10 @@ impl KernelReceiptSigner {
         drop(cs);
 
         // Advance the batch start.
-        let mut bs = self.batch_start_seq.lock().map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-        })?;
+        let mut bs = self
+            .batch_start_seq
+            .lock()
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
         *bs = current;
 
         tracing::info!(
@@ -155,7 +160,10 @@ impl ReceiptSigner for KernelReceiptSigner {
         let body = ArcReceiptBody {
             id: format!("acp-{}", entry.tool_call_id),
             timestamp,
-            capability_id: format!("acp-session:{}", entry.session_id),
+            capability_id: entry
+                .capability_id
+                .clone()
+                .unwrap_or_else(|| format!("acp-session:{}", entry.session_id)),
             tool_server: request.tool_server.clone(),
             tool_name: request.tool_name.clone(),
             action,
@@ -163,14 +171,18 @@ impl ReceiptSigner for KernelReceiptSigner {
             content_hash: entry.content_hash.clone(),
             policy_hash: String::new(),
             evidence: Vec::new(),
-            metadata: None,
+            metadata: Some(serde_json::json!({
+                "acp": {
+                    "sessionId": entry.session_id,
+                    "enforcementMode": entry.enforcement_mode,
+                }
+            })),
             kernel_key: self.keypair.public_key(),
         };
 
         // Sign the receipt.
-        let receipt = ArcReceipt::sign(body, &self.keypair).map_err(|e| {
-            ReceiptSignError::SigningFailed(format!("Ed25519 signing failed: {e}"))
-        })?;
+        let receipt = ArcReceipt::sign(body, &self.keypair)
+            .map_err(|e| ReceiptSignError::SigningFailed(format!("Ed25519 signing failed: {e}")))?;
 
         // Append to the receipt store and track seq.
         {
@@ -184,9 +196,10 @@ impl ReceiptSigner for KernelReceiptSigner {
 
         // Increment sequence counter.
         {
-            let mut seq = self.current_seq.lock().map_err(|e| {
-                ReceiptSignError::SigningFailed(format!("lock poisoned: {e}"))
-            })?;
+            let mut seq = self
+                .current_seq
+                .lock()
+                .map_err(|e| ReceiptSignError::SigningFailed(format!("lock poisoned: {e}")))?;
             *seq += 1;
         }
 
