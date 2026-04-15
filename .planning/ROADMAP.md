@@ -11102,7 +11102,7 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 382 | 2/2 | Complete    | 2026-04-14 |
-| 383 | 3/3 | Complete   | 2026-04-15 |
+| 383 | 3/3 | Complete    | 2026-04-15 |
 | 384 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
 | 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
 

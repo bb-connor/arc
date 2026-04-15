@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
 stopped_at: Completed 383-03-PLAN.md (integration tests for example guards)
-last_updated: "2026-04-15T00:02:43.450Z"
+last_updated: "2026-04-15T00:05:30.478Z"
 last_activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
 progress:
   total_phases: 349
