@@ -66,6 +66,10 @@ pub enum WasmGuardError {
     /// The manifest declares an unsupported ABI version.
     #[error("unsupported abi_version \"{version}\" (supported: {supported})")]
     UnsupportedAbiVersion { version: String, supported: String },
+
+    /// The .wasm binary is neither a valid core module nor a Component Model component.
+    #[error("unrecognized WASM format: neither core module nor component")]
+    UnrecognizedFormat,
 }
 
 #[cfg(test)]

@@ -362,6 +362,66 @@ pub mod wasmtime_backend {
     /// Default maximum module size in bytes (10 MiB).
     const DEFAULT_MAX_MODULE_SIZE: usize = 10 * 1024 * 1024;
 
+    // -------------------------------------------------------------------
+    // Dual-mode format detection
+    // -------------------------------------------------------------------
+
+    /// Detected format of a .wasm binary.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum WasmFormat {
+        /// Traditional core WASM module (raw evaluate ABI).
+        CoreModule,
+        /// Component Model component (WIT-based ABI).
+        Component,
+    }
+
+    /// Inspect the first bytes of a WASM binary to determine its format.
+    ///
+    /// Uses `wasmparser::Parser` for authoritative detection. Returns `Err` if
+    /// the bytes are neither a valid core module nor a component.
+    pub fn detect_wasm_format(bytes: &[u8]) -> Result<WasmFormat, WasmGuardError> {
+        if wasmparser::Parser::is_component(bytes) {
+            Ok(WasmFormat::Component)
+        } else if wasmparser::Parser::is_core_wasm(bytes) {
+            Ok(WasmFormat::CoreModule)
+        } else {
+            Err(WasmGuardError::UnrecognizedFormat)
+        }
+    }
+
+    /// Create the appropriate WASM guard backend based on binary format detection.
+    ///
+    /// Inspects `wasm_bytes` to determine whether it is a core module or Component
+    /// Model component, then returns a loaded backend ready for `evaluate()` calls.
+    ///
+    /// - Core modules route to `WasmtimeBackend` (raw ABI with host functions).
+    /// - Components route to `ComponentBackend` (WIT-based, type-safe bindings).
+    pub fn create_backend(
+        engine: Arc<Engine>,
+        wasm_bytes: &[u8],
+        fuel_limit: u64,
+        config: HashMap<String, String>,
+    ) -> Result<Box<dyn crate::abi::WasmGuardAbi>, WasmGuardError> {
+        let format = detect_wasm_format(wasm_bytes)?;
+
+        match format {
+            WasmFormat::CoreModule => {
+                let mut backend = WasmtimeBackend::with_engine_and_config(engine, config);
+                backend.load_module(wasm_bytes, fuel_limit)?;
+                Ok(Box::new(backend))
+            }
+            WasmFormat::Component => {
+                let mut backend = crate::component::ComponentBackend::with_engine(engine);
+                backend.load_module(wasm_bytes, fuel_limit)?;
+                Ok(Box::new(backend))
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // WasmtimeBackend
+    // -------------------------------------------------------------------
+
     /// WASM guard backend powered by Wasmtime.
     ///
     /// Uses a shared [`Arc<Engine>`] and creates a fresh
@@ -1276,6 +1336,35 @@ pub mod wasmtime_backend {
             let evidence = guard.guard_evidence_metadata();
             assert!(evidence["fuel_consumed"].as_u64().unwrap() > 0);
             assert_eq!(evidence["manifest_sha256"], "deadbeef");
+        }
+
+        // -------------------------------------------------------------------
+        // Format detection tests
+        // -------------------------------------------------------------------
+
+        #[test]
+        fn detect_core_module_magic_bytes() {
+            // Core WASM magic: \0asm followed by version 1
+            let core_bytes = b"\x00asm\x01\x00\x00\x00";
+            let format = detect_wasm_format(core_bytes);
+            assert!(format.is_ok());
+            assert_eq!(format.unwrap(), WasmFormat::CoreModule);
+        }
+
+        #[test]
+        fn detect_component_magic_bytes() {
+            // Component magic: \0asm followed by component layer encoding
+            let component_bytes = b"\x00asm\x0d\x00\x01\x00";
+            let format = detect_wasm_format(component_bytes);
+            assert!(format.is_ok());
+            assert_eq!(format.unwrap(), WasmFormat::Component);
+        }
+
+        #[test]
+        fn detect_invalid_bytes() {
+            let garbage = b"not wasm at all";
+            let format = detect_wasm_format(garbage);
+            assert!(format.is_err());
         }
     }
 }
