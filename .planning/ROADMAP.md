@@ -11256,8 +11256,8 @@ Plans:
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
-- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
-- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
+- [ ] 385-01-PLAN.md -- arc guard test (YAML fixtures) and arc guard bench (p50/p99 fuel/latency)
+- [ ] 385-02-PLAN.md -- arc guard pack (.arcguard archive) and arc guard install
 
 ---
 
