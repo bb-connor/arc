@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
 stopped_at: Completed 386-02-PLAN.md (dual-mode format detection and routing)
-last_updated: "2026-04-15T02:43:09.746Z"
+last_updated: "2026-04-15T02:46:47.848Z"
 last_activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
 progress:
   total_phases: 355

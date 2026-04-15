@@ -11378,7 +11378,7 @@ Plans:
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 386 | 2/2 | Complete   | 2026-04-15 |
+| 386 | 2/2 | Complete    | 2026-04-15 |
 | 387 | v4.2 | TypeScript Guard SDK | Not started |
 | 388 | v4.2 | Python and Go Guard SDKs | Not started |
 | 389 | v4.2 | Cross-Language Conformance Suite | Not started |
