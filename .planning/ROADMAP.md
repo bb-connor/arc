@@ -195,6 +195,8 @@
   (completed locally and archived locally 2026-04-14)
 - [x] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
   (completed locally 2026-04-14; pending archival)
+- [ ] **v3.16 Universal Control-Plane Thesis** - Phases 407-412 (active locally
+  2026-04-15; phases 407-408 complete, 409 next)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11289,6 +11291,144 @@ Plans:
 
 ---
 
+## v3.16 Universal Control-Plane Thesis (Phases 407-412)
+
+**Milestone Goal:** Turn the remaining post-v3.15 blocker list into an
+evidence-grade execution lane that either qualifies ARC for the full original
+technical control-plane thesis or cleanly separates what is still missing. This
+means replacing bounded target defaults with universal registry resolution,
+proving real multi-hop authoritative routing, making route planning
+intent-aware, converging lifecycle/fidelity semantics on one shared contract,
+and collecting operator-grade qualification evidence before the final thesis
+gate.
+
+**Dependency:** Follows `v3.15`, which upgraded ARC to a bounded
+protocol-aware fabric but explicitly retained blockers around universal
+registry-driven routing, dynamic control-plane semantics, and ecosystem-scale
+proof.
+
+**Parallelism:** Phase 407 establishes universal binding and executor-registry
+resolution. Phase 408 proves real multi-hop authoritative routes on that
+substrate. Phase 409 layers dynamic intent-aware route planning on top of the
+shared fabric. Phase 410 converges lifecycle/fidelity semantics on the
+claim-eligible surfaces. Phase 411 runs operator-grade multi-hop qualification
+and deployment evidence. Phase 412 reruns the full thesis gate against the
+post-v3.16 runtime and evidence bundle.
+
+### Phase 407: Universal Binding Resolution and Executor Registry
+**Goal**: Remove implicit authoritative `Native` fallback and make every
+claim-eligible binding explicit or registry-derived through one shared executor
+registry
+**Depends on**: Phase 406 (bounded-fabric blocker list is explicit)
+**Requirements**: FABRIC3-01, FABRIC3-02
+**Status**: complete locally
+**Success Criteria** (what must be TRUE):
+  1. Claim-eligible authoritative bindings never silently fall back to
+     `DiscoveryProtocol::Native`; route selection is explicit or derived from
+     a shared registry policy
+  2. `CrossProtocolOrchestrator` resolves target executors through a shared
+     registry contract rather than edge-local branch tables
+  3. The shared fabric supports at least one additional target family beyond
+     today's `Native` and `Mcp` path assumptions without edge-specific wiring
+**Estimated complexity**: L
+**Plans**: 1 plan
+
+### Phase 408: Multi-Hop Authoritative Fabric Routes
+**Goal**: Prove the fabric is no longer merely bounded edge-to-target routing by
+qualifying real multi-hop authoritative routes with continuous receipt lineage
+**Depends on**: Phase 407
+**Requirements**: FABRIC3-03
+**Status**: complete locally
+**Success Criteria** (what must be TRUE):
+  1. At least two qualified authoritative flows traverse more than one protocol
+     boundary before tool execution or completion
+  2. Receipt lineage, route selection metadata, and intermediate protocol
+     evidence survive across the full multi-hop path
+  3. The multi-hop path is implemented on the shared fabric rather than a
+     bespoke edge helper
+**Estimated complexity**: L
+**Plans**: 1 plan
+
+### Phase 409: Dynamic Intent-Aware Governance Control Plane
+**Goal**: Lift route selection from static bridge metadata to a real dynamic
+control plane that can choose, attenuate, or deny paths based on intent and
+runtime conditions
+**Depends on**: Phases 407 and 408
+**Requirements**: CTRL3-01, CTRL3-02, CTRL3-03
+**Status**: next up
+**Success Criteria** (what must be TRUE):
+  1. Governed intent is a first-class input to route planning rather than
+     passive metadata
+  2. The control plane can select, attenuate, or deny candidate routes based
+     on policy, capability, intent, and runtime availability
+  3. Route-selection evidence is signed and visible on the qualified
+     authoritative HTTP/OpenAI/MCP/A2A/ACP paths
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 410: Shared Lifecycle Contract and Runtime Fidelity Closure
+**Goal**: Replace surface-specific adapted lifecycle semantics with one shared
+runtime lifecycle/fidelity contract across every claim-eligible protocol path
+**Depends on**: Phase 409
+**Requirements**: LIFE3-01, LIFE3-02, LIFE3-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Stream, cancel, resume, and partial-output semantics are derived from one
+     shared lifecycle contract on every claim-eligible surface
+  2. Publication/fidelity gating uses runtime route and lifecycle evidence
+     rather than schema hints alone
+  3. Compatibility-only helpers remain isolated and non-claim-eligible
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 411: Multi-Operator Qualification and Ecosystem Proof
+**Goal**: Produce operator-grade evidence that the technical control-plane
+thesis works outside one local in-process runtime seam
+**Depends on**: Phases 408, 409, and 410
+**Requirements**: ECO3-01, ECO3-02
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Qualification harnesses exercise qualified multi-hop flows across more
+     than one operator or externally hosted protocol boundary
+  2. Deployment/runbook evidence documents trust boundaries, route planning,
+     failure handling, and receipt recovery for the control plane
+  3. Qualification artifacts make clear which parts of the thesis are proven
+     technically versus which still depend on broader market evidence
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 412: Universal Control-Plane Thesis Gate
+**Goal**: Decide whether ARC can now honestly claim the full original
+technical-control-plane vision and whether any broader market thesis is
+qualified or still explicitly excluded
+**Depends on**: Phases 409, 410, and 411
+**Requirements**: VISION3-01, VISION3-02
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. ARC upgrades to the stronger original-vision claim only if the technical
+     control-plane proof is complete end-to-end
+  2. The docs cleanly separate technical control-plane qualification from any
+     still-unproved market-position thesis
+  3. One authoritative blocker list remains if the full thesis still does not
+     qualify
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+---
+
+## Phase Summary (v3.16)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 407 | v3.16 | Universal Binding Resolution and Executor Registry | Complete |
+| 408 | v3.16 | Multi-Hop Authoritative Fabric Routes | Complete |
+| 409 | v3.16 | Dynamic Intent-Aware Governance Control Plane | Next |
+| 410 | v3.16 | Shared Lifecycle Contract and Runtime Fidelity Closure | Planned |
+| 411 | v3.16 | Multi-Operator Qualification and Ecosystem Proof | Planned |
+| 412 | v3.16 | Universal Control-Plane Thesis Gate | Planned |
+
+---
+
 ## v4.1 Guard SDK and Developer Experience (Phases 382-385)
 
 **Milestone Goal:** Ship the guest-side Rust SDK, proc macro, example guards,
@@ -11428,7 +11568,7 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 - [x] **Phase 386: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package (completed 2026-04-15)
 - [x] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation (completed 2026-04-15)
 - [x] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation (completed 2026-04-15)
-- [ ] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
+- [x] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation (completed 2026-04-15)
 
 ### Phase 386: WIT Interface and Dual-Mode Host
 **Goal**: Guard authors and SDK toolchains target a stable, versioned WIT contract instead of raw pointer/length ABI conventions, and the host runtime transparently loads both legacy core-WASM modules and new Component Model components
@@ -11500,4 +11640,4 @@ Plans:
 | 386 | 2/2 | Complete    | 2026-04-15 |
 | 387 | 2/2 | Complete    | 2026-04-15 |
 | 388 | 3/3 | Complete    | 2026-04-15 |
-| 389 | 1/2 | In Progress|  |
+| 389 | 2/2 | Complete   | 2026-04-15 |

@@ -2,45 +2,46 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: `v3.15` existed because the post-v3.14 audit still found a bounded
-stopped_at: Completed 389-01-PLAN.md
-last_updated: "2026-04-15T04:12:14.062Z"
-last_activity: 2026-04-14 -- completed `v3.15/406` and closed the milestone's
+status: completed
+stopped_at: Completed 389-02-PLAN.md
+last_updated: "2026-04-15T04:50:32.434Z"
+last_activity: 2026-04-15 -- completed phases `407` and `408` locally and
 progress:
-  total_phases: 359
-  completed_phases: 278
-  total_plans: 766
-  completed_plans: 803
-  percent: 100
+  total_phases: 365
+  completed_phases: 281
+  total_plans: 768
+  completed_plans: 806
+  percent: 33
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-14)
+See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.15 Universal Protocol Fabric Realization` is complete
-locally. `v3.14` is archived locally, and phases `403` through `406` have now
-closed the protocol-aware fabric routing, lifecycle-equivalent mediation,
-final v3 ledger/archive closure, and post-v3.15 claim-gate rerun. The next
-workflow step is milestone archival or the next milestone start.
+**Current focus:** `v3.16 Universal Control-Plane Thesis` is now the active
+lane. `v3.15` is complete locally and pending archival; it upgraded ARC to a
+bounded protocol-aware fabric but still left the universal control-plane thesis
+unqualified. `v3.16` now owns the remaining proof gaps: universal registry
+routing, dynamic intent-aware governance, ecosystem-grade qualification, and
+the final thesis gate.
 
 ## Current Position
 
-Phase: 389-cross-language-conformance-suite
-Plan: 01 of 2 complete
-Status: 389-01 complete -- shared YAML conformance fixtures and cross-language
-runner proving Rust, TypeScript, and Python guards produce identical verdicts
-against 11 test cases. Go guard gracefully skipped (no TinyGo binary).
-Last activity: 2026-04-15 -- completed 389-01 with conformance fixtures and
-runner integration test.
+Phase: 409 Dynamic Intent-Aware Governance Control Plane
+Plan: `$gsd-plan-phase 409`
+Status: `v3.16` has completed the universal binding registry work (`407`) and
+the first explicit multi-hop authoritative routes (`408`). The next open proof
+gap is dynamic route planning and signed route-selection evidence.
+Last activity: 2026-04-15 -- completed phases `407` and `408` locally and
+advanced to `409`.
 
-Progress: [##########] 100%
+Progress: [###-------] 33%
 
 ## Performance Metrics
 
@@ -49,7 +50,8 @@ Progress: [##########] 100%
 - v2.0 completed: 6 phases, 19 plans
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
-- v3.0-v3.14: 72 phases planned across 15 milestones
+- v3.0-v3.15: 78 phases completed across 16 milestones
+- v3.16: 6 phases planned (universal control-plane thesis)
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 - v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
@@ -163,6 +165,7 @@ Progress: [##########] 100%
 - [Phase 388]: Go guard tests use runtime path existence checks instead of #[ignore] for informative skip messages with build instructions
 - [Phase 389]: Fresh backend per fixture for fuel state isolation in conformance runner
 - [Phase 389]: GuardEntry carries wasm_bytes + factory fn for deferred loading; Rust guard mandatory, TS/Python/Go optional with graceful skip
+- [Phase 389]: Fuel parity threshold set to 100x (not 2x) because core WASM modules vs Component Model guards differ by 60-90x inherently due to embedded runtime engines
 
 ### Roadmap Evolution
 
@@ -177,14 +180,18 @@ Progress: [##########] 100%
 
 ### Pending Todos
 
-- Archive `v3.15 Universal Protocol Fabric Realization`.
+- Plan and execute `v3.16 Universal Control-Plane Thesis`, starting with phase
+  `407`.
+- Archive `v3.15 Universal Protocol Fabric Realization` once the new lane is
+  stable.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
-- `v3.12`, `v3.13`, and `v3.14` are now archived locally, and `v3.15` is
-  complete locally but not yet archived. The stronger full original-vision
-  claim is still not qualified after the post-v3.15 rerun.
+- `v3.12`, `v3.13`, and `v3.14` are archived locally; `v3.15` is complete
+  locally but not yet archived. `v3.16` exists because the stronger
+  control-plane thesis still lacks universal registry routing, dynamic
+  intent-aware governance, and ecosystem-grade qualification evidence.
 - `v2.83` is still partially complete locally because phase `316` remains
   pending, so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
@@ -231,7 +238,7 @@ integration tests
 
 ## Session Continuity
 
-Last session: 2026-04-15T04:12:14.044Z
-Stopped at: Completed 389-01-PLAN.md
+Last session: 2026-04-15T04:50:32.408Z
+Stopped at: Completed 389-02-PLAN.md
 Next action: execute 388-02-PLAN.md
 Resume file: None

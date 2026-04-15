@@ -7,8 +7,8 @@
 (completed locally and archived locally 2026-04-14)
 **Most recent implemented milestone:** v3.15 Universal Protocol Fabric
 Realization (completed locally 2026-04-14; pending archival)
-**Active milestone:** v3.15 Universal Protocol Fabric Realization
-**Planned milestones:** v3.0 through v3.15 (Universal Security Kernel era)
+**Active milestone:** v3.16 Universal Control-Plane Thesis
+**Planned milestones:** v3.0 through v3.16 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -3233,6 +3233,70 @@ qualification pass.
 *Requirements defined: 2026-04-14*
 *Last updated: 2026-04-14 after completing phase 406 full original-vision requalification locally*
 
+## v3.16 Universal Control-Plane Thesis
+
+Converts the post-v3.15 blocker list into the exact conditions that must be
+true before ARC can honestly claim the full original technical control-plane
+vision. This lane treats the remaining gap as three distinct proof problems:
+universalized registry-driven fabric routing, dynamic intent-aware governance,
+and ecosystem-grade qualification evidence. It also cleanly separates the
+technical control-plane thesis from any broader still-unproved market thesis.
+
+### Universal Fabric Completion
+
+- [x] **FABRIC3-01**: claim-eligible authoritative bindings never silently default to `DiscoveryProtocol::Native`; target protocol is explicit in bridge metadata or derived from a shared registry policy with signed route evidence
+- [x] **FABRIC3-02**: `CrossProtocolOrchestrator` resolves target executors through a shared registry contract instead of edge-local branch tables, and the registry supports at least one additional target family beyond the currently qualified `Native` / `Mcp` paths
+- [x] **FABRIC3-03**: at least two qualified authoritative multi-hop routes execute across more than one protocol boundary with continuous ARC receipt lineage and intermediate route evidence
+
+### Dynamic Intent-Aware Governance
+
+- [ ] **CTRL3-01**: governed intent is a first-class input to route planning and route selection, not merely a pass-through metadata field
+- [ ] **CTRL3-02**: ARC's control plane can select, attenuate, or deny candidate routes based on policy, capability, intent, and runtime availability
+- [ ] **CTRL3-03**: route-selection decisions and their evidence are signed and surfaced consistently on the qualified HTTP/API, MCP, OpenAI, A2A, and ACP authoritative paths
+
+### Shared Lifecycle and Fidelity Contract
+
+- [ ] **LIFE3-01**: stream, cancel, resume, and partial-output semantics are defined by one shared lifecycle contract used by every claim-eligible protocol surface
+- [ ] **LIFE3-02**: bridge fidelity and publication gating are derived from runtime route/lifecycle capability evidence rather than static schema hints alone
+- [ ] **LIFE3-03**: compatibility-only helpers remain isolated, non-default, and explicitly non-claim-eligible across every surface included in the stronger thesis
+
+### Ecosystem-Grade Qualification
+
+- [ ] **ECO3-01**: the qualification harness exercises qualified multi-hop flows across more than one operator or externally hosted protocol boundary instead of only one local in-process seam
+- [ ] **ECO3-02**: operator-grade deployment and runbook evidence documents trust boundaries, route planning behavior, failure recovery, and receipt continuity for the control plane
+
+### Full-Thesis Claim Gate
+
+- [ ] **VISION3-01**: ARC upgrades to the stronger original-vision claim only if `FABRIC3-*`, `CTRL3-*`, `LIFE3-*`, and `ECO3-*` are all demonstrably complete
+- [ ] **VISION3-02**: the docs cleanly separate technical control-plane qualification from any still-unproved “comptroller of the agent economy” market-position thesis; that broader market claim upgrades only with ecosystem-scale operational proof
+
+## v3.16 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FABRIC3-01 | Phase 407 | Complete |
+| FABRIC3-02 | Phase 407 | Complete |
+| FABRIC3-03 | Phase 408 | Complete |
+| CTRL3-01 | Phase 409 | Planned |
+| CTRL3-02 | Phase 409 | Planned |
+| CTRL3-03 | Phase 409 | Planned |
+| LIFE3-01 | Phase 410 | Planned |
+| LIFE3-02 | Phase 410 | Planned |
+| LIFE3-03 | Phase 410 | Planned |
+| ECO3-01 | Phase 411 | Planned |
+| ECO3-02 | Phase 411 | Planned |
+| VISION3-01 | Phase 412 | Planned |
+| VISION3-02 | Phase 412 | Planned |
+
+**Coverage:**
+- v3.16 requirements: 13 total
+- Mapped to phases: 13
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-15*
+*Last updated: 2026-04-15 after completing phases 407-408 locally*
+
 ## v4.0 WASM Guard Runtime Completion
 
 Completes the arc-wasm-guards host-side runtime that Phase 347 scaffolded.
@@ -3468,7 +3532,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 - [x] **CONF-01**: Cross-language conformance test suite with shared YAML fixtures exercising Allow, Deny, deny-reason, host function calls, and enriched request fields
 - [x] **CONF-02**: Conformance suite runs all four language guards (Rust, TypeScript, Python, Go) against the same fixture set and reports pass/fail per guard per fixture
-- [ ] **CONF-03**: Conformance suite validates that fuel consumption is within 2x across languages for the same fixture
+- [x] **CONF-03**: Conformance suite validates that fuel consumption is within 2x across languages for the same fixture
 
 ## v4.2 Out of Scope
 
@@ -3503,7 +3567,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | GODK-04 | Phase 383 | Complete |
 | CONF-01 | Phase 384 | Complete |
 | CONF-02 | Phase 384 | Complete |
-| CONF-03 | Phase 384 | Pending |
+| CONF-03 | Phase 384 | Complete |
 
 **Coverage:**
 - v4.2 requirements: 19 total
