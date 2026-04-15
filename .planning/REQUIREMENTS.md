@@ -3451,9 +3451,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 ### Python SDK
 
-- [ ] **PYDK-01**: Python guard SDK (`packages/sdk/arc-guard-py`) provides typed dataclasses matching the WIT contract
-- [ ] **PYDK-02**: Python guards compile to WASM components via `componentize-py`
-- [ ] **PYDK-03**: Python SDK includes example guard with build instructions
+- [x] **PYDK-01**: Python guard SDK (`packages/sdk/arc-guard-py`) provides typed dataclasses matching the WIT contract
+- [x] **PYDK-02**: Python guards compile to WASM components via `componentize-py`
+- [x] **PYDK-03**: Python SDK includes example guard with build instructions
 - [ ] **PYDK-04**: Python-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Go SDK
@@ -3492,9 +3492,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | TSDK-02 | Phase 382 | Complete |
 | TSDK-03 | Phase 382 | Complete |
 | TSDK-04 | Phase 382 | Complete |
-| PYDK-01 | Phase 383 | Pending |
-| PYDK-02 | Phase 383 | Pending |
-| PYDK-03 | Phase 383 | Pending |
+| PYDK-01 | Phase 383 | Complete |
+| PYDK-02 | Phase 383 | Complete |
+| PYDK-03 | Phase 383 | Complete |
 | PYDK-04 | Phase 383 | Pending |
 | GODK-01 | Phase 383 | Complete |
 | GODK-02 | Phase 383 | Complete |

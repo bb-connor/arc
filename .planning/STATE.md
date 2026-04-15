@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.15` exists because the post-v3.14 audit still found a bounded
-stopped_at: Completed 388-02-PLAN.md (Go guard SDK with build scripts)
-last_updated: "2026-04-15T03:34:22.394Z"
+stopped_at: Completed 388-01-PLAN.md
+last_updated: "2026-04-15T03:34:59.899Z"
 last_activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
 progress:
   total_phases: 359
@@ -160,6 +160,8 @@ Progress: [########--] 76%
 - [Phase 387]: ComponentBackend::with_limits(16 MiB memory, 15 MiB module) for jco-compiled TS guards exceeding default 10 MiB max_module_size
 - [Phase 388]: wit-bindgen-go generates bindings into internal/ with guard package re-exporting types as aliases; example imports both guard and types packages
 - [Phase 388]: Extended WIT world lists WASI imports individually (environment, stdin, stdout, stderr, clocks, filesystem, random) for TinyGo compatibility; wasi-virt strips them post-compilation
+- [Phase 388]: componentize-py --world-module guard used to name generated bindings 'guard' for ergonomic imports; entrypoint renamed to app.py because APP_NAME must not clash with world module
+- [Phase 388]: componentize-py 0.22.1 generates Guard protocol class (not Evaluate); dist/tool-gate.wasm is 17.6 MiB Component Model binary (version 0x0d)
 
 ### Roadmap Evolution
 
@@ -216,9 +218,19 @@ expanded prelude. 24 tests passing, clippy clean, fmt clean.
 Last activity: 2026-04-14 -- completed 382-02 with host function bindings, ABI
 glue, and expanded prelude
 
+## v4.2 Multi-Language Guard SDKs
+
+Phase: 388 (in progress -- 01 of 03 plans done)
+Plan: 01 of 3 complete
+Status: Phase 388-01 complete -- Python guard SDK with typed dataclasses
+matching all 10 WIT guard-request fields, example tool-gate guard compiles
+to 17.6 MiB Component Model WASM binary via componentize-py --stub-wasi.
+Last activity: 2026-04-15 -- completed 388-01 with Python SDK package,
+build scripts, and compiled WASM binary
+
 ## Session Continuity
 
-Last session: 2026-04-15T03:34:22.375Z
-Stopped at: Completed 388-02-PLAN.md (Go guard SDK with build scripts)
-Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
+Last session: 2026-04-15T03:34:59.882Z
+Stopped at: Completed 388-01-PLAN.md
+Next action: execute 388-02-PLAN.md
 Resume file: None
