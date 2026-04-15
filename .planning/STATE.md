@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
-stopped_at: Completed 386-01-PLAN.md (WIT interface and ComponentBackend)
-last_updated: "2026-04-15T02:35:09.517Z"
+stopped_at: Completed 386-02-PLAN.md (dual-mode format detection and routing)
+last_updated: "2026-04-15T02:43:09.746Z"
 last_activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
 progress:
   total_phases: 355
-  completed_phases: 271
+  completed_phases: 272
   total_plans: 755
-  completed_plans: 792
+  completed_plans: 793
   percent: 76
 ---
 
@@ -150,6 +150,7 @@ Progress: [########--] 76%
 - [Phase 386]: WIT types placed inside interface block (not top-level) because WIT parser requires variant/record inside interface scope
 - [Phase 386]: ComponentState(StoreLimits) wrapper for import-free component Store data; WasmHostState reserved for core-module path with host imports
 - [Phase 386]: Guard::instantiate in wasmtime 29 returns Guard directly (not tuple); adapted plan's destructuring accordingly
+- [Phase 386]: wasmparser::Parser static methods used for authoritative core/component format detection; create_backend() returns Box<dyn WasmGuardAbi> for transparent dual-mode dispatch
 
 ### Roadmap Evolution
 
@@ -209,7 +210,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:35:09.497Z
-Stopped at: Completed 386-01-PLAN.md (WIT interface and ComponentBackend)
+Last session: 2026-04-15T02:43:09.728Z
+Stopped at: Completed 386-02-PLAN.md (dual-mode format detection and routing)
 Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None

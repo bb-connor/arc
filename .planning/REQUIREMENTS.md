@@ -3370,7 +3370,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 - [x] **WIT-01**: Guard WIT interface defined (`arc:guard@0.1.0`) with `evaluate` function, `guard-request` record, and `verdict` variant types
 - [x] **WIT-02**: Host implements the WIT interface using `wasmtime::component::bindgen!` with generated Rust types
-- [ ] **WIT-03**: Host supports dual-mode loading: raw core-WASM modules (legacy ABI) and Component Model components (WIT ABI) detected at load time
+- [x] **WIT-03**: Host supports dual-mode loading: raw core-WASM modules (legacy ABI) and Component Model components (WIT ABI) detected at load time
 - [x] **WIT-04**: WIT package published in-repo under `wit/arc-guard/` with versioned world definition
 
 ### TypeScript SDK
@@ -3417,7 +3417,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 |-------------|-------|--------|
 | WIT-01 | Phase 381 | Complete |
 | WIT-02 | Phase 381 | Complete |
-| WIT-03 | Phase 381 | Pending |
+| WIT-03 | Phase 381 | Complete |
 | WIT-04 | Phase 381 | Complete |
 | TSDK-01 | Phase 382 | Pending |
 | TSDK-02 | Phase 382 | Pending |
