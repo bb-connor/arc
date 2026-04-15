@@ -3105,8 +3105,8 @@ decided from one honest source of record.
 
 ### Lifecycle-Equivalent Protocol Mediation
 
-- [ ] **LIFE-01**: A2A authoritative execution distinguishes blocking and streaming/task lifecycles strongly enough to justify the public surface ARC claims
-- [ ] **LIFE-02**: ACP authoritative execution supports the invoke/stream/cancel/resume lifecycle ARC claims, or the official ACP profile is narrowed with no contradictory public surface
+- [x] **LIFE-01**: A2A authoritative execution distinguishes blocking and streaming/task lifecycles strongly enough to justify the public surface ARC claims
+- [x] **LIFE-02**: ACP authoritative execution supports the invoke/stream/cancel/resume lifecycle ARC claims, or the official ACP profile is narrowed with no contradictory public surface
 - [ ] **LIFE-03**: Non-authoritative A2A/ACP compatibility helpers are internalized, feature-gated, or otherwise isolated so public/default surfaces cannot be mistaken for receipt-bearing authority
 
 ### Ledger and Archival Truth
@@ -3182,9 +3182,9 @@ qualification pass.
 
 ### Lifecycle-Equivalent Mediation
 
-- [ ] **LIFE2-01**: A2A authoritative mediation either ships a receipt-bearing `message/stream` / task-progress lifecycle that matches the public symmetry claim, or the official claim gate excludes lifecycle equivalence until it does
-- [ ] **LIFE2-02**: ACP authoritative mediation either ships truthful `tool/stream`, `tool/cancel`, and `tool/resume` behavior for the public profile ARC wants to claim, or the official claim gate excludes lifecycle equivalence until it does
-- [ ] **LIFE2-03**: any remaining compatibility-only bypasses are internalized or clearly isolated enough that the public/default surface cannot be mistaken for the receipt-bearing authority path
+- [x] **LIFE2-01**: A2A authoritative mediation either ships a receipt-bearing `message/stream` / task-progress lifecycle that matches the public symmetry claim, or the official claim gate excludes lifecycle equivalence until it does
+- [x] **LIFE2-02**: ACP authoritative mediation either ships truthful `tool/stream`, `tool/cancel`, and `tool/resume` behavior for the public profile ARC wants to claim, or the official claim gate excludes lifecycle equivalence until it does
+- [x] **LIFE2-03**: any remaining compatibility-only bypasses are internalized or clearly isolated enough that the public/default surface cannot be mistaken for the receipt-bearing authority path
 
 ### Ledger and Archival Truth Closure
 
@@ -3210,12 +3210,12 @@ qualification pass.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FABRIC2-01 | Phase 403 | Planned |
-| FABRIC2-02 | Phase 403 | Planned |
-| FABRIC2-03 | Phase 403 | Planned |
-| LIFE2-01 | Phase 404 | Planned |
-| LIFE2-02 | Phase 404 | Planned |
-| LIFE2-03 | Phase 404 | Planned |
+| FABRIC2-01 | Phase 403 | Complete |
+| FABRIC2-02 | Phase 403 | Complete |
+| FABRIC2-03 | Phase 403 | Complete |
+| LIFE2-01 | Phase 404 | Complete |
+| LIFE2-02 | Phase 404 | Complete |
+| LIFE2-03 | Phase 404 | Complete |
 | LEDGER2-01 | Phase 405 | Planned |
 | LEDGER2-02 | Phase 405 | Planned |
 | LEDGER2-03 | Phase 405 | Planned |
@@ -3458,9 +3458,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 ### Go SDK
 
-- [ ] **GODK-01**: Go guard SDK (`packages/sdk/arc-guard-go`) provides typed structs matching the WIT contract
-- [ ] **GODK-02**: Go guards compile to WASM components via TinyGo with `wasip2` target
-- [ ] **GODK-03**: Go SDK includes example guard with build instructions
+- [x] **GODK-01**: Go guard SDK (`packages/sdk/arc-guard-go`) provides typed structs matching the WIT contract
+- [x] **GODK-02**: Go guards compile to WASM components via TinyGo with `wasip2` target
+- [x] **GODK-03**: Go SDK includes example guard with build instructions
 - [ ] **GODK-04**: Go-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Conformance
@@ -3496,9 +3496,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | PYDK-02 | Phase 383 | Pending |
 | PYDK-03 | Phase 383 | Pending |
 | PYDK-04 | Phase 383 | Pending |
-| GODK-01 | Phase 383 | Pending |
-| GODK-02 | Phase 383 | Pending |
-| GODK-03 | Phase 383 | Pending |
+| GODK-01 | Phase 383 | Complete |
+| GODK-02 | Phase 383 | Complete |
+| GODK-03 | Phase 383 | Complete |
 | GODK-04 | Phase 383 | Pending |
 | CONF-01 | Phase 384 | Pending |
 | CONF-02 | Phase 384 | Pending |
