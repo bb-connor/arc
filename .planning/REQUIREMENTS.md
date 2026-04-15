@@ -3214,7 +3214,7 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 ### CLI Scaffolding
 
-- [ ] **GCLI-01**: `arc guard new <name>` scaffolds a new guard project with Cargo.toml, src/lib.rs using `#[arc_guard]`, and guard-manifest.yaml
+- [x] **GCLI-01**: `arc guard new <name>` scaffolds a new guard project with Cargo.toml, src/lib.rs using `#[arc_guard]`, and guard-manifest.yaml
 - [ ] **GCLI-02**: `arc guard build` compiles the guard to `wasm32-unknown-unknown` release and reports binary size
 - [ ] **GCLI-03**: `arc guard inspect <path>` reads a .wasm file and prints exported functions, ABI compatibility, and memory requirements
 
@@ -3252,7 +3252,7 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GEXM-03 | Phase 378 | Complete |
 | GEXM-04 | Phase 378 | Complete |
 | GEXM-05 | Phase 378 | Complete |
-| GCLI-01 | Phase 379 | Pending |
+| GCLI-01 | Phase 379 | Complete |
 | GCLI-02 | Phase 379 | Pending |
 | GCLI-03 | Phase 379 | Pending |
 | GCLI-04 | Phase 380 | Pending |

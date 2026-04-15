@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 383-03-PLAN.md (integration tests for example guards)
-last_updated: "2026-04-15T00:05:30.478Z"
+stopped_at: Completed 384-01-PLAN.md (guard CLI scaffolding with arc guard new)
+last_updated: "2026-04-15T00:23:29.846Z"
 last_activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
 progress:
   total_phases: 349
   completed_phases: 263
-  total_plans: 743
-  completed_plans: 774
+  total_plans: 745
+  completed_plans: 777
   percent: 100
 ---
 
@@ -142,6 +142,7 @@ Progress: [##########] 100%
 - [Phase 383]: Proc-macro crate generates path references (arc_guard_sdk::*) instead of depending on arc-guard-sdk; user fn renamed to __arc_guard_user_{name} for ABI symbol isolation
 - [Phase 383]: Example guard crate template: cdylib crate-type under examples/guards/, arc-guard-sdk + arc-guard-sdk-macros deps, #[arc_guard] fn evaluate pattern
 - [Phase 383]: Integration test pattern: load_example_wasm(artifact_name) with CARGO_MANIFEST_DIR-relative path, fresh WasmtimeBackend per test, match on GuardVerdict::Deny for reason assertions
+- [Phase 384]: Inline string templates for guard scaffold (3 small files, no template directory needed); package name derived from final path component; SDK deps use version strings not path deps
 
 ### Roadmap Evolution
 
@@ -199,7 +200,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T00:02:43.413Z
-Stopped at: Completed 383-03-PLAN.md (integration tests for example guards)
+Last session: 2026-04-15T00:23:29.809Z
+Stopped at: Completed 384-01-PLAN.md (guard CLI scaffolding with arc guard new)
 Next action: begin Phase 383 (proc macro and example guards)
 Resume file: None
