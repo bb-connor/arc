@@ -3303,9 +3303,9 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 
 ### CLI Test and Package
 
-- [ ] **GCLI-04**: `arc guard test` loads a compiled .wasm and runs it against YAML test fixture files with expected verdicts
-- [ ] **GCLI-05**: Test fixture YAML format specifies request fields, expected verdict (allow/deny), and optional expected deny reason substring
-- [ ] **GCLI-06**: `arc guard bench <path>` measures fuel consumption and execution time on sample requests and reports p50/p99
+- [x] **GCLI-04**: `arc guard test` loads a compiled .wasm and runs it against YAML test fixture files with expected verdicts
+- [x] **GCLI-05**: Test fixture YAML format specifies request fields, expected verdict (allow/deny), and optional expected deny reason substring
+- [x] **GCLI-06**: `arc guard bench <path>` measures fuel consumption and execution time on sample requests and reports p50/p99
 - [ ] **GCLI-07**: `arc guard pack` creates a distributable `.arcguard` archive (gzipped tar) from guard-manifest.yaml + .wasm binary
 - [ ] **GCLI-08**: `arc guard install <path>` extracts an `.arcguard` archive to the configured guard directory
 
@@ -3338,9 +3338,9 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GCLI-01 | Phase 379 | Complete |
 | GCLI-02 | Phase 379 | Complete |
 | GCLI-03 | Phase 379 | Complete |
-| GCLI-04 | Phase 380 | Pending |
-| GCLI-05 | Phase 380 | Pending |
-| GCLI-06 | Phase 380 | Pending |
+| GCLI-04 | Phase 380 | Complete |
+| GCLI-05 | Phase 380 | Complete |
+| GCLI-06 | Phase 380 | Complete |
 | GCLI-07 | Phase 380 | Pending |
 | GCLI-08 | Phase 380 | Pending |
 

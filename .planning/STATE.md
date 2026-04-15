@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: v3.14 has been defined from the post-v3 debate. The new milestone owns
-stopped_at: Completed 384-02-PLAN.md (guard build and inspect CLI commands)
-last_updated: "2026-04-15T00:44:34.487Z"
+stopped_at: Completed 385-01-PLAN.md (guard test and bench CLI commands)
+last_updated: "2026-04-15T01:29:32.506Z"
 last_activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
 progress:
   total_phases: 355
   completed_phases: 264
-  total_plans: 745
-  completed_plans: 778
+  total_plans: 747
+  completed_plans: 784
   percent: 0
 ---
 
@@ -141,6 +141,10 @@ Progress: [----------] 0%
 - [Phase 383]: Integration test pattern: load_example_wasm(artifact_name) with CARGO_MANIFEST_DIR-relative path, fresh WasmtimeBackend per test, match on GuardVerdict::Deny for reason assertions
 - [Phase 384]: Inline string templates for guard scaffold (3 small files, no template directory needed); package name derived from final path component; SDK deps use version strings not path deps
 - [Phase 384]: wasmparser 0.221 as direct arc-cli dep (not workspace); cmd_guard_inspect is informational-only (does not fail on ABI incompatibility)
+- [Phase 385]: Fresh WasmtimeBackend per fixture/iteration for fuel and memory state isolation in test and bench commands
+- [Phase 385]: TestFixture YAML format uses flat list with GuardRequest shape for request field, expected_verdict (allow/deny), and optional deny_reason_contains
+- [Phase 385]: Percentile uses index = len * pct / 100 clamped to len-1 for non-interpolating semantics
+- [Phase 385]: Fresh WasmtimeBackend per fixture/iteration for fuel and memory state isolation in test and bench commands
 
 ### Roadmap Evolution
 
@@ -165,8 +169,8 @@ Progress: [----------] 0%
 - `v3.12` and `v3.13` are complete locally but not yet archived, so the repo
   still carries milestone-closeout debt alongside the new `v3.14` lane and
   the parallel v4.0 lane.
-- `v2.83` is still partially complete locally (phases `316` and `317` remain
-  pending), so it should stay marked as unresolved prior-lane debt instead of
+- `v2.83` is still partially complete locally because phase `316` remains
+  pending, so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
 - `v4.0` already reserved phases `373-376`, so `v3.12` begins at `377`; future
   v4.x placeholders must stay shifted to avoid roadmap collisions.
@@ -200,7 +204,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T00:36:17.266Z
-Stopped at: Completed 384-02-PLAN.md (guard build and inspect CLI commands)
-Next action: begin Phase 383 (proc macro and example guards)
+Last session: 2026-04-15T01:29:29.350Z
+Stopped at: Completed 385-01-PLAN.md (guard test and bench CLI commands)
+Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None
