@@ -182,13 +182,11 @@
   368-372 (implemented locally 2026-04-14; reconciliation pending in
   v3.14/401)
 - [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
-  (completed locally 2026-04-14; pending archival)
-- [ ] **v3.13 Universal Orchestration Closure** - Phases 390-396
-  (runtime/substrate closure landed locally 2026-04-14; final ledger/archive
-  closeout still pending in v3.14/401)
-- [ ] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
-  (planned; follows v3.13, can execute in parallel with v4.x and archival
-  closeout work)
+  (completed locally 2026-04-14; archived locally 2026-04-14)
+- [x] **v3.13 Universal Orchestration Closure** - Phases 390-396
+  (completed locally 2026-04-14; archived locally 2026-04-14)
+- [x] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
+  (completed locally 2026-04-14; pending archival / next milestone)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11054,7 +11052,7 @@ lookup, and truthful multi-hop lineage
 **Depends on**: Phase 396 (the current orchestrated substrate and claim gate
 exist)
 **Requirements**: FABRIC-01, FABRIC-02, FABRIC-03
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Bridge execution resolves target protocols through explicit registry or
      bridge metadata rather than hard-coding authoritative execution to
@@ -11073,7 +11071,7 @@ implementations
 **Depends on**: Phase 396 (current HTTP evidence model and qualification lane
 exist)
 **Requirements**: KERNEL-01, KERNEL-02
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. `arc-api-protect` routes authorization and receipt finalization through a
      shared kernel-backed authority path instead of a local evaluator/signer
@@ -11089,7 +11087,7 @@ exist)
 authority/evidence semantics as the converged Rust HTTP lane
 **Depends on**: Phase 398 (shared Rust HTTP authority path exists)
 **Requirements**: KERNEL-03, KERNEL-04
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Representative SDK substrates align to the shared authority/evidence
      contract rather than synthesizing misleading local receipt behavior
@@ -11107,7 +11105,7 @@ remaining compatibility ambiguity
 **Depends on**: Phase 397 (protocol fabric can carry richer lifecycle
 semantics)
 **Requirements**: LIFE-01, LIFE-02, LIFE-03
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. A2A authoritative mediation distinguishes blocking vs streaming/task
      semantics strongly enough to justify the public surface ARC claims
@@ -11127,7 +11125,7 @@ second contradictory narrative
 **Depends on**: Phases 397-400 (runtime and docs must exist in their strongest
 truthful form first)
 **Requirements**: LEDGER-01, LEDGER-02, LEDGER-03, LEDGER-04
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, and
      `ROADMAP.md` agree on the active milestone, latest completed milestone,
@@ -11146,7 +11144,7 @@ closure to decide whether ARC can now honestly upgrade to the stronger
 original vision claim
 **Depends on**: Phase 401 (runtime, docs, and planning truth are reconciled)
 **Requirements**: VISION-01, VISION-02, VISION-03, VISION-04
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Qualification evidence covers protocol-to-protocol bridge execution,
      unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle
@@ -11165,12 +11163,12 @@ original vision claim
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 397 | v3.14 | Protocol-to-Protocol Fabric Runtime | Planned |
-| 398 | v3.14 | Kernel-First HTTP Runtime Convergence | Planned |
-| 399 | v3.14 | SDK Authority and Evidence Convergence | Planned |
-| 400 | v3.14 | Lifecycle-Equivalent Protocol Mediation | Planned |
-| 401 | v3.14 | Ledger and Archival Truth Closure | Planned |
-| 402 | v3.14 | Full-Vision Qualification Gate | Planned |
+| 397 | v3.14 | Protocol-to-Protocol Fabric Runtime | Complete |
+| 398 | v3.14 | Kernel-First HTTP Runtime Convergence | Complete |
+| 399 | v3.14 | SDK Authority and Evidence Convergence | Complete |
+| 400 | v3.14 | Lifecycle-Equivalent Protocol Mediation | Complete |
+| 401 | v3.14 | Ledger and Archival Truth Closure | Complete |
+| 402 | v3.14 | Full-Vision Qualification Gate | Complete |
 
 ---
 
@@ -11327,8 +11325,8 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 **Estimated complexity**: L
 **Plans**: 2 plans
 Plans:
-- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
-- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
+- [ ] 386-01-PLAN.md -- WIT package definition, Component Model backend with bindgen!, Engine config update
+- [ ] 386-02-PLAN.md -- Dual-mode format detection, create_backend factory, module exports wiring
 
 ### Phase 387: TypeScript Guard SDK
 **Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the ARC host runtime alongside Rust guards
