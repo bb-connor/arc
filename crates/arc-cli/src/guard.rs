@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use crate::CliError;
 
@@ -101,7 +102,72 @@ pub(crate) fn cmd_guard_new(name: &str) -> Result<(), CliError> {
 }
 
 pub(crate) fn cmd_guard_build() -> Result<(), CliError> {
-    Err(CliError::Other("not yet implemented".to_string()))
+    // Verify Cargo.toml exists and contains cdylib crate-type
+    let cargo_toml_contents = fs::read_to_string("Cargo.toml").map_err(|e| {
+        CliError::Other(format!(
+            "could not read Cargo.toml in current directory: {e}"
+        ))
+    })?;
+    if !cargo_toml_contents.contains("cdylib") {
+        return Err(CliError::Other(
+            "current directory does not appear to be a guard project (no cdylib crate-type in Cargo.toml)"
+                .to_string(),
+        ));
+    }
+
+    // Extract the package name from Cargo.toml
+    let package_name = cargo_toml_contents
+        .lines()
+        .find(|line| line.starts_with("name = "))
+        .and_then(|line| {
+            let trimmed = line.trim_start_matches("name = ").trim();
+            let unquoted = trimmed.trim_matches('"');
+            if unquoted.is_empty() {
+                None
+            } else {
+                Some(unquoted.to_string())
+            }
+        })
+        .ok_or_else(|| {
+            CliError::Other("could not extract package name from Cargo.toml".to_string())
+        })?;
+    let underscored_name = package_name.replace('-', "_");
+
+    // Run cargo build
+    let status = Command::new("cargo")
+        .args(["build", "--target", "wasm32-unknown-unknown", "--release"])
+        .status()
+        .map_err(|e| CliError::Other(format!("failed to run cargo: {e}")))?;
+
+    if !status.success() {
+        return Err(CliError::Other("cargo build failed".to_string()));
+    }
+
+    // Verify the output .wasm file exists
+    let wasm_path = format!(
+        "target/wasm32-unknown-unknown/release/{underscored_name}.wasm"
+    );
+    let metadata = fs::metadata(&wasm_path).map_err(|e| {
+        CliError::Other(format!("expected output not found at {wasm_path}: {e}"))
+    })?;
+
+    let size = metadata.len();
+    let formatted_size = format_size(size);
+
+    println!("build complete: {wasm_path}");
+    println!("binary size: {formatted_size}");
+
+    Ok(())
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} bytes")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KiB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+    }
 }
 
 pub(crate) fn cmd_guard_inspect(_path: &Path) -> Result<(), CliError> {
