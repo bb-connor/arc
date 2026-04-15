@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
-stopped_at: Completed 386-02-PLAN.md (dual-mode format detection and routing)
-last_updated: "2026-04-15T02:46:47.848Z"
-last_activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
+status: `v3.15` exists because the post-v3.14 audit still found a bounded
+stopped_at: Completed 387-01-PLAN.md (TypeScript guard SDK scaffold and build pipeline)
+last_updated: "2026-04-15T03:02:15.747Z"
+last_activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
 progress:
-  total_phases: 355
+  total_phases: 359
   completed_phases: 272
-  total_plans: 755
-  completed_plans: 793
+  total_plans: 758
+  completed_plans: 794
   percent: 76
 ---
 
@@ -24,21 +24,23 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` remains the
-active local milestone only until archival / next-milestone selection.
-Execution is complete locally; the remaining action is closeout.
+**Current focus:** `v3.15 Universal Protocol Fabric Realization` is now the
+active local milestone. `v3.14` is complete locally, but the latest audit
+showed that protocol-aware fabric routing, lifecycle-equivalent mediation, and
+final v3 ledger/archive closure still need one more execution lane before the
+strongest claim can be re-qualified honestly.
 
 ## Current Position
 
-Phase: v3.14 execution complete locally (`397-402` complete)
-Plan: archive `v3.14` or open the next milestone
-Status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
-ledger, and claim-gate work that followed the v3.13 breakthrough lane. The
-result is a stronger qualified substrate/fabric claim, not an upgrade to the
-full original universal-orchestration thesis.
-Last activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
-Convergence` locally and retained the narrower qualified claim after the
-full-vision gate rerun.
+Phase: 403 planned / execution started
+Plan: land protocol-aware bridge bindings and registry-driven target selection
+so authoritative A2A/ACP flows stop defaulting to `Native`
+Status: `v3.15` exists because the post-v3.14 audit still found a bounded
+fabric story, incomplete lifecycle-equivalent mediation, and lingering
+planning/archive truth debt. The current claim remains the narrower qualified
+substrate/fabric claim until this lane proves otherwise.
+Last activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
+Realization` after the v3.14 review identified remaining execution gaps.
 
 Progress: [########--] 76%
 
@@ -151,6 +153,9 @@ Progress: [########--] 76%
 - [Phase 386]: ComponentState(StoreLimits) wrapper for import-free component Store data; WasmHostState reserved for core-module path with host imports
 - [Phase 386]: Guard::instantiate in wasmtime 29 returns Guard directly (not tuple); adapted plan's destructuring accordingly
 - [Phase 386]: wasmparser::Parser static methods used for authoritative core/component format detection; create_backend() returns Box<dyn WasmGuardAbi> for transparent dual-mode dispatch
+- [Phase 387]: jco types (not guest-types) generates correct export-side .d.ts bindings for the guard world
+- [Phase 387]: dist/tool-gate.wasm is 11 MiB (SpiderMonkey engine); ComponentBackend max_module_size may need adjustment
+- [Phase 387]: TypeScript guard pattern: import jco-generated types, export evaluate(GuardRequest): Verdict, compile via esbuild+componentize-js
 
 ### Roadmap Evolution
 
@@ -165,9 +170,8 @@ Progress: [########--] 76%
 
 ### Pending Todos
 
-- Start phase `397` for `v3.14 Universal Fabric and Kernel Convergence`.
-- Archive `v3.12` now that phases `377` through `381` are complete locally.
-- Archive `v3.13` now that phases `390` through `396` are complete locally.
+- Execute phase `403` for `v3.15 Universal Protocol Fabric Realization`.
+- Archive `v3.14` once the follow-on qualification lane is stable.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
@@ -210,7 +214,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T02:43:09.728Z
-Stopped at: Completed 386-02-PLAN.md (dual-mode format detection and routing)
+Last session: 2026-04-15T03:02:15.730Z
+Stopped at: Completed 387-01-PLAN.md (TypeScript guard SDK scaffold and build pipeline)
 Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None

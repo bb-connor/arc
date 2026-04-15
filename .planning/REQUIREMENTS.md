@@ -1,13 +1,14 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v3.12 Cross-Protocol Integrity and Truth
-Completion (completed locally 2026-04-14; pending archival)
-**Most recent implemented milestone:** v3.13 Universal Orchestration Closure
-(runtime/substrate closure landed locally 2026-04-14; ledger/archive closeout
-still pending)
-**Active milestone:** v3.14 Universal Fabric and Kernel Convergence
-**Planned milestones:** v3.0 through v3.14 (Universal Security Kernel era)
+**Latest completed milestone:** v3.14 Universal Fabric and Kernel Convergence
+(completed locally 2026-04-14; pending archival)
+**Latest archived milestone:** v3.13 Universal Orchestration Closure
+(completed locally 2026-04-14; archived locally 2026-04-14)
+**Most recent implemented milestone:** v3.14 Universal Fabric and Kernel
+Convergence (completed locally 2026-04-14; pending archival)
+**Active milestone:** v3.15 Universal Protocol Fabric Realization
+**Planned milestones:** v3.0 through v3.15 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -3005,9 +3006,9 @@ defend.
   The authoritative read is that `v3.9-v3.11` are implemented locally but
   still under reconciliation, and `v3.13` landed its runtime/substrate work
   while final ledger/archive closure rolled into `v3.14/401`.
-- [ ] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
+- [x] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
 - [x] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
-- [ ] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
+- [x] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
 - [x] **TRUTH-05**: Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
 - [x] **TRUTH-06**: Protocol/design docs no longer describe the shipped cross-protocol substrate or current A2A/ACP edge baseline as unimplemented
 
@@ -3162,6 +3163,74 @@ decided from one honest source of record.
 ---
 *Requirements defined: 2026-04-14*
 *Last updated: 2026-04-14 after completing milestone v3.14 Universal Fabric and Kernel Convergence locally*
+
+## v3.15 Universal Protocol Fabric Realization
+
+Closes the remaining post-v3.14 gap between ARC's qualified cross-protocol
+substrate and the full original vision. This milestone lifts target-protocol
+selection into shared bridge metadata and registry-driven bindings, removes
+the remaining authoritative-edge `Native` defaults, pushes the public
+lifecycle surfaces toward real symmetry where ARC wants to claim it, and
+finishes the final v3 planning/archive truth closure before another full
+qualification pass.
+
+### Protocol-Aware Fabric Routing
+
+- [ ] **FABRIC2-01**: shared bridge metadata expresses target protocol explicitly for outward-authoritative tool bindings instead of forcing A2A/ACP to hardcode `DiscoveryProtocol::Native`
+- [ ] **FABRIC2-02**: both A2A and ACP authoritative execution can select a non-native target protocol from shared binding metadata without bespoke edge-only helper methods
+- [ ] **FABRIC2-03**: the bridge architecture docs distinguish the shipped protocol-aware substrate from the still-future universal multi-hop registry/fabric end-state without stale contradictions
+
+### Lifecycle-Equivalent Mediation
+
+- [ ] **LIFE2-01**: A2A authoritative mediation either ships a receipt-bearing `message/stream` / task-progress lifecycle that matches the public symmetry claim, or the official claim gate excludes lifecycle equivalence until it does
+- [ ] **LIFE2-02**: ACP authoritative mediation either ships truthful `tool/stream`, `tool/cancel`, and `tool/resume` behavior for the public profile ARC wants to claim, or the official claim gate excludes lifecycle equivalence until it does
+- [ ] **LIFE2-03**: any remaining compatibility-only bypasses are internalized or clearly isolated enough that the public/default surface cannot be mistaken for the receipt-bearing authority path
+
+### Ledger and Archival Truth Closure
+
+- [ ] **LEDGER2-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `ROADMAP.md`, and `REQUIREMENTS.md` all identify `v3.15` as the active lane, `v3.14` as the most recent implemented lane, and the archived milestone boundary truthfully
+- [ ] **LEDGER2-02**: `v3.14` is archived locally once the follow-on lane is stable, and any remaining non-archived v3 milestones are called out explicitly
+- [ ] **LEDGER2-03**: early-v3 top-level milestone labels, detailed phase tables, and per-milestone requirement sections now tell one coherent implementation/audit-pending story
+
+### Full-Vision Requalification
+
+- [ ] **QUAL2-01**: `STRATEGIC-VISION.md`, `QUALIFICATION.md`, `RELEASE_AUDIT.md`, and `ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json` are rerun against the post-v3.15 runtime instead of older bounded-fabric assumptions
+- [ ] **QUAL2-02**: ARC upgrades to the stronger original-vision claim only if protocol-aware fabric routing, lifecycle-equivalent mediation, and ledger/archive truth are all demonstrably complete
+- [ ] **QUAL2-03**: if the stronger claim still does not qualify, one authoritative blocker list explains exactly what remains without conflicting docs or milestone state
+
+## v3.15 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| New protocol families beyond the existing MCP/A2A/ACP/OpenAI/HTTP set | Finish truthful symmetry and qualification on shipped families first |
+| Economic or agent-market dominance claims beyond the execution/control substrate | These follow only after the stronger orchestration/runtime claim is honestly qualified |
+| WASM guard SDK / WIT work | Continues in parallel `v4.x` lane |
+
+## v3.15 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FABRIC2-01 | Phase 403 | Planned |
+| FABRIC2-02 | Phase 403 | Planned |
+| FABRIC2-03 | Phase 403 | Planned |
+| LIFE2-01 | Phase 404 | Planned |
+| LIFE2-02 | Phase 404 | Planned |
+| LIFE2-03 | Phase 404 | Planned |
+| LEDGER2-01 | Phase 405 | Planned |
+| LEDGER2-02 | Phase 405 | Planned |
+| LEDGER2-03 | Phase 405 | Planned |
+| QUAL2-01 | Phase 406 | Planned |
+| QUAL2-02 | Phase 406 | Planned |
+| QUAL2-03 | Phase 406 | Planned |
+
+**Coverage:**
+- v3.15 requirements: 12 total
+- Mapped to phases: 12
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-14*
+*Last updated: 2026-04-14 at milestone start*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3375,9 +3444,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 ### TypeScript SDK
 
-- [ ] **TSDK-01**: TypeScript guard SDK (`packages/sdk/arc-guard-ts`) provides typed `GuardRequest` and `GuardVerdict` interfaces matching the WIT contract
-- [ ] **TSDK-02**: TypeScript guards compile to WASM components via `jco` / ComponentizeJS
-- [ ] **TSDK-03**: TypeScript SDK includes example guard with build instructions
+- [x] **TSDK-01**: TypeScript guard SDK (`packages/sdk/arc-guard-ts`) provides typed `GuardRequest` and `GuardVerdict` interfaces matching the WIT contract
+- [x] **TSDK-02**: TypeScript guards compile to WASM components via `jco` / ComponentizeJS
+- [x] **TSDK-03**: TypeScript SDK includes example guard with build instructions
 - [ ] **TSDK-04**: TypeScript-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Python SDK
@@ -3419,9 +3488,9 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | WIT-02 | Phase 381 | Complete |
 | WIT-03 | Phase 381 | Complete |
 | WIT-04 | Phase 381 | Complete |
-| TSDK-01 | Phase 382 | Pending |
-| TSDK-02 | Phase 382 | Pending |
-| TSDK-03 | Phase 382 | Pending |
+| TSDK-01 | Phase 382 | Complete |
+| TSDK-02 | Phase 382 | Complete |
+| TSDK-03 | Phase 382 | Complete |
 | TSDK-04 | Phase 382 | Pending |
 | PYDK-01 | Phase 383 | Pending |
 | PYDK-02 | Phase 383 | Pending |
