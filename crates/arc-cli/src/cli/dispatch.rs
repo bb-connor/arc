@@ -2205,6 +2205,10 @@ fn main() {
             GuardCommands::New { name } => guard::cmd_guard_new(&name),
             GuardCommands::Build => guard::cmd_guard_build(),
             GuardCommands::Inspect { path } => guard::cmd_guard_inspect(&path),
+            GuardCommands::Test { wasm, fixtures, fuel_limit } => guard::cmd_guard_test(&wasm, &fixtures, fuel_limit),
+            GuardCommands::Bench { path, iterations, fuel_limit } => guard::cmd_guard_bench(&path, iterations, fuel_limit),
+            GuardCommands::Pack => guard::cmd_guard_pack(),
+            GuardCommands::Install { path, target_dir } => guard::cmd_guard_install(&path, &target_dir),
         },
     };
 

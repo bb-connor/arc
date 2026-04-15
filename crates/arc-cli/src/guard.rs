@@ -1,8 +1,12 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::CliError;
+
+use arc_wasm_guards::abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
+use arc_wasm_guards::runtime::wasmtime_backend::WasmtimeBackend;
+use serde::Deserialize;
 
 // ---------------------------------------------------------------------------
 // Templates
@@ -283,6 +287,34 @@ pub(crate) fn cmd_guard_inspect(path: &Path) -> Result<(), CliError> {
     }
 
     Ok(())
+}
+
+pub(crate) fn cmd_guard_test(
+    _wasm_path: &Path,
+    _fixture_paths: &[PathBuf],
+    _fuel_limit: u64,
+) -> Result<(), CliError> {
+    // Implemented in Task 2.
+    Err(CliError::Other("guard test not yet implemented".to_string()))
+}
+
+pub(crate) fn cmd_guard_bench(
+    _wasm_path: &Path,
+    _iterations: u32,
+    _fuel_limit: u64,
+) -> Result<(), CliError> {
+    // Implemented in Task 3.
+    Err(CliError::Other("guard bench not yet implemented".to_string()))
+}
+
+pub(crate) fn cmd_guard_pack() -> Result<(), CliError> {
+    // Implemented in Plan 02.
+    Err(CliError::Other("guard pack not yet implemented".to_string()))
+}
+
+pub(crate) fn cmd_guard_install(_path: &Path, _target_dir: &Path) -> Result<(), CliError> {
+    // Implemented in Plan 02.
+    Err(CliError::Other("guard install not yet implemented".to_string()))
 }
 
 // ---------------------------------------------------------------------------

@@ -229,6 +229,42 @@ enum GuardCommands {
         /// Path to the .wasm file to inspect.
         path: PathBuf,
     },
+
+    /// Run YAML test fixtures against a compiled .wasm guard.
+    Test {
+        /// Path to the .wasm file to test.
+        #[arg(long)]
+        wasm: PathBuf,
+        /// Glob or paths to YAML fixture files.
+        fixtures: Vec<PathBuf>,
+        /// Fuel limit per fixture evaluation (default: 1_000_000).
+        #[arg(long, default_value = "1000000")]
+        fuel_limit: u64,
+    },
+
+    /// Benchmark a compiled .wasm guard for fuel consumption and latency.
+    Bench {
+        /// Path to the .wasm file to benchmark.
+        path: PathBuf,
+        /// Number of iterations (default: 100).
+        #[arg(long, default_value = "100")]
+        iterations: u32,
+        /// Fuel limit per evaluation (default: 1_000_000).
+        #[arg(long, default_value = "1000000")]
+        fuel_limit: u64,
+    },
+
+    /// Package a guard project into a distributable .arcguard archive.
+    Pack,
+
+    /// Install a .arcguard archive to the guard directory.
+    Install {
+        /// Path to the .arcguard archive file.
+        path: PathBuf,
+        /// Target directory to extract into (default: ./guards/).
+        #[arg(long, default_value = "guards")]
+        target_dir: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
