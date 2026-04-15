@@ -1,0 +1,10 @@
+# Compiled WASM output
+dist/
+
+# Python artifacts
+__pycache__/
+*.egg-info/
+*.pyc
+
+# Generated componentize-py bindings
+guard/
