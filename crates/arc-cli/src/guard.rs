@@ -429,12 +429,141 @@ fn check_verdict(
 }
 
 pub(crate) fn cmd_guard_bench(
-    _wasm_path: &Path,
-    _iterations: u32,
-    _fuel_limit: u64,
+    wasm_path: &Path,
+    iterations: u32,
+    fuel_limit: u64,
 ) -> Result<(), CliError> {
-    // Implemented in Task 3.
-    Err(CliError::Other("guard bench not yet implemented".to_string()))
+    let wasm_bytes = fs::read(wasm_path).map_err(|e| {
+        CliError::Other(format!("failed to read {}: {e}", wasm_path.display()))
+    })?;
+
+    let sample_request = GuardRequest {
+        tool_name: "bench_tool".to_string(),
+        server_id: "bench-server".to_string(),
+        agent_id: "bench-agent".to_string(),
+        arguments: serde_json::json!({"key": "value"}),
+        scopes: vec!["bench-server:bench_tool".to_string()],
+        action_type: Some("mcp_tool".to_string()),
+        extracted_path: None,
+        extracted_target: None,
+        filesystem_roots: Vec::new(),
+        matched_grant_index: None,
+    };
+
+    // Warmup: 5 iterations (discard results, ensures JIT compilation is warm)
+    let warmup_count = 5u32;
+    for _ in 0..warmup_count {
+        let mut backend = WasmtimeBackend::new().map_err(|e| {
+            CliError::Other(format!("failed to create wasmtime backend: {e}"))
+        })?;
+        backend.load_module(&wasm_bytes, fuel_limit).map_err(|e| {
+            CliError::Other(format!("failed to load wasm module: {e}"))
+        })?;
+        let _ = backend.evaluate(&sample_request);
+    }
+
+    // Benchmark iterations
+    let mut durations_ns: Vec<u64> = Vec::with_capacity(iterations as usize);
+    let mut fuel_values: Vec<u64> = Vec::with_capacity(iterations as usize);
+
+    for _ in 0..iterations {
+        let mut backend = WasmtimeBackend::new().map_err(|e| {
+            CliError::Other(format!("failed to create wasmtime backend: {e}"))
+        })?;
+        backend.load_module(&wasm_bytes, fuel_limit).map_err(|e| {
+            CliError::Other(format!("failed to load wasm module: {e}"))
+        })?;
+
+        let start = std::time::Instant::now();
+        let _verdict = backend.evaluate(&sample_request).map_err(|e| {
+            CliError::Other(format!("evaluation failed during benchmark: {e}"))
+        })?;
+        let elapsed = start.elapsed();
+
+        durations_ns.push(elapsed.as_nanos() as u64);
+        if let Some(fuel) = backend.last_fuel_consumed() {
+            fuel_values.push(fuel);
+        }
+    }
+
+    durations_ns.sort_unstable();
+    fuel_values.sort_unstable();
+
+    // Print results
+    println!("=== Guard Benchmark ===");
+    println!();
+    println!("File: {}", wasm_path.display());
+    println!("Iterations: {iterations}");
+    println!("Fuel limit: {}", format_number(fuel_limit));
+    println!();
+
+    println!("Latency:");
+    println!("  p50:  {}", format_duration_us(percentile(&durations_ns, 50)));
+    println!("  p99:  {}", format_duration_us(percentile(&durations_ns, 99)));
+    println!(
+        "  min:  {}",
+        format_duration_us(durations_ns.first().copied().unwrap_or(0))
+    );
+    println!(
+        "  max:  {}",
+        format_duration_us(durations_ns.last().copied().unwrap_or(0))
+    );
+    println!("  mean: {}", format_duration_us(mean_u64(&durations_ns)));
+    println!();
+
+    println!("Fuel consumed:");
+    println!("  p50:  {}", format_number(percentile(&fuel_values, 50)));
+    println!("  p99:  {}", format_number(percentile(&fuel_values, 99)));
+    println!(
+        "  min:  {}",
+        format_number(fuel_values.first().copied().unwrap_or(0))
+    );
+    println!(
+        "  max:  {}",
+        format_number(fuel_values.last().copied().unwrap_or(0))
+    );
+    println!("  mean: {}", format_number(mean_u64(&fuel_values)));
+
+    Ok(())
+}
+
+/// Compute the value at the given percentile from a sorted slice.
+/// Returns 0 for an empty slice.
+fn percentile(sorted: &[u64], pct: usize) -> u64 {
+    if sorted.is_empty() {
+        return 0;
+    }
+    let idx = (sorted.len() * pct / 100).min(sorted.len() - 1);
+    sorted[idx]
+}
+
+/// Compute the arithmetic mean of a slice of u64 values.
+/// Returns 0 for an empty slice.
+fn mean_u64(values: &[u64]) -> u64 {
+    if values.is_empty() {
+        return 0;
+    }
+    let sum: u128 = values.iter().map(|v| u128::from(*v)).sum();
+    (sum / values.len() as u128) as u64
+}
+
+/// Format nanoseconds as microseconds with 2 decimal places.
+fn format_duration_us(nanos: u64) -> String {
+    let us = nanos as f64 / 1_000.0;
+    format!("{us:.2} us")
+}
+
+/// Format a number with comma separators.
+fn format_number(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::with_capacity(s.len() + s.len() / 3);
+    for (i, ch) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            result.push(',');
+        }
+        result.push(ch);
+    }
+    result.chars().rev().collect()
 }
 
 pub(crate) fn cmd_guard_pack() -> Result<(), CliError> {
@@ -783,5 +912,60 @@ mod tests {
             filesystem_roots: Vec::new(),
             matched_grant_index: None,
         }
+    }
+
+    // --- Percentile / bench helper tests ---
+
+    #[test]
+    fn test_percentile_basic() {
+        let data = vec![1, 2, 3, 4, 5];
+        // p50: index = 5 * 50 / 100 = 2 -> data[2] = 3
+        assert_eq!(percentile(&data, 50), 3);
+        // p99: index = 5 * 99 / 100 = 4 -> data[4] = 5
+        assert_eq!(percentile(&data, 99), 5);
+    }
+
+    #[test]
+    fn test_percentile_single_element() {
+        let data = vec![42];
+        assert_eq!(percentile(&data, 50), 42);
+        assert_eq!(percentile(&data, 99), 42);
+    }
+
+    #[test]
+    fn test_percentile_empty() {
+        let data: Vec<u64> = vec![];
+        assert_eq!(percentile(&data, 50), 0);
+        assert_eq!(percentile(&data, 99), 0);
+    }
+
+    #[test]
+    fn test_mean_u64_basic() {
+        assert_eq!(mean_u64(&[10, 20, 30]), 20);
+        assert_eq!(mean_u64(&[1, 2, 3, 4, 5]), 3);
+    }
+
+    #[test]
+    fn test_mean_u64_empty() {
+        assert_eq!(mean_u64(&[]), 0);
+    }
+
+    #[test]
+    fn test_format_duration_us() {
+        // 1000 ns = 1.00 us
+        assert_eq!(format_duration_us(1000), "1.00 us");
+        // 1500 ns = 1.50 us
+        assert_eq!(format_duration_us(1500), "1.50 us");
+        // 0 ns = 0.00 us
+        assert_eq!(format_duration_us(0), "0.00 us");
+    }
+
+    #[test]
+    fn test_format_number() {
+        assert_eq!(format_number(0), "0");
+        assert_eq!(format_number(999), "999");
+        assert_eq!(format_number(1000), "1,000");
+        assert_eq!(format_number(1_000_000), "1,000,000");
+        assert_eq!(format_number(12_345), "12,345");
     }
 }
