@@ -183,6 +183,9 @@
   (completed locally 2026-04-14; pending archival)
 - [x] **v3.13 Universal Orchestration Closure** - Phases 390-396
   (completed locally 2026-04-14; pending archival)
+- [ ] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
+  (planned; follows v3.13, can execute in parallel with v4.x and archival
+  closeout work)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11011,6 +11014,161 @@ Plans:
 
 ---
 
+## v3.14 Universal Fabric and Kernel Convergence (Phases 397-402)
+
+**Milestone Goal:** Close the final documented gap between ARC's current
+qualified kernel/substrate claim and the stronger original vision by
+implementing real protocol-to-protocol bridge execution, converging supported
+HTTP/API surfaces on one literal kernel authority story, finishing the
+remaining public lifecycle and compatibility-surface work, and making the
+historical milestone ledger and claim gate fully auditable.
+
+**Dependency:** Follows v3.13's orchestrated substrate closure. This milestone
+starts at phase `397` and keeps the remaining “full vision” gaps in one lane
+instead of scattering them across ad hoc follow-up fixes. It can execute in
+parallel with the v4.x WASM guard lane because the work targets protocol
+fabric, kernel convergence, and planning/claim truth rather than guard runtime
+internals.
+
+**Parallelism:** Phase 397 establishes the general protocol fabric. Phase 398
+converges the Rust HTTP authority story on a literal kernel path, while Phase
+399 extends the same authority/evidence model across the representative SDK
+substrates. Phase 400 closes the remaining A2A/ACP lifecycle and public
+compatibility-surface gaps. Phase 401 repairs the historical milestone,
+requirements, roadmap, and archival truth so planning becomes evidence-grade.
+Phase 402 reruns the qualification gate and decides whether ARC can honestly
+upgrade the top-level claim. Phases 397 and 398 can start in parallel; Phase
+399 depends on Phase 398; Phase 400 depends on Phase 397; Phase 401 should
+consume the real runtime/doc outputs of Phases 397-400; Phase 402 depends on
+all prior phases.
+
+### Phase 397: Protocol-to-Protocol Fabric Runtime
+**Goal**: Extend `CrossProtocolOrchestrator` from edge-to-native execution into
+an explicit protocol-to-protocol fabric with target resolution, registry
+lookup, and truthful multi-hop lineage
+**Depends on**: Phase 396 (the current orchestrated substrate and claim gate
+exist)
+**Requirements**: FABRIC-01, FABRIC-02, FABRIC-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Bridge execution resolves target protocols through explicit registry or
+     bridge metadata rather than hard-coding authoritative execution to
+     `Native`
+  2. At least one authoritative bridge path executes protocol-to-protocol
+     without immediately terminating in the native kernel tool surface
+  3. Multi-hop execution preserves attenuation, trace lineage, fidelity
+     semantics, and receipt/evidence references across each hop
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 398: Kernel-First HTTP Runtime Convergence
+**Goal**: Converge `arc-api-protect` and `arc-tower` on one literal
+kernel-backed authority/evidence path instead of parallel local evaluator
+implementations
+**Depends on**: Phase 396 (current HTTP evidence model and qualification lane
+exist)
+**Requirements**: KERNEL-01, KERNEL-02
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. `arc-api-protect` routes authorization and receipt finalization through a
+     shared kernel-backed authority path instead of a local evaluator/signer
+  2. `arc-tower` uses the same shared kernel-backed authority/evidence path as
+     `arc-api-protect`
+  3. The Rust HTTP lane can be described literally, not figuratively, as one
+     kernel authority story
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 399: SDK Authority and Evidence Convergence
+**Goal**: Bring the representative HTTP/API SDK substrates onto the same
+authority/evidence semantics as the converged Rust HTTP lane
+**Depends on**: Phase 398 (shared Rust HTTP authority path exists)
+**Requirements**: KERNEL-03, KERNEL-04
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Representative SDK substrates align to the shared authority/evidence
+     contract rather than synthesizing misleading local receipt behavior
+  2. Synthetic fail-open or non-evidence-grade receipt paths are removed,
+     renamed, or explicitly downgraded from evidence claims
+  3. For supported HTTP/API surfaces, ARC can truthfully say governed
+     invocations flow through one shared kernel authority story
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 400: Lifecycle-Equivalent Protocol Mediation
+**Goal**: Make A2A and ACP lifecycle claims as strong as ARC's authority claim
+by implementing the richer public lifecycles or narrowing them with no
+remaining compatibility ambiguity
+**Depends on**: Phase 397 (protocol fabric can carry richer lifecycle
+semantics)
+**Requirements**: LIFE-01, LIFE-02, LIFE-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. A2A authoritative mediation distinguishes blocking vs streaming/task
+     semantics strongly enough to justify the public surface ARC claims
+  2. ACP authoritative mediation either supports invoke/stream/cancel/resume
+     lifecycle semantics or narrows the official profile with no contradictory
+     public behavior
+  3. Non-authoritative compatibility helpers are internalized, feature-gated,
+     or otherwise isolated so default/public surfaces cannot be mistaken for
+     receipt-bearing authority
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+### Phase 401: Ledger and Archival Truth Closure
+**Goal**: Repair the historical planning/archive record so milestone status,
+traceability, and archival state become trustworthy evidence instead of a
+second contradictory narrative
+**Depends on**: Phases 397-400 (runtime and docs must exist in their strongest
+truthful form first)
+**Requirements**: LEDGER-01, LEDGER-02, LEDGER-03, LEDGER-04
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, and
+     `ROADMAP.md` agree on the active milestone, latest completed milestone,
+     archival status, and next executable phase
+  2. v3.0-v3.8 milestone and phase summaries reflect implementation or
+     audit-pending truth rather than blanket `Planned` placeholders
+  3. v3.9-v3.13 checklists, traceability tables, and milestone summaries
+     reconcile to the same implementation and verification truth, and v3.12
+     plus v3.13 archival is complete locally
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+### Phase 402: Full-Vision Qualification Gate
+**Goal**: Re-run the claim gate after fabric, kernel, lifecycle, and ledger
+closure to decide whether ARC can now honestly upgrade to the stronger
+original vision claim
+**Depends on**: Phase 401 (runtime, docs, and planning truth are reconciled)
+**Requirements**: VISION-01, VISION-02, VISION-03, VISION-04
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Qualification evidence covers protocol-to-protocol bridge execution,
+     unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle
+     surfaces without overstating unsupported paths
+  2. Protocol, release, standards, and top-level vision docs all make the same
+     strongest honest claim about ARC's current state
+  3. The repo either upgrades the top-level claim with exact evidence or
+     records the precise remaining blockers in one authoritative claim-gate
+     surface
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+---
+
+## Phase Summary (v3.14)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 397 | v3.14 | Protocol-to-Protocol Fabric Runtime | Planned |
+| 398 | v3.14 | Kernel-First HTTP Runtime Convergence | Planned |
+| 399 | v3.14 | SDK Authority and Evidence Convergence | Planned |
+| 400 | v3.14 | Lifecycle-Equivalent Protocol Mediation | Planned |
+| 401 | v3.14 | Ledger and Archival Truth Closure | Planned |
+| 402 | v3.14 | Full-Vision Qualification Gate | Planned |
+
+---
+
 ## v4.1 Guard SDK and Developer Experience (Phases 382-385)
 
 **Milestone Goal:** Ship the guest-side Rust SDK, proc macro, example guards,
@@ -11109,7 +11267,7 @@ Plans:
 |-------|-----------|------|--------|
 | 382 | 2/2 | Complete    | 2026-04-14 |
 | 383 | 3/3 | Complete    | 2026-04-15 |
-| 384 | 1/2 | In Progress|  |
+| 384 | 2/2 | Complete   | 2026-04-15 |
 | 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
 
 ---

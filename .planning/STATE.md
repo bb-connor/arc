@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: completed
-stopped_at: Completed 384-01-PLAN.md (guard CLI scaffolding with arc guard new)
-last_updated: "2026-04-15T00:23:29.846Z"
-last_activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
+status: v3.14 has been defined from the post-v3 debate. The new milestone owns
+stopped_at: Completed 384-02-PLAN.md (guard build and inspect CLI commands)
+last_updated: "2026-04-15T00:36:17.282Z"
+last_activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
 progress:
-  total_phases: 349
-  completed_phases: 263
+  total_phases: 355
+  completed_phases: 264
   total_plans: 745
-  completed_plans: 777
-  percent: 100
+  completed_plans: 778
+  percent: 0
 ---
 
 # Project State
@@ -24,26 +24,23 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v3.13 Universal Orchestration Closure is complete locally.
-The immediate follow-up is archival/closeout for `v3.12` and `v3.13`, while
-`v4.0` remains the parallel strategic lane.
+**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` is now
+defined. The next execution step is Phase `397`, while `v3.12`/`v3.13`
+archival and the parallel `v4.x` guard lane remain separate follow-up work.
 
 ## Current Position
 
-Phase: 396 (complete locally)
-Plan: 01 (complete)
-Status: v3.13 is complete locally. Phases `390` through `393` landed the
-shared orchestrator substrate, authoritative edge unification, truthful bridge
-publication semantics, and ledger/doc reconciliation. Phase `394` then closed
-HTTP receipt/evidence convergence across `arc-http-core`, `arc-api-protect`,
-and `arc-tower`. Phase `395` narrowed A2A/ACP lifecycle claims to the
-truthful authoritative surfaces. Phase `396` added the executable
-cross-protocol runtime qualification lane, machine-readable claim matrix, and
-release/protocol claim-gate updates.
-Last activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
-and generated the runtime evidence bundle.
+Phase: Not started (next planned phase 397)
+Plan: —
+Status: v3.14 has been defined from the post-v3 debate. The new milestone owns
+protocol-to-protocol fabric runtime, literal kernel convergence across
+HTTP/API surfaces, SDK authority/evidence parity, lifecycle-equivalent
+protocol mediation, historical ledger/archive closure, and the final
+full-vision claim decision.
+Last activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
+Kernel Convergence` and routed the next execution step to phase `397`.
 
-Progress: [##########] 100%
+Progress: [----------] 0%
 
 ## Performance Metrics
 
@@ -52,7 +49,7 @@ Progress: [##########] 100%
 - v2.0 completed: 6 phases, 19 plans
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
-- v3.0-v3.13: 66 phases planned across 14 milestones
+- v3.0-v3.14: 72 phases planned across 15 milestones
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 - v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
@@ -143,6 +140,7 @@ Progress: [##########] 100%
 - [Phase 383]: Example guard crate template: cdylib crate-type under examples/guards/, arc-guard-sdk + arc-guard-sdk-macros deps, #[arc_guard] fn evaluate pattern
 - [Phase 383]: Integration test pattern: load_example_wasm(artifact_name) with CARGO_MANIFEST_DIR-relative path, fresh WasmtimeBackend per test, match on GuardVerdict::Deny for reason assertions
 - [Phase 384]: Inline string templates for guard scaffold (3 small files, no template directory needed); package name derived from final path component; SDK deps use version strings not path deps
+- [Phase 384]: wasmparser 0.221 as direct arc-cli dep (not workspace); cmd_guard_inspect is informational-only (does not fail on ABI incompatibility)
 
 ### Roadmap Evolution
 
@@ -157,6 +155,7 @@ Progress: [##########] 100%
 
 ### Pending Todos
 
+- Start phase `397` for `v3.14 Universal Fabric and Kernel Convergence`.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
 - Archive `v3.13` now that phases `390` through `396` are complete locally.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
@@ -164,7 +163,8 @@ Progress: [##########] 100%
 ### Blockers/Concerns
 
 - `v3.12` and `v3.13` are complete locally but not yet archived, so the repo
-  still carries milestone-closeout debt alongside the parallel v4.0 lane.
+  still carries milestone-closeout debt alongside the new `v3.14` lane and
+  the parallel v4.0 lane.
 - `v2.83` is still partially complete locally (phases `316` and `317` remain
   pending), so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
@@ -200,7 +200,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T00:23:29.809Z
-Stopped at: Completed 384-01-PLAN.md (guard CLI scaffolding with arc guard new)
+Last session: 2026-04-15T00:36:17.266Z
+Stopped at: Completed 384-02-PLAN.md (guard build and inspect CLI commands)
 Next action: begin Phase 383 (proc macro and example guards)
 Resume file: None

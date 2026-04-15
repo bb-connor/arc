@@ -19,38 +19,48 @@ security, regulatory compliance, and portable trust.
 
 ## Current State
 
-**Latest completed milestone:** v2.82 Normative Protocol Specification and
-Conformance
-(completed locally 2026-04-13)
-**Active milestone:** v3.12 Cross-Protocol Integrity and Truth Completion
-(phases 377-381)
+**Latest completed milestone:** v3.13 Universal Orchestration Closure
+(completed locally 2026-04-14; pending archival)
+**Active milestone:** v3.14 Universal Fabric and Kernel Convergence
+(phases 397-402)
 **Parallel milestone:** v4.0 WASM Guard Runtime Completion (phases 373-376)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
 Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
-**Planned milestones:** v3.0 through v3.12 (Universal Security Kernel era)
+**Planned milestones:** v3.0 through v3.14 (Universal Security Kernel era)
 **Planned milestones:** v4.0 through v4.2 (WASM Guard Plugin Ecosystem)
-**Next GSD action:** `/gsd:plan-phase 377` to begin ACP live-path
-cryptographic enforcement; v4.0 remains parallel and v2.83 remains an
-unarchived local qualification lane
+**Next GSD action:** `$gsd-plan-phase 397` to begin `v3.14`, while archival
+for `v3.12`/`v3.13` and the parallel `v4.x` lane continue independently
 
-## Current Milestone: v3.12 Cross-Protocol Integrity and Truth Completion
+## Current Milestone: v3.14 Universal Fabric and Kernel Convergence
 
-**Goal:** Close the credibility gap between ARC's shipped kernel/substrate
-breakthrough and the broader cross-protocol governance vision by finishing ACP
-live-path cryptographic enforcement, making outward A2A/ACP edges genuinely
-kernel-mediated, completing the remaining operational parity gaps, and forcing
-the repo/docs/planning stack to tell one truthful story.
+**Goal:** Close the remaining gap between ARC's qualified cross-protocol
+execution substrate and the full original vision by extending orchestration
+beyond edge-to-native execution, converging supported HTTP/API surfaces on one
+literal kernel authority story, completing or truthfully narrowing the
+remaining protocol lifecycle surfaces, and reconciling the milestone ledger
+and claim gate so the repo can honestly decide whether the stronger vision
+claim is earned.
 
 **Target features:**
-- ACP live-path capability checking with real signature verification and
-  fail-closed enforcement on filesystem and terminal operations
-- A2A and ACP outward-edge flows routed through the ARC kernel with signed
-  receipt parity instead of direct adapter invocation
-- Persistent sidecar receipt storage, `arc-tower` raw-body binding, and
-  kernel-backed Kubernetes capability validation
-- Full protocol/docs/planning reconciliation so shipped claims match live code
-- Qualification artifacts that codify the narrower truthful breakthrough claim
-  and block broader overclaiming until the remaining conditions are proven
+- A registry-driven protocol-to-protocol bridge fabric with truthful multi-hop
+  lineage, attenuation, fidelity, and receipt propagation
+- A literal kernel-backed authority/evidence path shared by `arc-api-protect`,
+  `arc-tower`, and the representative HTTP/API SDK substrates
+- Lifecycle-equivalent A2A/ACP mediation for the public surfaces ARC wants to
+  claim, with compatibility bypasses retired or strongly isolated
+- Historical milestone, roadmap, requirements, and archive truth repaired
+  across v3.0-v3.13 so planning becomes auditable evidence instead of a
+  competing narrative
+- A final qualification gate that either upgrades ARC's top-level claim to the
+  stronger original vision or records the exact remaining blockers in one
+  authoritative place
+
+**Execution status:** requirements and roadmap are now defined; execution has
+not started. Phases `397` through `402` cover protocol-fabric runtime,
+kernel-first HTTP convergence, SDK authority/evidence convergence,
+lifecycle-equivalent mediation, historical ledger closure, and the final
+full-vision claim decision. `v3.13` remains complete locally pending archival,
+and `v4.x` remains the parallel strategic lane.
 
 ## v4.x WASM Guard Plugin Ecosystem
 
@@ -61,8 +71,6 @@ the repo/docs/planning stack to tell one truthful story.
 | Milestone | Name | Phases | Focus |
 |-----------|------|--------|-------|
 | v4.0 | WASM Guard Runtime Completion | 373-376 | Host-side hardening, manifest, enriched request, startup wiring, benchmarks |
-| v4.1 | Guard SDK and Developer Experience | 377-380 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
-| v4.2 | WIT Migration and Multi-Language SDKs | 381-384 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
 | v4.1 | Guard SDK and Developer Experience | 382-385 | Rust guest SDK, proc macro, CLI tooling, test fixtures |
 | v4.2 | WIT Migration and Multi-Language SDKs | 386-389 | Component Model, TypeScript/Python/Go guest SDKs, conformance |
 
@@ -71,13 +79,14 @@ landscape, long-range roadmap, HushSpec/ClawdStrike integration, v1 decisions)
 
 ## Current Milestone Status
 
-`v3.12 Cross-Protocol Integrity and Truth Completion` is now the active
-planning lane. The v3.9-v3.11 remediation wave closed the major HTTP and
-cross-SDK substrate gaps, but the cross-protocol debate established that ARC's
-broader vision claim still depends on ACP live-path cryptographic enforcement,
-kernel-mediated outward edges, operational parity completion, and a full truth
-pass across docs and planning. `v4.0` remains a parallel strategic bet, and
-`v2.83` remains locally unarchived rather than silently treated as complete.
+`v3.13 Universal Orchestration Closure` is complete locally but still pending
+archival. `v3.14 Universal Fabric and Kernel Convergence` is now the active
+post-breakthrough lane: it owns the remaining protocol-to-protocol fabric,
+literal kernel convergence, lifecycle-equivalent mediation, and historical
+ledger/claim-gate closure work that still blocks the strongest original
+vision claim. `v4.0` remains a parallel strategic bet, while `v2.83` remains
+an older partially complete prior-lane debt item rather than an archived
+milestone.
 
 ## v3.x Universal Security Kernel Era
 
@@ -85,10 +94,11 @@ pass across docs and planning. `v4.0` remains a parallel strategic bet, and
 security kernel for the agent economy. One kernel, many substrates. Signed
 receipts across HTTP APIs, agent protocols, and framework middleware.
 
-**13 milestones:** v3.0 through v3.12, from foundation through
-cross-protocol integrity and truth completion.
+**15 milestones:** v3.0 through v3.14, from foundation through universal
+fabric and kernel convergence.
 **Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 ->
-v3.5 -> v3.6 -> v3.7 -> v3.8 -> v3.9 -> v3.10 -> v3.11 -> v3.12
+v3.5 -> v3.6 -> v3.7 -> v3.8 -> v3.9 -> v3.10 -> v3.11 -> v3.12 -> v3.13 ->
+v3.14
 
 | Milestone | Name | Phases | Focus |
 |-----------|------|--------|-------|
@@ -105,6 +115,8 @@ v3.5 -> v3.6 -> v3.7 -> v3.8 -> v3.9 -> v3.10 -> v3.11 -> v3.12
 | v3.10 | HTTP Sidecar and Cross-SDK Contract Completion | 364-367 | Rust sidecar endpoints, Python substrate migration, cross-SDK capability alignment |
 | v3.11 | Sidecar Entrypoint and Body-Integrity Completion | 368-372 | `arc api protect` CLI, body-preserving middleware, raw-byte hashing, schema cleanup |
 | v3.12 | Cross-Protocol Integrity and Truth Completion | 377-381 | ACP crypto enforcement, outward-edge kernel mediation, operational parity, repo-truth reconciliation |
+| v3.13 | Universal Orchestration Closure | 390-396 | generic orchestrator, edge unification, fidelity gating, ledger reconciliation, HTTP/runtime convergence, lifecycle closure, claim upgrade |
+| v3.14 | Universal Fabric and Kernel Convergence | 397-402 | protocol-to-protocol fabric, literal kernel convergence, SDK evidence parity, lifecycle-equivalent mediation, archival truth, full-vision claim decision |
 
 ## Foundation and Adoption Ladder (v2.80-v2.83)
 
@@ -1387,4 +1399,4 @@ Key regulatory milestones achieved:
 | Workload identity bridges follow portable and economic interop | Concrete verifier integrations should bind into already-stabilized policy, credential, and economic semantics | Completed in v2.12 |
 
 ---
-*Last updated: 2026-04-14 after starting v3.12 Cross-Protocol Integrity and Truth Completion*
+*Last updated: 2026-04-14 after completing phase 392 and starting phase 393 ledger/narrative reconciliation*

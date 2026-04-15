@@ -1,11 +1,10 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v3.12 Cross-Protocol Integrity and Truth
-Completion
+**Latest completed milestone:** v3.13 Universal Orchestration Closure
 (completed locally 2026-04-14; pending archival)
-**Active milestone:** v3.13 Universal Orchestration Closure
-**Planned milestones:** v3.0 through v3.13 (Universal Security Kernel era)
+**Active milestone:** v3.14 Universal Fabric and Kernel Convergence
+**Planned milestones:** v3.0 through v3.14 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -946,7 +945,7 @@ checklists were never flipped at the time.
 | FINAL-11 | Phase 372 | Complete |
 
 **Coverage:**
-- Universal security kernel requirements (v3.0-v3.13): 179 total, 179 mapped, 0 unmapped
+- Universal security kernel requirements (v3.0-v3.14): 197 total, 197 mapped, 0 unmapped
 
 ## Out of Scope (v3.x)
 
@@ -3073,6 +3072,90 @@ defend.
 *Requirements defined: 2026-04-14*
 *Last updated: 2026-04-14 after completing phases 394-396 and qualifying the cross-protocol runtime gate*
 
+## v3.14 Universal Fabric and Kernel Convergence
+
+Closes the remaining gap between ARC's qualified cross-protocol execution
+substrate and the stronger original vision. This milestone extends the
+orchestrator from edge-to-native execution into a protocol-to-protocol fabric,
+converges supported HTTP/API surfaces on one literal kernel authority story,
+finishes the remaining lifecycle and compatibility-surface truth work, and
+repairs the historical milestone/archive ledger so the final claim gate can be
+decided from one honest source of record.
+
+### Protocol-to-Protocol Fabric
+
+- [ ] **FABRIC-01**: `CrossProtocolOrchestrator` resolves target protocols through an explicit bridge registry and bridge metadata instead of collapsing every authoritative execution to `Native`
+- [ ] **FABRIC-02**: At least one authoritative bridge path executes protocol-to-protocol without terminating immediately in `DiscoveryProtocol::Native`
+- [ ] **FABRIC-03**: Multi-hop bridge execution preserves attenuation, trace lineage, fidelity semantics, and receipt/evidence references across each hop
+
+### Kernel-First HTTP and SDK Convergence
+
+- [ ] **KERNEL-01**: `arc-api-protect` routes authorization and receipt finalization through one shared kernel-backed authority path instead of a local evaluator/signer
+- [ ] **KERNEL-02**: `arc-tower` uses the same shared kernel-backed authority/evidence path as `arc-api-protect` rather than a parallel evaluator implementation
+- [ ] **KERNEL-03**: Representative HTTP/API SDK substrates (TypeScript, Python, Go, JVM, and .NET) converge on the shared authority/evidence contract and do not synthesize misleading fail-open receipts
+- [ ] **KERNEL-04**: For the supported HTTP/API surfaces ARC publicly claims, governed invocations can be described literally and truthfully as flowing through one shared kernel authority story
+
+### Lifecycle-Equivalent Protocol Mediation
+
+- [ ] **LIFE-01**: A2A authoritative execution distinguishes blocking and streaming/task lifecycles strongly enough to justify the public surface ARC claims
+- [ ] **LIFE-02**: ACP authoritative execution supports the invoke/stream/cancel/resume lifecycle ARC claims, or the official ACP profile is narrowed with no contradictory public surface
+- [ ] **LIFE-03**: Non-authoritative A2A/ACP compatibility helpers are internalized, feature-gated, or otherwise isolated so public/default surfaces cannot be mistaken for receipt-bearing authority
+
+### Ledger and Archival Truth
+
+- [ ] **LEDGER-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, and `ROADMAP.md` agree on the active milestone, latest completed milestone, archival status, and next executable phase
+- [ ] **LEDGER-02**: v3.0-v3.8 milestone and phase summaries reflect implementation/audit-pending truth rather than blanket `Planned` placeholders
+- [ ] **LEDGER-03**: v3.9-v3.13 requirement checklists, traceability tables, and milestone status summaries reconcile to the same implementation and verification truth
+- [ ] **LEDGER-04**: v3.12 and v3.13 archival is complete locally, and any remaining local-only milestone state is called out explicitly rather than implicitly
+
+### Full-Vision Qualification
+
+- [ ] **VISION-01**: Qualification evidence covers protocol-to-protocol bridge execution, unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle surfaces without overstating unsupported paths
+- [ ] **VISION-02**: `docs/protocols/`, `docs/release/`, `docs/standards/`, and `docs/VISION.md` all make the same strongest honest claim about ARC's current state
+- [ ] **VISION-03**: If ARC can now honestly claim the stronger original vision, the repo ships the evidence and exact claim text needed to do so; otherwise one authoritative claim-gate document names the remaining blockers
+- [ ] **VISION-04**: Economic/control-plane language is either bounded to strategic research or tied to explicit shipped/runtime qualification evidence rather than aspirational prose
+
+## v3.14 Out of Scope
+
+| Feature | Reason |
+|---------|--------|
+| Net-new protocol families beyond HTTP, MCP, OpenAI, A2A, and ACP | Close the remaining truth and authority gaps on the existing surfaces first |
+| New economic or marketplace runtime features | The goal is to qualify or narrow the existing claim, not expand product surface |
+| Broad ecosystem or market-adoption proof | This milestone can tighten the claim gate, but not manufacture external market validation |
+| v4.x WASM guard SDK / WIT work | Parallel strategic lane, not part of the post-v3 full-vision closure work |
+
+## v3.14 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| FABRIC-01 | Phase 397 | Pending |
+| FABRIC-02 | Phase 397 | Pending |
+| FABRIC-03 | Phase 397 | Pending |
+| KERNEL-01 | Phase 398 | Pending |
+| KERNEL-02 | Phase 398 | Pending |
+| KERNEL-03 | Phase 399 | Pending |
+| KERNEL-04 | Phase 399 | Pending |
+| LIFE-01 | Phase 400 | Pending |
+| LIFE-02 | Phase 400 | Pending |
+| LIFE-03 | Phase 400 | Pending |
+| LEDGER-01 | Phase 401 | Pending |
+| LEDGER-02 | Phase 401 | Pending |
+| LEDGER-03 | Phase 401 | Pending |
+| LEDGER-04 | Phase 401 | Pending |
+| VISION-01 | Phase 402 | Pending |
+| VISION-02 | Phase 402 | Pending |
+| VISION-03 | Phase 402 | Pending |
+| VISION-04 | Phase 402 | Pending |
+
+**Coverage:**
+- v3.14 requirements: 18 total
+- Mapped to phases: 18
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-14*
+*Last updated: 2026-04-14 after starting milestone v3.14 Universal Fabric and Kernel Convergence*
+
 ## v4.0 WASM Guard Runtime Completion
 
 Completes the arc-wasm-guards host-side runtime that Phase 347 scaffolded.
@@ -3215,8 +3298,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 ### CLI Scaffolding
 
 - [x] **GCLI-01**: `arc guard new <name>` scaffolds a new guard project with Cargo.toml, src/lib.rs using `#[arc_guard]`, and guard-manifest.yaml
-- [ ] **GCLI-02**: `arc guard build` compiles the guard to `wasm32-unknown-unknown` release and reports binary size
-- [ ] **GCLI-03**: `arc guard inspect <path>` reads a .wasm file and prints exported functions, ABI compatibility, and memory requirements
+- [x] **GCLI-02**: `arc guard build` compiles the guard to `wasm32-unknown-unknown` release and reports binary size
+- [x] **GCLI-03**: `arc guard inspect <path>` reads a .wasm file and prints exported functions, ABI compatibility, and memory requirements
 
 ### CLI Test and Package
 
@@ -3253,8 +3336,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GEXM-04 | Phase 378 | Complete |
 | GEXM-05 | Phase 378 | Complete |
 | GCLI-01 | Phase 379 | Complete |
-| GCLI-02 | Phase 379 | Pending |
-| GCLI-03 | Phase 379 | Pending |
+| GCLI-02 | Phase 379 | Complete |
+| GCLI-03 | Phase 379 | Complete |
 | GCLI-04 | Phase 380 | Pending |
 | GCLI-05 | Phase 380 | Pending |
 | GCLI-06 | Phase 380 | Pending |
