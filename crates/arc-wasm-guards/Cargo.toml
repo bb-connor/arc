@@ -13,7 +13,7 @@ name = "arc_wasm_guards"
 [features]
 default = []
 # Enable the wasmtime-based runtime backend.
-wasmtime-runtime = ["dep:wasmtime"]
+wasmtime-runtime = ["dep:wasmtime", "dep:wasmparser"]
 
 [dependencies]
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
@@ -27,6 +27,7 @@ serde_yml = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+wasmparser = { version = "0.221", optional = true }
 wasmtime = { version = "29", optional = true }
 
 [dev-dependencies]
