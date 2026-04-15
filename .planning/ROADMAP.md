@@ -11082,7 +11082,10 @@ Plans:
   2. `arc guard build` in a guard project directory compiles to `wasm32-unknown-unknown` in release mode and reports the output path and binary size
   3. `arc guard inspect path/to/guard.wasm` reads the WASM binary and prints: exported functions, ABI compatibility status (whether `evaluate`, `arc_alloc`, `arc_deny_reason` are present), and linear memory configuration
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ### Phase 385: CLI Test, Bench, Pack, and Install
 **Goal**: Guard authors can test against fixtures, benchmark fuel consumption, package for distribution, and install from archives -- completing the guard development lifecycle from authoring through deployment
@@ -11093,7 +11096,10 @@ Plans:
   2. `arc guard bench path/to/guard.wasm` measures fuel consumption and execution time across sample requests and reports p50/p99 latency and fuel statistics
   3. `arc guard pack` creates a `.arcguard` archive (gzipped tar containing `guard-manifest.yaml` and the `.wasm` binary) and `arc guard install path.arcguard` extracts it to the configured guard directory
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ---
 
@@ -11156,7 +11162,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
   3. When loading a `.wasm` file, the host detects whether it is a core module (legacy raw ABI) or a Component Model component (WIT ABI) and evaluates it through the correct path, with existing raw-ABI guards continuing to work unchanged
   4. The WIT package under `wit/arc-guard/` includes a versioned world definition with documentation comments that SDK toolchains (jco, componentize-py, TinyGo) can consume to generate guest bindings
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ### Phase 387: TypeScript Guard SDK
 **Goal**: Guard authors can write policy guards in TypeScript, compile them to WASM components via jco/ComponentizeJS, and load them in the ARC host runtime alongside Rust guards
@@ -11168,7 +11177,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
   3. An example TypeScript guard exists with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands
   4. A TypeScript-compiled guard loaded into the ARC host runtime produces correct Allow and Deny verdicts for the same test inputs that the Rust example guards handle
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ### Phase 388: Python and Go Guard SDKs
 **Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the ARC host runtime alongside Rust and TypeScript guards
@@ -11180,7 +11192,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
   3. Example guards exist for both Python and Go with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands per language
   4. Python-compiled and Go-compiled guards loaded into the ARC host runtime produce correct Allow and Deny verdicts for the same test inputs that the Rust and TypeScript example guards handle
 **Estimated complexity**: L
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ### Phase 389: Cross-Language Conformance Suite
 **Goal**: A single conformance test suite proves that all four language SDKs (Rust, TypeScript, Python, Go) produce identical guard verdicts and comparable fuel consumption for the same policy scenarios
@@ -11191,7 +11206,10 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
   2. The conformance runner loads all four compiled guards (Rust `.wasm`, TypeScript `.wasm`, Python `.wasm`, Go `.wasm`), executes each against the full fixture set, and reports pass/fail per guard per fixture in a single invocation
   3. The conformance suite measures fuel consumption for each guard on each fixture and fails if any language exceeds 2x the fuel of the most efficient language for the same fixture, ensuring no SDK introduces unreasonable overhead
 **Estimated complexity**: M
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
+- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
 
 ---
 
