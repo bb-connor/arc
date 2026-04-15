@@ -11378,7 +11378,7 @@ Plans:
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 386 | v4.2 | WIT Interface and Dual-Mode Host | Not started |
+| 386 | 1/2 | In Progress|  |
 | 387 | v4.2 | TypeScript Guard SDK | Not started |
 | 388 | v4.2 | Python and Go Guard SDKs | Not started |
 | 389 | v4.2 | Cross-Language Conformance Suite | Not started |

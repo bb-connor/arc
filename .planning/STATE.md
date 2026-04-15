@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: `v3.14` now owns protocol-to-protocol fabric runtime, literal kernel
-stopped_at: Completed 385-02-PLAN.md (guard pack and install CLI commands)
-last_updated: "2026-04-15T01:50:56.109Z"
-last_activity: 2026-04-14 -- continued `v3.14 Universal Fabric and Kernel
+status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
+stopped_at: Completed 386-01-PLAN.md (WIT interface and ComponentBackend)
+last_updated: "2026-04-15T02:35:09.517Z"
+last_activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
 progress:
   total_phases: 355
-  completed_phases: 265
-  total_plans: 747
-  completed_plans: 785
-  percent: 0
+  completed_phases: 271
+  total_plans: 755
+  completed_plans: 792
+  percent: 76
 ---
 
 # Project State
@@ -24,29 +24,23 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` is active.
-Protocol-fabric runtime, HTTP/kernel convergence, SDK authority/evidence
-convergence, and lifecycle-surface closure are the live execution lanes, while
-`v3.12`/`v3.13` archival and the parallel `v4.x` guard lane remain separate
-follow-up work.
+**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` remains the
+active local milestone only until archival / next-milestone selection.
+Execution is complete locally; the remaining action is closeout.
 
 ## Current Position
 
-Phase: v3.14 execution in progress (`397`, `398`, and `400` actively
-advancing; `399` partially landed; `401-402` pending)
-Plan: continue runtime execution first, then close ledger/archive truth and the
-full-vision claim gate
-Status: `v3.14` now owns protocol-to-protocol fabric runtime, literal kernel
-convergence across HTTP/API surfaces, SDK authority/evidence parity,
-lifecycle-equivalent protocol mediation, historical ledger/archive closure,
-and the final full-vision claim decision. The runtime lanes have active local
-code/test progress; the remaining closeout work is primarily in phases `401`
-and `402`.
-Last activity: 2026-04-14 -- continued `v3.14 Universal Fabric and Kernel
-Convergence` execution after landing active runtime progress across the 397 /
-398 / 399 / 400 lanes.
+Phase: v3.14 execution complete locally (`397-402` complete)
+Plan: archive `v3.14` or open the next milestone
+Status: `v3.14` now closes the remaining fabric, kernel, SDK, lifecycle,
+ledger, and claim-gate work that followed the v3.13 breakthrough lane. The
+result is a stronger qualified substrate/fabric claim, not an upgrade to the
+full original universal-orchestration thesis.
+Last activity: 2026-04-14 -- completed `v3.14 Universal Fabric and Kernel
+Convergence` locally and retained the narrower qualified claim after the
+full-vision gate rerun.
 
-Progress: [----------] 0%
+Progress: [########--] 76%
 
 ## Performance Metrics
 
@@ -153,6 +147,9 @@ Progress: [----------] 0%
 - [Phase 385]: Percentile uses index = len * pct / 100 clamped to len-1 for non-interpolating semantics
 - [Phase 385]: Fresh WasmtimeBackend per fixture/iteration for fuel and memory state isolation in test and bench commands
 - [Phase 385]: pack_from_dir takes explicit path for testability; archive stores wasm as filename-only for portability; install uses temp-dir extraction for gzip stream compatibility
+- [Phase 386]: WIT types placed inside interface block (not top-level) because WIT parser requires variant/record inside interface scope
+- [Phase 386]: ComponentState(StoreLimits) wrapper for import-free component Store data; WasmHostState reserved for core-module path with host imports
+- [Phase 386]: Guard::instantiate in wasmtime 29 returns Guard directly (not tuple); adapted plan's destructuring accordingly
 
 ### Roadmap Evolution
 
@@ -212,7 +209,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T01:42:31.215Z
-Stopped at: Completed 385-02-PLAN.md (guard pack and install CLI commands)
+Last session: 2026-04-15T02:35:09.497Z
+Stopped at: Completed 386-01-PLAN.md (WIT interface and ComponentBackend)
 Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None

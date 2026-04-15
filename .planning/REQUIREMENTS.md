@@ -3001,6 +3001,10 @@ defend.
 
 ### Ledger and Narrative Reconciliation
 
+- Late-v3 note: phase-local checkbox sections here remain historical artifacts.
+  The authoritative read is that `v3.9-v3.11` are implemented locally but
+  still under reconciliation, and `v3.13` landed its runtime/substrate work
+  while final ledger/archive closure rolled into `v3.14/401`.
 - [ ] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
 - [x] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
 - [ ] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
@@ -3049,9 +3053,9 @@ defend.
 | FID-01 | Phase 392 | Complete |
 | FID-02 | Phase 392 | Complete |
 | FID-03 | Phase 392 | Complete |
-| LEDGER-01 | Phase 393 | Complete |
+| LEDGER-01 | Phase 393 / 401 | Complete |
 | LEDGER-02 | Phase 393 | Complete |
-| LEDGER-03 | Phase 393 | Complete |
+| LEDGER-03 | Phase 393 / 401 | Complete |
 | TRUTH-05 | Phase 393 / 396 | Complete |
 | TRUTH-06 | Phase 393 / 396 | Complete |
 | HTTP-01 | Phase 394 | Complete |
@@ -3131,24 +3135,24 @@ decided from one honest source of record.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FABRIC-01 | Phase 397 | Pending |
-| FABRIC-02 | Phase 397 | Pending |
-| FABRIC-03 | Phase 397 | Pending |
-| KERNEL-01 | Phase 398 | Pending |
-| KERNEL-02 | Phase 398 | Pending |
-| KERNEL-03 | Phase 399 | Pending |
-| KERNEL-04 | Phase 399 | Pending |
-| LIFE-01 | Phase 400 | Pending |
-| LIFE-02 | Phase 400 | Pending |
-| LIFE-03 | Phase 400 | Pending |
-| LEDGER-01 | Phase 401 | Pending |
-| LEDGER-02 | Phase 401 | Pending |
-| LEDGER-03 | Phase 401 | Pending |
-| LEDGER-04 | Phase 401 | Pending |
-| VISION-01 | Phase 402 | Pending |
-| VISION-02 | Phase 402 | Pending |
-| VISION-03 | Phase 402 | Pending |
-| VISION-04 | Phase 402 | Pending |
+| FABRIC-01 | Phase 397 | Complete |
+| FABRIC-02 | Phase 397 | Complete |
+| FABRIC-03 | Phase 397 | Complete |
+| KERNEL-01 | Phase 398 | Complete |
+| KERNEL-02 | Phase 398 | Complete |
+| KERNEL-03 | Phase 399 | Complete |
+| KERNEL-04 | Phase 399 | Complete |
+| LIFE-01 | Phase 400 | Complete |
+| LIFE-02 | Phase 400 | Complete |
+| LIFE-03 | Phase 400 | Complete |
+| LEDGER-01 | Phase 401 | Complete |
+| LEDGER-02 | Phase 401 | Complete |
+| LEDGER-03 | Phase 401 | Complete |
+| LEDGER-04 | Phase 401 | Complete |
+| VISION-01 | Phase 402 | Complete |
+| VISION-02 | Phase 402 | Complete |
+| VISION-03 | Phase 402 | Complete |
+| VISION-04 | Phase 402 | Complete |
 
 **Coverage:**
 - v3.14 requirements: 18 total
@@ -3157,7 +3161,7 @@ decided from one honest source of record.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after starting milestone v3.14 Universal Fabric and Kernel Convergence*
+*Last updated: 2026-04-14 after completing milestone v3.14 Universal Fabric and Kernel Convergence locally*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3364,10 +3368,10 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 ### WIT Interface
 
-- [ ] **WIT-01**: Guard WIT interface defined (`arc:guard@0.1.0`) with `evaluate` function, `guard-request` record, and `verdict` variant types
-- [ ] **WIT-02**: Host implements the WIT interface using `wasmtime::component::bindgen!` with generated Rust types
+- [x] **WIT-01**: Guard WIT interface defined (`arc:guard@0.1.0`) with `evaluate` function, `guard-request` record, and `verdict` variant types
+- [x] **WIT-02**: Host implements the WIT interface using `wasmtime::component::bindgen!` with generated Rust types
 - [ ] **WIT-03**: Host supports dual-mode loading: raw core-WASM modules (legacy ABI) and Component Model components (WIT ABI) detected at load time
-- [ ] **WIT-04**: WIT package published in-repo under `wit/arc-guard/` with versioned world definition
+- [x] **WIT-04**: WIT package published in-repo under `wit/arc-guard/` with versioned world definition
 
 ### TypeScript SDK
 
@@ -3411,10 +3415,10 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WIT-01 | Phase 381 | Pending |
-| WIT-02 | Phase 381 | Pending |
+| WIT-01 | Phase 381 | Complete |
+| WIT-02 | Phase 381 | Complete |
 | WIT-03 | Phase 381 | Pending |
-| WIT-04 | Phase 381 | Pending |
+| WIT-04 | Phase 381 | Complete |
 | TSDK-01 | Phase 382 | Pending |
 | TSDK-02 | Phase 382 | Pending |
 | TSDK-03 | Phase 382 | Pending |
