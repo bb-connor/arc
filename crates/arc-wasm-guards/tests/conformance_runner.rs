@@ -38,6 +38,9 @@ struct TestFixture {
 // Guard registry
 // ---------------------------------------------------------------------------
 
+/// Guard loader function type: returns None if the guard binary is not available.
+type GuardLoader = fn() -> Option<GuardEntry>;
+
 /// A loadable guard entry with its WASM bytes and a factory for backends.
 struct GuardEntry {
     name: &'static str,
@@ -217,7 +220,10 @@ fn print_fuel_summary(records: &[FuelRecord], fixtures: &[TestFixture]) {
     // Build lookup: (fixture, guard) -> fuel
     let mut lookup: HashMap<(&str, &str), u64> = HashMap::new();
     for rec in records {
-        lookup.insert((rec.fixture_name.as_str(), rec.guard_name.as_str()), rec.fuel_consumed);
+        lookup.insert(
+            (rec.fixture_name.as_str(), rec.guard_name.as_str()),
+            rec.fuel_consumed,
+        );
     }
 
     // Collect guard names that have at least one record.
@@ -333,8 +339,8 @@ fn conformance_tool_gate_all_languages() {
     let engine = create_shared_engine().unwrap();
 
     // Build guard registry: Rust is mandatory, others are optional.
-    let guard_loaders: Vec<(&str, fn() -> Option<GuardEntry>)> = vec![
-        ("rust", try_load_rust_guard as fn() -> Option<GuardEntry>),
+    let guard_loaders: Vec<(&str, GuardLoader)> = vec![
+        ("rust", try_load_rust_guard as GuardLoader),
         ("typescript", try_load_ts_guard),
         ("python", try_load_py_guard),
         ("go", try_load_go_guard),
@@ -401,9 +407,7 @@ fn conformance_tool_gate_all_languages() {
     }
 
     let total = passed + failed;
-    println!(
-        "\nconformance: {passed}/{total} passed, {skipped_guards} guards skipped"
-    );
+    println!("\nconformance: {passed}/{total} passed, {skipped_guards} guards skipped");
 
     // Print fuel summary table.
     print_fuel_summary(&fuel_records, &fixtures);
@@ -466,10 +470,7 @@ fn conformance_enriched_inspector_rust() {
         match verdict {
             Ok(ref v) => match check_verdict(fixture, v) {
                 Ok(()) => {
-                    println!(
-                        "[PASS] enriched-inspector / {} ({fuel_str})",
-                        fixture.name
-                    );
+                    println!("[PASS] enriched-inspector / {} ({fuel_str})", fixture.name);
                     passed += 1;
                 }
                 Err(reason) => {
@@ -497,5 +498,8 @@ fn conformance_enriched_inspector_rust() {
     print_fuel_summary(&fuel_records, &fixtures);
     println!("enriched-inspector fuel: reported only (single language, no parity check)");
 
-    assert_eq!(failed, 0, "enriched-inspector conformance failures detected");
+    assert_eq!(
+        failed, 0,
+        "enriched-inspector conformance failures detected"
+    );
 }
