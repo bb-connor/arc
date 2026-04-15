@@ -11210,7 +11210,7 @@ registry-driven authoritative bindings so A2A/ACP no longer default every
 published tool to `DiscoveryProtocol::Native`
 **Depends on**: Phase 402 (the bounded-fabric claim gate outcome is explicit)
 **Requirements**: FABRIC2-01, FABRIC2-02, FABRIC2-03
-**Status**: planned locally 2026-04-14; execution started
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Shared bridge metadata records authoritative target protocol explicitly
      for outward bindings
@@ -11220,14 +11220,14 @@ published tool to `DiscoveryProtocol::Native`
      substrate and the still-future universal multi-hop fabric without stale
      contradictions
 **Estimated complexity**: M
-**Plans**: 1 plan
+**Plans**: 1/1 plan complete
 
 ### Phase 404: Lifecycle-Equivalent A2A/ACP Mediation
 **Goal**: Earn the lifecycle-equivalent claim on the public A2A/ACP surfaces,
 or narrow the claim gate again with no remaining public ambiguity
 **Depends on**: Phase 403 (protocol-aware fabric selection exists)
 **Requirements**: LIFE2-01, LIFE2-02, LIFE2-03
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. A2A either ships receipt-bearing stream/task lifecycle semantics or the
      official claim gate excludes lifecycle equivalence explicitly
@@ -11236,7 +11236,9 @@ or narrow the claim gate again with no remaining public ambiguity
   3. Compatibility-only bypasses are isolated strongly enough that default
      public surfaces cannot be mistaken for the authoritative path
 **Estimated complexity**: L
-**Plans**: 0 plans
+**Plans**: 1/1 plan complete
+Plans:
+- [x] 404-01-PLAN.md -- authoritative deferred-task lifecycle for A2A/ACP plus truth reconciliation across specs, docs, and qualification surfaces
 
 ### Phase 405: Final v3 Ledger and Archive Closure
 **Goal**: Finish the remaining v3 milestone, roadmap, requirements, and
@@ -11277,8 +11279,8 @@ honestly upgrade beyond the narrower substrate claim
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 403 | v3.15 | Protocol-Aware Bridge Binding and Registry Generalization | Planned / started |
-| 404 | v3.15 | Lifecycle-Equivalent A2A/ACP Mediation | Planned |
+| 403 | v3.15 | Protocol-Aware Bridge Binding and Registry Generalization | Complete |
+| 404 | v3.15 | Lifecycle-Equivalent A2A/ACP Mediation | Complete |
 | 405 | v3.15 | Final v3 Ledger and Archive Closure | Planned |
 | 406 | v3.15 | Full Original-Vision Requalification | Planned |
 
@@ -11465,10 +11467,12 @@ Plans:
   3. Example guards exist for both Python and Go with build instructions that a developer can follow from zero to compiled `.wasm` in under five commands per language
   4. Python-compiled and Go-compiled guards loaded into the ARC host runtime produce correct Allow and Deny verdicts for the same test inputs that the Rust and TypeScript example guards handle
 **Estimated complexity**: L
-**Plans**: 2 plans
+**Plans**: 3 plans
 Plans:
-- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
-- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
+- [ ] 388-01-PLAN.md -- Python SDK scaffold, typed dataclasses, componentize-py build pipeline
+- [ ] 388-02-PLAN.md -- Go SDK scaffold, typed structs, TinyGo wasip2 + wasi-virt build pipeline
+- [ ] 388-03-PLAN.md -- Rust integration tests for Python and Go compiled guards in host runtime
+
 
 ### Phase 389: Cross-Language Conformance Suite
 **Goal**: A single conformance test suite proves that all four language SDKs (Rust, TypeScript, Python, Go) produce identical guard verdicts and comparable fuel consumption for the same policy scenarios
