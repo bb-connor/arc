@@ -58,6 +58,8 @@ p256 = { version = "0.13", features = ["ecdsa"] }
 p384 = { version = "0.13", features = ["ecdsa"] }
 arc-wasm-guards = { package = "arc-wasm-guards", path = "../arc-wasm-guards", features = ["wasmtime-runtime"] }
 wasmparser = "0.221"
+flate2 = "1"
+tar = "0.4"
 
 [dev-dependencies]
 arc-credit = { package = "arc-credit", path = "../arc-credit" }
