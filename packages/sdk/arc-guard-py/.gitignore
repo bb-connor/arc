@@ -6,5 +6,9 @@ __pycache__/
 *.egg-info/
 *.pyc
 
-# Generated componentize-py bindings
+# Generated componentize-py bindings and runtime support
 guard/
+componentize_py_async_support/
+componentize_py_types.py
+componentize_py_runtime.pyi
+poll_loop.py
