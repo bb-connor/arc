@@ -1,0 +1,23 @@
+{"plugins": [],
+ "package": "arc",
+ "options": {"autoImplicit": false},
+ "name": "Pact.Proofs.Monotonicity",
+ "isModule": false,
+ "importArts":
+ {"Pact.Spec.Properties":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Spec/Properties.olean"],
+  "Pact.Core.Scope":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Scope.olean"],
+  "Pact.Core.Revocation":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Revocation.olean"],
+  "Pact.Core.Capability":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Capability.olean"],
+  "Arc.Spec.Properties":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Spec/Properties.olean"],
+  "Arc.Core.Scope":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Core/Scope.olean"],
+  "Arc.Core.Revocation":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Core/Revocation.olean"],
+  "Arc.Core.Capability":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Core/Capability.olean"]},
+ "dynlibs": []}

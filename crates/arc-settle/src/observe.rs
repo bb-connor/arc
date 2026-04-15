@@ -350,3 +350,693 @@ fn recovery_action_for_projection(
         },
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+    use std::str::FromStr;
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+    use std::time::Duration;
+
+    use alloy_primitives::{Address, B256, U256};
+    use alloy_sol_types::SolCall;
+    use arc_core::web3::{
+        Web3FinalityMode, Web3SettlementDispatchArtifact, Web3SettlementLifecycleState,
+        Web3SettlementPath,
+    };
+    use arc_web3_bindings::{IArcBondVault, IArcEscrow};
+    use serde_json::{json, Value};
+
+    use super::*;
+
+    struct MockJsonRpcServer {
+        base_url: String,
+        requests: Arc<Mutex<Vec<Value>>>,
+        handle: thread::JoinHandle<()>,
+    }
+
+    impl MockJsonRpcServer {
+        fn spawn(envelopes: Vec<Value>) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock JSON-RPC listener");
+            let address = listener.local_addr().expect("listener address");
+            let base_url = format!("http://127.0.0.1:{}", address.port());
+            let requests = Arc::new(Mutex::new(Vec::new()));
+            let requests_for_thread = Arc::clone(&requests);
+
+            let handle = thread::spawn(move || {
+                for envelope in envelopes {
+                    let (mut stream, _) = listener.accept().expect("accept mock request");
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .expect("set read timeout");
+                    let request = read_http_request(&mut stream);
+                    requests_for_thread
+                        .lock()
+                        .expect("lock request log")
+                        .push(parse_json_request(&request));
+                    write_http_json_response(&mut stream, 200, &envelope);
+                    stream.flush().expect("flush mock response");
+                }
+            });
+
+            Self {
+                base_url,
+                requests,
+                handle,
+            }
+        }
+
+        fn base_url(&self) -> &str {
+            &self.base_url
+        }
+
+        fn requests(&self) -> Vec<Value> {
+            self.requests.lock().expect("lock request log").clone()
+        }
+
+        fn join(self) {
+            self.handle.join().expect("join mock JSON-RPC server");
+        }
+    }
+
+    fn sample_config(rpc_url: &str) -> SettlementChainConfig {
+        SettlementChainConfig {
+            chain_id: "eip155:31337".to_string(),
+            network_name: "Ganache".to_string(),
+            rpc_url: rpc_url.to_string(),
+            escrow_contract: "0x69011eD3D9792Ea93595EeBd919EE621764B19e0".to_string(),
+            bond_vault_contract: "0x621c302d6EC93b7186bEF18dF5D6436C6ea30125".to_string(),
+            identity_registry_contract: "0x0eAFb60DD4F4b3863eb5490752238aC37A625dc6".to_string(),
+            root_registry_contract: "0x3a167ACFC3348a8f8df11BF383aF3cA86a8A2B42".to_string(),
+            operator_address: "0x8d6d63c22D114C18C2a0dA6Db0A8972Ed9C40343".to_string(),
+            settlement_token_symbol: "mUSDC".to_string(),
+            settlement_token_address: "0x735F1Ba389D9D350501dB8FBbB5b52477DcaddA8".to_string(),
+            oracle: crate::SettlementOracleConfig::default(),
+            evidence_substrate: crate::SettlementEvidenceConfig::default(),
+            policy: crate::SettlementPolicyConfig {
+                arc_minor_unit_decimals: 2,
+                token_minor_unit_decimals: 6,
+                tiers: vec![
+                    crate::SettlementAmountTier {
+                        upper_bound_units: 1_000,
+                        dispute_window_secs: 0,
+                        min_confirmations: 1,
+                        finality_mode: Web3FinalityMode::OptimisticL2,
+                    },
+                    crate::SettlementAmountTier {
+                        upper_bound_units: 100_000,
+                        dispute_window_secs: 3_600,
+                        min_confirmations: 1,
+                        finality_mode: Web3FinalityMode::OptimisticL2,
+                    },
+                    crate::SettlementAmountTier {
+                        upper_bound_units: 1_000_000,
+                        dispute_window_secs: 14_400,
+                        min_confirmations: 12,
+                        finality_mode: Web3FinalityMode::L1Finalized,
+                    },
+                    crate::SettlementAmountTier {
+                        upper_bound_units: u64::MAX,
+                        dispute_window_secs: 86_400,
+                        min_confirmations: 64,
+                        finality_mode: Web3FinalityMode::L1Finalized,
+                    },
+                ],
+            },
+        }
+    }
+
+    fn sample_receipt(
+        block_number: u64,
+        block_hash: &str,
+        observed_at: u64,
+    ) -> EvmTransactionReceipt {
+        EvmTransactionReceipt {
+            tx_hash: "0xabc".to_string(),
+            block_number,
+            block_hash: block_hash.to_string(),
+            status: true,
+            from_address: "0x1000000000000000000000000000000000000001".to_string(),
+            to_address: "0x1000000000000000000000000000000000000002".to_string(),
+            gas_used: 21_000,
+            observed_at,
+            logs: Vec::new(),
+        }
+    }
+
+    fn sample_dispatch() -> Web3SettlementDispatchArtifact {
+        let mut dispatch: Web3SettlementDispatchArtifact = serde_json::from_str(include_str!(
+            "../../../docs/standards/ARC_WEB3_SETTLEMENT_DISPATCH_EXAMPLE.json"
+        ))
+        .expect("dispatch example should parse");
+        dispatch.escrow_id =
+            "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string();
+        dispatch.settlement_path = Web3SettlementPath::DualSignature;
+        dispatch.support_boundary.anchor_proof_required = false;
+        dispatch.support_boundary.oracle_evidence_required_for_fx = false;
+        dispatch
+    }
+
+    fn rpc_result(result: Value) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": result,
+        })
+    }
+
+    fn rpc_error(code: i64, message: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": code,
+                "message": message,
+            }
+        })
+    }
+
+    fn encode_hex(data: Vec<u8>) -> String {
+        format!("0x{}", hex::encode(data))
+    }
+
+    fn read_http_request<R: Read>(stream: &mut R) -> String {
+        let mut request = Vec::new();
+        let mut chunk = [0_u8; 1024];
+        let mut header_end = None;
+        let mut content_length = 0_usize;
+
+        loop {
+            let read = stream.read(&mut chunk).expect("read request");
+            if read == 0 {
+                break;
+            }
+            request.extend_from_slice(&chunk[..read]);
+            if header_end.is_none() {
+                header_end = find_header_end(&request);
+                if let Some(end) = header_end {
+                    content_length = parse_content_length(&request[..end]);
+                }
+            }
+            if let Some(end) = header_end {
+                if request.len() >= end + content_length {
+                    break;
+                }
+            }
+        }
+
+        String::from_utf8(request).expect("request should be valid UTF-8")
+    }
+
+    fn find_header_end(request: &[u8]) -> Option<usize> {
+        request
+            .windows(4)
+            .position(|window| window == b"\r\n\r\n")
+            .map(|position| position + 4)
+    }
+
+    fn parse_content_length(headers: &[u8]) -> usize {
+        String::from_utf8_lossy(headers)
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                if name.eq_ignore_ascii_case("content-length") {
+                    value.trim().parse::<usize>().ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0)
+    }
+
+    fn parse_json_request(request: &str) -> Value {
+        let body = request
+            .split_once("\r\n\r\n")
+            .map(|(_, body)| body)
+            .unwrap_or_default();
+        serde_json::from_str(body).expect("request body should be JSON")
+    }
+
+    fn write_http_json_response<W: Write>(stream: &mut W, status: u16, body: &Value) {
+        let body_text = body.to_string();
+        let response = format!(
+            "HTTP/1.1 {status} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            http_status_text(status),
+            body_text.len(),
+            body_text
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write mock response");
+    }
+
+    fn http_status_text(status: u16) -> &'static str {
+        match status {
+            200 => "OK",
+            500 => "Internal Server Error",
+            _ => "Unknown",
+        }
+    }
+
+    #[test]
+    fn parse_hex_u64_accepts_and_rejects_expected_values() {
+        assert_eq!(parse_hex_u64("0x2a").expect("hex should parse"), 42);
+        let error = parse_hex_u64("nope").expect_err("bad hex should fail");
+        assert!(matches!(error, SettlementError::Rpc(_)));
+    }
+
+    #[test]
+    fn recovery_action_mapping_covers_terminal_states() {
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::AwaitingConfirmations,
+                Web3SettlementLifecycleState::Settled,
+            ),
+            Some(SettlementRecoveryAction::WaitForConfirmations)
+        );
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::AwaitingDisputeWindow,
+                Web3SettlementLifecycleState::Settled,
+            ),
+            Some(SettlementRecoveryAction::WaitForDisputeWindow)
+        );
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::Reorged,
+                Web3SettlementLifecycleState::Settled,
+            ),
+            Some(SettlementRecoveryAction::ResubmitAfterReorg)
+        );
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::Finalized,
+                Web3SettlementLifecycleState::Failed,
+            ),
+            Some(SettlementRecoveryAction::RetrySubmission)
+        );
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::Finalized,
+                Web3SettlementLifecycleState::TimedOut,
+            ),
+            Some(SettlementRecoveryAction::ExecuteRefund)
+        );
+        assert_eq!(
+            recovery_action_for_projection(
+                SettlementFinalityStatus::Finalized,
+                Web3SettlementLifecycleState::Settled,
+            ),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_for_receipt_awaits_confirmations() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({ "number": "0x69" })),
+            rpc_result(json!({ "hash": "0xaaa" })),
+        ]);
+        let config = sample_config(server.base_url());
+        let receipt = sample_receipt(100, "0xaaa", 1_700_000_000);
+
+        let assessment = inspect_finality_for_receipt(&config, &receipt, 500_000, None)
+            .await
+            .expect("assessment should succeed");
+
+        let requests = server.requests();
+        server.join();
+
+        assert_eq!(
+            assessment.status,
+            SettlementFinalityStatus::AwaitingConfirmations
+        );
+        assert_eq!(assessment.required_confirmations, 12);
+        assert_eq!(assessment.current_confirmations, 6);
+        assert_eq!(assessment.dispute_window_secs, 14_400);
+        assert_eq!(requests[0]["method"], "eth_getBlockByNumber");
+        assert_eq!(requests[1]["method"], "eth_getBlockByNumber");
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_for_receipt_awaits_dispute_window() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({ "number": "0x78" })),
+            rpc_result(json!({ "hash": "0xaaa" })),
+        ]);
+        let config = sample_config(server.base_url());
+        let receipt = sample_receipt(100, "0xaaa", 1_700_000_000);
+
+        let assessment =
+            inspect_finality_for_receipt(&config, &receipt, 500_000, Some(1_700_010_000))
+                .await
+                .expect("assessment should succeed");
+
+        server.join();
+
+        assert_eq!(
+            assessment.status,
+            SettlementFinalityStatus::AwaitingDisputeWindow
+        );
+        assert_eq!(assessment.current_confirmations, 21);
+        assert_eq!(assessment.dispute_window_closes_at, 1_700_014_400);
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_for_receipt_finalizes_after_dispute_window() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({ "number": "0x78" })),
+            rpc_result(json!({ "hash": "0xaaa" })),
+        ]);
+        let config = sample_config(server.base_url());
+        let receipt = sample_receipt(100, "0xaaa", 1_700_000_000);
+
+        let assessment =
+            inspect_finality_for_receipt(&config, &receipt, 500_000, Some(1_700_020_000))
+                .await
+                .expect("assessment should succeed");
+
+        server.join();
+
+        assert_eq!(assessment.status, SettlementFinalityStatus::Finalized);
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_for_receipt_marks_reorgs_for_hash_mismatch_or_missing_block() {
+        let mismatch_server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({ "number": "0x78" })),
+            rpc_result(json!({ "hash": "0xbbb" })),
+        ]);
+        let mismatch_config = sample_config(mismatch_server.base_url());
+        let receipt = sample_receipt(100, "0xaaa", 1_700_000_000);
+
+        let mismatch =
+            inspect_finality_for_receipt(&mismatch_config, &receipt, 500_000, Some(1_700_020_000))
+                .await
+                .expect("assessment should succeed");
+        mismatch_server.join();
+        assert_eq!(mismatch.status, SettlementFinalityStatus::Reorged);
+
+        let missing_server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({ "number": "0x78" })),
+            rpc_result(Value::Null),
+        ]);
+        let missing_config = sample_config(missing_server.base_url());
+        let missing =
+            inspect_finality_for_receipt(&missing_config, &receipt, 500_000, Some(1_700_020_000))
+                .await
+                .expect("assessment should succeed");
+        missing_server.join();
+        assert_eq!(missing.status, SettlementFinalityStatus::Reorged);
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_fetches_receipt_and_timestamp() {
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!({
+                "blockHash": "0xabc",
+                "blockNumber": "0x64",
+                "status": "0x1",
+                "gasUsed": "0x5208",
+                "from": "0x1000000000000000000000000000000000000001",
+                "to": "0x1000000000000000000000000000000000000002",
+                "logs": []
+            })),
+            rpc_result(json!({
+                "timestamp": "0x6553f100"
+            })),
+            rpc_result(json!({ "number": "0x64" })),
+            rpc_result(json!({ "hash": "0xabc" })),
+        ]);
+        let config = sample_config(server.base_url());
+
+        let (receipt, assessment) =
+            inspect_finality(&config, "0xdeadbeef", 50_000, Some(1_700_004_000))
+                .await
+                .expect("finality inspection should succeed");
+
+        let requests = server.requests();
+        server.join();
+
+        assert_eq!(receipt.tx_hash, "0xdeadbeef");
+        assert_eq!(receipt.block_number, 100);
+        assert_eq!(receipt.block_hash, "0xabc");
+        assert_eq!(receipt.gas_used, 21_000);
+        assert_eq!(receipt.observed_at, 1_700_000_000);
+        assert_eq!(assessment.status, SettlementFinalityStatus::Finalized);
+        assert_eq!(assessment.required_confirmations, 1);
+        assert_eq!(requests[0]["method"], "eth_getTransactionReceipt");
+        assert_eq!(requests[1]["method"], "eth_getBlockByHash");
+        assert_eq!(requests[2]["method"], "eth_getBlockByNumber");
+        assert_eq!(requests[3]["method"], "eth_getBlockByNumber");
+    }
+
+    #[tokio::test]
+    async fn inspect_finality_for_receipt_surfaces_rpc_errors_and_missing_fields() {
+        let error_server = MockJsonRpcServer::spawn(vec![rpc_error(-32000, "boom")]);
+        let error_config = sample_config(error_server.base_url());
+        let receipt = sample_receipt(100, "0xaaa", 1_700_000_000);
+        let error = inspect_finality_for_receipt(&error_config, &receipt, 500_000, None)
+            .await
+            .expect_err("RPC error should fail");
+        error_server.join();
+        assert!(matches!(error, SettlementError::Rpc(_)));
+
+        let missing_field_server =
+            MockJsonRpcServer::spawn(vec![rpc_result(json!({ "hash": "0xaaa" }))]);
+        let missing_field_config = sample_config(missing_field_server.base_url());
+        let error = inspect_finality_for_receipt(&missing_field_config, &receipt, 500_000, None)
+            .await
+            .expect_err("missing block number should fail");
+        missing_field_server.join();
+        assert!(error.to_string().contains("latest block missing number"));
+    }
+
+    #[tokio::test]
+    async fn project_escrow_execution_receipt_projects_timed_out_refund() {
+        let dispatch = sample_dispatch();
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcEscrow::getEscrowCall::abi_encode_returns(&IArcEscrow::getEscrowReturn {
+                    terms: IArcEscrow::EscrowTerms {
+                        capabilityId: B256::from([0x11; 32]),
+                        depositor: Address::from_str("0x1000000000000000000000000000000000000001",)
+                            .unwrap(),
+                        beneficiary: Address::from_str(
+                            "0x1000000000000000000000000000000000000002",
+                        )
+                        .unwrap(),
+                        token: Address::from_str("0x1000000000000000000000000000000000000003",)
+                            .unwrap(),
+                        maxAmount: U256::from(1_500_000_u64),
+                        deadline: U256::from(1_700_003_000_u64),
+                        operator: Address::from_str("0x1000000000000000000000000000000000000004",)
+                            .unwrap(),
+                        operatorKeyHash: B256::from([0x22; 32]),
+                    },
+                    deposited: U256::from(1_500_000_u64),
+                    released: U256::from(250_000_u64),
+                    refunded: true,
+                })
+            ))),
+            rpc_result(json!({
+                "blockHash": "0xabc",
+                "blockNumber": "0x64",
+                "status": "0x1",
+                "gasUsed": "0x5208",
+                "from": "0x1000000000000000000000000000000000000001",
+                "to": "0x1000000000000000000000000000000000000002",
+                "logs": []
+            })),
+            rpc_result(json!({
+                "timestamp": "0x6553f100"
+            })),
+            rpc_result(json!({ "number": "0x64" })),
+            rpc_result(json!({ "hash": "0xabc" })),
+        ]);
+        let config = sample_config(server.base_url());
+
+        let projection = project_escrow_execution_receipt(
+            &config,
+            ExecutionProjectionInput {
+                dispatch: &dispatch,
+                tx_hash: "0xdeadbeef",
+                execution_receipt_id: "exec-1".to_string(),
+                settlement_reference: "settlement-1".to_string(),
+                observed_at: Some(1_700_004_000),
+                observed_amount: dispatch.settlement_amount.clone(),
+                anchor_proof: None,
+                oracle_evidence: None,
+                failure_reason: None,
+                reversal_of: None,
+                note: Some("timed out".to_string()),
+            },
+        )
+        .await
+        .expect("projection should succeed");
+
+        server.join();
+
+        assert_eq!(
+            projection.receipt.lifecycle_state,
+            Web3SettlementLifecycleState::TimedOut
+        );
+        assert_eq!(
+            projection.receipt.failure_reason.as_deref(),
+            Some("escrow refunded after deadline")
+        );
+        assert_eq!(projection.receipt.settled_amount.units, 125);
+        assert_eq!(
+            projection.recovery_action,
+            Some(SettlementRecoveryAction::ExecuteRefund)
+        );
+        assert!(projection.escrow_snapshot.refunded);
+    }
+
+    #[tokio::test]
+    async fn project_escrow_execution_receipt_projects_partial_settlement() {
+        let dispatch = sample_dispatch();
+        let server = MockJsonRpcServer::spawn(vec![
+            rpc_result(json!(encode_hex(
+                IArcEscrow::getEscrowCall::abi_encode_returns(&IArcEscrow::getEscrowReturn {
+                    terms: IArcEscrow::EscrowTerms {
+                        capabilityId: B256::from([0x33; 32]),
+                        depositor: Address::from_str("0x1000000000000000000000000000000000000001",)
+                            .unwrap(),
+                        beneficiary: Address::from_str(
+                            "0x1000000000000000000000000000000000000002",
+                        )
+                        .unwrap(),
+                        token: Address::from_str("0x1000000000000000000000000000000000000003",)
+                            .unwrap(),
+                        maxAmount: U256::from(1_500_000_u64),
+                        deadline: U256::from(1_700_050_000_u64),
+                        operator: Address::from_str("0x1000000000000000000000000000000000000004",)
+                            .unwrap(),
+                        operatorKeyHash: B256::from([0x44; 32]),
+                    },
+                    deposited: U256::from(1_500_000_u64),
+                    released: U256::from(750_000_u64),
+                    refunded: false,
+                })
+            ))),
+            rpc_result(json!({
+                "blockHash": "0xabc",
+                "blockNumber": "0x64",
+                "status": "0x1",
+                "gasUsed": "0x5208",
+                "from": "0x1000000000000000000000000000000000000001",
+                "to": "0x1000000000000000000000000000000000000002",
+                "logs": []
+            })),
+            rpc_result(json!({
+                "timestamp": "0x6553f100"
+            })),
+            rpc_result(json!({ "number": "0x78" })),
+            rpc_result(json!({ "hash": "0xabc" })),
+        ]);
+        let config = sample_config(server.base_url());
+
+        let projection = project_escrow_execution_receipt(
+            &config,
+            ExecutionProjectionInput {
+                dispatch: &dispatch,
+                tx_hash: "0xfeedbeef",
+                execution_receipt_id: "exec-2".to_string(),
+                settlement_reference: "settlement-2".to_string(),
+                observed_at: Some(1_700_001_000),
+                observed_amount: arc_core::capability::MonetaryAmount {
+                    units: dispatch.settlement_amount.units / 2,
+                    currency: dispatch.settlement_amount.currency.clone(),
+                },
+                anchor_proof: None,
+                oracle_evidence: None,
+                failure_reason: Some("partial release".to_string()),
+                reversal_of: None,
+                note: None,
+            },
+        )
+        .await
+        .expect("projection should succeed");
+
+        server.join();
+
+        assert_eq!(
+            projection.receipt.lifecycle_state,
+            Web3SettlementLifecycleState::PartiallySettled
+        );
+        assert_eq!(
+            projection.receipt.failure_reason.as_deref(),
+            Some("partial release")
+        );
+        assert_eq!(
+            projection.finality.status,
+            SettlementFinalityStatus::Finalized
+        );
+        assert_eq!(projection.recovery_action, None);
+        assert!(!projection.escrow_snapshot.refunded);
+    }
+
+    #[tokio::test]
+    async fn observe_bond_classifies_statuses_and_recovery_actions() {
+        let cases = [
+            (false, false, 0_u64, BondLifecycleStatus::Active, None),
+            (
+                true,
+                false,
+                0_u64,
+                BondLifecycleStatus::Released,
+                Some(SettlementRecoveryAction::ManualReview),
+            ),
+            (
+                false,
+                false,
+                5_u64,
+                BondLifecycleStatus::Impaired,
+                Some(SettlementRecoveryAction::ManualReview),
+            ),
+            (false, true, 0_u64, BondLifecycleStatus::Expired, None),
+        ];
+
+        for (released, expired, slashed_minor_units, expected_status, expected_recovery) in cases {
+            let server = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
+                IArcBondVault::getBondCall::abi_encode_returns(&IArcBondVault::getBondReturn {
+                    terms: IArcBondVault::BondTerms {
+                        bondId: B256::from([0x55; 32]),
+                        facilityId: B256::from([0x66; 32]),
+                        principal: Address::from_str("0x1000000000000000000000000000000000000001",)
+                            .unwrap(),
+                        token: Address::from_str("0x1000000000000000000000000000000000000002",)
+                            .unwrap(),
+                        collateralAmount: U256::from(1_000_u64),
+                        reserveRequirementAmount: U256::from(250_u64),
+                        expiresAt: U256::from(1_700_100_000_u64),
+                        reserveRequirementRatioBps: 2_500_u16,
+                        operator: Address::from_str("0x1000000000000000000000000000000000000003",)
+                            .unwrap(),
+                    },
+                    lockedAmount: U256::from(1_000_u64),
+                    slashedAmount: U256::from(slashed_minor_units),
+                    released,
+                    expired,
+                })
+            )))]);
+            let config = sample_config(server.base_url());
+
+            let observation = observe_bond(
+                &config,
+                "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            )
+            .await
+            .expect("bond observation should succeed");
+
+            server.join();
+
+            assert_eq!(observation.status, expected_status);
+            assert_eq!(observation.recovery_action, expected_recovery);
+        }
+    }
+}

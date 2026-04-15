@@ -51,6 +51,8 @@ func Protect(handler http.Handler, opts ...Option) http.Handler
 ```
 
 Allowed requests proceed with an `X-Arc-Receipt-Id` response header. Denied requests receive a structured JSON error response.
+Fail-open passthroughs proceed without that header and expose an explicit
+`ArcPassthrough` marker on the request context.
 
 ### Request Flow
 
@@ -112,10 +114,20 @@ Control behavior when the sidecar is unreachable.
 | Value | Behavior |
 |-------|----------|
 | `"deny"` | Fail-closed (default). Return 502 error. |
-| `"allow"` | Fail-open. Forward request to inner handler. |
+| `"allow"` | Fail-open. Forward request to inner handler without attaching an ARC receipt header. |
 
 ```go
 arc.WithOnSidecarError("allow")  // fail-open
+```
+
+Retrieve the explicit degraded-state marker inside a handler:
+
+```go
+func handler(w http.ResponseWriter, r *http.Request) {
+	if passthrough, ok := arc.GetArcPassthrough(r); ok {
+		log.Printf("ARC passthrough: %s (%s)", passthrough.Mode, passthrough.Error)
+	}
+}
 ```
 
 **`WithIdentityExtractor(fn IdentityExtractorFunc)`**
@@ -221,7 +233,7 @@ type HTTPReceipt struct {
 	SessionID          string          `json:"session_id,omitempty"`
 	Verdict            Verdict         `json:"verdict"`
 	Evidence           []GuardEvidence `json:"evidence,omitempty"`
-	ResponseStatus     int             `json:"response_status"`
+	ResponseStatus     int             `json:"response_status"` // ARC evaluation-time HTTP status; allow receipts may be signed before downstream response completion.
 	Timestamp          int64           `json:"timestamp"`
 	ContentHash        string          `json:"content_hash"`
 	PolicyHash         string          `json:"policy_hash"`

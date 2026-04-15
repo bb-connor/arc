@@ -1,0 +1,11 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 5
+
+capabilities:
+  default:
+    tools:
+      - server: "*"
+        tool: "*"
+        operations: [invoke]
+        ttl: 900

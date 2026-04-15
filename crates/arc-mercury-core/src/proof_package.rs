@@ -310,19 +310,31 @@ pub struct MercuryInquiryPackage {
     pub proof_package: MercuryProofPackage,
 }
 
+#[derive(Debug, Clone)]
+pub struct MercuryInquiryPackageArgs {
+    pub created_at: u64,
+    pub audience: String,
+    pub redaction_profile: Option<String>,
+    pub rendered_export: serde_json::Value,
+    pub disclosure: MercuryDisclosurePolicy,
+    pub approval_state: MercuryApprovalState,
+    pub verifier_equivalent: bool,
+}
+
 impl MercuryInquiryPackage {
-    #[allow(clippy::too_many_arguments)]
     pub fn build(
         proof_package: MercuryProofPackage,
-        created_at: u64,
-        audience: impl Into<String>,
-        redaction_profile: Option<String>,
-        rendered_export: serde_json::Value,
-        disclosure: MercuryDisclosurePolicy,
-        approval_state: MercuryApprovalState,
-        verifier_equivalent: bool,
+        args: MercuryInquiryPackageArgs,
     ) -> Result<Self, MercuryContractError> {
-        let audience = audience.into();
+        let MercuryInquiryPackageArgs {
+            created_at,
+            audience,
+            redaction_profile,
+            rendered_export,
+            disclosure,
+            approval_state,
+            verifier_equivalent,
+        } = args;
         let rendered_export_sha256 =
             sha256_hex(&canonical_json(&rendered_export, "rendered_export")?);
         let inquiry_id = build_hash_id(
@@ -740,17 +752,19 @@ mod tests {
         let metadata = proof_package.receipt_records[0].metadata.clone();
         let inquiry = MercuryInquiryPackage::build(
             proof_package,
-            1_775_137_901,
-            "compliance",
-            Some("internal-default".to_string()),
-            serde_json::json!({
-                "workflowId": "workflow-release-control",
-                "receiptIds": ["receipt-proof-1"],
-                "audience": "compliance",
-            }),
-            metadata.disclosure,
-            metadata.approval_state,
-            false,
+            MercuryInquiryPackageArgs {
+                created_at: 1_775_137_901,
+                audience: "compliance".to_string(),
+                redaction_profile: Some("internal-default".to_string()),
+                rendered_export: serde_json::json!({
+                    "workflowId": "workflow-release-control",
+                    "receiptIds": ["receipt-proof-1"],
+                    "audience": "compliance",
+                }),
+                disclosure: metadata.disclosure,
+                approval_state: metadata.approval_state,
+                verifier_equivalent: false,
+            },
         )
         .expect("inquiry package");
 

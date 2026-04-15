@@ -1,0 +1,29 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["ef74ba40e10fa2db.olean"],
+  "i": "4b535e9fbfa5d109.ilean",
+  "c": "f7be91d76e584e76.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean /Users/connor/.elan/toolchains/leanprover--lean4---v4.28.0-rc1/bin/lean /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Pact/Core/Revocation.lean -o /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Revocation.olean -i /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Revocation.ilean -c /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Pact/Core/Revocation.c --setup /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Pact/Core/Revocation.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["Pact.Core.Revocation:deps",
+   [["deps",
+     [["arc/Pact:extraDep", [["@arc:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["Arc.Core.Capability transitive imports (legacy)", "427ed88e77bcfc91"],
+        ["Arc.Core.Capability:importAllArts", "53005665e5c36730"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.28.0, commit 3b0f2862196c6a8af9eb0025ee650252694013dd",
+   "612345b87aa96642"],
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Pact/Core/Revocation.lean",
+   "1be2aabd010f54c5"],
+  ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "783bfcf1c0e9592b"}

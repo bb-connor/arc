@@ -17,7 +17,10 @@ sidecar protocol is defined in `spec/HTTP-SUBSTRATE.md`.
 
 A `tower::Layer` that wraps any Tower-compatible HTTP service with ARC
 capability validation and receipt signing. Works with Axum (HTTP) and
-Tonic (gRPC).
+Tower-compatible HTTP/2 services. The current body-binding qualification is
+strongest on replayable body types such as Axum's `Body`; the gRPC/Tonic lane
+is still exercised through the generic Tower/HTTP2 contract rather than a
+separate `tonic::body::Body` replay proof.
 
 ### API Surface
 
@@ -60,7 +63,9 @@ let layer = ArcLayer::from_evaluator(evaluator);
 - Evaluates each request against the ARC kernel policy
 - Safe methods (GET, HEAD, OPTIONS) are allowed with session-scoped receipts
 - Side-effect methods (POST, PUT, PATCH, DELETE) require a capability token
-  in the `X-Arc-Capability` header
+  in the `X-Arc-Capability` header or `arc_capability` query parameter
+- Buffers and hashes raw request bytes for replayable body types before
+  evaluation, preserving the original bytes for downstream handlers
 - Signs an `HttpReceipt` for every request (allow or deny)
 - Attaches the receipt ID as the `X-Arc-Receipt-Id` response header
 
@@ -104,7 +109,7 @@ pod deployment time and optionally injects the ARC sidecar container.
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| Validating webhook | `webhooks/validating-webhook.yaml` | Rejects pods without ARC capability annotations |
+| Validating webhook | `webhooks/validating-webhook.yaml` | Rejects pods without trusted ARC capability tokens |
 | Mutating webhook | `webhooks/mutating-webhook.yaml` | Injects the `arc-sidecar` container into annotated pods |
 | ArcPolicy CRD | `crds/arcpolicy-crd.yaml` | Namespace-scoped policy defining required scopes and sidecar config |
 | Controller | `controller/main.go` | Go binary serving `/validate` and `/mutate` endpoints |
@@ -113,7 +118,12 @@ pod deployment time and optionally injects the ARC sidecar container.
 
 The validating webhook rejects pods that lack the required
 `arc.backbay.io/capability-token` annotation, unless the pod carries an
-explicit `arc.backbay.io/exempt: "true"` exemption.
+explicit `arc.backbay.io/exempt: "true"` exemption. Presented tokens are
+parsed as ARC capability tokens, verified cryptographically, checked for time
+validity, and matched against any required scopes before the pod is allowed.
+The controller only trusts issuers configured through
+`ARC_TRUSTED_ISSUER_KEY` or `ARC_TRUSTED_ISSUER_KEYS` (comma-separated for key
+rotation). If neither is configured, non-exempt pods fail closed.
 
 The webhook is scoped to namespaces with the `arc.backbay.io/enforce: "true"`
 label. It runs on pod CREATE and UPDATE operations.
@@ -128,14 +138,39 @@ and proxies HTTP traffic through the ARC kernel on port 9090.
 
 | Annotation | Required | Description |
 |------------|----------|-------------|
-| `arc.backbay.io/capability-token` | Yes (unless exempt) | ARC capability token for the workload |
-| `arc.backbay.io/required-scopes` | No | Comma-separated required ARC scopes |
+| `arc.backbay.io/capability-token` | Yes (unless exempt) | ARC capability token for the workload, signed by a controller-trusted ARC issuer |
+| `arc.backbay.io/required-scopes` | No | Comma-separated required ARC scopes using the grammar below |
 | `arc.backbay.io/exempt` | No | Set to `"true"` to skip capability validation |
 | `arc.backbay.io/inject` | No | Set to `"true"` to trigger sidecar injection |
 | `arc.backbay.io/sidecar-image` | No | Override the default sidecar image (default: `ghcr.io/backbay-labs/arc:latest`) |
 | `arc.backbay.io/upstream` | No | Upstream URL the sidecar proxies to (default: `http://127.0.0.1:8080`) |
 | `arc.backbay.io/spec-path` | No | Path to the OpenAPI spec file inside the pod |
 | `arc.backbay.io/receipt-store` | No | Receipt storage backend URI |
+
+### Required Scope Grammar
+
+Prefer explicit forms:
+
+- `tool:<server_id>:<tool_name>:<operation>`
+- `resource:<uri_pattern>:<operation>`
+- `prompt:<prompt_name>:<operation>`
+
+Supported operations are `invoke`, `read`, `read_result`, `subscribe`, `get`,
+and `delegate`, plus operator-friendly aliases such as `call`, `exec`,
+`execute`, and `watch`. The controller also accepts a legacy shorthand
+`<tool_name>:<verb>` for tool-oriented policy, mapping `read`/`write` style
+verbs onto tool invocation.
+
+### Trust Anchor Configuration
+
+Set one of these environment variables on the admission controller deployment:
+
+- `ARC_TRUSTED_ISSUER_KEY`: a single hex-encoded Ed25519 public key for the
+  ARC authority that signs workload capability tokens
+- `ARC_TRUSTED_ISSUER_KEYS`: a comma-separated list of trusted issuer keys for
+  rotation or multi-authority deployments
+
+If both are present, the controller trusts the union of those keys.
 
 ### ArcPolicy CRD
 
@@ -149,8 +184,8 @@ metadata:
   namespace: my-app
 spec:
   requiredScopes:
-    - "db:read"
-    - "api:write"
+    - "tool:*:db:invoke"
+    - "tool:*:deploy:invoke"
   selector:
     matchLabels:
       app: my-service
@@ -217,7 +252,7 @@ The `ArcProperties` class maps the `arc.*` prefix:
 |----------|------|---------|-------------|
 | `arc.sidecar-url` | String | `ARC_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
 | `arc.timeout-seconds` | Long | 5 | HTTP timeout for sidecar calls |
-| `arc.on-sidecar-error` | String | `deny` | `deny` (fail-closed) or `allow` (fail-open) |
+| `arc.on-sidecar-error` | String | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without ARC receipt) |
 | `arc.enabled` | Boolean | true | Enable/disable ARC protection |
 | `arc.url-patterns` | List | `["/*"]` | URL patterns to protect |
 | `arc.filter-order` | Int | 1 | Servlet filter ordering |
@@ -228,7 +263,7 @@ The `ArcFilter` is a standard Jakarta Servlet `Filter` that:
 
 1. Extracts caller identity from request headers
 2. Resolves the route pattern
-3. Hashes the request body (SHA-256)
+3. Hashes the raw request body bytes (SHA-256) while preserving the body for downstream handlers
 4. Builds an `ArcHttpRequest` and sends it to `POST /arc/evaluate`
 5. Attaches `X-Arc-Receipt-Id` to the response
 6. Returns a structured JSON error on deny (403) or sidecar failure (502)
@@ -292,7 +327,7 @@ app.Run();
 |----------|------|---------|-------------|
 | `SidecarUrl` | string | `ARC_SIDECAR_URL` env or `http://127.0.0.1:9090` | Sidecar kernel URL |
 | `TimeoutSeconds` | int | 5 | HTTP timeout for sidecar calls |
-| `OnSidecarError` | string | `deny` | `deny` (fail-closed) or `allow` (fail-open) |
+| `OnSidecarError` | string | `deny` | `deny` (fail-closed) or `allow` (fail-open passthrough without ARC receipt) |
 | `IdentityExtractor` | delegate | Header-based extraction | Custom identity extraction function |
 | `RouteResolver` | delegate | Raw path passthrough | Custom route pattern resolver |
 
@@ -308,7 +343,7 @@ app.Run();
 1. Validates the HTTP method
 2. Extracts caller identity (Bearer token, API key, or custom extractor)
 3. Resolves the route pattern
-4. Hashes the request body (SHA-256) with buffering enabled
+4. Hashes the raw request body bytes (SHA-256) with buffering enabled
 5. Sends an `ArcHttpRequest` to `POST /arc/evaluate` on the sidecar
 6. Attaches `X-Arc-Receipt-Id` to the response
 7. Returns structured JSON errors on deny (403) or sidecar failure (502)
@@ -338,18 +373,28 @@ All four platform SDKs share the same operational model:
 
 2. **Fail-closed by default.** If the sidecar is unreachable or returns an
    error, the request is denied. Fail-open mode is available as an explicit
-   opt-in for each SDK.
+   opt-in for each SDK, but it forwards the request without ARC evidence and
+   exposes explicit passthrough state instead of synthesizing a receipt.
 
 3. **Receipt attachment.** Every evaluated request (allow or deny) produces a
    signed receipt. The receipt ID is attached as `X-Arc-Receipt-Id` on the
-   HTTP response.
+   HTTP response. Fail-open passthroughs do not attach a synthetic receipt.
 
-4. **Identity extraction.** Each SDK extracts caller identity from standard
+4. **Degraded-state visibility.** Representative SDKs expose a receiptless
+   passthrough marker on the request/context surface:
+   `req.arcPassthrough` (TypeScript Express), `arc.GetArcPassthrough(r)` (Go),
+   `request.state.arc_passthrough` or `request.arc_passthrough` (Python),
+   Servlet request attribute `arcPassthrough` (JVM), and
+   `HttpContext.Items["ArcPassthrough"]` (.NET).
+
+5. **Identity extraction.** Each SDK extracts caller identity from standard
    HTTP headers (Authorization, X-Api-Key, etc.) and supports custom
    extractors for application-specific identity models.
 
-5. **Capability header.** Side-effect methods (POST, PUT, PATCH, DELETE) require
-   a capability token in the `X-Arc-Capability` request header. Safe methods
-   (GET, HEAD, OPTIONS) are allowed with session-scoped audit receipts.
+6. **Capability presentation.** Side-effect methods (POST, PUT, PATCH,
+   DELETE) require a valid capability token presented in the
+   `X-Arc-Capability` request header or the `arc_capability` query
+   parameter. Safe methods (GET, HEAD, OPTIONS) are allowed with
+   session-scoped audit receipts.
 
 For the normative sidecar evaluation protocol, see `spec/HTTP-SUBSTRATE.md`.

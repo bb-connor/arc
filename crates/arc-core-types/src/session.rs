@@ -357,6 +357,29 @@ pub struct SessionAuthContext {
     pub origin: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuthBearerSessionAuthInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scopes: Vec<String>,
+    #[serde(default)]
+    pub federated_claims: OAuthBearerFederatedClaims,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enterprise_identity: Option<EnterpriseIdentityContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+}
+
 impl SessionAuthContext {
     pub fn in_process_anonymous() -> Self {
         Self {
@@ -398,44 +421,33 @@ impl SessionAuthContext {
         token_fingerprint: Option<String>,
         origin: Option<String>,
     ) -> Self {
-        Self::streamable_http_oauth_bearer_with_claims(
+        Self::streamable_http_oauth_bearer_with_claims(OAuthBearerSessionAuthInput {
             principal,
             issuer,
             subject,
             audience,
             scopes,
-            OAuthBearerFederatedClaims::default(),
-            None,
+            federated_claims: OAuthBearerFederatedClaims::default(),
+            enterprise_identity: None,
             token_fingerprint,
             origin,
-        )
+        })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn streamable_http_oauth_bearer_with_claims(
-        principal: Option<String>,
-        issuer: Option<String>,
-        subject: Option<String>,
-        audience: Option<String>,
-        scopes: Vec<String>,
-        federated_claims: OAuthBearerFederatedClaims,
-        enterprise_identity: Option<EnterpriseIdentityContext>,
-        token_fingerprint: Option<String>,
-        origin: Option<String>,
-    ) -> Self {
+    pub fn streamable_http_oauth_bearer_with_claims(input: OAuthBearerSessionAuthInput) -> Self {
         Self {
             transport: SessionTransport::StreamableHttp,
             method: SessionAuthMethod::OAuthBearer {
-                principal,
-                issuer,
-                subject,
-                audience,
-                scopes,
-                federated_claims,
-                enterprise_identity,
-                token_fingerprint,
+                principal: input.principal,
+                issuer: input.issuer,
+                subject: input.subject,
+                audience: input.audience,
+                scopes: input.scopes,
+                federated_claims: input.federated_claims,
+                enterprise_identity: input.enterprise_identity,
+                token_fingerprint: input.token_fingerprint,
             },
-            origin,
+            origin: input.origin,
         }
     }
 
@@ -1588,41 +1600,43 @@ mod tests {
     #[test]
     fn oauth_session_auth_context_roundtrips_with_federated_claims() {
         let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-            Some("oidc:https://issuer.example#sub:user-123".to_string()),
-            Some("https://issuer.example".to_string()),
-            Some("user-123".to_string()),
-            Some("arc-mcp".to_string()),
-            vec!["mcp:invoke".to_string()],
-            OAuthBearerFederatedClaims {
-                client_id: Some("client-abc".to_string()),
-                object_id: Some("object-123".to_string()),
-                tenant_id: Some("tenant-123".to_string()),
-                organization_id: Some("org-789".to_string()),
-                groups: vec!["eng".to_string(), "ops".to_string()],
-                roles: vec!["operator".to_string()],
+            OAuthBearerSessionAuthInput {
+                principal: Some("oidc:https://issuer.example#sub:user-123".to_string()),
+                issuer: Some("https://issuer.example".to_string()),
+                subject: Some("user-123".to_string()),
+                audience: Some("arc-mcp".to_string()),
+                scopes: vec!["mcp:invoke".to_string()],
+                federated_claims: OAuthBearerFederatedClaims {
+                    client_id: Some("client-abc".to_string()),
+                    object_id: Some("object-123".to_string()),
+                    tenant_id: Some("tenant-123".to_string()),
+                    organization_id: Some("org-789".to_string()),
+                    groups: vec!["eng".to_string(), "ops".to_string()],
+                    roles: vec!["operator".to_string()],
+                },
+                enterprise_identity: Some(EnterpriseIdentityContext {
+                    provider_id: "provider-1".to_string(),
+                    provider_record_id: Some("provider-1".to_string()),
+                    provider_kind: "oidc_jwks".to_string(),
+                    federation_method: EnterpriseFederationMethod::Jwt,
+                    principal: "oidc:https://issuer.example#sub:user-123".to_string(),
+                    subject_key: "subject-key-123".to_string(),
+                    client_id: Some("client-abc".to_string()),
+                    object_id: Some("object-123".to_string()),
+                    tenant_id: Some("tenant-123".to_string()),
+                    organization_id: Some("org-789".to_string()),
+                    groups: vec!["eng".to_string(), "ops".to_string()],
+                    roles: vec!["operator".to_string()],
+                    source_subject: Some("user-123".to_string()),
+                    attribute_sources: BTreeMap::from([
+                        ("principal".to_string(), "sub".to_string()),
+                        ("groups".to_string(), "groups".to_string()),
+                    ]),
+                    trust_material_ref: Some("jwks:primary".to_string()),
+                }),
+                token_fingerprint: Some("cafebabe".to_string()),
+                origin: Some("http://localhost:3000".to_string()),
             },
-            Some(EnterpriseIdentityContext {
-                provider_id: "provider-1".to_string(),
-                provider_record_id: Some("provider-1".to_string()),
-                provider_kind: "oidc_jwks".to_string(),
-                federation_method: EnterpriseFederationMethod::Jwt,
-                principal: "oidc:https://issuer.example#sub:user-123".to_string(),
-                subject_key: "subject-key-123".to_string(),
-                client_id: Some("client-abc".to_string()),
-                object_id: Some("object-123".to_string()),
-                tenant_id: Some("tenant-123".to_string()),
-                organization_id: Some("org-789".to_string()),
-                groups: vec!["eng".to_string(), "ops".to_string()],
-                roles: vec!["operator".to_string()],
-                source_subject: Some("user-123".to_string()),
-                attribute_sources: BTreeMap::from([
-                    ("principal".to_string(), "sub".to_string()),
-                    ("groups".to_string(), "groups".to_string()),
-                ]),
-                trust_material_ref: Some("jwks:primary".to_string()),
-            }),
-            Some("cafebabe".to_string()),
-            Some("http://localhost:3000".to_string()),
         );
 
         assert!(auth.is_authenticated());

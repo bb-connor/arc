@@ -35,7 +35,7 @@ deterministic control.
   Agent Card, invoke with `SendMessage`, kernel runs guards and signs
   receipts.
 - **ACP capabilities.** Editor connects to `arc-acp-edge` over stdio;
-  each `session/prompt` triggers a kernel tool invocation with full
+  each authoritative `tool/invoke` triggers a kernel tool invocation with full
   capability validation.
 - **One tool, three surfaces.** Single `ToolManifest` loaded once, three
   edge crates translate it. Kernel is the single enforcement point.
@@ -58,7 +58,6 @@ pub struct A2aEdgeConfig {
     pub agent_version: String,
     pub base_url: String,
     pub security_schemes: Vec<A2aSecuritySchemeConfig>,
-    pub streaming_enabled: bool,
 }
 
 pub enum A2aSecuritySchemeConfig {
@@ -106,15 +105,17 @@ from config and registered skills. Served at
 
 | A2A Method | Edge Behavior |
 |------------|---------------|
-| `SendMessage` | Extract `targetSkillId`, resolve binding, build `ToolCallOperation`, submit to kernel, return A2A task |
-| `SendStreamingMessage` | Same, but open SSE; emit `task/status` (`working`), `task/artifact` per `ToolCallChunk`, `task/status` (`completed`/`failed`) |
-| `GetTask` | Look up task by ID, return current status |
-| `CancelTask` | Forward cancellation to the kernel session |
+| `SendMessage` | Extract `targetSkillId`, resolve binding, submit to the authoritative ARC path, return blocking A2A task/result payload |
+| `SendStreamingMessage` | Create a deferred authoritative task with `receiptPending = true` |
+| `GetTask` | Resolve a deferred task through the authoritative ARC path and return the terminal receipt-bearing task result |
+| `CancelTask` | Cancel a deferred task before execution |
 
-Kernel call path mirrors `arc-mcp-edge`: resolve binding, build
-`OperationContext` + `ToolCallOperation`, call
-`kernel.process_session_operation(...)`, translate
-`SessionOperationResponse` into A2A task JSON.
+The shipped authoritative A2A profile is now dual-surface: blocking
+`SendMessage` for immediate calls and deferred-task `SendStreamingMessage`
+plus `GetTask` / `CancelTask` for truthful lifecycle mediation without
+pretending push updates exist. Compatibility passthrough helpers remain
+explicitly non-authoritative and are compiled only when the crate's
+`compatibility-surface` feature is enabled.
 
 ### 2.5 Authentication
 
@@ -170,51 +171,26 @@ session ID, and auth context.
 
 | ACP Method | Edge Behavior |
 |------------|---------------|
-| `initialize` | Create kernel session, return agent info and capabilities |
-| `session/new` | Allocate `AcpEdgeSession`, return available commands |
-| `session/prompt` | Extract command + args, resolve binding, build `ToolCallOperation`, submit to kernel |
-| `session/request_permission` | Map ACP permission to ARC `Operation` + scope, call `kernel.check_capability(...)`, return granted/denied |
-| `session/cancel` | Forward cancellation to kernel session |
+| `session/list_capabilities` | Return the truthful authoritative ACP capability surface |
+| `session/request_permission` | Capability-aware preview only; does not imply receipt-bearing execution by itself |
+| `tool/invoke` | Blocking authoritative invocation path with ARC receipt metadata |
+| `tool/stream` | Create a deferred authoritative task with receipt-pending metadata |
+| `tool/cancel` | Cancel a deferred task before execution |
+| `tool/resume` | Resolve a deferred task through the authoritative ARC path and return the terminal result |
 
 ```rust
-impl ArcAcpEdge {
-    pub fn handle_acp_message(&mut self, message: Value) -> Option<Value> {
-        let method = message.get("method").and_then(Value::as_str)?;
-        let params = message.get("params").cloned().unwrap_or_else(|| json!({}));
-        let id = message.get("id").cloned();
-        match (id, method) {
-            (Some(id), "initialize") => Some(self.handle_initialize(id, params)),
-            (Some(id), "session/new") => Some(self.handle_session_new(id, params)),
-            (Some(id), "session/prompt") => Some(self.handle_session_prompt(id, params)),
-            (Some(id), "session/request_permission") =>
-                Some(self.handle_permission_request(id, params)),
-            (None, "session/cancel") => { self.handle_session_cancel(params); None }
-            _ => id.map(|id| jsonrpc_error(id, -32601, "method not found")),
-        }
-    }
-}
+The shipped authoritative ACP profile is now blocking `tool/invoke` plus a
+capability-aware preview surface and a deferred-task lifecycle via
+`tool/stream`, `tool/cancel`, and `tool/resume`. Compatibility passthrough
+helpers remain explicitly non-authoritative and are compiled only when the
+crate's `compatibility-surface` feature is enabled.
 ```
 
 ### 3.4 Session Update Notifications
 
-Each kernel response is emitted as an ACP `session/update` notification
-with `tool_call` events:
-
-```json
-{
-    "jsonrpc": "2.0",
-    "method": "session/update",
-    "params": {
-        "sessionId": "...",
-        "events": [{
-            "type": "tool_call",
-            "tool": "search_code",
-            "arguments": { "query": "..." },
-            "result": { "content": ["..."] }
-        }]
-    }
-}
-```
+The shipped authoritative ACP profile does not emit receipt-bearing
+`session/update` notifications. That richer lifecycle remains future work and
+must not be implied by the current edge surface.
 
 ### 3.5 Permission Gating
 
@@ -307,6 +283,21 @@ The registry and discovery surfaces should publish caveats alongside any
 `Adapted` tool rather than implying protocol equivalence where it does not
 exist.
 
+The current edge implementations now enforce this as runtime policy rather than
+just design guidance:
+
+- Shared semantic hints come from `x-arc-publish`,
+  `x-arc-approval-required`, `x-arc-streaming`, `x-arc-cancellation`, and
+  `x-arc-partial-output`.
+- `arc-a2a-edge` auto-publishes only `Lossless` and `Adapted` skills. Approval
+  and cancellation requirements are treated as `Unsupported`; side effects and
+  collated streaming/partial-output semantics are exposed as `Adapted`
+  caveats.
+- `arc-acp-edge` auto-publishes only `Lossless` and `Adapted` capabilities.
+  Browser projections and generic mutating tools are treated as
+  `Unsupported`; permission-preview, generic-tool-category, and collected
+  streaming semantics are exposed as `Adapted` caveats.
+
 This same discipline should apply to security claims. ARC should never present
 "discoverable on MCP" as equivalent to "governed across the full runtime path"
 when meaningful A2A, ACP, or native execution paths remain outside the same
@@ -380,10 +371,10 @@ signed observability to a second major runtime surface.
 
 | Phase | Scope |
 |-------|-------|
-| 1 | Agent Card generation + `SendMessage` (blocking) |
-| 2 | SSE streaming via `SendStreamingMessage` |
-| 3 | Task lifecycle (`GetTask`, `CancelTask`) |
-| 4 | Authentication scheme validation |
+| 1 | Agent Card generation + authoritative blocking `SendMessage` and deferred-task `SendStreamingMessage` |
+| 2 | Compatibility-surface isolation and truthful narrowing of unsupported streaming/task lifecycle |
+| 3 | Authentication scheme validation |
+| 4 | Future richer lifecycle only if the shared protocol fabric can support it honestly |
 
 ### `arc-acp-edge` second.
 
@@ -398,7 +389,7 @@ integration checkbox.
 
 | Phase | Scope |
 |-------|-------|
-| 1 | `initialize` + `session/new` + `session/prompt` (blocking) |
-| 2 | `session/update` streaming notifications |
-| 3 | `session/request_permission` backed by ARC capabilities |
-| 4 | Stdio transport with editor integration testing |
+| 1 | authoritative blocking `tool/invoke` plus deferred-task `tool/stream` / `tool/cancel` / `tool/resume` and `session/list_capabilities` / `session/request_permission` preview |
+| 2 | Compatibility-surface isolation so passthrough lifecycle behavior cannot be confused with the authoritative path |
+| 3 | Stdio/editor transport hardening over the authoritative blocking-plus-deferred-task profile |
+| 4 | Future richer lifecycle only if the shared protocol fabric can support it honestly |

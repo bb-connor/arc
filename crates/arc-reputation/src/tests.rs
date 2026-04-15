@@ -5,16 +5,16 @@ mod tests {
 
     #[test]
     fn capability_lineage_record_parses_scope_json() {
-        let record = CapabilityLineageRecord::from_scope_json(
-            "cap-1",
-            "agent-1",
-            "issuer-1",
-            10,
-            20,
-            r#"{"grants":[{"server_id":"srv","tool_name":"read","operations":["invoke"],"constraints":[],"max_invocations":10}],"resource_grants":[],"prompt_grants":[]}"#,
-            0,
-            None,
-        )
+        let record = CapabilityLineageRecord::from_scope_json(CapabilityLineageScopeJsonInput {
+            capability_id: "cap-1".to_string(),
+            subject_key: "agent-1".to_string(),
+            issuer_key: "issuer-1".to_string(),
+            issued_at: 10,
+            expires_at: 20,
+            scope_json: r#"{"grants":[{"server_id":"srv","tool_name":"read","operations":["invoke"],"constraints":[],"max_invocations":10}],"resource_grants":[],"prompt_grants":[]}"#,
+            delegation_depth: 0,
+            parent_capability_id: None,
+        })
         .unwrap();
 
         assert_eq!(record.scope.grants.len(), 1);

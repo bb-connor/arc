@@ -82,16 +82,16 @@ fn export_downstream_review(
     write_json_file(&internal_inquiry_path, &internal_inquiry)?;
     write_verification_report(&internal_inquiry_report_path, &internal_inquiry_report)?;
 
-    let internal_assurance = build_assurance_package(
-        &qualification_report.workflow_id,
-        MercuryAssuranceAudience::InternalReview,
-        "internal-review-default",
-        &relative_display(output, &proof_package_path)?,
-        &relative_display(output, &internal_inquiry_path)?,
-        &relative_display(output, &reviewer_package_path)?,
-        &relative_display(output, &qualification_report_path)?,
-        internal_inquiry_report.verifier_equivalent,
-    )?;
+    let internal_assurance = build_assurance_package(AssurancePackageArgs {
+        workflow_id: &qualification_report.workflow_id,
+        audience: MercuryAssuranceAudience::InternalReview,
+        disclosure_profile: "internal-review-default",
+        proof_package_file: &relative_display(output, &proof_package_path)?,
+        inquiry_package_file: &relative_display(output, &internal_inquiry_path)?,
+        reviewer_package_file: &relative_display(output, &reviewer_package_path)?,
+        qualification_report_file: &relative_display(output, &qualification_report_path)?,
+        verifier_equivalent: internal_inquiry_report.verifier_equivalent,
+    })?;
     let internal_assurance_path = internal_dir.join("assurance-package.json");
     write_json_file(&internal_assurance_path, &internal_assurance)?;
 
@@ -109,16 +109,16 @@ fn export_downstream_review(
     write_json_file(&external_inquiry_path, &external_inquiry)?;
     write_verification_report(&external_inquiry_report_path, &external_inquiry_report)?;
 
-    let external_assurance = build_assurance_package(
-        &qualification_report.workflow_id,
-        MercuryAssuranceAudience::ExternalReview,
-        "external-review-default",
-        &relative_display(output, &proof_package_path)?,
-        &relative_display(output, &external_inquiry_path)?,
-        &relative_display(output, &reviewer_package_path)?,
-        &relative_display(output, &qualification_report_path)?,
-        external_inquiry_report.verifier_equivalent,
-    )?;
+    let external_assurance = build_assurance_package(AssurancePackageArgs {
+        workflow_id: &qualification_report.workflow_id,
+        audience: MercuryAssuranceAudience::ExternalReview,
+        disclosure_profile: "external-review-default",
+        proof_package_file: &relative_display(output, &proof_package_path)?,
+        inquiry_package_file: &relative_display(output, &external_inquiry_path)?,
+        reviewer_package_file: &relative_display(output, &reviewer_package_path)?,
+        qualification_report_file: &relative_display(output, &qualification_report_path)?,
+        verifier_equivalent: external_inquiry_report.verifier_equivalent,
+    })?;
     let external_assurance_path = external_dir.join("assurance-package.json");
     write_json_file(&external_assurance_path, &external_assurance)?;
 
@@ -339,31 +339,31 @@ fn export_governance_workbench(
     let control_state_path = output.join("governance-control-state.json");
     write_json_file(&control_state_path, &control_state)?;
 
-    let workflow_owner_review = build_governance_review_package(
-        &qualification_report.workflow_id,
-        MercuryGovernanceReviewAudience::WorkflowOwner,
-        "workflow-owner-default",
-        &relative_display(output, &proof_package_path)?,
-        &relative_display(output, &workflow_owner_inquiry_path)?,
-        &relative_display(output, &reviewer_package_path)?,
-        &relative_display(output, &qualification_report_path)?,
-        &relative_display(output, &decision_package_path)?,
-        workflow_owner_inquiry_report.verifier_equivalent,
-    )?;
+    let workflow_owner_review = build_governance_review_package(GovernanceReviewPackageArgs {
+        workflow_id: &qualification_report.workflow_id,
+        audience: MercuryGovernanceReviewAudience::WorkflowOwner,
+        disclosure_profile: "workflow-owner-default",
+        proof_package_file: &relative_display(output, &proof_package_path)?,
+        inquiry_package_file: &relative_display(output, &workflow_owner_inquiry_path)?,
+        reviewer_package_file: &relative_display(output, &reviewer_package_path)?,
+        qualification_report_file: &relative_display(output, &qualification_report_path)?,
+        decision_package_file: &relative_display(output, &decision_package_path)?,
+        verifier_equivalent: workflow_owner_inquiry_report.verifier_equivalent,
+    })?;
     let workflow_owner_review_path = workflow_owner_dir.join("review-package.json");
     write_json_file(&workflow_owner_review_path, &workflow_owner_review)?;
 
-    let control_team_review = build_governance_review_package(
-        &qualification_report.workflow_id,
-        MercuryGovernanceReviewAudience::ControlTeam,
-        "control-team-default",
-        &relative_display(output, &proof_package_path)?,
-        &relative_display(output, &control_team_inquiry_path)?,
-        &relative_display(output, &reviewer_package_path)?,
-        &relative_display(output, &qualification_report_path)?,
-        &relative_display(output, &decision_package_path)?,
-        control_team_inquiry_report.verifier_equivalent,
-    )?;
+    let control_team_review = build_governance_review_package(GovernanceReviewPackageArgs {
+        workflow_id: &qualification_report.workflow_id,
+        audience: MercuryGovernanceReviewAudience::ControlTeam,
+        disclosure_profile: "control-team-default",
+        proof_package_file: &relative_display(output, &proof_package_path)?,
+        inquiry_package_file: &relative_display(output, &control_team_inquiry_path)?,
+        reviewer_package_file: &relative_display(output, &reviewer_package_path)?,
+        qualification_report_file: &relative_display(output, &qualification_report_path)?,
+        decision_package_file: &relative_display(output, &decision_package_path)?,
+        verifier_equivalent: control_team_inquiry_report.verifier_equivalent,
+    })?;
     let control_team_review_path = control_team_dir.join("review-package.json");
     write_json_file(&control_team_review_path, &control_team_review)?;
 

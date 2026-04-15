@@ -1,7 +1,7 @@
 # Operations Runbook
 
 This runbook covers the supported self-hosted operator surfaces for the current
-ARC `v2.8` launch candidate:
+bounded ARC release candidate:
 
 - `arc trust serve` for the trust-control plane
 - `arc mcp serve-http` for a hosted remote MCP edge
@@ -9,6 +9,20 @@ ARC `v2.8` launch candidate:
 
 It is intentionally pragmatic and assumes one service owner is operating local
 or cluster-contained deployments backed by SQLite state.
+
+## Bounded Operational Profile
+
+The current ship boundary is:
+
+- **trust-control:** local or leader-local single-writer truth with
+  deterministic leader selection and eventual repair; not consensus-backed HA
+- **hosted auth:** single-node or dedicated-per-session hosted admission with
+  explicit sender-constrained access tokens where available; static bearer,
+  non-`cnf`, and `shared_hosted_owner` paths are compatibility-only
+- **monetary budgets:** single-node atomic on one SQLite store; clustered mode
+  admits the documented overrun bound and is not distributed-linearizable
+- **receipts and checkpoints:** signed local audit evidence with checkpoint
+  export and inclusion-proof material; not public transparency-log semantics
 
 ## 1. Required Runtime Inputs
 
@@ -61,6 +75,14 @@ Optional auth and federation inputs:
 - `--auth-server-seed-file <path>` for local JWT issuance
 - `--identity-federation-seed-file <path>` for stable subject derivation
 - `--enterprise-providers-file <path>` for enterprise-origin federation lanes
+
+Bounded hosted/auth recommendation:
+
+- prefer dedicated-per-session hosting
+- require explicit sender-constrained access tokens with `cnf` where the
+  hosted authorization surface is part of the security boundary
+- treat `--auth-token`, non-`cnf` JWT/introspection tokens, random per-session
+  subject fallback, and `shared_hosted_owner` as compatibility-only paths
 
 Hosted session lifecycle tuning now uses these canonical env names:
 
@@ -157,6 +179,12 @@ Run the production qualification lane from the repo root:
 
 ```bash
 ./scripts/qualify-release.sh
+```
+
+For the ship-facing bounded release gate specifically:
+
+```bash
+./scripts/qualify-bounded-arc.sh
 ```
 
 Minimum deploy-time smoke checks:

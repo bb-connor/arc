@@ -2640,3 +2640,550 @@ fn build_capital_allocation_decision_artifact_from_store(
     })
 }
 
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod cluster_and_reports_tests {
+    use super::*;
+    use axum::body::to_bytes;
+    use serde_json::Value;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    fn base_config() -> TrustServiceConfig {
+        TrustServiceConfig {
+            listen: "127.0.0.1:0".parse().expect("parse listen addr"),
+            service_token: "token".to_string(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            certification_public_metadata_ttl_seconds: 300,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(25),
+        }
+    }
+
+    fn state_with_cluster(
+        advertise_url: &str,
+        peer_urls: &[&str],
+        receipt_db_path: Option<PathBuf>,
+        revocation_db_path: Option<PathBuf>,
+        budget_db_path: Option<PathBuf>,
+    ) -> TrustServiceState {
+        let mut config = base_config();
+        config.advertise_url = Some(advertise_url.to_string());
+        config.peer_urls = peer_urls.iter().map(|value| value.to_string()).collect();
+        config.receipt_db_path = receipt_db_path;
+        config.revocation_db_path = revocation_db_path;
+        config.budget_db_path = budget_db_path;
+        let cluster =
+            build_cluster_state(&config, config.listen).expect("build cluster runtime state");
+        TrustServiceState {
+            config,
+            enterprise_provider_registry: None,
+            verifier_policy_registry: None,
+            federation_admission_rate_limiter: Arc::new(Mutex::new(
+                FederationAdmissionRateLimiter::default(),
+            )),
+            cluster,
+        }
+    }
+
+    fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+    }
+
+    fn sample_tool_receipt(id: &str, capability_id: &str) -> ArcReceipt {
+        let keypair = Keypair::generate();
+        ArcReceipt::sign(
+            ArcReceiptBody {
+                id: id.to_string(),
+                timestamp: 11,
+                capability_id: capability_id.to_string(),
+                tool_server: "wrapped-http-mock".to_string(),
+                tool_name: "echo_json".to_string(),
+                action: ToolCallAction {
+                    parameters: json!({"message": "cluster"}),
+                    parameter_hash: "param-hash".to_string(),
+                },
+                decision: Decision::Allow,
+                content_hash: "content-hash".to_string(),
+                policy_hash: "policy-hash".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign tool receipt")
+    }
+
+    fn sample_child_receipt(id: &str, suffix: &str) -> ChildRequestReceipt {
+        let keypair = Keypair::generate();
+        ChildRequestReceipt::sign(
+            arc_core::receipt::ChildRequestReceiptBody {
+                id: id.to_string(),
+                timestamp: 13,
+                session_id: arc_core::session::SessionId::new(&format!("sess-{suffix}")),
+                parent_request_id: arc_core::session::RequestId::new(&format!("parent-{suffix}")),
+                request_id: arc_core::session::RequestId::new(&format!("child-{suffix}")),
+                operation_kind: arc_core::session::OperationKind::CreateMessage,
+                terminal_state: OperationTerminalState::Completed,
+                outcome_hash: "outcome-hash".to_string(),
+                policy_hash: "policy-hash".to_string(),
+                metadata: Some(json!({ "source": "cluster-test" })),
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign child receipt")
+    }
+
+    fn sample_capability(id: &str) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        CapabilityToken::sign(
+            arc_core::capability::CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: ArcScope::default(),
+                issued_at: 1_000,
+                expires_at: 9_000,
+                delegation_chain: vec![],
+            },
+            &issuer,
+        )
+        .expect("sign capability token")
+    }
+
+    #[test]
+    fn build_cluster_state_validates_inputs_and_normalizes_peers() {
+        let mut invalid = base_config();
+        invalid.advertise_url = Some("http://127.0.0.1:3200".to_string());
+        invalid.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+        invalid.authority_seed_path = Some(unique_temp_path("authority", "seed"));
+
+        let error = build_cluster_state(&invalid, invalid.listen)
+            .expect_err("clustered mode should reject authority seed files");
+        assert!(error
+            .to_string()
+            .contains("--authority-db instead of --authority-seed-file"));
+
+        assert!(
+            build_cluster_state(&base_config(), "127.0.0.1:0".parse().unwrap())
+                .expect("standalone without advertise URL")
+                .is_none()
+        );
+
+        let mut config = base_config();
+        config.advertise_url = Some("http://127.0.0.1:3200/".to_string());
+        config.peer_urls = vec![
+            "http://127.0.0.1:3200/".to_string(),
+            " http://127.0.0.1:3300/ ".to_string(),
+            "http://127.0.0.1:3300".to_string(),
+        ];
+
+        let cluster = build_cluster_state(&config, config.listen)
+            .expect("build cluster state")
+            .expect("cluster should be enabled");
+        let guard = cluster.lock().expect("cluster guard");
+        assert_eq!(guard.self_url, "http://127.0.0.1:3200");
+        assert_eq!(guard.peers.len(), 1);
+        assert!(guard.peers.contains_key("http://127.0.0.1:3300"));
+    }
+
+    #[test]
+    fn compute_cluster_consensus_tracks_role_quorum_and_election_terms() {
+        let mut cluster = ClusterRuntimeState {
+            self_url: "http://node-a".to_string(),
+            peers: HashMap::from([
+                ("http://node-b".to_string(), PeerSyncState::default()),
+                ("http://node-c".to_string(), PeerSyncState::default()),
+            ]),
+            election_term: 0,
+            last_leader_url: None,
+        };
+
+        let initial = compute_cluster_consensus_locked(&mut cluster);
+        assert_eq!(initial.role, "candidate");
+        assert!(!initial.has_quorum);
+        assert_eq!(initial.quorum_size, 2);
+        assert_eq!(initial.reachable_nodes, 1);
+        assert_eq!(initial.election_term, 0);
+
+        cluster.peers.get_mut("http://node-b").unwrap().health = PeerHealth::Healthy;
+        let with_quorum = compute_cluster_consensus_locked(&mut cluster);
+        assert_eq!(with_quorum.role, "leader");
+        assert!(with_quorum.has_quorum);
+        assert_eq!(with_quorum.leader_url.as_deref(), Some("http://node-a"));
+        assert_eq!(with_quorum.reachable_nodes, 2);
+        assert_eq!(with_quorum.election_term, 1);
+
+        cluster.peers.get_mut("http://node-c").unwrap().health = PeerHealth::Healthy;
+        let stable = compute_cluster_consensus_locked(&mut cluster);
+        assert_eq!(stable.role, "leader");
+        assert_eq!(stable.election_term, 1);
+        assert_eq!(stable.reachable_nodes, 3);
+
+        cluster.peers.get_mut("http://node-b").unwrap().health = PeerHealth::Unhealthy;
+        cluster.peers.get_mut("http://node-c").unwrap().health = PeerHealth::Unhealthy;
+        let lost_quorum = compute_cluster_consensus_locked(&mut cluster);
+        assert_eq!(lost_quorum.role, "candidate");
+        assert!(!lost_quorum.has_quorum);
+        assert_eq!(lost_quorum.election_term, 2);
+    }
+
+    #[tokio::test]
+    async fn leader_visibility_responses_add_cluster_metadata_and_reject_scalars() {
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        update_peer_reachable(&state, "http://node-b");
+
+        let response = json_response_with_leader_visibility(&state, json!({ "stored": true }));
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read JSON response body");
+        let body: Value = serde_json::from_slice(&body).expect("decode JSON body");
+        assert_eq!(body["stored"], Value::Bool(true));
+        assert_eq!(
+            body["handledBy"],
+            Value::String("http://node-a".to_string())
+        );
+        assert_eq!(
+            body["leaderUrl"],
+            Value::String("http://node-a".to_string())
+        );
+        assert_eq!(body["visibleAtLeader"], Value::Bool(true));
+
+        let scalar = json_response_with_leader_visibility(&state, "not-an-object");
+        assert_eq!(scalar.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let body = to_bytes(scalar.into_body(), usize::MAX)
+            .await
+            .expect("read scalar error body");
+        let text = String::from_utf8(body.to_vec()).expect("decode error body");
+        assert!(text.contains("success responses must be JSON objects"));
+    }
+
+    #[test]
+    fn peer_state_helpers_update_health_cursors_and_snapshot_thresholds() {
+        let state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+
+        update_peer_reachable(&state, "http://node-b");
+        assert_eq!(
+            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            Some("healthy")
+        );
+
+        update_peer_sync_error(&state, "http://node-b", "lagging".to_string());
+        assert_eq!(
+            with_peer_state(&state, "http://node-b", |peer| peer.last_error.clone()),
+            Some(Some("lagging".to_string()))
+        );
+
+        update_peer_failure(&state, "http://node-b", "offline".to_string());
+        assert_eq!(
+            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            Some("unhealthy")
+        );
+        assert!(peer_should_force_snapshot(&state, "http://node-b"));
+
+        update_peer_success(&state, "http://node-b");
+        assert_eq!(
+            with_peer_state(&state, "http://node-b", |peer| peer.health.label()),
+            Some("healthy")
+        );
+        assert!(!peer_should_force_snapshot(&state, "http://node-b"));
+
+        update_peer_revocation_cursor(
+            &state,
+            "http://node-b",
+            RevocationCursor {
+                revoked_at: 5,
+                capability_id: "cap-1".to_string(),
+            },
+        );
+        update_peer_budget_cursor(
+            &state,
+            "http://node-b",
+            BudgetCursor {
+                seq: 8,
+                updated_at: 13,
+                capability_id: "cap-1".to_string(),
+                grant_index: 2,
+            },
+        );
+        update_peer_tool_seq(&state, "http://node-b", 3);
+        update_peer_child_seq(&state, "http://node-b", 4);
+        update_peer_lineage_seq(&state, "http://node-b", 5);
+        update_peer_delta_records(
+            &state,
+            "http://node-b",
+            CLUSTER_SNAPSHOT_RECORD_THRESHOLD - 1,
+        );
+        assert_eq!(peer_tool_seq(&state, "http://node-b"), 3);
+        assert_eq!(peer_child_seq(&state, "http://node-b"), 4);
+        assert_eq!(peer_lineage_seq(&state, "http://node-b"), 5);
+        assert_eq!(
+            peer_revocation_cursor(&state, "http://node-b")
+                .expect("revocation cursor")
+                .capability_id,
+            "cap-1"
+        );
+        assert_eq!(
+            peer_budget_cursor(&state, "http://node-b")
+                .expect("budget cursor")
+                .grant_index,
+            2
+        );
+        assert!(!peer_should_force_snapshot(&state, "http://node-b"));
+
+        update_peer_delta_records(&state, "http://node-b", 1);
+        assert!(peer_should_force_snapshot(&state, "http://node-b"));
+
+        assert!(budget_visibility_matches(true, Some(1), Some(2)));
+        assert!(!budget_visibility_matches(true, None, Some(2)));
+        assert!(budget_visibility_matches(false, Some(2), Some(2)));
+        assert!(budget_visibility_matches(false, Some(1), None));
+        assert!(!budget_visibility_matches(false, None, Some(3)));
+    }
+
+    #[test]
+    fn auth_helpers_and_metered_billing_validation_cover_error_paths() {
+        let mut headers = HeaderMap::new();
+        let auth_error = bearer_token_from_headers(&headers).expect_err("missing bearer token");
+        assert_eq!(auth_error.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            auth_error
+                .headers()
+                .get(WWW_AUTHENTICATE)
+                .and_then(|value| value.to_str().ok()),
+            Some("Bearer realm=\"arc-passport-issuance\"")
+        );
+
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_static("Bearer issue-token"),
+        );
+        assert_eq!(
+            bearer_token_from_headers(&headers).expect("extract bearer token"),
+            "issue-token"
+        );
+        assert!(validate_service_auth(&headers, "issue-token").is_ok());
+
+        let invalid_auth = validate_service_auth(&headers, "other-token")
+            .expect_err("mismatched control token should fail");
+        assert_eq!(invalid_auth.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            invalid_auth
+                .headers()
+                .get(WWW_AUTHENTICATE)
+                .and_then(|value| value.to_str().ok()),
+            Some("Bearer")
+        );
+
+        let mut request = MeteredBillingReconciliationUpdateRequest {
+            receipt_id: "receipt-1".to_string(),
+            adapter_kind: "usage-adapter".to_string(),
+            evidence_id: "evidence-1".to_string(),
+            observed_units: 3,
+            billed_cost: MonetaryAmount {
+                units: 25,
+                currency: "USD".to_string(),
+            },
+            evidence_sha256: Some("digest".to_string()),
+            recorded_at: 44,
+            reconciliation_state: MeteredBillingReconciliationState::Open,
+            note: None,
+        };
+        assert!(validate_metered_billing_reconciliation_request(&request).is_ok());
+
+        request.receipt_id.clear();
+        assert_eq!(
+            validate_metered_billing_reconciliation_request(&request),
+            Err("receiptId must not be empty".to_string())
+        );
+        request.receipt_id = "receipt-1".to_string();
+        request.observed_units = 0;
+        assert_eq!(
+            validate_metered_billing_reconciliation_request(&request),
+            Err("observedUnits must be greater than zero".to_string())
+        );
+        request.observed_units = 3;
+        request.billed_cost.currency.clear();
+        assert_eq!(
+            validate_metered_billing_reconciliation_request(&request),
+            Err("billedCost.currency must not be empty".to_string())
+        );
+        request.billed_cost.currency = "USD".to_string();
+        request.evidence_sha256 = Some(String::new());
+        assert_eq!(
+            validate_metered_billing_reconciliation_request(&request),
+            Err("evidenceSha256 must not be empty when provided".to_string())
+        );
+    }
+
+    #[test]
+    fn cluster_snapshot_round_trip_copies_receipts_revocations_lineage_and_budgets() {
+        let source_receipt_db = unique_temp_path("cluster-source-receipts", "sqlite3");
+        let source_revocation_db = unique_temp_path("cluster-source-revocations", "sqlite3");
+        let source_budget_db = unique_temp_path("cluster-source-budgets", "sqlite3");
+        let target_receipt_db = unique_temp_path("cluster-target-receipts", "sqlite3");
+        let target_revocation_db = unique_temp_path("cluster-target-revocations", "sqlite3");
+        let target_budget_db = unique_temp_path("cluster-target-budgets", "sqlite3");
+
+        let source_state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            Some(source_receipt_db.clone()),
+            Some(source_revocation_db.clone()),
+            Some(source_budget_db.clone()),
+        );
+        let target_state = state_with_cluster(
+            "http://node-b",
+            &["http://node-a"],
+            Some(target_receipt_db.clone()),
+            Some(target_revocation_db.clone()),
+            Some(target_budget_db.clone()),
+        );
+
+        {
+            let mut revocation_store = SqliteRevocationStore::open(&source_revocation_db)
+                .expect("open source revocation db");
+            revocation_store
+                .upsert_revocation(&RevocationRecord {
+                    capability_id: "cap-1".to_string(),
+                    revoked_at: 17,
+                })
+                .expect("write revocation");
+        }
+        {
+            let mut receipt_store =
+                SqliteReceiptStore::open(&source_receipt_db).expect("open source receipt db");
+            receipt_store
+                .append_arc_receipt(&sample_tool_receipt("tool-1", "cap-1"))
+                .expect("append tool receipt");
+            receipt_store
+                .append_child_receipt(&sample_child_receipt("child-1", "alpha"))
+                .expect("append child receipt");
+            receipt_store
+                .record_capability_snapshot(&sample_capability("cap-1"), None)
+                .expect("record capability snapshot");
+        }
+        {
+            let mut budget_store =
+                SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
+            budget_store
+                .upsert_usage(&BudgetUsageRecord {
+                    capability_id: "cap-1".to_string(),
+                    grant_index: 0,
+                    invocation_count: 2,
+                    updated_at: 31,
+                    seq: 1,
+                    total_cost_charged: 9,
+                })
+                .expect("write budget usage");
+        }
+
+        let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
+        assert_eq!(snapshot.replication.tool_seq, 1);
+        assert_eq!(snapshot.replication.child_seq, 1);
+        assert_eq!(snapshot.replication.lineage_seq, 1);
+        assert_eq!(snapshot.replication.budget_seq, 1);
+        assert_eq!(
+            snapshot
+                .replication
+                .revocation_cursor
+                .as_ref()
+                .expect("revocation cursor")
+                .capability_id,
+            "cap-1"
+        );
+
+        let generated_at = snapshot.generated_at;
+        apply_cluster_snapshot(&target_state, "http://node-a", snapshot)
+            .expect("apply cluster snapshot");
+
+        let revocations = SqliteRevocationStore::open(&target_revocation_db)
+            .expect("open target revocation db")
+            .list_revocations_after(MAX_LIST_LIMIT, None, None)
+            .expect("list replicated revocations");
+        assert_eq!(revocations.len(), 1);
+        assert_eq!(revocations[0].capability_id, "cap-1");
+
+        let receipt_store =
+            SqliteReceiptStore::open(&target_receipt_db).expect("open target receipt db");
+        assert_eq!(
+            receipt_store
+                .list_tool_receipts_after_seq(0, MAX_LIST_LIMIT)
+                .expect("list replicated tool receipts")
+                .len(),
+            1
+        );
+        assert_eq!(
+            receipt_store
+                .list_child_receipts_after_seq(0, MAX_LIST_LIMIT)
+                .expect("list replicated child receipts")
+                .len(),
+            1
+        );
+        assert_eq!(
+            receipt_store
+                .list_capability_snapshots_after_seq(0, MAX_LIST_LIMIT)
+                .expect("list replicated lineage")
+                .len(),
+            1
+        );
+
+        let budgets = SqliteBudgetStore::open(&target_budget_db)
+            .expect("open target budget db")
+            .list_usages_after(MAX_LIST_LIMIT, None)
+            .expect("list replicated budgets");
+        assert_eq!(budgets.len(), 1);
+        assert_eq!(budgets[0].invocation_count, 2);
+        assert_eq!(budgets[0].total_cost_charged, 9);
+
+        assert_eq!(peer_tool_seq(&target_state, "http://node-a"), 1);
+        assert_eq!(peer_child_seq(&target_state, "http://node-a"), 1);
+        assert_eq!(peer_lineage_seq(&target_state, "http://node-a"), 1);
+        assert_eq!(
+            peer_budget_cursor(&target_state, "http://node-a")
+                .expect("replicated budget cursor")
+                .seq,
+            1
+        );
+        assert_eq!(
+            peer_revocation_cursor(&target_state, "http://node-a")
+                .expect("replicated revocation cursor")
+                .capability_id,
+            "cap-1"
+        );
+        assert_eq!(
+            with_peer_state(&target_state, "http://node-a", |peer| peer
+                .snapshot_applied_count),
+            Some(1)
+        );
+        assert_eq!(
+            with_peer_state(&target_state, "http://node-a", |peer| peer.last_snapshot_at),
+            Some(Some(generated_at))
+        );
+        assert!(!peer_should_force_snapshot(&target_state, "http://node-a"));
+    }
+}

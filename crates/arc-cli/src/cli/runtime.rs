@@ -140,6 +140,32 @@ fn cmd_run(
     }
 }
 
+fn cmd_api_protect(
+    upstream: &str,
+    spec_path: Option<&Path>,
+    listen_addr: &str,
+    receipt_store: Option<&Path>,
+) -> Result<(), CliError> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| CliError::Other(format!("failed to start async runtime: {error}")))?;
+
+    runtime.block_on(async move {
+        let config = ProtectConfig {
+            upstream: upstream.to_string(),
+            spec_content: None,
+            spec_path: spec_path.map(|path| path.display().to_string()),
+            listen_addr: listen_addr.to_string(),
+            receipt_db: receipt_store.map(|path| path.display().to_string()),
+        };
+        ProtectProxy::new(config)
+            .run()
+            .await
+            .map_err(|error| CliError::Other(format!("failed to start arc api protect: {error}")))
+    })
+}
+
 fn cmd_check(
     policy_path: &Path,
     tool: &str,
@@ -650,44 +676,162 @@ fn cmd_trust_status(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
-fn cmd_trust_evidence_share_list(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
+struct SharedEvidenceListArgs<'a> {
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
     since: Option<u64>,
     until: Option<u64>,
-    issuer: Option<&str>,
-    partner: Option<&str>,
+    issuer: Option<&'a str>,
+    partner: Option<&'a str>,
     limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+}
+
+struct AuthorizationContextListArgs<'a> {
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    limit: usize,
+}
+
+struct BehavioralFeedExportArgs<'a> {
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+}
+
+struct ExposureLedgerQueryArgs<'a> {
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    decision_limit: usize,
+}
+
+struct AgentExposureLedgerQueryArgs<'a> {
+    agent_subject: &'a str,
+    capability_id: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    decision_limit: usize,
+}
+
+struct CapitalBookExportArgs<'a> {
+    agent_subject: &'a str,
+    capability_id: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    facility_limit: usize,
+    bond_limit: usize,
+    loss_event_limit: usize,
+}
+
+struct CreditFacilityIssueArgs<'a> {
+    query: AgentExposureLedgerQueryArgs<'a>,
+    supersedes_facility_id: Option<&'a str>,
+}
+
+struct CreditFacilityListArgs<'a> {
+    facility_id: Option<&'a str>,
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    disposition: Option<&'a str>,
+    lifecycle_state: Option<&'a str>,
+    limit: usize,
+}
+
+struct CreditBondIssueArgs<'a> {
+    query: AgentExposureLedgerQueryArgs<'a>,
+    supersedes_bond_id: Option<&'a str>,
+}
+
+struct CreditBondListArgs<'a> {
+    bond_id: Option<&'a str>,
+    facility_id: Option<&'a str>,
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    disposition: Option<&'a str>,
+    lifecycle_state: Option<&'a str>,
+    limit: usize,
+}
+
+fn build_exposure_ledger_query(
+    args: &ExposureLedgerQueryArgs<'_>,
+) -> arc_kernel::ExposureLedgerQuery {
+    arc_kernel::ExposureLedgerQuery {
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+        decision_limit: Some(args.decision_limit),
+    }
+}
+
+fn build_agent_exposure_ledger_query(
+    args: &AgentExposureLedgerQueryArgs<'_>,
+) -> arc_kernel::ExposureLedgerQuery {
+    arc_kernel::ExposureLedgerQuery {
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: Some(args.agent_subject.to_string()),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+        decision_limit: Some(args.decision_limit),
+    }
+}
+
+fn cmd_trust_evidence_share_list(
+    args: SharedEvidenceListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::SharedEvidenceQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        issuer: issuer.map(ToOwned::to_owned),
-        partner: partner.map(ToOwned::to_owned),
-        limit: Some(limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        issuer: args.issuer.map(ToOwned::to_owned),
+        partner: args.partner.map(ToOwned::to_owned),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.shared_evidence_report(&query)?
     } else {
-        let path = require_receipt_db_path(receipt_db_path)?;
+        let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = arc_store_sqlite::SqliteReceiptStore::open(path)?;
         store.query_shared_evidence_report(&query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
@@ -728,7 +872,6 @@ fn cmd_trust_evidence_share_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_authorization_context_metadata(
     json_output: bool,
     receipt_db_path: Option<&Path>,
@@ -780,41 +923,31 @@ fn cmd_trust_authorization_context_metadata(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_authorization_context_list(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: AuthorizationContextListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::OperatorReportQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        authorization_limit: Some(limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        authorization_limit: Some(args.limit),
         ..arc_kernel::OperatorReportQuery::default()
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.authorization_context_report(&query)?
     } else {
-        let path = require_receipt_db_path(receipt_db_path)?;
+        let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = arc_store_sqlite::SqliteReceiptStore::open(path)?;
         store.query_authorization_context_report(&query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                     {}", report.schema);
@@ -884,41 +1017,31 @@ fn cmd_trust_authorization_context_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_authorization_context_review_pack(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: AuthorizationContextListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::OperatorReportQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        authorization_limit: Some(limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        authorization_limit: Some(args.limit),
         ..arc_kernel::OperatorReportQuery::default()
     };
 
-    let pack = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let pack = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.authorization_review_pack(&query)?
     } else {
-        let path = require_receipt_db_path(receipt_db_path)?;
+        let path = require_receipt_db_path(backend.receipt_db_path)?;
         let store = arc_store_sqlite::SqliteReceiptStore::open(path)?;
         store.query_authorization_review_pack(&query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&pack)?);
     } else {
         println!("schema:                     {}", pack.schema);
@@ -965,38 +1088,25 @@ fn cmd_trust_authorization_context_review_pack(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_behavioral_feed_export(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: BehavioralFeedExportArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::BehavioralFeedQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
     };
 
-    let feed = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let feed = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.behavioral_feed(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "behavioral feed export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1004,14 +1114,14 @@ fn cmd_trust_behavioral_feed_export(
         })?;
         trust_control::build_signed_behavioral_feed(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&feed)?);
     } else {
         println!("schema:                 {}", feed.body.schema);
@@ -1051,39 +1161,17 @@ fn cmd_trust_behavioral_feed_export(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_exposure_ledger_export(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: ExposureLedgerQueryArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::ExposureLedgerQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-    };
+    let query = build_exposure_ledger_query(&args);
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.exposure_ledger(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "exposure ledger export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1091,13 +1179,13 @@ fn cmd_trust_exposure_ledger_export(
         })?;
         trust_control::build_signed_exposure_ledger_report(
             receipt_db_path,
-            authority_seed_path,
-            authority_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.body.schema);
@@ -1142,40 +1230,18 @@ fn cmd_trust_exposure_ledger_export(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_scorecard_export(
     agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: ExposureLedgerQueryArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::ExposureLedgerQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-    };
+    let query = build_exposure_ledger_query(&args);
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.credit_scorecard(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit scorecard export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1183,14 +1249,14 @@ fn cmd_trust_credit_scorecard_export(
         })?;
         trust_control::build_signed_credit_scorecard_report(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.body.schema);
@@ -1227,43 +1293,28 @@ fn cmd_trust_credit_scorecard_export(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_capital_book_export(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    facility_limit: usize,
-    bond_limit: usize,
-    loss_event_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CapitalBookExportArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CapitalBookQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        facility_limit: Some(facility_limit),
-        bond_limit: Some(bond_limit),
-        loss_event_limit: Some(loss_event_limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: Some(args.agent_subject.to_string()),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+        facility_limit: Some(args.facility_limit),
+        bond_limit: Some(args.bond_limit),
+        loss_event_limit: Some(args.loss_event_limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.capital_book(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "capital book export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1271,13 +1322,13 @@ fn cmd_trust_capital_book_export(
         })?;
         trust_control::build_signed_capital_book_report(
             receipt_db_path,
-            authority_seed_path,
-            authority_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.body.schema);
@@ -1374,25 +1425,17 @@ fn cmd_trust_capital_instruction_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_capital_allocation_issue(
     input_file: &Path,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request: trust_control::CapitalAllocationDecisionRequest = load_json_or_yaml(input_file)?;
 
-    let allocation = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let allocation = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.issue_capital_allocation_decision(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "capital allocation issuance requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1400,15 +1443,15 @@ fn cmd_trust_capital_allocation_issue(
         })?;
         trust_control::issue_signed_capital_allocation_decision(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
+            backend.certification_registry_file,
             &request,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&allocation)?);
     } else {
         println!("schema:                 {}", allocation.body.schema);
@@ -1434,39 +1477,17 @@ fn cmd_trust_capital_allocation_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_facility_evaluate(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: AgentExposureLedgerQueryArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::ExposureLedgerQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-    };
+    let query = build_agent_exposure_ledger_query(&args);
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.credit_facility_report(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit facility evaluation requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1474,19 +1495,19 @@ fn cmd_trust_credit_facility_evaluate(
         })?;
         trust_control::build_credit_facility_report(
             receipt_db_path,
-            budget_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.certification_registry_file,
             None,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.schema);
         println!("generated_at:           {}", report.generated_at);
-        println!("subject_key:            {}", agent_subject);
+        println!("subject_key:            {}", args.agent_subject);
         println!("disposition:            {:?}", report.disposition);
         println!("score_band:             {:?}", report.scorecard.band);
         println!(
@@ -1511,63 +1532,38 @@ fn cmd_trust_credit_facility_evaluate(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_facility_issue(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    supersedes_facility_id: Option<&str>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditFacilityIssueArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request = trust_control::CreditFacilityIssueRequest {
-        query: arc_kernel::ExposureLedgerQuery {
-            capability_id: capability_id.map(ToOwned::to_owned),
-            agent_subject: Some(agent_subject.to_string()),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            since,
-            until,
-            receipt_limit: Some(receipt_limit),
-            decision_limit: Some(decision_limit),
-        },
-        supersedes_facility_id: supersedes_facility_id.map(ToOwned::to_owned),
+        query: build_agent_exposure_ledger_query(&args.query),
+        supersedes_facility_id: args.supersedes_facility_id.map(ToOwned::to_owned),
     };
 
-    let facility = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let facility = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.issue_credit_facility(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit facility issuance requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
             )
         })?;
-        trust_control::issue_signed_credit_facility(
+        trust_control::issue_signed_credit_facility(trust_control::CreditIssuanceArgs {
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
-            None,
-            &request.query,
-            request.supersedes_facility_id.as_deref(),
-        )?
+            budget_db_path: backend.budget_db_path,
+            authority_seed_path: backend.authority_seed_path,
+            authority_db_path: backend.authority_db_path,
+            certification_registry_file: backend.certification_registry_file,
+            issuance_policy: None,
+            query: &request.query,
+            supersedes_artifact_id: request.supersedes_facility_id.as_deref(),
+        })?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&facility)?);
     } else {
         println!("schema:                 {}", facility.body.schema);
@@ -1588,41 +1584,30 @@ fn cmd_trust_credit_facility_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_facility_list(
-    facility_id: Option<&str>,
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    disposition: Option<&str>,
-    lifecycle_state: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditFacilityListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CreditFacilityListQuery {
-        facility_id: facility_id.map(ToOwned::to_owned),
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        disposition: disposition
+        facility_id: args.facility_id.map(ToOwned::to_owned),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        disposition: args.disposition
             .map(parse_credit_facility_disposition)
             .transpose()?,
-        lifecycle_state: lifecycle_state
+        lifecycle_state: args.lifecycle_state
             .map(parse_credit_facility_lifecycle_state)
             .transpose()?,
-        limit: Some(limit),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.list_credit_facilities(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit facility list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1631,7 +1616,7 @@ fn cmd_trust_credit_facility_list(
         trust_control::list_credit_facilities(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
@@ -1663,39 +1648,17 @@ fn cmd_trust_credit_facility_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_bond_evaluate(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: AgentExposureLedgerQueryArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::ExposureLedgerQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-    };
+    let query = build_agent_exposure_ledger_query(&args);
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.credit_bond_report(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit bond evaluation requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1703,19 +1666,19 @@ fn cmd_trust_credit_bond_evaluate(
         })?;
         trust_control::build_credit_bond_report(
             receipt_db_path,
-            budget_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.certification_registry_file,
             None,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.schema);
         println!("generated_at:           {}", report.generated_at);
-        println!("subject_key:            {}", agent_subject);
+        println!("subject_key:            {}", args.agent_subject);
         println!("disposition:            {:?}", report.disposition);
         println!("score_band:             {:?}", report.scorecard.band);
         println!(
@@ -1740,63 +1703,38 @@ fn cmd_trust_credit_bond_evaluate(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_bond_issue(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    supersedes_bond_id: Option<&str>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditBondIssueArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request = trust_control::CreditBondIssueRequest {
-        query: arc_kernel::ExposureLedgerQuery {
-            capability_id: capability_id.map(ToOwned::to_owned),
-            agent_subject: Some(agent_subject.to_string()),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            since,
-            until,
-            receipt_limit: Some(receipt_limit),
-            decision_limit: Some(decision_limit),
-        },
-        supersedes_bond_id: supersedes_bond_id.map(ToOwned::to_owned),
+        query: build_agent_exposure_ledger_query(&args.query),
+        supersedes_bond_id: args.supersedes_bond_id.map(ToOwned::to_owned),
     };
 
-    let bond = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let bond = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.issue_credit_bond(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit bond issuance requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
             )
         })?;
-        trust_control::issue_signed_credit_bond(
+        trust_control::issue_signed_credit_bond(trust_control::CreditIssuanceArgs {
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
-            None,
-            &request.query,
-            request.supersedes_bond_id.as_deref(),
-        )?
+            budget_db_path: backend.budget_db_path,
+            authority_seed_path: backend.authority_seed_path,
+            authority_db_path: backend.authority_db_path,
+            certification_registry_file: backend.certification_registry_file,
+            issuance_policy: None,
+            query: &request.query,
+            supersedes_artifact_id: request.supersedes_bond_id.as_deref(),
+        })?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&bond)?);
     } else {
         println!("schema:                 {}", bond.body.schema);
@@ -1873,41 +1811,30 @@ fn cmd_trust_credit_bond_simulate(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_bond_list(
-    bond_id: Option<&str>,
-    facility_id: Option<&str>,
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    disposition: Option<&str>,
-    lifecycle_state: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditBondListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CreditBondListQuery {
-        bond_id: bond_id.map(ToOwned::to_owned),
-        facility_id: facility_id.map(ToOwned::to_owned),
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        disposition: disposition.map(parse_credit_bond_disposition).transpose()?,
-        lifecycle_state: lifecycle_state
+        bond_id: args.bond_id.map(ToOwned::to_owned),
+        facility_id: args.facility_id.map(ToOwned::to_owned),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        disposition: args.disposition.map(parse_credit_bond_disposition).transpose()?,
+        lifecycle_state: args
+            .lifecycle_state
             .map(parse_credit_bond_lifecycle_state)
             .transpose()?,
-        limit: Some(limit),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.list_credit_bonds(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit bond list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1916,7 +1843,7 @@ fn cmd_trust_credit_bond_list(
         trust_control::list_credit_bonds(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("matching_bonds:         {}", report.summary.matching_bonds);
@@ -1960,4 +1887,3 @@ fn build_credit_loss_lifecycle_query(
         amount,
     })
 }
-

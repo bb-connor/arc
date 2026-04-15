@@ -20,6 +20,7 @@ from arc_sdk.models import (
     CallerIdentity,
     CapabilityToken,
     Decision,
+    EvaluateResponse,
     GuardEvidence,
     HttpReceipt,
     Operation,
@@ -114,12 +115,12 @@ class TestCanonicalJson:
 class TestHealth:
     @respx.mock
     async def test_health(self) -> None:
-        respx.get(f"{BASE}/health").mock(
-            return_value=httpx.Response(200, json={"status": "ok"})
+        respx.get(f"{BASE}/arc/health").mock(
+            return_value=httpx.Response(200, json={"status": "healthy"})
         )
         async with ArcClient(BASE) as client:
             data = await client.health()
-            assert data["status"] == "ok"
+            assert data["status"] == "healthy"
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +203,7 @@ class TestVerifyReceipt:
 class TestVerifyHttpReceipt:
     @respx.mock
     async def test_verify_http(self) -> None:
-        respx.post(f"{BASE}/v1/receipts/verify-http").mock(
+        respx.post(f"{BASE}/arc/verify").mock(
             return_value=httpx.Response(200, json={"valid": True})
         )
         async with ArcClient(BASE) as client:
@@ -270,19 +271,26 @@ class TestEvaluateToolCall:
 class TestEvaluateHttpRequest:
     @respx.mock
     async def test_evaluate_http(self) -> None:
-        respx.post(f"{BASE}/v1/evaluate-http").mock(
-            return_value=httpx.Response(200, json=_make_http_receipt_dict())
+        respx.post(f"{BASE}/arc/evaluate").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "verdict": {"verdict": "allow"},
+                    "receipt": _make_http_receipt_dict(),
+                    "evidence": [],
+                },
+            )
         )
         async with ArcClient(BASE) as client:
-            receipt = await client.evaluate_http_request(
+            result = await client.evaluate_http_request(
                 request_id="req-1",
                 method="GET",
                 route_pattern="/pets/{petId}",
                 path="/pets/42",
                 caller=CallerIdentity.anonymous(),
             )
-            assert isinstance(receipt, HttpReceipt)
-            assert receipt.is_allowed
+            assert isinstance(result, EvaluateResponse)
+            assert result.receipt.is_allowed
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +323,7 @@ class TestErrorHandling:
 
     @respx.mock
     async def test_server_error(self) -> None:
-        respx.get(f"{BASE}/health").mock(
+        respx.get(f"{BASE}/arc/health").mock(
             return_value=httpx.Response(500, json={"error": "internal"})
         )
         async with ArcClient(BASE) as client:

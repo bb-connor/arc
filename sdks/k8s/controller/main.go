@@ -1,7 +1,8 @@
 // Package main implements the ARC Kubernetes admission controller and sidecar injector.
 //
 // This controller runs as a Kubernetes admission webhook that:
-//  1. Rejects pods without valid ARC capability token annotations.
+//  1. Rejects pods without valid ARC capability tokens issued by configured ARC
+//     trust anchors.
 //  2. Injects the arc-api-protect sidecar container into pods that have the
 //     arc.backbay.io/inject: "true" annotation.
 //
@@ -18,7 +19,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"time"
 )
 
 func main() {
@@ -63,7 +64,8 @@ func handleHealthz(w http.ResponseWriter, _ *http.Request) {
 }
 
 // handleValidate is the validating admission webhook handler.
-// It rejects pods that lack the required ARC capability token annotation.
+// It rejects pods that lack the required ARC capability token or whose token
+// does not validate against configured ARC trust anchors.
 func handleValidate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -131,21 +133,16 @@ func validatePod(req AdmissionRequest) AdmissionResponse {
 		)
 	}
 
-	// Check required scopes if specified.
-	requiredScopes := annotations[AnnotationRequiredScopes]
-	if requiredScopes != "" {
-		// In a full implementation, the token would be validated against
-		// the ARC kernel and scopes would be checked. For now, we verify
-		// the annotation exists and is non-empty.
-		scopes := strings.Split(requiredScopes, ",")
-		for _, scope := range scopes {
-			if strings.TrimSpace(scope) == "" {
-				return denyResponse("invalid empty scope in " + AnnotationRequiredScopes)
-			}
-		}
+	requiredScopes, err := parseRequiredScopes(annotations[AnnotationRequiredScopes])
+	if err != nil {
+		return denyResponse(err.Error())
 	}
 
-	return allowResponse("ARC capability token annotation present")
+	if err := validateCapabilityToken(capToken, requiredScopes, time.Now().UTC()); err != nil {
+		return denyResponse(err.Error())
+	}
+
+	return allowResponse("ARC capability token validated against configured trusted issuers")
 }
 
 // mutatePod injects the ARC sidecar if the pod has the injection annotation.

@@ -215,7 +215,7 @@ class TestArcToolkit:
                 },
             ],
         }
-        respx.get(f"{BASE}/health").mock(
+        respx.get(f"{BASE}/arc/health").mock(
             return_value=httpx.Response(200, json=health_data)
         )
 
@@ -240,7 +240,7 @@ class TestArcToolkit:
                 },
             ],
         }
-        respx.get(f"{BASE}/health").mock(
+        respx.get(f"{BASE}/arc/health").mock(
             return_value=httpx.Response(200, json=health_data)
         )
 

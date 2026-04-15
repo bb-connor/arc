@@ -1,6 +1,17 @@
 # Monetary Budgets Guide
 
-Monetary budgets let operators cap how much an agent can spend when invoking cost-bearing tools. Budgets are enforced by the ARC kernel before each tool invocation using an atomic read-check-increment transaction. An invocation is denied at the kernel boundary if it would exceed either the per-call cap or the lifetime total.
+Monetary budgets let operators cap how much an agent can spend when invoking
+cost-bearing tools. The strongest honest budget claim today is:
+
+- **single node:** ARC enforces budgets with an atomic read-check-increment
+  transaction on one SQLite store
+- **clustered mode:** ARC bounds provisional authorized exposure, but does not
+  claim distributed-linearizable spend truth and admits the documented overrun
+  bound under split-brain conditions
+
+An invocation is denied at the kernel boundary if it would exceed either the
+per-call cap or the lifetime total for the currently selected local budget
+store.
 
 If you need the planning step that happens before budget issuance, see
 [TOOL_PRICING_GUIDE.md](TOOL_PRICING_GUIDE.md). That guide covers how
@@ -63,7 +74,9 @@ The kernel calls `BudgetStore::try_charge_cost` on every invocation of a grant t
 
 If all three checks pass the function increments `invocation_count` by 1 and adds `cost_units` to `total_cost_charged`, then commits the transaction and returns `true`. If any check fails the transaction is rolled back and the function returns `false`, causing the kernel to deny the invocation.
 
-The SQLite backend uses `TransactionBehavior::Immediate` (write-lock acquired on BEGIN) to ensure the read and the subsequent write are atomic with respect to concurrent requests on the same node.
+The SQLite backend uses `TransactionBehavior::Immediate` (write-lock acquired on
+BEGIN) to ensure the read and the subsequent write are atomic with respect to
+concurrent requests on the same node.
 
 ## HA Overrun Bound
 

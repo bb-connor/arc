@@ -37,6 +37,10 @@ dev = [
     "respx>=0.21,<1",
 ]
 
+[tool.uv.sources]
+arc-sdk-python = { path = "../arc-sdk-python" }
+arc-asgi = { path = "../arc-asgi" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/arc_fastapi"]
 

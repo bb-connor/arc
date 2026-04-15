@@ -171,22 +171,13 @@ pub struct SettlementIndexerCursor {
 
 impl SettlementIndexerCursor {
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_blocks(
-        service_id: impl Into<String>,
-        chain_id: impl Into<String>,
-        last_indexed_block_number: Option<u64>,
-        canonical_block_number: u64,
-        replaying: bool,
-        failed: bool,
-        checked_at: u64,
-        note: Option<String>,
-    ) -> Self {
-        let lag_blocks =
-            canonical_block_number.saturating_sub(last_indexed_block_number.unwrap_or(0));
-        let status = if failed {
+    pub fn from_blocks(input: SettlementIndexerCursorInput) -> Self {
+        let lag_blocks = input
+            .canonical_block_number
+            .saturating_sub(input.last_indexed_block_number.unwrap_or(0));
+        let status = if input.failed {
             SettlementIndexerStatus::Failed
-        } else if replaying {
+        } else if input.replaying {
             SettlementIndexerStatus::Replaying
         } else if lag_blocks == 0 {
             SettlementIndexerStatus::Healthy
@@ -196,16 +187,28 @@ impl SettlementIndexerCursor {
             SettlementIndexerStatus::Drifted
         };
         Self {
-            service_id: service_id.into(),
-            chain_id: chain_id.into(),
-            last_indexed_block_number,
-            canonical_block_number,
+            service_id: input.service_id,
+            chain_id: input.chain_id,
+            last_indexed_block_number: input.last_indexed_block_number,
+            canonical_block_number: input.canonical_block_number,
             lag_blocks,
             status,
-            checked_at,
-            note,
+            checked_at: input.checked_at,
+            note: input.note,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettlementIndexerCursorInput {
+    pub service_id: String,
+    pub chain_id: String,
+    pub last_indexed_block_number: Option<u64>,
+    pub canonical_block_number: u64,
+    pub replaying: bool,
+    pub failed: bool,
+    pub checked_at: u64,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,29 +245,32 @@ pub struct SettlementLaneRuntimeStatus {
 
 impl SettlementLaneRuntimeStatus {
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        chain_id: impl Into<String>,
-        network_name: impl Into<String>,
-        indexer_status: SettlementIndexerStatus,
-        finality_status: Option<SettlementFinalityStatus>,
-        controls: SettlementEmergencyControls,
-        queued_recoveries: usize,
-        last_observed_at: Option<u64>,
-        note: Option<String>,
-    ) -> Self {
-        let status = classify_settlement_lane(indexer_status, finality_status, controls);
+    pub fn new(input: SettlementLaneRuntimeStatusInput) -> Self {
+        let status =
+            classify_settlement_lane(input.indexer_status, input.finality_status, input.controls);
         Self {
-            chain_id: chain_id.into(),
-            network_name: network_name.into(),
+            chain_id: input.chain_id,
+            network_name: input.network_name,
             status,
-            indexer_status,
-            finality_status,
-            queued_recoveries,
-            last_observed_at,
-            note,
+            indexer_status: input.indexer_status,
+            finality_status: input.finality_status,
+            queued_recoveries: input.queued_recoveries,
+            last_observed_at: input.last_observed_at,
+            note: input.note,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SettlementLaneRuntimeStatusInput {
+    pub chain_id: String,
+    pub network_name: String,
+    pub indexer_status: SettlementIndexerStatus,
+    pub finality_status: Option<SettlementFinalityStatus>,
+    pub controls: SettlementEmergencyControls,
+    pub queued_recoveries: usize,
+    pub last_observed_at: Option<u64>,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -360,23 +366,23 @@ mod tests {
     use super::{
         classify_settlement_lane, ensure_settlement_operation_allowed, SettlementControlState,
         SettlementEmergencyControls, SettlementEmergencyMode, SettlementIndexerCursor,
-        SettlementIndexerStatus, SettlementOperationKind, SettlementRuntimeReport,
-        SettlementRuntimeStatus, ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
+        SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementOperationKind,
+        SettlementRuntimeReport, SettlementRuntimeStatus, ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
     };
     use crate::SettlementFinalityStatus;
 
     #[test]
     fn indexer_cursor_classifies_lagging() {
-        let cursor = SettlementIndexerCursor::from_blocks(
-            "escrow-event-indexer",
-            "eip155:8453",
-            Some(23_456_789),
-            23_456_797,
-            false,
-            false,
-            1_712_337_200,
-            Some("eight blocks behind canonical head".to_string()),
-        );
+        let cursor = SettlementIndexerCursor::from_blocks(SettlementIndexerCursorInput {
+            service_id: "escrow-event-indexer".to_string(),
+            chain_id: "eip155:8453".to_string(),
+            last_indexed_block_number: Some(23_456_789),
+            canonical_block_number: 23_456_797,
+            replaying: false,
+            failed: false,
+            checked_at: 1_712_337_200,
+            note: Some("eight blocks behind canonical head".to_string()),
+        });
         assert_eq!(cursor.lag_blocks, 8);
         assert_eq!(cursor.status, SettlementIndexerStatus::Lagging);
     }

@@ -24,15 +24,13 @@ import {
   type ArcConfig,
   type EvaluateResponse,
   type HttpMethod,
-  type ArcHttpRequest,
-  type CallerIdentity,
   ARC_ERROR_CODES,
   isDenied,
   resolveConfig,
-  type ResolvedConfig,
   buildArcHttpRequest,
 } from "@arc-protocol/node-http";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { PassThrough } from "node:stream";
 
 /** Fastify-specific ARC config. */
 export interface ArcFastifyConfig extends ArcConfig {
@@ -47,6 +45,7 @@ export interface ArcFastifyConfig extends ArcConfig {
 declare module "fastify" {
   interface FastifyRequest {
     arcResult?: EvaluateResponse | undefined;
+    arcRawBody?: Buffer | undefined;
   }
 }
 
@@ -67,6 +66,23 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
 
   // Decorate request with arcResult
   fastify.decorateRequest("arcResult", undefined);
+  fastify.decorateRequest("arcRawBody", undefined);
+
+  fastify.addHook("preParsing", async (request, _reply, payload) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of payload) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    const bodyBytes = Buffer.concat(chunks);
+    request.arcRawBody = bodyBytes;
+
+    const replay = new PassThrough();
+    replay.end(bodyBytes);
+    (replay as PassThrough & { receivedEncodedLength?: number }).receivedEncodedLength =
+      bodyBytes.length;
+    return replay;
+  });
 
   // Register preHandler hook (runs after parsing, before the handler)
   fastify.addHook("preHandler", async (request: FastifyRequest, reply: FastifyReply) => {
@@ -119,26 +135,25 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
       }
     }
 
-    // Compute body hash (Fastify may have already parsed the body)
+    // Compute body hash from the raw request bytes captured in preParsing.
     let bodyHash: string | undefined;
     let bodyLength = 0;
-    const rawBody = request.body;
-    if (rawBody != null) {
-      let bodyBytes: Buffer;
-      if (Buffer.isBuffer(rawBody)) {
-        bodyBytes = rawBody;
-      } else if (typeof rawBody === "string") {
-        bodyBytes = Buffer.from(rawBody, "utf-8");
-      } else {
-        bodyBytes = Buffer.from(JSON.stringify(rawBody), "utf-8");
-      }
-      bodyLength = bodyBytes.length;
-      if (bodyLength > 0) {
-        bodyHash = createHash("sha256").update(bodyBytes).digest("hex");
-      }
+    const rawBody = request.arcRawBody;
+    if (rawBody != null && rawBody.length > 0) {
+      bodyLength = rawBody.length;
+      bodyHash = createHash("sha256").update(rawBody).digest("hex");
     }
 
-    const capabilityId = rawHeaders["x-arc-capability"] ?? undefined;
+    const capabilityToken = rawHeaders["x-arc-capability"] ?? query["arc_capability"] ?? undefined;
+    let capabilityId: string | undefined;
+    if (capabilityToken != null) {
+      try {
+        const parsed = JSON.parse(capabilityToken) as { id?: unknown };
+        capabilityId = typeof parsed.id === "string" ? parsed.id : undefined;
+      } catch {
+        capabilityId = undefined;
+      }
+    }
 
     const arcReq = buildArcHttpRequest({
       method: httpMethod,
@@ -153,7 +168,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
     });
 
     try {
-      const result = await resolved.client.evaluate(arcReq);
+      const result = await resolved.client.evaluate(arcReq, rawHeaders["x-arc-capability"] ?? undefined);
 
       // Attach receipt ID header
       reply.header("X-Arc-Receipt-Id", result.receipt.id);
@@ -163,7 +178,7 @@ const arcPlugin: FastifyPluginAsync<ArcFastifyConfig> = async (
           error: ARC_ERROR_CODES.ACCESS_DENIED,
           message: result.verdict.reason,
           receipt_id: result.receipt.id,
-          suggestion: "provide a valid capability token in the X-Arc-Capability header",
+          suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
         });
         return reply;
       }

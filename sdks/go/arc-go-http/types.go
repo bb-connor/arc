@@ -121,6 +121,14 @@ type EvaluateResponse struct {
 	Evidence []GuardEvidence `json:"evidence"`
 }
 
+// ArcPassthrough describes an explicit fail-open degraded state where the
+// request was forwarded without a signed ARC receipt.
+type ArcPassthrough struct {
+	Mode    string `json:"mode"`
+	Error   string `json:"error"`
+	Message string `json:"message"`
+}
+
 // Error codes for ARC HTTP responses.
 const (
 	ErrAccessDenied       = "arc_access_denied"

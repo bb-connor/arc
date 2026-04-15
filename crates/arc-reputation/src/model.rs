@@ -17,27 +17,29 @@ pub struct CapabilityLineageRecord {
     pub parent_capability_id: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct CapabilityLineageScopeJsonInput<'a> {
+    pub capability_id: String,
+    pub subject_key: String,
+    pub issuer_key: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub scope_json: &'a str,
+    pub delegation_depth: u64,
+    pub parent_capability_id: Option<String>,
+}
+
 impl CapabilityLineageRecord {
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_scope_json(
-        capability_id: impl Into<String>,
-        subject_key: impl Into<String>,
-        issuer_key: impl Into<String>,
-        issued_at: u64,
-        expires_at: u64,
-        scope_json: &str,
-        delegation_depth: u64,
-        parent_capability_id: Option<String>,
-    ) -> Result<Self, ReputationError> {
+    pub fn from_scope_json(input: CapabilityLineageScopeJsonInput<'_>) -> Result<Self, ReputationError> {
         Ok(Self {
-            capability_id: capability_id.into(),
-            subject_key: subject_key.into(),
-            issuer_key: issuer_key.into(),
-            issued_at,
-            expires_at,
-            scope: serde_json::from_str(scope_json)?,
-            delegation_depth,
-            parent_capability_id,
+            capability_id: input.capability_id,
+            subject_key: input.subject_key,
+            issuer_key: input.issuer_key,
+            issued_at: input.issued_at,
+            expires_at: input.expires_at,
+            scope: serde_json::from_str(input.scope_json)?,
+            delegation_depth: input.delegation_depth,
+            parent_capability_id: input.parent_capability_id,
         })
     }
 }

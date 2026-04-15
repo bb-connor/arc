@@ -1268,29 +1268,32 @@ fn write_evidence_package(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct EvidenceFederationPolicyCreateArgs<'a> {
+    pub output: &'a Path,
+    pub signing_seed_file: &'a Path,
+    pub issuer: &'a str,
+    pub partner: &'a str,
+    pub capability_id: Option<&'a str>,
+    pub agent_subject: Option<&'a str>,
+    pub since: Option<u64>,
+    pub until: Option<u64>,
+    pub expires_at: u64,
+    pub require_proofs: bool,
+    pub purpose: Option<&'a str>,
+    pub json_output: bool,
+}
+
 pub fn cmd_evidence_federation_policy_create(
-    output: &Path,
-    signing_seed_file: &Path,
-    issuer: &str,
-    partner: &str,
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    expires_at: u64,
-    require_proofs: bool,
-    purpose: Option<&str>,
-    json_output: bool,
+    args: EvidenceFederationPolicyCreateArgs<'_>,
 ) -> Result<(), CliError> {
-    let keypair = load_or_create_authority_keypair(signing_seed_file)?;
+    let keypair = load_or_create_authority_keypair(args.signing_seed_file)?;
     let created_at = unix_now();
-    if created_at > expires_at {
+    if created_at > args.expires_at {
         return Err(CliError::Other(
             "--expires-at must be greater than or equal to the current Unix timestamp".to_string(),
         ));
     }
-    if let (Some(since), Some(until)) = (since, until) {
+    if let (Some(since), Some(until)) = (args.since, args.until) {
         if since > until {
             return Err(CliError::Other(
                 "federation policy since must be less than or equal to until".to_string(),
@@ -1300,30 +1303,30 @@ pub fn cmd_evidence_federation_policy_create(
 
     let body = FederationPolicyBody {
         schema: FEDERATION_POLICY_SCHEMA.to_string(),
-        issuer: issuer.to_string(),
-        partner: partner.to_string(),
+        issuer: args.issuer.to_string(),
+        partner: args.partner.to_string(),
         signer_public_key: keypair.public_key(),
         created_at,
-        expires_at,
+        expires_at: args.expires_at,
         query: EvidenceExportQuery {
-            capability_id: capability_id.map(ToOwned::to_owned),
-            agent_subject: agent_subject.map(ToOwned::to_owned),
-            since,
-            until,
+            capability_id: args.capability_id.map(ToOwned::to_owned),
+            agent_subject: args.agent_subject.map(ToOwned::to_owned),
+            since: args.since,
+            until: args.until,
         },
-        require_proofs,
-        purpose: purpose.map(ToOwned::to_owned),
+        require_proofs: args.require_proofs,
+        purpose: args.purpose.map(ToOwned::to_owned),
     };
     let (signature, _) = keypair.sign_canonical(&body)?;
     let policy = FederationPolicyDocument { body, signature };
     verify_federation_policy(&policy)?;
-    fs::write(output, serde_json::to_vec_pretty(&policy)?)?;
+    fs::write(args.output, serde_json::to_vec_pretty(&policy)?)?;
 
-    if json_output {
+    if args.json_output {
         println!("{}", serde_json::to_string_pretty(&policy)?);
     } else {
         println!("federation policy created");
-        println!("output:              {}", output.display());
+        println!("output:              {}", args.output.display());
         println!("issuer:              {}", policy.body.issuer);
         println!("partner:             {}", policy.body.partner);
         println!(

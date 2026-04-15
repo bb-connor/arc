@@ -606,10 +606,10 @@ mod tests {
             &["mcp:invoke"],
         );
         let auth_context = verifier
-            .session_auth_context_from_introspection(
-                "opaque-token",
-                &empty_header_map(),
-                OAuthIntrospectionResponse {
+            .session_auth_context_from_introspection(super::IntrospectionSessionAuthInput {
+                token: "opaque-token",
+                headers: &empty_header_map(),
+                introspection: OAuthIntrospectionResponse {
                     active: true,
                     token_type: Some("Bearer".to_string()),
                     claims: JwtClaims {
@@ -637,11 +637,11 @@ mod tests {
                         nbf: None,
                     },
                 },
-                Some("http://localhost:3000".to_string()),
-                None,
-                "POST",
-                "arc-mcp",
-            )
+                origin: Some("http://localhost:3000".to_string()),
+                protected_resource_metadata: None,
+                expected_method: "POST",
+                expected_target: "arc-mcp",
+            })
             .unwrap();
         match &auth_context.method {
             SessionAuthMethod::OAuthBearer {
@@ -701,10 +701,10 @@ mod tests {
     fn introspection_bearer_verifier_rejects_inactive_token() {
         let verifier = test_introspection_verifier(None, None, &[]);
         let error = verifier
-            .session_auth_context_from_introspection(
-                "opaque-token",
-                &empty_header_map(),
-                OAuthIntrospectionResponse {
+            .session_auth_context_from_introspection(super::IntrospectionSessionAuthInput {
+                token: "opaque-token",
+                headers: &empty_header_map(),
+                introspection: OAuthIntrospectionResponse {
                     active: false,
                     token_type: Some("Bearer".to_string()),
                     claims: JwtClaims {
@@ -732,11 +732,11 @@ mod tests {
                         nbf: None,
                     },
                 },
-                None,
-                None,
-                "POST",
-                "arc-mcp",
-            )
+                origin: None,
+                protected_resource_metadata: None,
+                expected_method: "POST",
+                expected_target: "arc-mcp",
+            })
             .unwrap_err();
         assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
     }

@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 
 mod runtime;
 
-pub use runtime::{ArcMcpEdge, McpEdgeConfig, McpExposedTool};
+pub use runtime::{
+    ArcMcpEdge, BridgeMcpToolCall, BridgeMcpToolCallRequest, McpEdgeConfig, McpExposedTool,
+    McpTargetExecutor,
+};
 
 /// Minimal representation of an MCP tool listing response.
 /// This captures just enough to translate into ARC tool definitions.
@@ -131,6 +134,9 @@ impl McpServerCapabilities {
 pub enum AdapterError {
     #[error("MCP server connection failed: {0}")]
     ConnectionFailed(String),
+
+    #[error("kernel runtime error: {0}")]
+    KernelRuntime(String),
 
     #[error("MCP server returned an error ({code}): {message}")]
     McpError {

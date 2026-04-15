@@ -26,6 +26,7 @@ from arc_fastapi.dependencies import set_arc_client
 from arc_langchain.tool import ArcTool, ArcToolkit
 from arc_sdk.client import ArcClient, _canonical_json, _sha256_hex
 from arc_sdk.models import (
+    EvaluateResponse,
     ArcReceipt,
     ArcScope,
     Decision,
@@ -94,7 +95,13 @@ class TestE2EFastAPIWithReceipts:
         http_receipt = HttpReceipt.model_validate(_receipt_dict())
 
         mock_client = AsyncMock()
-        mock_client.evaluate_http_request = AsyncMock(return_value=http_receipt)
+        mock_client.evaluate_http_request = AsyncMock(
+            return_value=EvaluateResponse(
+                verdict=http_receipt.verdict,
+                receipt=http_receipt,
+                evidence=http_receipt.evidence,
+            )
+        )
         set_arc_client(mock_client)
 
         @app.post("/tools/query")
@@ -155,7 +162,13 @@ class TestE2EFastAPIWithReceipts:
         )
 
         mock_client = AsyncMock()
-        mock_client.evaluate_http_request = AsyncMock(return_value=denied_receipt)
+        mock_client.evaluate_http_request = AsyncMock(
+            return_value=EvaluateResponse(
+                verdict=denied_receipt.verdict,
+                receipt=denied_receipt,
+                evidence=denied_receipt.evidence,
+            )
+        )
         set_arc_client(mock_client)
 
         @app.post("/tools/dangerous")
@@ -240,7 +253,7 @@ class TestE2ELangChainTool:
                 },
             ],
         }
-        respx.get(f"{BASE}/health").mock(
+        respx.get(f"{BASE}/arc/health").mock(
             return_value=httpx.Response(200, json=health_data)
         )
 

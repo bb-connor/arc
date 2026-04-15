@@ -8,8 +8,7 @@ const CARGO_TEMPLATE: &str = include_str!("../templates/init/Cargo.toml.tmpl");
 const README_TEMPLATE: &str = include_str!("../templates/init/README.md.tmpl");
 const POLICY_TEMPLATE: &str = include_str!("../templates/init/policy.yaml.tmpl");
 const GITIGNORE_TEMPLATE: &str = include_str!("../templates/init/gitignore.tmpl");
-const HELLO_SERVER_TEMPLATE: &str =
-    include_str!("../templates/init/src/bin/hello_server.rs.tmpl");
+const HELLO_SERVER_TEMPLATE: &str = include_str!("../templates/init/src/bin/hello_server.rs.tmpl");
 const DEMO_TEMPLATE: &str = include_str!("../templates/init/src/bin/demo.rs.tmpl");
 
 pub(crate) fn cmd_init(path: &Path) -> Result<(), CliError> {

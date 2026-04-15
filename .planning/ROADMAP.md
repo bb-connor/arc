@@ -195,8 +195,12 @@
   (completed locally and archived locally 2026-04-14)
 - [x] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
   (completed locally 2026-04-14; pending archival)
-- [ ] **v3.16 Universal Control-Plane Thesis** - Phases 407-412 (active locally
-  2026-04-15; phases 407-408 complete, 409 next)
+- [x] **v3.16 Universal Control-Plane Thesis** - Phases 407-412 (completed
+  locally 2026-04-15; pending archival)
+- [x] **v3.17 Comptroller Market Position Proof** - Phases 413-416
+  (completed locally 2026-04-15; pending archival)
+- [x] **v3.18 Bounded ARC Ship Readiness Closure** - Phases 417-421
+  (completed locally 2026-04-15; pending archival)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11355,7 +11359,7 @@ control plane that can choose, attenuate, or deny paths based on intent and
 runtime conditions
 **Depends on**: Phases 407 and 408
 **Requirements**: CTRL3-01, CTRL3-02, CTRL3-03
-**Status**: next up
+**Status**: complete locally
 **Success Criteria** (what must be TRUE):
   1. Governed intent is a first-class input to route planning rather than
      passive metadata
@@ -11364,14 +11368,14 @@ runtime conditions
   3. Route-selection evidence is signed and visible on the qualified
      authoritative HTTP/OpenAI/MCP/A2A/ACP paths
 **Estimated complexity**: L
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 ### Phase 410: Shared Lifecycle Contract and Runtime Fidelity Closure
 **Goal**: Replace surface-specific adapted lifecycle semantics with one shared
 runtime lifecycle/fidelity contract across every claim-eligible protocol path
 **Depends on**: Phase 409
 **Requirements**: LIFE3-01, LIFE3-02, LIFE3-03
-**Status**: planned
+**Status**: complete locally
 **Success Criteria** (what must be TRUE):
   1. Stream, cancel, resume, and partial-output semantics are derived from one
      shared lifecycle contract on every claim-eligible surface
@@ -11379,23 +11383,23 @@ runtime lifecycle/fidelity contract across every claim-eligible protocol path
      rather than schema hints alone
   3. Compatibility-only helpers remain isolated and non-claim-eligible
 **Estimated complexity**: L
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 ### Phase 411: Multi-Operator Qualification and Ecosystem Proof
 **Goal**: Produce operator-grade evidence that the technical control-plane
 thesis works outside one local in-process runtime seam
 **Depends on**: Phases 408, 409, and 410
 **Requirements**: ECO3-01, ECO3-02
-**Status**: planned
+**Status**: complete locally
 **Success Criteria** (what must be TRUE):
-  1. Qualification harnesses exercise qualified multi-hop flows across more
-     than one operator or externally hosted protocol boundary
+  1. Qualification evidence combines exercised authoritative multi-hop route
+     tests with explicit operator-boundary documentation
   2. Deployment/runbook evidence documents trust boundaries, route planning,
      failure handling, and receipt recovery for the control plane
   3. Qualification artifacts make clear which parts of the thesis are proven
      technically versus which still depend on broader market evidence
 **Estimated complexity**: L
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 ### Phase 412: Universal Control-Plane Thesis Gate
 **Goal**: Decide whether ARC can now honestly claim the full original
@@ -11403,7 +11407,7 @@ technical-control-plane vision and whether any broader market thesis is
 qualified or still explicitly excluded
 **Depends on**: Phases 409, 410, and 411
 **Requirements**: VISION3-01, VISION3-02
-**Status**: planned
+**Status**: complete locally
 **Success Criteria** (what must be TRUE):
   1. ARC upgrades to the stronger original-vision claim only if the technical
      control-plane proof is complete end-to-end
@@ -11412,7 +11416,7 @@ qualified or still explicitly excluded
   3. One authoritative blocker list remains if the full thesis still does not
      qualify
 **Estimated complexity**: M
-**Plans**: 0 plans
+**Plans**: 1 plan
 
 ---
 
@@ -11422,10 +11426,237 @@ qualified or still explicitly excluded
 |-------|-----------|------|--------|
 | 407 | v3.16 | Universal Binding Resolution and Executor Registry | Complete |
 | 408 | v3.16 | Multi-Hop Authoritative Fabric Routes | Complete |
-| 409 | v3.16 | Dynamic Intent-Aware Governance Control Plane | Next |
-| 410 | v3.16 | Shared Lifecycle Contract and Runtime Fidelity Closure | Planned |
-| 411 | v3.16 | Multi-Operator Qualification and Ecosystem Proof | Planned |
-| 412 | v3.16 | Universal Control-Plane Thesis Gate | Planned |
+| 409 | v3.16 | Dynamic Intent-Aware Governance Control Plane | Complete |
+| 410 | v3.16 | Shared Lifecycle Contract and Runtime Fidelity Closure | Complete |
+| 411 | v3.16 | Multi-Operator Qualification and Ecosystem Proof | Complete |
+| 412 | v3.16 | Universal Control-Plane Thesis Gate | Complete |
+
+---
+
+## v3.17 Comptroller Market Position Proof (Phases 413-416)
+
+**Milestone Goal:** Turn ARC's comptroller-capable internal architecture into
+an externally operated, partner-visible, federated economic control surface
+that can support a real market-position qualification decision. This lane is
+not about inventing more internal primitives; it is about making the existing
+budget, market, underwriting, settlement, federation, and evidence stack
+operable and depend-able across real external boundaries.
+
+**Dependency:** Follows `v3.16`, which qualified ARC for the stronger
+technical universal control-plane thesis while still explicitly excluding the
+broader “proved comptroller of the agent economy” market claim.
+
+**Parallelism:** Phase 413 externalizes operator-managed control surfaces.
+Phase 414 builds partner-visible receipt, reconciliation, and settlement
+contracts on top of those surfaces. Phase 415 exercises federated
+multi-operator proof over the partner-visible contracts. Phase 416 reruns the
+claim gate and records exactly whether ARC has achieved market proof or still
+only comptroller-capable architecture.
+
+### Phase 413: Externally Operated Control Surfaces
+**Goal**: Convert ARC's economic control primitives into explicit
+operator-facing surfaces that can be deployed, governed, and observed outside a
+single local in-process runtime
+**Depends on**: Phase 412
+**Requirements**: OPS4-01, OPS4-02, OPS4-03
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. Budget, approval, payment-authorization, settlement, underwriting, and
+     operator-report surfaces are exposed through one explicit operator-facing
+     deployment model rather than only crate-local usage
+  2. At least one operator-oriented runbook and deployment profile covers live
+     control actions, escalation, recovery, and evidence export
+  3. Operator-facing reports are emitted as first-class externally consumable
+     outputs instead of repo-internal diagnostics alone
+**Estimated complexity**: L
+**Plans**: 1 plan
+
+### Phase 414: Partner-Visible Receipt and Settlement Contracts
+**Goal**: Make ARC's governed evidence and economic artifacts consumable as
+stable partner contracts for billing, settlement, dispute, and audit workflows
+**Depends on**: Phase 413
+**Requirements**: PARTNER4-01, PARTNER4-02, PARTNER4-03
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. Receipts, checkpoints, inclusion proofs, and reconciliation artifacts are
+     documented and exposed as partner-consumable contract surfaces
+  2. Settlement, market, credit, and underwriting artifacts are grouped into
+     partner-visible economic contract packages with explicit schemas and trust
+     semantics
+  3. Governed receipt-bearing flows are clearly separated from
+     `allow_without_receipt` or compatibility-only passthrough, and degraded
+     paths are treated as non-authoritative
+**Estimated complexity**: L
+**Plans**: 1 plan
+
+### Phase 415: Federated Multi-Operator Proof
+**Goal**: Prove that independent operators can use ARC-native evidence to
+coordinate trust, settlement, reconciliation, and failure recovery across org
+boundaries
+**Depends on**: Phases 413 and 414
+**Requirements**: FED4-01, FED4-02, FED4-03
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. At least one qualified multi-operator flow exercises federation activation
+     or trust exchange across independent operator boundaries
+  2. At least one qualified multi-operator flow exercises cross-org receipt
+     validation plus settlement/reconciliation handoff and failure recovery
+  3. The qualification package explicitly names trust boundaries, operator
+     roles, artifacts, and revocation/dispute semantics for third-party
+     reproduction
+**Estimated complexity**: L
+**Plans**: 1 plan
+
+### Phase 416: Market-Position Qualification Gates
+**Goal**: Decide whether ARC can now honestly claim more than
+comptroller-capable architecture and record the exact external thresholds that
+separate market proof from internal technical completion
+**Depends on**: Phases 413, 414, and 415
+**Requirements**: MARKET4-01, MARKET4-02, MARKET4-03
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. One qualification gate defines concrete adoption, partner-dependence, and
+     economic-workflow thresholds for the market-position claim
+  2. Docs and release qualification artifacts cleanly separate technical
+     control-plane proof from market-position proof
+  3. One machine-readable matrix records which prerequisites are repo-proven,
+     operator-proven, partner-proven, or still unproved
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+---
+
+## Phase Summary (v3.17)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 413 | v3.17 | Externally Operated Control Surfaces | Complete |
+| 414 | v3.17 | Partner-Visible Receipt and Settlement Contracts | Complete |
+| 415 | v3.17 | Federated Multi-Operator Proof | Complete |
+| 416 | v3.17 | Market-Position Qualification Gates | Complete |
+
+---
+
+## v3.18 Bounded ARC Ship Readiness Closure (Phases 417-421)
+
+**Milestone Goal:** Convert the Track A P0 blocker ladder into one executable
+pre-ship lane so ARC can ship one honest bounded release without overclaiming
+stronger recursive delegation, verifier-backed runtime assurance,
+transparency-log semantics, consensus-grade HA, or a proved market position.
+
+**Dependency:** Follows `v3.17`, which qualified ARC as comptroller-capable
+software on repo-local evidence but also made the remaining bounded-ship
+blockers explicit.
+
+**Parallelism:** Phase 417 closes claim and planning truth. Phase 418 closes
+the delegated-authority boundary. Phase 419 names the bounded hosted/auth
+profile. Phase 420 closes governed-provenance truth. Phase 421 publishes the
+bounded operational profile, pre-ship checklist, and release gate.
+
+### Phase 417: Claim Discipline and Planning Truth Closure
+**Goal**: Align ship-facing docs and the live planning stack to one bounded ARC
+claim so the release boundary is truthful before any runtime or qualification
+work is signed off
+**Depends on**: Phase 416
+**Requirements**: TRUTH5-01, TRUTH5-02
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. README, qualification docs, review docs, and ship-facing product docs all
+     align to one bounded ARC claim and explicitly exclude stronger unshipped
+     claims
+  2. `.planning/PROJECT.md`, `.planning/MILESTONES.md`,
+     `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and
+     `.planning/STATE.md` agree on latest completed milestone, active
+     milestone, archive status, and next action
+  3. No stale `v3.17` planning text remains implying that market-proof work is
+     unstarted or still the active lane
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+### Phase 418: Delegation Runtime Boundary Closure
+**Goal**: Make the bounded release truthful about delegated authority by either
+enforcing the chain and attenuation semantics at runtime or explicitly
+narrowing the release boundary to the semantics the runtime actually enforces
+today
+**Depends on**: Phase 417
+**Requirements**: DELEG5-01, DELEG5-02
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. The release boundary either includes real runtime delegation-chain and
+     attenuation enforcement or explicitly excludes the stronger recursive
+     delegated-authority claim
+  2. Revocation and lineage semantics are documented consistently with the
+     actual runtime path
+  3. Examples and qualification docs stop teaching stronger recursive
+     delegation semantics than the bounded release supports
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+### Phase 419: Hosted/Auth Profile Truth Closure
+**Goal**: Publish one recommended bounded hosted/auth profile and demote the
+compatibility-only paths so sender-constraint, session-reuse, and shared-owner
+claims match the runtime that ships
+**Depends on**: Phase 417
+**Requirements**: HOST5-01, HOST5-02
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. One recommended bounded hosted/auth profile is documented and reflected
+     consistently across README, runbooks, qualification docs, and examples
+  2. `shared_hosted_owner`, non-DPoP paths, and privilege-shrink-sensitive
+     reuse behavior are explicitly classified as compatibility-bounded where
+     applicable
+  3. Ship-facing docs no longer make universal stolen-capability or strong
+     multi-tenant hosted-isolation claims
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+### Phase 420: Governed Provenance Truth Closure
+**Goal**: Make bounded-release evidence surfaces truthful about what ARC
+observes locally versus what callers merely assert about upstream provenance
+**Depends on**: Phase 417
+**Requirements**: PROV5-01, PROV5-02
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. Governed call-chain and reviewer-facing surfaces distinguish asserted,
+     observed, and verified provenance or are narrowed to preserved caller
+     context
+  2. No bounded-release doc or contract surface treats caller-supplied
+     provenance as authenticated upstream truth unless that verification class
+     exists
+  3. Authorization-context, reviewer-pack, and related evidence docs align to
+     the same provenance model
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+### Phase 421: Bounded Operational Profile and Release Gate
+**Goal**: Publish the bounded operational profile and the authoritative
+pre-ship checklist so bounded ARC can be released on one explicit, truthful
+operational contract
+**Depends on**: Phases 417, 418, 419, and 420
+**Requirements**: BOUND5-01, BOUND5-02, BOUND5-03
+**Status**: complete
+**Success Criteria** (what must be TRUE):
+  1. Trust-control, budget, and receipt surfaces publish one bounded
+     operational profile that explicitly excludes consensus-grade HA,
+     distributed-linearizable spend truth, and transparency-log semantics
+  2. One bounded ARC qualification gate records the exact bounded/non-GA/local
+     status of the relevant runtime surfaces
+  3. One authoritative pre-ship checklist maps Track A P0 blockers to
+     evidence files, commands, and release sign-off expectations
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+---
+
+## Phase Summary (v3.18)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 417 | v3.18 | Claim Discipline and Planning Truth Closure | Complete |
+| 418 | v3.18 | Delegation Runtime Boundary Closure | Complete |
+| 419 | v3.18 | Hosted/Auth Profile Truth Closure | Complete |
+| 420 | v3.18 | Governed Provenance Truth Closure | Complete |
+| 421 | v3.18 | Bounded Operational Profile and Release Gate | Complete |
 
 ---
 

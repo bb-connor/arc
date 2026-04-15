@@ -1,0 +1,125 @@
+openapi: 3.1.0
+info:
+  title: Acme Procurement API
+  version: 0.1.0
+  description: >
+    Buyer-side procurement workflow for the agent-commerce-network example.
+servers:
+  - url: http://buyer-api:8101
+paths:
+  /procurement/quote-requests:
+    post:
+      summary: Request a provider quote for the security-review family
+      operationId: requestQuote
+      x-arc-side-effects: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [service_family, target, requested_scope]
+              properties:
+                service_family:
+                  type: string
+                  enum: [security-review]
+                target:
+                  type: string
+                requested_scope:
+                  type: string
+                release_window:
+                  type: string
+      responses:
+        "202":
+          description: Quote request accepted
+  /procurement/jobs:
+    post:
+      summary: Create a governed purchase request from a returned quote
+      operationId: createJob
+      x-arc-side-effects: true
+      x-arc-approval-required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quote_id, provider_id, service_family]
+              properties:
+                quote_id:
+                  type: string
+                provider_id:
+                  type: string
+                service_family:
+                  type: string
+                budget_minor:
+                  type: integer
+      responses:
+        "202":
+          description: Job staged
+  /procurement/jobs/{job_id}:
+    get:
+      summary: Read buyer-side job state
+      operationId: getJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job detail
+  /procurement/jobs/{job_id}/approve:
+    post:
+      summary: Approve a previously staged job
+      operationId: approveJob
+      x-arc-side-effects: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approver, reason]
+              properties:
+                approver:
+                  type: string
+                reason:
+                  type: string
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job approved
+  /procurement/jobs/{job_id}/disputes:
+    post:
+      summary: Raise a post-fulfillment dispute
+      operationId: disputeJob
+      x-arc-side-effects: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason_code, summary]
+              properties:
+                reason_code:
+                  type: string
+                  enum: [scope_miss, delay, quality_issue]
+                summary:
+                  type: string
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Dispute opened

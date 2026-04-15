@@ -1,132 +1,193 @@
 // Kernel-backed CapabilityChecker implementation.
 //
-// Validates capability tokens for file and terminal operations.
-// Fail-closed: any error during validation results in deny.
+// Routes ACP live-path checks through the shared cross-protocol orchestrator and
+// kernel guard pipeline. A no-op authority server satisfies the kernel's
+// registered-target contract without duplicating the real ACP side effect.
+
+use std::sync::Arc;
 
 use arc_core::capability::CapabilityToken;
-use arc_core::crypto::PublicKey;
+use arc_cross_protocol::{
+    BridgeError, CapabilityBridge, CrossProtocolCapabilityRef, CrossProtocolExecutionRequest,
+    CrossProtocolOrchestrator, DiscoveryProtocol,
+};
+use arc_kernel::{
+    ArcKernel, KernelError, NestedFlowBridge, ToolServerConnection, Verdict as KernelVerdict,
+};
+use serde_json::json;
+
+const ACP_GUARD_READ_TOOL: &str = "fs/read_text_file";
+const ACP_GUARD_WRITE_TOOL: &str = "fs/write_text_file";
+const ACP_GUARD_TERMINAL_TOOL: &str = "terminal/create";
+
+struct AcpGuardCapabilityBridge;
+
+impl CapabilityBridge for AcpGuardCapabilityBridge {
+    fn source_protocol(&self) -> DiscoveryProtocol {
+        DiscoveryProtocol::Acp
+    }
+
+    fn extract_capability_ref(
+        &self,
+        request: &Value,
+    ) -> Result<Option<CrossProtocolCapabilityRef>, BridgeError> {
+        request
+            .pointer("/metadata/arc/capabilityRef")
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| BridgeError::InvalidRequest(error.to_string()))
+    }
+
+    fn inject_capability_ref(
+        &self,
+        envelope: &mut Value,
+        cap_ref: &CrossProtocolCapabilityRef,
+    ) -> Result<(), BridgeError> {
+        let Some(object) = envelope.as_object_mut() else {
+            return Err(BridgeError::InvalidRequest(
+                "request envelope must be a JSON object".to_string(),
+            ));
+        };
+        let metadata = object
+            .entry("metadata".to_string())
+            .or_insert_with(|| json!({}));
+        let Some(metadata_obj) = metadata.as_object_mut() else {
+            return Err(BridgeError::InvalidRequest(
+                "metadata must be a JSON object".to_string(),
+            ));
+        };
+        let arc = metadata_obj
+            .entry("arc".to_string())
+            .or_insert_with(|| json!({}));
+        let Some(arc_obj) = arc.as_object_mut() else {
+            return Err(BridgeError::InvalidRequest(
+                "metadata.arc must be a JSON object".to_string(),
+            ));
+        };
+        arc_obj.insert(
+            "capabilityRef".to_string(),
+            serde_json::to_value(cap_ref)
+                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+        );
+        Ok(())
+    }
+
+    fn protocol_context(&self, request: &Value) -> Result<Option<Value>, BridgeError> {
+        Ok(Some(json!({
+            "sessionId": request.get("sessionId").cloned().unwrap_or(Value::Null),
+            "operation": request.get("operation").cloned().unwrap_or(Value::Null),
+            "resource": request.get("resource").cloned().unwrap_or(Value::Null),
+        })))
+    }
+}
+
+struct AcpAuthorityToolServer {
+    server_id: String,
+}
+
+impl AcpAuthorityToolServer {
+    fn new(server_id: impl Into<String>) -> Self {
+        Self {
+            server_id: server_id.into(),
+        }
+    }
+}
+
+impl ToolServerConnection for AcpAuthorityToolServer {
+    fn server_id(&self) -> &str {
+        &self.server_id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec![
+            ACP_GUARD_READ_TOOL.to_string(),
+            ACP_GUARD_WRITE_TOOL.to_string(),
+            ACP_GUARD_TERMINAL_TOOL.to_string(),
+        ]
+    }
+
+    fn invoke(
+        &self,
+        tool_name: &str,
+        arguments: Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<Value, KernelError> {
+        Ok(json!({
+            "authorityOnly": true,
+            "toolName": tool_name,
+            "arguments": arguments,
+        }))
+    }
+}
 
 /// Kernel-backed capability checker.
 ///
-/// Validates ACP operations against presented capability tokens.
-/// Uses the kernel's public key for trusted-issuer verification,
-/// verifies the token signature, and checks time bounds and scope.
+/// Uses the shared cross-protocol orchestrator plus a guard-only kernel server
+/// to make the authoritative allow/deny decision for ACP file and terminal
+/// operations. Every successful check emits a signed ARC receipt.
 pub struct KernelCapabilityChecker {
-    /// Trusted kernel public key for verifying token signatures.
-    kernel_public_key: PublicKey,
-    /// Server ID this checker is bound to.
+    kernel: Arc<ArcKernel>,
     server_id: String,
 }
 
 impl KernelCapabilityChecker {
     /// Create a new kernel-backed checker.
-    pub fn new(kernel_public_key: PublicKey, server_id: impl Into<String>) -> Self {
+    pub fn new(mut kernel: ArcKernel, server_id: impl Into<String>) -> Self {
+        let server_id = server_id.into();
+        kernel.register_tool_server(Box::new(AcpAuthorityToolServer::new(server_id.clone())));
         Self {
-            kernel_public_key,
-            server_id: server_id.into(),
+            kernel: Arc::new(kernel),
+            server_id,
         }
     }
 
-    /// Validate a capability token's structure, trust binding, signature, and
-    /// time bounds.
-    fn validate_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
-        let token: CapabilityToken = serde_json::from_str(token_json).map_err(|e| {
-            CapabilityCheckError::InvalidToken(format!("failed to parse token: {e}"))
-        })?;
-
-        if token.issuer != self.kernel_public_key {
-            return Err(CapabilityCheckError::SignatureVerificationFailed(
-                "token issuer does not match the trusted kernel key".to_string(),
-            ));
-        }
-
-        let signature_valid = token.verify_signature().map_err(|e| {
-            CapabilityCheckError::SignatureVerificationFailed(format!(
-                "failed to verify token signature: {e}"
-            ))
-        })?;
-        if !signature_valid {
-            return Err(CapabilityCheckError::SignatureVerificationFailed(
-                "token signature is invalid".to_string(),
-            ));
-        }
-
-        // Check time bounds.
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-
-        // `issued_at` serves as the earliest validity time.
-        if now < token.issued_at {
-            return Err(CapabilityCheckError::InvalidToken(
-                "token not yet valid".to_string(),
-            ));
-        }
-
-        if now > token.expires_at {
-            return Err(CapabilityCheckError::Expired);
-        }
-
-        Ok(token)
+    fn parse_token(&self, token_json: &str) -> Result<CapabilityToken, CapabilityCheckError> {
+        serde_json::from_str(token_json)
+            .map_err(|error| CapabilityCheckError::InvalidToken(format!("failed to parse token: {error}")))
     }
 
-    /// Check whether a token's scope covers the requested operation.
-    fn check_scope(&self, token: &CapabilityToken, operation: &str, resource: &str) -> bool {
-        // Check each tool grant in the token's scope for a match.
-        for grant in &token.scope.grants {
-            // Match the tool name against the operation type.
-            let tool_matches = match operation {
-                "fs_read" => {
-                    grant.tool_name == "fs/read_text_file"
-                        || grant.tool_name == "fs/*"
-                        || grant.tool_name == "*"
-                }
-                "fs_write" => {
-                    grant.tool_name == "fs/write_text_file"
-                        || grant.tool_name == "fs/*"
-                        || grant.tool_name == "*"
-                }
-                "terminal" => {
-                    grant.tool_name == "terminal/create"
-                        || grant.tool_name == "terminal/*"
-                        || grant.tool_name == "*"
-                }
-                _ => grant.tool_name == "*",
-            };
-
-            if !tool_matches {
-                continue;
-            }
-
-            // Check server scope.
-            let server_matches = grant.server_id == "*" || grant.server_id == self.server_id;
-
-            if !server_matches {
-                continue;
-            }
-
-            // Check resource constraints if present.
-            // For PathPrefix constraints, the resource path must start
-            // with the prefix. For other constraint types, we skip them
-            // (fail open on unknown constraint types within the grant,
-            // since the grant itself was already matched by tool name).
-            let resource_matches = if grant.constraints.is_empty() {
-                true
-            } else {
-                grant.constraints.iter().any(|c| {
-                    matches!(
-                        c,
-                        arc_core::capability::Constraint::PathPrefix(prefix) if resource.starts_with(prefix.as_str())
-                    )
-                })
-            };
-
-            if resource_matches {
-                return true;
-            }
+    fn map_request(
+        &self,
+        request: &AcpCapabilityRequest,
+    ) -> Result<(&'static str, Value), CapabilityCheckError> {
+        match request.operation.as_str() {
+            "fs_read" => Ok((
+                ACP_GUARD_READ_TOOL,
+                json!({
+                    "path": request.resource,
+                }),
+            )),
+            "fs_write" => Ok((
+                ACP_GUARD_WRITE_TOOL,
+                json!({
+                    "path": request.resource,
+                }),
+            )),
+            "terminal" => Ok((
+                ACP_GUARD_TERMINAL_TOOL,
+                json!({
+                    "command": request.resource,
+                    "args": [],
+                }),
+            )),
+            other => Err(CapabilityCheckError::Internal(format!(
+                "unsupported ACP operation for authoritative enforcement: {other}"
+            ))),
         }
-        false
+    }
+
+    fn build_source_envelope(
+        &self,
+        request: &AcpCapabilityRequest,
+        arguments: &Value,
+    ) -> Value {
+        json!({
+            "sessionId": request.session_id,
+            "operation": request.operation,
+            "resource": request.resource,
+            "arguments": arguments,
+        })
     }
 }
 
@@ -135,47 +196,88 @@ impl CapabilityChecker for KernelCapabilityChecker {
         &self,
         request: &AcpCapabilityRequest,
     ) -> Result<AcpVerdict, CapabilityCheckError> {
-        // No token presented -- fail closed.
         let token_json = match &request.token {
-            Some(t) if !t.is_empty() => t,
+            Some(token) if !token.trim().is_empty() => token,
             _ => {
                 return Ok(AcpVerdict {
                     allowed: false,
                     capability_id: None,
+                    receipt_id: None,
                     reason: "no capability token presented".to_string(),
                 });
             }
         };
 
-        // Validate token structure and time bounds.
-        let token = match self.validate_token(token_json) {
-            Ok(t) => t,
-            Err(e) => {
-                // Fail closed: validation errors deny access.
+        let capability = match self.parse_token(token_json) {
+            Ok(capability) => capability,
+            Err(error) => {
                 return Ok(AcpVerdict {
                     allowed: false,
                     capability_id: None,
-                    reason: format!("token validation failed: {e}"),
+                    receipt_id: None,
+                    reason: error.to_string(),
                 });
             }
         };
+        let (tool_name, arguments) = match self.map_request(request) {
+            Ok(mapped) => mapped,
+            Err(error) => {
+                return Ok(AcpVerdict {
+                    allowed: false,
+                    capability_id: Some(capability.id.clone()),
+                    receipt_id: None,
+                    reason: error.to_string(),
+                });
+            }
+        };
+        let request_hash = arc_core::sha256_hex(
+            serde_json::to_string(&json!({
+                "sessionId": request.session_id,
+                "operation": request.operation,
+                "resource": request.resource,
+            }))
+            .unwrap_or_default()
+            .as_bytes(),
+        );
+        let orchestrated = CrossProtocolOrchestrator::new(self.kernel.as_ref())
+            .execute(
+                &AcpGuardCapabilityBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: format!("acp-guard-{}-{request_hash}", request.session_id),
+                    kernel_request_id: format!("acp-live-guard-{request_hash}"),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: self.server_id.clone(),
+                    target_tool_name: tool_name.to_string(),
+                    agent_id: capability.subject.to_hex(),
+                    arguments: arguments.clone(),
+                    capability: capability.clone(),
+                    source_envelope: self.build_source_envelope(request, &arguments),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                },
+            )
+            .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
 
-        // Check scope.
-        if self.check_scope(&token, &request.operation, &request.resource) {
-            Ok(AcpVerdict {
+        let response = orchestrated.response;
+        let capability_id = Some(response.receipt.capability_id.clone());
+        let receipt_id = Some(response.receipt.id.clone());
+
+        match response.verdict {
+            KernelVerdict::Allow => Ok(AcpVerdict {
                 allowed: true,
-                capability_id: Some(token.id.clone()),
-                reason: "capability token authorized access".to_string(),
-            })
-        } else {
-            Ok(AcpVerdict {
+                capability_id,
+                receipt_id,
+                reason: "authorized through kernel-backed ACP guard pipeline".to_string(),
+            }),
+            KernelVerdict::Deny => Ok(AcpVerdict {
                 allowed: false,
-                capability_id: Some(token.id.clone()),
-                reason: format!(
-                    "token scope does not cover {} on {}",
-                    request.operation, request.resource
-                ),
-            })
+                capability_id,
+                receipt_id,
+                reason: response
+                    .reason
+                    .unwrap_or_else(|| "kernel denied ACP operation".to_string()),
+            }),
         }
     }
 }

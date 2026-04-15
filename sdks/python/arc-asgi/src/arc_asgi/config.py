@@ -14,7 +14,7 @@ class ArcASGIConfig:
     sidecar_url:
         Base URL of the ARC sidecar (default ``http://127.0.0.1:9090``).
     timeout:
-        Request timeout in seconds for sidecar calls (default 10).
+        Request timeout in seconds for sidecar calls (default 5).
     exclude_paths:
         Paths that bypass ARC evaluation (e.g. health checks).
     exclude_methods:
@@ -27,7 +27,7 @@ class ArcASGIConfig:
     """
 
     sidecar_url: str = "http://127.0.0.1:9090"
-    timeout: float = 10.0
+    timeout: float = 5.0
     exclude_paths: frozenset[str] = frozenset()
     exclude_methods: frozenset[str] = frozenset({"OPTIONS"})
     receipt_header: str = "X-Arc-Receipt"

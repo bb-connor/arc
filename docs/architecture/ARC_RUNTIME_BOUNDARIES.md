@@ -9,7 +9,7 @@ quietly collapse back into monolithic shells.
 | Surface | Runtime shell responsibility | Extracted boundary |
 | --- | --- | --- |
 | `crates/arc-cli/src/remote_mcp.rs` | hosted MCP session lifecycle, auth, edge routing, and transport orchestration | `crates/arc-cli/src/remote_mcp/admin.rs` owns remote admin routes, admin-only storage access, and session trust control handlers |
-| `crates/arc-cli/src/trust_control.rs` | trust-service routing, issuance, registry operations, remote client entrypoints, and cluster coordination | `crates/arc-cli/src/trust_control/health.rs` owns health-report composition and cluster health projection |
+| `crates/arc-cli/src/trust_control.rs` | trust-service routing, issuance, registry operations, remote client entrypoints, and cluster coordination | `crates/arc-cli/src/trust_control/health.rs` owns health-report composition and cluster health projection; `crates/arc-cli/src/federation_policy.rs` owns the bounded federation-policy model; `crates/arc-cli/src/scim_lifecycle.rs` owns the bounded SCIM lifecycle model |
 | `crates/arc-mcp-edge/src/runtime.rs` | `ArcMcpEdge` state machine, task orchestration, runtime event forwarding, and inbound loop control | `crates/arc-mcp-edge/src/runtime/protocol.rs` owns JSON-RPC shaping, task/result metadata, transport glue, pagination, and capability selection helpers |
 | `crates/arc-kernel/src/lib.rs` | kernel policy flow, dispatch, receipt persistence, checkpoint triggering, and public crate surface | `crates/arc-kernel/src/receipt_support.rs` owns receipt hashing and metadata helpers; `crates/arc-kernel/src/request_matching.rs` owns session request tracking plus capability and constraint matching |
 

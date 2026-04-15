@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from arc_asgi.config import ArcASGIConfig
-from arc_asgi.middleware import ArcASGIMiddleware, _extract_capability_id
+from arc_asgi.middleware import ArcASGIMiddleware, _extract_capability_token
 from arc_sdk.errors import ArcConnectionError
-from arc_sdk.models import HttpReceipt, Verdict
+from arc_sdk.models import EvaluateResponse, HttpReceipt, Verdict
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +93,18 @@ def _make_receipt(
     )
 
 
+def _make_evaluation(
+    allowed: bool = True,
+    receipt_id: str = "receipt-1",
+) -> EvaluateResponse:
+    receipt = _make_receipt(allowed=allowed, receipt_id=receipt_id)
+    return EvaluateResponse(
+        verdict=receipt.verdict,
+        receipt=receipt,
+        evidence=[],
+    )
+
+
 async def _echo_app(scope: Scope, receive: Receive, send: Send) -> None:
     """Simple ASGI app that returns 200 OK."""
     await send({
@@ -149,13 +161,13 @@ class TestNonHttpScope:
 
 class TestAllowedRequest:
     async def test_forwards_on_allow(self) -> None:
-        receipt = _make_receipt(allowed=True, receipt_id="r-allow")
+        evaluation = _make_evaluation(allowed=True, receipt_id="r-allow")
 
         with patch(
             "arc_asgi.middleware.ArcClient", autospec=True
         ) as MockClient:
             instance = MockClient.return_value
-            instance.evaluate_http_request = AsyncMock(return_value=receipt)
+            instance.evaluate_http_request = AsyncMock(return_value=evaluation)
 
             config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(_echo_app, config=config)
@@ -178,13 +190,13 @@ class TestAllowedRequest:
 
 class TestDeniedRequest:
     async def test_returns_error_on_deny(self) -> None:
-        receipt = _make_receipt(allowed=False, receipt_id="r-deny")
+        evaluation = _make_evaluation(allowed=False, receipt_id="r-deny")
 
         with patch(
             "arc_asgi.middleware.ArcClient", autospec=True
         ) as MockClient:
             instance = MockClient.return_value
-            instance.evaluate_http_request = AsyncMock(return_value=receipt)
+            instance.evaluate_http_request = AsyncMock(return_value=evaluation)
 
             config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(_echo_app, config=config)
@@ -230,6 +242,13 @@ class TestSidecarUnavailable:
             assert start_msg["status"] == 503
 
     async def test_fail_open(self) -> None:
+        observed_passthrough = None
+
+        async def app_with_passthrough(scope: Scope, receive: Receive, send: Send) -> None:
+            nonlocal observed_passthrough
+            observed_passthrough = scope.get("state", {}).get("arc_passthrough")
+            await _echo_app(scope, receive, send)
+
         with patch(
             "arc_asgi.middleware.ArcClient", autospec=True
         ) as MockClient:
@@ -241,7 +260,7 @@ class TestSidecarUnavailable:
             config = ArcASGIConfig(
                 sidecar_url="http://mock:9090", fail_open=True
             )
-            mw = ArcASGIMiddleware(_echo_app, config=config)
+            mw = ArcASGIMiddleware(app_with_passthrough, config=config)
 
             scope = _make_scope()
             send, messages = _make_send()
@@ -251,18 +270,23 @@ class TestSidecarUnavailable:
                 m for m in messages if m.get("type") == "http.response.start"
             )
             assert start_msg["status"] == 200
+            header_dict = dict(start_msg.get("headers", []))
+            assert b"x-arc-receipt" not in header_dict
+            assert observed_passthrough is not None
+            assert observed_passthrough.mode == "allow_without_receipt"
+            assert observed_passthrough.error == "arc_sidecar_unreachable"
 
 
 class TestReceiptCallback:
     async def test_on_receipt_called(self) -> None:
-        receipt = _make_receipt(allowed=True)
+        evaluation = _make_evaluation(allowed=True)
         callback = AsyncMock()
 
         with patch(
             "arc_asgi.middleware.ArcClient", autospec=True
         ) as MockClient:
             instance = MockClient.return_value
-            instance.evaluate_http_request = AsyncMock(return_value=receipt)
+            instance.evaluate_http_request = AsyncMock(return_value=evaluation)
 
             config = ArcASGIConfig(sidecar_url="http://mock:9090")
             mw = ArcASGIMiddleware(
@@ -273,28 +297,28 @@ class TestReceiptCallback:
             send, _ = _make_send()
             await mw(scope, _make_receive(), send)
 
-            callback.assert_awaited_once_with(receipt)
+            callback.assert_awaited_once_with(evaluation.receipt)
 
 
 class TestCapabilityIdExtraction:
     def test_from_header(self) -> None:
         scope = _make_scope(headers={"x-arc-capability": "cap-123"})
-        assert _extract_capability_id(scope) == "cap-123"
+        assert _extract_capability_token(scope) == "cap-123"
 
     def test_from_query_string(self) -> None:
         scope = _make_scope(query_string="arc_capability=cap-456&other=val")
-        assert _extract_capability_id(scope) == "cap-456"
+        assert _extract_capability_token(scope) == "cap-456"
 
     def test_none_when_missing(self) -> None:
         scope = _make_scope()
-        assert _extract_capability_id(scope) is None
+        assert _extract_capability_token(scope) is None
 
     def test_header_takes_precedence(self) -> None:
         scope = _make_scope(
             headers={"x-arc-capability": "cap-header"},
             query_string="arc_capability=cap-query",
         )
-        assert _extract_capability_id(scope) == "cap-header"
+        assert _extract_capability_token(scope) == "cap-header"
 
 
 class TestConfig:

@@ -1,0 +1,39 @@
+import express from "express";
+import { arc, arcErrorHandler } from "@arc-protocol/express";
+
+const app = express();
+
+app.use(
+  arc({
+    sidecarUrl: process.env["ARC_SIDECAR_URL"] ?? "http://127.0.0.1:9090",
+    skip: ["/healthz"],
+  }),
+);
+app.use(express.json());
+
+app.get("/healthz", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.get("/hello", (req, res) => {
+  res.json({
+    message: "hello from express",
+    receipt_id: req.arcResult?.receipt.id ?? null,
+  });
+});
+
+app.post("/echo", (req, res) => {
+  res.json({
+    ...(typeof req.body === "object" && req.body !== null ? req.body : { payload: req.body }),
+    receipt_id: req.arcResult?.receipt.id ?? null,
+    has_raw_body: Buffer.isBuffer(req.rawBody),
+  });
+});
+
+app.use(arcErrorHandler);
+
+const port = Number(process.env["HELLO_EXPRESS_PORT"] ?? "8011");
+app.listen(port, "127.0.0.1", () => {
+  process.stdout.write(`hello-express listening on http://127.0.0.1:${port}\n`);
+});
+

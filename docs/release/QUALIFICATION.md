@@ -1,17 +1,10 @@
 # Release Qualification
 
-This document defines the production qualification lane for the current ARC
-production-candidate surface, including the locally completed `v2.9`
-economic-interop additions plus the locally completed `v2.35` `arc-link`
-oracle-runtime additions plus the locally completed `v2.36` `arc-anchor`
-anchoring-runtime additions plus the locally completed `v2.37`
-`arc-settle` settlement-runtime additions plus the locally completed `v2.38`
-web3 automation, CCIP, and payment-interop additions plus the locally
-completed `v2.39` web3 operations, public-boundary, and partner-proof
-closure additions plus the locally completed `v2.40` runtime-integrity,
-evidence-gating, and contract-coherence additions plus the locally completed
-`v2.41` hosted qualification, deployment-promotion, operator-control, and
-generated end-to-end settlement-proof additions.
+This document defines the qualification lane for the current bounded ARC
+release candidate. The ship boundary is intentionally narrower than the
+stronger repo-local v3.16 and v3.17 thesis gates: bounded ARC is the
+release-facing claim, while stronger technical-control-plane and
+comptroller-capable packaging claims remain optional addenda.
 
 Use the release documents this way:
 
@@ -26,12 +19,102 @@ Use the release documents this way:
   [ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md) are reviewer-facing
   packages derived from the same evidence lanes
 
-ARC now has two distinct gate types:
+ARC now has four distinct gate types:
 
 - the regular workspace CI lane, which blocks routine regressions quickly
+- the bounded ARC release gate, which proves the current ship-facing boundary
+  and records the supported local-only, leader-local, informational-only, and
+  compatibility-only surfaces explicitly
 - the release-qualification lane, which proves source-only release inputs,
-  dashboard and SDK packaging, conformance-critical behavior, and the repeat-run
-  HA control-plane path
+  dashboard and SDK packaging, conformance-critical behavior, and the bounded
+  operational profile
+- the focused claim-gate lanes, which qualify increasingly strong technical and
+  market-adjacent statements without pretending repo-local evidence proves the
+  broader market thesis
+
+## Bounded ARC Release Gate
+
+For the current ship decision, ARC has one primary release gate:
+
+- `./scripts/qualify-bounded-arc.sh`
+
+This command is the authoritative bounded ARC ship gate. It records:
+
+- the named bounded operational profile used for release
+- the exact guarantee class for the sensitive surfaces that were previously
+  overclaimed
+- the retained non-claims: no consensus-grade HA, no distributed-linearizable
+  budget authority, no public transparency-log semantics, no authenticated
+  recursive delegation ancestry beyond the preserved chain, and no proved
+  market-position thesis
+
+The strongest honest ship-facing claim ARC can now make is:
+
+- ARC ships a cryptographically signed, fail-closed governance and evidence
+  control plane with bounded delegated-authority semantics, bounded hosted/auth
+  profiles, bounded provenance semantics, signed receipts and checkpoints, and
+  explicit local or leader-local operational contracts for trust-control,
+  budgets, and review surfaces.
+
+That bounded release does **not** qualify:
+
+- theorem-prover completion for every protocol claim
+- authenticated recursive delegation ancestry beyond the preserved
+  caller-presented chain
+- verifier-backed runtime assurance as the sole admission boundary
+- consensus-grade HA or distributed-linearizable budget truth
+- public transparency-log or strong non-repudiation semantics
+- a proved "comptroller of the agent economy" market position
+
+The machine-readable gate for this lane is:
+
+- [ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json](../standards/ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json)
+
+Its artifact bundle is written to:
+
+- `target/release-qualification/bounded-arc/`
+
+## Additional Claim-Gate Addenda
+
+ARC also retains three stronger repo-local claim gates for technical and
+strategic review work:
+
+- `./scripts/qualify-cross-protocol-runtime.sh`
+- `./scripts/qualify-universal-control-plane.sh`
+- `./scripts/qualify-comptroller-market-position.sh`
+
+Those commands are additive and are not the front-door bounded release
+requirement. They remain useful when a reviewer wants the stronger local
+technical-control-plane or comptroller-capable packaging evidence.
+
+- `./scripts/qualify-cross-protocol-runtime.sh` qualifies the bounded
+  cross-protocol runtime substrate and representative SDK/runtime surface
+- `./scripts/qualify-universal-control-plane.sh` qualifies the stronger
+  technical control-plane thesis on top of that substrate
+- `./scripts/qualify-comptroller-market-position.sh` qualifies the strongest
+  honest repo-local economic/control-plane boundary: comptroller-capable
+  software with qualified operator, partner, and bounded federated proof,
+  while still refusing the stronger proved-market-position claim
+
+The machine-readable gates for the stronger addenda are:
+
+- [ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json](../standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json)
+- [ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json](../standards/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json)
+- [ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json](../standards/ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json)
+
+Their artifact bundles are written to:
+
+- `target/release-qualification/cross-protocol-runtime/`
+- `target/release-qualification/universal-control-plane/`
+- `target/release-qualification/comptroller-market-position/`
+
+The current retained decision is therefore:
+
+- ship bounded ARC on the bounded release gate above
+- keep the stronger cross-protocol, universal-control-plane, and
+  comptroller-capable gates as separate optional addenda
+- do not treat those stronger addenda as the primary shipping boundary
+- do not upgrade the broader market-position thesis
 
 ## Environments
 
@@ -67,7 +150,16 @@ Regular workspace lane:
 Release-qualification lane:
 
 ```bash
+./scripts/qualify-bounded-arc.sh
 ./scripts/qualify-release.sh
+```
+
+Focused stronger claim-gates:
+
+```bash
+./scripts/qualify-cross-protocol-runtime.sh
+./scripts/qualify-universal-control-plane.sh
+./scripts/qualify-comptroller-market-position.sh
 ```
 
 Focused release-component lanes:
@@ -188,7 +280,7 @@ The current launch package also consumes the same evidence set through
 | The Python SDK wheel and sdist are reproducible and install cleanly | `packages/sdk/arc-py/pyproject.toml`, built wheel/sdist, and clean venv smoke installs | `./scripts/check-arc-py-release.sh` |
 | The Go SDK module qualifies as a module release and consumer dependency | `packages/sdk/arc-go/go.mod`, `go install ./cmd/conformance-peer`, and consumer-module smoke build | `./scripts/check-arc-go-release.sh` |
 | Executable scope-attenuation semantics stay aligned with the current shipped runtime surface | `formal/diff-tests/` reference model and differential properties | `cargo test -p arc-formal-diff-tests` |
-| HA trust-control remains deterministic on the supported clustered control-plane flow | `crates/arc-cli/tests/trust_cluster.rs` repeat-run qualification plus normal workspace coverage | `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` |
+| Clustered trust-control remains a bounded leader-local control-plane flow rather than a consensus system | `crates/arc-cli/tests/trust_cluster.rs` repeat-run qualification plus normal workspace coverage | `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` |
 | The insurer-facing behavioral feed remains signed, filterable, and anchored to canonical trust data | `crates/arc-cli/tests/receipt_query.rs` behavioral-feed endpoint/CLI regression | `cargo test -p arc-cli --test receipt_query test_behavioral_feed_export_surfaces -- --exact` |
 | OID4VCI-compatible ARC passport issuance remains replay-safe, fail-closed, remotely usable through public metadata, and now exposes bounded projected `application/dc+sd-jwt` and `jwt_vc_json` passport lanes without widening ARC-native presentation semantics | `crates/arc-credentials/src/oid4vci.rs`, `crates/arc-credentials/src/portable_sd_jwt.rs`, and `crates/arc-credentials/src/portable_jwt_vc.rs` unit coverage plus `crates/arc-cli/tests/passport.rs` local and remote issuance or lifecycle regressions | `cargo test -p arc-credentials oid4vci -- --nocapture && cargo test -p arc-credentials portable_sd_jwt -- --nocapture && cargo test -p arc-credentials portable_jwt_vc_json -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_local_with_published_status_attaches_portable_lifecycle_reference -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_remote_requires_published_status_and_exposes_public_resolution -- --nocapture && cargo test -p arc-cli --test passport passport_portable_sd_jwt_metadata_and_issuance_roundtrip -- --nocapture && cargo test -p arc-cli --test passport passport_portable_jwt_vc_json_metadata_and_issuance_roundtrip -- --nocapture && cargo test -p arc-cli --test passport passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revoked_states -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_metadata_rejects_public_status_distribution_without_cache_ttl -- --nocapture && cargo test -p arc-cli --test passport passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_resolution -- --nocapture && cargo test -p arc-cli --test passport passport_portable_metadata_endpoints_require_signing_key_configuration -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_rejects_mixed_portable_profile_request -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_local_portable_offer_requires_signing_seed -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vci -- --nocapture` |
 | ARC now ships one narrow verifier-side OID4VP bridge with signed `request_uri` requests, one transport-neutral wallet exchange descriptor and canonical transaction state, one optional verifier-scoped identity assertion continuity lane, same-device and cross-device launch artifacts, verifier metadata, trusted-key `JWKS`, and fail-closed `direct_post.jwt` verification over the projected passport lane | `crates/arc-core/src/session.rs`, `crates/arc-credentials/src/oid4vp.rs` unit coverage plus `crates/arc-cli/tests/passport.rs` verifier transport, wallet-exchange state, identity-assertion continuity, CLI holder adapter, and rotation regressions | `cargo test -p arc-core arc_identity_assertion -- --nocapture && cargo test -p arc-credentials oid4vp -- --nocapture && cargo test -p arc-credentials wallet_exchange_validation_rejects_contradictory_state -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_launches -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request_truth -- --nocapture` |
@@ -216,8 +308,8 @@ The current launch package also consumes the same evidence set through
 | Liability-market claim, dispute, adjudication, payout, and settlement workflows remain immutable, evidence-linked, and fail closed on oversized claims, invalid dispute state, duplicate payout receipts, stale settlement authority, or mismatched settlement topology | `crates/arc-core/src/market.rs` claim, payout, and settlement contracts, `crates/arc-store-sqlite/src/receipt_store.rs` immutable claim-workflow persistence, `crates/arc-cli/src/trust_control.rs` claim, payout, and settlement issuance surfaces, `crates/arc-cli/src/main.rs` liability-market CLI issuance and list commands, and `crates/arc-cli/tests/receipt_query.rs` end-to-end workflow regressions | `cargo test -p arc-core market -- --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_rejects_oversized_claims_and_invalid_disputes -- --exact --nocapture` |
 | ARC's bounded liability-market posture is qualified end to end across curated provider resolution, delegated pricing authority, quote and bind, claim workflow evidence, and one explicit payout-and-settlement lane without implying autonomous insurer pricing beyond the delegated envelope or open-ended cross-organization recovery clearing | the provider-registry, delegated-pricing/quote-and-bind, claim-workflow, and settlement-workflow regressions together with the updated partner-proof and release-boundary docs | `cargo test -p arc-core market -- --nocapture && cargo test -p arc-cli --test receipt_query liability_provider -- --nocapture && cargo test -p arc-cli --test receipt_query liability_market -- --nocapture --test-threads=1 && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_workflow_surfaces -- --exact --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test receipt_query test_liability_claim_rejects_oversized_claims_and_invalid_disputes -- --exact --nocapture` |
 | Metered billing evidence remains separate from signed receipt truth while staying operator-reconcilable | `crates/arc-cli/tests/receipt_query.rs` metered-billing reconciliation regression | `cargo test -p arc-cli --test receipt_query test_metered_billing_reconciliation_report_and_action_endpoint -- --exact` |
-| Governed receipts can be projected into enterprise-facing authorization-context, metadata, and reviewer-pack reports without widening scope, and the hosted request-time authorization flow now preserves the same bounded ARC profile across `authorization_details`, `arc_transaction_context`, protected-resource `resource` binding, optional identity-assertion continuity, and runtime-versus-audit artifact boundaries | `crates/arc-cli/tests/receipt_query.rs` authorization-context endpoint, metadata, reviewer-pack, and negative-path regressions plus hosted discovery and request-time authorization regressions in `crates/arc-cli/tests/mcp_auth_server.rs` | `cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_metadata_and_review_pack_surfaces -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_arc_oauth_profile_projection -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_missing_sender_binding_material -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_incomplete_runtime_assurance_projection -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_delegated_call_chain_projection -- --exact && cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_serves_oauth_authorization_server_metadata_for_local_issuer -- --exact --nocapture && cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture && cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture` |
-| ARC Certify public marketplace surfaces remain evidence-backed and fail closed: certification artifacts advertise one versioned evidence profile, public discovery metadata rejects stale or mismatched publishers, search and transparency preserve operator provenance, and consume plus dispute flows never auto-grant trust from listing visibility | `crates/arc-cli/tests/certify.rs` public metadata, marketplace search/transparency, consume, and dispute regressions | `cargo test -p arc-cli --test certify certify_check_emits_signed_pass_artifact_and_report -- --exact --nocapture && cargo test -p arc-cli --test certify certify_registry_discover_fails_closed_on_stale_and_mismatched_public_metadata -- --exact --nocapture && cargo test -p arc-cli --test certify certify_marketplace_search_transparency_consume_and_dispute_work -- --exact --nocapture` |
+| Governed receipts can be projected into enterprise-facing authorization-context, metadata, and reviewer-pack reports without widening scope, while delegated call-chain context remains preserved caller context unless separately verified and the hosted request-time authorization flow keeps the same bounded ARC profile across `authorization_details`, `arc_transaction_context`, protected-resource `resource` binding, optional identity-assertion continuity, and runtime-versus-audit artifact boundaries | `crates/arc-cli/tests/receipt_query.rs` authorization-context endpoint, metadata, reviewer-pack, and negative-path regressions plus hosted discovery and request-time authorization regressions in `crates/arc-cli/tests/mcp_auth_server.rs` | `cargo test -p arc-cli --test receipt_query test_authorization_context_report_and_cli -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_metadata_and_review_pack_surfaces -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_arc_oauth_profile_projection -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_missing_sender_binding_material -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_incomplete_runtime_assurance_projection -- --exact && cargo test -p arc-cli --test receipt_query test_authorization_context_report_rejects_invalid_delegated_call_chain_projection -- --exact && cargo test -p arc-cli --test mcp_serve_http mcp_serve_http_serves_oauth_authorization_server_metadata_for_local_issuer -- --exact --nocapture && cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture && cargo test -p arc-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture` |
+| ARC Certify public marketplace surfaces remain evidence-backed and fail closed: certification artifacts advertise one versioned evidence profile, public discovery metadata rejects stale or mismatched publishers, and search plus transparency remain signed visibility feeds that preserve operator provenance without auto-granting trust from listing visibility | `crates/arc-cli/tests/certify.rs` public metadata, marketplace search/transparency, consume, and dispute regressions | `cargo test -p arc-cli --test certify certify_check_emits_signed_pass_artifact_and_report -- --exact --nocapture && cargo test -p arc-cli --test certify certify_registry_discover_fails_closed_on_stale_and_mismatched_public_metadata -- --exact --nocapture && cargo test -p arc-cli --test certify certify_marketplace_search_transparency_consume_and_dispute_work -- --exact --nocapture` |
 | The bounded generic registry substrate keeps namespace ownership explicit and auditable, projects current tool-server, issuer, verifier, and liability-provider surfaces through one signed listing envelope, makes origin/mirror/indexer publisher roles plus deterministic search-policy and freshness metadata explicit, and fails closed on contradictory ownership or stale/divergent replica state without turning visibility into trust admission | `crates/arc-core/src/listing.rs` generic namespace/listing/aggregation contract, `crates/arc-cli/src/trust_control.rs` public namespace plus listing projection surfaces, and `crates/arc-cli/tests/certify.rs` generic-registry regression | `CARGO_INCREMENTAL=0 cargo test -p arc-core generic_listing_ -- --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_public_generic_registry_namespace_and_listings_project_current_actor_families -- --exact --nocapture` |
 | Open-registry trust activation remains explicit, local, machine-readable, and fail closed: one signed local activation artifact binds one listing plus review context and eligibility policy, `public_untrusted` never admits, `reviewable` admits only after approval, and stale or incompatible registry state rejects runtime trust import | `crates/arc-core/src/listing.rs` trust-activation contract and `crates/arc-cli/tests/certify.rs` local activation issue/evaluate regression | `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib generic_trust_activation_ -- --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_generic_registry_trust_activation_requires_explicit_local_activation_and_fails_closed -- --exact --nocapture` |
 | Open-registry governance remains signed, scope-bounded, and fail closed: governance charters declare namespace and operator authority plus allowed case kinds, dispute/freeze/sanction/appeal cases bind to listing and optional activation truth, and expired, unauthorized, invalid-appeal, or unsupported governance actions reject rather than widening trust | `crates/arc-core/src/governance.rs` governance contract, `crates/arc-cli/src/trust_control.rs` charter/case issue and evaluate surfaces, and `crates/arc-cli/tests/certify.rs` governance regression | `CARGO_INCREMENTAL=0 cargo test -p arc-core --lib generic_governance_ -- --nocapture && CARGO_INCREMENTAL=0 cargo test -p arc-cli --test certify certify_generic_registry_governance_charters_and_cases_enforce_bounded_open_governance -- --exact --nocapture` |

@@ -295,8 +295,9 @@ Operations classified as DenyByDefault require the caller to present a valid
 capability token. Without a token, the proxy **MUST** return a structured 403
 response (see Section 4.4).
 
-The caller presents a capability token via the `X-Arc-Capability` HTTP header.
-When a valid token is present, the request proceeds to the upstream.
+The caller presents a capability token via the `X-Arc-Capability` HTTP header
+or the `arc_capability` query parameter. When a valid token is present, the
+request proceeds to the upstream.
 
 ### 3.4 Extension Overrides
 
@@ -369,7 +370,7 @@ this schema:
   "error": "arc_access_denied",
   "message": "<human-readable denial reason>",
   "receipt_id": "<receipt ID for the denial>",
-  "suggestion": "provide a valid capability token in the X-Arc-Capability header"
+  "suggestion": "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter"
 }
 ```
 
@@ -396,7 +397,7 @@ of whether the request is allowed or denied. The receipt records:
 | `caller_identity_hash` | SHA-256 hash of the caller identity |
 | `verdict` | `Allow` or `Deny` with reason and guard name |
 | `evidence` | Guard evaluation evidence chain |
-| `response_status` | HTTP status code (200 for allowed, 403 for denied) |
+| `response_status` | ARC evaluation-time HTTP status (`403` for denied; typically `200` for allowed sidecar/proxy evaluations before the upstream response exists) |
 | `timestamp` | Unix timestamp of the request |
 | `content_hash` | Hash of the request content |
 | `policy_hash` | SHA-256 hash of the loaded OpenAPI spec |

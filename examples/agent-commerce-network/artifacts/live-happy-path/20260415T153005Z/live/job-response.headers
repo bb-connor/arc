@@ -1,0 +1,6 @@
+HTTP/1.1 403 Forbidden
+content-type: application/json
+x-arc-receipt-id: 019d91c6-fe7d-7d62-b9fb-47dbf4dfc600
+content-length: 252
+date: Wed, 15 Apr 2026 15:33:50 GMT
+

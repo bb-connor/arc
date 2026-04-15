@@ -356,6 +356,17 @@ struct RemoteSession {
     next_event_id: Arc<AtomicU64>,
 }
 
+struct RemoteSessionInit {
+    session_id: String,
+    capabilities: Vec<RemoteSessionCapability>,
+    auth_context: SessionAuthContext,
+    lifecycle_policy: SessionLifecyclePolicy,
+    input_tx: mpsc::Sender<Value>,
+    event_tx: broadcast::Sender<RemoteSessionEvent>,
+    retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
+    next_event_id: Arc<AtomicU64>,
+}
+
 struct NotificationStreamAttachment {
     session: Arc<RemoteSession>,
 }
@@ -466,11 +477,15 @@ struct LocalAuthorizationServer {
 }
 
 impl RemoteAppState {
+    // Retained for enterprise-provider validation paths shared with the local
+    // trust-control surface even though the current remote flow does not call it.
     #[allow(dead_code)]
     fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
         self.enterprise_provider_registry.as_deref()
     }
 
+    // Retained for enterprise-provider validation paths shared with the local
+    // trust-control surface even though the current remote flow does not call it.
     #[allow(dead_code)]
     fn validated_enterprise_provider(
         &self,
@@ -1599,23 +1614,13 @@ struct TokenRequestForm {
 }
 
 impl RemoteSession {
-    #[allow(clippy::too_many_arguments)]
-    fn new(
-        session_id: String,
-        capabilities: Vec<RemoteSessionCapability>,
-        auth_context: SessionAuthContext,
-        lifecycle_policy: SessionLifecyclePolicy,
-        input_tx: mpsc::Sender<Value>,
-        event_tx: broadcast::Sender<RemoteSessionEvent>,
-        retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
-        next_event_id: Arc<AtomicU64>,
-    ) -> Self {
+    fn new(init: RemoteSessionInit) -> Self {
         let now = session_now_millis();
         Self {
-            session_id,
-            capabilities,
-            auth_context,
-            lifecycle_policy,
+            session_id: init.session_id,
+            capabilities: init.capabilities,
+            auth_context: init.auth_context,
+            lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(None),
             lifecycle: StdMutex::new(RemoteSessionLifecycleSnapshot {
                 state: RemoteSessionState::Initializing,
@@ -1624,12 +1629,12 @@ impl RemoteSession {
                 idle_expires_at: now,
                 drain_deadline_at: None,
             }),
-            input_tx,
-            event_tx,
-            retained_notification_events,
+            input_tx: init.input_tx,
+            event_tx: init.event_tx,
+            retained_notification_events: init.retained_notification_events,
             active_request_stream: Arc::new(Mutex::new(())),
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
-            next_event_id,
+            next_event_id: init.next_event_id,
         }
     }
 
@@ -2082,16 +2087,16 @@ impl RemoteSessionFactory {
             }
         });
 
-        Ok(Arc::new(RemoteSession::new(
+        Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
             session_id,
-            session_capabilities,
+            capabilities: session_capabilities,
             auth_context,
-            self.lifecycle_policy.clone(),
+            lifecycle_policy: self.lifecycle_policy.clone(),
             input_tx,
             event_tx,
             retained_notification_events,
             next_event_id,
-        )))
+        })))
     }
 }
 

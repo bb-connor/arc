@@ -69,8 +69,11 @@ class TestMiddlewareAllowed(TestCase):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "id": "receipt-1",
             "verdict": {"verdict": "allow"},
+            "receipt": {
+                "id": "receipt-1",
+                "verdict": {"verdict": "allow"},
+            },
         }
         mock_post.return_value = mock_resp
 
@@ -92,12 +95,20 @@ class TestMiddlewareDenied(TestCase):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
-            "id": "receipt-2",
             "verdict": {
                 "verdict": "deny",
                 "reason": "no capability",
                 "guard": "CapGuard",
                 "http_status": 403,
+            },
+            "receipt": {
+                "id": "receipt-2",
+                "verdict": {
+                    "verdict": "deny",
+                    "reason": "no capability",
+                    "guard": "CapGuard",
+                    "http_status": 403,
+                },
             },
         }
         mock_post.return_value = mock_resp
@@ -137,7 +148,11 @@ class TestMiddlewareSidecarDown(TestCase):
         import httpx
         mock_post.side_effect = httpx.ConnectError("connection refused")
 
+        observed_request = None
+
         def get_response(request):
+            nonlocal observed_request
+            observed_request = request
             return JsonResponse({"status": "ok"})
 
         mw = ArcDjangoMiddleware(get_response)
@@ -146,17 +161,17 @@ class TestMiddlewareSidecarDown(TestCase):
         response = mw(request)
 
         assert response.status_code == 200
+        assert "X-Arc-Receipt" not in response
+        assert observed_request is not None
+        assert observed_request.arc_passthrough.mode == "allow_without_receipt"
+        assert observed_request.arc_passthrough.error == "arc_sidecar_unreachable"
 
 
-class TestMiddleware403FromSidecar(TestCase):
+class TestMiddlewareBadSidecarResponse(TestCase):
     @patch("arc_django.middleware.httpx.post")
-    def test_sidecar_403(self, mock_post: MagicMock) -> None:
+    def test_sidecar_500(self, mock_post: MagicMock) -> None:
         mock_resp = MagicMock()
-        mock_resp.status_code = 403
-        mock_resp.json.return_value = {
-            "message": "expired",
-            "guard": "TimeGuard",
-        }
+        mock_resp.status_code = 500
         mock_post.return_value = mock_resp
 
         def get_response(request):
@@ -167,9 +182,9 @@ class TestMiddleware403FromSidecar(TestCase):
         request = factory.get("/protected")
         response = mw(request)
 
-        assert response.status_code == 403
+        assert response.status_code == 502
         body = json.loads(response.content)
-        assert body["error"]["guard"] == "TimeGuard"
+        assert body["error"]["code"] == "ARC_INTERNAL_ERROR"
 
 
 class TestErrors:

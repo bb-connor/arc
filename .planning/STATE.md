@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.66
-milestone_name: Test Coverage for Untested Crates
-status: completed
-stopped_at: Completed 389-02-PLAN.md
-last_updated: "2026-04-15T05:01:06.037Z"
-last_activity: 2026-04-15 -- completed phases `407` and `408` locally and
+milestone: v3.18
+milestone_name: Bounded ARC Ship Readiness Closure
+status: complete_local_pending_archival
+stopped_at: Completed v3.18 phases 417 through 421 and qualified the bounded ARC release gate
+last_updated: "2026-04-15T23:59:59Z"
+last_activity: "2026-04-15 -- completed the bounded ARC ship-readiness closure lane"
 progress:
-  total_phases: 365
-  completed_phases: 281
-  total_plans: 768
-  completed_plans: 806
-  percent: 33
+  total_phases: 374
+  completed_phases: 289
+  total_plans: 818
+  completed_plans: 818
+  percent: 78
 ---
 
 # Project State
@@ -24,24 +24,24 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.16 Universal Control-Plane Thesis` is now the active
-lane. `v3.15` is complete locally and pending archival; it upgraded ARC to a
-bounded protocol-aware fabric but still left the universal control-plane thesis
-unqualified. `v3.16` now owns the remaining proof gaps: universal registry
-routing, dynamic intent-aware governance, ecosystem-grade qualification, and
-the final thesis gate.
+**Current focus:** `v3.18 Bounded ARC Ship Readiness Closure` is complete
+locally and pending archival. No newer ship lane is active yet. `v3.17`
+remains the retained repo-local comptroller-capable packaging decision, and
+`v3.18` closes the remaining Track A P0 blockers required to ship one honest
+bounded ARC release.
 
 ## Current Position
 
-Phase: 409 Dynamic Intent-Aware Governance Control Plane
-Plan: `$gsd-plan-phase 409`
-Status: `v3.16` has completed the universal binding registry work (`407`) and
-the first explicit multi-hop authoritative routes (`408`). The next open proof
-gap is dynamic route planning and signed route-selection evidence.
-Last activity: 2026-04-15 -- completed phases `407` and `408` locally and
-advanced to `409`.
+Phase: complete
+Plan: n/a
+Status: `v3.18` is now the latest completed milestone and bounded ARC
+ship-readiness lane. The retained decision boundary is: ARC is
+comptroller-capable software on repo-local proof, and bounded ARC is now the
+primary ship-facing release boundary.
+Last activity: 2026-04-15 -- completed `v3.18` and qualified the bounded ARC
+release gate.
 
-Progress: [###-------] 33%
+Progress: [#######...] 77%
 
 ## Performance Metrics
 
@@ -51,7 +51,9 @@ Progress: [###-------] 33%
 - v2.1-v2.73: 290 phases completed across 72 milestones
 - v2.80-v2.83: 16 phases planned across 4 milestones
 - v3.0-v3.15: 78 phases completed across 16 milestones
-- v3.16: 6 phases planned (universal control-plane thesis)
+- v3.16: 6 phases completed locally (universal control-plane thesis)
+- v3.17: 4 phases completed locally (market-position proof)
+- v3.18: 5 phases completed locally (bounded ARC ship readiness closure)
 - v4.0: 4 phases planned (parallel strategic lane)
 - v4.1: 4 phases planned (depends on v4.0; guard SDK + CLI)
 - v4.2: 4 phases planned (depends on v4.1; WIT migration + multi-language SDKs)
@@ -100,6 +102,10 @@ Progress: [###-------] 33%
   universal cross-protocol governance kernel" claim still requires ACP
   cryptographic enforcement, truthful outward-edge mediation, operational
   parity, and repo-wide truth reconciliation.
+- The 2026-04-15 post-`v3.17` release review established the Track A P0
+  blocker ladder: bounded ARC is close, but honest ship still requires claim
+  discipline, planning truth, delegation-boundary truth, hosted/auth profile
+  truth, governed provenance truth, and one bounded operational profile.
 - v3.12 closed the first credibility gap and established the narrow truthful
   ARC claim, but the follow-on review found four remaining closures: generic
   orchestration, authoritative edge unification, bridge-fidelity truth, and
@@ -180,18 +186,16 @@ Progress: [###-------] 33%
 
 ### Pending Todos
 
-- Plan and execute `v3.16 Universal Control-Plane Thesis`, starting with phase
-  `407`.
-- Archive `v3.15 Universal Protocol Fabric Realization` once the new lane is
-  stable.
+- Archive `v3.15 Universal Protocol Fabric Realization`.
+- Archive `v3.16 Universal Control-Plane Thesis`.
+- Archive `v3.17 Comptroller Market Position Proof`.
+- Archive `v3.18 Bounded ARC Ship Readiness Closure`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
-- `v3.12`, `v3.13`, and `v3.14` are archived locally; `v3.15` is complete
-  locally but not yet archived. `v3.16` exists because the stronger
-  control-plane thesis still lacks universal registry routing, dynamic
-  intent-aware governance, and ecosystem-grade qualification evidence.
+- `v3.12`, `v3.13`, and `v3.14` are archived locally. `v3.15`, `v3.16`,
+  `v3.17`, and `v3.18` are complete locally but not yet archived.
 - `v2.83` is still partially complete locally because phase `316` remains
   pending, so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.

@@ -43,19 +43,32 @@ pub struct MercuryPilotScenario {
     pub rollback_bundle_manifest: MercuryBundleManifest,
 }
 
+struct MercuryPilotStepSpec<'a> {
+    step_id: &'a str,
+    receipt_id: &'a str,
+    timestamp: u64,
+    tool_name: &'a str,
+    decision_type: MercuryDecisionType,
+    stage: MercuryChronologyStage,
+    event_id: &'a str,
+    parents: &'a [&'a str],
+}
+
 impl MercuryPilotScenario {
     #[must_use]
     pub fn gold_release_control() -> Self {
         let primary_steps = vec![
             build_step(
-                "proposal",
-                "rcpt-mercury-proposal-1",
-                1_775_137_600,
-                "proposal_review",
-                MercuryDecisionType::Propose,
-                MercuryChronologyStage::Proposal,
-                "evt-proposal-1",
-                &[],
+                MercuryPilotStepSpec {
+                    step_id: "proposal",
+                    receipt_id: "rcpt-mercury-proposal-1",
+                    timestamp: 1_775_137_600,
+                    tool_name: "proposal_review",
+                    decision_type: MercuryDecisionType::Propose,
+                    stage: MercuryChronologyStage::Proposal,
+                    event_id: "evt-proposal-1",
+                    parents: &[],
+                },
                 |metadata| {
                     metadata.approval_state.state = MercuryApprovalStatus::Pending;
                     metadata.approval_state.approver_subjects.clear();
@@ -67,14 +80,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "approval",
-                "rcpt-mercury-approval-1",
-                1_775_137_610,
-                "approval_review",
-                MercuryDecisionType::Approve,
-                MercuryChronologyStage::Approval,
-                "evt-approval-1",
-                &["evt-proposal-1"],
+                MercuryPilotStepSpec {
+                    step_id: "approval",
+                    receipt_id: "rcpt-mercury-approval-1",
+                    timestamp: 1_775_137_610,
+                    tool_name: "approval_review",
+                    decision_type: MercuryDecisionType::Approve,
+                    stage: MercuryChronologyStage::Approval,
+                    event_id: "evt-approval-1",
+                    parents: &["evt-proposal-1"],
+                },
                 |metadata| {
                     metadata.approval_state.state = MercuryApprovalStatus::Approved;
                     metadata.approval_state.approver_subjects = vec!["approver-risk-1".to_string()];
@@ -86,14 +101,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "release",
-                "rcpt-mercury-release-1",
-                1_775_137_620,
-                "release_control",
-                MercuryDecisionType::Release,
-                MercuryChronologyStage::Release,
-                "evt-release-1",
-                &["evt-approval-1"],
+                MercuryPilotStepSpec {
+                    step_id: "release",
+                    receipt_id: "rcpt-mercury-release-1",
+                    timestamp: 1_775_137_620,
+                    tool_name: "release_control",
+                    decision_type: MercuryDecisionType::Release,
+                    stage: MercuryChronologyStage::Release,
+                    event_id: "evt-release-1",
+                    parents: &["evt-approval-1"],
+                },
                 |metadata| {
                     metadata.approval_state.state = MercuryApprovalStatus::Approved;
                     metadata.approval_state.approver_subjects = vec!["approver-risk-1".to_string()];
@@ -104,14 +121,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "inquiry",
-                "rcpt-mercury-inquiry-1",
-                1_775_137_630,
-                "inquiry_review",
-                MercuryDecisionType::Inquiry,
-                MercuryChronologyStage::Inquiry,
-                "evt-inquiry-1",
-                &["evt-release-1"],
+                MercuryPilotStepSpec {
+                    step_id: "inquiry",
+                    receipt_id: "rcpt-mercury-inquiry-1",
+                    timestamp: 1_775_137_630,
+                    tool_name: "inquiry_review",
+                    decision_type: MercuryDecisionType::Inquiry,
+                    stage: MercuryChronologyStage::Inquiry,
+                    event_id: "evt-inquiry-1",
+                    parents: &["evt-release-1"],
+                },
                 |metadata| {
                     metadata.approval_state.state = MercuryApprovalStatus::InquiryOpen;
                     metadata.approval_state.approver_subjects =
@@ -132,14 +151,16 @@ impl MercuryPilotScenario {
 
         let rollback_steps = vec![
             build_step(
-                "proposal",
-                "rcpt-mercury-rollback-proposal-1",
-                1_775_137_700,
-                "proposal_review",
-                MercuryDecisionType::Propose,
-                MercuryChronologyStage::Proposal,
-                "evt-rollback-proposal-1",
-                &[],
+                MercuryPilotStepSpec {
+                    step_id: "proposal",
+                    receipt_id: "rcpt-mercury-rollback-proposal-1",
+                    timestamp: 1_775_137_700,
+                    tool_name: "proposal_review",
+                    decision_type: MercuryDecisionType::Propose,
+                    stage: MercuryChronologyStage::Proposal,
+                    event_id: "evt-rollback-proposal-1",
+                    parents: &[],
+                },
                 |metadata| {
                     metadata.business_ids.release_id = Some("release-2026-04-02".to_string());
                     metadata.business_ids.rollback_id = Some("rollback-2026-04-02".to_string());
@@ -154,14 +175,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "approval",
-                "rcpt-mercury-rollback-approval-1",
-                1_775_137_710,
-                "approval_review",
-                MercuryDecisionType::Approve,
-                MercuryChronologyStage::Approval,
-                "evt-rollback-approval-1",
-                &["evt-rollback-proposal-1"],
+                MercuryPilotStepSpec {
+                    step_id: "approval",
+                    receipt_id: "rcpt-mercury-rollback-approval-1",
+                    timestamp: 1_775_137_710,
+                    tool_name: "approval_review",
+                    decision_type: MercuryDecisionType::Approve,
+                    stage: MercuryChronologyStage::Approval,
+                    event_id: "evt-rollback-approval-1",
+                    parents: &["evt-rollback-proposal-1"],
+                },
                 |metadata| {
                     metadata.business_ids.release_id = Some("release-2026-04-02".to_string());
                     metadata.business_ids.rollback_id = Some("rollback-2026-04-02".to_string());
@@ -176,14 +199,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "release",
-                "rcpt-mercury-rollback-release-1",
-                1_775_137_720,
-                "release_control",
-                MercuryDecisionType::Release,
-                MercuryChronologyStage::Release,
-                "evt-rollback-release-1",
-                &["evt-rollback-approval-1"],
+                MercuryPilotStepSpec {
+                    step_id: "release",
+                    receipt_id: "rcpt-mercury-rollback-release-1",
+                    timestamp: 1_775_137_720,
+                    tool_name: "release_control",
+                    decision_type: MercuryDecisionType::Release,
+                    stage: MercuryChronologyStage::Release,
+                    event_id: "evt-rollback-release-1",
+                    parents: &["evt-rollback-approval-1"],
+                },
                 |metadata| {
                     metadata.business_ids.release_id = Some("release-2026-04-02".to_string());
                     metadata.business_ids.rollback_id = Some("rollback-2026-04-02".to_string());
@@ -198,14 +223,16 @@ impl MercuryPilotScenario {
                 },
             ),
             build_step(
-                "rollback",
-                "rcpt-mercury-rollback-1",
-                1_775_137_730,
-                "rollback_control",
-                MercuryDecisionType::Rollback,
-                MercuryChronologyStage::Rollback,
-                "evt-rollback-1",
-                &["evt-rollback-release-1"],
+                MercuryPilotStepSpec {
+                    step_id: "rollback",
+                    receipt_id: "rcpt-mercury-rollback-1",
+                    timestamp: 1_775_137_730,
+                    tool_name: "rollback_control",
+                    decision_type: MercuryDecisionType::Rollback,
+                    stage: MercuryChronologyStage::Rollback,
+                    event_id: "evt-rollback-1",
+                    parents: &["evt-rollback-release-1"],
+                },
                 |metadata| {
                     metadata.business_ids.release_id = Some("release-2026-04-02".to_string());
                     metadata.business_ids.rollback_id = Some("rollback-2026-04-02".to_string());
@@ -328,18 +355,20 @@ impl MercuryPilotScenario {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_step(
-    step_id: &str,
-    receipt_id: &str,
-    timestamp: u64,
-    tool_name: &str,
-    decision_type: MercuryDecisionType,
-    stage: MercuryChronologyStage,
-    event_id: &str,
-    parents: &[&str],
+    spec: MercuryPilotStepSpec<'_>,
     mutate: impl FnOnce(&mut MercuryReceiptMetadata),
 ) -> MercuryPilotStep {
+    let MercuryPilotStepSpec {
+        step_id,
+        receipt_id,
+        timestamp,
+        tool_name,
+        decision_type,
+        stage,
+        event_id,
+        parents,
+    } = spec;
     let mut metadata = sample_mercury_receipt_metadata();
     metadata.decision_context.decision_type = decision_type;
     metadata.chronology.stage = stage;

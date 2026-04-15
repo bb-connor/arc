@@ -395,14 +395,14 @@ systems, not attestation systems.
 | **Cascade revocation** | -- | -- | -- | -- | -- | -- | -- | Yes (spec-level) | Yes |
 | **Invocation budgets** | -- | -- | -- | Yes (spending) | Yes (spending) | Per-request | -- | -- | Yes |
 | **Signed receipts (every decision)** | -- | -- | -- | -- | -- | Payment only | -- | Optional | Yes |
-| **Tamper-evident audit log** | -- | -- | -- | -- | -- | On-chain | -- | -- | Signed, append-only (Merkle commitment Q2 2026) |
-| **Formal safety proofs** | -- | -- | -- | -- | -- | -- | -- | -- | Yes (P1-P5 core theorems, Lean 4; auxiliary lemmas in progress) |
+| **Signed audit evidence** | -- | -- | -- | -- | -- | On-chain | -- | -- | Yes (signed receipts, checkpoints, exportable inclusion proof material) |
+| **Executable safety evidence** | -- | -- | -- | -- | -- | -- | -- | -- | Yes (differential tests, runtime qualification, informative Lean work) |
 | **Fail-closed enforcement** | -- | -- | -- | -- | -- | -- | -- | -- | Yes |
 | **Kernel as TCB (privilege separation)** | -- | -- | -- | -- | -- | -- | -- | -- | Yes |
 | **Cross-org federated trust** | -- | -- | Partial (DID) | Stripe Connect | Google-mediated | Blockchain | SPIFFE federation | DID federation | Yes (delegation chains) |
 | **Subject-bound tokens (DPoP)** | -- | -- | -- | -- | -- | Wallet-bound | mTLS | DID-bound | Partial (subject binding implemented; per-invocation DPoP specified, not yet in code) |
 
-ARC is the only protocol that addresses all twelve dimensions (ten fully, two partially: DPoP per-invocation proofs and Merkle commitment are specified and roadmapped but not yet shipped).
+ARC is unusual in covering all twelve dimensions within one governed execution stack, but not every ARC dimension is at the strongest imaginable boundary today. The bounded release is strongest on fail-closed mediation, signed receipts, budgets, and kernel-enforced execution, while sender-constrained invocation proofs and transparency-log semantics remain explicitly bounded or optional.
 The closest competitor on authorization semantics is UCAN, which lacks the
 kernel TCB, mandatory receipts, invocation budgets, and formal proofs (UCAN
 does specify cascade revocation at the spec level). The closest competitor on
@@ -428,17 +428,18 @@ they all allow direct agent-to-tool communication.
 Retrofitting a kernel into MCP would require breaking the stdio/HTTP
 client-server model that the entire ecosystem is built on.
 
-### 7.2 Delegation Chains with Cascade Revocation
+### 7.2 Delegation Chains with Bounded Revocation Coverage
 
 ARC capability tokens carry an ordered `delegation_chain` field listing
 every ancestor capability ID from root to leaf. When any ancestor is
-revoked, all descendants are automatically invalid -- the kernel checks every
-entry in the chain against the revocation store on every presentation.
+presented as part of that chain is revoked, the descendant presentation is
+rejected. The current bounded release checks the leaf capability plus the
+presented ancestor IDs against revocation state on every presentation; it does
+not claim authenticated recursive ancestry beyond the caller-presented chain.
 
-UCAN's Revocation spec defines MUST-level cascade semantics at the spec level,
-but ARC enforces cascade checks in the kernel on every capability presentation
-(checking every ancestor in the delegation chain against the revocation store).
-This is distinct
+UCAN's Revocation spec defines MUST-level cascade semantics at the spec level.
+ARC's shipped boundary is narrower: it preserves delegation lineage and checks
+presented ancestor IDs in the kernel. This is distinct
 from OAuth refresh token rotation, where revoking a refresh token does not
 automatically invalidate downstream tokens issued via token exchange.
 
@@ -447,37 +448,48 @@ automatically invalidate downstream tokens issued via token exchange.
 Every kernel decision -- allow or deny -- produces a signed ArcReceipt
 containing the capability ID, tool name, action, decision, content hash,
 policy hash, per-guard evidence, and the kernel's Ed25519 signature. Receipts
-are appended to a signed, append-only log (Merkle commitment over the log is roadmapped for Q2 2026, using the existing RFC 6962 module in `arc-core`).
+are stored as signed audit artifacts with checkpoint and export support.
 
-This is not logging. OTel traces (MCP's approach) are mutable, filterable,
-and deletable. ARC receipts are signed attestations in an append-only store. A missing receipt is proof of a protocol violation.
+This is not ordinary logging. OTel traces (MCP's approach) are mutable,
+filterable, and deletable. ARC receipts are signed decision artifacts backed
+by checkpoint material and operator-local storage. A missing receipt remains a
+useful signal of protocol drift or operational failure, but ARC's bounded
+release does not claim public transparency-log or strong non-repudiation
+semantics.
 Receipts cover denials as well as approvals -- you can prove an agent was
 blocked, not just that it succeeded.
 
-### 7.4 Formal Proofs (P1-P5)
+### 7.4 Safety Evidence Boundary
 
-ARC's core safety properties (P1-P5) are proven in Lean 4 with standard
-cryptographic axiomatization. Auxiliary lemmas are in progress (some carry
-`sorry` placeholders):
+ARC's core safety boundary is backed by executable differential tests, runtime
+tests, conformance, and release qualification. The Lean work remains useful
+and informative, but it is not the shipped release gate while portions remain
+outside the root import surface or contain `sorry` placeholders.
 
-- **P1 (Capability monotonicity):** Delegation can only attenuate scope, never amplify. Core theorem proven; one auxiliary lemma (`list_isSubsetOf_trans` in `Monotonicity.lean`) carries a `sorry` for BEq transitivity.
-- **P2 (Revocation completeness):** If a capability ID is in the revocation store, the kernel denies it. Proven for direct revocation and delegation chain traversal.
-- **P3 (Fail-closed guarantee):** Errors during evaluation produce denial decisions. Proven total.
-- **P4 (Receipt chain integrity):** Every kernel decision produces a signed receipt. Sign-verify roundtrip axiomatized (standard for cryptographic primitives).
-- **P5 (Delegation graph acyclicity):** Delegation chains are acyclic (append-only, monotonically increasing depth).
+- **P1 (Capability monotonicity):** The shipped runtime and differential tests
+  defend subset behavior for the selected grant set.
+- **P2 (Presented revocation coverage):** If a capability ID or presented
+  delegation ancestor ID is in the revocation store, the kernel denies it.
+- **P3 (Fail-closed guarantee):** Errors during evaluation produce denial
+  decisions.
+- **P4 (Receipt integrity):** Every kernel decision produces a signed receipt.
+- **P5 (Presented delegation-chain structure):** Depth, connectivity, and
+  timestamp monotonicity helpers define the bounded structural contract for a
+  presented chain.
 
-No other agent protocol has formal proofs of its security properties at this level. UCAN's attenuation model is specified but not formally verified. MCP has no security properties to verify.
+No other agent protocol ships this exact mix of differential tests, signed
+receipt evidence, qualification lanes, and optional formal artifacts. ARC's
+bounded release should be compared on that executable evidence boundary rather
+than on proof branding alone.
 
 ### 7.5 Subject-Bound Tokens via DPoP
 
 ARC capability tokens carry a subject field binding them to the presenting
-agent's Ed25519 key; this binding is checked at validation time (implemented).
-The protocol spec also defines per-invocation DPoP proofs (adapted from
-RFC 9449) -- signed payloads with ephemeral keypairs and monotonically
-increasing nonces that bind each tool call to the capability token, preventing
-replay and making stolen tokens useless without the agent's private key. The
-per-invocation DPoP proof mechanism is specified but not yet implemented in
-the kernel codebase.
+agent's Ed25519 key; this binding is checked at validation time. The protocol
+spec also defines per-invocation DPoP proofs (adapted from RFC 9449), and the
+runtime can require PoP on selected grants. That makes replay materially
+harder on those bounded paths, but the bounded release does not claim that all
+capabilities are universally sender-constrained or useless if stolen.
 
 OAuth DPoP exists but is not integrated into any agent protocol. UCAN binds
 tokens to DIDs but does not require per-invocation proof-of-possession.
@@ -541,10 +553,11 @@ update, configuration change, or novel input could cause policy violations that
 go undetected until the next audit cycle.
 
 ARC produces a signed receipt for every tool invocation in real time. The
-signed, append-only receipt log provides continuous, cryptographically verifiable
-attestation (with Merkle commitment adding tamper-evident ordering in Q2 2026). Compliance is not a periodic assertion -- it is a property that
-can be verified for any specific invocation at any point in time by any party
-with access to the receipt log and the kernel's public key.
+receipt plane provides continuous signed action evidence with checkpoint and
+export support. Compliance is therefore no longer only a periodic assertion --
+it can be tied to specific invocations and reviewed against signed receipt
+artifacts and the kernel's public key. The bounded release still does not
+claim public transparency-log semantics.
 
 The difference is structural: audits verify *systems*, receipts verify
 *actions*. ARC makes every agent action independently verifiable without

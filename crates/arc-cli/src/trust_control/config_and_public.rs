@@ -1142,20 +1142,22 @@ fn build_public_issuer_discovery(
         .unwrap_or_default();
     create_signed_public_issuer_discovery(
         &signing_key,
-        format!("issuer-discovery:{}", metadata.credential_issuer),
-        metadata.credential_issuer.clone(),
-        public_discovery_version(config)?,
-        now,
-        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
-        format!(
-            "{}{OID4VCI_ISSUER_METADATA_PATH}",
-            metadata.credential_issuer
-        ),
-        metadata_sha256,
-        metadata.jwks_uri.clone(),
-        credential_configuration_ids,
-        passport_status_distribution,
-        public_discovery_guardrails(),
+        arc_credentials::SignedPublicIssuerDiscoveryInput {
+            discovery_id: format!("issuer-discovery:{}", metadata.credential_issuer),
+            issuer: metadata.credential_issuer.clone(),
+            version: public_discovery_version(config)?,
+            published_at: now,
+            expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+            metadata_url: format!(
+                "{}{OID4VCI_ISSUER_METADATA_PATH}",
+                metadata.credential_issuer
+            ),
+            metadata_sha256,
+            jwks_uri: metadata.jwks_uri.clone(),
+            credential_configuration_ids,
+            passport_status_distribution,
+            import_guardrails: public_discovery_guardrails(),
+        },
     )
     .map_err(CliError::from)
 }
@@ -1169,16 +1171,18 @@ fn build_public_verifier_discovery(
     let metadata_sha256 = sha256_hex(&canonical_json_bytes(&metadata)?);
     create_signed_public_verifier_discovery(
         &signing_key,
-        format!("verifier-discovery:{}", metadata.verifier_id),
-        metadata.verifier_id.clone(),
-        public_discovery_version(config)?,
-        now,
-        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
-        format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
-        metadata_sha256,
-        metadata.jwks_uri.clone(),
-        metadata.request_uri_prefix.clone(),
-        public_discovery_guardrails(),
+        arc_credentials::SignedPublicVerifierDiscoveryInput {
+            discovery_id: format!("verifier-discovery:{}", metadata.verifier_id),
+            verifier: metadata.verifier_id.clone(),
+            version: public_discovery_version(config)?,
+            published_at: now,
+            expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+            metadata_url: format!("{}{OID4VP_VERIFIER_METADATA_PATH}", metadata.verifier_id),
+            metadata_sha256,
+            jwks_uri: metadata.jwks_uri.clone(),
+            request_uri_prefix: metadata.request_uri_prefix.clone(),
+            import_guardrails: public_discovery_guardrails(),
+        },
     )
     .map_err(CliError::from)
 }
@@ -1216,13 +1220,15 @@ fn build_public_discovery_transparency(
     ];
     create_signed_public_discovery_transparency(
         &signing_key,
-        format!("public-discovery-transparency:{publisher}"),
-        publisher,
-        public_discovery_version(config)?,
-        now,
-        now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
-        entries,
-        public_discovery_guardrails(),
+        arc_credentials::SignedPublicDiscoveryTransparencyInput {
+            transparency_id: format!("public-discovery-transparency:{publisher}"),
+            publisher: publisher.to_string(),
+            version: public_discovery_version(config)?,
+            published_at: now,
+            expires_at: now.saturating_add(PUBLIC_DISCOVERY_TTL_SECS),
+            entries,
+            import_guardrails: public_discovery_guardrails(),
+        },
     )
     .map_err(CliError::from)
 }
@@ -1702,4 +1708,229 @@ fn build_scim_deprovision_receipt(
         },
         &keypair,
     )?)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod config_and_public_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn base_config() -> TrustServiceConfig {
+        TrustServiceConfig {
+            listen: "127.0.0.1:0".parse().expect("parse listen addr"),
+            service_token: "token".to_string(),
+            receipt_db_path: None,
+            revocation_db_path: None,
+            authority_seed_path: None,
+            authority_db_path: None,
+            budget_db_path: None,
+            enterprise_providers_file: None,
+            federation_policies_file: None,
+            scim_lifecycle_file: None,
+            verifier_policies_file: None,
+            verifier_challenge_db_path: None,
+            passport_statuses_file: None,
+            passport_issuance_offers_file: None,
+            certification_registry_file: None,
+            certification_discovery_file: None,
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+            advertise_url: None,
+            certification_public_metadata_ttl_seconds: 900,
+            peer_urls: Vec::new(),
+            cluster_sync_interval: Duration::from_millis(200),
+        }
+    }
+
+    fn unique_temp_path(prefix: &str, extension: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+    }
+
+    #[test]
+    fn configured_public_certification_metadata_validates_advertise_url_and_builds_paths() {
+        let missing_error = configured_public_certification_metadata(&base_config())
+            .expect_err("missing advertise URL should fail");
+        assert!(missing_error
+            .to_string()
+            .contains("requires --advertise-url"));
+
+        let mut blank_config = base_config();
+        blank_config.advertise_url = Some("/".to_string());
+        let blank_error = configured_public_certification_metadata(&blank_config)
+            .expect_err("blank advertise URL should fail");
+        assert!(blank_error.to_string().contains("non-empty advertise_url"));
+
+        let mut config = base_config();
+        config.advertise_url = Some("https://trust.example.com/".to_string());
+        config.certification_public_metadata_ttl_seconds = 120;
+
+        let metadata = configured_public_certification_metadata(&config)
+            .expect("build certification metadata");
+
+        assert_eq!(metadata.publisher.publisher_id, "https://trust.example.com");
+        assert_eq!(metadata.publisher.registry_url, "https://trust.example.com");
+        assert_eq!(metadata.expires_at - metadata.generated_at, 120);
+        assert_eq!(
+            metadata.public_resolve_path_template,
+            "https://trust.example.com/v1/public/certifications/resolve/{tool_server_id}"
+        );
+        assert_eq!(
+            metadata.public_search_path,
+            "https://trust.example.com/v1/public/certifications/search"
+        );
+        assert_eq!(
+            metadata.public_transparency_path,
+            "https://trust.example.com/v1/public/certifications/transparency"
+        );
+    }
+
+    #[test]
+    fn public_generic_registry_publisher_requires_and_normalizes_advertise_url() {
+        let missing_error =
+            public_generic_registry_publisher(&base_config()).expect_err("missing advertise URL");
+        assert!(missing_error
+            .to_string()
+            .contains("require --advertise-url"));
+
+        let mut blank_config = base_config();
+        blank_config.advertise_url = Some("///".to_string());
+        let blank_error = public_generic_registry_publisher(&blank_config)
+            .expect_err("blank normalized advertise URL");
+        assert!(blank_error.to_string().contains("non-empty advertise_url"));
+
+        let mut config = base_config();
+        config.advertise_url = Some("https://trust.example.com/".to_string());
+        let publisher =
+            public_generic_registry_publisher(&config).expect("build generic registry publisher");
+
+        assert_eq!(publisher.role, GenericRegistryPublisherRole::Origin);
+        assert_eq!(publisher.operator_id, "https://trust.example.com");
+        assert_eq!(publisher.registry_url, "https://trust.example.com");
+        assert!(publisher.upstream_registry_urls.is_empty());
+    }
+
+    #[test]
+    fn trusted_public_keys_require_configuration_and_add_current_key_once() {
+        let not_configured = trusted_public_keys_from_status(&TrustAuthorityStatus {
+            configured: false,
+            backend: None,
+            public_key: None,
+            generation: None,
+            rotated_at: None,
+            applies_to_future_sessions_only: false,
+            trusted_public_keys: Vec::new(),
+        })
+        .expect_err("unconfigured authority should fail");
+        assert!(not_configured
+            .to_string()
+            .contains("requires a configured authority"));
+
+        let current = Keypair::generate().public_key().to_hex();
+        let trusted = trusted_public_keys_from_status(&TrustAuthorityStatus {
+            configured: true,
+            backend: Some("seed_file".to_string()),
+            public_key: Some(current.clone()),
+            generation: None,
+            rotated_at: None,
+            applies_to_future_sessions_only: true,
+            trusted_public_keys: vec![current.clone()],
+        })
+        .expect("current key should be trusted once");
+        assert_eq!(trusted.len(), 1);
+        assert_eq!(trusted[0].to_hex(), current);
+
+        let missing_material = trusted_public_keys_from_status(&TrustAuthorityStatus {
+            configured: true,
+            backend: Some("seed_file".to_string()),
+            public_key: None,
+            generation: None,
+            rotated_at: None,
+            applies_to_future_sessions_only: true,
+            trusted_public_keys: Vec::new(),
+        })
+        .expect_err("empty trust material should fail");
+        assert!(missing_material
+            .to_string()
+            .contains("did not publish any signing keys"));
+    }
+
+    #[test]
+    fn oid4vp_url_helpers_encode_request_values() {
+        let token = generate_oid4vp_token("req", "portable-seed");
+        assert!(token.starts_with("req-"));
+        assert_eq!(token.len(), 28);
+
+        let request_uri = "https://wallet.example/request?id=a/b";
+        let encoded_request_uri = utf8_percent_encode(request_uri, NON_ALPHANUMERIC).to_string();
+        let same_device = oid4vp_same_device_url(request_uri);
+        assert!(same_device.starts_with("openid4vp://authorize?request_uri="));
+        assert!(same_device.ends_with(&encoded_request_uri));
+
+        let mut config = base_config();
+        config.advertise_url = Some("https://trust.example.com".to_string());
+
+        let wallet_exchange =
+            oid4vp_wallet_exchange_url(&config, "request/alpha").expect("wallet exchange URL");
+        assert_eq!(
+            wallet_exchange,
+            "https://trust.example.com/v1/public/passport/wallet-exchanges/request%2Falpha"
+        );
+
+        let cross_device = oid4vp_cross_device_url(&config, "request/alpha", request_uri)
+            .expect("cross-device URL");
+        assert!(cross_device.starts_with(
+            "https://trust.example.com/v1/public/passport/oid4vp/launch/request%2Falpha?request_uri="
+        ));
+        assert!(cross_device.ends_with(&encoded_request_uri));
+    }
+
+    #[test]
+    fn verifier_metadata_and_jwks_can_be_built_from_seed_authority() {
+        let seed_path = unique_temp_path("arc-trust-control-authority", "seed");
+        let authority_keypair =
+            load_or_create_authority_keypair(&seed_path).expect("create authority seed file");
+
+        let mut config = base_config();
+        config.advertise_url = Some("https://trust.example.com".to_string());
+        config.authority_seed_path = Some(seed_path);
+
+        let status = authority_status_for_config(&config).expect("authority status from seed file");
+        assert!(status.configured);
+        assert_eq!(status.backend.as_deref(), Some("seed_file"));
+        let authority_public_key = authority_keypair.public_key().to_hex();
+        assert_eq!(
+            status.public_key.as_deref(),
+            Some(authority_public_key.as_str())
+        );
+        assert_eq!(status.trusted_public_keys.len(), 1);
+
+        let metadata =
+            build_oid4vp_verifier_metadata(&config).expect("build OID4VP verifier metadata");
+        assert_eq!(metadata.verifier_id, "https://trust.example.com");
+        assert_eq!(metadata.client_id, "https://trust.example.com");
+        assert_eq!(
+            metadata.request_uri_prefix,
+            "https://trust.example.com/v1/public/passport/oid4vp/requests/"
+        );
+        assert_eq!(
+            metadata.response_uri,
+            "https://trust.example.com/v1/public/passport/oid4vp/direct-post"
+        );
+        assert_eq!(metadata.trusted_key_count, 1);
+        assert!(metadata.authority_generation.is_none());
+
+        let jwks = build_oid4vp_verifier_jwks(&config).expect("build verifier JWKS");
+        assert_eq!(jwks.keys.len(), 1);
+        assert_eq!(jwks.keys[0].alg, "EdDSA");
+        assert_eq!(jwks.keys[0].use_, "sig");
+
+        let discovery_version =
+            public_discovery_version(&config).expect("derive public discovery version");
+        assert_eq!(discovery_version, 1);
+    }
 }

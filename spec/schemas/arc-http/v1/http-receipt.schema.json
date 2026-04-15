@@ -44,7 +44,7 @@
       "description": "SHA-256 hex hash of the caller identity."
     },
     "session_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Session ID the request belonged to."
     },
     "verdict": {
@@ -79,7 +79,7 @@
       "type": "integer",
       "minimum": 100,
       "maximum": 599,
-      "description": "HTTP status code of the proxied or error response."
+      "description": "HTTP status ARC associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete ARC error status; allow receipts may carry evaluation-time status metadata rather than downstream response evidence."
     },
     "timestamp": {
       "type": "integer",
@@ -96,7 +96,7 @@
       "description": "SHA-256 hex hash of the policy that was applied."
     },
     "capability_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Capability ID that was exercised, if any."
     },
     "metadata": {

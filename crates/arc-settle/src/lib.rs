@@ -56,9 +56,9 @@ pub use ops::{
     classify_settlement_lane, ensure_settlement_operation_allowed, SettlementAlertSeverity,
     SettlementControlChangeRecord, SettlementControlState, SettlementEmergencyControls,
     SettlementEmergencyMode, SettlementIncidentAlert, SettlementIndexerCursor,
-    SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementOperationKind,
-    SettlementRecoveryRecord, SettlementRuntimeReport, SettlementRuntimeStatus,
-    ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
+    SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementLaneRuntimeStatus,
+    SettlementLaneRuntimeStatusInput, SettlementOperationKind, SettlementRecoveryRecord,
+    SettlementRuntimeReport, SettlementRuntimeStatus, ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
 };
 pub use payments::{
     build_x402_payment_requirements, evaluate_circle_nanopayment, prepare_paymaster_compatibility,

@@ -1,6 +1,7 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::{Mutex, RwLock};
 
+use self::responses::FinalizeToolOutputCostContext;
 use crate::*;
 
 pub type AgentId = String;
@@ -15,6 +16,30 @@ pub type ServerId = String;
 pub(crate) struct ReceiptContent {
     pub(crate) content_hash: String,
     pub(crate) metadata: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct StructuredErrorReport {
+    pub code: String,
+    pub message: String,
+    pub context: serde_json::Value,
+    pub suggested_fix: String,
+}
+
+impl StructuredErrorReport {
+    pub fn new(
+        code: impl Into<String>,
+        message: impl Into<String>,
+        context: serde_json::Value,
+        suggested_fix: impl Into<String>,
+    ) -> Self {
+        Self {
+            code: code.into(),
+            message: message.into(),
+            context,
+            suggested_fix: suggested_fix.into(),
+        }
+    }
 }
 
 /// Errors that can occur during kernel operations.
@@ -165,6 +190,258 @@ pub enum KernelError {
 
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
+}
+
+impl KernelError {
+    fn report_with_context(
+        &self,
+        code: &str,
+        context: serde_json::Value,
+        suggested_fix: impl Into<String>,
+    ) -> StructuredErrorReport {
+        StructuredErrorReport::new(code, self.to_string(), context, suggested_fix)
+    }
+
+    pub fn report(&self) -> StructuredErrorReport {
+        match self {
+            Self::UnknownSession(session_id) => self.report_with_context(
+                "ARC-KERNEL-UNKNOWN-SESSION",
+                serde_json::json!({ "session_id": session_id.to_string() }),
+                "Create the session first or reuse a session ID returned by the kernel before issuing follow-up operations.",
+            ),
+            Self::Session(error) => self.report_with_context(
+                "ARC-KERNEL-SESSION",
+                serde_json::json!({ "session_error": error.to_string() }),
+                "Inspect the session lifecycle and ordering of operations, then recreate the session if it is no longer valid.",
+            ),
+            Self::CapabilityExpired => self.report_with_context(
+                "ARC-KERNEL-CAPABILITY-EXPIRED",
+                serde_json::json!({}),
+                "Refresh or reissue the capability so its validity window includes the current time.",
+            ),
+            Self::CapabilityNotYetValid => self.report_with_context(
+                "ARC-KERNEL-CAPABILITY-NOT-YET-VALID",
+                serde_json::json!({}),
+                "Use a capability whose validity window has started, or correct the issuer clock skew if timestamps are wrong.",
+            ),
+            Self::CapabilityRevoked(capability_id) => self.report_with_context(
+                "ARC-KERNEL-CAPABILITY-REVOKED",
+                serde_json::json!({ "capability_id": capability_id }),
+                "Request a new non-revoked capability or inspect the revocation record for this capability lineage.",
+            ),
+            Self::InvalidSignature => self.report_with_context(
+                "ARC-KERNEL-INVALID-SIGNATURE",
+                serde_json::json!({}),
+                "Reissue the capability or receipt with the correct signing key and verify the payload was not mutated in transit.",
+            ),
+            Self::UntrustedIssuer => self.report_with_context(
+                "ARC-KERNEL-UNTRUSTED-ISSUER",
+                serde_json::json!({}),
+                "Configure the issuing CA public key in the kernel trust set or use a capability issued by a trusted authority.",
+            ),
+            Self::CapabilityIssuanceFailed(reason) => self.report_with_context(
+                "ARC-KERNEL-CAPABILITY-ISSUANCE-FAILED",
+                serde_json::json!({ "reason": reason }),
+                "Inspect the issuance pipeline inputs and upstream stores, then retry once the issuing dependency is healthy.",
+            ),
+            Self::CapabilityIssuanceDenied(reason) => self.report_with_context(
+                "ARC-KERNEL-CAPABILITY-ISSUANCE-DENIED",
+                serde_json::json!({ "reason": reason }),
+                "Adjust the issuance request so it satisfies the policy, score, or trust requirements enforced by the authority.",
+            ),
+            Self::OutOfScope { tool, server } => self.report_with_context(
+                "ARC-KERNEL-OUT-OF-SCOPE-TOOL",
+                serde_json::json!({ "tool": tool, "server": server }),
+                "Issue a capability that grants this tool on this server, or call a tool already inside the granted scope.",
+            ),
+            Self::OutOfScopeResource { uri } => self.report_with_context(
+                "ARC-KERNEL-OUT-OF-SCOPE-RESOURCE",
+                serde_json::json!({ "uri": uri }),
+                "Issue a capability/resource grant that matches this URI, or request a resource already inside scope.",
+            ),
+            Self::OutOfScopePrompt { prompt } => self.report_with_context(
+                "ARC-KERNEL-OUT-OF-SCOPE-PROMPT",
+                serde_json::json!({ "prompt": prompt }),
+                "Issue a capability/prompt grant that matches this prompt, or request a prompt already inside scope.",
+            ),
+            Self::BudgetExhausted(capability_id) => self.report_with_context(
+                "ARC-KERNEL-BUDGET-EXHAUSTED",
+                serde_json::json!({ "capability_id": capability_id }),
+                "Increase the capability budget, wait for the budget window to reset, or lower the cost of the requested operation.",
+            ),
+            Self::SubjectMismatch { expected, actual } => self.report_with_context(
+                "ARC-KERNEL-SUBJECT-MISMATCH",
+                serde_json::json!({ "expected": expected, "actual": actual }),
+                "Use a capability issued to the requesting subject, or correct the agent identity bound to the request.",
+            ),
+            Self::DelegationChainRevoked(capability_id) => self.report_with_context(
+                "ARC-KERNEL-DELEGATION-CHAIN-REVOKED",
+                serde_json::json!({ "capability_id": capability_id }),
+                "Inspect the capability lineage and reissue the chain from a non-revoked ancestor.",
+            ),
+            Self::InvalidConstraint(reason) => self.report_with_context(
+                "ARC-KERNEL-INVALID-CONSTRAINT",
+                serde_json::json!({ "reason": reason }),
+                "Fix the capability constraint payload so it matches the kernel's supported schema and value rules.",
+            ),
+            Self::GovernedTransactionDenied(reason) => self.report_with_context(
+                "ARC-KERNEL-GOVERNED-TRANSACTION-DENIED",
+                serde_json::json!({ "reason": reason }),
+                "Adjust the governed transaction intent so it satisfies the configured approval and policy requirements.",
+            ),
+            Self::GuardDenied(reason) => self.report_with_context(
+                "ARC-KERNEL-GUARD-DENIED",
+                serde_json::json!({ "reason": reason }),
+                "Adjust the request or policy/guard configuration so the request satisfies the active guard pipeline.",
+            ),
+            Self::ToolServerError(reason) => self.report_with_context(
+                "ARC-KERNEL-TOOL-SERVER",
+                serde_json::json!({ "reason": reason }),
+                "Inspect the wrapped tool server logs and protocol compatibility, then retry once the server is healthy.",
+            ),
+            Self::RequestIncomplete(reason) => self.report_with_context(
+                "ARC-KERNEL-REQUEST-INCOMPLETE",
+                serde_json::json!({ "reason": reason }),
+                "Resubmit the request with all required fields and protocol state transitions present.",
+            ),
+            Self::ToolNotRegistered(tool) => self.report_with_context(
+                "ARC-KERNEL-TOOL-NOT-REGISTERED",
+                serde_json::json!({ "tool": tool }),
+                "Register the tool on the target server or update the request to reference an exposed tool.",
+            ),
+            Self::ResourceNotRegistered(uri) => self.report_with_context(
+                "ARC-KERNEL-RESOURCE-NOT-REGISTERED",
+                serde_json::json!({ "uri": uri }),
+                "Register the resource provider for this URI or request a resource that is actually exposed by the runtime.",
+            ),
+            Self::ResourceRootDenied { uri, reason } => self.report_with_context(
+                "ARC-KERNEL-RESOURCE-ROOT-DENIED",
+                serde_json::json!({ "uri": uri, "reason": reason }),
+                "Expand the session filesystem roots if the access is intentional, or request a resource inside the approved root set.",
+            ),
+            Self::PromptNotRegistered(prompt) => self.report_with_context(
+                "ARC-KERNEL-PROMPT-NOT-REGISTERED",
+                serde_json::json!({ "prompt": prompt }),
+                "Register the prompt provider for this prompt name or request a prompt that is actually exposed.",
+            ),
+            Self::SamplingNotAllowedByPolicy => self.report_with_context(
+                "ARC-KERNEL-SAMPLING-NOT-ALLOWED",
+                serde_json::json!({}),
+                "Enable sampling in policy if this workflow requires it, or retry without a sampling request.",
+            ),
+            Self::SamplingNotNegotiated => self.report_with_context(
+                "ARC-KERNEL-SAMPLING-NOT-NEGOTIATED",
+                serde_json::json!({}),
+                "Negotiate sampling support with the client before issuing sampling operations.",
+            ),
+            Self::SamplingContextNotSupported => self.report_with_context(
+                "ARC-KERNEL-SAMPLING-CONTEXT-NOT-SUPPORTED",
+                serde_json::json!({}),
+                "Disable sampling context inclusion or upgrade the client to one that supports the negotiated feature.",
+            ),
+            Self::SamplingToolUseNotAllowedByPolicy => self.report_with_context(
+                "ARC-KERNEL-SAMPLING-TOOL-USE-NOT-ALLOWED",
+                serde_json::json!({}),
+                "Enable sampling tool use in policy or retry without delegated tool execution inside the sampling branch.",
+            ),
+            Self::SamplingToolUseNotNegotiated => self.report_with_context(
+                "ARC-KERNEL-SAMPLING-TOOL-USE-NOT-NEGOTIATED",
+                serde_json::json!({}),
+                "Negotiate sampling tool-use support with the client before attempting tool execution inside sampling.",
+            ),
+            Self::ElicitationNotAllowedByPolicy => self.report_with_context(
+                "ARC-KERNEL-ELICITATION-NOT-ALLOWED",
+                serde_json::json!({}),
+                "Enable elicitation in policy or retry without requesting user input through the kernel.",
+            ),
+            Self::ElicitationNotNegotiated => self.report_with_context(
+                "ARC-KERNEL-ELICITATION-NOT-NEGOTIATED",
+                serde_json::json!({}),
+                "Negotiate elicitation support with the client before attempting elicitation operations.",
+            ),
+            Self::ElicitationFormNotSupported => self.report_with_context(
+                "ARC-KERNEL-ELICITATION-FORM-NOT-SUPPORTED",
+                serde_json::json!({}),
+                "Switch to a supported elicitation mode or upgrade the client to one that supports form-mode elicitation.",
+            ),
+            Self::ElicitationUrlNotSupported => self.report_with_context(
+                "ARC-KERNEL-ELICITATION-URL-NOT-SUPPORTED",
+                serde_json::json!({}),
+                "Switch to a supported elicitation mode or negotiate URL-based elicitation support with the client.",
+            ),
+            Self::UrlElicitationsRequired {
+                message,
+                elicitations,
+            } => self.report_with_context(
+                "ARC-KERNEL-URL-ELICITATIONS-REQUIRED",
+                serde_json::json!({
+                    "message": message,
+                    "elicitation_count": elicitations.len()
+                }),
+                "Complete the required URL-based elicitation flow and resubmit the request afterward.",
+            ),
+            Self::RootsNotNegotiated => self.report_with_context(
+                "ARC-KERNEL-ROOTS-NOT-NEGOTIATED",
+                serde_json::json!({}),
+                "Negotiate roots/list support with the client before using root-scoped resource protections.",
+            ),
+            Self::InvalidChildRequestParent => self.report_with_context(
+                "ARC-KERNEL-INVALID-CHILD-REQUEST-PARENT",
+                serde_json::json!({}),
+                "Create the child request from a ready session-bound parent request that is currently in flight.",
+            ),
+            Self::RequestCancelled { request_id, reason } => self.report_with_context(
+                "ARC-KERNEL-REQUEST-CANCELLED",
+                serde_json::json!({ "request_id": request_id.to_string(), "reason": reason }),
+                "Stop using the cancelled request ID and restart the operation if the workflow still needs to continue.",
+            ),
+            Self::ReceiptSigningFailed(reason) => self.report_with_context(
+                "ARC-KERNEL-RECEIPT-SIGNING-FAILED",
+                serde_json::json!({ "reason": reason }),
+                "Inspect the kernel signing key configuration and signing payload integrity, then retry receipt generation.",
+            ),
+            Self::ReceiptPersistence(error) => self.report_with_context(
+                "ARC-KERNEL-RECEIPT-PERSISTENCE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured receipt store connectivity, permissions, and schema health before retrying.",
+            ),
+            Self::RevocationStore(error) => self.report_with_context(
+                "ARC-KERNEL-REVOCATION-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured revocation store connectivity, permissions, and schema health before retrying.",
+            ),
+            Self::BudgetStore(error) => self.report_with_context(
+                "ARC-KERNEL-BUDGET-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured budget store connectivity, permissions, and schema health before retrying.",
+            ),
+            Self::NoCrossCurrencyOracle { base, quote } => self.report_with_context(
+                "ARC-KERNEL-NO-CROSS-CURRENCY-ORACLE",
+                serde_json::json!({ "base": base, "quote": quote }),
+                "Configure a price oracle for this currency pair or avoid a cross-currency budget path for this request.",
+            ),
+            Self::CrossCurrencyOracle(reason) => self.report_with_context(
+                "ARC-KERNEL-CROSS-CURRENCY-ORACLE",
+                serde_json::json!({ "reason": reason }),
+                "Inspect the price-oracle configuration and upstream quote availability for the requested currency conversion.",
+            ),
+            Self::Web3EvidenceUnavailable(reason) => self.report_with_context(
+                "ARC-KERNEL-WEB3-EVIDENCE-UNAVAILABLE",
+                serde_json::json!({ "reason": reason }),
+                "Enable the required receipt-store, checkpoint, and oracle prerequisites before running the web3 evidence path.",
+            ),
+            Self::Internal(reason) => self.report_with_context(
+                "ARC-KERNEL-INTERNAL",
+                serde_json::json!({ "reason": reason }),
+                "Capture the error report and kernel logs, then treat this as a reproducible kernel bug if it persists.",
+            ),
+            Self::DpopVerificationFailed(reason) => self.report_with_context(
+                "ARC-KERNEL-DPOP-VERIFICATION-FAILED",
+                serde_json::json!({ "reason": reason }),
+                "Attach a valid DPoP proof bound to the current capability, request, server, and tool before retrying.",
+            ),
+        }
+    }
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
@@ -875,20 +1152,44 @@ impl ArcKernel {
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None)
+        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
     }
 
     pub fn evaluate_tool_call_blocking(
         &self,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_with_session_roots(request, None)
+        self.evaluate_tool_call_sync_with_session_roots(request, None, None)
+    }
+
+    pub fn evaluate_tool_call_blocking_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_roots(request, None, extra_metadata)
+    }
+
+    pub fn sign_planned_deny_response(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_deny_response_with_metadata(
+            request,
+            reason,
+            current_unix_timestamp(),
+            None,
+            extra_metadata,
+        )
     }
 
     fn evaluate_tool_call_sync_with_session_roots(
         &self,
         request: &ToolCallRequest,
         session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         self.validate_web3_evidence_prerequisites()?;
         let now = current_unix_timestamp();
@@ -905,25 +1206,49 @@ impl ArcKernel {
         if let Err(reason) = self.verify_capability_signature(cap) {
             let msg = format!("signature verification failed: {reason}");
             warn!(request_id = %request.request_id, %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         if let Err(e) = check_time_bounds(cap, now) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         if let Err(e) = self.check_revocation(cap) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         let matching_grants = match resolve_matching_grants(
@@ -940,12 +1265,24 @@ impl ArcKernel {
                 };
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now, None);
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
             }
             Err(e) => {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                return self.build_deny_response(request, &msg, now, None);
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
             }
         };
 
@@ -959,20 +1296,38 @@ impl ArcKernel {
             if let Err(e) = self.verify_dpop_for_request(request, cap) {
                 let msg = e.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "DPoP verification failed");
-                return self.build_deny_response(request, &msg, now, None);
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    None,
+                    extra_metadata.clone(),
+                );
             }
         }
 
         if let Err(e) = self.ensure_registered_tool_target(request) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "tool target not registered");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         if let Err(error) = self.record_observed_capability_snapshot(cap) {
             let msg = error.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "failed to persist capability lineage");
-            return self.build_deny_response(request, &msg, now, None);
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
         }
 
         let (matched_grant_index, charge_result) =
@@ -982,12 +1337,13 @@ impl ArcKernel {
                     let msg = e.to_string();
                     warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
                     // For monetary budget exhaustion, build a denial receipt with financial metadata.
-                    return self.build_monetary_deny_response(
+                    return self.build_monetary_deny_response_with_metadata(
                         request,
                         &msg,
                         now,
                         &matching_grants,
                         cap,
+                        extra_metadata.clone(),
                     );
                 }
             };
@@ -1014,16 +1370,23 @@ impl ArcKernel {
             if let Some(ref charge) = charge_result {
                 let total_cost_charged_after_release =
                     self.reverse_budget_charge(&cap.id, charge)?;
-                return self.build_pre_execution_monetary_deny_response(
+                return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
                     charge,
                     total_cost_charged_after_release,
                     cap,
+                    extra_metadata.clone(),
                 );
             }
-            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                Some(matched_grant_index),
+                extra_metadata.clone(),
+            );
         }
 
         if let Err(e) = self.run_guards(
@@ -1037,16 +1400,23 @@ impl ArcKernel {
             if let Some(ref charge) = charge_result {
                 let total_cost_charged_after_release =
                     self.reverse_budget_charge(&cap.id, charge)?;
-                return self.build_pre_execution_monetary_deny_response(
+                return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
                     charge,
                     total_cost_charged_after_release,
                     cap,
+                    extra_metadata.clone(),
                 );
             }
-            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                Some(matched_grant_index),
+                extra_metadata.clone(),
+            );
         }
 
         let payment_authorization =
@@ -1058,16 +1428,23 @@ impl ArcKernel {
                     if let Some(ref charge) = charge_result {
                         let total_cost_charged_after_release =
                             self.reverse_budget_charge(&cap.id, charge)?;
-                        return self.build_pre_execution_monetary_deny_response(
+                        return self.build_pre_execution_monetary_deny_response_with_metadata(
                             request,
                             &msg,
                             now,
                             charge,
                             total_cost_charged_after_release,
                             cap,
+                            extra_metadata.clone(),
                         );
                     }
-                    return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+                    return self.build_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        Some(matched_grant_index),
+                        extra_metadata.clone(),
+                    );
                 }
             };
 
@@ -1102,11 +1479,12 @@ impl ArcKernel {
                         reason = %reason,
                         "tool call cancelled"
                     );
-                    return self.build_cancelled_response(
+                    return self.build_cancelled_response_with_metadata(
                         request,
                         &reason,
                         now,
                         Some(matched_grant_index),
+                        extra_metadata.clone(),
                     );
                 }
                 Err(KernelError::RequestIncomplete(reason)) => {
@@ -1121,11 +1499,13 @@ impl ArcKernel {
                         reason = %reason,
                         "tool call incomplete"
                     );
-                    return self.build_incomplete_response(
+                    return self.build_incomplete_response_with_output_and_metadata(
                         request,
+                        None,
                         &reason,
                         now,
                         Some(matched_grant_index),
+                        extra_metadata.clone(),
                     );
                 }
                 Err(e) => {
@@ -1137,19 +1517,28 @@ impl ArcKernel {
                     )?;
                     let msg = e.to_string();
                     warn!(request_id = %request.request_id, reason = %msg, "tool server error");
-                    return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+                    return self.build_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        Some(matched_grant_index),
+                        extra_metadata.clone(),
+                    );
                 }
             };
-        self.finalize_tool_output_with_cost(
+        self.finalize_tool_output_with_cost_and_metadata(
             request,
             tool_output,
             tool_started_at.elapsed(),
             now,
             matched_grant_index,
-            charge_result,
-            reported_cost,
-            payment_authorization,
-            cap,
+            FinalizeToolOutputCostContext {
+                charge_result,
+                reported_cost,
+                payment_authorization,
+                cap,
+            },
+            extra_metadata,
         )
     }
 
@@ -1463,10 +1852,12 @@ impl ArcKernel {
             tool_started_at.elapsed(),
             now,
             matched_grant_index,
-            charge_result,
-            None,
-            payment_authorization,
-            cap,
+            FinalizeToolOutputCostContext {
+                charge_result,
+                reported_cost: None,
+                payment_authorization,
+                cap,
+            },
         )
     }
 

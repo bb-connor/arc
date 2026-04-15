@@ -1,0 +1,6 @@
+{
+  "service_family": "security-review",
+  "target": "git://acme.example/payments-api",
+  "requested_scope": "hotfix-review",
+  "release_window": "2026-05-01T16:00:00Z"
+}

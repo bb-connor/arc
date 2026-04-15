@@ -12,29 +12,29 @@
 //! implementations now live in dedicated crates. This crate preserves the
 //! historical `arc_core::*` surface by re-exporting those extracted crates.
 
-pub mod appraisal;
-pub mod autonomy;
-pub mod canonical;
-pub mod capability;
-pub mod credit;
-pub mod crypto;
-pub mod error;
+pub use arc_appraisal as appraisal;
+pub use arc_autonomy as autonomy;
+pub use arc_core_types::canonical;
+pub use arc_core_types::capability;
+pub use arc_core_types::crypto;
+pub use arc_core_types::error;
+pub use arc_credit as credit;
 pub mod extension;
-pub mod federation;
-pub mod governance;
-pub mod hashing;
+pub use arc_core_types::hashing;
+pub use arc_federation as federation;
+pub use arc_governance as governance;
 pub mod identity_network;
-pub mod listing;
-pub mod manifest;
-pub mod market;
-pub mod merkle;
-pub mod message;
-pub mod open_market;
-pub mod receipt;
-pub mod session;
+pub use arc_core_types::manifest;
+pub use arc_core_types::merkle;
+pub use arc_core_types::message;
+pub use arc_core_types::receipt;
+pub use arc_core_types::session;
+pub use arc_listing as listing;
+pub use arc_market as market;
+pub use arc_open_market as open_market;
 pub mod standards;
-pub mod underwriting;
-pub mod web3;
+pub use arc_underwriting as underwriting;
+pub use arc_web3 as web3;
 
 pub use appraisal::{
     derive_runtime_attestation_appraisal, evaluate_imported_runtime_attestation_appraisal,

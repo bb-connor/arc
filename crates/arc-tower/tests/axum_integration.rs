@@ -4,13 +4,36 @@
 //! producing signed receipts for allowed requests and denying requests
 //! without capability tokens.
 
+use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
 use arc_core_types::crypto::Keypair;
+use arc_http_core::{http_status_scope, HttpReceipt, ARC_HTTP_STATUS_SCOPE_FINAL};
 use arc_tower::{ArcEvaluator, ArcService};
 use axum::{body::Body, routing::get, routing::post, Router};
+use bytes::Bytes;
 use http::Request;
+use http_body::Body as HttpBody;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use tower_layer::Layer;
+
+fn valid_capability_token_json(id: &str) -> String {
+    let issuer = Keypair::generate();
+    let now = chrono::Utc::now().timestamp() as u64;
+    let token = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: id.to_string(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ArcScope::default(),
+            issued_at: now.saturating_sub(60),
+            expires_at: now + 3600,
+            delegation_chain: Vec::new(),
+        },
+        &issuer,
+    )
+    .unwrap_or_else(|e| panic!("token sign failed: {e}"));
+    serde_json::to_string(&token).unwrap_or_else(|e| panic!("token serialize failed: {e}"))
+}
 
 /// A thin Layer wrapper that adapts ArcService's error type to Infallible
 /// for Axum compatibility. Axum requires layers with Error: Into<Infallible>.
@@ -51,7 +74,9 @@ where
         + 'static,
     S::Future: Send,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
-    ReqBody: Send + 'static,
+    ReqBody: HttpBody + From<Bytes> + Send + 'static,
+    ReqBody::Data: Send,
+    ReqBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     type Response = http::Response<Body>;
     type Error = std::convert::Infallible;
@@ -105,8 +130,8 @@ async fn list_pets() -> &'static str {
     r#"[{"id":1,"name":"Fido"}]"#
 }
 
-async fn create_pet() -> (http::StatusCode, &'static str) {
-    (http::StatusCode::CREATED, r#"{"id":2,"name":"Rex"}"#)
+async fn create_pet(body: String) -> (http::StatusCode, String) {
+    (http::StatusCode::CREATED, body)
 }
 
 async fn get_pet(axum::extract::Path(pet_id): axum::extract::Path<String>) -> String {
@@ -130,6 +155,15 @@ async fn axum_get_allowed_with_receipt() {
         .unwrap_or_else(|e| panic!("oneshot failed: {e}"));
 
     assert_eq!(resp.status(), http::StatusCode::OK);
+    let receipt = resp
+        .extensions()
+        .get::<HttpReceipt>()
+        .unwrap_or_else(|| panic!("missing receipt extension"));
+    assert_eq!(receipt.response_status, 200);
+    assert_eq!(
+        http_status_scope(receipt.metadata.as_ref()),
+        Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+    );
 
     // Verify receipt ID header is present.
     let receipt_id = resp
@@ -168,19 +202,29 @@ async fn axum_post_denied_without_capability() {
 
     assert_eq!(resp.status(), http::StatusCode::FORBIDDEN);
     assert!(resp.headers().contains_key("x-arc-receipt-id"));
+    let receipt = resp
+        .extensions()
+        .get::<HttpReceipt>()
+        .unwrap_or_else(|| panic!("missing receipt extension"));
+    assert_eq!(receipt.response_status, 403);
+    assert_eq!(
+        http_status_scope(receipt.metadata.as_ref()),
+        Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+    );
 }
 
 #[tokio::test]
 async fn axum_post_allowed_with_capability() {
     let keypair = Keypair::generate();
     let app = build_app(keypair);
+    let payload = r#"{"name":"Rex"}"#;
 
     let req = Request::builder()
         .method("POST")
         .uri("/pets")
         .header("content-type", "application/json")
-        .header("x-arc-capability", "cap-token-axum-test")
-        .body(Body::from(r#"{"name":"Rex"}"#))
+        .header("x-arc-capability", valid_capability_token_json("cap-axum"))
+        .body(Body::from(payload))
         .unwrap_or_else(|e| panic!("build request failed: {e}"));
 
     let resp = app
@@ -190,6 +234,24 @@ async fn axum_post_allowed_with_capability() {
 
     assert_eq!(resp.status(), http::StatusCode::CREATED);
     assert!(resp.headers().contains_key("x-arc-receipt-id"));
+    let receipt = resp
+        .extensions()
+        .get::<HttpReceipt>()
+        .unwrap_or_else(|| panic!("missing receipt extension"));
+    assert_eq!(receipt.response_status, 201);
+    assert_eq!(
+        http_status_scope(receipt.metadata.as_ref()),
+        Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+    );
+
+    let body = resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap_or_else(|e| panic!("body collect failed: {e}"))
+        .to_bytes();
+    let body_str = std::str::from_utf8(&body).unwrap_or_else(|e| panic!("utf8 failed: {e}"));
+    assert_eq!(body_str, payload);
 }
 
 #[tokio::test]

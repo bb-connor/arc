@@ -16,8 +16,11 @@ The design rationale and migration guide are in
 ## 1. File Format
 
 The configuration file is YAML and MUST be named `arc.yaml` by convention.
-The file is loaded via `arc start --config arc.yaml` or the equivalent
-programmatic API.
+The file is consumed by ARC runtimes and commands that explicitly opt into
+`arc.yaml` configuration via their own flags or programmatic APIs. This
+repository does not currently ship a universal `arc start` entrypoint, so
+implementations MUST NOT document `arc start --config arc.yaml` as a required
+or normative command path.
 
 Implementations MUST apply `deny_unknown_fields` semantics to every section.
 Any key not defined in this specification MUST cause a parse-time error.

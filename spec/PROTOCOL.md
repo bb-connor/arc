@@ -2,7 +2,7 @@
 
 **Version:** 3.0
 **Date:** 2026-04-14
-**Status:** Shipped repository profile
+**Status:** Current bounded ARC release profile
 
 v3.0 is a backward-compatible extension of v2.0. All v2 artifacts, wire
 formats, and verification rules remain valid. v3 adds the HTTP substrate
@@ -314,8 +314,10 @@ Approval tokens are verified against trusted authority keys and are bound to:
 
 If `governed_intent.call_chain` is present, the kernel rejects empty fields and
 self-referential `parent_request_id == request_id` bindings. ARC treats
-delegated call-chain provenance as part of the approval-bound intent, not as a
-mutable reporting annotation.
+delegated call-chain provenance as preserved caller context inside the
+approval-bound intent, not as a mutable reporting annotation. The bounded
+release does not automatically upgrade that preserved call-chain context into
+independently authenticated upstream truth.
 
 ### 5.3 Verification Rules
 
@@ -324,8 +326,10 @@ The kernel and trust surfaces verify, at minimum:
 1. Ed25519 signature validity
 2. current time is within `issued_at <= now < expires_at`
 3. the requested target is contained by the grant set
-4. attenuation stays within the parent scope
-5. revocation state is clear
+4. the presented capability and any preserved delegation structure are
+   syntactically valid for the bounded shipped profile
+5. revocation state is clear for the presented capability and any presented
+   delegation ancestor IDs
 6. DPoP proof is valid when the selected grant requires it
 7. policy guards pass
 
@@ -335,16 +339,17 @@ Any failure denies or rejects the action instead of widening access.
 
 The current launch-candidate safety inventory is:
 
-- `P1` capability attenuation: delegation can only narrow scope relative to its
-  parent
-- `P2` revocation completeness: a revoked capability or revoked delegation
-  ancestor is denied
+- `P1` capability attenuation: supported delegated capability issuance can only
+  narrow scope relative to the issuing parent
+- `P2` presented revocation coverage: a revoked capability or revoked
+  presented delegation ancestor ID is denied
 - `P3` fail-closed evaluation: verification or policy failures deny or reject
   rather than widening access
 - `P4` receipt integrity: signed receipts and checkpoints remain verifiable as
   evidence artifacts
-- `P5` delegation-chain structural validity: delegation depth, connectivity,
-  and timestamp monotonicity are enforced
+- `P5` presented delegation-chain structural validity: delegation depth,
+  connectivity, and timestamp monotonicity helpers define the bounded
+  structural contract for a presented chain
 
 ARC intentionally distinguishes evidence classes for these claims:
 
@@ -667,7 +672,9 @@ governed receipts into:
 That projection is always derived from the signed governed receipt metadata.
 Trust-control does not accept a second independently editable authorization
 document, because that would silently widen authority or billing scope outside
-the approval-bound intent hash.
+the approval-bound intent hash. If delegated `call_chain` context is present in
+that projection, it remains preserved caller context unless an external system
+independently verifies it.
 
 The report now declares ARC's first normative enterprise-facing profile over
 that projection:
@@ -700,6 +707,8 @@ ARC resolves that sender truth from receipt attribution plus persisted
 capability lineage. If the capability snapshot is missing, the grant cannot be
 resolved, the subject binding is inconsistent, or a required DPoP proof shape
 cannot be represented, the report fails closed instead of degrading silently.
+These reports describe bounded runtime truth; they do not transform asserted
+delegated call-chain fields into independently verified upstream provenance.
 
 ARC's hosted authorization edge now publishes and enforces the same bounded
 contract at request time. The published `arc_authorization_profile` includes:
@@ -1754,7 +1763,7 @@ That discovery layer is intentionally conservative:
   `JWKS`, and request-URI prefix
 - transparency is one signed snapshot over the current issuer and verifier
   discovery documents, carrying per-entry hashes plus publication and expiry
-  windows
+  windows for visibility and manual review
 - every discovery document carries explicit import guardrails requiring
   informational-only visibility, explicit local policy import, and manual
   review before any activation
@@ -2080,8 +2089,10 @@ The certification contract covers:
   does not widen runtime trust from visibility alone
 
 This is a governed public certification marketplace surface backed by signed
-operator evidence. It is not a permissionless trust oracle, global mutable
-trust network, or automatic runtime-admission mechanism.
+operator evidence. Search and transparency are signed visibility feeds rather
+than public transparency-log semantics. It is not a permissionless trust
+oracle, global mutable trust network, or automatic runtime-admission
+mechanism.
 
 ARC now also ships one bounded generic public registry substrate over those
 existing operator-owned surfaces:

@@ -3,8 +3,8 @@
 // ARC (Provable Agent Capability Transport) secures HTTP APIs with
 // cryptographic receipts and capability-based access control. This package
 // wraps any net/http Handler, sending evaluation requests to the ARC Rust
-// kernel running as a localhost sidecar and attaching signed receipts to
-// every response.
+// kernel running as a localhost sidecar and attaching signed receipt IDs to
+// evaluated responses. Fail-open passthroughs do not synthesize ARC receipts.
 //
 // Usage:
 //
@@ -22,7 +22,7 @@ import (
 // signing. All requests are evaluated against the ARC sidecar kernel before
 // being forwarded to the inner handler. Denied requests receive a structured
 // JSON error response; allowed requests proceed with a signed receipt ID in
-// the X-Arc-Receipt-Id response header.
+// the X-Arc-Receipt-Id response header when ARC evaluation succeeds.
 //
 // The middleware fails closed: if the sidecar is unreachable or returns an
 // error, the request is denied (unless OnSidecarError is set to "allow" in
@@ -70,12 +70,18 @@ func (m *arcMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Build ARC HTTP request.
 	arcReq := buildArcHTTPRequest(r, method, routePattern, caller)
+	capabilityToken := extractCapabilityToken(r)
 
 	// Evaluate against sidecar.
-	result, err := m.client.Evaluate(r.Context(), arcReq)
+	result, err := m.client.Evaluate(r.Context(), arcReq, capabilityToken)
 	if err != nil {
 		if m.config.OnSidecarError == "allow" {
-			m.inner.ServeHTTP(w, r)
+			passthrough := &ArcPassthrough{
+				Mode:    "allow_without_receipt",
+				Error:   ErrSidecarUnreachable,
+				Message: "ARC sidecar error: " + err.Error(),
+			}
+			m.inner.ServeHTTP(w, r.WithContext(withArcPassthrough(r.Context(), passthrough)))
 			return
 		}
 		writeJSONError(w, http.StatusBadGateway, ErrorResponse{
@@ -98,7 +104,7 @@ func (m *arcMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Error:      ErrAccessDenied,
 			Message:    result.Verdict.Reason,
 			ReceiptID:  result.Receipt.ID,
-			Suggestion: "provide a valid capability token in the X-Arc-Capability header",
+			Suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
 		})
 		return
 	}

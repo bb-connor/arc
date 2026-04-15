@@ -243,6 +243,21 @@ public class EvaluateResponse
 }
 
 /// <summary>
+/// Explicit fail-open degraded state where no ARC receipt exists.
+/// </summary>
+public class ArcPassthrough
+{
+    [JsonPropertyName("mode")]
+    public string Mode { get; set; } = "allow_without_receipt";
+
+    [JsonPropertyName("error")]
+    public string Error { get; set; } = ArcErrorCodes.SidecarUnreachable;
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = "";
+}
+
+/// <summary>
 /// Structured error response body.
 /// </summary>
 public class ArcErrorResponse
@@ -272,4 +287,9 @@ public static class ArcErrorCodes
     public const string EvaluationFailed = "arc_evaluation_failed";
     public const string InvalidReceipt = "arc_invalid_receipt";
     public const string Timeout = "arc_timeout";
+}
+
+public static class ArcContextKeys
+{
+    public const string Passthrough = "ArcPassthrough";
 }

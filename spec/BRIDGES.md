@@ -146,7 +146,7 @@ The Agent Card structure:
 | `description` | `A2aEdgeConfig.agent_description` | Human-readable summary |
 | `version` | `A2aEdgeConfig.agent_version` | Semantic version |
 | `supportedInterfaces` | Derived from config | One entry per endpoint URL |
-| `capabilities.streaming` | `A2aEdgeConfig.streaming_enabled` | Defaults to `false` |
+| `capabilities.streaming` | Fixed `false` on the authoritative A2A profile | ARC does not currently advertise a receipt-bearing streaming/task lifecycle |
 | `defaultInputModes` | `["text"]` | Fixed for current implementation |
 | `defaultOutputModes` | `["text"]` | Fixed for current implementation |
 | `skills` | Derived from tool manifests | One skill per ARC tool |
@@ -171,8 +171,10 @@ skill entry. The mapping rules are:
 | (fixed) | `outputModes` | `["text"]` |
 | `tool.has_side_effects` | `bridgeFidelity` | Used as fidelity signal |
 
-When multiple manifests contain tools with the same name, the edge MUST
-use the first encountered definition and skip duplicates silently.
+When multiple manifests contain tools with the same name, the edge MUST NOT
+silently collapse them. Unqualified ambiguous names are withheld from the
+authoritative surface, and only deterministic qualified identifiers are
+published.
 
 ### 2.4 SendMessage and SendStreamingMessage
 
@@ -200,17 +202,35 @@ The task response MUST include:
 - `statusMessage`: present when status is `failed`; contains the error
   description
 
-#### 2.4.2 SendStreamingMessage (SSE)
+#### 2.4.2 SendStreamingMessage
 
-The `message/stream` method is accepted on the same handler as
-`message/send`. When `A2aEdgeConfig.streaming_enabled` is `true`, the
-Agent Card advertises streaming support.
+The authoritative A2A surface exposes `message/stream` as a deferred
+receipt-bearing task lifecycle rather than a push-stream transport.
 
-The current implementation handles `message/stream` synchronously
-(single-shot response). Future versions MAY emit SSE events for
-long-running tool invocations.
+`message/stream` MUST:
 
-#### 2.4.3 Result Conversion
+1. Resolve the target skill using the same rules as `message/send`.
+2. Create a working `TaskResponse` with signed-authority metadata and
+   `receiptPending = true`.
+3. Persist the deferred execution request under the returned task ID.
+4. Require follow-up `task/get` or `task/cancel` calls to resolve or cancel
+   the task.
+
+#### 2.4.3 GetTask / CancelTask
+
+The authoritative A2A surface also exposes:
+
+| Method | Purpose | Response |
+|---|---|---|
+| `task/get` | Resolve a deferred `message/stream` task | `TaskResponse` |
+| `task/cancel` | Cancel a deferred `message/stream` task before execution | `TaskResponse` |
+
+`task/get` MUST execute the deferred request through the authoritative ARC
+path the first time it is called for a working task and then persist the
+terminal result. Terminal task results MUST carry the same signed ARC receipt
+metadata as `message/send`.
+
+#### 2.4.4 Result Conversion
 
 Tool results are converted to A2A message parts using these rules:
 
@@ -228,13 +248,23 @@ indicates how faithfully an ARC tool maps to A2A semantics.
 
 | Fidelity Level | Criteria | Implications |
 |---|---|---|
-| `full` | Tool is read-only (`has_side_effects` is `false`) | Perfect mapping; no semantic loss |
-| `partial` | Tool has side effects (`has_side_effects` is `true`) | A2A does not distinguish read-only from mutating operations; the side-effect signal is lost in translation |
-| `degraded` | Reserved for tools with streaming output or binary payloads | Significant semantic loss; A2A text/data parts cannot fully represent the output |
+| `lossless` | Tool is publishable and does not depend on approval, deferred-stream, cancellation, or partial-output caveats | The current A2A edge can project the tool without semantic loss |
+| `adapted` | Tool is publishable but side-effect, deferred-stream, cancellation, or partial-output semantics require explicit caveats | The edge preserves the tool through A2A but must surface caveats in discovery metadata |
+| `unsupported` | Tool requires interactive approval or explicit publication suppression (`x-arc-publish: false`) | The tool MUST NOT be auto-published on the A2A surface |
 
 The `bridgeFidelity` field is included in each skill entry in the Agent
 Card. Clients SHOULD use this field to assess whether the A2A interface
-is sufficient for their use case.
+is sufficient for their use case. `Unsupported` skills are withheld from the
+Agent Card entirely.
+
+The current implementation uses these semantic hints when present on the tool
+schema:
+
+- `x-arc-publish`
+- `x-arc-approval-required`
+- `x-arc-streaming`
+- `x-arc-cancellation`
+- `x-arc-partial-output`
 
 ### 2.6 Kernel-Mediated Receipts
 
@@ -276,8 +306,10 @@ mapping rules are:
 | `tool.has_side_effects` + config | `requiresPermission` | `true` if config requires permission OR tool has side effects |
 | (evaluated) | `bridgeFidelity` | See Section 3.5 |
 
-When multiple manifests contain tools with the same name, the edge MUST
-use the first encountered definition and skip duplicates.
+When multiple manifests contain tools with the same name, the edge MUST NOT
+silently collapse them. Unqualified ambiguous names are withheld from the
+authoritative surface, and only deterministic qualified identifiers are
+published.
 
 ### 3.3 Category Inference
 
@@ -338,23 +370,27 @@ tool properties.
 
 | Fidelity Level | Criteria | Implications |
 |---|---|---|
-| `full` | Category is `filesystem` or `terminal` | ACP natively supports these primitives; no semantic loss |
-| `partial` | Category is `browser`, or category is `tool` with `has_side_effects` = `false` | Minor semantic loss; ACP's browser model is narrower than arbitrary tools; read-only generic tools lose category specificity |
-| `degraded` | Category is `tool` with `has_side_effects` = `true` | ACP has no generic "mutating tool" primitive; the side-effect and scope semantics are lost |
+| `lossless` | Category is `filesystem` or `terminal` and no caveated semantic hints are present | ACP natively supports the projection without caveats |
+| `adapted` | Capability is publishable but depends on permission-preview, collected streaming, partial-output, cancellation, or generic-tool-category caveats | The capability remains discoverable but caveats MUST be surfaced in `bridgeFidelity` |
+| `unsupported` | Category is `browser`, category is generic mutating `tool`, or publication is disabled with `x-arc-publish: false` | The capability MUST NOT be auto-published on the ACP surface |
 
 The `bridgeFidelity` field is included in each capability advertisement.
 Clients SHOULD use this field to determine whether the ACP interface
-provides sufficient fidelity for their use case.
+provides sufficient fidelity for their use case. `Unsupported` capabilities are
+withheld from `session/list_capabilities`.
 
 ### 3.6 JSON-RPC Interface
 
-The ACP edge exposes three JSON-RPC methods:
+The ACP edge exposes six JSON-RPC methods:
 
 | Method | Purpose | Response |
 |---|---|---|
 | `session/list_capabilities` | List all ACP capabilities | `{ capabilities: [...] }` |
 | `session/request_permission` | Evaluate permission for a capability | `{ decision: "allow" \| "deny" }` |
 | `tool/invoke` | Invoke a capability through the kernel | Invocation result or error |
+| `tool/stream` | Create a deferred authoritative invocation task | `{ task: {...} }` |
+| `tool/cancel` | Cancel a deferred invocation task before execution | `{ task: {...} }` |
+| `tool/resume` | Resolve a deferred invocation task through the kernel | `{ task: {...}, result: {...} }` |
 
 Unknown methods MUST return a JSON-RPC error with code `-32601`.
 
@@ -383,9 +419,11 @@ sequenceDiagram
     end
 ```
 
-Every invocation that reaches the tool server MUST produce a signed
-receipt. Failed invocations (tool server errors) MUST return
-`{ success: false, error: "<message>" }` and still produce a receipt.
+Every authoritative invocation that reaches the tool server MUST produce a
+signed receipt. Failed invocations (tool server errors) MUST return
+`{ success: false, error: "<message>" }` and still produce a receipt. Deferred
+tasks created through `tool/stream` remain receipt-pending until `tool/resume`
+resolves them or `tool/cancel` marks them cancelled before execution.
 
 ---
 
@@ -451,19 +489,12 @@ sequenceDiagram
     else Arguments invalid
         A-->>LLM: ToolCallResult(denied: true, "parse error")
     else Valid call
-        A->>K: Validate capability token
-        K->>K: Run guard pipeline
-        alt Guard denies
-            K-->>A: Deny verdict
-            A-->>LLM: ToolCallResult(denied: true, receipt_ref)
-        else Guard allows
-            K-->>A: Allow verdict
-            A->>T: Invoke tool
-            T-->>A: Tool result
-            A->>K: Sign receipt
-            K-->>A: Signed receipt with receipt_ref
-            A-->>LLM: ToolCallResult(denied: false, content, receipt_ref)
-        end
+        A->>K: evaluate_tool_call_blocking(ToolCallRequest)
+        K->>K: Validate capability + run guard pipeline
+        K->>T: Invoke tool when allowed
+        T-->>K: Tool result or error
+        K-->>A: ToolCallResponse with signed ArcReceipt
+        A-->>LLM: ToolCallResult(content, denied, receipt_ref, receipt)
     end
 ```
 
@@ -520,16 +551,18 @@ include:
 
 - `tool_name`: the OpenAI function name, which matches the ARC tool name
 - `server_id`: the adapter's configured server ID
-- `receipt_ref`: a unique reference (format:
-  `arc-receipt-{server_id}-{counter}`) included in the `ToolCallResult`
+- `receipt_ref`: the signed receipt's real `id`, included in the
+  `ToolCallResult`
+- `receipt`: the signed `ArcReceipt` object itself when the call reached
+  the kernel
 
 Receipt generation occurs for both successful and failed invocations:
 
 | Outcome | `denied` | `receipt_ref` | Notes |
 |---|---|---|---|
-| Successful invocation | `false` | Present | Normal execution path |
-| Guard denial | `true` | Present | Kernel denied the capability |
-| Tool server error | `true` | Present | Tool execution failed |
+| Successful invocation | `false` | Present | Kernel returns signed receipt with allow verdict |
+| Guard denial | `true` | Present | Kernel returns signed denial receipt |
+| Tool server error | `true` | Present | Kernel returns signed denial receipt |
 | Function not found | `true` | Absent | No kernel interaction occurred |
 | Argument parse failure | `true` | Absent | No kernel interaction occurred |
 
@@ -546,7 +579,8 @@ parallel function calls.
 Batch execution MUST:
 
 - Process each tool call sequentially in the provided order.
-- Generate a unique `receipt_ref` for each call that reaches the kernel.
+- Return the kernel-issued `receipt.id` as `receipt_ref` for each call that
+  reaches the kernel.
 - Return one `ToolCallResult` per input `OpenAiToolCall`.
 
 Each call in the batch is independent. A failure in one call MUST NOT
@@ -563,9 +597,9 @@ All edges use a three-level fidelity assessment:
 
 | Level | Meaning | Guidance |
 |---|---|---|
-| `full` | The ARC tool maps perfectly to the target protocol's native primitives | No semantic loss; the bridge is transparent |
-| `partial` | The ARC tool maps with minor semantic loss | Some ARC metadata (side-effect signals, scopes, structured output) may be collapsed or omitted |
-| `degraded` | The ARC tool maps with significant semantic loss | The target protocol cannot represent key ARC properties; callers should verify results independently |
+| `lossless` | The ARC tool maps cleanly to the target protocol's native primitives | No caveats are required and the bridge may publish by default |
+| `adapted` | The ARC tool is publishable only with explicit caveats | Discovery metadata MUST surface the caveats honestly |
+| `unsupported` | The target protocol cannot represent the required semantics honestly | The tool MUST remain unpublished on that surface |
 
 ### 5.2 Fail-Closed Invariant
 

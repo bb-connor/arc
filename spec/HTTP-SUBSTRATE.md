@@ -348,7 +348,7 @@ evidence under an Ed25519 signature from the kernel.
 | `session_id` | `string` or `null` | MAY | `null` | Yes | Session ID the request belonged to |
 | `verdict` | `Verdict` | MUST | | Yes | The kernel's verdict |
 | `evidence` | `GuardEvidence[]` | MAY | `[]` | Yes | Per-guard evidence collected during evaluation |
-| `response_status` | `integer` | MUST | | Yes | HTTP status code of the proxied or error response |
+| `response_status` | `integer` | MUST | | Yes | HTTP status ARC associated with the evaluation outcome at receipt-signing time. For deny receipts this is the concrete ARC error status; for allow receipts produced before proxy or app execution completes, it is evaluation-time status metadata rather than guaranteed downstream response evidence. |
 | `timestamp` | `integer` | MUST | | Yes | Unix timestamp (seconds) when the receipt was created |
 | `content_hash` | `string` | MUST | | Yes | SHA-256 hex hash binding the request content to this receipt |
 | `policy_hash` | `string` | MUST | | Yes | SHA-256 hex hash of the policy that was applied |

@@ -1,11 +1,18 @@
 # Cross-Protocol Bridging
 
-**Status:** Draft
+**Status:** Draft architecture with shipped edge baseline
 **Date:** 2026-04-13
 
-> **Status**: Design proposal. The `CrossProtocolOrchestrator` and
-> `CapabilityBridge` trait described here are not yet implemented. This document
-> specifies the target architecture for cross-protocol bridging.
+> **Status**: ARC now ships a shared `arc-cross-protocol` substrate with a real
+> `CrossProtocolOrchestrator`, `CapabilityBridge`, capability-envelope, and
+> bridge-lineage model. The current implementation is the authoritative
+> edge-to-native execution substrate used by the A2A/ACP lanes.
+>
+> **Remaining future work**: The fuller bridge-registry and multi-hop
+> protocol-to-protocol fabric sketched in this document is still future
+> architecture. The shipped runtime now includes protocol-aware target binding
+> metadata and executor selection for the supported authoritative edges, but it
+> is not yet the final universal orchestrator end-state.
 
 ---
 
@@ -20,8 +27,9 @@ ARC aims to reduce this fragmentation by serving as the universal protocol
 bridge. A tool published once through ARC can be made consumable via MCP, A2A,
 and ACP surfaces when the semantic projection is faithful enough to preserve
 ARC's security and execution guarantees. Every bridged invocation passes
-through the same kernel -- the same capability validation, guard pipeline, and
-signed receipt log.
+through the same kernel in the shipped edge-helper paths. The generic
+orchestrator sketched here is the next architectural step, not a current
+runtime claim.
 
 ```
                    +------------------+
@@ -172,6 +180,33 @@ pub enum BridgeFidelity {
 
 Every outward edge should compute a per-tool `BridgeFidelity` before automatic
 publication. `Unsupported` tools stay local to their source protocol.
+
+The shipped `arc-cross-protocol` substrate now derives these decisions from a
+shared semantic-hint pass over tool schemas:
+
+- `x-arc-publish: false` gates publication entirely.
+- `x-arc-approval-required` marks projections that need honest interactive
+  approval semantics.
+- `x-arc-streaming`, `x-arc-cancellation`, and `x-arc-partial-output` express
+  lifecycle guarantees that must either survive the bridge or be surfaced as
+  caveats.
+- `x-arc-target-protocol` records the intended authoritative target protocol
+  for a published outward binding (`native`, `mcp`, `http`, `a2a`, `acp`,
+  `open_ai`). Unsupported values fail closed.
+
+Current truthful publication rules are intentionally conservative:
+
+- A2A marks tools as `Unsupported` when they require interactive approval or
+  cancellation semantics the current task surface cannot represent honestly.
+- A2A marks tools as `Adapted` when side-effect, streaming, or partial-output
+  semantics are preserved only through final task payloads rather than native
+  incremental lifecycle events.
+- ACP marks browser capabilities and generic mutating tools as `Unsupported`
+  because the current ACP edge cannot project those authority semantics
+  truthfully.
+- ACP marks generic read-only tools, permission-preview-dependent tools, and
+  collected streaming outputs as `Adapted` with explicit caveats in outward
+  discovery metadata.
 
 ---
 
@@ -398,7 +433,19 @@ pub struct CrossProtocolOrchestrator {
 }
 ```
 
-This orchestrator is part of the Tier 2 roadmap (Phase 6). Not yet implemented.
+The shipped runtime now implements the substrate-level form of this idea in
+`arc-cross-protocol`: a real orchestrator, capability-envelope contract,
+trace-lineage model, and protocol executor registry seam. The current
+authoritative edges use shared bridge metadata plus that executor seam to
+select supported targets such as `native` and `mcp` without hardcoding every
+call to `Native`.
+
+The broader architecture shown here is still future work in one main way:
+
+1. the executor/bridge registry is now a shipped intent-aware control-plane
+   substrate for the qualified authoritative surfaces, but it is not yet a
+   claim that every protocol family or partner ecosystem in the long-range
+   research is already integrated or qualified
 
 ### 6.2 Flow: A2A -> MCP -> ACP
 

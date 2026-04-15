@@ -324,7 +324,10 @@ pub(crate) fn cmd_trust_federation_policy_upsert(
     if json_output {
         println!("{}", serde_json::to_string_pretty(&response)?);
     } else {
-        println!("federation policy upserted: {}", response.policy.body.policy_id);
+        println!(
+            "federation policy upserted: {}",
+            response.policy.body.policy_id
+        );
     }
 
     Ok(())

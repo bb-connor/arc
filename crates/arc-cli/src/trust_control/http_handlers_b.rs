@@ -405,16 +405,16 @@ async fn handle_issue_credit_facility(
         }
     };
 
-    match issue_signed_credit_facility_detailed(
+    match issue_signed_credit_facility_detailed(CreditIssuanceArgs {
         receipt_db_path,
-        state.config.budget_db_path.as_deref(),
-        state.config.authority_seed_path.as_deref(),
-        state.config.authority_db_path.as_deref(),
-        state.config.certification_registry_file.as_deref(),
-        state.config.issuance_policy.as_ref(),
-        &request.query,
-        request.supersedes_facility_id.as_deref(),
-    ) {
+        budget_db_path: state.config.budget_db_path.as_deref(),
+        authority_seed_path: state.config.authority_seed_path.as_deref(),
+        authority_db_path: state.config.authority_db_path.as_deref(),
+        certification_registry_file: state.config.certification_registry_file.as_deref(),
+        issuance_policy: state.config.issuance_policy.as_ref(),
+        query: &request.query,
+        supersedes_artifact_id: request.supersedes_facility_id.as_deref(),
+    }) {
         Ok(facility) => Json::<SignedCreditFacility>(facility).into_response(),
         Err(error) => error.into_response(),
     }
@@ -495,16 +495,16 @@ async fn handle_issue_credit_bond(
         }
     };
 
-    match issue_signed_credit_bond_detailed(
+    match issue_signed_credit_bond_detailed(CreditIssuanceArgs {
         receipt_db_path,
-        state.config.budget_db_path.as_deref(),
-        state.config.authority_seed_path.as_deref(),
-        state.config.authority_db_path.as_deref(),
-        state.config.certification_registry_file.as_deref(),
-        state.config.issuance_policy.as_ref(),
-        &request.query,
-        request.supersedes_bond_id.as_deref(),
-    ) {
+        budget_db_path: state.config.budget_db_path.as_deref(),
+        authority_seed_path: state.config.authority_seed_path.as_deref(),
+        authority_db_path: state.config.authority_db_path.as_deref(),
+        certification_registry_file: state.config.certification_registry_file.as_deref(),
+        issuance_policy: state.config.issuance_policy.as_ref(),
+        query: &request.query,
+        supersedes_artifact_id: request.supersedes_bond_id.as_deref(),
+    }) {
         Ok(bond) => Json::<SignedCreditBond>(bond).into_response(),
         Err(error) => error.into_response(),
     }
@@ -2300,4 +2300,3 @@ async fn handle_reduce_charge_cost(
         },
     )
 }
-

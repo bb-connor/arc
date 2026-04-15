@@ -5,7 +5,9 @@ use std::collections::HashMap;
 use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::GuardEvidence;
 use arc_http_core::{
-    ArcHttpRequest, AuthMethod, CallerIdentity, HttpMethod, HttpReceipt, HttpReceiptBody, Verdict,
+    ArcHttpRequest, AuthMethod, CallerIdentity, HttpAuthority, HttpAuthorityError,
+    HttpAuthorityEvaluation, HttpAuthorityInput, HttpAuthorityPolicy, HttpMethod, HttpReceipt,
+    Verdict,
 };
 use arc_openapi::PolicyDecision;
 
@@ -25,19 +27,17 @@ pub struct RouteEntry {
     pub policy: PolicyDecision,
 }
 
-/// The request evaluator holds the loaded route table and kernel keypair.
+/// The request evaluator holds the loaded route table and shared HTTP authority.
 pub struct RequestEvaluator {
     routes: Vec<RouteEntry>,
-    keypair: Keypair,
-    policy_hash: String,
+    authority: HttpAuthority,
 }
 
 impl RequestEvaluator {
     pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
         Self {
             routes,
-            keypair,
-            policy_hash,
+            authority: HttpAuthority::new(keypair, policy_hash),
         }
     }
 
@@ -46,6 +46,7 @@ impl RequestEvaluator {
         &self,
         method: HttpMethod,
         path: &str,
+        query: &HashMap<String, String>,
         headers: &HashMap<String, String>,
         body_hash: Option<String>,
         body_length: u64,
@@ -53,105 +54,60 @@ impl RequestEvaluator {
         let request_id = uuid::Uuid::now_v7().to_string();
         let caller = extract_caller(headers);
         let (route_pattern, matched_policy) = self.match_route(method, path);
-
-        let mut evidence = Vec::new();
-
-        // Determine verdict based on policy.
-        let verdict = match matched_policy {
-            PolicyDecision::SessionAllow => {
-                evidence.push(GuardEvidence {
-                    guard_name: "DefaultPolicyGuard".to_string(),
-                    verdict: true,
-                    details: Some("safe method, session-scoped allow".to_string()),
-                });
-                Verdict::Allow
-            }
-            PolicyDecision::DenyByDefault => {
-                // Check for capability token in headers.
-                let cap_header = headers
-                    .get("x-arc-capability")
-                    .or_else(|| headers.get("X-Arc-Capability"));
-                match cap_header {
-                    Some(_token) => {
-                        // In a full implementation, validate the token against
-                        // the kernel's capability authority. For now, the
-                        // presence of a token is sufficient to allow.
-                        evidence.push(GuardEvidence {
-                            guard_name: "CapabilityGuard".to_string(),
-                            verdict: true,
-                            details: Some("capability token presented".to_string()),
-                        });
-                        Verdict::Allow
-                    }
-                    None => {
-                        evidence.push(GuardEvidence {
-                            guard_name: "CapabilityGuard".to_string(),
-                            verdict: false,
-                            details: Some(
-                                "side-effect route requires X-Arc-Capability header".to_string(),
-                            ),
-                        });
-                        Verdict::deny(
-                            "side-effect route requires a capability token",
-                            "CapabilityGuard",
-                        )
-                    }
-                }
-            }
-        };
-
-        let response_status = if verdict.is_allowed() { 200 } else { 403 };
-
-        let caller_identity_hash = caller.identity_hash().map_err(|e| {
-            crate::error::ProtectError::ReceiptSign(format!("failed to hash caller identity: {e}"))
-        })?;
-
-        let request = ArcHttpRequest {
-            request_id: request_id.clone(),
+        let result = self.authority.evaluate(HttpAuthorityInput {
+            request_id,
             method,
-            route_pattern: route_pattern.clone(),
-            path: path.to_string(),
-            query: HashMap::new(),
-            headers: HashMap::new(), // Don't store raw headers in receipt
+            route_pattern,
+            path,
+            query,
             caller,
-            body_hash: body_hash.clone(),
+            body_hash,
             body_length,
             session_id: None,
-            capability_id: None,
-            timestamp: chrono::Utc::now().timestamp() as u64,
-        };
-
-        let content_hash = request.content_hash().map_err(|e| {
-            crate::error::ProtectError::ReceiptSign(format!("failed to compute content hash: {e}"))
+            capability_id_hint: None,
+            presented_capability: extract_presented_capability(headers, query),
+            policy: policy_mode(matched_policy),
         })?;
+        Ok(result.into())
+    }
 
-        let receipt_id = uuid::Uuid::now_v7().to_string();
-        let body = HttpReceiptBody {
-            id: receipt_id,
+    /// Evaluate a fully normalized sidecar request.
+    pub fn evaluate_arc_request(
+        &self,
+        request: ArcHttpRequest,
+        presented_capability: Option<&str>,
+    ) -> Result<EvaluationResult, crate::error::ProtectError> {
+        let ArcHttpRequest {
             request_id,
-            route_pattern,
             method,
-            caller_identity_hash,
-            session_id: None,
-            verdict: verdict.clone(),
-            evidence: evidence.clone(),
-            response_status,
-            timestamp: request.timestamp,
-            content_hash,
-            policy_hash: self.policy_hash.clone(),
-            capability_id: None,
-            metadata: None,
-            kernel_key: self.keypair.public_key(),
-        };
-
-        let receipt = HttpReceipt::sign(body, &self.keypair)
-            .map_err(|e| crate::error::ProtectError::ReceiptSign(format!("signing failed: {e}")))?;
-
-        Ok(EvaluationResult {
-            verdict,
-            receipt,
-            evidence,
-        })
+            path,
+            query,
+            headers,
+            caller,
+            body_hash,
+            body_length,
+            session_id,
+            capability_id,
+            ..
+        } = request;
+        let (route_pattern, matched_policy) = self.match_route(method, &path);
+        let raw_capability =
+            presented_capability.or_else(|| extract_presented_capability(&headers, &query));
+        let result = self.authority.evaluate(HttpAuthorityInput {
+            request_id,
+            method,
+            route_pattern,
+            path: &path,
+            query: &query,
+            caller,
+            body_hash,
+            body_length,
+            session_id,
+            capability_id_hint: capability_id.as_deref(),
+            presented_capability: raw_capability,
+            policy: policy_mode(matched_policy),
+        })?;
+        Ok(result.into())
     }
 
     /// Match a request path against the route table.
@@ -172,6 +128,57 @@ impl RequestEvaluator {
             PolicyDecision::DenyByDefault
         };
         (pattern, policy)
+    }
+}
+
+fn extract_presented_capability<'a>(
+    headers: &'a HashMap<String, String>,
+    query: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    headers
+        .get("x-arc-capability")
+        .or_else(|| headers.get("X-Arc-Capability"))
+        .map(String::as_str)
+        .or_else(|| query.get("arc_capability").map(String::as_str))
+}
+
+fn policy_mode(policy: PolicyDecision) -> HttpAuthorityPolicy {
+    match policy {
+        PolicyDecision::SessionAllow => HttpAuthorityPolicy::SessionAllow,
+        PolicyDecision::DenyByDefault => HttpAuthorityPolicy::DenyByDefault,
+    }
+}
+
+impl RequestEvaluator {
+    pub fn finalize_receipt(
+        &self,
+        decision_receipt: &HttpReceipt,
+        response_status: u16,
+    ) -> Result<HttpReceipt, crate::error::ProtectError> {
+        self.authority
+            .finalize_decision_receipt(decision_receipt, response_status)
+            .map_err(Into::into)
+    }
+}
+
+impl From<HttpAuthorityEvaluation> for EvaluationResult {
+    fn from(value: HttpAuthorityEvaluation) -> Self {
+        Self {
+            verdict: value.verdict,
+            receipt: value.receipt,
+            evidence: value.evidence,
+        }
+    }
+}
+
+impl From<HttpAuthorityError> for crate::error::ProtectError {
+    fn from(value: HttpAuthorityError) -> Self {
+        match value {
+            HttpAuthorityError::CallerIdentity(message)
+            | HttpAuthorityError::ContentHash(message)
+            | HttpAuthorityError::Kernel(message) => Self::Evaluation(message),
+            HttpAuthorityError::ReceiptSign(message) => Self::ReceiptSign(message),
+        }
     }
 }
 
@@ -232,6 +239,30 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
+    use arc_http_core::{
+        http_status_scope, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
+        ARC_HTTP_STATUS_SCOPE_FINAL,
+    };
+
+    fn valid_capability_token_json(id: &str) -> String {
+        let issuer = Keypair::generate();
+        let now = chrono::Utc::now().timestamp() as u64;
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: issuer.public_key(),
+                scope: ArcScope::default(),
+                issued_at: now.saturating_sub(60),
+                expires_at: now + 3600,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("token should sign");
+        serde_json::to_string(&token).expect("token should serialize")
+    }
 
     #[test]
     fn path_matching() {
@@ -269,10 +300,21 @@ mod tests {
         let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
 
         let result = evaluator
-            .evaluate(HttpMethod::Get, "/pets", &HashMap::new(), None, 0)
+            .evaluate(
+                HttpMethod::Get,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
             .unwrap();
         assert!(result.verdict.is_allowed());
         assert!(result.receipt.verify_signature().unwrap());
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
     }
 
     #[test]
@@ -287,11 +329,22 @@ mod tests {
         let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
 
         let result = evaluator
-            .evaluate(HttpMethod::Post, "/pets", &HashMap::new(), None, 0)
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
             .unwrap();
         assert!(result.verdict.is_denied());
         assert_eq!(result.receipt.response_status, 403);
         assert!(result.receipt.verify_signature().unwrap());
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
     }
 
     #[test]
@@ -306,12 +359,68 @@ mod tests {
         let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
 
         let mut headers = HashMap::new();
-        headers.insert("X-Arc-Capability".to_string(), "cap-token-123".to_string());
+        headers.insert(
+            "X-Arc-Capability".to_string(),
+            valid_capability_token_json("cap-123"),
+        );
 
         let result = evaluator
-            .evaluate(HttpMethod::Post, "/pets", &headers, None, 0)
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &headers,
+                None,
+                0,
+            )
             .unwrap();
         assert!(result.verdict.is_allowed());
+        assert_eq!(result.receipt.capability_id.as_deref(), Some("cap-123"));
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
+    }
+
+    #[test]
+    fn finalize_receipt_rebinds_status_and_links_decision_receipt() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Get,
+            operation_id: Some("listPets".to_string()),
+            policy: PolicyDecision::SessionAllow,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+
+        let decision = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .unwrap()
+            .receipt;
+        let final_receipt = evaluator.finalize_receipt(&decision, 204).unwrap();
+
+        assert_ne!(final_receipt.id, decision.id);
+        assert_eq!(final_receipt.response_status, 204);
+        assert_eq!(
+            http_status_scope(final_receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+        );
+        assert_eq!(
+            final_receipt
+                .metadata
+                .as_ref()
+                .and_then(|meta| meta.get(ARC_DECISION_RECEIPT_ID_KEY))
+                .and_then(|value| value.as_str()),
+            Some(decision.id.as_str())
+        );
+        assert!(final_receipt.verify_signature().unwrap());
     }
 
     #[test]
@@ -377,6 +486,7 @@ mod tests {
                 HttpMethod::Get,
                 "/data",
                 &HashMap::new(),
+                &HashMap::new(),
                 Some("bodyhash123".to_string()),
                 1024,
             )
@@ -392,14 +502,95 @@ mod tests {
 
         // GET to unknown route should still be allowed (safe method)
         let result = evaluator
-            .evaluate(HttpMethod::Get, "/unknown", &HashMap::new(), None, 0)
+            .evaluate(
+                HttpMethod::Get,
+                "/unknown",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
             .unwrap();
         assert!(result.verdict.is_allowed());
 
         // DELETE to unknown route should be denied (side-effect method)
         let result = evaluator
-            .evaluate(HttpMethod::Delete, "/unknown", &HashMap::new(), None, 0)
+            .evaluate(
+                HttpMethod::Delete,
+                "/unknown",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
             .unwrap();
         assert!(result.verdict.is_denied());
+    }
+
+    #[test]
+    fn evaluate_invalid_capability_denied_fail_closed() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/pets".to_string(),
+            method: HttpMethod::Post,
+            operation_id: Some("createPet".to_string()),
+            policy: PolicyDecision::DenyByDefault,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let mut headers = HashMap::new();
+        headers.insert("X-Arc-Capability".to_string(), "not-json".to_string());
+
+        let result = evaluator
+            .evaluate(
+                HttpMethod::Post,
+                "/pets",
+                &HashMap::new(),
+                &headers,
+                None,
+                0,
+            )
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.as_deref().is_none());
+    }
+
+    #[test]
+    fn evaluate_query_parameters_affect_content_hash() {
+        let keypair = Keypair::generate();
+        let routes = vec![RouteEntry {
+            pattern: "/search".to_string(),
+            method: HttpMethod::Get,
+            operation_id: Some("search".to_string()),
+            policy: PolicyDecision::SessionAllow,
+        }];
+        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let mut query_a = HashMap::new();
+        query_a.insert("q".to_string(), "cats".to_string());
+        let mut query_b = HashMap::new();
+        query_b.insert("q".to_string(), "dogs".to_string());
+
+        let result_a = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/search",
+                &query_a,
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .unwrap();
+        let result_b = evaluator
+            .evaluate(
+                HttpMethod::Get,
+                "/search",
+                &query_b,
+                &HashMap::new(),
+                None,
+                0,
+            )
+            .unwrap();
+
+        assert_ne!(result_a.receipt.content_hash, result_b.receipt.content_hash);
     }
 }

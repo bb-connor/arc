@@ -19,48 +19,46 @@ security, regulatory compliance, and portable trust.
 
 ## Current State
 
-**Latest completed milestone:** v3.13 Universal Orchestration Closure
-(completed locally 2026-04-14; pending archival)
-**Active milestone:** v3.14 Universal Fabric and Kernel Convergence
-(phases 397-402)
+**Latest completed milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(completed locally 2026-04-15; pending archival)
+**Latest archived milestone:** v3.14 Universal Fabric and Kernel Convergence
+(completed locally and archived locally 2026-04-14)
+**Most recent implemented milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(completed locally 2026-04-15; pending archival)
+**Active milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(complete locally 2026-04-15; pending archival)
 **Parallel milestone:** v4.0 WASM Guard Runtime Completion (phases 373-376)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
 Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
-**Planned milestones:** v3.0 through v3.14 (Universal Security Kernel era)
+**Planned milestones:** v3.0 through v3.18 (Universal Security Kernel era)
 **Planned milestones:** v4.0 through v4.2 (WASM Guard Plugin Ecosystem)
-**Next GSD action:** `$gsd-plan-phase 397` to begin `v3.14`, while archival
-for `v3.12`/`v3.13` and the parallel `v4.x` lane continue independently
+**Next GSD action:** `$gsd-complete-milestone`
 
-## Current Milestone: v3.14 Universal Fabric and Kernel Convergence
+## Current Milestone: v3.18 Bounded ARC Ship Readiness Closure
 
-**Goal:** Close the remaining gap between ARC's qualified cross-protocol
-execution substrate and the full original vision by extending orchestration
-beyond edge-to-native execution, converging supported HTTP/API surfaces on one
-literal kernel authority story, completing or truthfully narrowing the
-remaining protocol lifecycle surfaces, and reconciling the milestone ledger
-and claim gate so the repo can honestly decide whether the stronger vision
-claim is earned.
+**Goal:** Convert the Track A P0 blocker list into one executable bounded-ship
+closure lane so ARC can ship one honest, pristine bounded release without
+overclaiming stronger delegation, attestation, non-repudiation, HA, or
+market-position properties.
 
 **Target features:**
-- A registry-driven protocol-to-protocol bridge fabric with truthful multi-hop
-  lineage, attenuation, fidelity, and receipt propagation
-- A literal kernel-backed authority/evidence path shared by `arc-api-protect`,
-  `arc-tower`, and the representative HTTP/API SDK substrates
-- Lifecycle-equivalent A2A/ACP mediation for the public surfaces ARC wants to
-  claim, with compatibility bypasses retired or strongly isolated
-- Historical milestone, roadmap, requirements, and archive truth repaired
-  across v3.0-v3.13 so planning becomes auditable evidence instead of a
-  competing narrative
-- A final qualification gate that either upgrades ARC's top-level claim to the
-  stronger original vision or records the exact remaining blockers in one
-  authoritative place
+- one coherent bounded-ARC claim surface across README, release docs, review
+  docs, and planning state
+- one explicit runtime boundary for delegated authority and governed
+  provenance so ship-facing docs stop implying stronger semantics than the
+  kernel enforces
+- one named hosted/auth security profile for the recommended bounded release,
+  with compatibility-only paths clearly demoted
+- one named bounded operational profile for trust-control, budgets, and
+  receipts that excludes consensus-grade HA, distributed-linearizable spend,
+  and transparency-log semantics
+- one authoritative pre-ship checklist and bounded qualification gate
 
-**Execution status:** requirements and roadmap are now defined; execution has
-not started. Phases `397` through `402` cover protocol-fabric runtime,
-kernel-first HTTP convergence, SDK authority/evidence convergence,
-lifecycle-equivalent mediation, historical ledger closure, and the final
-full-vision claim decision. `v3.13` remains complete locally pending archival,
-and `v4.x` remains the parallel strategic lane.
+**Execution status:** phases `417` through `421` are complete locally.
+`v3.18` is now the latest completed milestone and closes the Track A P0
+bounded-ship blockers by making bounded ARC the only ship-facing release
+boundary. The retained repo-local decision from `v3.17` still stands: ARC is
+comptroller-capable software, not yet a proved market position.
 
 ## v4.x WASM Guard Plugin Ecosystem
 
@@ -79,14 +77,16 @@ landscape, long-range roadmap, HushSpec/ClawdStrike integration, v1 decisions)
 
 ## Current Milestone Status
 
-`v3.13 Universal Orchestration Closure` is complete locally but still pending
-archival. `v3.14 Universal Fabric and Kernel Convergence` is now the active
-post-breakthrough lane: it owns the remaining protocol-to-protocol fabric,
-literal kernel convergence, lifecycle-equivalent mediation, and historical
-ledger/claim-gate closure work that still blocks the strongest original
-vision claim. `v4.0` remains a parallel strategic bet, while `v2.83` remains
-an older partially complete prior-lane debt item rather than an archived
-milestone.
+`v3.13 Universal Orchestration Closure` and `v3.14 Universal Fabric and
+Kernel Convergence` are complete and archived locally. `v3.15 Universal
+Protocol Fabric Realization`, `v3.16 Universal Control-Plane Thesis`,
+`v3.17 Comptroller Market Position Proof`, and `v3.18 Bounded ARC Ship
+Readiness Closure` are complete locally and pending archival. Their combined
+result is that ARC can now honestly claim a bounded ship-ready ARC release on
+repo-local evidence while keeping the stronger control-plane and
+comptroller-capable claims explicitly secondary. `v4.0` remains a parallel
+strategic bet, while `v2.83` remains older prior-lane debt rather than an
+archived milestone.
 
 ## v3.x Universal Security Kernel Era
 
@@ -94,11 +94,11 @@ milestone.
 security kernel for the agent economy. One kernel, many substrates. Signed
 receipts across HTTP APIs, agent protocols, and framework middleware.
 
-**15 milestones:** v3.0 through v3.14, from foundation through universal
-fabric and kernel convergence.
+**19 milestones:** v3.0 through v3.18, from foundation through bounded ship
+readiness closure.
 **Dependency chain:** v3.0 -> v3.1 (parallel with v3.2) -> v3.3 -> v3.4 ->
 v3.5 -> v3.6 -> v3.7 -> v3.8 -> v3.9 -> v3.10 -> v3.11 -> v3.12 -> v3.13 ->
-v3.14
+v3.14 -> v3.15 -> v3.16 -> v3.17 -> v3.18
 
 | Milestone | Name | Phases | Focus |
 |-----------|------|--------|-------|
@@ -117,6 +117,10 @@ v3.14
 | v3.12 | Cross-Protocol Integrity and Truth Completion | 377-381 | ACP crypto enforcement, outward-edge kernel mediation, operational parity, repo-truth reconciliation |
 | v3.13 | Universal Orchestration Closure | 390-396 | generic orchestrator, edge unification, fidelity gating, ledger reconciliation, HTTP/runtime convergence, lifecycle closure, claim upgrade |
 | v3.14 | Universal Fabric and Kernel Convergence | 397-402 | protocol-to-protocol fabric, literal kernel convergence, SDK evidence parity, lifecycle-equivalent mediation, archival truth, full-vision claim decision |
+| v3.15 | Universal Protocol Fabric Realization | 403-406 | protocol-aware binding/registry, lifecycle completion, final v3 truth closure, full-vision requalification |
+| v3.16 | Universal Control-Plane Thesis | 407-412 | universal registry routing, dynamic control plane, ecosystem proof, final thesis gate |
+| v3.17 | Comptroller Market Position Proof | 413-416 | external operator surfaces, partner-visible settlement contracts, federated proof, market-position gate |
+| v3.18 | Bounded ARC Ship Readiness Closure | 417-421 | claim/planning truth, delegation boundary, hosted/auth profile truth, provenance truth, bounded release gate |
 
 ## Foundation and Adoption Ladder (v2.80-v2.83)
 

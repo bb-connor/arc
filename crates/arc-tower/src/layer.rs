@@ -47,6 +47,8 @@ impl<S> Layer<S> for ArcLayer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::Bytes;
+    use http_body_util::Full;
 
     #[test]
     fn layer_creates_service() {
@@ -54,8 +56,10 @@ mod tests {
         let layer = ArcLayer::new(keypair, "test-policy".to_string());
 
         // Verify that layer can wrap a simple closure.
-        let _service = layer.layer(tower::service_fn(|_req: http::Request<()>| async {
-            Ok::<_, std::convert::Infallible>(http::Response::new(()))
-        }));
+        let _service = layer.layer(tower::service_fn(
+            |_req: http::Request<Full<Bytes>>| async {
+                Ok::<_, std::convert::Infallible>(http::Response::new(()))
+            },
+        ));
     }
 }

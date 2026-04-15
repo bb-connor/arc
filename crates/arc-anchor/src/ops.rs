@@ -164,23 +164,13 @@ pub struct AnchorIndexerCursor {
 
 impl AnchorIndexerCursor {
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
-    pub fn from_sequences(
-        service_id: impl Into<String>,
-        lane: AnchorLaneKind,
-        chain_id: Option<String>,
-        indexed_checkpoint_seq: u64,
-        canonical_checkpoint_seq: u64,
-        indexed_block_number: Option<u64>,
-        replaying: bool,
-        failed: bool,
-        checked_at: u64,
-        note: Option<String>,
-    ) -> Self {
-        let lag_checkpoints = canonical_checkpoint_seq.saturating_sub(indexed_checkpoint_seq);
-        let status = if failed {
+    pub fn from_sequences(input: AnchorIndexerCursorInput) -> Self {
+        let lag_checkpoints = input
+            .canonical_checkpoint_seq
+            .saturating_sub(input.indexed_checkpoint_seq);
+        let status = if input.failed {
             AnchorIndexerStatus::Failed
-        } else if replaying {
+        } else if input.replaying {
             AnchorIndexerStatus::Replaying
         } else if lag_checkpoints == 0 {
             AnchorIndexerStatus::Healthy
@@ -190,18 +180,32 @@ impl AnchorIndexerCursor {
             AnchorIndexerStatus::Drifted
         };
         Self {
-            service_id: service_id.into(),
-            lane,
-            chain_id,
-            indexed_checkpoint_seq,
-            canonical_checkpoint_seq,
+            service_id: input.service_id,
+            lane: input.lane,
+            chain_id: input.chain_id,
+            indexed_checkpoint_seq: input.indexed_checkpoint_seq,
+            canonical_checkpoint_seq: input.canonical_checkpoint_seq,
             lag_checkpoints,
-            indexed_block_number,
+            indexed_block_number: input.indexed_block_number,
             status,
-            checked_at,
-            note,
+            checked_at: input.checked_at,
+            note: input.note,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnchorIndexerCursorInput {
+    pub service_id: String,
+    pub lane: AnchorLaneKind,
+    pub chain_id: Option<String>,
+    pub indexed_checkpoint_seq: u64,
+    pub canonical_checkpoint_seq: u64,
+    pub indexed_block_number: Option<u64>,
+    pub replaying: bool,
+    pub failed: bool,
+    pub checked_at: u64,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -224,31 +228,40 @@ pub struct AnchorLaneRuntimeStatus {
 
 impl AnchorLaneRuntimeStatus {
     #[must_use]
-    #[allow(clippy::too_many_arguments)]
     pub fn from_indexer(
-        lane: AnchorLaneKind,
-        chain_id: Option<String>,
-        latest_checkpoint_seq: u64,
         indexer: &AnchorIndexerCursor,
-        controls: AnchorEmergencyControls,
-        reorg_depth: u32,
-        last_published_at: Option<u64>,
-        next_action: Option<String>,
-        note: Option<String>,
+        input: AnchorLaneRuntimeStatusInput,
     ) -> Self {
-        let status = classify_anchor_lane(lane, indexer.status, controls, reorg_depth);
+        let status = classify_anchor_lane(
+            input.lane,
+            indexer.status,
+            input.controls,
+            input.reorg_depth,
+        );
         Self {
-            lane,
-            chain_id,
+            lane: input.lane,
+            chain_id: input.chain_id,
             status,
-            latest_checkpoint_seq,
+            latest_checkpoint_seq: input.latest_checkpoint_seq,
             indexed_checkpoint_seq: indexer.indexed_checkpoint_seq,
-            reorg_depth,
-            last_published_at,
-            next_action,
-            note,
+            reorg_depth: input.reorg_depth,
+            last_published_at: input.last_published_at,
+            next_action: input.next_action,
+            note: input.note,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnchorLaneRuntimeStatusInput {
+    pub lane: AnchorLaneKind,
+    pub chain_id: Option<String>,
+    pub latest_checkpoint_seq: u64,
+    pub controls: AnchorEmergencyControls,
+    pub reorg_depth: u32,
+    pub last_published_at: Option<u64>,
+    pub next_action: Option<String>,
+    pub note: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -345,26 +358,26 @@ pub fn ensure_anchor_operation_allowed(
 mod tests {
     use super::{
         classify_anchor_lane, ensure_anchor_operation_allowed, AnchorControlState,
-        AnchorEmergencyControls, AnchorEmergencyMode, AnchorIndexerCursor, AnchorIndexerStatus,
-        AnchorLaneHealthStatus, AnchorOperationKind, AnchorRuntimeReport,
-        ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
+        AnchorEmergencyControls, AnchorEmergencyMode, AnchorIndexerCursor,
+        AnchorIndexerCursorInput, AnchorIndexerStatus, AnchorLaneHealthStatus, AnchorOperationKind,
+        AnchorRuntimeReport, ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
     };
     use crate::bundle::AnchorLaneKind;
 
     #[test]
     fn indexer_cursor_classifies_drift() {
-        let cursor = AnchorIndexerCursor::from_sequences(
-            "root-registry-indexer",
-            AnchorLaneKind::EvmPrimary,
-            Some("eip155:8453".to_string()),
-            40,
-            45,
-            Some(23_456_789),
-            false,
-            false,
-            1_712_337_200,
-            Some("five checkpoints behind canonical registry".to_string()),
-        );
+        let cursor = AnchorIndexerCursor::from_sequences(AnchorIndexerCursorInput {
+            service_id: "root-registry-indexer".to_string(),
+            lane: AnchorLaneKind::EvmPrimary,
+            chain_id: Some("eip155:8453".to_string()),
+            indexed_checkpoint_seq: 40,
+            canonical_checkpoint_seq: 45,
+            indexed_block_number: Some(23_456_789),
+            replaying: false,
+            failed: false,
+            checked_at: 1_712_337_200,
+            note: Some("five checkpoints behind canonical registry".to_string()),
+        });
         assert_eq!(cursor.lag_checkpoints, 5);
         assert_eq!(cursor.status, AnchorIndexerStatus::Drifted);
     }

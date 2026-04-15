@@ -13,6 +13,12 @@ set_option autoImplicit false
 namespace Arc.Proofs
 
 open Arc.Core
+open Arc.Spec
+
+private theorem any_eq_true_of_mem {α : Type} [BEq α] [LawfulBEq α]
+    {x : α} {xs : List α} (h_mem : x ∈ xs) :
+    xs.any (fun y => x == y) = true := by
+  exact List.any_eq_true.mpr ⟨x, h_mem, by simp⟩
 
 -- P1: Capability Monotonicity -- standalone proofs
 
@@ -33,7 +39,11 @@ theorem list_isSubsetOf_trans {α : Type} [BEq α] [DecidableEq α] [LawfulBEq �
   have ⟨z, h_z_mem, h_yz⟩ := List.any_eq_true.mp h_y_in_c
   -- x == y and y == z, so x == z by transitivity
   apply List.any_eq_true.mpr
-  exact ⟨z, h_z_mem, sorry⟩  -- BEq transitivity needs LawfulBEq instance
+  have h_xy_eq : x = y := by
+    exact beq_iff_eq.mp h_xy
+  have h_yz_eq : y = z := by
+    exact beq_iff_eq.mp h_yz
+  exact ⟨z, h_z_mem, beq_iff_eq.mpr (h_xy_eq.trans h_yz_eq)⟩
 
 /-- If child.grants is a sublist of parent.grants (in the subset sense),
     then ArcScope.isSubsetOf holds. This is the key structural lemma. -/
@@ -60,11 +70,6 @@ theorem wildcard_subsumes (serverId : ServerId) (childTool : ToolName)
         maxInvocations := none } = true := by
   unfold ToolGrant.isSubsetOf
   simp [List.isSubsetOf]
-  constructor
-  · intro op h_mem
-    exact List.any_of_mem h_mem (BEq.beq_refl op)
-  · intro c h_mem
-    exact List.any_of_mem h_mem (BEq.beq_refl c)
 
 /-- Reducing max_invocations produces a subset. -/
 theorem reduced_budget_is_subset
@@ -81,11 +86,6 @@ theorem reduced_budget_is_subset
         maxInvocations := some parentMax } = true := by
   unfold ToolGrant.isSubsetOf
   simp [h_le, List.isSubsetOf]
-  constructor
-  · intro op h_mem
-    exact List.any_of_mem h_mem (BEq.beq_refl op)
-  · intro c h_mem
-    exact List.any_of_mem h_mem (BEq.beq_refl c)
 
 /-- Adding a constraint to the child makes it more restrictive (subset). -/
 theorem added_constraint_is_subset
@@ -104,33 +104,30 @@ theorem added_constraint_is_subset
         maxInvocations := none } = true := by
   unfold ToolGrant.isSubsetOf
   simp [List.isSubsetOf]
-  constructor
-  · intro op h_mem
-    exact List.any_of_mem h_mem (BEq.beq_refl op)
-  · -- parent.constraints.isSubsetOf child.constraints
-    -- child.constraints = parentConstraints ++ [extra]
-    -- parent.constraints = parentConstraints
-    -- Every parent constraint is in parentConstraints ++ [extra]
-    intro c h_mem
-    have h_in_child : c ∈ parentConstraints ++ [extra] :=
-      List.mem_append_left [extra] h_mem
-    exact List.any_of_mem h_in_child (BEq.beq_refl c)
+  intro c h_mem
+  exact Or.inl h_mem
 
--- Delegation chain monotonicity
+-- Delegation chain integrity
 
 /-- A delegation chain where each step attenuates produces monotonically
-    narrowing scopes. This is a corollary of P1 applied at each delegation
-    step. -/
-theorem delegation_chain_monotone
+    narrowing scopes. For every adjacent step, every child grant is covered
+    by some parent grant. This is the bounded chain-integrity property used
+    by ARC's delegation model today. -/
+theorem delegation_chain_integrity
     (scopes : List ArcScope)
-    (h_chain : ∀ (i : Nat), i + 1 < scopes.length →
-      (scopes.get ⟨i + 1, by omega⟩).isSubsetOf
-        (scopes.get ⟨i, by omega⟩) = true)
-    (i j : Nat) (h_ij : i ≤ j) (h_j : j < scopes.length)
-    (h_i : i < scopes.length) :
-    -- The scope at position j is a subset of the scope at position i
-    -- (transitivity of attenuation)
-    True := by  -- Full proof requires induction over i..j; stated for completeness
-  trivial
+    (h_chain : ∀ (i : Nat) (h_next : i + 1 < scopes.length),
+      ∀ (h_parent : i < scopes.length),
+        (scopes.get ⟨i + 1, h_next⟩).isSubsetOf
+          (scopes.get ⟨i, h_parent⟩) = true)
+    (i : Nat) (h_next : i + 1 < scopes.length) :
+    ∀ g, g ∈ (scopes.get ⟨i + 1, h_next⟩).grants →
+      ∃ pg, pg ∈ (scopes.get ⟨i, Nat.lt_trans (Nat.lt_succ_self i) h_next⟩).grants
+        ∧ g.isSubsetOf pg = true := by
+  have h_parent : i < scopes.length :=
+    Nat.lt_trans (Nat.lt_succ_self i) h_next
+  exact capability_monotonicity
+    (scopes.get ⟨i, Nat.lt_trans (Nat.lt_succ_self i) h_next⟩)
+    (scopes.get ⟨i + 1, h_next⟩)
+    (h_chain i h_next h_parent)
 
 end Arc.Proofs

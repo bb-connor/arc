@@ -1,0 +1,39 @@
+{
+  "totalCount": 1,
+  "nextCursor": null,
+  "receipts": [
+    {
+      "action": {
+        "parameter_hash": "b9700d5091e35c580e24ab97361b063e91c5b0c57b08035af7221d78f46e366b",
+        "parameters": {
+          "buyer_id": "acme-platform-security",
+          "release_window": "2026-05-01T16:00:00Z",
+          "request_id": "quote_req_e028e866cb",
+          "requested_scope": "hotfix-review",
+          "service_family": "security-review",
+          "target": "git://acme.example/payments-api"
+        }
+      },
+      "capability_id": "cap-019d91c6-fded-71d3-a36d-55b689ab60d0",
+      "content_hash": "500a950d4179b4e013309bfa9fd1fdcfe62c976625d0f5d2c06650e1af7c9115",
+      "decision": {
+        "verdict": "allow"
+      },
+      "id": "rcpt-019d91c6-fe79-7c22-a3dc-cfe53bcc42b3",
+      "kernel_key": "ed6c490ba2dc2b0158c36610df5eafc3a8f2655e7cdc0df903434c26244fddba",
+      "metadata": {
+        "attribution": {
+          "delegation_depth": 0,
+          "grant_index": 0,
+          "issuer_key": "4b90a8745d34bde9ab6f8778514b713c490b3423f98b30c8a80b8467e724cafd",
+          "subject_key": "2b112205c51caa4c81c1792cd6f9def92b11586dcad79fe68d4a437613029045"
+        }
+      },
+      "policy_hash": "8f6d01879e4802b692baf75fc33aadee9bcb00680a2f9d545edef2f814cc0b7e",
+      "signature": "008d10cf5ae8f4fafa3833eaaf2d7a20840e7b6db010d733db60bba2a4460861a1d73f6477b8e1d3dcfef66b20623dfd1ae519095894733c7dd0fca90b3dec0e",
+      "timestamp": 1776267230,
+      "tool_name": "request_quote",
+      "tool_server": "provider-security-review"
+    }
+  ]
+}

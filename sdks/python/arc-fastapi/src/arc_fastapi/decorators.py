@@ -105,14 +105,27 @@ def arc_requires(
                     hashlib.sha256(body_bytes).hexdigest() if body_bytes else None
                 )
 
-                receipt = await client.evaluate_http_request(
+                evaluation = await client.evaluate_http_request(
                     request_id=str(uuid.uuid4()),
                     method=request.method,
                     route_pattern=str(request.url.path),
                     path=str(request.url.path),
                     caller=caller,
+                    query={
+                        key: value
+                        for key, value in request.query_params.items()
+                    },
+                    headers={
+                        key.lower(): value
+                        for key, value in (
+                            ("content-type", request.headers.get("content-type")),
+                            ("content-length", request.headers.get("content-length")),
+                        )
+                        if value is not None
+                    },
                     body_hash=body_hash,
-                    capability_id=cap_id,
+                    body_length=len(body_bytes),
+                    capability_token=cap_id,
                 )
             except ArcDeniedError as exc:
                 return arc_error_response(
@@ -133,6 +146,8 @@ def arc_requires(
                     ArcErrorCode.INTERNAL_ERROR,
                     str(exc),
                 )
+
+            receipt = evaluation.receipt
 
             if receipt.is_denied:
                 return arc_error_response(

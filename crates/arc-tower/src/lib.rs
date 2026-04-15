@@ -4,8 +4,10 @@
 //! extracting caller identity, evaluating requests against the ARC kernel,
 //! and attaching signed receipts to responses.
 //!
-//! Works with any Tower-compatible framework including Axum (HTTP) and
-//! Tonic (gRPC).
+//! Works with replayable Tower request body types, including Axum's
+//! `axum::body::Body` and bytes-backed HTTP bodies used in generic Tower/HTTP2
+//! tests. Real `tonic::body::Body` replay remains a follow-on concern and is
+//! not claimed as fully covered by the current middleware contract.
 //!
 //! # Example with Tower service
 //!
@@ -18,7 +20,7 @@
 //! let layer = ArcLayer::new(keypair, "policy-hash-abc".to_string());
 //!
 //! // Wrap any tower Service with ARC evaluation.
-//! let inner = tower::service_fn(|_req: http::Request<()>| async {
+//! let inner = tower::service_fn(|_req: http::Request<http_body_util::Full<bytes::Bytes>>| async {
 //!     Ok::<_, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(()))
 //! });
 //! let _service = layer.layer(inner);

@@ -17,8 +17,14 @@ pub enum ProtectError {
     #[error("upstream request failed: {0}")]
     Upstream(String),
 
+    #[error("evaluation failed: {0}")]
+    Evaluation(String),
+
     #[error("receipt signing failed: {0}")]
     ReceiptSign(String),
+
+    #[error("receipt persistence failed: {0}")]
+    ReceiptStore(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

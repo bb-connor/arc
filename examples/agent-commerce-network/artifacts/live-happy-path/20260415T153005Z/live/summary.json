@@ -1,0 +1,12 @@
+{
+  "buyer_quote_receipt_id": "019d91c6-fd66-7491-9b39-66c7420dc337",
+  "buyer_job_receipt_id": "019d91c6-fe7d-7d62-b9fb-47dbf4dfc600",
+  "provider_quote_trace": {
+    "tool_name": "request_quote",
+    "session_id": "0c1839ea486b4e570d61206da552c561bd70f53ab0cadae23ae5448f918ffcfc",
+    "capability_id": "cap-019d91c6-fc91-7941-a29d-c5e95cc7644a",
+    "edge_base_url": "http://127.0.0.1:8931"
+  },
+  "provider_fulfillment_trace": {},
+  "job_status": null
+}

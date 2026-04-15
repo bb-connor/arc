@@ -90,6 +90,14 @@ pub struct WorkflowExecution {
     pub active: bool,
 }
 
+pub struct StepExecutionRecordInput {
+    pub outcome: StepOutcome,
+    pub duration_ms: u64,
+    pub cost: Option<MonetaryAmount>,
+    pub tool_receipt_id: Option<String>,
+    pub output_hash: Option<String>,
+}
+
 impl WorkflowExecution {
     /// Return the number of completed steps.
     #[must_use]
@@ -232,16 +240,11 @@ impl WorkflowAuthority {
     }
 
     /// Record the result of a step execution.
-    #[allow(clippy::too_many_arguments)]
     pub fn record_step(
         &self,
         execution: &mut WorkflowExecution,
         step: &SkillStep,
-        outcome: StepOutcome,
-        duration_ms: u64,
-        cost: Option<MonetaryAmount>,
-        tool_receipt_id: Option<String>,
-        output_hash: Option<String>,
+        input: StepExecutionRecordInput,
     ) -> Result<(), WorkflowError> {
         if !execution.active {
             return Err(WorkflowError::InvalidState(
@@ -250,7 +253,7 @@ impl WorkflowAuthority {
         }
 
         // Track budget
-        if let Some(ref c) = cost {
+        if let Some(ref c) = input.cost {
             execution.budget_spent = execution.budget_spent.saturating_add(c.units);
         }
 
@@ -260,12 +263,12 @@ impl WorkflowAuthority {
             step_index: step.index,
             server_id: step.server_id.clone(),
             tool_name: step.tool_name.clone(),
-            allowed: matches!(outcome, StepOutcome::Success | StepOutcome::Failed),
-            tool_receipt_id,
-            outcome: outcome.clone(),
-            duration_ms,
-            cost,
-            output_hash,
+            allowed: matches!(input.outcome, StepOutcome::Success | StepOutcome::Failed),
+            tool_receipt_id: input.tool_receipt_id,
+            outcome: input.outcome.clone(),
+            duration_ms: input.duration_ms,
+            cost: input.cost,
+            output_hash: input.output_hash,
         };
 
         execution.step_records.push(record);
@@ -283,7 +286,7 @@ impl WorkflowAuthority {
             }
         }
 
-        if outcome == StepOutcome::Failed || outcome == StepOutcome::Denied {
+        if input.outcome == StepOutcome::Failed || input.outcome == StepOutcome::Denied {
             execution.active = false;
         }
 
@@ -481,14 +484,16 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Success,
-                100,
-                Some(MonetaryAmount {
-                    units: 50,
-                    currency: "USD".to_string(),
-                }),
-                Some("rcpt-0".to_string()),
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 100,
+                    cost: Some(MonetaryAmount {
+                        units: 50,
+                        currency: "USD".to_string(),
+                    }),
+                    tool_receipt_id: Some("rcpt-0".to_string()),
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -500,14 +505,16 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[1],
-                StepOutcome::Success,
-                200,
-                Some(MonetaryAmount {
-                    units: 100,
-                    currency: "USD".to_string(),
-                }),
-                Some("rcpt-1".to_string()),
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 200,
+                    cost: Some(MonetaryAmount {
+                        units: 100,
+                        currency: "USD".to_string(),
+                    }),
+                    tool_receipt_id: Some("rcpt-1".to_string()),
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -587,14 +594,16 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Success,
-                100,
-                Some(MonetaryAmount {
-                    units: 80,
-                    currency: "USD".to_string(),
-                }),
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 100,
+                    cost: Some(MonetaryAmount {
+                        units: 80,
+                        currency: "USD".to_string(),
+                    }),
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -602,14 +611,16 @@ mod tests {
         let result = authority.record_step(
             &mut execution,
             &manifest.steps[1],
-            StepOutcome::Success,
-            100,
-            Some(MonetaryAmount {
-                units: 50,
-                currency: "USD".to_string(),
-            }),
-            None,
-            None,
+            StepExecutionRecordInput {
+                outcome: StepOutcome::Success,
+                duration_ms: 100,
+                cost: Some(MonetaryAmount {
+                    units: 50,
+                    currency: "USD".to_string(),
+                }),
+                tool_receipt_id: None,
+                output_hash: None,
+            },
         );
         assert!(matches!(result, Err(WorkflowError::BudgetExceeded { .. })));
 
@@ -660,11 +671,13 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Failed,
-                50,
-                None,
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Failed,
+                    duration_ms: 50,
+                    cost: None,
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -718,11 +731,13 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Success,
-                50,
-                None,
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 50,
+                    cost: None,
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -767,11 +782,13 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Success,
-                10,
-                None,
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 10,
+                    cost: None,
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
         authority.finalize(execution).unwrap();
@@ -809,14 +826,16 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Success,
-                100,
-                Some(MonetaryAmount {
-                    units: 100,
-                    currency: "USD".to_string(),
-                }),
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 100,
+                    cost: Some(MonetaryAmount {
+                        units: 100,
+                        currency: "USD".to_string(),
+                    }),
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
 
@@ -825,14 +844,16 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[1],
-                StepOutcome::Success,
-                100,
-                Some(MonetaryAmount {
-                    units: 0,
-                    currency: "USD".to_string(),
-                }),
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Success,
+                    duration_ms: 100,
+                    cost: Some(MonetaryAmount {
+                        units: 0,
+                        currency: "USD".to_string(),
+                    }),
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
     }
@@ -859,11 +880,13 @@ mod tests {
         let result = authority.record_step(
             &mut execution,
             &manifest.steps[0],
-            StepOutcome::Success,
-            10,
-            None,
-            None,
-            None,
+            StepExecutionRecordInput {
+                outcome: StepOutcome::Success,
+                duration_ms: 10,
+                cost: None,
+                tool_receipt_id: None,
+                output_hash: None,
+            },
         );
         assert!(matches!(result, Err(WorkflowError::InvalidState(_))));
     }
@@ -888,11 +911,13 @@ mod tests {
             .record_step(
                 &mut execution,
                 &manifest.steps[0],
-                StepOutcome::Denied,
-                50,
-                None,
-                None,
-                None,
+                StepExecutionRecordInput {
+                    outcome: StepOutcome::Denied,
+                    duration_ms: 50,
+                    cost: None,
+                    tool_receipt_id: None,
+                    output_hash: None,
+                },
             )
             .unwrap();
 

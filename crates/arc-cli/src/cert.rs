@@ -3,9 +3,8 @@
 use std::path::Path;
 
 use arc_acp_proxy::{
-    generate_compliance_certificate, verify_compliance_certificate,
-    ComplianceCertificate, ComplianceConfig, ComplianceReceiptEntry,
-    VerificationMode,
+    generate_compliance_certificate, verify_compliance_certificate, ComplianceCertificate,
+    ComplianceConfig, ComplianceReceiptEntry, VerificationMode,
 };
 
 use crate::CliError;
@@ -97,11 +96,7 @@ pub fn cmd_cert_verify(
         None
     };
 
-    let result = verify_compliance_certificate(
-        &cert,
-        mode,
-        receipts.as_deref(),
-    );
+    let result = verify_compliance_certificate(&cert, mode, receipts.as_deref());
 
     if json_output {
         let result_json = serde_json::to_string_pretty(&result)
@@ -121,10 +116,7 @@ pub fn cmd_cert_verify(
 }
 
 /// `arc cert inspect` -- display certificate contents.
-pub fn cmd_cert_inspect(
-    certificate_path: &Path,
-    json_output: bool,
-) -> Result<(), CliError> {
+pub fn cmd_cert_inspect(certificate_path: &Path, json_output: bool) -> Result<(), CliError> {
     let cert_text = std::fs::read_to_string(certificate_path)
         .map_err(|e| CliError::Other(format!("failed to read certificate: {e}")))?;
 
@@ -132,8 +124,11 @@ pub fn cmd_cert_inspect(
         .map_err(|e| CliError::Other(format!("failed to parse certificate: {e}")))?;
 
     if json_output {
-        println!("{}", serde_json::to_string_pretty(&cert.body)
-            .map_err(|e| CliError::Other(format!("serialization failed: {e}")))?);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&cert.body)
+                .map_err(|e| CliError::Other(format!("serialization failed: {e}")))?
+        );
     } else {
         println!("Session ID:     {}", cert.body.session_id);
         println!("Schema:         {}", cert.body.schema);
@@ -141,11 +136,46 @@ pub fn cmd_cert_inspect(
         println!("Receipt count:  {}", cert.body.receipt_count);
         println!("First receipt:  {}", cert.body.first_receipt_at);
         println!("Last receipt:   {}", cert.body.last_receipt_at);
-        println!("Signatures:     {}", if cert.body.all_signatures_valid { "valid" } else { "INVALID" });
-        println!("Chain:          {}", if cert.body.chain_continuous { "continuous" } else { "BROKEN" });
-        println!("Scope:          {}", if cert.body.scope_compliant { "compliant" } else { "VIOLATED" });
-        println!("Budget:         {}", if cert.body.budget_compliant { "compliant" } else { "EXCEEDED" });
-        println!("Guards:         {}", if cert.body.guards_compliant { "compliant" } else { "BYPASSED" });
+        println!(
+            "Signatures:     {}",
+            if cert.body.all_signatures_valid {
+                "valid"
+            } else {
+                "INVALID"
+            }
+        );
+        println!(
+            "Chain:          {}",
+            if cert.body.chain_continuous {
+                "continuous"
+            } else {
+                "BROKEN"
+            }
+        );
+        println!(
+            "Scope:          {}",
+            if cert.body.scope_compliant {
+                "compliant"
+            } else {
+                "VIOLATED"
+            }
+        );
+        println!(
+            "Budget:         {}",
+            if cert.body.budget_compliant {
+                "compliant"
+            } else {
+                "EXCEEDED"
+            }
+        );
+        println!(
+            "Guards:         {}",
+            if cert.body.guards_compliant {
+                "compliant"
+            } else {
+                "BYPASSED"
+            }
+        );
         if !cert.body.anomalies.is_empty() {
             println!("Anomalies:");
             for a in &cert.body.anomalies {
@@ -194,8 +224,7 @@ fn load_session_receipts(
 
     let mut entries = Vec::new();
     for row in rows {
-        let (seq, json_data) =
-            row.map_err(|e| CliError::Other(format!("row read failed: {e}")))?;
+        let (seq, json_data) = row.map_err(|e| CliError::Other(format!("row read failed: {e}")))?;
         let receipt: arc_core::receipt::ArcReceipt = serde_json::from_str(&json_data)
             .map_err(|e| CliError::Other(format!("receipt parse failed: {e}")))?;
         entries.push(ComplianceReceiptEntry { receipt, seq });

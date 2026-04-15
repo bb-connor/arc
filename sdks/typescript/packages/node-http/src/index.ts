@@ -17,8 +17,11 @@ export * from "./sidecar-client.js";
 export {
   interceptNodeRequest,
   interceptWebRequest,
+  getBufferedNodeRequestBody,
   buildArcHttpRequest,
   resolveConfig,
   type ResolvedConfig,
   type BuildRequestOptions,
+  type NodeInterceptionOutcome,
+  type WebInterceptionOutcome,
 } from "./interceptor.js";

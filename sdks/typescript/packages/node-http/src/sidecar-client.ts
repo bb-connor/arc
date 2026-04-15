@@ -56,15 +56,24 @@ export class ArcSidecarClient {
    * Evaluate an HTTP request against the ARC kernel.
    * Returns the verdict and a signed receipt.
    */
-  async evaluate(request: ArcHttpRequest): Promise<EvaluateResponse> {
+  async evaluate(
+    request: ArcHttpRequest,
+    capabilityToken?: string,
+  ): Promise<EvaluateResponse> {
     const url = `${this.baseUrl}/arc/evaluate`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (capabilityToken != null && capabilityToken.length > 0) {
+      headers["X-Arc-Capability"] = capabilityToken;
+    }
 
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(request),
         signal: controller.signal,
       });

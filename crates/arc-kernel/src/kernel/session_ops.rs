@@ -506,6 +506,7 @@ impl ArcKernel {
                 self.evaluate_tool_call_sync_with_session_roots(
                     &request,
                     Some(session_roots.as_slice()),
+                    None,
                 )
                 .map(SessionOperationResponse::ToolCall)
             }

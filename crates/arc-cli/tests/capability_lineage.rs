@@ -9,7 +9,58 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_core::capability::{
+    ArcScope, Constraint, Operation, RuntimeAssuranceTier, RuntimeAttestationEvidence, ToolGrant,
+    WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityScheme,
+};
+use arc_core::crypto::Keypair;
 use reqwest::blocking::Client;
+use reqwest::header::AUTHORIZATION;
+
+fn bearer(token: &str) -> String {
+    format!("Bearer {token}")
+}
+
+fn issue_scope() -> ArcScope {
+    ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "test-server".to_string(),
+            tool_name: "test_tool".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::GovernedIntentRequired],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        resource_grants: Vec::new(),
+        prompt_grants: Vec::new(),
+    }
+}
+
+fn conflicting_runtime_attestation() -> RuntimeAttestationEvidence {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time before unix epoch")
+        .as_secs();
+    RuntimeAttestationEvidence {
+        schema: "arc.runtime-attestation.v1".to_string(),
+        verifier: "verifier.arc".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(5),
+        expires_at: now + 300,
+        evidence_sha256: "attestation-digest".to_string(),
+        runtime_identity: Some("spiffe://prod.arc/payments/worker".to_string()),
+        workload_identity: Some(WorkloadIdentity {
+            scheme: WorkloadIdentityScheme::Spiffe,
+            credential_kind: WorkloadCredentialKind::X509Svid,
+            uri: "spiffe://dev.arc/payments/worker".to_string(),
+            trust_domain: "dev.arc".to_string(),
+            path: "/payments/worker".to_string(),
+        }),
+        claims: None,
+    }
+}
 
 fn unique_dir(prefix: &str) -> PathBuf {
     let nonce = SystemTime::now()
@@ -116,28 +167,19 @@ fn issue_capability_records_lineage_snapshot() {
 
     // Generate a fresh Ed25519 keypair for the subject (agent).
     // We encode the public key as hex for the request body.
-    let subject_kp = arc_core::crypto::Keypair::generate();
+    let subject_kp = Keypair::generate();
     let subject_hex = subject_kp.public_key().to_hex();
 
     // Issue a capability via the trust-control HTTP endpoint.
     let issue_body = serde_json::json!({
         "subjectPublicKey": subject_hex,
-        "scope": {
-            "grants": [{
-                "server_id": "test-server",
-                "tool_name": "test_tool",
-                "operations": ["invoke"],
-                "constraints": []
-            }],
-            "resourceGrants": [],
-            "promptGrants": []
-        },
+        "scope": issue_scope(),
         "ttlSeconds": 3600
     });
 
     let issue_resp = client
         .post(format!("{base_url}/v1/capabilities/issue"))
-        .header("Authorization", format!("Bearer {service_token}"))
+        .header(AUTHORIZATION, bearer(service_token))
         .json(&issue_body)
         .send()
         .expect("send issue capability request");
@@ -162,7 +204,7 @@ fn issue_capability_records_lineage_snapshot() {
     // Query the lineage endpoint to verify the snapshot was recorded.
     let lineage_resp = client
         .get(format!("{base_url}/v1/lineage/{capability_id}"))
-        .header("Authorization", format!("Bearer {service_token}"))
+        .header(AUTHORIZATION, bearer(service_token))
         .send()
         .expect("send lineage query request");
 
@@ -195,6 +237,176 @@ fn issue_capability_records_lineage_snapshot() {
         lineage_json["parent_capability_id"].is_null(),
         "root capability should have no parent"
     );
+
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn authority_endpoints_require_auth_and_rotate_generation() {
+    let dir = unique_dir("arc-cli-authority-http");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "authority-http-token";
+    let base_url = format!("http://{listen}");
+
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+
+    let client = Client::builder().build().expect("build reqwest client");
+    wait_for_trust_service(&client, &base_url);
+
+    let unauthorized = client
+        .get(format!("{base_url}/v1/authority"))
+        .send()
+        .expect("send unauthorized authority request");
+    assert_eq!(unauthorized.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+    let before = client
+        .get(format!("{base_url}/v1/authority"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .send()
+        .expect("send authority status request");
+    assert_eq!(before.status(), reqwest::StatusCode::OK);
+    let before: serde_json::Value = before.json().expect("parse authority status");
+    let before_generation = before["generation"].as_u64().expect("authority generation");
+
+    let unauthorized_rotate = client
+        .post(format!("{base_url}/v1/authority"))
+        .send()
+        .expect("send unauthorized rotate request");
+    assert_eq!(
+        unauthorized_rotate.status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+
+    let rotated = client
+        .post(format!("{base_url}/v1/authority"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .send()
+        .expect("send rotate request");
+    assert_eq!(rotated.status(), reqwest::StatusCode::OK);
+    let rotated: serde_json::Value = rotated.json().expect("parse rotated authority");
+    let rotated_generation = rotated["generation"]
+        .as_u64()
+        .expect("rotated authority generation");
+    assert!(
+        rotated_generation > before_generation,
+        "rotation should advance authority generation"
+    );
+
+    let after = client
+        .get(format!("{base_url}/v1/authority"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .send()
+        .expect("send authority status request after rotation");
+    assert_eq!(after.status(), reqwest::StatusCode::OK);
+    let after: serde_json::Value = after.json().expect("parse post-rotation authority status");
+    assert_eq!(after["generation"].as_u64(), Some(rotated_generation));
+
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn issue_capability_rejects_invalid_public_key() {
+    let dir = unique_dir("arc-cli-invalid-capability-key");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "invalid-capability-key-token";
+    let base_url = format!("http://{listen}");
+
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+
+    let client = Client::builder().build().expect("build reqwest client");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .post(format!("{base_url}/v1/capabilities/issue"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .json(&serde_json::json!({
+            "subjectPublicKey": "not-a-public-key",
+            "scope": issue_scope(),
+            "ttlSeconds": 120
+        }))
+        .send()
+        .expect("send invalid issue capability request");
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body: serde_json::Value = response.json().expect("parse invalid key response");
+    assert!(body["error"]
+        .as_str()
+        .expect("invalid key error string")
+        .contains("hex"));
+
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn issue_capability_rejects_conflicting_runtime_attestation_binding() {
+    let dir = unique_dir("arc-cli-invalid-runtime-attestation");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "invalid-runtime-attestation-token";
+    let base_url = format!("http://{listen}");
+
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+
+    let client = Client::builder().build().expect("build reqwest client");
+    wait_for_trust_service(&client, &base_url);
+
+    let subject_kp = Keypair::generate();
+    let response = client
+        .post(format!("{base_url}/v1/capabilities/issue"))
+        .header(AUTHORIZATION, bearer(service_token))
+        .json(&serde_json::json!({
+            "subjectPublicKey": subject_kp.public_key().to_hex(),
+            "scope": issue_scope(),
+            "ttlSeconds": 120,
+            "runtimeAttestation": conflicting_runtime_attestation(),
+        }))
+        .send()
+        .expect("send conflicting runtime attestation request");
+    assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
+    let body: serde_json::Value = response
+        .json()
+        .expect("parse conflicting runtime attestation response");
+    assert!(body["error"]
+        .as_str()
+        .expect("runtime attestation error string")
+        .contains("workload identity is invalid"));
 
     let _ = std::fs::remove_dir_all(dir);
 }

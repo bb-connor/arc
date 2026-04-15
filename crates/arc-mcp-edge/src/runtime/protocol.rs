@@ -1,5 +1,16 @@
 use super::*;
 
+pub(super) struct KernelResponseToToolResultArgs<'a> {
+    pub pending_notifications: &'a mut Vec<Value>,
+    pub request_id: &'a Value,
+    pub output: Option<ToolCallOutput>,
+    pub reason: Option<String>,
+    pub verdict: Verdict,
+    pub terminal_state: &'a OperationTerminalState,
+    pub peer_supports_arc_tool_streaming: bool,
+    pub related_task_id: Option<&'a str>,
+}
+
 pub(super) fn manifest_tool_to_mcp_tool(tool: ToolDefinition) -> McpExposedTool {
     let annotations = Some(json!({
         "readOnlyHint": !tool.has_side_effects,
@@ -35,17 +46,17 @@ pub(super) fn latency_hint_to_label(latency_hint: LatencyHint) -> &'static str {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(super) fn kernel_response_to_tool_result(
-    pending_notifications: &mut Vec<Value>,
-    request_id: &Value,
-    output: Option<ToolCallOutput>,
-    reason: Option<String>,
-    verdict: Verdict,
-    terminal_state: &OperationTerminalState,
-    peer_supports_arc_tool_streaming: bool,
-    related_task_id: Option<&str>,
-) -> Value {
+pub(super) fn kernel_response_to_tool_result(args: KernelResponseToToolResultArgs<'_>) -> Value {
+    let KernelResponseToToolResultArgs {
+        pending_notifications,
+        request_id,
+        output,
+        reason,
+        verdict,
+        terminal_state,
+        peer_supports_arc_tool_streaming,
+        related_task_id,
+    } = args;
     let is_error = matches!(verdict, Verdict::Deny) || !terminal_state.is_completed();
     let terminal_reason = reason
         .as_deref()

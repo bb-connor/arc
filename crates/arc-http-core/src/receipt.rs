@@ -1,6 +1,7 @@
 //! HTTP receipt: signed proof that an HTTP request was evaluated by ARC.
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use arc_core_types::crypto::{Keypair, PublicKey, Signature};
 use arc_core_types::receipt::GuardEvidence;
@@ -8,6 +9,12 @@ use arc_core_types::{canonical_json_bytes, sha256_hex};
 
 use crate::method::HttpMethod;
 use crate::verdict::Verdict;
+
+pub const ARC_HTTP_STATUS_SCOPE_KEY: &str = "arc_http_status_scope";
+pub const ARC_DECISION_RECEIPT_ID_KEY: &str = "arc_decision_receipt_id";
+pub const ARC_KERNEL_RECEIPT_ID_KEY: &str = "arc_kernel_receipt_id";
+pub const ARC_HTTP_STATUS_SCOPE_DECISION: &str = "decision";
+pub const ARC_HTTP_STATUS_SCOPE_FINAL: &str = "final";
 
 /// Signed receipt for an HTTP request evaluation.
 /// Binds the request identity, route, method, verdict, and guard evidence
@@ -40,7 +47,13 @@ pub struct HttpReceipt {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<GuardEvidence>,
 
-    /// HTTP status code of the proxied response (or the error response).
+    /// HTTP status ARC associated with the evaluation outcome at receipt-signing
+    /// time.
+    ///
+    /// For deny receipts this is the concrete error status ARC will emit.
+    /// For allow receipts produced before an upstream or inner response exists,
+    /// this is evaluation-time status metadata rather than guaranteed
+    /// downstream response evidence.
     pub response_status: u16,
 
     /// Unix timestamp (seconds) when the receipt was created.
@@ -156,8 +169,7 @@ impl HttpReceipt {
         self.verdict.is_denied()
     }
 
-    /// Convert this HTTP receipt into a core ArcReceipt for unified storage.
-    pub fn to_arc_receipt(&self) -> arc_core_types::Result<arc_core_types::ArcReceipt> {
+    fn arc_receipt_body(&self) -> arc_core_types::ArcReceiptBody {
         let action = arc_core_types::ToolCallAction {
             parameters: serde_json::json!({
                 "method": self.method.to_string(),
@@ -167,8 +179,7 @@ impl HttpReceipt {
             parameter_hash: self.content_hash.clone(),
         };
 
-        // Build the body and compute canonical bytes for the content hash.
-        let arc_body = arc_core_types::ArcReceiptBody {
+        arc_core_types::ArcReceiptBody {
             id: self.id.clone(),
             timestamp: self.timestamp,
             capability_id: self.capability_id.clone().unwrap_or_default(),
@@ -181,31 +192,64 @@ impl HttpReceipt {
             evidence: self.evidence.clone(),
             metadata: self.metadata.clone(),
             kernel_key: self.kernel_key.clone(),
-        };
-
-        // Re-sign with the same key is not possible here -- the caller
-        // should use the kernel keypair directly. Return unsigned for now.
-        // In practice, the kernel signs both HttpReceipt and ArcReceipt
-        // from the same evaluation.
-        let canonical = canonical_json_bytes(&arc_body)?;
-        let content_hash = sha256_hex(&canonical);
-
-        Ok(arc_core_types::ArcReceipt {
-            id: arc_body.id,
-            timestamp: arc_body.timestamp,
-            capability_id: arc_body.capability_id,
-            tool_server: arc_body.tool_server,
-            tool_name: arc_body.tool_name,
-            action: arc_body.action,
-            decision: arc_body.decision,
-            content_hash,
-            policy_hash: arc_body.policy_hash,
-            evidence: arc_body.evidence,
-            metadata: arc_body.metadata,
-            kernel_key: arc_body.kernel_key,
-            signature: self.signature.clone(),
-        })
+        }
     }
+
+    /// Convert this HTTP receipt into a signed core ArcReceipt for unified storage.
+    pub fn to_arc_receipt_with_keypair(
+        &self,
+        keypair: &Keypair,
+    ) -> arc_core_types::Result<arc_core_types::ArcReceipt> {
+        let mut arc_body = self.arc_receipt_body();
+        let canonical = canonical_json_bytes(&arc_body)?;
+        arc_body.content_hash = sha256_hex(&canonical);
+        arc_core_types::ArcReceipt::sign(arc_body, keypair)
+    }
+
+    /// Convert this HTTP receipt into a core ArcReceipt for unified storage.
+    ///
+    /// This method fails closed because a valid ArcReceipt signature cannot be
+    /// derived from an HttpReceipt without the kernel signing keypair.
+    pub fn to_arc_receipt(&self) -> arc_core_types::Result<arc_core_types::ArcReceipt> {
+        Err(arc_core_types::Error::CanonicalJson(
+            "cannot convert HttpReceipt into signed ArcReceipt without the kernel keypair"
+                .to_string(),
+        ))
+    }
+}
+
+#[must_use]
+pub fn http_status_metadata_decision() -> Value {
+    let mut map = Map::new();
+    map.insert(
+        ARC_HTTP_STATUS_SCOPE_KEY.to_string(),
+        Value::String(ARC_HTTP_STATUS_SCOPE_DECISION.to_string()),
+    );
+    Value::Object(map)
+}
+
+#[must_use]
+pub fn http_status_metadata_final(decision_receipt_id: Option<&str>) -> Value {
+    let mut map = Map::new();
+    map.insert(
+        ARC_HTTP_STATUS_SCOPE_KEY.to_string(),
+        Value::String(ARC_HTTP_STATUS_SCOPE_FINAL.to_string()),
+    );
+    if let Some(id) = decision_receipt_id {
+        map.insert(
+            ARC_DECISION_RECEIPT_ID_KEY.to_string(),
+            Value::String(id.to_string()),
+        );
+    }
+    Value::Object(map)
+}
+
+#[must_use]
+pub fn http_status_scope(metadata: Option<&Value>) -> Option<&str> {
+    metadata
+        .and_then(Value::as_object)
+        .and_then(|object| object.get(ARC_HTTP_STATUS_SCOPE_KEY))
+        .and_then(Value::as_str)
 }
 
 #[cfg(test)]
@@ -283,10 +327,10 @@ mod tests {
         let kp = test_keypair();
         let body = sample_body(&kp);
         let receipt = HttpReceipt::sign(body, &kp).unwrap();
-        let arc_receipt = receipt.to_arc_receipt().unwrap();
-        assert_eq!(arc_receipt.id, "receipt-001");
-        assert_eq!(arc_receipt.tool_server, "http");
-        assert!(arc_receipt.tool_name.contains("GET"));
+        let error = receipt.to_arc_receipt().unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("cannot convert HttpReceipt into signed ArcReceipt"));
     }
 
     #[test]
@@ -334,8 +378,9 @@ mod tests {
         let receipt = HttpReceipt::sign(body, &kp).unwrap();
         assert!(receipt.verify_signature().unwrap());
         assert_eq!(receipt.capability_id.as_deref(), Some("cap-xyz-789"));
-        let arc_receipt = receipt.to_arc_receipt().unwrap();
+        let arc_receipt = receipt.to_arc_receipt_with_keypair(&kp).unwrap();
         assert_eq!(arc_receipt.capability_id, "cap-xyz-789");
+        assert!(arc_receipt.verify_signature().unwrap());
     }
 
     #[test]
@@ -345,6 +390,32 @@ mod tests {
         let mut receipt = HttpReceipt::sign(body, &kp).unwrap();
         // Tamper with the response status
         receipt.response_status = 500;
+        assert!(!receipt.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn receipt_metadata_scope_roundtrip_and_signature_verifies() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.metadata = Some(http_status_metadata_final(Some("decision-001")));
+
+        let receipt = HttpReceipt::sign(body, &kp).unwrap();
+        assert_eq!(
+            http_status_scope(receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+        );
+        assert!(receipt.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn tampering_with_status_scope_metadata_breaks_signature() {
+        let kp = test_keypair();
+        let mut body = sample_body(&kp);
+        body.metadata = Some(http_status_metadata_decision());
+
+        let mut receipt = HttpReceipt::sign(body, &kp).unwrap();
+        receipt.metadata = Some(http_status_metadata_final(Some("decision-001")));
+
         assert!(!receipt.verify_signature().unwrap());
     }
 }

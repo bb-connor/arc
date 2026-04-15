@@ -13,8 +13,10 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-# ci-workspace runs the workspace layering guardrail before the wider release lane.
+# ci-workspace remains the fast regression gate. The bounded ARC release lane
+# is the ship-facing qualification boundary.
 ./scripts/ci-workspace.sh
+./scripts/qualify-bounded-arc.sh
 ./scripts/check-dashboard-release.sh
 ./scripts/check-arc-ts-release.sh
 ./scripts/check-arc-py-release.sh

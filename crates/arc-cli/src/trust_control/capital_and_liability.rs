@@ -1060,27 +1060,19 @@ pub fn build_credit_facility_report(
     .map_err(CliError::from)
 }
 
-pub fn issue_signed_credit_facility(
-    receipt_db_path: &Path,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
-    query: &ExposureLedgerQuery,
-    supersedes_facility_id: Option<&str>,
-) -> Result<SignedCreditFacility, CliError> {
-    issue_signed_credit_facility_detailed(
-        receipt_db_path,
-        budget_db_path,
-        authority_seed_path,
-        authority_db_path,
-        certification_registry_file,
-        issuance_policy,
-        query,
-        supersedes_facility_id,
-    )
-    .map_err(CliError::from)
+pub struct CreditIssuanceArgs<'a> {
+    pub receipt_db_path: &'a Path,
+    pub budget_db_path: Option<&'a Path>,
+    pub authority_seed_path: Option<&'a Path>,
+    pub authority_db_path: Option<&'a Path>,
+    pub certification_registry_file: Option<&'a Path>,
+    pub issuance_policy: Option<&'a crate::policy::ReputationIssuancePolicy>,
+    pub query: &'a ExposureLedgerQuery,
+    pub supersedes_artifact_id: Option<&'a str>,
+}
+
+pub fn issue_signed_credit_facility(args: CreditIssuanceArgs<'_>) -> Result<SignedCreditFacility, CliError> {
+    issue_signed_credit_facility_detailed(args).map_err(CliError::from)
 }
 
 pub fn list_credit_facilities(
@@ -1093,7 +1085,6 @@ pub fn list_credit_facilities(
         .map_err(|error| CliError::Other(error.to_string()))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_credit_bond_report(
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -1113,28 +1104,8 @@ pub fn build_credit_bond_report(
     .map_err(CliError::from)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn issue_signed_credit_bond(
-    receipt_db_path: &Path,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
-    query: &ExposureLedgerQuery,
-    supersedes_bond_id: Option<&str>,
-) -> Result<SignedCreditBond, CliError> {
-    issue_signed_credit_bond_detailed(
-        receipt_db_path,
-        budget_db_path,
-        authority_seed_path,
-        authority_db_path,
-        certification_registry_file,
-        issuance_policy,
-        query,
-        supersedes_bond_id,
-    )
-    .map_err(CliError::from)
+pub fn issue_signed_credit_bond(args: CreditIssuanceArgs<'_>) -> Result<SignedCreditBond, CliError> {
+    issue_signed_credit_bond_detailed(args).map_err(CliError::from)
 }
 
 pub fn list_credit_bonds(
@@ -1189,7 +1160,6 @@ pub fn list_credit_loss_lifecycle(
         .map_err(|error| CliError::Other(error.to_string()))
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_credit_backtest_report(
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -1209,7 +1179,6 @@ pub fn build_credit_backtest_report(
     .map_err(CliError::from)
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn build_signed_credit_provider_risk_package(
     receipt_db_path: &Path,
     budget_db_path: Option<&Path>,
@@ -2641,7 +2610,6 @@ fn build_liability_claim_settlement_receipt_artifact(
     Ok(artifact)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_credit_backtest_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,

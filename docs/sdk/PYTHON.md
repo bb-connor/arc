@@ -30,7 +30,7 @@ All ARC Python SDKs communicate with the ARC Rust kernel through localhost HTTP.
 - **Default URL**: `http://127.0.0.1:9090`
 - **Configurable via**: `ARC_SIDECAR_URL` environment variable or constructor argument
 - **No native compilation or FFI**: pure Python over HTTP
-- **Fail-closed by default**: when the sidecar is unreachable, requests are denied (503). Configure `fail_open=True` to change this behavior.
+- **Fail-closed by default**: when the sidecar is unreachable, requests are denied (503). Configure `fail_open=True` to forward without a receipt and expose an explicit `ArcPassthrough` marker.
 
 ---
 
@@ -67,7 +67,7 @@ async with ArcClient() as client:
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `base_url` | `str \| None` | `"http://127.0.0.1:9090"` | Base URL of the ARC sidecar |
-| `timeout` | `float` | `10.0` | Request timeout in seconds |
+| `timeout` | `float` | `5.0` | Request timeout in seconds |
 
 ### Capability Operations
 
@@ -134,15 +134,16 @@ caller = CallerIdentity(
     verified=False,
 )
 
-http_receipt = await client.evaluate_http_request(
+evaluation = await client.evaluate_http_request(
     request_id="req-001",
     method="POST",
     route_pattern="/api/tools/{tool_id}",
     path="/api/tools/42",
     caller=caller,
     body_hash="sha256hex...",
-    capability_id="cap-abc-123",
+    capability_token='{"id":"cap-abc-123", ...}',
 )
+http_receipt = evaluation.receipt
 ```
 
 ### Receipt Verification
@@ -203,12 +204,20 @@ All models use Pydantic v2 and match the Rust kernel's canonical JSON format.
 | `caller_identity_hash` | `str` | SHA-256 of caller identity |
 | `verdict` | `Verdict` | HTTP-layer verdict |
 | `evidence` | `list[GuardEvidence]` | Per-guard evaluation evidence |
-| `response_status` | `int` | HTTP status code |
+| `response_status` | `int` | ARC evaluation-time HTTP status. Deny receipts carry the concrete ARC error status; allow receipts may be signed before the downstream app or upstream response exists. |
 | `timestamp` | `int` | Unix timestamp |
 | `content_hash` | `str` | SHA-256 of canonical request content |
 | `policy_hash` | `str` | Policy set hash |
 | `kernel_key` | `str` | Kernel's Ed25519 public key |
 | `signature` | `str` | Ed25519 signature |
+
+**ArcPassthrough** -- explicit fail-open degraded state for HTTP integrations.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `str` | Currently `"allow_without_receipt"` |
+| `error` | `str` | ARC error code, typically `arc_sidecar_unreachable` |
+| `message` | `str` | Operator-readable passthrough reason |
 
 **Decision** -- kernel verdict on a tool call.
 
@@ -311,11 +320,11 @@ app = Litestar(middleware=[ArcASGIMiddleware])
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `sidecar_url` | `str` | `"http://127.0.0.1:9090"` | Sidecar base URL |
-| `timeout` | `float` | `10.0` | Sidecar request timeout in seconds |
+| `timeout` | `float` | `5.0` | Sidecar request timeout in seconds |
 | `exclude_paths` | `frozenset[str]` | `frozenset()` | Paths to skip evaluation |
 | `exclude_methods` | `frozenset[str]` | `frozenset({"OPTIONS"})` | HTTP methods to skip |
 | `receipt_header` | `str` | `"X-Arc-Receipt"` | Response header for receipt ID |
-| `fail_open` | `bool` | `False` | Allow requests when sidecar is unreachable |
+| `fail_open` | `bool` | `False` | Allow requests when sidecar is unreachable, without attaching a synthetic ARC receipt |
 
 ```python
 config = ArcASGIConfig(
@@ -456,10 +465,11 @@ async def query(request: Request):
 ```python
 from fastapi import Depends, Request
 from arc_sdk.client import ArcClient
-from arc_sdk.models import CallerIdentity, HttpReceipt
+from arc_sdk.models import ArcPassthrough, CallerIdentity, HttpReceipt
 from arc_fastapi.dependencies import (
     get_arc_client,
     get_caller_identity,
+    get_arc_passthrough,
     get_arc_receipt,
     set_arc_client,
 )
@@ -481,6 +491,15 @@ async def show_receipt(receipt: HttpReceipt | None = Depends(get_arc_receipt)):
     if receipt is None:
         return {"status": "no receipt"}
     return {"receipt_id": receipt.id}
+
+# Inject explicit fail-open passthrough state
+@app.get("/authority")
+async def show_authority(
+    passthrough: ArcPassthrough | None = Depends(get_arc_passthrough),
+):
+    if passthrough is not None:
+        return {"mode": passthrough.mode, "error": passthrough.error}
+    return {"mode": "governed"}
 
 # Override the client singleton for testing
 set_arc_client(mock_client)
@@ -518,7 +537,7 @@ ARC_FAIL_OPEN = False                        # default, fail-closed
 ARC_EXCLUDE_PATHS = ["/health", "/ready"]    # paths to skip
 ARC_EXCLUDE_METHODS = ["OPTIONS"]            # methods to skip (default)
 ARC_RECEIPT_HEADER = "X-Arc-Receipt"         # response header (default)
-ARC_TIMEOUT = 10.0                           # seconds (default)
+ARC_TIMEOUT = 5.0                            # seconds (default)
 ```
 
 ### Django Settings Reference
@@ -530,7 +549,7 @@ ARC_TIMEOUT = 10.0                           # seconds (default)
 | `ARC_EXCLUDE_PATHS` | `list[str]` | `[]` | Paths to skip evaluation |
 | `ARC_EXCLUDE_METHODS` | `list[str]` | `["OPTIONS"]` | HTTP methods to skip |
 | `ARC_RECEIPT_HEADER` | `str` | `"X-Arc-Receipt"` | Response header name for receipt ID |
-| `ARC_TIMEOUT` | `float` | `10.0` | Request timeout in seconds |
+| `ARC_TIMEOUT` | `float` | `5.0` | Request timeout in seconds |
 
 ### Accessing Receipts in Views
 
@@ -540,10 +559,16 @@ from django.http import JsonResponse
 def my_view(request):
     # Receipt is attached by middleware on successful evaluation
     receipt = getattr(request, "arc_receipt", None)
+    passthrough = getattr(request, "arc_passthrough", None)
     if receipt:
         return JsonResponse({
             "receipt_id": receipt.get("id"),
             "verdict": receipt.get("verdict", {}).get("verdict"),
+        })
+    if passthrough:
+        return JsonResponse({
+            "mode": passthrough.mode,
+            "error": passthrough.error,
         })
     return JsonResponse({"status": "no receipt"})
 ```

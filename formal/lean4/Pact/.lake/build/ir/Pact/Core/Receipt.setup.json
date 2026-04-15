@@ -1,0 +1,7 @@
+{"plugins": [],
+ "package": "arc",
+ "options": {"autoImplicit": false},
+ "name": "Pact.Core.Receipt",
+ "isModule": false,
+ "importArts": {},
+ "dynlibs": []}

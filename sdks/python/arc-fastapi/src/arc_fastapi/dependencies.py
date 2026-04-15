@@ -8,7 +8,7 @@ from typing import Any
 from fastapi import Depends, Request
 
 from arc_sdk.client import ArcClient
-from arc_sdk.models import AuthMethod, CallerIdentity, HttpReceipt
+from arc_sdk.models import ArcPassthrough, AuthMethod, CallerIdentity, HttpReceipt
 
 # Module-level singleton. Override via ``set_arc_client`` for testing.
 _arc_client: ArcClient | None = None
@@ -89,3 +89,9 @@ async def get_arc_receipt(request: Request) -> HttpReceipt | None:
     if no receipt is available.
     """
     return getattr(request.state, "arc_receipt", None)
+
+
+async def get_arc_passthrough(request: Request) -> ArcPassthrough | None:
+    """FastAPI dependency that retrieves explicit fail-open passthrough state."""
+
+    return getattr(request.state, "arc_passthrough", None)

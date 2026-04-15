@@ -162,7 +162,13 @@ func TestProtect_SidecarUnreachable_FailClosed(t *testing.T) {
 }
 
 func TestProtect_SidecarUnreachable_FailOpen(t *testing.T) {
-	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	var observedPassthrough *ArcPassthrough
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		passthrough, ok := GetArcPassthrough(r)
+		if !ok {
+			t.Fatal("expected fail-open passthrough context")
+		}
+		observedPassthrough = passthrough
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("passed through"))
 	})
@@ -180,6 +186,18 @@ func TestProtect_SidecarUnreachable_FailOpen(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 (fail-open), got %d", rec.Code)
+	}
+	if got := rec.Header().Get("X-Arc-Receipt-Id"); got != "" {
+		t.Fatalf("expected no ARC receipt header on fail-open passthrough, got %q", got)
+	}
+	if observedPassthrough == nil {
+		t.Fatal("expected observed passthrough")
+	}
+	if observedPassthrough.Mode != "allow_without_receipt" {
+		t.Fatalf("expected allow_without_receipt, got %q", observedPassthrough.Mode)
+	}
+	if observedPassthrough.Error != ErrSidecarUnreachable {
+		t.Fatalf("expected %q, got %q", ErrSidecarUnreachable, observedPassthrough.Error)
 	}
 }
 
@@ -284,6 +302,59 @@ func TestProtect_CustomRouteResolver(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestProtect_ForwardsQueryCapabilityTokenToSidecar(t *testing.T) {
+	observedCapability := ""
+	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observedCapability = r.Header.Get("X-Arc-Capability")
+
+		body, _ := io.ReadAll(r.Body)
+		var req ArcHTTPRequest
+		_ = json.Unmarshal(body, &req)
+
+		resp := EvaluateResponse{
+			Verdict: Verdict{Verdict: "allow"},
+			Receipt: HTTPReceipt{
+				ID:             "receipt-query-capability",
+				RequestID:      req.RequestID,
+				RoutePattern:   req.RoutePattern,
+				Method:         req.Method,
+				Verdict:        Verdict{Verdict: "allow"},
+				ResponseStatus: 200,
+				KernelKey:      "key",
+				Signature:      "sig",
+			},
+			Evidence: []GuardEvidence{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer sidecar.Close()
+
+	innerCalled := false
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		innerCalled = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	handler := Protect(inner, WithSidecarURL(sidecar.URL))
+
+	req := httptest.NewRequest(http.MethodPost, "/pets?arc_capability=query-token", strings.NewReader(`{"name":"Fido"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if !innerCalled {
+		t.Fatal("inner handler should be called for allowed requests")
+	}
+	if observedCapability != "query-token" {
+		t.Fatalf("expected sidecar to receive query capability token, got %q", observedCapability)
+	}
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", rec.Code)
 	}
 }
 

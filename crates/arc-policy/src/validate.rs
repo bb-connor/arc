@@ -573,6 +573,359 @@ fn is_valid_duration(value: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn assert_error_contains(result: &ValidationResult, needle: &str) {
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|error| error.to_string().contains(needle)),
+            "expected error containing {needle:?}, got: {:?}",
+            result.errors
+        );
+    }
+
+    fn assert_warning_contains(result: &ValidationResult, needle: &str) {
+        assert!(
+            result
+                .warnings
+                .iter()
+                .any(|warning| warning.contains(needle)),
+            "expected warning containing {needle:?}, got: {:?}",
+            result.warnings
+        );
+    }
+
+    #[test]
+    fn posture_validation_reports_state_budget_and_transition_issues() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: posture-validation
+extensions:
+  posture:
+    initial: review
+    states:
+      draft:
+        capabilities: ["file_access", "mystery_capability"]
+        budgets:
+          file_writes: 1
+          shadow_budget: 2
+      limited:
+        budgets:
+          tool_calls: -1
+    transitions:
+      - from: unknown
+        to: draft
+        on: user_approval
+        after: 5x
+      - from: draft
+        to: "*"
+        on: user_denial
+      - from: draft
+        to: missing
+        on: critical_violation
+      - from: draft
+        to: limited
+        on: timeout
+      - from: limited
+        to: draft
+        on: timeout
+        after: later
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "posture.initial 'review' does not reference a defined state",
+        );
+        assert_error_contains(
+            &result,
+            "posture.states.limited.budgets.tool_calls must be non-negative, got -1",
+        );
+        assert_error_contains(
+            &result,
+            "posture.transitions[0].from 'unknown' does not reference a defined state",
+        );
+        assert_error_contains(
+            &result,
+            "posture.transitions[0].after must match ^\\d+[smhd]$",
+        );
+        assert_error_contains(&result, "posture.transitions[1].to cannot be '*'");
+        assert_error_contains(
+            &result,
+            "posture.transitions[2].to 'missing' does not reference a defined state",
+        );
+        assert_error_contains(
+            &result,
+            "posture.transitions[3]: timeout trigger requires 'after' field",
+        );
+        assert_error_contains(
+            &result,
+            "posture.transitions[4].after must match ^\\d+[smhd]$",
+        );
+        assert_warning_contains(
+            &result,
+            "posture.states.draft.capabilities includes unknown capability 'mystery_capability'",
+        );
+        assert_warning_contains(
+            &result,
+            "posture.states.draft.budgets uses unknown budget key 'shadow_budget'",
+        );
+    }
+
+    #[test]
+    fn posture_validation_rejects_empty_state_sets() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: empty-posture
+extensions:
+  posture:
+    initial: draft
+    states: {}
+    transitions: []
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(&result, "posture.states must define at least one state");
+        assert_error_contains(
+            &result,
+            "posture.initial 'draft' does not reference a defined state",
+        );
+    }
+
+    #[test]
+    fn detection_validation_reports_threshold_errors_and_warning_ordering() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: detection-validation
+extensions:
+  detection:
+    prompt_injection:
+      warn_at_or_above: critical
+      block_at_or_above: suspicious
+      max_scan_bytes: 0
+    jailbreak:
+      block_threshold: 101
+      warn_threshold: 102
+      max_input_bytes: 0
+    threat_intel:
+      similarity_threshold: 1.5
+      top_k: 0
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "detection.prompt_injection.max_scan_bytes must be >= 1",
+        );
+        assert_error_contains(
+            &result,
+            "detection.jailbreak.block_threshold must be between 0 and 100",
+        );
+        assert_error_contains(
+            &result,
+            "detection.jailbreak.warn_threshold must be between 0 and 100",
+        );
+        assert_error_contains(&result, "detection.jailbreak.max_input_bytes must be >= 1");
+        assert_error_contains(
+            &result,
+            "detection.threat_intel.similarity_threshold must be between 0.0 and 1.0",
+        );
+        assert_error_contains(&result, "detection.threat_intel.top_k must be >= 1");
+        assert_warning_contains(
+            &result,
+            "detection.prompt_injection: block_at_or_above is less strict than warn_at_or_above",
+        );
+        assert_warning_contains(
+            &result,
+            "detection.jailbreak: block_threshold is lower than warn_threshold",
+        );
+    }
+
+    #[test]
+    fn reputation_validation_reports_scoring_scope_and_operation_issues() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: reputation-validation
+extensions:
+  reputation:
+    scoring:
+      temporal_decay_half_life_days: 0
+      probationary_score_ceiling: 1.5
+      weights:
+        boundary_pressure: -0.1
+        resource_stewardship: 1.1
+        least_privilege: 0.2
+        history_depth: 0.3
+        tool_diversity: 0.4
+        delegation_hygiene: 0.5
+        reliability: 0.6
+        incident_correlation: 1.2
+    tiers:
+      bronze:
+        score_range: [0.8, 0.2]
+        max_scope:
+          operations: []
+          ttl_seconds: 0
+      silver:
+        score_range: [-0.1, 1.2]
+        max_scope:
+          operations: ["invoke", "escalate"]
+          ttl_seconds: 60
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "extensions.reputation.scoring.temporal_decay_half_life_days must be >= 1",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.scoring.probationary_score_ceiling must be in [0.0, 1.0]",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.scoring.weights.boundary_pressure must be in [0.0, 1.0]",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.scoring.weights.resource_stewardship must be in [0.0, 1.0]",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.scoring.weights.incident_correlation must be in [0.0, 1.0]",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.tiers.bronze.score_range lower bound exceeds upper bound",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.tiers.bronze.max_scope.ttl_seconds must be >= 1",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.reputation.tiers.silver.score_range values must be in [0.0, 1.0]",
+        );
+        assert_warning_contains(
+            &result,
+            "extensions.reputation.tiers.bronze.max_scope.operations is empty",
+        );
+        assert_warning_contains(
+            &result,
+            "extensions.reputation.tiers.silver.max_scope.operations includes unknown operation 'escalate'",
+        );
+    }
+
+    #[test]
+    fn reputation_validation_rejects_empty_tiers() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: empty-reputation
+extensions:
+  reputation:
+    tiers: {}
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "extensions.reputation.tiers must define at least one tier",
+        );
+    }
+
+    #[test]
+    fn runtime_assurance_validation_reports_empty_scope_and_blank_verifiers() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: runtime-assurance-validation
+extensions:
+  runtime_assurance:
+    tiers:
+      baseline:
+        minimum_attestation_tier: none
+        max_scope:
+          operations: []
+          ttl_seconds: 0
+    trusted_verifiers:
+      blank:
+        schema: "   "
+        verifier: "   "
+        effective_tier: verified
+        max_evidence_age_seconds: 0
+        allowed_attestation_types: [""]
+        required_assertions:
+          "": "enabled"
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.tiers.baseline.max_scope.ttl_seconds must be >= 1",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.tiers.baseline.max_scope.operations is empty",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.trusted_verifiers.blank.schema must not be empty",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.trusted_verifiers.blank.verifier must not be empty",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.trusted_verifiers.blank.max_evidence_age_seconds must be >= 1",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.trusted_verifiers.blank.allowed_attestation_types[0] must not be empty",
+        );
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.trusted_verifiers.blank.required_assertions keys must not be empty",
+        );
+    }
+
+    #[test]
+    fn runtime_assurance_validation_rejects_empty_tiers() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: empty-runtime-assurance
+extensions:
+  runtime_assurance:
+    tiers: {}
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "extensions.runtime_assurance.tiers must define at least one tier",
+        );
+    }
+
     #[test]
     fn runtime_assurance_validation_rejects_duplicate_minimum_tiers() {
         let spec: HushSpec = serde_yml::from_str(

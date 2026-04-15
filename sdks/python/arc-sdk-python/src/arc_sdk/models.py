@@ -458,7 +458,12 @@ class HttpReceipt(BaseModel):
     session_id: str | None = None
     verdict: Verdict
     evidence: list[GuardEvidence] = Field(default_factory=list)
-    response_status: int
+    response_status: int = Field(
+        description=(
+            "ARC evaluation-time HTTP status; allow receipts may be signed "
+            "before downstream response completion."
+        )
+    )
     timestamp: int
     content_hash: str
     policy_hash: str
@@ -474,6 +479,44 @@ class HttpReceipt(BaseModel):
     @property
     def is_denied(self) -> bool:
         return self.verdict.is_denied
+
+
+# ---------------------------------------------------------------------------
+# HTTP substrate request/response
+# ---------------------------------------------------------------------------
+
+
+class ArcHttpRequest(BaseModel):
+    """Normalized HTTP substrate request submitted to the ARC sidecar."""
+
+    request_id: str
+    method: str
+    route_pattern: str
+    path: str
+    query: dict[str, str] = Field(default_factory=dict)
+    headers: dict[str, str] = Field(default_factory=dict)
+    caller: CallerIdentity
+    body_hash: str | None = None
+    body_length: int = 0
+    session_id: str | None = None
+    capability_id: str | None = None
+    timestamp: int
+
+
+class EvaluateResponse(BaseModel):
+    """Sidecar response for HTTP request evaluation."""
+
+    verdict: Verdict
+    receipt: HttpReceipt
+    evidence: list[GuardEvidence] = Field(default_factory=list)
+
+
+class ArcPassthrough(BaseModel):
+    """Explicit fail-open degraded state where no ARC receipt exists."""
+
+    mode: str
+    error: str
+    message: str
 
 
 # ---------------------------------------------------------------------------

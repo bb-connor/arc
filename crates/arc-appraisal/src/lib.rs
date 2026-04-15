@@ -373,35 +373,38 @@ pub enum RuntimeAttestationAppraisalError {
     UnsupportedSchema { schema: String },
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct RuntimeAttestationVerifierDescriptorArgs<'a> {
+    pub signer: &'a crate::crypto::Keypair,
+    pub descriptor_id: String,
+    pub verifier: String,
+    pub verifier_family: AttestationVerifierFamily,
+    pub adapter: String,
+    pub attestation_schemas: Vec<String>,
+    pub signing_key_fingerprints: Vec<String>,
+    pub reference_values_uri: Option<String>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+}
+
 pub fn create_signed_runtime_attestation_verifier_descriptor(
-    signer: &crate::crypto::Keypair,
-    descriptor_id: impl Into<String>,
-    verifier: impl Into<String>,
-    verifier_family: AttestationVerifierFamily,
-    adapter: impl Into<String>,
-    attestation_schemas: Vec<String>,
-    signing_key_fingerprints: Vec<String>,
-    reference_values_uri: Option<String>,
-    issued_at: u64,
-    expires_at: u64,
+    args: RuntimeAttestationVerifierDescriptorArgs<'_>,
 ) -> ArcResult<SignedRuntimeAttestationVerifierDescriptor> {
     let descriptor = RuntimeAttestationVerifierDescriptorDocument {
         schema: RUNTIME_ATTESTATION_VERIFIER_DESCRIPTOR_SCHEMA.to_string(),
-        descriptor_id: descriptor_id.into(),
-        verifier: verifier.into(),
-        verifier_family,
-        adapter: adapter.into(),
-        attestation_schemas,
+        descriptor_id: args.descriptor_id,
+        verifier: args.verifier,
+        verifier_family: args.verifier_family,
+        adapter: args.adapter,
+        attestation_schemas: args.attestation_schemas,
         appraisal_artifact_schema: RUNTIME_ATTESTATION_APPRAISAL_ARTIFACT_SCHEMA.to_string(),
         appraisal_result_schema: RUNTIME_ATTESTATION_APPRAISAL_RESULT_SCHEMA.to_string(),
-        signing_key_fingerprints,
-        reference_values_uri,
-        issued_at,
-        expires_at,
+        signing_key_fingerprints: args.signing_key_fingerprints,
+        reference_values_uri: args.reference_values_uri,
+        issued_at: args.issued_at,
+        expires_at: args.expires_at,
     };
     validate_runtime_attestation_verifier_descriptor(&descriptor)?;
-    SignedExportEnvelope::sign(descriptor, signer)
+    SignedExportEnvelope::sign(descriptor, args.signer)
 }
 
 pub fn verify_signed_runtime_attestation_verifier_descriptor(
@@ -430,37 +433,40 @@ pub fn verify_signed_runtime_attestation_verifier_descriptor(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct RuntimeAttestationReferenceValueSetArgs<'a> {
+    pub signer: &'a crate::crypto::Keypair,
+    pub reference_value_id: String,
+    pub descriptor_id: String,
+    pub verifier_family: AttestationVerifierFamily,
+    pub attestation_schema: String,
+    pub source_uri: Option<String>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub state: RuntimeAttestationReferenceValueState,
+    pub superseded_by: Option<String>,
+    pub revoked_reason: Option<String>,
+    pub measurements: BTreeMap<String, Value>,
+}
+
 pub fn create_signed_runtime_attestation_reference_value_set(
-    signer: &crate::crypto::Keypair,
-    reference_value_id: impl Into<String>,
-    descriptor_id: impl Into<String>,
-    verifier_family: AttestationVerifierFamily,
-    attestation_schema: impl Into<String>,
-    source_uri: Option<String>,
-    issued_at: u64,
-    expires_at: u64,
-    state: RuntimeAttestationReferenceValueState,
-    superseded_by: Option<String>,
-    revoked_reason: Option<String>,
-    measurements: BTreeMap<String, Value>,
+    args: RuntimeAttestationReferenceValueSetArgs<'_>,
 ) -> ArcResult<SignedRuntimeAttestationReferenceValueSet> {
     let reference_value_set = RuntimeAttestationReferenceValueSet {
         schema: RUNTIME_ATTESTATION_REFERENCE_VALUE_SET_SCHEMA.to_string(),
-        reference_value_id: reference_value_id.into(),
-        descriptor_id: descriptor_id.into(),
-        verifier_family,
-        attestation_schema: attestation_schema.into(),
-        source_uri,
-        issued_at,
-        expires_at,
-        state,
-        superseded_by,
-        revoked_reason,
-        measurements,
+        reference_value_id: args.reference_value_id,
+        descriptor_id: args.descriptor_id,
+        verifier_family: args.verifier_family,
+        attestation_schema: args.attestation_schema,
+        source_uri: args.source_uri,
+        issued_at: args.issued_at,
+        expires_at: args.expires_at,
+        state: args.state,
+        superseded_by: args.superseded_by,
+        revoked_reason: args.revoked_reason,
+        measurements: args.measurements,
     };
     validate_runtime_attestation_reference_value_set(&reference_value_set)?;
-    SignedExportEnvelope::sign(reference_value_set, signer)
+    SignedExportEnvelope::sign(reference_value_set, args.signer)
 }
 
 pub fn verify_signed_runtime_attestation_reference_value_set(
@@ -489,29 +495,32 @@ pub fn verify_signed_runtime_attestation_reference_value_set(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct RuntimeAttestationTrustBundleArgs<'a> {
+    pub signer: &'a crate::crypto::Keypair,
+    pub bundle_id: String,
+    pub publisher: String,
+    pub version: u64,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub descriptors: Vec<SignedRuntimeAttestationVerifierDescriptor>,
+    pub reference_values: Vec<SignedRuntimeAttestationReferenceValueSet>,
+}
+
 pub fn create_signed_runtime_attestation_trust_bundle(
-    signer: &crate::crypto::Keypair,
-    bundle_id: impl Into<String>,
-    publisher: impl Into<String>,
-    version: u64,
-    issued_at: u64,
-    expires_at: u64,
-    descriptors: Vec<SignedRuntimeAttestationVerifierDescriptor>,
-    reference_values: Vec<SignedRuntimeAttestationReferenceValueSet>,
+    args: RuntimeAttestationTrustBundleArgs<'_>,
 ) -> ArcResult<SignedRuntimeAttestationTrustBundle> {
     let bundle = RuntimeAttestationTrustBundleDocument {
         schema: RUNTIME_ATTESTATION_TRUST_BUNDLE_SCHEMA.to_string(),
-        bundle_id: bundle_id.into(),
-        publisher: publisher.into(),
-        version,
-        issued_at,
-        expires_at,
-        descriptors,
-        reference_values,
+        bundle_id: args.bundle_id,
+        publisher: args.publisher,
+        version: args.version,
+        issued_at: args.issued_at,
+        expires_at: args.expires_at,
+        descriptors: args.descriptors,
+        reference_values: args.reference_values,
     };
-    validate_runtime_attestation_trust_bundle(&bundle, issued_at)?;
-    SignedExportEnvelope::sign(bundle, signer)
+    validate_runtime_attestation_trust_bundle(&bundle, args.issued_at)?;
+    SignedExportEnvelope::sign(bundle, args.signer)
 }
 
 pub fn verify_signed_runtime_attestation_trust_bundle(
@@ -1365,39 +1374,40 @@ impl RuntimeAttestationAppraisalResult {
     }
 }
 
+struct RuntimeAttestationArtifactArgs<'a> {
+    adapter: String,
+    verifier_family: AttestationVerifierFamily,
+    evidence: &'a RuntimeAttestationEvidence,
+    normalized_assertions: BTreeMap<String, Value>,
+    vendor_claims: BTreeMap<String, Value>,
+    verdict: RuntimeAttestationAppraisalVerdict,
+    effective_tier: RuntimeAssuranceTier,
+    reason_codes: Vec<RuntimeAttestationAppraisalReasonCode>,
+}
+
 impl RuntimeAttestationAppraisal {
-    #[allow(clippy::too_many_arguments)]
-    fn artifact(
-        adapter: impl Into<String>,
-        verifier_family: AttestationVerifierFamily,
-        evidence: &RuntimeAttestationEvidence,
-        normalized_assertions: BTreeMap<String, Value>,
-        vendor_claims: BTreeMap<String, Value>,
-        verdict: RuntimeAttestationAppraisalVerdict,
-        effective_tier: RuntimeAssuranceTier,
-        reason_codes: Vec<RuntimeAttestationAppraisalReasonCode>,
-    ) -> RuntimeAttestationAppraisalArtifact {
-        let normalized_claims = normalized_claims_from_assertions(&normalized_assertions);
-        let reasons = reasons_from_codes(&reason_codes);
+    fn artifact(args: RuntimeAttestationArtifactArgs<'_>) -> RuntimeAttestationAppraisalArtifact {
+        let normalized_claims = normalized_claims_from_assertions(&args.normalized_assertions);
+        let reasons = reasons_from_codes(&args.reason_codes);
         RuntimeAttestationAppraisalArtifact {
             schema: RUNTIME_ATTESTATION_APPRAISAL_ARTIFACT_SCHEMA.to_string(),
-            evidence: RuntimeAttestationEvidenceDescriptor::from(evidence),
+            evidence: RuntimeAttestationEvidenceDescriptor::from(args.evidence),
             verifier: RuntimeAttestationVerifierDescriptor {
-                adapter: adapter.into(),
-                verifier_family,
+                adapter: args.adapter,
+                verifier_family: args.verifier_family,
             },
             claims: RuntimeAttestationClaimSets {
-                normalized_assertions,
+                normalized_assertions: args.normalized_assertions,
                 normalized_claims,
-                vendor_claims,
+                vendor_claims: args.vendor_claims,
             },
             policy: RuntimeAttestationPolicyProjection {
-                verdict,
-                effective_tier,
-                reason_codes,
+                verdict: args.verdict,
+                effective_tier: args.effective_tier,
+                reason_codes: args.reason_codes,
                 reasons,
             },
-            workload_identity: evidence.workload_identity.clone(),
+            workload_identity: args.evidence.workload_identity.clone(),
         }
     }
 
@@ -1413,16 +1423,16 @@ impl RuntimeAttestationAppraisal {
         let adapter = adapter.into();
         let normalized_claims = normalized_claims_from_assertions(&normalized_assertions);
         let reasons = reasons_from_codes(&reason_codes);
-        let artifact = Self::artifact(
-            adapter.clone(),
+        let artifact = Self::artifact(RuntimeAttestationArtifactArgs {
+            adapter: adapter.clone(),
             verifier_family,
             evidence,
-            normalized_assertions.clone(),
-            vendor_claims.clone(),
-            RuntimeAttestationAppraisalVerdict::Accepted,
-            evidence.tier,
-            reason_codes.clone(),
-        );
+            normalized_assertions: normalized_assertions.clone(),
+            vendor_claims: vendor_claims.clone(),
+            verdict: RuntimeAttestationAppraisalVerdict::Accepted,
+            effective_tier: evidence.tier,
+            reason_codes: reason_codes.clone(),
+        });
         Self {
             schema: RUNTIME_ATTESTATION_APPRAISAL_SCHEMA.to_string(),
             adapter,
@@ -1452,16 +1462,16 @@ impl RuntimeAttestationAppraisal {
         let adapter = adapter.into();
         let normalized_claims = normalized_claims_from_assertions(&normalized_assertions);
         let reasons = reasons_from_codes(&reason_codes);
-        let artifact = Self::artifact(
-            adapter.clone(),
+        let artifact = Self::artifact(RuntimeAttestationArtifactArgs {
+            adapter: adapter.clone(),
             verifier_family,
             evidence,
-            normalized_assertions.clone(),
-            vendor_claims.clone(),
-            RuntimeAttestationAppraisalVerdict::Rejected,
-            RuntimeAssuranceTier::None,
-            reason_codes.clone(),
-        );
+            normalized_assertions: normalized_assertions.clone(),
+            vendor_claims: vendor_claims.clone(),
+            verdict: RuntimeAttestationAppraisalVerdict::Rejected,
+            effective_tier: RuntimeAssuranceTier::None,
+            reason_codes: reason_codes.clone(),
+        });
         Self {
             schema: RUNTIME_ATTESTATION_APPRAISAL_SCHEMA.to_string(),
             adapter,
@@ -3039,44 +3049,49 @@ mod tests {
     fn runtime_attestation_trust_bundle_verifies_signed_descriptor_and_reference_values() {
         let signer = crate::crypto::Keypair::generate();
         let descriptor = create_signed_runtime_attestation_verifier_descriptor(
-            &signer,
-            "azure-prod",
-            "https://maa.contoso.test",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_VERIFIER_ADAPTER,
-            vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
-            vec!["sha256:azure-key-1".to_string()],
-            Some("https://maa.contoso.test/reference-values".to_string()),
-            100,
-            300,
+            RuntimeAttestationVerifierDescriptorArgs {
+                signer: &signer,
+                descriptor_id: "azure-prod".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                adapter: AZURE_MAA_VERIFIER_ADAPTER.to_string(),
+                attestation_schemas: vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
+                signing_key_fingerprints: vec!["sha256:azure-key-1".to_string()],
+                reference_values_uri: Some("https://maa.contoso.test/reference-values".to_string()),
+                issued_at: 100,
+                expires_at: 300,
+            },
         )
         .expect("descriptor");
         let reference_values = create_signed_runtime_attestation_reference_value_set(
-            &signer,
-            "azure-rv-1",
-            "azure-prod",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_ATTESTATION_SCHEMA,
-            Some("https://maa.contoso.test/reference-values/1".to_string()),
-            100,
-            300,
-            RuntimeAttestationReferenceValueState::Active,
-            None,
-            None,
-            BTreeMap::from([("mrEnclave".to_string(), json!("abc123"))]),
+            RuntimeAttestationReferenceValueSetArgs {
+                signer: &signer,
+                reference_value_id: "azure-rv-1".to_string(),
+                descriptor_id: "azure-prod".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                attestation_schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+                source_uri: Some("https://maa.contoso.test/reference-values/1".to_string()),
+                issued_at: 100,
+                expires_at: 300,
+                state: RuntimeAttestationReferenceValueState::Active,
+                superseded_by: None,
+                revoked_reason: None,
+                measurements: BTreeMap::from([("mrEnclave".to_string(), json!("abc123"))]),
+            },
         )
         .expect("reference values");
-        let bundle = create_signed_runtime_attestation_trust_bundle(
-            &signer,
-            "bundle-1",
-            "https://trust.contoso.test",
-            1,
-            100,
-            300,
-            vec![descriptor],
-            vec![reference_values],
-        )
-        .expect("bundle");
+        let bundle =
+            create_signed_runtime_attestation_trust_bundle(RuntimeAttestationTrustBundleArgs {
+                signer: &signer,
+                bundle_id: "bundle-1".to_string(),
+                publisher: "https://trust.contoso.test".to_string(),
+                version: 1,
+                issued_at: 100,
+                expires_at: 300,
+                descriptors: vec![descriptor],
+                reference_values: vec![reference_values],
+            })
+            .expect("bundle");
 
         let verification =
             verify_signed_runtime_attestation_trust_bundle(&bundle, 150).expect("verify");
@@ -3094,29 +3109,32 @@ mod tests {
     fn runtime_attestation_trust_bundle_rejects_expired_descriptor() {
         let signer = crate::crypto::Keypair::generate();
         let descriptor = create_signed_runtime_attestation_verifier_descriptor(
-            &signer,
-            "azure-prod",
-            "https://maa.contoso.test",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_VERIFIER_ADAPTER,
-            vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
-            vec!["sha256:azure-key-1".to_string()],
-            None,
-            100,
-            120,
+            RuntimeAttestationVerifierDescriptorArgs {
+                signer: &signer,
+                descriptor_id: "azure-prod".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                adapter: AZURE_MAA_VERIFIER_ADAPTER.to_string(),
+                attestation_schemas: vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
+                signing_key_fingerprints: vec!["sha256:azure-key-1".to_string()],
+                reference_values_uri: None,
+                issued_at: 100,
+                expires_at: 120,
+            },
         )
         .expect("descriptor");
-        let bundle = create_signed_runtime_attestation_trust_bundle(
-            &signer,
-            "bundle-2",
-            "https://trust.contoso.test",
-            1,
-            100,
-            300,
-            vec![descriptor],
-            Vec::new(),
-        )
-        .expect("bundle");
+        let bundle =
+            create_signed_runtime_attestation_trust_bundle(RuntimeAttestationTrustBundleArgs {
+                signer: &signer,
+                bundle_id: "bundle-2".to_string(),
+                publisher: "https://trust.contoso.test".to_string(),
+                version: 1,
+                issued_at: 100,
+                expires_at: 300,
+                descriptors: vec![descriptor],
+                reference_values: Vec::new(),
+            })
+            .expect("bundle");
 
         let error = verify_signed_runtime_attestation_trust_bundle(&bundle, 150)
             .expect_err("expired descriptor");
@@ -3129,59 +3147,66 @@ mod tests {
     fn runtime_attestation_trust_bundle_rejects_ambiguous_active_reference_values() {
         let signer = crate::crypto::Keypair::generate();
         let descriptor = create_signed_runtime_attestation_verifier_descriptor(
-            &signer,
-            "azure-prod",
-            "https://maa.contoso.test",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_VERIFIER_ADAPTER,
-            vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
-            vec!["sha256:azure-key-1".to_string()],
-            None,
-            100,
-            300,
+            RuntimeAttestationVerifierDescriptorArgs {
+                signer: &signer,
+                descriptor_id: "azure-prod".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                adapter: AZURE_MAA_VERIFIER_ADAPTER.to_string(),
+                attestation_schemas: vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
+                signing_key_fingerprints: vec!["sha256:azure-key-1".to_string()],
+                reference_values_uri: None,
+                issued_at: 100,
+                expires_at: 300,
+            },
         )
         .expect("descriptor");
         let reference_a = create_signed_runtime_attestation_reference_value_set(
-            &signer,
-            "azure-rv-1",
-            "azure-prod",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_ATTESTATION_SCHEMA,
-            None,
-            100,
-            300,
-            RuntimeAttestationReferenceValueState::Active,
-            None,
-            None,
-            BTreeMap::from([("mrEnclave".to_string(), json!("abc123"))]),
+            RuntimeAttestationReferenceValueSetArgs {
+                signer: &signer,
+                reference_value_id: "azure-rv-1".to_string(),
+                descriptor_id: "azure-prod".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                attestation_schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+                source_uri: None,
+                issued_at: 100,
+                expires_at: 300,
+                state: RuntimeAttestationReferenceValueState::Active,
+                superseded_by: None,
+                revoked_reason: None,
+                measurements: BTreeMap::from([("mrEnclave".to_string(), json!("abc123"))]),
+            },
         )
         .expect("reference values");
         let reference_b = create_signed_runtime_attestation_reference_value_set(
-            &signer,
-            "azure-rv-2",
-            "azure-prod",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_ATTESTATION_SCHEMA,
-            None,
-            100,
-            300,
-            RuntimeAttestationReferenceValueState::Active,
-            None,
-            None,
-            BTreeMap::from([("mrEnclave".to_string(), json!("def456"))]),
+            RuntimeAttestationReferenceValueSetArgs {
+                signer: &signer,
+                reference_value_id: "azure-rv-2".to_string(),
+                descriptor_id: "azure-prod".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                attestation_schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+                source_uri: None,
+                issued_at: 100,
+                expires_at: 300,
+                state: RuntimeAttestationReferenceValueState::Active,
+                superseded_by: None,
+                revoked_reason: None,
+                measurements: BTreeMap::from([("mrEnclave".to_string(), json!("def456"))]),
+            },
         )
         .expect("reference values");
-        let error = create_signed_runtime_attestation_trust_bundle(
-            &signer,
-            "bundle-3",
-            "https://trust.contoso.test",
-            1,
-            100,
-            300,
-            vec![descriptor],
-            vec![reference_a, reference_b],
-        )
-        .expect_err("ambiguous reference values");
+        let error =
+            create_signed_runtime_attestation_trust_bundle(RuntimeAttestationTrustBundleArgs {
+                signer: &signer,
+                bundle_id: "bundle-3".to_string(),
+                publisher: "https://trust.contoso.test".to_string(),
+                version: 1,
+                issued_at: 100,
+                expires_at: 300,
+                descriptors: vec![descriptor],
+                reference_values: vec![reference_a, reference_b],
+            })
+            .expect_err("ambiguous reference values");
         assert!(error
             .to_string()
             .contains("ambiguous active reference values"));
@@ -3191,44 +3216,49 @@ mod tests {
     fn runtime_attestation_trust_bundle_rejects_reference_values_outside_descriptor_contract() {
         let signer = crate::crypto::Keypair::generate();
         let descriptor = create_signed_runtime_attestation_verifier_descriptor(
-            &signer,
-            "azure-prod",
-            "https://maa.contoso.test",
-            AttestationVerifierFamily::AzureMaa,
-            AZURE_MAA_VERIFIER_ADAPTER,
-            vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
-            vec!["sha256:azure-key-1".to_string()],
-            None,
-            100,
-            300,
+            RuntimeAttestationVerifierDescriptorArgs {
+                signer: &signer,
+                descriptor_id: "azure-prod".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                verifier_family: AttestationVerifierFamily::AzureMaa,
+                adapter: AZURE_MAA_VERIFIER_ADAPTER.to_string(),
+                attestation_schemas: vec![AZURE_MAA_ATTESTATION_SCHEMA.to_string()],
+                signing_key_fingerprints: vec!["sha256:azure-key-1".to_string()],
+                reference_values_uri: None,
+                issued_at: 100,
+                expires_at: 300,
+            },
         )
         .expect("descriptor");
         let reference_values = create_signed_runtime_attestation_reference_value_set(
-            &signer,
-            "google-rv-1",
-            "azure-prod",
-            AttestationVerifierFamily::GoogleAttestation,
-            GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA,
-            None,
-            100,
-            300,
-            RuntimeAttestationReferenceValueState::Active,
-            None,
-            None,
-            BTreeMap::from([("hwModel".to_string(), json!("GCP_AMD_SEV"))]),
+            RuntimeAttestationReferenceValueSetArgs {
+                signer: &signer,
+                reference_value_id: "google-rv-1".to_string(),
+                descriptor_id: "azure-prod".to_string(),
+                verifier_family: AttestationVerifierFamily::GoogleAttestation,
+                attestation_schema: GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA.to_string(),
+                source_uri: None,
+                issued_at: 100,
+                expires_at: 300,
+                state: RuntimeAttestationReferenceValueState::Active,
+                superseded_by: None,
+                revoked_reason: None,
+                measurements: BTreeMap::from([("hwModel".to_string(), json!("GCP_AMD_SEV"))]),
+            },
         )
         .expect("reference values");
-        let error = create_signed_runtime_attestation_trust_bundle(
-            &signer,
-            "bundle-4",
-            "https://trust.contoso.test",
-            1,
-            100,
-            300,
-            vec![descriptor],
-            vec![reference_values],
-        )
-        .expect_err("mismatched reference values");
+        let error =
+            create_signed_runtime_attestation_trust_bundle(RuntimeAttestationTrustBundleArgs {
+                signer: &signer,
+                bundle_id: "bundle-4".to_string(),
+                publisher: "https://trust.contoso.test".to_string(),
+                version: 1,
+                issued_at: 100,
+                expires_at: 300,
+                descriptors: vec![descriptor],
+                reference_values: vec![reference_values],
+            })
+            .expect_err("mismatched reference values");
         assert!(error.to_string().contains("does not match verifier-family"));
     }
 

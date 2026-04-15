@@ -5,7 +5,8 @@
  *
  * - `arc()` middleware that evaluates requests against the ARC sidecar
  * - `arcErrorHandler` for structured ARC error responses
- * - ARC evaluation results attached to req.arcResult
+ * - ARC evaluation results attached to req.arcResult when ARC produced a signed receipt
+ * - Fail-open passthrough state attached to req.arcPassthrough when no receipt exists
  *
  * @example
  * ```ts
@@ -23,6 +24,7 @@ export { arc, arcErrorHandler, type ArcExpressConfig, type ArcRequest } from "./
 // Re-export key types from node-http for convenience
 export type {
   ArcConfig,
+  ArcPassthrough,
   EvaluateResponse,
   HttpReceipt,
   Verdict,

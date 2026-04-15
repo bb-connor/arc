@@ -70,6 +70,9 @@ pub struct AcpVerdict {
     pub allowed: bool,
     /// The capability ID that authorized access, if any.
     pub capability_id: Option<String>,
+    /// The signed authorization receipt emitted by the authoritative check, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_id: Option<String>,
     /// Human-readable reason for the decision.
     pub reason: String,
 }

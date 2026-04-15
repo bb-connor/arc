@@ -20,7 +20,7 @@ inductive Operation where
   | invoke
   | readResult
   | delegate
-  deriving Repr, BEq, DecidableEq, Inhabited
+  deriving Repr, BEq, DecidableEq, Inhabited, ReflBEq, LawfulBEq
 
 /-- Mirrors: Constraint in capability.rs -/
 inductive Constraint where
@@ -30,7 +30,7 @@ inductive Constraint where
   | regexMatch : String → Constraint
   | maxLength : Nat → Constraint
   | custom : String → String → Constraint
-  deriving Repr, BEq, DecidableEq
+  deriving Repr, BEq, DecidableEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: ToolGrant in capability.rs -/
 structure ToolGrant where
@@ -39,12 +39,12 @@ structure ToolGrant where
   operations : List Operation
   constraints : List Constraint
   maxInvocations : Option Nat
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: ArcScope in capability.rs -/
 structure ArcScope where
   grants : List ToolGrant
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: Attenuation in capability.rs -/
 inductive Attenuation where
@@ -53,7 +53,7 @@ inductive Attenuation where
   | addConstraint : ServerId → ToolName → Constraint → Attenuation
   | reduceBudget : ServerId → ToolName → Nat → Attenuation
   | shortenExpiry : Timestamp → Attenuation
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: DelegationLink in capability.rs (signature opaque). -/
 structure DelegationLink where
@@ -61,7 +61,7 @@ structure DelegationLink where
   delegatee : PublicKeyHex
   attenuations : List Attenuation
   timestamp : Timestamp
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: CapabilityToken in capability.rs.
     Signature and cryptographic fields are axiomatized in Crypto. -/
@@ -73,7 +73,7 @@ structure CapabilityToken where
   issuedAt : Timestamp
   expiresAt : Timestamp
   delegationChain : List DelegationLink
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
 
 /-- Mirrors: CapabilityToken::is_valid_at (issued_at <= now < expires_at). -/
 def CapabilityToken.isValidAt (cap : CapabilityToken) (now : Timestamp) : Bool :=

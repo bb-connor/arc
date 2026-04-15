@@ -11,8 +11,10 @@
  */
 
 import type { Request, Response, NextFunction, RequestHandler } from "express";
+import { PassThrough } from "node:stream";
 import {
   type ArcConfig,
+  type ArcPassthrough,
   type EvaluateResponse,
   type HttpMethod,
   type Verdict,
@@ -71,13 +73,18 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
       resolved.routePatternResolver = () => routePattern;
 
       try {
-        const result = await interceptNodeRequest(req, res, resolved);
-        if (result != null) {
-          // Attach result to request for downstream handlers
-          (req as ArcRequest).arcResult = result;
+        const rawBody = await ensureExpressBufferedBody(req as ArcRequest);
+        const outcome = await interceptNodeRequest(req, res, resolved);
+        if (!outcome.responseSent) {
+          hydrateExpressBody(req as ArcRequest, rawBody);
+          if (outcome.result != null) {
+            (req as ArcRequest).arcResult = outcome.result;
+          }
+          if (outcome.passthrough != null) {
+            (req as ArcRequest).arcPassthrough = outcome.passthrough;
+          }
           next();
         }
-        // If result is null, interceptor already sent the response
       } catch (error) {
         next(error);
       } finally {
@@ -87,9 +94,16 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
     }
 
     try {
-      const result = await interceptNodeRequest(req, res, resolved);
-      if (result != null) {
-        (req as ArcRequest).arcResult = result;
+      const rawBody = await ensureExpressBufferedBody(req as ArcRequest);
+      const outcome = await interceptNodeRequest(req, res, resolved);
+      if (!outcome.responseSent) {
+        hydrateExpressBody(req as ArcRequest, rawBody);
+        if (outcome.result != null) {
+          (req as ArcRequest).arcResult = outcome.result;
+        }
+        if (outcome.passthrough != null) {
+          (req as ArcRequest).arcPassthrough = outcome.passthrough;
+        }
         next();
       }
     } catch (error) {
@@ -103,6 +117,9 @@ export function arc(config: ArcExpressConfig = {}): RequestHandler {
  */
 export interface ArcRequest extends Request {
   arcResult?: EvaluateResponse | undefined;
+  arcPassthrough?: ArcPassthrough | undefined;
+  rawBody?: Buffer | undefined;
+  _body?: boolean | undefined;
 }
 
 /**
@@ -157,4 +174,116 @@ function extractRoutePattern(req: Request): string | null {
     return `${base}${req.route.path}`;
   }
   return null;
+}
+
+async function ensureExpressBufferedBody(req: ArcRequest): Promise<Buffer> {
+  if (Buffer.isBuffer(req.rawBody)) {
+    return req.rawBody;
+  }
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  const rawBody = Buffer.concat(chunks);
+  req.rawBody = rawBody;
+  replayExpressRequestBody(req, rawBody);
+  return rawBody;
+}
+
+function replayExpressRequestBody(req: ArcRequest, rawBody: Buffer): void {
+  const replay = new PassThrough();
+  replay.end(rawBody);
+
+  const replayable = req as unknown as Record<string | symbol, unknown>;
+  const methods = [
+    "on",
+    "once",
+    "addListener",
+    "prependListener",
+    "prependOnceListener",
+    "removeListener",
+    "off",
+    "pipe",
+    "unpipe",
+    "pause",
+    "resume",
+    "read",
+    "setEncoding",
+  ] as const;
+
+  for (const method of methods) {
+    const impl = replay[method];
+    if (typeof impl === "function") {
+      replayable[method] = impl.bind(replay) as unknown;
+    }
+  }
+
+  Object.defineProperty(replayable, "_readableState", {
+    configurable: true,
+    enumerable: false,
+    get: () => (replay as PassThrough & { _readableState: unknown })._readableState,
+  });
+
+  Object.defineProperty(replayable, "complete", {
+    configurable: true,
+    enumerable: false,
+    get: () => replay.readableEnded,
+  });
+
+  for (const property of [
+    "readable",
+    "readableEnded",
+    "readableEncoding",
+    "readableFlowing",
+    "readableLength",
+  ] as const) {
+    Object.defineProperty(replayable, property, {
+      configurable: true,
+      enumerable: false,
+      get: () => replay[property],
+    });
+  }
+}
+
+function hydrateExpressBody(req: ArcRequest, rawBody: Buffer): void {
+  if (req.body !== undefined) {
+    return;
+  }
+
+  const contentTypeHeader = req.headers["content-type"];
+  const contentType = Array.isArray(contentTypeHeader)
+    ? contentTypeHeader[0]
+    : contentTypeHeader;
+  const normalizedType = contentType?.split(";")[0]?.trim().toLowerCase();
+
+  try {
+    if (normalizedType === "application/json" || normalizedType?.endsWith("+json") === true) {
+      req.body = rawBody.length > 0 ? JSON.parse(rawBody.toString("utf-8")) : {};
+      req._body = true;
+      return;
+    }
+
+    if (normalizedType === "application/x-www-form-urlencoded") {
+      req.body = Object.fromEntries(
+        new URLSearchParams(rawBody.toString("utf-8")).entries(),
+      );
+      req._body = true;
+      return;
+    }
+
+    if (normalizedType?.startsWith("text/") === true) {
+      req.body = rawBody.toString("utf-8");
+      req._body = true;
+      return;
+    }
+
+    if (rawBody.length > 0) {
+      req.body = rawBody;
+      req._body = true;
+    }
+  } catch {
+    // Leave body parsing to downstream middleware when ARC cannot safely infer it.
+  }
 }

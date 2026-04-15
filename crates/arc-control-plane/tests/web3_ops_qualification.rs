@@ -6,7 +6,8 @@ use std::sync::Arc;
 use arc_anchor::{
     ensure_anchor_operation_allowed, AnchorAlertSeverity, AnchorControlState,
     AnchorEmergencyControls, AnchorEmergencyMode, AnchorIncidentAlert, AnchorIndexerCursor,
-    AnchorLaneKind, AnchorLaneRuntimeStatus, AnchorOperationKind, AnchorRuntimeReport,
+    AnchorIndexerCursorInput, AnchorLaneKind, AnchorLaneRuntimeStatus,
+    AnchorLaneRuntimeStatusInput, AnchorOperationKind, AnchorRuntimeReport,
 };
 use arc_link::config::{
     OracleBackendKind, PairConfig, PairRuntimeOverride, PriceOracleConfig, ARBITRUM_ONE_CHAIN_ID,
@@ -16,9 +17,10 @@ use arc_link::{ArcLinkOracle, ExchangeRate, OracleBackend, OracleFuture, PriceOr
 use arc_settle::{
     ensure_settlement_operation_allowed, SettlementAlertSeverity, SettlementControlState,
     SettlementEmergencyControls, SettlementEmergencyMode, SettlementFinalityStatus,
-    SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerStatus,
-    SettlementLaneRuntimeStatus, SettlementOperationKind, SettlementRecoveryAction,
-    SettlementRecoveryRecord, SettlementRuntimeReport,
+    SettlementIncidentAlert, SettlementIndexerCursor, SettlementIndexerCursorInput,
+    SettlementIndexerStatus, SettlementLaneRuntimeStatus, SettlementLaneRuntimeStatusInput,
+    SettlementOperationKind, SettlementRecoveryAction, SettlementRecoveryRecord,
+    SettlementRuntimeReport,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -258,57 +260,67 @@ async fn web3_ops_qualification_emits_generated_runtime_reports_and_control_audi
     )
     .expect("confirm publication allowed");
 
-    let root_registry_indexer = AnchorIndexerCursor::from_sequences(
-        "root-registry-indexer",
-        AnchorLaneKind::EvmPrimary,
-        Some("eip155:8453".to_string()),
-        9_182,
-        9_184,
-        Some(29_920_123),
-        true,
-        false,
-        generated_at - 10,
-        Some("Indexer is replaying publishRoot events after a canonical rollback.".to_string()),
-    );
-    let ots_indexer = AnchorIndexerCursor::from_sequences(
-        "ots-import-monitor",
-        AnchorLaneKind::BitcoinOts,
-        Some("bitcoin:mainnet".to_string()),
-        9_182,
-        9_184,
-        None,
-        false,
-        false,
-        generated_at - 12,
-        Some("OTS attachment remains behind the canonical EVM head during replay.".to_string()),
-    );
+    let root_registry_indexer = AnchorIndexerCursor::from_sequences(AnchorIndexerCursorInput {
+        service_id: "root-registry-indexer".to_string(),
+        lane: AnchorLaneKind::EvmPrimary,
+        chain_id: Some("eip155:8453".to_string()),
+        indexed_checkpoint_seq: 9_182,
+        canonical_checkpoint_seq: 9_184,
+        indexed_block_number: Some(29_920_123),
+        replaying: true,
+        failed: false,
+        checked_at: generated_at - 10,
+        note: Some(
+            "Indexer is replaying publishRoot events after a canonical rollback.".to_string(),
+        ),
+    });
+    let ots_indexer = AnchorIndexerCursor::from_sequences(AnchorIndexerCursorInput {
+        service_id: "ots-import-monitor".to_string(),
+        lane: AnchorLaneKind::BitcoinOts,
+        chain_id: Some("bitcoin:mainnet".to_string()),
+        indexed_checkpoint_seq: 9_182,
+        canonical_checkpoint_seq: 9_184,
+        indexed_block_number: None,
+        replaying: false,
+        failed: false,
+        checked_at: generated_at - 12,
+        note: Some(
+            "OTS attachment remains behind the canonical EVM head during replay.".to_string(),
+        ),
+    });
     let mut anchor_report = AnchorRuntimeReport::new(generated_at, anchor_state.controls.clone());
     anchor_report.indexers = vec![root_registry_indexer.clone(), ots_indexer.clone()];
     anchor_report.lanes = vec![
         AnchorLaneRuntimeStatus::from_indexer(
-            AnchorLaneKind::EvmPrimary,
-            Some("eip155:8453".to_string()),
-            9_184,
             &root_registry_indexer,
-            anchor_state.controls.clone(),
-            2,
-            Some(generated_at - 40),
-            Some(
-                "confirm the canonical publishRoot event for checkpoint 9184 before resuming new publication"
-                    .to_string(),
-            ),
-            Some("Primary publication remains in recovery-only mode.".to_string()),
+            AnchorLaneRuntimeStatusInput {
+                lane: AnchorLaneKind::EvmPrimary,
+                chain_id: Some("eip155:8453".to_string()),
+                latest_checkpoint_seq: 9_184,
+                controls: anchor_state.controls.clone(),
+                reorg_depth: 2,
+                last_published_at: Some(generated_at - 40),
+                next_action: Some(
+                    "confirm the canonical publishRoot event for checkpoint 9184 before resuming new publication"
+                        .to_string(),
+                ),
+                note: Some("Primary publication remains in recovery-only mode.".to_string()),
+            },
         ),
         AnchorLaneRuntimeStatus::from_indexer(
-            AnchorLaneKind::BitcoinOts,
-            Some("bitcoin:mainnet".to_string()),
-            9_184,
             &ots_indexer,
-            anchor_state.controls.clone(),
-            0,
-            Some(generated_at - 50),
-            Some("hold imported OTS attachment until the EVM lane reconverges".to_string()),
-            Some("Secondary proof import is gated behind canonical replay.".to_string()),
+            AnchorLaneRuntimeStatusInput {
+                lane: AnchorLaneKind::BitcoinOts,
+                chain_id: Some("bitcoin:mainnet".to_string()),
+                latest_checkpoint_seq: 9_184,
+                controls: anchor_state.controls.clone(),
+                reorg_depth: 0,
+                last_published_at: Some(generated_at - 50),
+                next_action: Some(
+                    "hold imported OTS attachment until the EVM lane reconverges".to_string(),
+                ),
+                note: Some("Secondary proof import is gated behind canonical replay.".to_string()),
+            },
         ),
     ];
     anchor_report.incidents = vec![
@@ -371,26 +383,28 @@ async fn web3_ops_qualification_emits_generated_runtime_reports_and_control_audi
     )
     .expect("refund allowed");
 
-    let escrow_indexer = SettlementIndexerCursor::from_blocks(
-        "escrow-release-indexer",
-        "eip155:8453",
-        Some(29_920_145),
-        29_920_148,
-        true,
-        false,
-        generated_at - 15,
-        Some("Escrow release events are being replayed against the canonical head.".to_string()),
-    );
-    let bond_indexer = SettlementIndexerCursor::from_blocks(
-        "bond-watchdog-indexer",
-        "eip155:8453",
-        Some(29_920_148),
-        29_920_148,
-        false,
-        false,
-        generated_at - 14,
-        Some("Bond lifecycle observation is current.".to_string()),
-    );
+    let escrow_indexer = SettlementIndexerCursor::from_blocks(SettlementIndexerCursorInput {
+        service_id: "escrow-release-indexer".to_string(),
+        chain_id: "eip155:8453".to_string(),
+        last_indexed_block_number: Some(29_920_145),
+        canonical_block_number: 29_920_148,
+        replaying: true,
+        failed: false,
+        checked_at: generated_at - 15,
+        note: Some(
+            "Escrow release events are being replayed against the canonical head.".to_string(),
+        ),
+    });
+    let bond_indexer = SettlementIndexerCursor::from_blocks(SettlementIndexerCursorInput {
+        service_id: "bond-watchdog-indexer".to_string(),
+        chain_id: "eip155:8453".to_string(),
+        last_indexed_block_number: Some(29_920_148),
+        canonical_block_number: 29_920_148,
+        replaying: false,
+        failed: false,
+        checked_at: generated_at - 14,
+        note: Some("Bond lifecycle observation is current.".to_string()),
+    });
     let recovery = SettlementRecoveryRecord {
         execution_receipt_id: "arc.web3-execution-receipt.replay-001".to_string(),
         chain_id: "eip155:8453".to_string(),
@@ -408,17 +422,19 @@ async fn web3_ops_qualification_emits_generated_runtime_reports_and_control_audi
         SettlementRuntimeReport::new(generated_at, settlement_state.controls.clone());
     settlement_report.indexers = vec![escrow_indexer.clone(), bond_indexer];
     settlement_report.lanes = vec![SettlementLaneRuntimeStatus::new(
-        "eip155:8453",
-        "Base Mainnet",
-        SettlementIndexerStatus::Replaying,
-        Some(SettlementFinalityStatus::Reorged),
-        settlement_state.controls.clone(),
-        1,
-        Some(generated_at - 15),
-        Some(
-            "New dispatch is paused; refunds and expiry remain allowed while replay completes."
-                .to_string(),
-        ),
+        SettlementLaneRuntimeStatusInput {
+            chain_id: "eip155:8453".to_string(),
+            network_name: "Base Mainnet".to_string(),
+            indexer_status: SettlementIndexerStatus::Replaying,
+            finality_status: Some(SettlementFinalityStatus::Reorged),
+            controls: settlement_state.controls.clone(),
+            queued_recoveries: 1,
+            last_observed_at: Some(generated_at - 15),
+            note: Some(
+                "New dispatch is paused; refunds and expiry remain allowed while replay completes."
+                    .to_string(),
+            ),
+        },
     )];
     settlement_report.recoveries = vec![recovery.clone()];
     settlement_report.incidents = vec![

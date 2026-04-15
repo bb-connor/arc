@@ -1540,33 +1540,34 @@ fn assurance_suite_population_configs() -> [MercuryAssurancePopulationConfig<'st
     ]
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_assurance_package(
-    workflow_id: &str,
+struct AssurancePackageArgs<'a> {
+    workflow_id: &'a str,
     audience: MercuryAssuranceAudience,
-    disclosure_profile: &str,
-    proof_package_file: &str,
-    inquiry_package_file: &str,
-    reviewer_package_file: &str,
-    qualification_report_file: &str,
+    disclosure_profile: &'a str,
+    proof_package_file: &'a str,
+    inquiry_package_file: &'a str,
+    reviewer_package_file: &'a str,
+    qualification_report_file: &'a str,
     verifier_equivalent: bool,
-) -> Result<MercuryAssurancePackage, CliError> {
+}
+
+fn build_assurance_package(args: AssurancePackageArgs<'_>) -> Result<MercuryAssurancePackage, CliError> {
     let package = MercuryAssurancePackage {
         schema: MERCURY_ASSURANCE_PACKAGE_SCHEMA.to_string(),
         package_id: format!(
             "assurance-{}-{}-{}",
-            audience.as_str(),
-            workflow_id,
+            args.audience.as_str(),
+            args.workflow_id,
             current_utc_date()
         ),
-        workflow_id: workflow_id.to_string(),
-        audience,
-        disclosure_profile: disclosure_profile.to_string(),
-        proof_package_file: proof_package_file.to_string(),
-        inquiry_package_file: inquiry_package_file.to_string(),
-        reviewer_package_file: reviewer_package_file.to_string(),
-        qualification_report_file: qualification_report_file.to_string(),
-        verifier_equivalent,
+        workflow_id: args.workflow_id.to_string(),
+        audience: args.audience,
+        disclosure_profile: args.disclosure_profile.to_string(),
+        proof_package_file: args.proof_package_file.to_string(),
+        inquiry_package_file: args.inquiry_package_file.to_string(),
+        reviewer_package_file: args.reviewer_package_file.to_string(),
+        qualification_report_file: args.qualification_report_file.to_string(),
+        verifier_equivalent: args.verifier_equivalent,
     };
     package
         .validate()
@@ -1574,35 +1575,38 @@ fn build_assurance_package(
     Ok(package)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_governance_review_package(
-    workflow_id: &str,
+struct GovernanceReviewPackageArgs<'a> {
+    workflow_id: &'a str,
     audience: MercuryGovernanceReviewAudience,
-    disclosure_profile: &str,
-    proof_package_file: &str,
-    inquiry_package_file: &str,
-    reviewer_package_file: &str,
-    qualification_report_file: &str,
-    decision_package_file: &str,
+    disclosure_profile: &'a str,
+    proof_package_file: &'a str,
+    inquiry_package_file: &'a str,
+    reviewer_package_file: &'a str,
+    qualification_report_file: &'a str,
+    decision_package_file: &'a str,
     verifier_equivalent: bool,
+}
+
+fn build_governance_review_package(
+    args: GovernanceReviewPackageArgs<'_>,
 ) -> Result<MercuryGovernanceReviewPackage, CliError> {
     let package = MercuryGovernanceReviewPackage {
         schema: MERCURY_GOVERNANCE_REVIEW_PACKAGE_SCHEMA.to_string(),
         package_id: format!(
             "governance-review-{}-{}-{}",
-            audience.as_str(),
-            workflow_id,
+            args.audience.as_str(),
+            args.workflow_id,
             current_utc_date()
         ),
-        workflow_id: workflow_id.to_string(),
-        audience,
-        disclosure_profile: disclosure_profile.to_string(),
-        proof_package_file: proof_package_file.to_string(),
-        inquiry_package_file: inquiry_package_file.to_string(),
-        reviewer_package_file: reviewer_package_file.to_string(),
-        qualification_report_file: qualification_report_file.to_string(),
-        decision_package_file: decision_package_file.to_string(),
-        verifier_equivalent,
+        workflow_id: args.workflow_id.to_string(),
+        audience: args.audience,
+        disclosure_profile: args.disclosure_profile.to_string(),
+        proof_package_file: args.proof_package_file.to_string(),
+        inquiry_package_file: args.inquiry_package_file.to_string(),
+        reviewer_package_file: args.reviewer_package_file.to_string(),
+        qualification_report_file: args.qualification_report_file.to_string(),
+        decision_package_file: args.decision_package_file.to_string(),
+        verifier_equivalent: args.verifier_equivalent,
     };
     package
         .validate()
@@ -1636,37 +1640,40 @@ fn build_assurance_disclosure_profile(
     Ok(profile)
 }
 
-#[allow(clippy::too_many_arguments)]
-fn build_assurance_review_package(
-    workflow_id: &str,
+struct AssuranceReviewPackageArgs<'a> {
+    workflow_id: &'a str,
     reviewer_population: MercuryAssuranceReviewerPopulation,
-    disclosure_profile_file: &str,
-    proof_package_file: &str,
-    inquiry_package_file: &str,
-    inquiry_verification_file: &str,
-    reviewer_package_file: &str,
-    qualification_report_file: &str,
-    governance_decision_package_file: &str,
+    disclosure_profile_file: &'a str,
+    proof_package_file: &'a str,
+    inquiry_package_file: &'a str,
+    inquiry_verification_file: &'a str,
+    reviewer_package_file: &'a str,
+    qualification_report_file: &'a str,
+    governance_decision_package_file: &'a str,
     verifier_equivalent: bool,
+}
+
+fn build_assurance_review_package(
+    args: AssuranceReviewPackageArgs<'_>,
 ) -> Result<MercuryAssuranceReviewPackage, CliError> {
     let package = MercuryAssuranceReviewPackage {
         schema: MERCURY_ASSURANCE_REVIEW_PACKAGE_SCHEMA.to_string(),
         package_id: format!(
             "assurance-review-{}-{}-{}",
-            reviewer_population.as_str(),
-            workflow_id,
+            args.reviewer_population.as_str(),
+            args.workflow_id,
             current_utc_date()
         ),
-        workflow_id: workflow_id.to_string(),
-        reviewer_population,
-        disclosure_profile_file: disclosure_profile_file.to_string(),
-        proof_package_file: proof_package_file.to_string(),
-        inquiry_package_file: inquiry_package_file.to_string(),
-        inquiry_verification_file: inquiry_verification_file.to_string(),
-        reviewer_package_file: reviewer_package_file.to_string(),
-        qualification_report_file: qualification_report_file.to_string(),
-        governance_decision_package_file: governance_decision_package_file.to_string(),
-        verifier_equivalent,
+        workflow_id: args.workflow_id.to_string(),
+        reviewer_population: args.reviewer_population,
+        disclosure_profile_file: args.disclosure_profile_file.to_string(),
+        proof_package_file: args.proof_package_file.to_string(),
+        inquiry_package_file: args.inquiry_package_file.to_string(),
+        inquiry_verification_file: args.inquiry_verification_file.to_string(),
+        reviewer_package_file: args.reviewer_package_file.to_string(),
+        qualification_report_file: args.qualification_report_file.to_string(),
+        governance_decision_package_file: args.governance_decision_package_file.to_string(),
+        verifier_equivalent: args.verifier_equivalent,
     };
     package
         .validate()

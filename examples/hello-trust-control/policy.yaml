@@ -1,0 +1,10 @@
+hushspec: "0.1.0"
+name: hello-trust-control
+description: Allow one narrow read-style tool so a receipt can be minted without an app surface.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file

@@ -1,6 +1,8 @@
 """ARC SDK for Python -- thin HTTP client to the ARC sidecar kernel."""
 
 from arc_sdk.models import (
+    ArcHttpRequest,
+    ArcPassthrough,
     ArcReceipt,
     ArcScope,
     Attenuation,
@@ -11,6 +13,7 @@ from arc_sdk.models import (
     Constraint,
     Decision,
     DelegationLink,
+    EvaluateResponse,
     GuardEvidence,
     HttpReceipt,
     MonetaryAmount,
@@ -37,6 +40,8 @@ __all__ = [
     "CapabilityToken",
     "CapabilityTokenBody",
     "ArcScope",
+    "ArcHttpRequest",
+    "ArcPassthrough",
     "ToolGrant",
     "ResourceGrant",
     "PromptGrant",
@@ -48,6 +53,7 @@ __all__ = [
     # Models -- receipts
     "ArcReceipt",
     "HttpReceipt",
+    "EvaluateResponse",
     "Decision",
     "Verdict",
     "ToolCallAction",

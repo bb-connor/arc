@@ -1539,7 +1539,10 @@ fn path_prefix_constraint_is_enforced() {
     );
 
     assert_eq!(
-        kernel.evaluate_tool_call_blocking(&allowed).unwrap().verdict,
+        kernel
+            .evaluate_tool_call_blocking(&allowed)
+            .unwrap()
+            .verdict,
         Verdict::Allow
     );
     let denied_response = kernel.evaluate_tool_call_blocking(&denied).unwrap();
@@ -1588,7 +1591,10 @@ fn domain_exact_constraint_is_enforced() {
     );
 
     assert_eq!(
-        kernel.evaluate_tool_call_blocking(&allowed).unwrap().verdict,
+        kernel
+            .evaluate_tool_call_blocking(&allowed)
+            .unwrap()
+            .verdict,
         Verdict::Allow
     );
     assert_eq!(
@@ -2251,10 +2257,7 @@ fn begin_child_request_requires_parent_lineage() {
         .unwrap();
 
     let session = kernel.session(&session_id).unwrap();
-    let child = session
-        .inflight()
-        .get(&child_context.request_id)
-        .unwrap();
+    let child = session.inflight().get(&child_context.request_id).unwrap();
     assert_eq!(child.parent_request_id, Some(RequestId::new("parent-1")));
 }
 
@@ -4498,7 +4501,9 @@ fn monetary_denial_exceeds_per_invocation_cap() {
     }
 
     // 6th invocation would need 600 total, exceeding max_total_cost=500.
-    let resp = kernel.evaluate_tool_call_blocking(&request("req-6")).unwrap();
+    let resp = kernel
+        .evaluate_tool_call_blocking(&request("req-6"))
+        .unwrap();
     assert_eq!(
         resp.verdict,
         Verdict::Deny,
@@ -4607,7 +4612,9 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
         approval_token: None,
     };
 
-    let denied_response = kernel.evaluate_tool_call_blocking(&request("req-deny")).unwrap();
+    let denied_response = kernel
+        .evaluate_tool_call_blocking(&request("req-deny"))
+        .unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
     let denied_metadata = denied_response
         .receipt
@@ -4622,7 +4629,9 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
     assert_eq!(denied_financial["budget_remaining"].as_u64(), Some(100));
     assert_eq!(denied_financial["settlement_status"], "not_applicable");
 
-    let allowed_response = kernel.evaluate_tool_call_blocking(&request("req-allow")).unwrap();
+    let allowed_response = kernel
+        .evaluate_tool_call_blocking(&request("req-allow"))
+        .unwrap();
     assert_eq!(allowed_response.verdict, Verdict::Allow);
     let allowed_metadata = allowed_response
         .receipt
@@ -4690,7 +4699,13 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["attempted_cost"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -4732,7 +4747,13 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
     assert_eq!(financial["settlement_status"], "settled");
     assert_eq!(financial["cost_charged"].as_u64(), Some(100));
     assert_eq!(financial["budget_remaining"].as_u64(), Some(900));
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.total_cost_charged, 100);
 }
 
@@ -4782,7 +4803,13 @@ fn monetary_allow_receipt_contains_financial_metadata() {
         .expect("should have 'attribution' key");
     assert_eq!(attribution["grant_index"].as_u64(), Some(0));
 
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 1);
     assert_eq!(usage.total_cost_charged, 75);
 }
@@ -4978,7 +5005,13 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .as_deref()
         .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -5206,7 +5239,13 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
         .and_then(|metadata| metadata.get("financial"))
         .expect("deny receipt should carry financial metadata");
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.total_cost_charged, 0);
 }
 
@@ -5861,7 +5900,13 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
     assert_eq!(financial["budget_remaining"].as_u64(), Some(1000));
     assert_eq!(financial["settlement_status"], "not_applicable");
 
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -6151,7 +6196,13 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
         .expect("deny receipt should carry governed transaction metadata");
     assert_eq!(governed["intent_id"], intent.id);
 
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 
@@ -6372,7 +6423,13 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
     assert_eq!(governed["intent_id"], intent.id);
     assert_eq!(governed["commerce"]["seller"], "wrong-merchant.example");
 
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -6483,7 +6540,13 @@ fn monetary_tool_server_error_releases_precharged_budget() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    let usage = kernel.budget_store.lock().unwrap().get_usage(&cap.id, 0).unwrap().unwrap();
+    let usage = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .get_usage(&cap.id, 0)
+        .unwrap()
+        .unwrap();
     assert_eq!(usage.invocation_count, 0);
     assert_eq!(usage.total_cost_charged, 0);
 }
@@ -6515,13 +6578,19 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         approval_token: None,
     };
 
-    let r1 = kernel.evaluate_tool_call_blocking(&make_req("req-1")).unwrap();
+    let r1 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-1"))
+        .unwrap();
     assert_eq!(r1.verdict, Verdict::Allow, "first invocation should pass");
 
-    let r2 = kernel.evaluate_tool_call_blocking(&make_req("req-2")).unwrap();
+    let r2 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-2"))
+        .unwrap();
     assert_eq!(r2.verdict, Verdict::Allow, "second invocation should pass");
 
-    let r3 = kernel.evaluate_tool_call_blocking(&make_req("req-3")).unwrap();
+    let r3 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-3"))
+        .unwrap();
     assert_eq!(
         r3.verdict,
         Verdict::Deny,
@@ -6611,11 +6680,11 @@ async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
             assert_eq!(tool_name, "echo");
 
             let concurrent = self.current.fetch_add(1, Ordering::SeqCst) + 1;
-            let _ = self
-                .max_concurrent
-                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |observed| {
-                    (concurrent > observed).then_some(concurrent)
-                });
+            let _ =
+                self.max_concurrent
+                    .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |observed| {
+                        (concurrent > observed).then_some(concurrent)
+                    });
 
             self.barrier.wait();
             std::thread::sleep(Duration::from_millis(25));
@@ -6836,13 +6905,19 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
     };
 
     // First two invocations allowed.
-    let r1 = kernel.evaluate_tool_call_blocking(&make_req("req-1")).unwrap();
+    let r1 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-1"))
+        .unwrap();
     assert_eq!(r1.verdict, Verdict::Allow);
-    let r2 = kernel.evaluate_tool_call_blocking(&make_req("req-2")).unwrap();
+    let r2 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-2"))
+        .unwrap();
     assert_eq!(r2.verdict, Verdict::Allow);
 
     // Third invocation should be denied by the counting guard.
-    let r3 = kernel.evaluate_tool_call_blocking(&make_req("req-3")).unwrap();
+    let r3 = kernel
+        .evaluate_tool_call_blocking(&make_req("req-3"))
+        .unwrap();
     assert_eq!(
         r3.verdict,
         Verdict::Deny,
@@ -7308,4 +7383,34 @@ fn dpop_not_required_grant_allows_without_proof() {
         Verdict::Allow,
         "non-DPoP grant should allow without proof"
     );
+}
+
+#[test]
+fn kernel_error_report_includes_out_of_scope_context() {
+    let report = KernelError::OutOfScope {
+        tool: "read_file".to_string(),
+        server: "fs".to_string(),
+    }
+    .report();
+
+    assert_eq!(report.code, "ARC-KERNEL-OUT-OF-SCOPE-TOOL");
+    assert_eq!(report.context["tool"], "read_file");
+    assert_eq!(report.context["server"], "fs");
+    assert!(report
+        .suggested_fix
+        .contains("Issue a capability that grants this tool"));
+}
+
+#[test]
+fn kernel_error_report_includes_request_cancel_context() {
+    let report = KernelError::RequestCancelled {
+        request_id: "req-123".to_string().into(),
+        reason: "operator cancelled".to_string(),
+    }
+    .report();
+
+    assert_eq!(report.code, "ARC-KERNEL-REQUEST-CANCELLED");
+    assert_eq!(report.context["request_id"], "req-123");
+    assert_eq!(report.context["reason"], "operator cancelled");
+    assert!(report.suggested_fix.contains("cancelled request ID"));
 }

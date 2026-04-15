@@ -412,18 +412,30 @@ pub struct PortableReputationEvaluation {
     pub findings: Vec<PortableReputationFinding>,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Debug, Clone, PartialEq)]
+pub struct PortableReputationSummaryArtifactContext {
+    pub issuer_operator_name: Option<String>,
+    pub effective_score: f64,
+    pub probationary: bool,
+    pub imported_signal_count: Option<usize>,
+    pub accepted_imported_signal_count: Option<usize>,
+    pub issued_at: u64,
+}
+
 pub fn build_portable_reputation_summary_artifact(
     issuer_operator_id: &str,
-    issuer_operator_name: Option<String>,
     request: &PortableReputationSummaryIssueRequest,
     scorecard: &LocalReputationScorecard,
-    effective_score: f64,
-    probationary: bool,
-    imported_signal_count: Option<usize>,
-    accepted_imported_signal_count: Option<usize>,
-    issued_at: u64,
+    context: PortableReputationSummaryArtifactContext,
 ) -> Result<PortableReputationSummaryArtifact, CredentialError> {
+    let PortableReputationSummaryArtifactContext {
+        issuer_operator_name,
+        effective_score,
+        probationary,
+        imported_signal_count,
+        accepted_imported_signal_count,
+        issued_at,
+    } = context;
     validate_non_empty(issuer_operator_id, "issuerOperatorId")
         .map_err(CredentialError::InvalidPortableReputation)?;
     validate_non_empty(&request.subject_key, "subjectKey")
@@ -868,7 +880,6 @@ mod portable_reputation_tests {
         let summary = SignedPortableReputationSummary::sign(
             build_portable_reputation_summary_artifact(
                 "https://issuer.example",
-                None,
                 &PortableReputationSummaryIssueRequest {
                     subject_key: subject_key.clone(),
                     since: Some(1_700_000_000),
@@ -878,11 +889,14 @@ mod portable_reputation_tests {
                     note: None,
                 },
                 &scorecard(&subject_key, 0.8),
-                0.8,
-                false,
-                Some(0),
-                Some(0),
-                1_700_000_100,
+                PortableReputationSummaryArtifactContext {
+                    issuer_operator_name: None,
+                    effective_score: 0.8,
+                    probationary: false,
+                    imported_signal_count: Some(0),
+                    accepted_imported_signal_count: Some(0),
+                    issued_at: 1_700_000_100,
+                },
             )
             .expect("build summary"),
             &issuer,
@@ -960,7 +974,6 @@ mod portable_reputation_tests {
         let summary = SignedPortableReputationSummary::sign(
             build_portable_reputation_summary_artifact(
                 "https://issuer.example",
-                None,
                 &PortableReputationSummaryIssueRequest {
                     subject_key: subject_key.clone(),
                     since: None,
@@ -970,11 +983,14 @@ mod portable_reputation_tests {
                     note: None,
                 },
                 &scorecard(&subject_key, 0.7),
-                0.7,
-                true,
-                Some(0),
-                Some(0),
-                1_700_000_100,
+                PortableReputationSummaryArtifactContext {
+                    issuer_operator_name: None,
+                    effective_score: 0.7,
+                    probationary: true,
+                    imported_signal_count: Some(0),
+                    accepted_imported_signal_count: Some(0),
+                    issued_at: 1_700_000_100,
+                },
             )
             .expect("build summary"),
             &issuer,
@@ -1017,7 +1033,6 @@ mod portable_reputation_tests {
         let summary = SignedPortableReputationSummary::sign(
             build_portable_reputation_summary_artifact(
                 "https://issuer.example",
-                None,
                 &PortableReputationSummaryIssueRequest {
                     subject_key: subject_key.clone(),
                     since: Some(1_700_000_000),
@@ -1027,11 +1042,14 @@ mod portable_reputation_tests {
                     note: None,
                 },
                 &scorecard(&subject_key, 0.8),
-                0.8,
-                false,
-                Some(1),
-                Some(1),
-                1_700_000_100,
+                PortableReputationSummaryArtifactContext {
+                    issuer_operator_name: None,
+                    effective_score: 0.8,
+                    probationary: false,
+                    imported_signal_count: Some(1),
+                    accepted_imported_signal_count: Some(1),
+                    issued_at: 1_700_000_100,
+                },
             )
             .expect("build summary"),
             &issuer,

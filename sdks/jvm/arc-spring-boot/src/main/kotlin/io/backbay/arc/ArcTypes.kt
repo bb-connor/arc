@@ -7,6 +7,7 @@
 package io.backbay.arc
 
 import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 
 /** How the caller authenticated to the upstream API. */
@@ -52,7 +53,10 @@ data class Verdict(
     @JsonProperty("guard") val guard: String? = null,
     @JsonProperty("http_status") val httpStatus: Int? = null,
 ) {
+    @JsonIgnore
     fun isAllowed(): Boolean = verdict == "allow"
+
+    @JsonIgnore
     fun isDenied(): Boolean = verdict == "deny"
 
     companion object {
@@ -113,6 +117,14 @@ data class EvaluateResponse(
     @JsonProperty("verdict") val verdict: Verdict,
     @JsonProperty("receipt") val receipt: HttpReceipt,
     @JsonProperty("evidence") val evidence: List<GuardEvidence> = emptyList(),
+)
+
+/** Explicit fail-open degraded state where no ARC receipt exists. */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class ArcPassthrough(
+    @JsonProperty("mode") val mode: String = "allow_without_receipt",
+    @JsonProperty("error") val error: String = ArcErrorCodes.SIDECAR_UNREACHABLE,
+    @JsonProperty("message") val message: String,
 )
 
 /** Structured error response body. */

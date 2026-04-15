@@ -1,0 +1,37 @@
+{
+  "version": "2026-04-15",
+  "scope": "federated_multi_operator_proof",
+  "status": "bounded_federated_operator_proof_qualified",
+  "decision": "bounded_federated_multi_operator_flow_qualified_market_position_not_yet_qualified",
+  "qualifiedFlows": [
+    {
+      "id": "multi_hop_imported_upstream_lineage",
+      "summary": "Operator B can import operator A evidence and preserve upstream lineage across a multi-hop federated issuance path.",
+      "witnesses": [
+        "crates/arc-cli/tests/federated_issue.rs",
+        "crates/arc-cli/tests/evidence_export.rs"
+      ]
+    },
+    {
+      "id": "federated_reconciliation_review",
+      "summary": "Governed reconciliation review remains explicit and local rather than being silently rewritten by imported evidence.",
+      "witnesses": [
+        "crates/arc-cli/tests/receipt_query.rs",
+        "crates/arc-cli/tests/evidence_export.rs"
+      ]
+    },
+    {
+      "id": "adversarial_multi_operator_open_market",
+      "summary": "Visibility across operators does not imply local trust or economic activation; adversarial paths remain fail-closed.",
+      "witnesses": [
+        "crates/arc-cli/tests/certify.rs",
+        "docs/release/PARTNER_PROOF.md"
+      ]
+    }
+  ],
+  "constraints": [
+    "This matrix proves bounded federated flows, not ecosystem-wide operator dependence.",
+    "Local operator authority remains required for trust activation and economic effect.",
+    "The proof package is reproducible but still repo-local qualification evidence."
+  ]
+}

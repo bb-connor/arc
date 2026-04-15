@@ -10,8 +10,8 @@ use arc_core::crypto::PublicKey;
 use arc_kernel::{BudgetStore, CapabilityAuthority, KernelError};
 use arc_reputation::{
     compute_local_scorecard, BudgetUsageRecord as ReputationBudgetUsageRecord,
-    CapabilityLineageRecord, ImportedReputationSignal, ImportedTrustPolicy, LocalReputationCorpus,
-    LocalReputationScorecard, ReputationConfig,
+    CapabilityLineageRecord, CapabilityLineageScopeJsonInput, ImportedReputationSignal,
+    ImportedTrustPolicy, LocalReputationCorpus, LocalReputationScorecard, ReputationConfig,
 };
 use arc_store_sqlite::{SqliteBudgetStore, SqliteReceiptStore};
 use serde::{Deserialize, Serialize};
@@ -296,16 +296,16 @@ pub fn build_local_reputation_corpus(
             capabilities
                 .entry(snapshot.capability_id.clone())
                 .or_insert(
-                    CapabilityLineageRecord::from_scope_json(
-                        snapshot.capability_id,
-                        snapshot.subject_key,
-                        snapshot.issuer_key,
-                        snapshot.issued_at,
-                        snapshot.expires_at,
-                        &snapshot.grants_json,
-                        snapshot.delegation_depth,
-                        snapshot.parent_capability_id,
-                    )
+                    CapabilityLineageRecord::from_scope_json(CapabilityLineageScopeJsonInput {
+                        capability_id: snapshot.capability_id,
+                        subject_key: snapshot.subject_key,
+                        issuer_key: snapshot.issuer_key,
+                        issued_at: snapshot.issued_at,
+                        expires_at: snapshot.expires_at,
+                        scope_json: &snapshot.grants_json,
+                        delegation_depth: snapshot.delegation_depth,
+                        parent_capability_id: snapshot.parent_capability_id,
+                    })
                     .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?,
                 );
         }

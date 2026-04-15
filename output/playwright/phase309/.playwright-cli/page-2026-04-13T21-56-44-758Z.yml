@@ -1,0 +1,71 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "ARC Receipt Dashboard" [level=1] [ref=e5]
+  - generic [ref=e6]:
+    - complementary [ref=e7]:
+      - generic [ref=e8]:
+        - img [ref=e9]
+        - generic [ref=e11]: Filters
+      - generic [ref=e12]:
+        - generic [ref=e13]: Agent Subject
+        - textbox "Agent Subject" [ref=e14]:
+          - /placeholder: hex key...
+      - generic [ref=e15]:
+        - generic [ref=e16]: Tool Server
+        - textbox "Tool Server" [ref=e17]:
+          - /placeholder: server name...
+      - generic [ref=e18]:
+        - generic [ref=e19]: Tool Name
+        - textbox "Tool Name" [ref=e20]:
+          - /placeholder: tool name...
+      - generic [ref=e21]:
+        - generic [ref=e22]: Outcome
+        - combobox "Outcome" [ref=e23]:
+          - option "All" [selected]
+          - option "Allow"
+          - option "Deny"
+          - option "Cancelled"
+          - option "Incomplete"
+      - generic [ref=e24]:
+        - generic [ref=e25]: Since
+        - textbox "Since" [ref=e26]
+      - generic [ref=e27]:
+        - generic [ref=e28]: Until
+        - textbox "Until" [ref=e29]
+      - button "Clear Filters" [ref=e30] [cursor=pointer]
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: Loading operator report...
+        - region "Portable reputation comparison" [ref=e35]:
+          - generic [ref=e37]:
+            - heading "Portable Reputation Comparison" [level=2] [ref=e38]
+            - paragraph [ref=e39]: Compare a passport artifact against the live local score for the selected subject.
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - generic [ref=e42]: Agent Subject
+              - strong [ref=e43]: Set an Agent Subject filter to enable comparison
+            - generic [ref=e44]:
+              - generic [ref=e45]: Passport JSON
+              - button "Passport JSON No file selected" [ref=e46]
+              - generic [ref=e47]: No file selected
+            - button "Run Comparison" [disabled] [ref=e48]
+        - table [ref=e49]:
+          - rowgroup [ref=e50]:
+            - row "Time Tool Outcome Capability Cost" [ref=e51]:
+              - columnheader "Time" [ref=e52] [cursor=pointer]
+              - columnheader "Tool" [ref=e53] [cursor=pointer]
+              - columnheader "Outcome" [ref=e54] [cursor=pointer]
+              - columnheader "Capability" [ref=e55] [cursor=pointer]
+              - columnheader "Cost" [ref=e56] [cursor=pointer]
+          - rowgroup [ref=e57]:
+            - row "2026-04-13 17:55:20 wrapped-http-mock/echo_text Allow cap-019d --" [ref=e58] [cursor=pointer]:
+              - cell "2026-04-13 17:55:20" [ref=e59]
+              - cell "wrapped-http-mock/echo_text" [ref=e60]
+              - cell "Allow" [ref=e61]:
+                - generic [ref=e62]: Allow
+              - cell "cap-019d" [ref=e63]
+              - cell "--" [ref=e64]
+      - generic [ref=e65]:
+        - generic [ref=e66]: 1 total receipt
+        - button "Previous" [disabled] [ref=e67]
+        - button "Next" [disabled] [ref=e68]

@@ -249,6 +249,37 @@ fn spawn_trust_service(
     ServerGuard { child }
 }
 
+fn spawn_trust_service_without_receipt_db(
+    listen: std::net::SocketAddr,
+    service_token: &str,
+    revocation_db_path: &PathBuf,
+    authority_db_path: &PathBuf,
+    budget_db_path: &PathBuf,
+) -> ServerGuard {
+    let child = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .current_dir(workspace_root())
+        .args([
+            "--revocation-db",
+            revocation_db_path.to_str().expect("revocation db path"),
+            "--authority-db",
+            authority_db_path.to_str().expect("authority db path"),
+            "--budget-db",
+            budget_db_path.to_str().expect("budget db path"),
+            "trust",
+            "serve",
+            "--listen",
+            &listen.to_string(),
+            "--service-token",
+            service_token,
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn trust service without receipt db");
+    ServerGuard { child }
+}
+
 fn wait_for_trust_service_result(
     client: &Client,
     base_url: &str,
@@ -277,6 +308,57 @@ fn wait_for_trust_service(client: &Client, base_url: &str) {
         }
     }
     panic!("trust service did not become ready");
+}
+
+fn assert_trust_service_auth_required(client: &Client, base_url: &str, path: &str) {
+    let response = client
+        .get(format!("{base_url}{path}"))
+        .send()
+        .unwrap_or_else(|error| panic!("send unauthenticated request to {path}: {error}"));
+    assert_eq!(response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        response
+            .headers()
+            .get(reqwest::header::WWW_AUTHENTICATE)
+            .and_then(|value| value.to_str().ok()),
+        Some("Bearer")
+    );
+    let body: serde_json::Value = response
+        .json()
+        .unwrap_or_else(|error| panic!("parse unauthenticated error body for {path}: {error}"));
+    assert!(body["error"]
+        .as_str()
+        .unwrap_or_else(|| panic!("extract unauthenticated error string for {path}"))
+        .contains("missing or invalid control bearer token"));
+}
+
+fn assert_trust_service_get_error(
+    client: &Client,
+    base_url: &str,
+    service_token: &str,
+    path: &str,
+    status: reqwest::StatusCode,
+    expected_error_fragment: &str,
+) {
+    let response = client
+        .get(format!("{base_url}{path}"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .unwrap_or_else(|error| panic!("send authorized request to {path}: {error}"));
+    assert_eq!(response.status(), status, "unexpected status for {path}");
+    let body: serde_json::Value = response
+        .json()
+        .unwrap_or_else(|error| panic!("parse error body for {path}: {error}"));
+    assert!(
+        body["error"]
+            .as_str()
+            .unwrap_or_else(|| panic!("extract error string for {path}"))
+            .contains(expected_error_fragment),
+        "expected error for {path} to contain `{expected_error_fragment}`, got {body:?}"
+    );
 }
 
 fn record_test_credit_loss_event(
@@ -6589,6 +6671,296 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
     let cli_report: CreditFacilityListReport =
         serde_json::from_slice(&cli_output.stdout).expect("parse credit facility CLI list");
     assert_eq!(cli_report.summary.matching_facilities, 2);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_credit_issue_endpoints_require_service_auth() {
+    let dir = unique_dir("arc-credit-issue-auth");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "credit-issue-auth-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_response = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": "missing-auth-facility",
+                "receiptLimit": 10
+            }
+        }))
+        .send()
+        .expect("send unauthenticated facility issue request");
+    assert_eq!(
+        facility_response.status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        facility_response
+            .headers()
+            .get(reqwest::header::WWW_AUTHENTICATE)
+            .and_then(|value| value.to_str().ok()),
+        Some("Bearer")
+    );
+    let facility_body: serde_json::Value = facility_response
+        .json()
+        .expect("parse unauthenticated facility issue error");
+    assert!(facility_body["error"]
+        .as_str()
+        .expect("facility error string")
+        .contains("missing or invalid control bearer token"));
+
+    let bond_response = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": "missing-auth-bond",
+                "receiptLimit": 10
+            }
+        }))
+        .send()
+        .expect("send unauthenticated bond issue request");
+    assert_eq!(bond_response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        bond_response
+            .headers()
+            .get(reqwest::header::WWW_AUTHENTICATE)
+            .and_then(|value| value.to_str().ok()),
+        Some("Bearer")
+    );
+    let bond_body: serde_json::Value = bond_response
+        .json()
+        .expect("parse unauthenticated bond issue error");
+    assert!(bond_body["error"]
+        .as_str()
+        .expect("bond error string")
+        .contains("missing or invalid control bearer token"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_credit_issue_endpoints_require_receipt_db_configuration() {
+    let dir = unique_dir("arc-credit-issue-missing-receipt-db");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "credit-issue-receipt-db-token";
+    let _service = spawn_trust_service_without_receipt_db(
+        listen,
+        service_token,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let facility_response = client
+        .post(format!("{base_url}/v1/facilities/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": "missing-receipt-db-facility",
+                "receiptLimit": 10
+            }
+        }))
+        .send()
+        .expect("send facility issue request without receipt db");
+    assert_eq!(facility_response.status(), reqwest::StatusCode::CONFLICT);
+    let facility_body: serde_json::Value = facility_response
+        .json()
+        .expect("parse missing receipt db facility error");
+    assert!(facility_body["error"]
+        .as_str()
+        .expect("facility error string")
+        .contains("credit facility issuance requires --receipt-db"));
+
+    let bond_response = client
+        .post(format!("{base_url}/v1/bonds/issue"))
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .json(&serde_json::json!({
+            "query": {
+                "agentSubject": "missing-receipt-db-bond",
+                "receiptLimit": 10
+            }
+        }))
+        .send()
+        .expect("send bond issue request without receipt db");
+    assert_eq!(bond_response.status(), reqwest::StatusCode::CONFLICT);
+    let bond_body: serde_json::Value = bond_response
+        .json()
+        .expect("parse missing receipt db bond error");
+    assert!(bond_body["error"]
+        .as_str()
+        .expect("bond error string")
+        .contains("credit bond issuance requires --receipt-db"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_trust_control_report_endpoints_require_service_auth() {
+    let dir = unique_dir("arc-trust-report-auth");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "trust-report-auth-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    for path in [
+        "/v1/reports/capital-book?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/facility-policy?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/facilities?agentSubject=auth-matrix&limit=10",
+        "/v1/reports/bond-policy?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/bonds?agentSubject=auth-matrix&limit=10",
+        "/v1/reports/credit-backtest?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/provider-risk-package?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/liability-providers?limit=10",
+        "/v1/reports/liability-market?agentSubject=auth-matrix&limit=10",
+        "/v1/reports/underwriting-input?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/underwriting-decision?agentSubject=auth-matrix&receiptLimit=10",
+        "/v1/reports/underwriting-decisions?agentSubject=auth-matrix&limit=10",
+    ] {
+        assert_trust_service_auth_required(&client, &base_url, path);
+    }
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_trust_control_report_endpoints_require_receipt_db_configuration() {
+    let dir = unique_dir("arc-trust-report-missing-receipt-db");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let listen = reserve_listen_addr();
+    let service_token = "trust-report-receipt-db-token";
+    let _service = spawn_trust_service_without_receipt_db(
+        listen,
+        service_token,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    for (path, status, expected_error_fragment) in [
+        (
+            "/v1/reports/capital-book?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+        (
+            "/v1/reports/facility-policy?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::CONFLICT,
+            "credit facility evaluation requires --receipt-db on the trust-control service",
+        ),
+        (
+            "/v1/reports/facilities?agentSubject=missing-receipt-db&limit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+        (
+            "/v1/reports/bond-policy?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::CONFLICT,
+            "credit bond evaluation requires --receipt-db on the trust-control service",
+        ),
+        (
+            "/v1/reports/bonds?agentSubject=missing-receipt-db&limit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+        (
+            "/v1/reports/credit-backtest?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::CONFLICT,
+            "credit backtests require --receipt-db on the trust-control service",
+        ),
+        (
+            "/v1/reports/provider-risk-package?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::CONFLICT,
+            "provider risk package export requires --receipt-db on the trust-control service",
+        ),
+        (
+            "/v1/reports/liability-providers?limit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+        (
+            "/v1/reports/liability-market?agentSubject=missing-receipt-db&limit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+        (
+            "/v1/reports/underwriting-input?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            "trust service is missing receipt_db_path for underwriting input queries",
+        ),
+        (
+            "/v1/reports/underwriting-decision?agentSubject=missing-receipt-db&receiptLimit=10",
+            reqwest::StatusCode::INTERNAL_SERVER_ERROR,
+            "trust service is missing receipt_db_path for underwriting decision queries",
+        ),
+        (
+            "/v1/reports/underwriting-decisions?agentSubject=missing-receipt-db&limit=10",
+            reqwest::StatusCode::CONFLICT,
+            "trust control service requires --receipt-db",
+        ),
+    ] {
+        assert_trust_service_get_error(
+            &client,
+            &base_url,
+            service_token,
+            path,
+            status,
+            expected_error_fragment,
+        );
+    }
 
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -1,4 +1,3 @@
-#[allow(clippy::too_many_arguments)]
 fn build_credit_provider_risk_package_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
@@ -242,7 +241,6 @@ fn build_credit_scorecard_report(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_credit_facility_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
@@ -339,7 +337,6 @@ fn build_credit_facility_report_from_store(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn build_credit_bond_report_from_store(
     receipt_store: &SqliteReceiptStore,
     receipt_db_path: &Path,
@@ -495,17 +492,19 @@ fn build_credit_bond_report_from_store(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
 fn issue_signed_credit_bond_detailed(
-    receipt_db_path: &Path,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
-    query: &ExposureLedgerQuery,
-    supersedes_bond_id: Option<&str>,
+    args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditBond, TrustHttpError> {
+    let CreditIssuanceArgs {
+        receipt_db_path,
+        budget_db_path,
+        authority_seed_path,
+        authority_db_path,
+        certification_registry_file,
+        issuance_policy,
+        query,
+        supersedes_artifact_id,
+    } = args;
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let report = build_credit_bond_report_from_store(
         &receipt_store,
@@ -527,7 +526,7 @@ fn issue_signed_credit_bond_detailed(
     let artifact = build_credit_bond_artifact(
         report,
         issued_at,
-        supersedes_bond_id.map(ToOwned::to_owned),
+        supersedes_artifact_id.map(ToOwned::to_owned),
         latest_facility_expires_at,
     )?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
@@ -1627,17 +1626,19 @@ fn issue_signed_credit_loss_lifecycle_detailed(
     Ok(signed)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn issue_signed_credit_facility_detailed(
-    receipt_db_path: &Path,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    issuance_policy: Option<&crate::policy::ReputationIssuancePolicy>,
-    query: &ExposureLedgerQuery,
-    supersedes_facility_id: Option<&str>,
+    args: CreditIssuanceArgs<'_>,
 ) -> Result<SignedCreditFacility, TrustHttpError> {
+    let CreditIssuanceArgs {
+        receipt_db_path,
+        budget_db_path,
+        authority_seed_path,
+        authority_db_path,
+        certification_registry_file,
+        issuance_policy,
+        query,
+        supersedes_artifact_id,
+    } = args;
     let mut receipt_store = SqliteReceiptStore::open(receipt_db_path)?;
     let report = build_credit_facility_report_from_store(
         &receipt_store,
@@ -1651,7 +1652,7 @@ fn issue_signed_credit_facility_detailed(
     let artifact = build_credit_facility_artifact(
         report,
         issued_at,
-        supersedes_facility_id.map(ToOwned::to_owned),
+        supersedes_artifact_id.map(ToOwned::to_owned),
     )?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     let signed = SignedCreditFacility::sign(artifact, &keypair)

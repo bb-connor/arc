@@ -16,10 +16,10 @@ rand_core = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v7"] }
 arc-core-types = { path = "../arc-core-types" }
-
-[dev-dependencies]
-proptest = { workspace = true }
+arc-cross-protocol = { path = "../arc-cross-protocol" }
+arc-kernel = { path = "../arc-kernel" }
 
 [lints.clippy]
 unwrap_used = "deny"

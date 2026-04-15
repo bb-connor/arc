@@ -1312,17 +1312,19 @@ async fn handle_create_passport_challenge(
         (None, payload.policy.clone())
     };
     let challenge = match create_passport_presentation_challenge_with_reference(
-        payload.verifier,
-        Some(Keypair::generate().public_key().to_hex()),
-        Keypair::generate().public_key().to_hex(),
-        now,
-        now.saturating_add(payload.ttl_seconds),
-        arc_credentials::PassportPresentationOptions {
-            issuer_allowlist: payload.issuers.into_iter().collect::<BTreeSet<_>>(),
-            max_credentials: payload.max_credentials,
+        arc_credentials::PassportPresentationChallengeArgs {
+            verifier: payload.verifier,
+            challenge_id: Some(Keypair::generate().public_key().to_hex()),
+            nonce: Keypair::generate().public_key().to_hex(),
+            issued_at: now,
+            expires_at: now.saturating_add(payload.ttl_seconds),
+            options: arc_credentials::PassportPresentationOptions {
+                issuer_allowlist: payload.issuers.into_iter().collect::<BTreeSet<_>>(),
+                max_credentials: payload.max_credentials,
+            },
+            policy_ref,
+            policy,
         },
-        policy_ref,
-        policy,
     ) {
         Ok(challenge) => challenge,
         Err(error) => return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string()),
@@ -2504,4 +2506,3 @@ async fn handle_query_receipts(
     })
     .into_response()
 }
-

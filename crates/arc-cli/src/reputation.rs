@@ -14,8 +14,8 @@ use arc_kernel::{
     SharedEvidenceReferenceReport,
 };
 use arc_reputation::{
-    build_imported_reputation_signal, CapabilityLineageRecord, ImportedReputationProvenance,
-    ImportedTrustPolicy, LocalReputationCorpus, MetricValue,
+    build_imported_reputation_signal, CapabilityLineageRecord, CapabilityLineageScopeJsonInput,
+    ImportedReputationProvenance, ImportedTrustPolicy, LocalReputationCorpus, MetricValue,
 };
 use arc_store_sqlite::SqliteReceiptStore;
 use serde::{Deserialize, Serialize};
@@ -30,18 +30,31 @@ fn unix_now() -> u64 {
         .unwrap_or(0)
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_reputation_local(
-    subject_public_key: &str,
-    since: Option<u64>,
-    until: Option<u64>,
-    policy_path: Option<&Path>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
+pub struct ReputationLocalCommand<'a> {
+    pub subject_public_key: &'a str,
+    pub since: Option<u64>,
+    pub until: Option<u64>,
+    pub policy_path: Option<&'a Path>,
+    pub json_output: bool,
+    pub receipt_db_path: Option<&'a Path>,
+    pub budget_db_path: Option<&'a Path>,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+pub fn cmd_reputation_local(command: ReputationLocalCommand<'_>) -> Result<(), CliError> {
+    let ReputationLocalCommand {
+        subject_public_key,
+        since,
+        until,
+        policy_path,
+        json_output,
+        receipt_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+    } = command;
+
     let mut inspection = if let Some(url) = control_url {
         if policy_path.is_some() {
             return Err(CliError::Other(
@@ -148,20 +161,35 @@ pub struct PortableReputationComparison {
     pub imported_trust: Option<issuance::ImportedTrustReport>,
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn cmd_reputation_compare(
-    subject_public_key: &str,
-    passport_path: &Path,
-    since: Option<u64>,
-    until: Option<u64>,
-    local_policy_path: Option<&Path>,
-    verifier_policy_path: Option<&Path>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
-) -> Result<(), CliError> {
+pub struct ReputationCompareCommand<'a> {
+    pub subject_public_key: &'a str,
+    pub passport_path: &'a Path,
+    pub since: Option<u64>,
+    pub until: Option<u64>,
+    pub local_policy_path: Option<&'a Path>,
+    pub verifier_policy_path: Option<&'a Path>,
+    pub json_output: bool,
+    pub receipt_db_path: Option<&'a Path>,
+    pub budget_db_path: Option<&'a Path>,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+pub fn cmd_reputation_compare(command: ReputationCompareCommand<'_>) -> Result<(), CliError> {
+    let ReputationCompareCommand {
+        subject_public_key,
+        passport_path,
+        since,
+        until,
+        local_policy_path,
+        verifier_policy_path,
+        json_output,
+        receipt_db_path,
+        budget_db_path,
+        control_url,
+        control_token,
+    } = command;
+
     let passport: AgentPassport = serde_json::from_slice(&fs::read(passport_path)?)?;
     let verifier_policy = verifier_policy_path
         .map(load_passport_verifier_policy)
@@ -394,16 +422,16 @@ pub(crate) fn build_behavioral_feed_reputation_summary(
 fn capability_snapshot_to_lineage(
     snapshot: CapabilitySnapshot,
 ) -> Result<CapabilityLineageRecord, CliError> {
-    CapabilityLineageRecord::from_scope_json(
-        snapshot.capability_id,
-        snapshot.subject_key,
-        snapshot.issuer_key,
-        snapshot.issued_at,
-        snapshot.expires_at,
-        &snapshot.grants_json,
-        snapshot.delegation_depth,
-        snapshot.parent_capability_id,
-    )
+    CapabilityLineageRecord::from_scope_json(CapabilityLineageScopeJsonInput {
+        capability_id: snapshot.capability_id,
+        subject_key: snapshot.subject_key,
+        issuer_key: snapshot.issuer_key,
+        issued_at: snapshot.issued_at,
+        expires_at: snapshot.expires_at,
+        scope_json: &snapshot.grants_json,
+        delegation_depth: snapshot.delegation_depth,
+        parent_capability_id: snapshot.parent_capability_id,
+    })
     .map_err(|error| CliError::Other(error.to_string()))
 }
 

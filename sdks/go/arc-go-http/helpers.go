@@ -1,6 +1,7 @@
 package arc
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -46,7 +47,6 @@ func buildArcHTTPRequest(r *http.Request, method, routePattern string, caller Ca
 	headers := filterHeaders(r, []string{
 		"content-type",
 		"content-length",
-		"x-arc-capability",
 	})
 
 	// Read and hash body for content binding.
@@ -54,14 +54,17 @@ func buildArcHTTPRequest(r *http.Request, method, routePattern string, caller Ca
 	var bodyLength int64
 	if r.Body != nil {
 		bodyBytes, err := io.ReadAll(r.Body)
-		if err == nil && len(bodyBytes) > 0 {
-			h := sha256.Sum256(bodyBytes)
-			bodyHash = hex.EncodeToString(h[:])
+		if err == nil {
+			r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 			bodyLength = int64(len(bodyBytes))
+			if len(bodyBytes) > 0 {
+				h := sha256.Sum256(bodyBytes)
+				bodyHash = hex.EncodeToString(h[:])
+			}
 		}
 	}
 
-	capabilityID := r.Header.Get("X-Arc-Capability")
+	capabilityID := capabilityIDFromToken(extractCapabilityToken(r))
 
 	return ArcHTTPRequest{
 		RequestID:    uuid.New().String(),
@@ -77,6 +80,26 @@ func buildArcHTTPRequest(r *http.Request, method, routePattern string, caller Ca
 		CapabilityID: capabilityID,
 		Timestamp:    time.Now().Unix(),
 	}
+}
+
+func extractCapabilityToken(r *http.Request) string {
+	if token := r.Header.Get("X-Arc-Capability"); token != "" {
+		return token
+	}
+	return r.URL.Query().Get("arc_capability")
+}
+
+func capabilityIDFromToken(rawToken string) string {
+	if rawToken == "" {
+		return ""
+	}
+	var parsed struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(rawToken), &parsed); err != nil {
+		return ""
+	}
+	return parsed.ID
 }
 
 // filterHeaders extracts only the allowed headers from the request.

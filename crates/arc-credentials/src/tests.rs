@@ -473,17 +473,19 @@ mod tests {
         let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
         let migration = create_signed_cross_issuer_migration(
             &Keypair::from_seed(&[9u8; 32]),
-            "migration-1",
-            "https://rp.example.com/migrations/1",
-            issuer.clone(),
-            issuer.clone(),
-            old_subject,
-            target_subject.clone(),
-            vec![passport_id],
-            "issuer migration",
-            "ledger://continuity/1",
-            1_710_000_000,
-            Some(1_710_086_400),
+            CreateSignedCrossIssuerMigrationArgs {
+                migration_id: "migration-1".to_string(),
+                attester: "https://rp.example.com/migrations/1".to_string(),
+                from_issuer: issuer.clone(),
+                to_issuer: issuer.clone(),
+                from_subject: old_subject,
+                to_subject: target_subject.clone(),
+                prior_passport_ids: vec![passport_id],
+                reason: "issuer migration".to_string(),
+                continuity_ref: "ledger://continuity/1".to_string(),
+                issued_at: 1_710_000_000,
+                expires_at: Some(1_710_086_400),
+            },
         )
         .expect("migration");
         let portfolio = CrossIssuerPortfolio {
@@ -538,32 +540,36 @@ mod tests {
         let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
         let migration_a = create_signed_cross_issuer_migration(
             &Keypair::from_seed(&[9u8; 32]),
-            "migration-dup",
-            "https://rp.example.com/migrations/a",
-            issuer.clone(),
-            issuer.clone(),
-            old_subject.clone(),
-            target_subject.clone(),
-            vec![passport_id.clone()],
-            "issuer migration",
-            "ledger://continuity/a",
-            1_710_000_000,
-            Some(1_710_086_400),
+            CreateSignedCrossIssuerMigrationArgs {
+                migration_id: "migration-dup".to_string(),
+                attester: "https://rp.example.com/migrations/a".to_string(),
+                from_issuer: issuer.clone(),
+                to_issuer: issuer.clone(),
+                from_subject: old_subject.clone(),
+                to_subject: target_subject.clone(),
+                prior_passport_ids: vec![passport_id.clone()],
+                reason: "issuer migration".to_string(),
+                continuity_ref: "ledger://continuity/a".to_string(),
+                issued_at: 1_710_000_000,
+                expires_at: Some(1_710_086_400),
+            },
         )
         .expect("migration");
         let migration_b = create_signed_cross_issuer_migration(
             &Keypair::from_seed(&[10u8; 32]),
-            "migration-dup",
-            "https://rp.example.com/migrations/b",
-            issuer.clone(),
-            issuer,
-            old_subject,
-            target_subject.clone(),
-            vec![passport_id],
-            "issuer migration",
-            "ledger://continuity/b",
-            1_710_000_000,
-            Some(1_710_086_400),
+            CreateSignedCrossIssuerMigrationArgs {
+                migration_id: "migration-dup".to_string(),
+                attester: "https://rp.example.com/migrations/b".to_string(),
+                from_issuer: issuer.clone(),
+                to_issuer: issuer,
+                from_subject: old_subject,
+                to_subject: target_subject.clone(),
+                prior_passport_ids: vec![passport_id],
+                reason: "issuer migration".to_string(),
+                continuity_ref: "ledger://continuity/b".to_string(),
+                issued_at: 1_710_000_000,
+                expires_at: Some(1_710_086_400),
+            },
         )
         .expect("migration");
         let portfolio = CrossIssuerPortfolio {

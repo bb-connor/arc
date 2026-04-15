@@ -2,6 +2,15 @@
 
 **Attested Rights Channel**
 
+This document is strategic narrative, not the authoritative claim gate. The
+current authoritative technical claim is now the universal control-plane thesis
+on the qualified authoritative surfaces, and the repo now also qualifies a
+stronger local economic boundary: ARC is comptroller-capable software on the
+documented operator, partner, and bounded federated proof surfaces. The
+broader market-position story remains strategic rather than proved. See
+[docs/protocols/STRATEGIC-VISION.md](protocols/STRATEGIC-VISION.md) and
+[docs/release/QUALIFICATION.md](release/QUALIFICATION.md).
+
 ---
 
 ## 1. The Problem
@@ -23,9 +32,10 @@ This is not an incremental gap. It is a structural absence.
 Payment without authorization is just a pipe to a wallet. Authorization without proof is just a policy document nobody can verify after the fact. The agent economy needs both, and it needs them fused at the protocol layer.
 
 No existing protocol combines identity, capability delegation, economic
-primitives, and non-repudiable receipts into a single coherent system.
+primitives, and non-repudiable receipts into a single coherent system on the
+qualified authoritative surfaces ARC now governs.
 
-ARC does.
+ARC now does.
 
 ---
 
@@ -63,17 +73,19 @@ can you prove it?
 
 ## 3. What ARC Already Has
 
-This is not a pitch deck for vaporware. ARC is a shipped, tested, formally
-verified protocol implementation with a release candidate that has passed
-qualification. Here is what exists today:
+This is not a pitch deck for vaporware. ARC is a shipped and tested protocol
+implementation with real runtime governance surfaces, signed receipts, and a
+substantial formal-methods track, but it is not yet honest to describe the
+entire system as fully formally verified or qualification-complete. Here is
+what exists today:
 
 ### Kernel as Trusted Computing Base
 
-The agent never reaches the tool server. Every tool invocation flows through
-the ARC kernel, a trusted mediator that validates capability tokens, runs the
-guard pipeline, and signs receipts. The agent does not know the kernel's
-address, PID, or keys. This is not defense in depth. It is architectural
-privilege separation.
+The agent never reaches the tool server on ARC's governed authoritative paths.
+Every governed tool invocation flows through the ARC kernel, a trusted
+mediator that validates capability tokens, runs the guard pipeline, and signs
+receipts. The agent does not know the kernel's address, PID, or keys. This is
+not defense in depth. It is architectural privilege separation.
 
 ### Seven Composable, Fail-Closed Guards
 
@@ -89,7 +101,11 @@ The guard pipeline runs in sequence. If any guard denies, the pipeline denies. E
 | `secret-leak` | Detects secrets in file writes |
 | `patch-integrity` | Validates patch safety before application |
 
-Guards are composable. Operators configure them through HushSpec policy files. The pipeline is fail-closed by design and by formal proof.
+Guards are composable. Operators configure them through HushSpec policy files.
+The pipeline is fail-closed by design. Core capability properties have formal
+support in the Lean track, while end-to-end runtime closure is still defended
+through executed qualification lanes rather than a claim of full implementation
+proof.
 
 ### Cascade Revocation Through Delegation Chains
 
@@ -112,7 +128,8 @@ Every grant in a capability token can carry invocation limits and parameter cons
 
 ### Lean 4 Machine-Checked Proofs
 
-Five core safety properties are formally verified in Lean 4, not hand-waved in a whitepaper:
+Five core safety properties have substantive Lean 4 mechanization behind them,
+not just whitepaper prose:
 
 - **P1: Capability Monotonicity** -- delegation can only attenuate, never amplify
 - **P2: Revocation Completeness** -- revoking an ancestor invalidates all descendants
@@ -120,7 +137,11 @@ Five core safety properties are formally verified in Lean 4, not hand-waved in a
 - **P4: Receipt Chain Integrity** -- every action produces a signed, verifiable receipt
 - **P5: Delegation Graph Acyclicity** -- delegation chains cannot form cycles
 
-P1-P5 are proven in Lean 4, with standard axiomatization of cryptographic primitives (Ed25519 is modeled axiomatically, as is typical for protocol verification). The Monotonicity proof has one outstanding `sorry` for BEq transitivity that depends on a LawfulBEq instance. These are substantive machine-checked proofs, not paper claims, though they are not yet fully closed from first principles.
+The current Lean track models these properties with standard axiomatization of
+cryptographic primitives, but ARC does not currently claim that the full Rust
+runtime is end-to-end formally verified. The Monotonicity proof still has one
+outstanding `sorry` for BEq transitivity, and the repo treats the Lean lane as
+meaningful but narrower than the full shipped implementation surface.
 
 ### HA Distributed Control Plane
 

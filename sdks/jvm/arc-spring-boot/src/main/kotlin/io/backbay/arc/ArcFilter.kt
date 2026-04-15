@@ -3,7 +3,8 @@
  *
  * Intercepts all requests, extracts caller identity, sends evaluation
  * requests to the ARC sidecar kernel, and either allows the request to
- * proceed with a signed receipt or returns a structured deny response.
+ * proceed with a signed receipt, allows a fail-open passthrough without a
+ * receipt when configured, or returns a structured deny response.
  *
  * Fails closed by default: if the sidecar is unreachable, the request
  * is denied.
@@ -19,6 +20,22 @@ import jakarta.servlet.ServletResponse
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import java.util.UUID
+
+private fun capabilityIdFromToken(rawToken: String?): String? {
+    if (rawToken.isNullOrBlank()) {
+        return null
+    }
+    return try {
+        jacksonObjectMapper().readTree(rawToken).get("id")?.takeIf { it.isTextual }?.asText()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+internal fun extractCapabilityToken(request: HttpServletRequest): String? =
+    request.getHeader("X-Arc-Capability") ?: request.getParameter("arc_capability")
+
+const val ARC_PASSTHROUGH_ATTRIBUTE = "arcPassthrough"
 
 /**
  * Configuration for the ARC servlet filter.
@@ -56,8 +73,12 @@ class ArcFilter(
     ) {
         val httpRequest = request as HttpServletRequest
         val httpResponse = response as HttpServletResponse
+        val cachedRequest = when (httpRequest) {
+            is CachedBodyHttpServletRequest -> httpRequest
+            else -> CachedBodyHttpServletRequest(httpRequest)
+        }
 
-        val method = httpRequest.method.uppercase()
+        val method = cachedRequest.method.uppercase()
         val validMethods = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS")
         if (method !in validMethods) {
             writeJsonError(httpResponse, 405, ArcErrorResponse(
@@ -68,50 +89,51 @@ class ArcFilter(
         }
 
         // Extract caller identity.
-        val caller = config.identityExtractor(httpRequest)
+        val caller = config.identityExtractor(cachedRequest)
 
         // Resolve route pattern.
-        val routePattern = config.routeResolver(method, httpRequest.requestURI)
+        val routePattern = config.routeResolver(method, cachedRequest.requestURI)
 
-        // Build body hash.
-        val bodyHash: String? = if (httpRequest.contentLength > 0) {
-            val bodyBytes = httpRequest.inputStream.readAllBytes()
-            sha256Hex(String(bodyBytes, Charsets.UTF_8))
-        } else {
-            null
-        }
+        val bodyBytes = cachedRequest.cachedBody
+        val bodyHash = bodyBytes.takeIf { it.isNotEmpty() }?.let(::sha256Hex)
 
         // Extract selected headers.
         val headers = mutableMapOf<String, String>()
-        for (header in listOf("content-type", "content-length", "x-arc-capability")) {
-            val value = httpRequest.getHeader(header)
+        for (header in listOf("content-type", "content-length")) {
+            val value = cachedRequest.getHeader(header)
             if (value != null) {
                 headers[header] = value
             }
         }
+
+        val capabilityToken = extractCapabilityToken(cachedRequest)
 
         // Build ARC HTTP request.
         val arcRequest = ArcHttpRequest(
             requestId = UUID.randomUUID().toString(),
             method = method,
             routePattern = routePattern,
-            path = httpRequest.requestURI,
-            query = httpRequest.parameterMap.mapValues { it.value.firstOrNull() ?: "" },
+            path = cachedRequest.requestURI,
+            query = cachedRequest.parameterMap.mapValues { it.value.firstOrNull() ?: "" },
             headers = headers,
             caller = caller,
             bodyHash = bodyHash,
-            bodyLength = httpRequest.contentLengthLong.coerceAtLeast(0),
-            capabilityId = httpRequest.getHeader("X-Arc-Capability"),
+            bodyLength = bodyBytes.size.toLong(),
+            capabilityId = capabilityIdFromToken(capabilityToken),
             timestamp = System.currentTimeMillis() / 1000,
         )
 
         // Evaluate against sidecar.
         val result: EvaluateResponse
         try {
-            result = client.evaluate(arcRequest)
+            result = client.evaluate(arcRequest, capabilityToken)
         } catch (e: ArcSidecarException) {
             if (config.onSidecarError == "allow") {
-                chain.doFilter(request, response)
+                cachedRequest.setAttribute(
+                    ARC_PASSTHROUGH_ATTRIBUTE,
+                    ArcPassthrough(message = "ARC sidecar error: ${e.message}"),
+                )
+                chain.doFilter(cachedRequest, response)
                 return
             }
             writeJsonError(httpResponse, 502, ArcErrorResponse(
@@ -121,7 +143,11 @@ class ArcFilter(
             return
         } catch (e: Exception) {
             if (config.onSidecarError == "allow") {
-                chain.doFilter(request, response)
+                cachedRequest.setAttribute(
+                    ARC_PASSTHROUGH_ATTRIBUTE,
+                    ArcPassthrough(message = "ARC sidecar error: ${e.message}"),
+                )
+                chain.doFilter(cachedRequest, response)
                 return
             }
             writeJsonError(httpResponse, 502, ArcErrorResponse(
@@ -141,13 +167,13 @@ class ArcFilter(
                 error = ArcErrorCodes.ACCESS_DENIED,
                 message = result.verdict.reason ?: "denied",
                 receiptId = result.receipt.id,
-                suggestion = "provide a valid capability token in the X-Arc-Capability header",
+                suggestion = "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
             ))
             return
         }
 
         // Request allowed -- forward to next filter/servlet.
-        chain.doFilter(request, response)
+        chain.doFilter(cachedRequest, response)
     }
 
     override fun destroy() {

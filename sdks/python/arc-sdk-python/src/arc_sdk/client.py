@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from typing import Any
 
 import httpx
@@ -21,11 +22,13 @@ from arc_sdk.errors import (
     ArcValidationError,
 )
 from arc_sdk.models import (
+    ArcHttpRequest,
     ArcReceipt,
     ArcScope,
     CallerIdentity,
     CapabilityToken,
     Decision,
+    EvaluateResponse,
     GuardEvidence,
     HttpReceipt,
     Verdict,
@@ -50,6 +53,16 @@ def _sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _capability_id_from_token(raw_token: str | None) -> str | None:
+    """Best-effort extraction of a capability token ID from its JSON payload."""
+    if raw_token is None:
+        return None
+    try:
+        return CapabilityToken.model_validate_json(raw_token).id
+    except Exception:
+        return None
+
+
 class ArcClient:
     """Async HTTP client for the ARC sidecar.
 
@@ -58,7 +71,7 @@ class ArcClient:
     base_url:
         Base URL of the ARC sidecar (default ``http://127.0.0.1:9090``).
     timeout:
-        Request timeout in seconds (default 10).
+        Request timeout in seconds (default 5).
     """
 
     DEFAULT_BASE_URL = "http://127.0.0.1:9090"
@@ -67,7 +80,7 @@ class ArcClient:
         self,
         base_url: str | None = None,
         *,
-        timeout: float = 10.0,
+        timeout: float = 5.0,
     ) -> None:
         self._base_url = (base_url or self.DEFAULT_BASE_URL).rstrip("/")
         self._http = httpx.AsyncClient(
@@ -95,7 +108,7 @@ class ArcClient:
 
     async def health(self) -> dict[str, Any]:
         """Check sidecar health."""
-        return await self._get("/health")
+        return await self._get("/arc/health")
 
     # ------------------------------------------------------------------
     # Capability tokens
@@ -180,7 +193,7 @@ class ArcClient:
     async def verify_http_receipt(self, receipt: HttpReceipt) -> bool:
         """Ask the sidecar to verify an HTTP receipt signature."""
         data = await self._post(
-            "/v1/receipts/verify-http",
+            "/arc/verify",
             receipt.model_dump(exclude_none=True),
         )
         return bool(data.get("valid", False))
@@ -241,23 +254,42 @@ class ArcClient:
         route_pattern: str,
         path: str,
         caller: CallerIdentity,
+        query: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
         body_hash: str | None = None,
+        body_length: int = 0,
+        session_id: str | None = None,
         capability_id: str | None = None,
-    ) -> HttpReceipt:
+        capability_token: str | None = None,
+        timestamp: int | None = None,
+    ) -> EvaluateResponse:
         """Evaluate an HTTP request through the sidecar kernel."""
-        payload: dict[str, Any] = {
-            "request_id": request_id,
-            "method": method,
-            "route_pattern": route_pattern,
-            "path": path,
-            "caller": caller.model_dump(exclude_none=True),
-        }
-        if body_hash is not None:
-            payload["body_hash"] = body_hash
-        if capability_id is not None:
-            payload["capability_id"] = capability_id
-        data = await self._post("/v1/evaluate-http", payload)
-        return HttpReceipt.model_validate(data)
+        resolved_capability_id = capability_id or _capability_id_from_token(
+            capability_token
+        )
+        request_model = ArcHttpRequest(
+            request_id=request_id,
+            method=method,
+            route_pattern=route_pattern,
+            path=path,
+            query=query or {},
+            headers=headers or {},
+            caller=caller,
+            body_hash=body_hash,
+            body_length=body_length,
+            session_id=session_id,
+            capability_id=resolved_capability_id,
+            timestamp=timestamp or int(time.time()),
+        )
+        request_headers: dict[str, str] | None = None
+        if capability_token is not None:
+            request_headers = {"X-Arc-Capability": capability_token}
+        data = await self._post(
+            "/arc/evaluate",
+            request_model.model_dump(exclude_none=True),
+            headers=request_headers,
+        )
+        return EvaluateResponse.model_validate(data)
 
     # ------------------------------------------------------------------
     # Guard evidence helpers
@@ -290,9 +322,15 @@ class ArcClient:
             ) from exc
         return self._handle_response(resp)
 
-    async def _post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    async def _post(
+        self,
+        path: str,
+        body: dict[str, Any],
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         try:
-            resp = await self._http.post(path, json=body)
+            resp = await self._http.post(path, json=body, headers=headers)
         except httpx.ConnectError as exc:
             raise ArcConnectionError(
                 f"Failed to connect to ARC sidecar at {self._base_url}"

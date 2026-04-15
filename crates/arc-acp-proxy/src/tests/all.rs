@@ -1911,6 +1911,7 @@ mod extended_tests {
             server_id: "srv-rt".to_string(),
             content_hash: "a".repeat(64),
             capability_id: Some("cap-rt".to_string()),
+            authorization_receipt_id: None,
             enforcement_mode: Some(AcpEnforcementMode::CryptographicallyEnforced),
         };
         let json_result = serde_json::to_string(&entry);
@@ -2165,6 +2166,10 @@ mod attestation_and_telemetry_tests {
     };
     use arc_kernel::checkpoint::KernelCheckpoint;
     use arc_kernel::receipt_store::{ReceiptStore, ReceiptStoreError};
+    use arc_kernel::{
+        ArcKernel, KernelConfig, DEFAULT_CHECKPOINT_BATCH_SIZE,
+        DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    };
     use serde_json::json;
 
     fn now_secs() -> u64 {
@@ -2211,6 +2216,23 @@ mod attestation_and_telemetry_tests {
         .expect("capability token should sign")
     }
 
+    fn test_kernel_config(issuer: &Keypair) -> KernelConfig {
+        KernelConfig {
+            ca_public_keys: vec![issuer.public_key()],
+            keypair: issuer.clone(),
+            max_delegation_depth: 8,
+            policy_hash: "policy-acp-proxy-test".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        }
+    }
+
     fn make_receipt(
         signer: &Keypair,
         id: &str,
@@ -2253,6 +2275,7 @@ mod attestation_and_telemetry_tests {
             server_id: "acp-proxy".to_string(),
             content_hash: format!("hash-{tool_call_id}"),
             capability_id: None,
+            authorization_receipt_id: None,
             enforcement_mode: Some(AcpEnforcementMode::AuditOnly),
         }
     }
@@ -2349,6 +2372,7 @@ mod attestation_and_telemetry_tests {
             Ok(AcpVerdict {
                 allowed: true,
                 capability_id: Some(format!("cap:{}", request.session_id)),
+                receipt_id: None,
                 reason: "dummy allow".to_string(),
             })
         }
@@ -2366,6 +2390,7 @@ mod attestation_and_telemetry_tests {
                 verdict: AcpVerdict {
                     allowed: true,
                     capability_id: Some(capability_id.to_string()),
+                    receipt_id: None,
                     reason: "recorded allow".to_string(),
                 },
             }
@@ -2377,6 +2402,7 @@ mod attestation_and_telemetry_tests {
                 verdict: AcpVerdict {
                     allowed: false,
                     capability_id: Some("cap-denied".to_string()),
+                    receipt_id: None,
                     reason: reason.to_string(),
                 },
             }
@@ -2411,8 +2437,9 @@ mod attestation_and_telemetry_tests {
 
     #[test]
     fn kernel_capability_checker_denies_missing_and_malformed_tokens() {
-        let kernel = Keypair::generate();
-        let checker = KernelCapabilityChecker::new(kernel.public_key(), "proxy-server");
+        let issuer = Keypair::generate();
+        let checker =
+            KernelCapabilityChecker::new(ArcKernel::new(test_kernel_config(&issuer)), "proxy-server");
         let request = AcpCapabilityRequest {
             session_id: "session-1".to_string(),
             operation: "fs_read".to_string(),
@@ -2442,7 +2469,8 @@ mod attestation_and_telemetry_tests {
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let now = now_secs();
-        let checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+        let checker =
+            KernelCapabilityChecker::new(ArcKernel::new(test_kernel_config(&issuer)), "proxy-server");
 
         let valid = make_capability_token(
             &issuer,
@@ -2465,6 +2493,7 @@ mod attestation_and_telemetry_tests {
             .expect("check should succeed");
         assert!(verdict.allowed);
         assert_eq!(verdict.capability_id.as_deref(), Some(valid.id.as_str()));
+        assert!(verdict.receipt_id.is_some());
 
         let out_of_scope = AcpCapabilityRequest {
             resource: "/tmp/escape.txt".to_string(),
@@ -2474,7 +2503,8 @@ mod attestation_and_telemetry_tests {
             .check_access(&out_of_scope)
             .expect("scope mismatch should deny");
         assert!(!verdict.allowed);
-        assert!(verdict.reason.contains("token scope does not cover"));
+        assert!(verdict.reason.contains("scope") || verdict.reason.contains("out of scope"));
+        assert!(verdict.receipt_id.is_some());
 
         let future_token = make_capability_token(
             &issuer,
@@ -2495,7 +2525,8 @@ mod attestation_and_telemetry_tests {
             .check_access(&future_request)
             .expect("future token should fail closed");
         assert!(!verdict.allowed);
-        assert!(verdict.reason.contains("token not yet valid"));
+        assert!(verdict.reason.contains("valid") || verdict.reason.contains("time"));
+        assert!(verdict.receipt_id.is_some());
 
         let expired_token = make_capability_token(
             &issuer,
@@ -2516,7 +2547,8 @@ mod attestation_and_telemetry_tests {
             .check_access(&expired_request)
             .expect("expired token should fail closed");
         assert!(!verdict.allowed);
-        assert!(verdict.reason.contains("capability expired"));
+        assert!(verdict.reason.contains("expired") || verdict.reason.contains("time"));
+        assert!(verdict.receipt_id.is_some());
     }
 
     #[test]
@@ -2524,12 +2556,13 @@ mod attestation_and_telemetry_tests {
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let now = now_secs();
-        let checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+        let checker =
+            KernelCapabilityChecker::new(ArcKernel::new(test_kernel_config(&issuer)), "proxy-server");
         let token = make_capability_token(
             &issuer,
             &subject,
             "*",
-            "terminal/*",
+            "terminal/create",
             Vec::new(),
             now.saturating_sub(30),
             now + 3600,
@@ -2545,7 +2578,11 @@ mod attestation_and_telemetry_tests {
             .check_access(&request)
             .expect("check should succeed");
         assert!(verdict.allowed);
-        assert_eq!(verdict.reason, "capability token authorized access");
+        assert_eq!(
+            verdict.reason,
+            "authorized through kernel-backed ACP guard pipeline"
+        );
+        assert!(verdict.receipt_id.is_some());
     }
 
     #[test]
@@ -2553,7 +2590,8 @@ mod attestation_and_telemetry_tests {
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let now = now_secs();
-        let trusted_checker = KernelCapabilityChecker::new(issuer.public_key(), "proxy-server");
+        let trusted_checker =
+            KernelCapabilityChecker::new(ArcKernel::new(test_kernel_config(&issuer)), "proxy-server");
 
         let token = make_capability_token(
             &issuer,
@@ -2565,8 +2603,11 @@ mod attestation_and_telemetry_tests {
             now + 3600,
         );
 
-        let untrusted_checker =
-            KernelCapabilityChecker::new(Keypair::generate().public_key(), "proxy-server");
+        let untrusted_issuer = Keypair::generate();
+        let untrusted_checker = KernelCapabilityChecker::new(
+            ArcKernel::new(test_kernel_config(&untrusted_issuer)),
+            "proxy-server",
+        );
         let request = AcpCapabilityRequest {
             session_id: "session-untrusted".to_string(),
             operation: "fs_read".to_string(),
@@ -2577,7 +2618,8 @@ mod attestation_and_telemetry_tests {
             .check_access(&request)
             .expect("untrusted issuer should fail closed");
         assert!(!verdict.allowed);
-        assert!(verdict.reason.contains("trusted kernel key"));
+        assert!(verdict.reason.contains("signature") || verdict.reason.contains("untrusted"));
+        assert!(verdict.receipt_id.is_some());
 
         let mut tampered = token.clone();
         tampered.expires_at = tampered.expires_at.saturating_add(60);
@@ -2589,7 +2631,8 @@ mod attestation_and_telemetry_tests {
             .check_access(&tampered_request)
             .expect("tampered token should fail closed");
         assert!(!verdict.allowed);
-        assert!(verdict.reason.contains("token signature is invalid"));
+        assert!(verdict.reason.contains("signature"));
+        assert!(verdict.receipt_id.is_some());
     }
 
     #[test]

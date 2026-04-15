@@ -35,7 +35,7 @@ data class ArcProperties(
     /** Whether ARC protection is enabled. Defaults to true. */
     val enabled: Boolean = true,
 
-    /** URL patterns to protect. Defaults to all ("/*"). */
+    /** URL patterns to protect. Defaults to all routes. */
     val urlPatterns: List<String> = listOf("/*"),
 
     /** Filter order. Lower values run first. */

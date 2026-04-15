@@ -590,6 +590,17 @@ pub struct Oid4vciCredentialResponse {
     pub arc_credential_context: Option<Oid4vciArcCredentialContext>,
 }
 
+struct PortableCompactCredentialArgs<'a> {
+    format: String,
+    compact: String,
+    passport_id: String,
+    subject: String,
+    passport_status: Option<Oid4vciArcPassportStatusReference>,
+    issuer_jwk: PortableEd25519Jwk,
+    allowed_formats: &'a [&'a str],
+    error_message: &'a str,
+}
+
 impl Oid4vciCredentialResponse {
     pub fn new(format: impl Into<String>, credential: AgentPassport) -> Result<Self, CredentialError> {
         Self::new_with_status_reference(format, credential, None)
@@ -621,16 +632,16 @@ impl Oid4vciCredentialResponse {
         passport_status: Option<Oid4vciArcPassportStatusReference>,
         issuer_jwk: PortableEd25519Jwk,
     ) -> Result<Self, CredentialError> {
-        Self::new_portable_compact(
-            format,
-            compact,
-            passport_id,
-            subject,
+        Self::new_portable_compact(PortableCompactCredentialArgs {
+            format: format.into(),
+            compact: compact.into(),
+            passport_id: passport_id.into(),
+            subject: subject.into(),
             passport_status,
             issuer_jwk,
-            &[ARC_PASSPORT_SD_JWT_VC_FORMAT],
-            "portable ARC passport credentials must use application/dc+sd-jwt",
-        )
+            allowed_formats: &[ARC_PASSPORT_SD_JWT_VC_FORMAT],
+            error_message: "portable ARC passport credentials must use application/dc+sd-jwt",
+        })
     }
 
     pub fn new_portable_jwt_vc_json(
@@ -641,37 +652,34 @@ impl Oid4vciCredentialResponse {
         passport_status: Option<Oid4vciArcPassportStatusReference>,
         issuer_jwk: PortableEd25519Jwk,
     ) -> Result<Self, CredentialError> {
-        Self::new_portable_compact(
+        Self::new_portable_compact(PortableCompactCredentialArgs {
+            format: format.into(),
+            compact: compact.into(),
+            passport_id: passport_id.into(),
+            subject: subject.into(),
+            passport_status,
+            issuer_jwk,
+            allowed_formats: &[ARC_PASSPORT_JWT_VC_JSON_FORMAT],
+            error_message: "portable ARC passport credentials must use jwt_vc_json",
+        })
+    }
+
+    fn new_portable_compact(args: PortableCompactCredentialArgs<'_>) -> Result<Self, CredentialError> {
+        let PortableCompactCredentialArgs {
             format,
             compact,
             passport_id,
             subject,
             passport_status,
             issuer_jwk,
-            &[ARC_PASSPORT_JWT_VC_JSON_FORMAT],
-            "portable ARC passport credentials must use jwt_vc_json",
-        )
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn new_portable_compact(
-        format: impl Into<String>,
-        compact: impl Into<String>,
-        passport_id: impl Into<String>,
-        subject: impl Into<String>,
-        passport_status: Option<Oid4vciArcPassportStatusReference>,
-        issuer_jwk: PortableEd25519Jwk,
-        allowed_formats: &[&str],
-        error_message: &str,
-    ) -> Result<Self, CredentialError> {
-        let format = format.into();
+            allowed_formats,
+            error_message,
+        } = args;
         if !allowed_formats.iter().any(|supported| *supported == format) {
             return Err(CredentialError::InvalidOid4vciCredentialResponse(
                 error_message.to_string(),
             ));
         }
-        let passport_id = passport_id.into();
-        let subject = subject.into();
         if passport_id.trim().is_empty() || subject.trim().is_empty() {
             return Err(CredentialError::InvalidOid4vciCredentialResponse(
                 "portable credential context must include non-empty passport_id and subject"
@@ -686,7 +694,7 @@ impl Oid4vciCredentialResponse {
                 passport_status,
                 issuer_jwk: Some(issuer_jwk),
             }),
-            credential: Oid4vciIssuedCredential::Compact(compact.into()),
+            credential: Oid4vciIssuedCredential::Compact(compact),
         })
     }
 

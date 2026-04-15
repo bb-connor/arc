@@ -1,0 +1,60 @@
+{
+  "schema": "arc.evidence_export_manifest.v1",
+  "exportedAt": 1776272775,
+  "query": {},
+  "counts": {
+    "toolReceipts": 1,
+    "childReceipts": 0,
+    "checkpoints": 0,
+    "capabilityLineage": 1,
+    "inclusionProofs": 0,
+    "uncheckpointedReceipts": 1
+  },
+  "proofCoverage": {
+    "checkpointedReceipts": 0,
+    "uncheckpointedReceipts": 1
+  },
+  "childReceiptScope": "full_query_window",
+  "files": [
+    {
+      "path": "query.json",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "bytes": 2
+    },
+    {
+      "path": "receipts.ndjson",
+      "sha256": "a8f224542a0605779f503c46276295a7d334a9a0b21f989e5a4bd98d4431dd87",
+      "bytes": 968
+    },
+    {
+      "path": "child-receipts.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "checkpoints.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "capability-lineage.ndjson",
+      "sha256": "789ca683a814f51088f5a4384ce22d3ecd04626620cd51c7909c11320686d928",
+      "bytes": 427
+    },
+    {
+      "path": "inclusion-proofs.ndjson",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "retention.json",
+      "sha256": "f92db6f4a99fbc039e8c68267ca9a6e512d00e3a2318423c49af9634916c318f",
+      "bytes": 75
+    },
+    {
+      "path": "README.txt",
+      "sha256": "fae16ce1c4cf9aae2da4cbbd407193460e85ab1231712677b76e32a5ed13a620",
+      "bytes": 372
+    }
+  ]
+}

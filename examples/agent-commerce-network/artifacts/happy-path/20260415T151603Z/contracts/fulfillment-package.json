@@ -1,0 +1,17 @@
+{
+  "fulfillment_id": "fulfillment_contoso_001",
+  "job_id": "job_acme_001",
+  "service_family": "security-review",
+  "deliverables": [
+    "executive-summary.md",
+    "findings.json",
+    "remediation-checklist.md"
+  ],
+  "status": "completed_with_findings",
+  "severity_summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 5,
+    "low": 7
+  }
+}

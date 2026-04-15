@@ -2,11 +2,102 @@ package main
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 )
+
+type capabilitySigner struct {
+	publicKey  ed25519.PublicKey
+	privateKey ed25519.PrivateKey
+	issuerHex  string
+}
+
+func newCapabilitySigner(t *testing.T) capabilitySigner {
+	t.Helper()
+
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("failed to generate key: %v", err)
+	}
+
+	return capabilitySigner{
+		publicKey:  publicKey,
+		privateKey: privateKey,
+		issuerHex:  hex.EncodeToString(publicKey),
+	}
+}
+
+func trustCapabilitySigner(t *testing.T, signer capabilitySigner) {
+	t.Helper()
+	t.Setenv(envTrustedIssuerKey, signer.issuerHex)
+	t.Setenv(envTrustedIssuerKeys, "")
+}
+
+func signedCapabilityTokenJSON(
+	t *testing.T,
+	signer capabilitySigner,
+	scope capabilityScope,
+	issuedAt,
+	expiresAt time.Time,
+) string {
+	t.Helper()
+
+	body := map[string]any{
+		"id":         "cap-test-123",
+		"issuer":     signer.issuerHex,
+		"subject":    signer.issuerHex,
+		"scope":      scope,
+		"issued_at":  issuedAt.Unix(),
+		"expires_at": expiresAt.Unix(),
+	}
+
+	canonical, err := canonicalJSON(body)
+	if err != nil {
+		t.Fatalf("failed to canonicalize token body: %v", err)
+	}
+
+	token := body
+	token["signature"] = hex.EncodeToString(ed25519.Sign(signer.privateKey, canonical))
+
+	encoded, err := json.Marshal(token)
+	if err != nil {
+		t.Fatalf("failed to marshal token: %v", err)
+	}
+
+	return string(encoded)
+}
+
+func validToolCapabilityTokenJSON(
+	t *testing.T,
+	signer capabilitySigner,
+	toolName string,
+	operations ...string,
+) string {
+	t.Helper()
+	now := time.Now().UTC()
+	return signedCapabilityTokenJSON(
+		t,
+		signer,
+		capabilityScope{
+			Grants: []toolGrant{
+				{
+					ServerID:   "*",
+					ToolName:   toolName,
+					Operations: operations,
+				},
+			},
+		},
+		now.Add(-1*time.Minute),
+		now.Add(1*time.Hour),
+	)
+}
 
 // buildAdmissionReview creates an AdmissionReview with a pod having the given annotations.
 func buildAdmissionReview(t *testing.T, annotations map[string]string) []byte {
@@ -86,8 +177,10 @@ func TestValidate_RejectWithoutCapability(t *testing.T) {
 }
 
 func TestValidate_AllowWithCapability(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
 	body := buildAdmissionReview(t, map[string]string{
-		AnnotationCapabilityToken: "cap-token-abc123",
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
@@ -128,8 +221,9 @@ func TestValidate_AllowExempt(t *testing.T) {
 }
 
 func TestValidate_RejectInvalidScopes(t *testing.T) {
+	signer := newCapabilitySigner(t)
 	body := buildAdmissionReview(t, map[string]string{
-		AnnotationCapabilityToken: "cap-token-abc123",
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 		AnnotationRequiredScopes:  "read,,write",
 	})
 
@@ -149,9 +243,174 @@ func TestValidate_RejectInvalidScopes(t *testing.T) {
 	}
 }
 
-func TestMutate_NoInjectionWithoutAnnotation(t *testing.T) {
+func TestValidate_RejectInvalidCapabilitySignature(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
+	token := validToolCapabilityTokenJSON(t, signer, "db", "invoke")
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(token), &parsed); err != nil {
+		t.Fatalf("failed to parse token: %v", err)
+	}
+	parsed["signature"] = strings.Repeat("0", ed25519.SignatureSize*2)
+	tampered, err := json.Marshal(parsed)
+	if err != nil {
+		t.Fatalf("failed to marshal tampered token: %v", err)
+	}
+
 	body := buildAdmissionReview(t, map[string]string{
-		AnnotationCapabilityToken: "cap-token-abc123",
+		AnnotationCapabilityToken: string(tampered),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if review.Response.Allowed {
+		t.Fatal("expected invalid-signature token to be rejected")
+	}
+}
+
+func TestValidate_RejectExpiredCapability(t *testing.T) {
+	now := time.Now().UTC()
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: signedCapabilityTokenJSON(
+			t,
+			signer,
+			capabilityScope{
+				Grants: []toolGrant{{ServerID: "*", ToolName: "db", Operations: []string{"invoke"}}},
+			},
+			now.Add(-2*time.Hour),
+			now.Add(-1*time.Hour),
+		),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if review.Response.Allowed {
+		t.Fatal("expected expired token to be rejected")
+	}
+}
+
+func TestValidate_AllowWithMatchingRequiredScope(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
+		AnnotationRequiredScopes:  "db:write",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !review.Response.Allowed {
+		t.Fatal("expected matching scope to be allowed")
+	}
+}
+
+func TestValidate_RejectOutOfScopeCapability(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
+		AnnotationRequiredScopes:  "tool:*:admin:invoke",
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if review.Response.Allowed {
+		t.Fatal("expected out-of-scope token to be rejected")
+	}
+}
+
+func TestValidate_RejectUntrustedIssuer(t *testing.T) {
+	trustedSigner := newCapabilitySigner(t)
+	untrustedSigner := newCapabilitySigner(t)
+	trustCapabilitySigner(t, trustedSigner)
+
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, untrustedSigner, "db", "invoke"),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if review.Response.Allowed {
+		t.Fatal("expected untrusted issuer token to be rejected")
+	}
+}
+
+func TestValidate_RejectWhenTrustedIssuerConfigMissing(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	t.Setenv(envTrustedIssuerKey, "")
+	t.Setenv(envTrustedIssuerKeys, "")
+
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if review.Response.Allowed {
+		t.Fatal("expected validation to fail closed without trusted issuer configuration")
+	}
+}
+
+func TestMutate_NoInjectionWithoutAnnotation(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	body := buildAdmissionReview(t, map[string]string{
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/mutate", bytes.NewReader(body))
@@ -174,8 +433,9 @@ func TestMutate_NoInjectionWithoutAnnotation(t *testing.T) {
 }
 
 func TestMutate_InjectSidecar(t *testing.T) {
+	signer := newCapabilitySigner(t)
 	body := buildAdmissionReview(t, map[string]string{
-		AnnotationCapabilityToken: "cap-token-abc123",
+		AnnotationCapabilityToken: validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
 		AnnotationInject:          "true",
 		AnnotationUpstream:        "http://127.0.0.1:3000",
 		AnnotationSpecPath:        "/etc/arc/openapi.yaml",

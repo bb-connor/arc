@@ -417,6 +417,7 @@ impl MessageInterceptor {
                 CapabilityGate::Allow(AcpCapabilityAuditContext {
                     capability_id,
                     enforcement_mode: AcpEnforcementMode::CryptographicallyEnforced,
+                    authorization_receipt_id: verdict.receipt_id,
                 })
             }
             Ok(verdict) => {

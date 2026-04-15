@@ -5,7 +5,7 @@ use std::path::Path;
 
 use arc_core::crypto::Keypair;
 use arc_kernel::transport::TransportError;
-use arc_kernel::{ArcKernel, KernelConfig};
+use arc_kernel::{ArcKernel, KernelConfig, StructuredErrorReport};
 
 #[path = "../../arc-cli/src/policy.rs"]
 pub mod policy;
@@ -107,6 +107,113 @@ pub enum CliError {
 
     #[error("{0}")]
     Other(String),
+}
+
+impl CliError {
+    fn report_with_context(
+        &self,
+        code: &str,
+        context: serde_json::Value,
+        suggested_fix: impl Into<String>,
+    ) -> StructuredErrorReport {
+        StructuredErrorReport::new(code, self.to_string(), context, suggested_fix)
+    }
+
+    pub fn report(&self) -> StructuredErrorReport {
+        match self {
+            Self::Core(error) => self.report_with_context(
+                "ARC-CLI-CORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Inspect the ARC artifact or request payload that triggered the core validation failure and correct it before retrying.",
+            ),
+            Self::Policy(error) => self.report_with_context(
+                "ARC-CLI-POLICY",
+                serde_json::json!({ "source": error.to_string() }),
+                "Fix the policy file contents or path so the requested command can load a valid policy document.",
+            ),
+            Self::Adapter(error) => self.report_with_context(
+                "ARC-CLI-ADAPTER",
+                serde_json::json!({ "source": error.to_string() }),
+                "Inspect the MCP adapter configuration and upstream server compatibility before retrying.",
+            ),
+            Self::Kernel(error) => error.report(),
+            Self::Checkpoint(error) => self.report_with_context(
+                "ARC-CLI-CHECKPOINT",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the checkpoint input and configured receipt store, then retry once the checkpoint lane is valid.",
+            ),
+            Self::EvidenceExport(error) => self.report_with_context(
+                "ARC-CLI-EVIDENCE-EXPORT",
+                serde_json::json!({ "source": error.to_string() }),
+                "Inspect the evidence export inputs, output path, and receipt-store state before retrying.",
+            ),
+            Self::Credential(error) => self.report_with_context(
+                "ARC-CLI-CREDENTIAL",
+                serde_json::json!({ "source": error.to_string() }),
+                "Validate the credential, issuer, and subject inputs before retrying the command.",
+            ),
+            Self::ReceiptStore(error) => self.report_with_context(
+                "ARC-CLI-RECEIPT-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured receipt store path, permissions, and schema health before retrying.",
+            ),
+            Self::ConformanceLoad(error) => self.report_with_context(
+                "ARC-CLI-CONFORMANCE-LOAD",
+                serde_json::json!({ "source": error.to_string() }),
+                "Fix the conformance corpus path or file contents so the requested scenarios can be loaded successfully.",
+            ),
+            Self::RevocationStore(error) => self.report_with_context(
+                "ARC-CLI-REVOCATION-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured revocation store path, permissions, and schema health before retrying.",
+            ),
+            Self::AuthorityStore(error) => self.report_with_context(
+                "ARC-CLI-AUTHORITY-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured authority store path, permissions, and schema health before retrying.",
+            ),
+            Self::BudgetStore(error) => self.report_with_context(
+                "ARC-CLI-BUDGET-STORE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the configured budget store path, permissions, and schema health before retrying.",
+            ),
+            Self::Sqlite(error) => self.report_with_context(
+                "ARC-CLI-SQLITE",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check the SQLite path, file permissions, and database schema state before retrying.",
+            ),
+            Self::Transport(error) => self.report_with_context(
+                "ARC-CLI-TRANSPORT",
+                serde_json::json!({ "source": error.to_string() }),
+                "Verify the remote endpoint or subprocess transport is reachable and speaking the expected protocol.",
+            ),
+            Self::Io(error) => self.report_with_context(
+                "ARC-CLI-IO",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check file paths, permissions, and parent directories before retrying.",
+            ),
+            Self::Json(error) => self.report_with_context(
+                "ARC-CLI-JSON",
+                serde_json::json!({ "source": error.to_string() }),
+                "Fix the JSON input so it is syntactically valid and matches the expected ARC schema.",
+            ),
+            Self::Yaml(error) => self.report_with_context(
+                "ARC-CLI-YAML",
+                serde_json::json!({ "source": error.to_string() }),
+                "Fix the YAML syntax or schema mismatch in the provided configuration before retrying.",
+            ),
+            Self::Reqwest(error) => self.report_with_context(
+                "ARC-CLI-HTTP",
+                serde_json::json!({ "source": error.to_string() }),
+                "Check network reachability, TLS settings, and remote endpoint availability before retrying.",
+            ),
+            Self::Other(message) => self.report_with_context(
+                "ARC-CLI-OTHER",
+                serde_json::json!({ "detail": message }),
+                "Read the error detail, correct the conflicting inputs or missing prerequisite, and retry the command.",
+            ),
+        }
+    }
 }
 
 pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) -> ArcKernel {
@@ -456,5 +563,38 @@ mod tests {
         assert!(error
             .to_string()
             .contains("append-only remote receipt mirrors are unsupported"));
+    }
+
+    #[test]
+    fn cli_error_report_passes_through_kernel_metadata() {
+        let report = CliError::Kernel(arc_kernel::KernelError::OutOfScope {
+            tool: "read_file".to_string(),
+            server: "fs".to_string(),
+        })
+        .report();
+
+        assert_eq!(report.code, "ARC-KERNEL-OUT-OF-SCOPE-TOOL");
+        assert_eq!(report.context["tool"], "read_file");
+        assert_eq!(report.context["server"], "fs");
+        assert!(report
+            .suggested_fix
+            .contains("Issue a capability that grants this tool"));
+    }
+
+    #[test]
+    fn cli_error_report_captures_io_context() {
+        let report = CliError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "missing file",
+        ))
+        .report();
+
+        assert_eq!(report.code, "ARC-CLI-IO");
+        assert!(report.message.contains("i/o error"));
+        assert!(report.context["source"]
+            .as_str()
+            .expect("io source string")
+            .contains("missing file"));
+        assert!(report.suggested_fix.contains("Check file paths"));
     }
 }

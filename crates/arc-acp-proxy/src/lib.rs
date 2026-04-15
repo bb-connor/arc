@@ -16,6 +16,7 @@
 //!    in `session/update` notifications. These can be promoted to signed
 //!    ARC receipts by a downstream component with key material.
 
+use arc_core::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

@@ -63,9 +63,9 @@ pub use functions::{
 pub use ops::{
     classify_anchor_lane, ensure_anchor_operation_allowed, AnchorAlertSeverity,
     AnchorControlChangeRecord, AnchorControlState, AnchorEmergencyControls, AnchorEmergencyMode,
-    AnchorIncidentAlert, AnchorIndexerCursor, AnchorIndexerStatus, AnchorLaneHealthStatus,
-    AnchorLaneRuntimeStatus, AnchorOperationKind, AnchorRuntimeReport,
-    ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
+    AnchorIncidentAlert, AnchorIndexerCursor, AnchorIndexerCursorInput, AnchorIndexerStatus,
+    AnchorLaneHealthStatus, AnchorLaneRuntimeStatus, AnchorLaneRuntimeStatusInput,
+    AnchorOperationKind, AnchorRuntimeReport, ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
 };
 pub use solana::{
     prepare_solana_memo_publication, verify_solana_anchor, PreparedSolanaMemoPublication,

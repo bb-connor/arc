@@ -1,0 +1,30 @@
+{"synthetic": false,
+ "schemaVersion": "2025-09-10",
+ "outputs":
+ {"o": ["72e918cac6cecd9e.olean"],
+  "i": "f43d1eb1aa4bf748.ilean",
+  "c": "0448052792828cb4.c"},
+ "log":
+ [{"message":
+   ".> LEAN_PATH=/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean /Users/connor/.elan/toolchains/leanprover--lean4---v4.28.0-rc1/bin/lean /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Arc/Spec/Properties.lean -o /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Spec/Properties.olean -i /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Spec/Properties.ilean -c /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Arc/Spec/Properties.c --setup /Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/ir/Arc/Spec/Properties.setup.json --json",
+   "level": "trace"}],
+ "inputs":
+ [["Arc.Spec.Properties:deps",
+   [["deps",
+     [["arc/Arc:extraDep", [["@arc:extraDep", "00000000000006bb"]]],
+      ["imports",
+       [["Pact.Spec.Properties transitive imports (legacy)",
+         "d0d67015e62e1181"],
+        ["Pact.Spec.Properties:importAllArts", "65c1e41a5bf331b4"]]]]],
+    ["libs",
+     [["import dynlibs", "00000000000006bb"],
+      ["package external libraries", "00000000000006bb"],
+      ["module dynlibs", "00000000000006bb"],
+      ["module plugins", "00000000000006bb"]]]]],
+  ["Lean 4.28.0, commit 3b0f2862196c6a8af9eb0025ee650252694013dd",
+   "612345b87aa96642"],
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/Arc/Spec/Properties.lean",
+   "cf18d3c7737ebb79"],
+  ["options", [["-DautoImplicit=false", "4a85acb881fd49d0"]]],
+  ["Module.leanArgs: #[]", "00000000000006bb"]],
+ "depHash": "e65f106f21a2fbfc"}

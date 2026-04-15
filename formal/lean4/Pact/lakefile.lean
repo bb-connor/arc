@@ -9,3 +9,6 @@ package arc where
 @[default_target]
 lean_lib Arc where
   srcDir := "."
+
+lean_lib Pact where
+  srcDir := "."

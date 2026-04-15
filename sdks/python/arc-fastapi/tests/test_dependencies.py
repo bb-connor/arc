@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 
 from arc_fastapi.dependencies import (
     get_arc_client,
+    get_arc_passthrough,
     get_arc_receipt,
     get_caller_identity,
     set_arc_client,
 )
+from arc_sdk.models import ArcPassthrough
 from arc_sdk.client import ArcClient
 from arc_sdk.models import HttpReceipt, Verdict
 
@@ -96,3 +98,46 @@ class TestGetArcReceipt:
         resp = client.get("/test")
         assert resp.status_code == 200
         assert resp.json()["has_receipt"] is False
+
+
+class TestGetArcPassthrough:
+    def test_no_passthrough(self) -> None:
+        app = FastAPI()
+
+        @app.get("/test")
+        async def handler(request: Request) -> dict:
+            passthrough = await get_arc_passthrough(request)
+            return {"has_passthrough": passthrough is not None}
+
+        client = TestClient(app)
+        resp = client.get("/test")
+        assert resp.status_code == 200
+        assert resp.json()["has_passthrough"] is False
+
+    def test_reads_passthrough_from_request_state(self) -> None:
+        app = FastAPI()
+
+        @app.middleware("http")
+        async def inject_passthrough(request: Request, call_next):
+            request.state.arc_passthrough = ArcPassthrough(
+                mode="allow_without_receipt",
+                error="arc_sidecar_unreachable",
+                message="ARC sidecar unavailable",
+            )
+            return await call_next(request)
+
+        @app.get("/test")
+        async def handler(request: Request) -> dict:
+            passthrough = await get_arc_passthrough(request)
+            return {
+                "mode": passthrough.mode if passthrough else None,
+                "error": passthrough.error if passthrough else None,
+            }
+
+        client = TestClient(app)
+        resp = client.get("/test")
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "mode": "allow_without_receipt",
+            "error": "arc_sidecar_unreachable",
+        }

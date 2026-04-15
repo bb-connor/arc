@@ -1,0 +1,6 @@
+Research MERCURY from the competition, category, and moat angle. Read the current docs in docs/mercury as needed. Analyze what incumbents, adjacent platforms, or standards efforts could absorb this idea, and where MERCURY could have real moat. Include observability, archive and recordkeeping, surveillance, OMS and OEMS, governance platforms, and interoperability standards. Use current external research where helpful. Output markdown with sections exactly:
+1. Top 5 Insights
+2. Top 3 Risks
+3. Top 3 Strategic Options
+4. Concrete Positioning Changes
+5. Sources

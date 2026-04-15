@@ -295,6 +295,62 @@ fn load_existing_keypair(path: &Path) -> Result<Keypair, CliError> {
     Keypair::from_seed_hex(seed_hex.trim()).map_err(CliError::from)
 }
 
+pub(crate) struct PassportPolicyCreateArgs<'a> {
+    pub output: &'a Path,
+    pub policy_id: &'a str,
+    pub verifier: &'a str,
+    pub signing_seed_file: &'a Path,
+    pub policy_path: &'a Path,
+    pub expires_at: u64,
+    pub verifier_policies_file: Option<&'a Path>,
+    pub json_output: bool,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+pub(crate) struct PassportChallengeCreateArgs<'a> {
+    pub output: &'a Path,
+    pub verifier: &'a str,
+    pub ttl_secs: u64,
+    pub issuers: &'a [String],
+    pub max_credentials: Option<usize>,
+    pub policy_path: Option<&'a Path>,
+    pub policy_id: Option<&'a str>,
+    pub verifier_policies_file: Option<&'a Path>,
+    pub verifier_challenge_db: Option<&'a Path>,
+    pub json_output: bool,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+pub(crate) struct PassportOid4vpRequestCreateArgs<'a> {
+    pub output: Option<&'a Path>,
+    pub disclosure_claims: &'a [String],
+    pub issuer_allowlist: &'a [String],
+    pub ttl_secs: Option<u64>,
+    pub identity_subject: Option<&'a str>,
+    pub identity_continuity_id: Option<&'a str>,
+    pub identity_provider: Option<&'a str>,
+    pub identity_session_hint: Option<&'a str>,
+    pub identity_ttl_secs: Option<u64>,
+    pub json_output: bool,
+    pub control_url: Option<&'a str>,
+    pub control_token: Option<&'a str>,
+}
+
+pub(crate) struct PassportOid4vpRespondArgs<'a> {
+    pub input: &'a Path,
+    pub request_url: Option<&'a str>,
+    pub same_device_url: Option<&'a str>,
+    pub cross_device_url: Option<&'a str>,
+    pub holder_seed_file: &'a Path,
+    pub output: Option<&'a Path>,
+    pub submit: bool,
+    pub submit_url: Option<&'a str>,
+    pub at: Option<u64>,
+    pub json_output: bool,
+}
+
 fn validity_seconds(validity_days: u32) -> u64 {
     u64::from(validity_days) * 86_400
 }
@@ -1125,19 +1181,21 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_passport_policy_create(
-    output: &Path,
-    policy_id: &str,
-    verifier: &str,
-    signing_seed_file: &Path,
-    policy_path: &Path,
-    expires_at: u64,
-    verifier_policies_file: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: PassportPolicyCreateArgs<'_>,
 ) -> Result<(), CliError> {
+    let PassportPolicyCreateArgs {
+        output,
+        policy_id,
+        verifier,
+        signing_seed_file,
+        policy_path,
+        expires_at,
+        verifier_policies_file,
+        json_output,
+        control_url,
+        control_token,
+    } = args;
     let now = unix_now();
     let keypair = load_or_create_authority_keypair(signing_seed_file)?;
     let policy = load_passport_verifier_policy(policy_path)?;
@@ -1346,21 +1404,23 @@ pub(crate) fn cmd_passport_policy_delete(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_passport_challenge_create(
-    output: &Path,
-    verifier: &str,
-    ttl_secs: u64,
-    issuers: &[String],
-    max_credentials: Option<usize>,
-    policy_path: Option<&Path>,
-    policy_id: Option<&str>,
-    verifier_policies_file: Option<&Path>,
-    verifier_challenge_db: Option<&Path>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: PassportChallengeCreateArgs<'_>,
 ) -> Result<(), CliError> {
+    let PassportChallengeCreateArgs {
+        output,
+        verifier,
+        ttl_secs,
+        issuers,
+        max_credentials,
+        policy_path,
+        policy_id,
+        verifier_policies_file,
+        verifier_challenge_db,
+        json_output,
+        control_url,
+        control_token,
+    } = args;
     let now = unix_now();
     if policy_path.is_some() && policy_id.is_some() {
         return Err(CliError::Other(
@@ -1404,17 +1464,19 @@ pub(crate) fn cmd_passport_challenge_create(
             ));
         }
         let challenge = create_passport_presentation_challenge_with_reference(
-            verifier,
-            Some(Keypair::generate().public_key().to_hex()),
-            Keypair::generate().public_key().to_hex(),
-            now,
-            now.saturating_add(ttl_secs),
-            PassportPresentationOptions {
-                issuer_allowlist: issuers.iter().cloned().collect::<BTreeSet<_>>(),
-                max_credentials,
+            arc_credentials::PassportPresentationChallengeArgs {
+                verifier: verifier.to_string(),
+                challenge_id: Some(Keypair::generate().public_key().to_hex()),
+                nonce: Keypair::generate().public_key().to_hex(),
+                issued_at: now,
+                expires_at: now.saturating_add(ttl_secs),
+                options: PassportPresentationOptions {
+                    issuer_allowlist: issuers.iter().cloned().collect::<BTreeSet<_>>(),
+                    max_credentials,
+                },
+                policy_ref,
+                policy,
             },
-            policy_ref,
-            policy,
         )?;
         if let Some(path) = verifier_challenge_db {
             PassportVerifierChallengeStore::open(path)?.register(&challenge)?;
@@ -1665,21 +1727,23 @@ pub(crate) fn cmd_passport_challenge_verify(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_passport_oid4vp_request_create(
-    output: Option<&Path>,
-    disclosure_claims: &[String],
-    issuer_allowlist: &[String],
-    ttl_secs: Option<u64>,
-    identity_subject: Option<&str>,
-    identity_continuity_id: Option<&str>,
-    identity_provider: Option<&str>,
-    identity_session_hint: Option<&str>,
-    identity_ttl_secs: Option<u64>,
-    json_output: bool,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: PassportOid4vpRequestCreateArgs<'_>,
 ) -> Result<(), CliError> {
+    let PassportOid4vpRequestCreateArgs {
+        output,
+        disclosure_claims,
+        issuer_allowlist,
+        ttl_secs,
+        identity_subject,
+        identity_continuity_id,
+        identity_provider,
+        identity_session_hint,
+        identity_ttl_secs,
+        json_output,
+        control_url,
+        control_token,
+    } = args;
     let identity_assertion = match (identity_subject, identity_continuity_id) {
         (Some(subject), Some(continuity_id)) => Some(CreateIdentityAssertionRequest {
             subject: subject.to_string(),
@@ -1746,19 +1810,21 @@ pub(crate) fn cmd_passport_oid4vp_request_create(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn cmd_passport_oid4vp_respond(
-    input: &Path,
-    request_url: Option<&str>,
-    same_device_url: Option<&str>,
-    cross_device_url: Option<&str>,
-    holder_seed_file: &Path,
-    output: Option<&Path>,
-    submit: bool,
-    submit_url: Option<&str>,
-    at: Option<u64>,
-    json_output: bool,
+    args: PassportOid4vpRespondArgs<'_>,
 ) -> Result<(), CliError> {
+    let PassportOid4vpRespondArgs {
+        input,
+        request_url,
+        same_device_url,
+        cross_device_url,
+        holder_seed_file,
+        output,
+        submit,
+        submit_url,
+        at,
+        json_output,
+    } = args;
     let resolved_request_url = match (request_url, same_device_url, cross_device_url) {
         (Some(url), None, None) => url.to_string(),
         (None, Some(url), None) | (None, None, Some(url)) => oid4vp_request_url_from_launch_url(url)?,

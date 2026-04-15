@@ -1,0 +1,13 @@
+{"plugins": [],
+ "package": "arc",
+ "options": {"autoImplicit": false},
+ "name": "Arc.Proofs.Receipt",
+ "isModule": false,
+ "importArts":
+ {"Pact.Proofs.Receipt":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Proofs/Receipt.olean"],
+  "Pact.Core.Receipt":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Receipt.olean"],
+  "Arc.Core.Receipt":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Core/Receipt.olean"]},
+ "dynlibs": []}

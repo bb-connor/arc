@@ -35,6 +35,9 @@ dev = [
     "respx>=0.21,<1",
 ]
 
+[tool.uv.sources]
+arc-sdk-python = { path = "../arc-sdk-python" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/arc_asgi"]
 

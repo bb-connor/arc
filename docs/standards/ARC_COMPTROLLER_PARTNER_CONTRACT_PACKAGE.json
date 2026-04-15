@@ -1,0 +1,80 @@
+{
+  "version": "2026-04-15",
+  "scope": "comptroller_partner_contract_package",
+  "packages": [
+    {
+      "id": "receipt_checkpoint_proof",
+      "authority": "arc_kernel",
+      "artifacts": [
+        {
+          "name": "http_receipt",
+          "schemaRef": "spec/schemas/arc-http/v1/http-receipt.schema.json",
+          "typeWitness": "crates/arc-http-core/src/receipt.rs"
+        },
+        {
+          "name": "kernel_checkpoint_statement",
+          "typeWitness": "crates/arc-kernel/src/checkpoint.rs"
+        },
+        {
+          "name": "anchor_inclusion_proof_example",
+          "exampleRef": "docs/standards/ARC_ANCHOR_INCLUSION_PROOF_EXAMPLE.json",
+          "typeWitness": "crates/arc-kernel/src/checkpoint.rs"
+        }
+      ]
+    },
+    {
+      "id": "settlement_reconciliation",
+      "authority": "arc_settle",
+      "artifacts": [
+        {
+          "name": "settlement_profile",
+          "profileRef": "docs/standards/ARC_SETTLE_PROFILE.md",
+          "typeWitness": "crates/arc-settle/src"
+        },
+        {
+          "name": "settlement_receipt_example",
+          "exampleRef": "docs/standards/ARC_WEB3_SETTLEMENT_RECEIPT_EXAMPLE.json",
+          "typeWitness": "crates/arc-settle/src/observe.rs"
+        }
+      ]
+    },
+    {
+      "id": "risk_credit_capital",
+      "authority": "arc_underwriting_and_credit",
+      "artifacts": [
+        {
+          "name": "underwriting_decision_artifact",
+          "typeWitness": "crates/arc-underwriting/src/lib.rs"
+        },
+        {
+          "name": "credit_facility_artifact",
+          "typeWitness": "crates/arc-credit/src/lib.rs"
+        },
+        {
+          "name": "capital_execution_instruction",
+          "typeWitness": "crates/arc-credit/src/credit/capital_and_execution.rs"
+        }
+      ]
+    },
+    {
+      "id": "liability_market",
+      "authority": "arc_market",
+      "artifacts": [
+        {
+          "name": "liability_claim_settlement_receipt",
+          "typeWitness": "crates/arc-market/src/lib.rs"
+        },
+        {
+          "name": "open_market_fee_schedule",
+          "typeWitness": "crates/arc-open-market/src/lib.rs"
+        }
+      ]
+    }
+  ],
+  "degradedPathRule": {
+    "mode": "allow_without_receipt",
+    "authoritative": false,
+    "summary": "Compatibility and degraded passthrough do not satisfy partner billing, settlement, dispute, or audit authority requirements."
+  }
+}
+

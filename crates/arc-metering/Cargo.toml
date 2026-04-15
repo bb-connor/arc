@@ -12,11 +12,9 @@ name = "arc_metering"
 
 [dependencies]
 arc-core = { package = "arc-core", path = "../arc-core" }
-arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-tracing = { workspace = true }
 chrono = { workspace = true }
 
 [dev-dependencies]

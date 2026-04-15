@@ -810,14 +810,16 @@ pub fn issue_signed_portable_reputation_summary(
     )?;
     let artifact = build_portable_reputation_summary_artifact(
         &local_operator.operator_id,
-        local_operator.operator_name.clone(),
         request,
         &inspection.scorecard,
-        inspection.effective_score,
-        inspection.probationary,
-        Some(imported_trust.signal_count),
-        Some(imported_trust.accepted_count),
-        issued_at,
+        arc_credentials::PortableReputationSummaryArtifactContext {
+            issuer_operator_name: local_operator.operator_name.clone(),
+            effective_score: inspection.effective_score,
+            probationary: inspection.probationary,
+            imported_signal_count: Some(imported_trust.signal_count),
+            accepted_imported_signal_count: Some(imported_trust.accepted_count),
+            issued_at,
+        },
     )?;
     SignedPortableReputationSummary::sign(artifact, &signer_keypair).map_err(|error| {
         CliError::Other(format!(
@@ -1684,6 +1686,8 @@ impl TrustControlClient {
         self.get_json_with_query(FEDERATION_EVIDENCE_SHARES_PATH, query)
     }
 
+    // Kept for API parity with the trust-control service surface even though
+    // the current CLI command set does not invoke it directly.
     #[allow(dead_code)]
     pub fn cost_attribution_report(
         &self,
@@ -1692,6 +1696,8 @@ impl TrustControlClient {
         self.get_json_with_query(COST_ATTRIBUTION_PATH, query)
     }
 
+    // Kept for API parity with the trust-control service surface even though
+    // the current CLI command set does not invoke it directly.
     #[allow(dead_code)]
     pub fn operator_report(&self, query: &OperatorReportQuery) -> Result<OperatorReport, CliError> {
         self.get_json_with_query(OPERATOR_REPORT_PATH, query)
@@ -2892,3 +2898,924 @@ fn into_budget_store_error(error: CliError) -> BudgetStoreError {
     BudgetStoreError::Io(std::io::Error::other(error.to_string()))
 }
 
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod service_runtime_tests {
+    use super::*;
+    use std::collections::BTreeMap;
+    use std::io::{Read, Write};
+    use std::net::{TcpListener, TcpStream};
+    use std::sync::{Arc, Mutex};
+    use std::thread;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct CapturedRequest {
+        method: String,
+        target: String,
+        headers: BTreeMap<String, String>,
+        body: String,
+    }
+
+    struct StaticResponseServer {
+        url: String,
+        captured: Arc<Mutex<Vec<CapturedRequest>>>,
+        join: Option<thread::JoinHandle<()>>,
+    }
+
+    impl StaticResponseServer {
+        fn spawn(status: u16, body: &str, content_type: &str, expected_requests: usize) -> Self {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind static response server");
+            let addr = listener.local_addr().expect("server local addr");
+            let body = body.to_string();
+            let content_type = content_type.to_string();
+            let captured = Arc::new(Mutex::new(Vec::new()));
+            let captured_requests = Arc::clone(&captured);
+            let join = thread::spawn(move || {
+                for _ in 0..expected_requests {
+                    let (mut stream, _) = listener.accept().expect("accept request");
+                    let request = read_http_request(&mut stream);
+                    captured_requests
+                        .lock()
+                        .expect("capture request")
+                        .push(request);
+                    write!(
+                        stream,
+                        "HTTP/1.1 {status} test\r\nContent-Length: {}\r\nContent-Type: {content_type}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    )
+                    .expect("write response");
+                    stream.flush().expect("flush response");
+                }
+            });
+            Self {
+                url: format!("http://{addr}"),
+                captured,
+                join: Some(join),
+            }
+        }
+
+        fn requests(&self) -> Vec<CapturedRequest> {
+            self.captured
+                .lock()
+                .expect("captured requests")
+                .clone()
+        }
+    }
+
+    impl Drop for StaticResponseServer {
+        fn drop(&mut self) {
+            if let Some(join) = self.join.take() {
+                join.join().expect("join response server");
+            }
+        }
+    }
+
+    fn read_http_request(stream: &mut TcpStream) -> CapturedRequest {
+        let mut buffer = Vec::new();
+        let mut chunk = [0u8; 4096];
+        let mut headers_end = None;
+        let mut content_length = 0usize;
+        loop {
+            let read = stream.read(&mut chunk).expect("read HTTP request");
+            if read == 0 {
+                break;
+            }
+            buffer.extend_from_slice(&chunk[..read]);
+            if headers_end.is_none() {
+                if let Some(position) = buffer.windows(4).position(|window| window == b"\r\n\r\n") {
+                    headers_end = Some(position + 4);
+                    content_length =
+                        parse_content_length(&String::from_utf8_lossy(&buffer[..position + 4]));
+                }
+            }
+            if let Some(headers_end) = headers_end {
+                if buffer.len() >= headers_end + content_length {
+                    break;
+                }
+            }
+        }
+
+        let headers_end = headers_end.expect("HTTP request headers terminator");
+        let header_text = String::from_utf8_lossy(&buffer[..headers_end]);
+        let mut lines = header_text.split("\r\n").filter(|line| !line.is_empty());
+        let request_line = lines.next().expect("request line");
+        let mut request_line_parts = request_line.split_whitespace();
+        let method = request_line_parts
+            .next()
+            .expect("request method")
+            .to_string();
+        let target = request_line_parts
+            .next()
+            .expect("request target")
+            .to_string();
+        let headers = lines
+            .filter_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                Some((name.trim().to_ascii_lowercase(), value.trim().to_string()))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let body = String::from_utf8_lossy(&buffer[headers_end..]).to_string();
+
+        CapturedRequest {
+            method,
+            target,
+            headers,
+            body,
+        }
+    }
+
+    fn parse_content_length(headers: &str) -> usize {
+        headers
+            .lines()
+            .find_map(|line| {
+                let (name, value) = line.split_once(':')?;
+                if name.trim().eq_ignore_ascii_case("content-length") {
+                    value.trim().parse::<usize>().ok()
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0)
+    }
+
+    fn assert_bearer_request(
+        request: &CapturedRequest,
+        method: &str,
+        path_prefix: &str,
+        fragments: &[&str],
+    ) {
+        assert_eq!(request.method, method);
+        assert!(request.target.starts_with(path_prefix), "unexpected target: {}", request.target);
+        for fragment in fragments {
+            assert!(
+                request.target.contains(fragment),
+                "expected `{}` in target `{}`",
+                fragment,
+                request.target
+            );
+        }
+        assert_eq!(
+            request.headers.get("authorization").map(String::as_str),
+            Some("Bearer secret")
+        );
+    }
+
+    fn assert_json_post(request: &CapturedRequest, path: &str, body_fragments: &[&str]) {
+        assert_bearer_request(request, "POST", path, &[]);
+        let content_type = request
+            .headers
+            .get("content-type")
+            .expect("content-type header");
+        assert!(content_type.starts_with("application/json"));
+        for fragment in body_fragments {
+            assert!(
+                request.body.contains(fragment),
+                "expected `{}` in body `{}`",
+                fragment,
+                request.body
+            );
+        }
+    }
+
+    #[test]
+    fn build_client_rejects_empty_control_url_and_normalizes_endpoints() {
+        let error = match build_client(" , , ", "token") {
+            Ok(_) => panic!("empty control URL should fail"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("control URL must not be empty"));
+
+        let client = build_client(" http://one/ , http://two// ,,", "secret")
+            .expect("build client with normalized endpoints");
+        assert_eq!(
+            client.endpoints.as_ref(),
+            &vec!["http://one".to_string(), "http://two".to_string()]
+        );
+        assert_eq!(client.endpoint_order(), vec![0, 1]);
+
+        client.mark_preferred(1);
+        assert_eq!(client.endpoint_order(), vec![1, 0]);
+    }
+
+    #[test]
+    fn path_helpers_encode_segments_and_certification_paths() {
+        assert_eq!(encode_path_segment("a/b c"), "a%2Fb%20c");
+        assert_eq!(
+            path_with_encoded_param("/v1/items/{item_id}", "item_id", "alpha/beta"),
+            "/v1/items/alpha%2Fbeta"
+        );
+
+        let search_path =
+            certification_marketplace_search_path(&CertificationMarketplaceSearchQuery {
+                filters: CertificationPublicSearchQuery {
+                    tool_server_id: Some("tool/server".to_string()),
+                    criteria_profile: None,
+                    evidence_profile: None,
+                    status: Some(CertificationRegistryState::Active),
+                },
+                operator_ids: Some("alpha,beta".to_string()),
+            });
+        assert!(search_path.starts_with(CERTIFICATION_DISCOVERY_SEARCH_PATH));
+        assert!(search_path.contains("toolServerId=tool%2Fserver"));
+        assert!(search_path.contains("status=active"));
+        assert!(search_path.contains("operatorIds=alpha%2Cbeta"));
+
+        let transparency_path = certification_marketplace_transparency_path(
+            &CertificationMarketplaceTransparencyQuery {
+                filters: CertificationTransparencyQuery {
+                    tool_server_id: Some("tool/server".to_string()),
+                },
+                operator_ids: Some("alpha,beta".to_string()),
+            },
+        );
+        assert!(transparency_path.starts_with(CERTIFICATION_DISCOVERY_TRANSPARENCY_PATH));
+        assert!(transparency_path.contains("toolServerId=tool%2Fserver"));
+        assert!(transparency_path.contains("operatorIds=alpha%2Cbeta"));
+    }
+
+    #[test]
+    fn request_json_retries_retryable_status_and_marks_preferred_endpoint() {
+        let retry =
+            StaticResponseServer::spawn(503, "{\"error\":\"retry\"}", "application/json", 1);
+        let success = StaticResponseServer::spawn(200, "{\"ok\":true}", "application/json", 1);
+        let client = build_client(&format!("{},{}", retry.url, success.url), "secret")
+            .expect("build failover client");
+
+        let response: Value = client
+            .request_json(
+                |agent, url, token| {
+                    assert_eq!(token, "secret");
+                    agent
+                        .get(url)
+                        .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                        .call()
+                },
+                "/status",
+            )
+            .expect("retry to healthy endpoint");
+
+        assert_eq!(response["ok"], Value::Bool(true));
+        assert_eq!(client.endpoint_order(), vec![1, 0]);
+    }
+
+    #[test]
+    fn request_text_without_service_auth_reads_text_response() {
+        let server = StaticResponseServer::spawn(200, "ready", "text/plain", 1);
+        let client = build_client(&server.url, "secret").expect("build text client");
+
+        let body = client
+            .request_text_without_service_auth(|agent, url| agent.get(url).call(), "/health")
+            .expect("read text response");
+
+        assert_eq!(body, "ready");
+    }
+
+    #[test]
+    fn trust_control_get_wrappers_encode_queries_and_service_auth() {
+        let server = StaticResponseServer::spawn(200, "{}", "application/json", 26);
+        let client = build_client(&server.url, "secret").expect("build client");
+
+        let _ = client.list_revocations(&RevocationQuery {
+            capability_id: Some("cap-1".to_string()),
+            limit: Some(2),
+        });
+        let _ = client.list_tool_receipts(&ToolReceiptQuery {
+            capability_id: Some("cap-2".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("echo".to_string()),
+            decision: Some("allow".to_string()),
+            limit: Some(3),
+        });
+        let _ = client.list_child_receipts(&ChildReceiptQuery {
+            session_id: Some("session-1".to_string()),
+            parent_request_id: Some("parent-1".to_string()),
+            request_id: Some("child-1".to_string()),
+            operation_kind: Some("create_message".to_string()),
+            terminal_state: Some("completed".to_string()),
+            limit: Some(4),
+        });
+        let _ = client.query_receipts(&ReceiptQueryHttpQuery {
+            capability_id: Some("cap-3".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("query".to_string()),
+            outcome: Some("allow".to_string()),
+            since: Some(10),
+            until: Some(20),
+            min_cost: Some(1),
+            max_cost: Some(9),
+            cursor: Some(7),
+            limit: Some(5),
+            agent_subject: Some("agent-1".to_string()),
+        });
+        let _ = client.shared_evidence_report(&SharedEvidenceQuery {
+            capability_id: Some("cap-4".to_string()),
+            agent_subject: Some("agent-2".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("share".to_string()),
+            since: Some(30),
+            until: Some(40),
+            issuer: Some("issuer-1".to_string()),
+            partner: Some("partner-1".to_string()),
+            limit: Some(6),
+        });
+
+        let exposure_query = ExposureLedgerQuery {
+            capability_id: Some("cap-exposure".to_string()),
+            agent_subject: Some("agent-3".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("exposure".to_string()),
+            since: Some(50),
+            until: Some(60),
+            receipt_limit: Some(7),
+            decision_limit: Some(8),
+        };
+        let _ = client.behavioral_feed(&BehavioralFeedQuery {
+            capability_id: Some("cap-feed".to_string()),
+            agent_subject: Some("agent-3".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("behavior".to_string()),
+            since: Some(50),
+            until: Some(60),
+            receipt_limit: Some(7),
+        });
+        let _ = client.exposure_ledger(&exposure_query);
+        let _ = client.credit_scorecard(&exposure_query);
+        let _ = client.credit_facility_report(&exposure_query);
+        let _ = client.credit_bond_report(&exposure_query);
+
+        let _ = client.capital_book(&CapitalBookQuery {
+            capability_id: Some("cap-capital".to_string()),
+            agent_subject: Some("agent-4".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("capital".to_string()),
+            since: Some(70),
+            until: Some(80),
+            receipt_limit: Some(9),
+            facility_limit: Some(10),
+            bond_limit: Some(11),
+            loss_event_limit: Some(12),
+        });
+        let _ = client.list_credit_facilities(&CreditFacilityListQuery {
+            facility_id: Some("facility-1".to_string()),
+            capability_id: Some("cap-facility".to_string()),
+            agent_subject: Some("agent-5".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("facility".to_string()),
+            disposition: None,
+            lifecycle_state: None,
+            limit: Some(13),
+        });
+        let _ = client.list_credit_bonds(&CreditBondListQuery {
+            bond_id: Some("bond-1".to_string()),
+            facility_id: Some("facility-1".to_string()),
+            capability_id: Some("cap-bond".to_string()),
+            agent_subject: Some("agent-6".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("bond".to_string()),
+            disposition: None,
+            lifecycle_state: None,
+            limit: Some(14),
+        });
+        let _ = client.credit_backtest(&CreditBacktestQuery {
+            capability_id: Some("cap-backtest".to_string()),
+            agent_subject: Some("agent-7".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("backtest".to_string()),
+            since: Some(90),
+            until: Some(100),
+            receipt_limit: Some(15),
+            decision_limit: Some(16),
+            window_seconds: Some(120),
+            window_count: Some(3),
+            stale_after_seconds: Some(240),
+        });
+        let _ = client.credit_provider_risk_package(&CreditProviderRiskPackageQuery {
+            capability_id: Some("cap-provider".to_string()),
+            agent_subject: Some("agent-8".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("provider".to_string()),
+            since: Some(110),
+            until: Some(120),
+            receipt_limit: Some(17),
+            decision_limit: Some(18),
+            recent_loss_limit: Some(4),
+        });
+        let _ = client.list_liability_providers(&LiabilityProviderListQuery {
+            provider_id: Some("provider-1".to_string()),
+            jurisdiction: Some("us-ny".to_string()),
+            coverage_class: None,
+            currency: Some("usd".to_string()),
+            lifecycle_state: None,
+            limit: Some(19),
+        });
+        let _ = client.liability_market_workflows(&LiabilityMarketWorkflowQuery {
+            quote_request_id: Some("quote-1".to_string()),
+            provider_id: Some("provider-2".to_string()),
+            agent_subject: Some("agent-9".to_string()),
+            jurisdiction: Some("us-ca".to_string()),
+            coverage_class: None,
+            currency: Some("usd".to_string()),
+            limit: Some(20),
+        });
+
+        let operator_query = OperatorReportQuery {
+            capability_id: Some("cap-operator".to_string()),
+            agent_subject: Some("agent-10".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("report".to_string()),
+            since: Some(130),
+            until: Some(140),
+            group_limit: Some(21),
+            time_bucket: None,
+            attribution_limit: Some(22),
+            budget_limit: Some(23),
+            settlement_limit: Some(24),
+            metered_limit: Some(25),
+            authorization_limit: Some(26),
+        };
+        let _ = client.operator_report(&operator_query);
+        let _ = client.metered_billing_report(&operator_query);
+        let _ = client.authorization_context_report(&operator_query);
+        let _ = client.authorization_profile_metadata();
+        let _ = client.authorization_review_pack(&operator_query);
+
+        let underwriting_input_query = UnderwritingPolicyInputQuery {
+            capability_id: Some("cap-underwriting".to_string()),
+            agent_subject: Some("agent-11".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("underwrite".to_string()),
+            since: Some(150),
+            until: Some(160),
+            receipt_limit: Some(27),
+        };
+        let _ = client.underwriting_policy_input(&underwriting_input_query);
+        let _ = client.underwriting_decision(&underwriting_input_query);
+        let _ = client.list_underwriting_decisions(&UnderwritingDecisionQuery {
+            decision_id: Some("decision-1".to_string()),
+            capability_id: Some("cap-decision".to_string()),
+            agent_subject: Some("agent-12".to_string()),
+            tool_server: Some("tool/server".to_string()),
+            tool_name: Some("decision".to_string()),
+            outcome: None,
+            lifecycle_state: None,
+            appeal_status: None,
+            limit: Some(28),
+        });
+        let _ = client.local_reputation(
+            "subject/key 9",
+            &LocalReputationQuery {
+                since: Some(170),
+                until: Some(180),
+            },
+        );
+
+        let requests = server.requests();
+        assert_eq!(requests.len(), 26);
+        assert_bearer_request(&requests[0], "GET", REVOCATIONS_PATH, &["capabilityId=cap-1", "limit=2"]);
+        assert_bearer_request(
+            &requests[1],
+            "GET",
+            TOOL_RECEIPTS_PATH,
+            &[
+                "capabilityId=cap-2",
+                "toolServer=tool%2Fserver",
+                "toolName=echo",
+                "decision=allow",
+                "limit=3",
+            ],
+        );
+        assert_bearer_request(
+            &requests[2],
+            "GET",
+            CHILD_RECEIPTS_PATH,
+            &[
+                "sessionId=session-1",
+                "parentRequestId=parent-1",
+                "requestId=child-1",
+                "operationKind=create_message",
+                "terminalState=completed",
+                "limit=4",
+            ],
+        );
+        assert_bearer_request(
+            &requests[3],
+            "GET",
+            RECEIPT_QUERY_PATH,
+            &[
+                "capabilityId=cap-3",
+                "toolServer=tool%2Fserver",
+                "toolName=query",
+                "outcome=allow",
+                "since=10",
+                "until=20",
+                "minCost=1",
+                "maxCost=9",
+                "cursor=7",
+                "limit=5",
+                "agentSubject=agent-1",
+            ],
+        );
+        assert_bearer_request(
+            &requests[4],
+            "GET",
+            FEDERATION_EVIDENCE_SHARES_PATH,
+            &[
+                "capabilityId=cap-4",
+                "agentSubject=agent-2",
+                "toolServer=tool%2Fserver",
+                "toolName=share",
+                "issuer=issuer-1",
+                "partner=partner-1",
+                "limit=6",
+            ],
+        );
+        assert_bearer_request(
+            &requests[5],
+            "GET",
+            BEHAVIORAL_FEED_PATH,
+            &[
+                "capabilityId=cap-feed",
+                "agentSubject=agent-3",
+                "toolServer=tool%2Fserver",
+                "toolName=behavior",
+                "receiptLimit=7",
+            ],
+        );
+        assert_bearer_request(
+            &requests[6],
+            "GET",
+            EXPOSURE_LEDGER_PATH,
+            &[
+                "capabilityId=cap-exposure",
+                "agentSubject=agent-3",
+                "toolServer=tool%2Fserver",
+                "toolName=exposure",
+                "receiptLimit=7",
+                "decisionLimit=8",
+            ],
+        );
+        assert_bearer_request(&requests[7], "GET", CREDIT_SCORECARD_PATH, &["capabilityId=cap-exposure"]);
+        assert_bearer_request(&requests[8], "GET", CREDIT_FACILITY_REPORT_PATH, &["capabilityId=cap-exposure"]);
+        assert_bearer_request(&requests[9], "GET", CREDIT_BOND_REPORT_PATH, &["capabilityId=cap-exposure"]);
+        assert_bearer_request(
+            &requests[10],
+            "GET",
+            CAPITAL_BOOK_PATH,
+            &[
+                "capabilityId=cap-capital",
+                "agentSubject=agent-4",
+                "receiptLimit=9",
+                "facilityLimit=10",
+                "bondLimit=11",
+                "lossEventLimit=12",
+            ],
+        );
+        assert_bearer_request(
+            &requests[11],
+            "GET",
+            CREDIT_FACILITIES_REPORT_PATH,
+            &[
+                "facilityId=facility-1",
+                "capabilityId=cap-facility",
+                "toolServer=tool%2Fserver",
+                "limit=13",
+            ],
+        );
+        assert_bearer_request(
+            &requests[12],
+            "GET",
+            CREDIT_BONDS_REPORT_PATH,
+            &[
+                "bondId=bond-1",
+                "facilityId=facility-1",
+                "capabilityId=cap-bond",
+                "toolServer=tool%2Fserver",
+                "limit=14",
+            ],
+        );
+        assert_bearer_request(
+            &requests[13],
+            "GET",
+            CREDIT_BACKTEST_PATH,
+            &[
+                "capabilityId=cap-backtest",
+                "agentSubject=agent-7",
+                "windowSeconds=120",
+                "windowCount=3",
+                "staleAfterSeconds=240",
+            ],
+        );
+        assert_bearer_request(
+            &requests[14],
+            "GET",
+            CREDIT_PROVIDER_RISK_PACKAGE_PATH,
+            &[
+                "capabilityId=cap-provider",
+                "agentSubject=agent-8",
+                "recentLossLimit=4",
+            ],
+        );
+        assert_bearer_request(
+            &requests[15],
+            "GET",
+            LIABILITY_PROVIDERS_REPORT_PATH,
+            &[
+                "providerId=provider-1",
+                "jurisdiction=us-ny",
+                "currency=usd",
+                "limit=19",
+            ],
+        );
+        assert_bearer_request(
+            &requests[16],
+            "GET",
+            LIABILITY_MARKET_WORKFLOW_REPORT_PATH,
+            &[
+                "quoteRequestId=quote-1",
+                "providerId=provider-2",
+                "agentSubject=agent-9",
+                "jurisdiction=us-ca",
+                "currency=usd",
+                "limit=20",
+            ],
+        );
+        assert_bearer_request(
+            &requests[17],
+            "GET",
+            OPERATOR_REPORT_PATH,
+            &[
+                "capabilityId=cap-operator",
+                "agentSubject=agent-10",
+                "groupLimit=21",
+                "authorizationLimit=26",
+            ],
+        );
+        assert_bearer_request(&requests[18], "GET", METERED_BILLING_REPORT_PATH, &["meteredLimit=25"]);
+        assert_bearer_request(
+            &requests[19],
+            "GET",
+            AUTHORIZATION_CONTEXT_REPORT_PATH,
+            &["authorizationLimit=26"],
+        );
+        assert_bearer_request(&requests[20], "GET", AUTHORIZATION_PROFILE_METADATA_PATH, &[]);
+        assert_bearer_request(
+            &requests[21],
+            "GET",
+            AUTHORIZATION_REVIEW_PACK_PATH,
+            &["authorizationLimit=26"],
+        );
+        assert_bearer_request(
+            &requests[22],
+            "GET",
+            UNDERWRITING_INPUT_PATH,
+            &[
+                "capabilityId=cap-underwriting",
+                "agentSubject=agent-11",
+                "toolServer=tool%2Fserver",
+                "receiptLimit=27",
+            ],
+        );
+        assert_bearer_request(
+            &requests[23],
+            "GET",
+            UNDERWRITING_DECISION_PATH,
+            &[
+                "capabilityId=cap-underwriting",
+                "agentSubject=agent-11",
+                "toolServer=tool%2Fserver",
+                "receiptLimit=27",
+            ],
+        );
+        assert_bearer_request(
+            &requests[24],
+            "GET",
+            UNDERWRITING_DECISIONS_REPORT_PATH,
+            &[
+                "decisionId=decision-1",
+                "capabilityId=cap-decision",
+                "agentSubject=agent-12",
+                "toolServer=tool%2Fserver",
+                "limit=28",
+            ],
+        );
+        assert_bearer_request(
+            &requests[25],
+            "GET",
+            &path_with_encoded_param(LOCAL_REPUTATION_PATH, "subject_key", "subject/key 9"),
+            &["since=170", "until=180"],
+        );
+    }
+
+    #[test]
+    fn trust_control_post_wrappers_send_json_bodies_and_encoded_paths() {
+        let server = StaticResponseServer::spawn(200, "{}", "application/json", 7);
+        let client = build_client(&server.url, "secret").expect("build client");
+
+        let _ = client.issue_credit_facility(&CreditFacilityIssueRequest {
+            query: ExposureLedgerQuery {
+                capability_id: Some("cap-post-facility".to_string()),
+                agent_subject: Some("agent-post".to_string()),
+                tool_server: Some("tool/post".to_string()),
+                tool_name: Some("facility".to_string()),
+                since: Some(200),
+                until: Some(210),
+                receipt_limit: Some(5),
+                decision_limit: Some(6),
+            },
+            supersedes_facility_id: Some("facility-prev".to_string()),
+        });
+        let _ = client.issue_credit_bond(&CreditBondIssueRequest {
+            query: ExposureLedgerQuery {
+                capability_id: Some("cap-post-bond".to_string()),
+                agent_subject: Some("agent-post".to_string()),
+                tool_server: Some("tool/post".to_string()),
+                tool_name: Some("bond".to_string()),
+                since: Some(220),
+                until: Some(230),
+                receipt_limit: Some(7),
+                decision_limit: Some(8),
+            },
+            supersedes_bond_id: Some("bond-prev".to_string()),
+        });
+        let _ = client.issue_underwriting_decision(&UnderwritingDecisionIssueRequest {
+            query: UnderwritingPolicyInputQuery {
+                capability_id: Some("cap-post-underwriting".to_string()),
+                agent_subject: Some("agent-post".to_string()),
+                tool_server: Some("tool/post".to_string()),
+                tool_name: Some("underwrite".to_string()),
+                since: Some(240),
+                until: Some(250),
+                receipt_limit: Some(9),
+            },
+            supersedes_decision_id: Some("decision-prev".to_string()),
+        });
+        let _ = client.issue_portable_reputation_summary(&PortableReputationSummaryIssueRequest {
+            subject_key: "subject-post".to_string(),
+            since: Some(260),
+            until: Some(270),
+            issued_at: Some(280),
+            expires_at: Some(290),
+            note: Some("summary note".to_string()),
+        });
+        let _ = client.issue_portable_negative_event(&arc_credentials::PortableNegativeEventIssueRequest {
+            subject_key: "subject-post".to_string(),
+            kind: arc_credentials::PortableNegativeEventKind::FraudSignal,
+            severity: 0.9,
+            observed_at: 300,
+            published_at: Some(310),
+            expires_at: Some(320),
+            evidence_refs: vec![arc_credentials::PortableNegativeEventEvidenceReference {
+                kind: arc_credentials::PortableNegativeEventEvidenceKind::External,
+                reference_id: "case-1".to_string(),
+                uri: Some("https://issuer.example/cases/1".to_string()),
+                sha256: None,
+            }],
+            note: Some("negative event".to_string()),
+        });
+        let _ = client.evaluate_portable_reputation(&arc_credentials::PortableReputationEvaluationRequest {
+            subject_key: "subject-post".to_string(),
+            summaries: Vec::new(),
+            negative_events: Vec::new(),
+            weighting_profile: arc_credentials::PortableReputationWeightingProfile {
+                profile_id: "profile-1".to_string(),
+                allowed_issuer_operator_ids: vec!["https://issuer.example".to_string()],
+                issuer_weights: BTreeMap::from([("https://issuer.example".to_string(), 1.0)]),
+                max_summary_age_secs: 3600,
+                max_event_age_secs: 3600,
+                reject_probationary: false,
+                negative_event_weight: 0.5,
+                blocking_event_kinds: vec![arc_credentials::PortableNegativeEventKind::FraudSignal],
+            },
+            evaluated_at: Some(330),
+        });
+        let _ = client.local_reputation(
+            "subject/key post",
+            &LocalReputationQuery {
+                since: Some(340),
+                until: Some(350),
+            },
+        );
+
+        let requests = server.requests();
+        assert_eq!(requests.len(), 7);
+        assert_json_post(
+            &requests[0],
+            CREDIT_FACILITY_ISSUE_PATH,
+            &["\"supersedesFacilityId\":\"facility-prev\"", "\"capabilityId\":\"cap-post-facility\""],
+        );
+        assert_json_post(
+            &requests[1],
+            CREDIT_BOND_ISSUE_PATH,
+            &["\"supersedesBondId\":\"bond-prev\"", "\"capabilityId\":\"cap-post-bond\""],
+        );
+        assert_json_post(
+            &requests[2],
+            UNDERWRITING_DECISION_ISSUE_PATH,
+            &["\"supersedesDecisionId\":\"decision-prev\"", "\"capabilityId\":\"cap-post-underwriting\""],
+        );
+        assert_json_post(
+            &requests[3],
+            PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH,
+            &["\"subjectKey\":\"subject-post\"", "\"note\":\"summary note\""],
+        );
+        assert_json_post(
+            &requests[4],
+            PORTABLE_NEGATIVE_EVENT_ISSUE_PATH,
+            &["\"subjectKey\":\"subject-post\"", "\"referenceId\":\"case-1\"", "\"severity\":0.9"],
+        );
+        assert_json_post(
+            &requests[5],
+            PORTABLE_REPUTATION_EVALUATE_PATH,
+            &["\"subjectKey\":\"subject-post\"", "\"profileId\":\"profile-1\"", "\"negativeEventWeight\":0.5"],
+        );
+        assert_bearer_request(
+            &requests[6],
+            "GET",
+            &path_with_encoded_param(LOCAL_REPUTATION_PATH, "subject_key", "subject/key post"),
+            &["since=340", "until=350"],
+        );
+    }
+
+    #[test]
+    fn authority_key_cache_from_status_validates_and_deduplicates_current_key() {
+        let current = Keypair::generate().public_key().to_hex();
+        let trusted_only = Keypair::generate().public_key().to_hex();
+
+        let cache = AuthorityKeyCache::from_status(&TrustAuthorityStatus {
+            configured: true,
+            backend: Some("sqlite".to_string()),
+            public_key: Some(current.clone()),
+            generation: Some(7),
+            rotated_at: Some(11),
+            applies_to_future_sessions_only: false,
+            trusted_public_keys: vec![trusted_only.clone()],
+        })
+        .expect("cache from valid status");
+
+        assert_eq!(
+            cache.current.as_ref().expect("current key").to_hex(),
+            current
+        );
+        assert_eq!(cache.trusted.len(), 2);
+        assert!(cache
+            .trusted
+            .iter()
+            .any(|public_key| public_key.to_hex() == current));
+        assert!(cache
+            .trusted
+            .iter()
+            .any(|public_key| public_key.to_hex() == trusted_only));
+
+        let missing_current = match AuthorityKeyCache::from_status(&TrustAuthorityStatus {
+            configured: true,
+            backend: None,
+            public_key: None,
+            generation: None,
+            rotated_at: None,
+            applies_to_future_sessions_only: false,
+            trusted_public_keys: Vec::new(),
+        }) {
+            Ok(_) => panic!("missing current key should fail"),
+            Err(error) => error,
+        };
+        assert!(missing_current
+            .to_string()
+            .contains("no current authority public key"));
+
+        let unconfigured = match AuthorityKeyCache::from_status(&TrustAuthorityStatus {
+            configured: false,
+            backend: None,
+            public_key: Some(current),
+            generation: None,
+            rotated_at: None,
+            applies_to_future_sessions_only: false,
+            trusted_public_keys: Vec::new(),
+        }) {
+            Ok(_) => panic!("unconfigured authority should fail"),
+            Err(error) => error,
+        };
+        assert!(unconfigured
+            .to_string()
+            .contains("does not have an authority configured"));
+    }
+
+    #[test]
+    fn retry_statuses_and_error_adapters_match_expected_behavior() {
+        assert!(should_retry_status(500));
+        assert!(should_retry_status(502));
+        assert!(should_retry_status(503));
+        assert!(should_retry_status(504));
+        assert!(!should_retry_status(400));
+        assert!(!should_retry_status(401));
+
+        let message = "backend unavailable".to_string();
+        let receipt_error = into_receipt_store_error(CliError::Other(message.clone()));
+        let revocation_error = into_revocation_store_error(CliError::Other(message.clone()));
+        let budget_error = into_budget_store_error(CliError::Other(message.clone()));
+
+        assert!(receipt_error.to_string().contains(&message));
+        assert!(revocation_error.to_string().contains(&message));
+        assert!(budget_error.to_string().contains(&message));
+    }
+}

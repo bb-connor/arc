@@ -1,3 +1,24 @@
+struct TokenResponseInput {
+    subject: String,
+    client_id: String,
+    resource: String,
+    scopes: Vec<String>,
+    authorization_details: Option<Vec<GovernedAuthorizationDetail>>,
+    transaction_context: Option<GovernedAuthorizationTransactionContext>,
+    sender_constraint: Option<ArcSenderConstraintClaims>,
+    grant_type: Option<String>,
+}
+
+struct SignedAccessTokenInput<'a> {
+    subject: &'a str,
+    client_id: &'a str,
+    resource: &'a str,
+    scopes: &'a [String],
+    authorization_details: Option<&'a [GovernedAuthorizationDetail]>,
+    transaction_context: Option<&'a GovernedAuthorizationTransactionContext>,
+    sender_constraint: Option<&'a ArcSenderConstraintClaims>,
+}
+
 impl LocalAuthorizationServer {
     fn token_endpoint_url(&self) -> String {
         format!("{}/token", self.issuer.trim_end_matches('/'))
@@ -292,16 +313,16 @@ impl LocalAuthorizationServer {
         )
         .map_err(|message| oauth_token_error(StatusCode::BAD_REQUEST, "invalid_grant", &message))?;
 
-        Ok(self.issue_token_response(
-            grant.subject,
-            grant.client_id,
+        Ok(self.issue_token_response(TokenResponseInput {
+            subject: grant.subject,
+            client_id: grant.client_id,
             resource,
-            grant.scopes,
-            grant.authorization_details,
-            grant.transaction_context,
-            grant.sender_constraint,
-            Some("authorization_code"),
-        ))
+            scopes: grant.scopes,
+            authorization_details: grant.authorization_details,
+            transaction_context: grant.transaction_context,
+            sender_constraint: grant.sender_constraint,
+            grant_type: Some("authorization_code".to_string()),
+        }))
     }
 
     fn exchange_subject_token(
@@ -375,16 +396,16 @@ impl LocalAuthorizationServer {
             None,
         )?;
 
-        Ok(self.issue_token_response(
+        Ok(self.issue_token_response(TokenResponseInput {
             subject,
             client_id,
             resource,
             scopes,
             authorization_details,
             transaction_context,
-            claims.cnf,
-            Some("urn:ietf:params:oauth:grant-type:token-exchange"),
-        ))
+            sender_constraint: claims.cnf,
+            grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
+        }))
     }
 
     fn validate_subject_token(&self, token: &str) -> Result<(JwtClaims, String), Response> {
@@ -442,48 +463,27 @@ impl LocalAuthorizationServer {
         Ok((claims, signed_input))
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn issue_token_response(
-        &self,
-        subject: String,
-        client_id: String,
-        resource: String,
-        scopes: Vec<String>,
-        authorization_details: Option<Vec<GovernedAuthorizationDetail>>,
-        transaction_context: Option<GovernedAuthorizationTransactionContext>,
-        sender_constraint: Option<ArcSenderConstraintClaims>,
-        grant_type: Option<&str>,
-    ) -> Value {
-        let access_token = self.sign_access_token(
-            &subject,
-            &client_id,
-            &resource,
-            &scopes,
-            authorization_details.as_deref(),
-            transaction_context.as_ref(),
-            sender_constraint.as_ref(),
-        );
+    fn issue_token_response(&self, input: TokenResponseInput) -> Value {
+        let access_token = self.sign_access_token(SignedAccessTokenInput {
+            subject: &input.subject,
+            client_id: &input.client_id,
+            resource: &input.resource,
+            scopes: &input.scopes,
+            authorization_details: input.authorization_details.as_deref(),
+            transaction_context: input.transaction_context.as_ref(),
+            sender_constraint: input.sender_constraint.as_ref(),
+        });
         json!({
             "access_token": access_token,
             "token_type": "Bearer",
             "expires_in": self.access_token_ttl_secs,
-            "scope": scopes.join(" "),
+            "scope": input.scopes.join(" "),
             "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
-            "grant_type": grant_type,
+            "grant_type": input.grant_type,
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn sign_access_token(
-        &self,
-        subject: &str,
-        client_id: &str,
-        resource: &str,
-        scopes: &[String],
-        authorization_details: Option<&[GovernedAuthorizationDetail]>,
-        transaction_context: Option<&GovernedAuthorizationTransactionContext>,
-        sender_constraint: Option<&ArcSenderConstraintClaims>,
-    ) -> String {
+    fn sign_access_token(&self, input: SignedAccessTokenInput<'_>) -> String {
         let now = unix_now();
         let issued_at_nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -491,29 +491,33 @@ impl LocalAuthorizationServer {
             .unwrap_or(0);
         let mut claims = json!({
             "iss": self.issuer,
-            "sub": subject,
-            "aud": resource,
-            "scope": scopes.join(" "),
-            "client_id": client_id,
-            "resource": resource,
+            "sub": input.subject,
+            "aud": input.resource,
+            "scope": input.scopes.join(" "),
+            "client_id": input.client_id,
+            "resource": input.resource,
             "iat": now,
             "exp": now.saturating_add(self.access_token_ttl_secs),
             "jti": format!(
                 "atk-{}",
                 sha256_hex(
-                    format!("{issued_at_nanos}:{subject}:{client_id}:{resource}")
+                    format!(
+                        "{issued_at_nanos}:{}:{}:{}",
+                        input.subject, input.client_id, input.resource
+                    )
                         .as_bytes()
                 )
             ),
         });
-        if let Some(details) = authorization_details {
+        if let Some(details) = input.authorization_details {
             claims[ARC_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM] = json!(details);
         }
-        if let Some(context) = transaction_context {
+        if let Some(context) = input.transaction_context {
             claims[ARC_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM] = json!(context);
         }
-        if let Some(sender_constraint) =
-            sender_constraint.filter(|sender_constraint| !sender_constraint.is_empty())
+        if let Some(sender_constraint) = input
+            .sender_constraint
+            .filter(|sender_constraint| !sender_constraint.is_empty())
         {
             claims["cnf"] = json!(sender_constraint);
         }
@@ -1235,18 +1239,30 @@ impl JwtBearerVerifier {
         });
         Ok(
             SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-                principal,
-                claims.iss.clone(),
-                claims.sub.clone(),
-                audience,
-                scopes,
-                federated_claims,
-                enterprise_identity,
-                Some(sha256_hex(token.as_bytes())),
-                origin,
+                arc_core::OAuthBearerSessionAuthInput {
+                    principal,
+                    issuer: claims.iss.clone(),
+                    subject: claims.sub.clone(),
+                    audience,
+                    scopes,
+                    federated_claims,
+                    enterprise_identity,
+                    token_fingerprint: Some(sha256_hex(token.as_bytes())),
+                    origin,
+                },
             ),
         )
     }
+}
+
+struct IntrospectionSessionAuthInput<'a> {
+    token: &'a str,
+    headers: &'a HeaderMap,
+    introspection: OAuthIntrospectionResponse,
+    origin: Option<String>,
+    protected_resource_metadata: Option<&'a ProtectedResourceMetadata>,
+    expected_method: &'a str,
+    expected_target: &'a str,
 }
 
 impl IntrospectionBearerVerifier {
@@ -1289,7 +1305,7 @@ impl IntrospectionBearerVerifier {
                     &format!("token introspection endpoint returned invalid JSON: {error}"),
                 )
             })?;
-        self.session_auth_context_from_introspection(
+        self.session_auth_context_from_introspection(IntrospectionSessionAuthInput {
             token,
             headers,
             introspection,
@@ -1297,27 +1313,20 @@ impl IntrospectionBearerVerifier {
             protected_resource_metadata,
             expected_method,
             expected_target,
-        )
+        })
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn session_auth_context_from_introspection(
         &self,
-        token: &str,
-        headers: &HeaderMap,
-        introspection: OAuthIntrospectionResponse,
-        origin: Option<String>,
-        protected_resource_metadata: Option<&ProtectedResourceMetadata>,
-        expected_method: &str,
-        expected_target: &str,
+        input: IntrospectionSessionAuthInput<'_>,
     ) -> Result<SessionAuthContext, Response> {
-        if !introspection.active {
+        if !input.introspection.active {
             return Err(unauthorized_bearer_response(
                 "bearer token is inactive",
-                protected_resource_metadata,
+                input.protected_resource_metadata,
             ));
         }
-        if let Some(token_type) = introspection.token_type.as_deref() {
+        if let Some(token_type) = input.introspection.token_type.as_deref() {
             if !matches!(
                 token_type,
                 "Bearer"
@@ -1327,18 +1336,18 @@ impl IntrospectionBearerVerifier {
             ) {
                 return Err(unauthorized_bearer_response(
                     "introspection returned unsupported token_type",
-                    protected_resource_metadata,
+                    input.protected_resource_metadata,
                 ));
             }
         }
 
-        let claims = introspection.claims;
+        let claims = input.introspection.claims;
         let now = unix_now();
         if let Some(nbf) = claims.nbf {
             if now < nbf {
                 return Err(unauthorized_bearer_response(
                     "bearer token not yet valid",
-                    protected_resource_metadata,
+                    input.protected_resource_metadata,
                 ));
             }
         }
@@ -1346,7 +1355,7 @@ impl IntrospectionBearerVerifier {
             if now >= exp {
                 return Err(unauthorized_bearer_response(
                     "bearer token expired",
-                    protected_resource_metadata,
+                    input.protected_resource_metadata,
                 ));
             }
         }
@@ -1355,20 +1364,20 @@ impl IntrospectionBearerVerifier {
                 if actual_issuer != expected_issuer {
                     return Err(unauthorized_bearer_response(
                         "bearer token issuer mismatch",
-                        protected_resource_metadata,
+                        input.protected_resource_metadata,
                     ));
                 }
             }
         }
-        if let Some(expected_audience) = self
-            .audience
-            .as_deref()
-            .or_else(|| protected_resource_metadata.map(|metadata| metadata.resource.as_str()))
-        {
+        if let Some(expected_audience) = self.audience.as_deref().or_else(|| {
+            input
+                .protected_resource_metadata
+                .map(|metadata| metadata.resource.as_str())
+        }) {
             if !claims.includes_audience_or_resource(expected_audience) {
                 return Err(unauthorized_bearer_response(
                     "bearer token audience mismatch",
-                    protected_resource_metadata,
+                    input.protected_resource_metadata,
                 ));
             }
         }
@@ -1381,14 +1390,14 @@ impl IntrospectionBearerVerifier {
         {
             return Err(unauthorized_bearer_response(
                 "bearer token is missing required scope",
-                protected_resource_metadata,
+                input.protected_resource_metadata,
             ));
         }
         if let Some(value) = claims.authorization_details.clone() {
             let _ = parse_request_time_authorization_details_from_value(value).map_err(|_| {
                 unauthorized_bearer_response(
                     "bearer authorization_details claim is invalid",
-                    protected_resource_metadata,
+                    input.protected_resource_metadata,
                 )
             })?;
         }
@@ -1397,14 +1406,14 @@ impl IntrospectionBearerVerifier {
                 parse_request_time_transaction_context_from_value(value).map_err(|_| {
                     unauthorized_bearer_response(
                         "bearer arc_transaction_context claim is invalid",
-                        protected_resource_metadata,
+                        input.protected_resource_metadata,
                     )
                 })?;
             if context.identity_assertion.is_some() {
                 let expected_client_id = claims.client_id.as_deref().ok_or_else(|| {
                     unauthorized_bearer_response(
                         "bearer arc_transaction_context.identityAssertion requires client_id",
-                        protected_resource_metadata,
+                        input.protected_resource_metadata,
                     )
                 })?;
                 validate_request_time_transaction_context_binding(
@@ -1415,26 +1424,28 @@ impl IntrospectionBearerVerifier {
                 .map_err(|_| {
                     unauthorized_bearer_response(
                         "bearer arc_transaction_context claim is invalid",
-                        protected_resource_metadata,
+                        input.protected_resource_metadata,
                     )
                 })?;
             }
         }
         validate_sender_constraint_runtime(
             claims.cnf.as_ref(),
-            headers,
+            input.headers,
             claims.jti.as_deref(),
-            expected_target,
-            expected_method,
+            input.expected_target,
+            input.expected_method,
             &self.sender_dpop_nonce_store,
             &self.sender_dpop_config,
         )
-        .map_err(|message| unauthorized_bearer_response(&message, protected_resource_metadata))?;
+        .map_err(|message| {
+            unauthorized_bearer_response(&message, input.protected_resource_metadata)
+        })?;
 
         let principal = Some(build_federated_principal(
             &claims,
             self.issuer.as_deref(),
-            protected_resource_metadata,
+            input.protected_resource_metadata,
             self.provider_profile,
         )?);
         let federated_claims = build_federated_claims(&claims, self.provider_profile);
@@ -1454,7 +1465,8 @@ impl IntrospectionBearerVerifier {
             )
         });
         let audience = self.audience.clone().or_else(|| {
-            protected_resource_metadata
+            input
+                .protected_resource_metadata
                 .map(|metadata| metadata.resource.clone())
                 .or_else(|| {
                     claims
@@ -1464,15 +1476,17 @@ impl IntrospectionBearerVerifier {
         });
         Ok(
             SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-                principal,
-                claims.iss.clone().or_else(|| self.issuer.clone()),
-                claims.sub.clone(),
-                audience,
-                scopes,
-                federated_claims,
-                enterprise_identity,
-                Some(sha256_hex(token.as_bytes())),
-                origin,
+                arc_core::OAuthBearerSessionAuthInput {
+                    principal,
+                    issuer: claims.iss.clone().or_else(|| self.issuer.clone()),
+                    subject: claims.sub.clone(),
+                    audience,
+                    scopes,
+                    federated_claims,
+                    enterprise_identity,
+                    token_fingerprint: Some(sha256_hex(input.token.as_bytes())),
+                    origin: input.origin,
+                },
             ),
         )
     }

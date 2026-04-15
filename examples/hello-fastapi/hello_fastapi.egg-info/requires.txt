@@ -1,0 +1,5 @@
+arc-asgi>=0.1.0
+arc-fastapi>=0.1.0
+arc-sdk-python>=0.1.0
+fastapi<1,>=0.116
+uvicorn<1,>=0.35

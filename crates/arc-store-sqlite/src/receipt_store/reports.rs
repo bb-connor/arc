@@ -1459,16 +1459,18 @@ impl SqliteReceiptStore {
                 authorization_transaction_context_from_governed_metadata(&governed);
             let sender_constraint = derive_authorization_sender_constraint(
                 &receipt.id,
-                &receipt.tool_server,
-                &receipt.tool_name,
-                receipt_subject_key.as_deref(),
-                receipt_issuer_key.as_deref(),
-                lineage_subject_key.as_deref(),
-                lineage_issuer_key.as_deref(),
-                attribution
-                    .grant_index
-                    .or_else(|| persisted_grant_index.map(|value| value.max(0) as u32)),
-                grants_json.as_deref(),
+                AuthorizationSenderConstraintArgs {
+                    tool_server: &receipt.tool_server,
+                    tool_name: &receipt.tool_name,
+                    receipt_subject_key: receipt_subject_key.as_deref(),
+                    receipt_issuer_key: receipt_issuer_key.as_deref(),
+                    lineage_subject_key: lineage_subject_key.as_deref(),
+                    lineage_issuer_key: lineage_issuer_key.as_deref(),
+                    grant_index: attribution
+                        .grant_index
+                        .or_else(|| persisted_grant_index.map(|value| value.max(0) as u32)),
+                    grants_json: grants_json.as_deref(),
+                },
                 &transaction_context,
             )?;
 

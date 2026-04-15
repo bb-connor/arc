@@ -1048,19 +1048,32 @@ pub(crate) fn resolve_sender_constraint_grant(
     Ok((index as u32, grant.dpop_required == Some(true)))
 }
 
-#[allow(clippy::too_many_arguments)]
+pub(crate) struct AuthorizationSenderConstraintArgs<'a> {
+    pub(crate) tool_server: &'a str,
+    pub(crate) tool_name: &'a str,
+    pub(crate) receipt_subject_key: Option<&'a str>,
+    pub(crate) receipt_issuer_key: Option<&'a str>,
+    pub(crate) lineage_subject_key: Option<&'a str>,
+    pub(crate) lineage_issuer_key: Option<&'a str>,
+    pub(crate) grant_index: Option<u32>,
+    pub(crate) grants_json: Option<&'a str>,
+}
+
 pub(crate) fn derive_authorization_sender_constraint(
     receipt_id: &str,
-    tool_server: &str,
-    tool_name: &str,
-    receipt_subject_key: Option<&str>,
-    receipt_issuer_key: Option<&str>,
-    lineage_subject_key: Option<&str>,
-    lineage_issuer_key: Option<&str>,
-    grant_index: Option<u32>,
-    grants_json: Option<&str>,
+    args: AuthorizationSenderConstraintArgs<'_>,
     transaction_context: &GovernedAuthorizationTransactionContext,
 ) -> Result<AuthorizationContextSenderConstraint, ReceiptStoreError> {
+    let AuthorizationSenderConstraintArgs {
+        tool_server,
+        tool_name,
+        receipt_subject_key,
+        receipt_issuer_key,
+        lineage_subject_key,
+        lineage_issuer_key,
+        grant_index,
+        grants_json,
+    } = args;
     let (subject_key, subject_key_source) = resolve_sender_constraint_subject_key(
         receipt_id,
         receipt_subject_key,

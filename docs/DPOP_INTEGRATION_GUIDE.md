@@ -1,6 +1,6 @@
 # ARC DPoP Integration Guide
 
-DPoP (Demonstration of Proof-of-Possession) prevents stolen-capability-token replay. When a `ToolGrant` carries `dpop_required: Some(true)`, the kernel requires the agent to attach a fresh cryptographic proof with every invocation. The proof binds the call to the agent's keypair, the specific capability token, the target tool, and the exact arguments.
+DPoP (Demonstration of Proof-of-Possession) is ARC's optional sender-constrained invocation profile. When a `ToolGrant` carries `dpop_required: Some(true)`, the kernel requires the agent to attach a fresh cryptographic proof with every invocation. The proof binds the call to the agent's keypair, the specific capability token, the target tool, and the exact arguments. Grants without `dpop_required: Some(true)` remain compatibility paths and should not be described as universally sender-constrained.
 
 ## When DPoP Is Required
 
@@ -24,7 +24,7 @@ JSON. It is not a JWT.
 
 ```rust
 pub struct DpopProofBody {
-    pub schema: String,        // "arc.dpop_proof.v1" (legacy `arc.*` accepted)
+    pub schema: String,        // "arc.dpop_proof.v1" (compatibility schema alias accepted)
     pub capability_id: String, // token ID of the capability being used
     pub tool_server: String,   // server_id of the target tool server
     pub tool_name: String,     // name of the tool being called
@@ -59,8 +59,8 @@ Each proof is bound to a single invocation by four fields:
 
 `verify_dpop_proof` in `arc-kernel` enforces six steps in order. The first failure returns an error and the invocation is denied.
 
-1. Schema check: `body.schema` must equal `"arc.dpop_proof.v1"` or the legacy
-   compatibility value `"arc.dpop_proof.v1"`.
+1. Schema check: `body.schema` must equal the current ARC DPoP schema or a
+   compatibility alias accepted by the verifier.
 2. Sender constraint: `body.agent_key` must equal `capability.subject` (the public key the token was issued to).
 3. Binding fields: `capability_id`, `tool_server`, `tool_name`, and `action_hash` must all match the kernel's expected values.
 4. Freshness: `body.issued_at + proof_ttl_secs >= now` (proof not expired) and `body.issued_at <= now + max_clock_skew_secs` (proof not future-dated beyond tolerance).

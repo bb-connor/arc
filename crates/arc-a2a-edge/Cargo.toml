@@ -1,6 +1,6 @@
 [package]
 name = "arc-a2a-edge"
-description = "A2A edge crate that exposes ARC tools as A2A skills with SendMessage and streaming"
+description = "A2A edge crate that exposes ARC tools as blocking A2A skills with truthful compatibility isolation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,16 @@ repository.workspace = true
 [lib]
 name = "arc_a2a_edge"
 
+[features]
+default = []
+compatibility-surface = []
+
 [dependencies]
 arc-core = { package = "arc-core-types", path = "../arc-core-types" }
+arc-cross-protocol = { package = "arc-cross-protocol", path = "../arc-cross-protocol" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
+arc-mcp-edge = { package = "arc-mcp-edge", path = "../arc-mcp-edge" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

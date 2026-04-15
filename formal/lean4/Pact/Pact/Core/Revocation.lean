@@ -96,7 +96,7 @@ def validateDelegationChain (chain : List DelegationLink) (maxDepth : Option Nat
 /-- Simplified kernel evaluation pipeline.
     Every path returns a Decision. Errors map to deny.
     Mirrors: ArcKernel::evaluate_tool_call in lib.rs. -/
-def evalToolCall
+noncomputable def evalToolCall
     (trustedKeys : List PublicKeyHex)
     (store : RevocationStore)
     (cap : CapabilityToken)

@@ -1,7 +1,6 @@
 pub const ARC_PUBLIC_ISSUER_DISCOVERY_SCHEMA: &str = "arc.public-issuer-discovery.v1";
 pub const ARC_PUBLIC_VERIFIER_DISCOVERY_SCHEMA: &str = "arc.public-verifier-discovery.v1";
-pub const ARC_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA: &str =
-    "arc.public-discovery-transparency.v1";
+pub const ARC_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA: &str = "arc.public-discovery-transparency.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -137,31 +136,48 @@ pub struct SignedPublicDiscoveryTransparency {
     pub signature: Signature,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedPublicIssuerDiscoveryInput {
+    pub discovery_id: String,
+    pub issuer: String,
+    pub version: u64,
+    pub published_at: u64,
+    pub expires_at: u64,
+    pub metadata_url: String,
+    pub metadata_sha256: String,
+    pub jwks_uri: Option<String>,
+    pub credential_configuration_ids: Vec<String>,
+    pub passport_status_distribution: PassportStatusDistribution,
+    pub import_guardrails: PublicDiscoveryImportGuardrails,
+}
+
 pub fn create_signed_public_issuer_discovery(
     signer_keypair: &Keypair,
-    discovery_id: impl Into<String>,
-    issuer: impl Into<String>,
-    version: u64,
-    published_at: u64,
-    expires_at: u64,
-    metadata_url: impl Into<String>,
-    metadata_sha256: impl Into<String>,
-    jwks_uri: Option<String>,
-    credential_configuration_ids: Vec<String>,
-    passport_status_distribution: PassportStatusDistribution,
-    import_guardrails: PublicDiscoveryImportGuardrails,
+    input: SignedPublicIssuerDiscoveryInput,
 ) -> Result<SignedPublicIssuerDiscovery, CredentialError> {
+    let SignedPublicIssuerDiscoveryInput {
+        discovery_id,
+        issuer,
+        version,
+        published_at,
+        expires_at,
+        metadata_url,
+        metadata_sha256,
+        jwks_uri,
+        credential_configuration_ids,
+        passport_status_distribution,
+        import_guardrails,
+    } = input;
     let body = SignedPublicIssuerDiscoveryBody {
         schema: ARC_PUBLIC_ISSUER_DISCOVERY_SCHEMA.to_string(),
-        discovery_id: discovery_id.into(),
-        issuer: issuer.into(),
+        discovery_id,
+        issuer,
         signer_public_key: signer_keypair.public_key(),
         version,
         published_at,
         expires_at,
-        metadata_url: metadata_url.into(),
-        metadata_sha256: metadata_sha256.into(),
+        metadata_url,
+        metadata_sha256,
         jwks_uri,
         credential_configuration_ids,
         passport_status_distribution,
@@ -195,32 +211,48 @@ pub fn ensure_signed_public_issuer_discovery_active(
     ensure_signed_public_discovery_active(document.body.published_at, document.body.expires_at, now)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedPublicVerifierDiscoveryInput {
+    pub discovery_id: String,
+    pub verifier: String,
+    pub version: u64,
+    pub published_at: u64,
+    pub expires_at: u64,
+    pub metadata_url: String,
+    pub metadata_sha256: String,
+    pub jwks_uri: String,
+    pub request_uri_prefix: String,
+    pub import_guardrails: PublicDiscoveryImportGuardrails,
+}
+
 pub fn create_signed_public_verifier_discovery(
     signer_keypair: &Keypair,
-    discovery_id: impl Into<String>,
-    verifier: impl Into<String>,
-    version: u64,
-    published_at: u64,
-    expires_at: u64,
-    metadata_url: impl Into<String>,
-    metadata_sha256: impl Into<String>,
-    jwks_uri: impl Into<String>,
-    request_uri_prefix: impl Into<String>,
-    import_guardrails: PublicDiscoveryImportGuardrails,
+    input: SignedPublicVerifierDiscoveryInput,
 ) -> Result<SignedPublicVerifierDiscovery, CredentialError> {
+    let SignedPublicVerifierDiscoveryInput {
+        discovery_id,
+        verifier,
+        version,
+        published_at,
+        expires_at,
+        metadata_url,
+        metadata_sha256,
+        jwks_uri,
+        request_uri_prefix,
+        import_guardrails,
+    } = input;
     let body = SignedPublicVerifierDiscoveryBody {
         schema: ARC_PUBLIC_VERIFIER_DISCOVERY_SCHEMA.to_string(),
-        discovery_id: discovery_id.into(),
-        verifier: verifier.into(),
+        discovery_id,
+        verifier,
         signer_public_key: signer_keypair.public_key(),
         version,
         published_at,
         expires_at,
-        metadata_url: metadata_url.into(),
-        metadata_sha256: metadata_sha256.into(),
-        jwks_uri: jwks_uri.into(),
-        request_uri_prefix: request_uri_prefix.into(),
+        metadata_url,
+        metadata_sha256,
+        jwks_uri,
+        request_uri_prefix,
         import_guardrails,
     };
     verify_signed_public_verifier_discovery_body(&body)?;
@@ -251,21 +283,34 @@ pub fn ensure_signed_public_verifier_discovery_active(
     ensure_signed_public_discovery_active(document.body.published_at, document.body.expires_at, now)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignedPublicDiscoveryTransparencyInput {
+    pub transparency_id: String,
+    pub publisher: String,
+    pub version: u64,
+    pub published_at: u64,
+    pub expires_at: u64,
+    pub entries: Vec<PublicDiscoveryTransparencyEntry>,
+    pub import_guardrails: PublicDiscoveryImportGuardrails,
+}
+
 pub fn create_signed_public_discovery_transparency(
     signer_keypair: &Keypair,
-    transparency_id: impl Into<String>,
-    publisher: impl Into<String>,
-    version: u64,
-    published_at: u64,
-    expires_at: u64,
-    entries: Vec<PublicDiscoveryTransparencyEntry>,
-    import_guardrails: PublicDiscoveryImportGuardrails,
+    input: SignedPublicDiscoveryTransparencyInput,
 ) -> Result<SignedPublicDiscoveryTransparency, CredentialError> {
+    let SignedPublicDiscoveryTransparencyInput {
+        transparency_id,
+        publisher,
+        version,
+        published_at,
+        expires_at,
+        entries,
+        import_guardrails,
+    } = input;
     let body = SignedPublicDiscoveryTransparencyBody {
         schema: ARC_PUBLIC_DISCOVERY_TRANSPARENCY_SCHEMA.to_string(),
-        transparency_id: transparency_id.into(),
-        publisher: publisher.into(),
+        transparency_id,
+        publisher,
         signer_public_key: signer_keypair.public_key(),
         version,
         published_at,
@@ -374,8 +419,7 @@ fn verify_signed_public_discovery_transparency_body(
     }
     if body.transparency_id.trim().is_empty() {
         return Err(CredentialError::InvalidPublicDiscoveryDocument(
-            "public discovery transparency must include a non-empty transparency_id"
-                .to_string(),
+            "public discovery transparency must include a non-empty transparency_id".to_string(),
         ));
     }
     if body.version == 0 {
@@ -474,22 +518,29 @@ mod discovery_tests {
         let signer = Keypair::generate();
         let document = create_signed_public_issuer_discovery(
             &signer,
-            "issuer-discovery-1",
-            "https://issuer.example.com",
-            1,
-            100,
-            300,
-            "https://issuer.example.com/.well-known/openid-credential-issuer",
-            "abc123",
-            Some("https://issuer.example.com/.well-known/jwks.json".to_string()),
-            vec!["arc_agent_passport".to_string(), "arc_agent_passport_sd_jwt_vc".to_string()],
-            PassportStatusDistribution {
-                resolve_urls: vec![
-                    "https://issuer.example.com/v1/public/passport/statuses/resolve".to_string(),
+            SignedPublicIssuerDiscoveryInput {
+                discovery_id: "issuer-discovery-1".to_string(),
+                issuer: "https://issuer.example.com".to_string(),
+                version: 1,
+                published_at: 100,
+                expires_at: 300,
+                metadata_url: "https://issuer.example.com/.well-known/openid-credential-issuer"
+                    .to_string(),
+                metadata_sha256: "abc123".to_string(),
+                jwks_uri: Some("https://issuer.example.com/.well-known/jwks.json".to_string()),
+                credential_configuration_ids: vec![
+                    "arc_agent_passport".to_string(),
+                    "arc_agent_passport_sd_jwt_vc".to_string(),
                 ],
-                cache_ttl_secs: Some(300),
+                passport_status_distribution: PassportStatusDistribution {
+                    resolve_urls: vec![
+                        "https://issuer.example.com/v1/public/passport/statuses/resolve"
+                            .to_string(),
+                    ],
+                    cache_ttl_secs: Some(300),
+                },
+                import_guardrails: PublicDiscoveryImportGuardrails::default(),
             },
-            PublicDiscoveryImportGuardrails::default(),
         )
         .expect("issuer discovery");
 
@@ -502,18 +553,22 @@ mod discovery_tests {
         let signer = Keypair::generate();
         let error = create_signed_public_verifier_discovery(
             &signer,
-            "verifier-discovery-1",
-            "https://verifier.example.com",
-            1,
-            100,
-            300,
-            "https://verifier.example.com/.well-known/arc-oid4vp-verifier",
-            "def456",
-            "https://verifier.example.com/.well-known/jwks.json",
-            "https://verifier.example.com/v1/public/passport/oid4vp/requests/",
-            PublicDiscoveryImportGuardrails {
-                informational_only: false,
-                ..PublicDiscoveryImportGuardrails::default()
+            SignedPublicVerifierDiscoveryInput {
+                discovery_id: "verifier-discovery-1".to_string(),
+                verifier: "https://verifier.example.com".to_string(),
+                version: 1,
+                published_at: 100,
+                expires_at: 300,
+                metadata_url: "https://verifier.example.com/.well-known/arc-oid4vp-verifier"
+                    .to_string(),
+                metadata_sha256: "def456".to_string(),
+                jwks_uri: "https://verifier.example.com/.well-known/jwks.json".to_string(),
+                request_uri_prefix:
+                    "https://verifier.example.com/v1/public/passport/oid4vp/requests/".to_string(),
+                import_guardrails: PublicDiscoveryImportGuardrails {
+                    informational_only: false,
+                    ..PublicDiscoveryImportGuardrails::default()
+                },
             },
         )
         .expect_err("missing informational guardrail should fail");
@@ -526,34 +581,36 @@ mod discovery_tests {
         let signer = Keypair::generate();
         let error = create_signed_public_discovery_transparency(
             &signer,
-            "transparency-1",
-            "https://trust.example.com",
-            1,
-            100,
-            300,
-            vec![
-                PublicDiscoveryTransparencyEntry {
-                    kind: PublicDiscoveryEntryKind::Issuer,
-                    discovery_id: "issuer-discovery-1".to_string(),
-                    metadata_url:
-                        "https://trust.example.com/.well-known/openid-credential-issuer"
-                            .to_string(),
-                    document_sha256: "aaa".to_string(),
-                    published_at: 100,
-                    expires_at: 300,
-                },
-                PublicDiscoveryTransparencyEntry {
-                    kind: PublicDiscoveryEntryKind::Issuer,
-                    discovery_id: "issuer-discovery-1".to_string(),
-                    metadata_url:
-                        "https://trust.example.com/.well-known/openid-credential-issuer"
-                            .to_string(),
-                    document_sha256: "bbb".to_string(),
-                    published_at: 100,
-                    expires_at: 300,
-                },
-            ],
-            PublicDiscoveryImportGuardrails::default(),
+            SignedPublicDiscoveryTransparencyInput {
+                transparency_id: "transparency-1".to_string(),
+                publisher: "https://trust.example.com".to_string(),
+                version: 1,
+                published_at: 100,
+                expires_at: 300,
+                entries: vec![
+                    PublicDiscoveryTransparencyEntry {
+                        kind: PublicDiscoveryEntryKind::Issuer,
+                        discovery_id: "issuer-discovery-1".to_string(),
+                        metadata_url:
+                            "https://trust.example.com/.well-known/openid-credential-issuer"
+                                .to_string(),
+                        document_sha256: "aaa".to_string(),
+                        published_at: 100,
+                        expires_at: 300,
+                    },
+                    PublicDiscoveryTransparencyEntry {
+                        kind: PublicDiscoveryEntryKind::Issuer,
+                        discovery_id: "issuer-discovery-1".to_string(),
+                        metadata_url:
+                            "https://trust.example.com/.well-known/openid-credential-issuer"
+                                .to_string(),
+                        document_sha256: "bbb".to_string(),
+                        published_at: 100,
+                        expires_at: 300,
+                    },
+                ],
+                import_guardrails: PublicDiscoveryImportGuardrails::default(),
+            },
         )
         .expect_err("duplicate transparency entries should fail");
 

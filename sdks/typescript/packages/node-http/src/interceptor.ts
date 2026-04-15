@@ -8,12 +8,14 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { PassThrough } from "node:stream";
 import { defaultIdentityExtractor } from "./identity.js";
 import { ArcSidecarClient, SidecarError } from "./sidecar-client.js";
 import type {
   ArcConfig,
   ArcErrorResponse,
   ArcHttpRequest,
+  ArcPassthrough,
   CallerIdentity,
   EvaluateResponse,
   HttpMethod,
@@ -22,6 +24,8 @@ import type {
   Verdict,
 } from "./types.js";
 import { ARC_ERROR_CODES, isDenied } from "./types.js";
+
+const bufferedNodeBodies = new WeakMap<IncomingMessage, Buffer>();
 
 // -- Helpers --
 
@@ -92,7 +96,7 @@ export function resolveConfig(config: ArcConfig): ResolvedConfig {
     routePatternResolver: config.routePatternResolver ?? defaultRoutePatternResolver,
     onSidecarError: config.onSidecarError ?? "deny",
     timeoutMs: config.timeoutMs ?? 5000,
-    forwardHeaders: config.forwardHeaders ?? ["content-type", "content-length", "x-arc-capability"],
+    forwardHeaders: config.forwardHeaders ?? ["content-type", "content-length"],
     client,
   };
 }
@@ -111,6 +115,34 @@ export interface BuildRequestOptions {
   capabilityId: string | undefined;
 }
 
+export function getBufferedNodeRequestBody(req: IncomingMessage): Buffer | undefined {
+  return bufferedNodeBodies.get(req);
+}
+
+export interface NodeInterceptionOutcome {
+  responseSent: boolean;
+  result: EvaluateResponse | null;
+  passthrough: ArcPassthrough | null;
+}
+
+export interface WebInterceptionOutcome {
+  response: Response;
+  result: EvaluateResponse | null;
+  passthrough: ArcPassthrough | null;
+}
+
+function capabilityIdFromToken(rawToken: string | undefined): string | undefined {
+  if (rawToken == null || rawToken.length === 0) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(rawToken) as { id?: unknown };
+    return typeof parsed.id === "string" ? parsed.id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Build an ArcHttpRequest from extracted request parts. */
 export function buildArcHttpRequest(opts: BuildRequestOptions): ArcHttpRequest {
   return {
@@ -119,11 +151,7 @@ export function buildArcHttpRequest(opts: BuildRequestOptions): ArcHttpRequest {
     route_pattern: opts.routePattern,
     path: opts.path,
     query: opts.query,
-    headers: filterHeaders(opts.headers, [
-      "content-type",
-      "content-length",
-      "x-arc-capability",
-    ]),
+    headers: filterHeaders(opts.headers, ["content-type", "content-length"]),
     caller: opts.caller,
     body_hash: opts.bodyHash,
     body_length: opts.bodyLength,
@@ -154,20 +182,22 @@ function filterHeaders(
  * Evaluates against the ARC sidecar and either allows the request
  * to proceed or sends a deny response.
  *
- * Returns the evaluation result if allowed, or null if denied (response already sent).
+ * Returns a structured outcome. Real signed ARC evidence is exposed via
+ * `result`. Fail-open passthroughs expose `passthrough` instead of
+ * fabricating a receipt-like object.
  */
 export async function interceptNodeRequest(
   req: IncomingMessage,
   res: ServerResponse,
   resolved: ResolvedConfig,
-): Promise<EvaluateResponse | null> {
+): Promise<NodeInterceptionOutcome> {
   const method = normalizeMethod(req.method ?? "GET");
   if (method == null) {
     sendJsonResponse(res, 405, {
       error: ARC_ERROR_CODES.EVALUATION_FAILED,
       message: `unsupported HTTP method: ${req.method ?? "unknown"}`,
     });
-    return null;
+    return { responseSent: true, result: null, passthrough: null };
   }
 
   const url = req.url ?? "/";
@@ -177,12 +207,13 @@ export async function interceptNodeRequest(
   const caller = resolved.identityExtractor(req.headers as Record<string, string | string[] | undefined>);
   const routePattern = resolved.routePatternResolver(method, path);
 
-  // Read body for hashing
-  const bodyBytes = await readBody(req);
+  // Read body for hashing and replay it for downstream consumers.
+  const bodyBytes = await getNodeRequestBody(req);
   const bodyHash = bodyBytes.length > 0 ? sha256Hex(bodyBytes) : undefined;
   const bodyLength = bodyBytes.length;
 
-  const capabilityId = rawHeaders["x-arc-capability"] ?? undefined;
+  const capabilityToken = rawHeaders["x-arc-capability"] ?? query["arc_capability"] ?? undefined;
+  const capabilityId = capabilityIdFromToken(capabilityToken);
 
   const arcReq = buildArcHttpRequest({
     method,
@@ -197,7 +228,7 @@ export async function interceptNodeRequest(
   });
 
   try {
-    const result = await resolved.client.evaluate(arcReq);
+    const result = await resolved.client.evaluate(arcReq, rawHeaders["x-arc-capability"] ?? undefined);
 
     // Attach receipt ID to response
     res.setHeader("X-Arc-Receipt-Id", result.receipt.id);
@@ -207,12 +238,12 @@ export async function interceptNodeRequest(
         error: ARC_ERROR_CODES.ACCESS_DENIED,
         message: result.verdict.reason,
         receipt_id: result.receipt.id,
-        suggestion: "provide a valid capability token in the X-Arc-Capability header",
+        suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
       });
-      return null;
+      return { responseSent: true, result, passthrough: null };
     }
 
-    return result;
+    return { responseSent: false, result, passthrough: null };
   } catch (error) {
     return handleSidecarError(res, resolved, error);
   }
@@ -222,12 +253,14 @@ export async function interceptNodeRequest(
 
 /**
  * Intercept a Web API Request.
- * Returns an EvaluateResponse on allow, or a structured error Response on deny.
+ * Returns a structured outcome. Real signed ARC evidence is exposed via
+ * `result`. Fail-open passthroughs expose `passthrough` instead of
+ * fabricating a receipt-like object.
  */
 export async function interceptWebRequest(
   request: Request,
   resolved: ResolvedConfig,
-): Promise<{ response: Response; result: EvaluateResponse | null }> {
+): Promise<WebInterceptionOutcome> {
   const url = new URL(request.url);
   const method = normalizeMethod(request.method);
 
@@ -238,6 +271,7 @@ export async function interceptWebRequest(
         message: `unsupported HTTP method: ${request.method}`,
       }),
       result: null,
+      passthrough: null,
     };
   }
 
@@ -263,14 +297,15 @@ export async function interceptWebRequest(
   let bodyHash: string | undefined;
   let bodyLength = 0;
   if (request.body != null) {
-    const bodyBytes = new Uint8Array(await request.arrayBuffer());
+    const bodyBytes = new Uint8Array(await request.clone().arrayBuffer());
     bodyLength = bodyBytes.length;
     if (bodyLength > 0) {
       bodyHash = sha256Hex(bodyBytes);
     }
   }
 
-  const capabilityId = rawHeaders["x-arc-capability"] ?? undefined;
+  const capabilityToken = rawHeaders["x-arc-capability"] ?? query["arc_capability"] ?? undefined;
+  const capabilityId = capabilityIdFromToken(capabilityToken);
 
   const arcReq = buildArcHttpRequest({
     method,
@@ -285,35 +320,37 @@ export async function interceptWebRequest(
   });
 
   try {
-    const evalResult = await resolved.client.evaluate(arcReq);
+    const evalResult = await resolved.client.evaluate(arcReq, rawHeaders["x-arc-capability"] ?? undefined);
 
     if (isDenied(evalResult.verdict)) {
       const resp = jsonResponse(evalResult.verdict.http_status, {
         error: ARC_ERROR_CODES.ACCESS_DENIED,
         message: evalResult.verdict.reason,
         receipt_id: evalResult.receipt.id,
-        suggestion: "provide a valid capability token in the X-Arc-Capability header",
+        suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
       });
       resp.headers.set("X-Arc-Receipt-Id", evalResult.receipt.id);
-      return { response: resp, result: evalResult };
+      return { response: resp, result: evalResult, passthrough: null };
     }
 
     // Return a marker response that the framework wrapper will replace
     // with the actual upstream response.
     const resp = new Response(null, { status: 200 });
     resp.headers.set("X-Arc-Receipt-Id", evalResult.receipt.id);
-    return { response: resp, result: evalResult };
+    return { response: resp, result: evalResult, passthrough: null };
   } catch (error) {
-    if (resolved.onSidecarError === "allow") {
-      return {
-        response: new Response(null, { status: 200 }),
-        result: null,
-      };
-    }
     const message =
       error instanceof SidecarError
         ? error.message
         : `sidecar error: ${error instanceof Error ? error.message : String(error)}`;
+
+    if (resolved.onSidecarError === "allow") {
+      return {
+        response: new Response(null, { status: 200 }),
+        result: null,
+        passthrough: buildAllowWithoutReceipt(message),
+      };
+    }
 
     return {
       response: jsonResponse(502, {
@@ -321,11 +358,112 @@ export async function interceptWebRequest(
         message,
       }),
       result: null,
+      passthrough: null,
     };
   }
 }
 
 // -- Helpers --
+
+type ReplayableIncomingMessage = IncomingMessage & {
+  rawBody?: unknown;
+  body?: unknown;
+  [Symbol.asyncIterator]?: () => AsyncIterableIterator<Buffer>;
+};
+
+function bufferedBodyFromValue(value: unknown): Buffer | null {
+  if (value == null) {
+    return null;
+  }
+  if (Buffer.isBuffer(value)) {
+    return value;
+  }
+  if (value instanceof Uint8Array) {
+    return Buffer.from(value);
+  }
+  if (typeof value === "string") {
+    return Buffer.from(value, "utf-8");
+  }
+  return null;
+}
+
+function preserveReadableBody(req: IncomingMessage, bodyBytes: Buffer): void {
+  const replay = new PassThrough();
+  replay.end(bodyBytes);
+  const replayWithState = replay as PassThrough & { _readableState: unknown };
+
+  const replayable = req as unknown as Record<string | symbol, unknown>;
+  const replayMethods = [
+    "on",
+    "once",
+    "addListener",
+    "prependListener",
+    "prependOnceListener",
+    "removeListener",
+    "off",
+    "pipe",
+    "unpipe",
+    "pause",
+    "resume",
+    "read",
+    "setEncoding",
+  ] as const;
+
+  for (const method of replayMethods) {
+    const impl = replay[method];
+    if (typeof impl === "function") {
+      replayable[method] = impl.bind(replay) as unknown;
+    }
+  }
+
+  replayable[Symbol.asyncIterator] = replay[Symbol.asyncIterator].bind(replay) as unknown;
+
+  Object.defineProperty(replayable, "_readableState", {
+    configurable: true,
+    enumerable: false,
+    get: () => replayWithState._readableState,
+  });
+
+  Object.defineProperty(replayable, "complete", {
+    configurable: true,
+    enumerable: false,
+    get: () => replay.readableEnded,
+  });
+
+  for (const property of [
+    "readable",
+    "readableEnded",
+    "readableEncoding",
+    "readableFlowing",
+    "readableLength",
+  ] as const) {
+    Object.defineProperty(replayable, property, {
+      configurable: true,
+      enumerable: false,
+      get: () => replay[property],
+    });
+  }
+}
+
+async function getNodeRequestBody(req: IncomingMessage): Promise<Buffer> {
+  const replayable = req as ReplayableIncomingMessage;
+  const preBuffered =
+    bufferedBodyFromValue(replayable.rawBody) ??
+    bufferedBodyFromValue(replayable.body);
+  if (preBuffered != null) {
+    bufferedNodeBodies.set(req, preBuffered);
+    replayable.rawBody = preBuffered;
+    return preBuffered;
+  }
+
+  const bodyBytes = await readBody(req);
+  bufferedNodeBodies.set(req, bodyBytes);
+  replayable.rawBody = bodyBytes;
+  if (bodyBytes.length > 0) {
+    preserveReadableBody(req, bodyBytes);
+  }
+  return bodyBytes;
+}
 
 function readBody(req: IncomingMessage): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -351,47 +489,40 @@ function jsonResponse(status: number, body: ArcErrorResponse): Response {
 /**
  * Handle a sidecar error during Node.js request interception.
  *
- * When onSidecarError is "allow" (fail-open), returns a synthetic allow
- * EvaluateResponse so the caller forwards the request to the inner handler.
+ * When onSidecarError is "allow" (fail-open), returns an explicit passthrough
+ * marker so the caller can forward the request without a synthetic receipt.
  * When "deny" (fail-closed, default), sends a 502 error response and
- * returns null to signal that the response has already been sent.
+ * returns a blocked outcome to signal that the response has already been sent.
  */
 function handleSidecarError(
   res: ServerResponse,
   resolved: ResolvedConfig,
   error: unknown,
-): EvaluateResponse | null {
-  if (resolved.onSidecarError === "allow") {
-    // Return a synthetic allow result so the caller forwards the request.
-    return {
-      verdict: { verdict: "allow" },
-      receipt: {
-        id: "arc-sidecar-unavailable",
-        request_id: "",
-        route_pattern: "",
-        method: "GET",
-        caller_identity_hash: "",
-        verdict: { verdict: "allow" },
-        evidence: [],
-        response_status: 0,
-        timestamp: Math.floor(Date.now() / 1000),
-        content_hash: "",
-        policy_hash: "",
-        kernel_key: "",
-        signature: "",
-      },
-      evidence: [],
-    };
-  }
-
+): NodeInterceptionOutcome {
   const message =
     error instanceof SidecarError
       ? error.message
       : `sidecar error: ${error instanceof Error ? error.message : String(error)}`;
 
+  if (resolved.onSidecarError === "allow") {
+    return {
+      responseSent: false,
+      result: null,
+      passthrough: buildAllowWithoutReceipt(message),
+    };
+  }
+
   sendJsonResponse(res, 502, {
     error: ARC_ERROR_CODES.SIDECAR_UNREACHABLE,
     message,
   });
-  return null;
+  return { responseSent: true, result: null, passthrough: null };
+}
+
+function buildAllowWithoutReceipt(message: string): ArcPassthrough {
+  return {
+    mode: "allow_without_receipt",
+    error: ARC_ERROR_CODES.SIDECAR_UNREACHABLE,
+    message,
+  };
 }

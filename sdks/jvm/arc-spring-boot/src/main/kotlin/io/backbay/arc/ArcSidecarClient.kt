@@ -40,14 +40,17 @@ class ArcSidecarClient(
         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
     /** Evaluate an HTTP request against the ARC kernel. */
-    fun evaluate(request: ArcHttpRequest): EvaluateResponse {
+    fun evaluate(request: ArcHttpRequest, capabilityToken: String? = null): EvaluateResponse {
         val body = objectMapper.writeValueAsString(request)
-        val httpRequest = HttpRequest.newBuilder()
+        val requestBuilder = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl/arc/evaluate"))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(timeoutSeconds))
             .POST(HttpRequest.BodyPublishers.ofString(body))
-            .build()
+        if (!capabilityToken.isNullOrBlank()) {
+            requestBuilder.header("X-Arc-Capability", capabilityToken)
+        }
+        val httpRequest = requestBuilder.build()
 
         val response = try {
             httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString())

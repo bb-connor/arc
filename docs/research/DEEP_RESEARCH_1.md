@@ -1,5 +1,10 @@
 # ARC: Attested Rights Channel as Economic Security for AI Agents
 
+Historical strategy note: this document captures exploratory long-range
+research and market framing. It is not the current shipped-claim boundary.
+Use `docs/protocols/STRATEGIC-VISION.md` and `.planning/REQUIREMENTS.md`
+(`UPGRADE-02`) for the authoritative current claim gate.
+
 ## Executive summary
 
 ARC (Attested Rights Channel) is best framed as a **trust-and-economics control plane** for agentic systems: it turns “an agent can call tools” into “an agent can execute governed actions with auditable authority, bounded cost, and provable outcomes.” This framing is strongly aligned with where standards and regulators are converging: **identity + authorization for non-human actors, tamper-evident logging, and traceability of actions**. citeturn16view0turn11search5turn11search16

@@ -1,6 +1,6 @@
 # Release Audit
 
-**Prepared:** 2026-04-02
+**Prepared:** 2026-04-15
 **Role:** authoritative repo-local release-go record for the current ARC
 production candidate
 
@@ -29,10 +29,58 @@ The web3-runtime ladder now also has focused audit and reviewer material in
 [ARC_WEB3_READINESS_AUDIT.md](ARC_WEB3_READINESS_AUDIT.md) and
 [ARC_WEB3_PARTNER_PROOF.md](ARC_WEB3_PARTNER_PROOF.md).
 
+## Bounded ARC Ship Addendum
+
+This file now records one primary ship-facing decision boundary for the current
+repo state: bounded ARC. Stronger v3.16 and v3.17 claim gates still exist as
+repo-local addenda, but they are no longer the front-door release framing.
+
+**Local bounded-ship status:** bounded ARC qualified locally on 2026-04-15.
+The current retained decision is that ARC can ship honestly as a bounded
+governance and evidence control plane with signed receipts, explicit bounded
+hosted/auth profiles, bounded provenance semantics, and explicit local or
+leader-local operational contracts for trust-control, budgets, and review
+surfaces.
+
+Qualified claim:
+
+- ARC ships a cryptographically signed, fail-closed governance and evidence
+  control plane with signed receipts, checkpoints, bounded delegated-authority
+  semantics, bounded hosted/auth profiles, and explicit provenance classes on
+  the current ship-facing surfaces.
+- ARC's supported clustered control-plane story is leader-local and bounded,
+  not consensus-grade HA.
+- ARC's supported monetary budget story is single-node atomic with an explicit
+  clustered overrun bound, not distributed-linearizable spend truth.
+- ARC's supported public evidence story is signed local audit evidence and
+  signed visibility snapshots, not public transparency-log or strong
+  non-repudiation semantics.
+
+Not yet qualified:
+
+- theorem-prover completion for every protocol claim
+- authenticated recursive delegation ancestry beyond the preserved presented
+  chain
+- verifier-backed runtime assurance as the sole admission boundary
+- consensus-grade HA or distributed-linearizable budget authority
+- public transparency-log semantics
+- stronger universal-control-plane or comptroller-capable packaging claims as
+  the ship-facing release boundary
+- a proved "comptroller of the agent economy" market position
+
+Primary bounded-ship evidence commands:
+
+- `./scripts/qualify-bounded-arc.sh`
+- `./scripts/qualify-release.sh`
+
+Primary bounded-ship machine-readable gate:
+
+- [ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json](../standards/ARC_BOUNDED_ARC_QUALIFICATION_MATRIX.json)
+
 ## Decision
 
-**Decision:** Local go, external release hold for the current post-`v2.41`
-ARC production candidate defined in
+**Decision:** Local go, external release hold for the current bounded ARC
+release candidate defined in
 [RELEASE_CANDIDATE.md](RELEASE_CANDIDATE.md).
 
 That current candidate includes the bounded web3 runtime realized in `v2.34`

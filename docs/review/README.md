@@ -15,6 +15,8 @@ Each document covers one hole:
 
 ## Documents
 
+- [13-ship-blocker-ladder.md](./13-ship-blocker-ladder.md): release-triage ladder splitting bounded-ARC blockers, stronger-security blockers, and comptroller-thesis blockers into P0/P1/P2
+- [14-bounded-arc-pre-ship-checklist.md](./14-bounded-arc-pre-ship-checklist.md): authoritative pre-ship checklist for the bounded ARC release boundary, mapped to `v3.18`
 - [01-formal-verification-remediation.md](./01-formal-verification-remediation.md): formal model scope, refinement to Rust, and proof-gated claim discipline
 - [02-delegation-enforcement-remediation.md](./02-delegation-enforcement-remediation.md): runtime delegation-chain validation, attenuation enforcement, and lineage completeness
 - [03-runtime-attestation-remediation.md](./03-runtime-attestation-remediation.md): verifier-backed runtime assurance from raw evidence to kernel admission
@@ -29,6 +31,12 @@ Each document covers one hole:
 - [12-standards-positioning-remediation.md](./12-standards-positioning-remediation.md): protocol-vs-product boundaries, interoperable scope, and evidence-based comparative claims
 
 ## Suggested Order
+
+Start with the release-triage memo if the immediate question is "what blocks
+shipping?" then go to the underlying remediations:
+
+- [13-ship-blocker-ladder.md](./13-ship-blocker-ladder.md)
+- [14-bounded-arc-pre-ship-checklist.md](./14-bounded-arc-pre-ship-checklist.md)
 
 Start with the foundation docs first:
 

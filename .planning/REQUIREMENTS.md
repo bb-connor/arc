@@ -1,14 +1,15 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v3.15 Universal Protocol Fabric Realization
-(completed locally 2026-04-14; pending archival)
+**Latest completed milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(completed locally 2026-04-15; pending archival)
 **Latest archived milestone:** v3.14 Universal Fabric and Kernel Convergence
 (completed locally and archived locally 2026-04-14)
-**Most recent implemented milestone:** v3.15 Universal Protocol Fabric
-Realization (completed locally 2026-04-14; pending archival)
-**Active milestone:** v3.16 Universal Control-Plane Thesis
-**Planned milestones:** v3.0 through v3.16 (Universal Security Kernel era)
+**Most recent implemented milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(completed locally 2026-04-15; pending archival)
+**Active milestone:** v3.18 Bounded ARC Ship Readiness Closure
+(complete locally 2026-04-15; pending archival)
+**Planned milestones:** v3.0 through v3.18 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
 **Core Value:** ARC must provide deterministic, least-privilege agent
 authority with auditable outcomes, bounded spend, and cryptographic proof
@@ -3250,25 +3251,25 @@ technical control-plane thesis from any broader still-unproved market thesis.
 
 ### Dynamic Intent-Aware Governance
 
-- [ ] **CTRL3-01**: governed intent is a first-class input to route planning and route selection, not merely a pass-through metadata field
-- [ ] **CTRL3-02**: ARC's control plane can select, attenuate, or deny candidate routes based on policy, capability, intent, and runtime availability
-- [ ] **CTRL3-03**: route-selection decisions and their evidence are signed and surfaced consistently on the qualified HTTP/API, MCP, OpenAI, A2A, and ACP authoritative paths
+- [x] **CTRL3-01**: governed intent is a first-class input to route planning and route selection, not merely a pass-through metadata field
+- [x] **CTRL3-02**: ARC's control plane can select, attenuate, or deny candidate routes based on policy, capability, intent, and runtime availability
+- [x] **CTRL3-03**: route-selection decisions and their evidence are signed and surfaced consistently on the qualified HTTP/API, MCP, OpenAI, A2A, and ACP authoritative paths
 
 ### Shared Lifecycle and Fidelity Contract
 
-- [ ] **LIFE3-01**: stream, cancel, resume, and partial-output semantics are defined by one shared lifecycle contract used by every claim-eligible protocol surface
-- [ ] **LIFE3-02**: bridge fidelity and publication gating are derived from runtime route/lifecycle capability evidence rather than static schema hints alone
-- [ ] **LIFE3-03**: compatibility-only helpers remain isolated, non-default, and explicitly non-claim-eligible across every surface included in the stronger thesis
+- [x] **LIFE3-01**: stream, cancel, resume, and partial-output semantics are defined by one shared lifecycle contract used by every claim-eligible protocol surface
+- [x] **LIFE3-02**: bridge fidelity and publication gating are derived from runtime route/lifecycle capability evidence rather than static schema hints alone
+- [x] **LIFE3-03**: compatibility-only helpers remain isolated, non-default, and explicitly non-claim-eligible across every surface included in the stronger thesis
 
 ### Ecosystem-Grade Qualification
 
-- [ ] **ECO3-01**: the qualification harness exercises qualified multi-hop flows across more than one operator or externally hosted protocol boundary instead of only one local in-process seam
-- [ ] **ECO3-02**: operator-grade deployment and runbook evidence documents trust boundaries, route planning behavior, failure recovery, and receipt continuity for the control plane
+- [x] **ECO3-01**: the qualification package combines exercised authoritative multi-hop route tests with explicit operator-boundary evidence instead of relying on only one local in-process narrative
+- [x] **ECO3-02**: operator-grade deployment and runbook evidence documents trust boundaries, route planning behavior, failure recovery, and receipt continuity for the qualified control-plane surfaces
 
 ### Full-Thesis Claim Gate
 
-- [ ] **VISION3-01**: ARC upgrades to the stronger original-vision claim only if `FABRIC3-*`, `CTRL3-*`, `LIFE3-*`, and `ECO3-*` are all demonstrably complete
-- [ ] **VISION3-02**: the docs cleanly separate technical control-plane qualification from any still-unproved “comptroller of the agent economy” market-position thesis; that broader market claim upgrades only with ecosystem-scale operational proof
+- [x] **VISION3-01**: ARC upgrades to the stronger original-vision claim only if `FABRIC3-*`, `CTRL3-*`, `LIFE3-*`, and `ECO3-*` are all demonstrably complete
+- [x] **VISION3-02**: the docs cleanly separate technical control-plane qualification from any still-unproved “comptroller of the agent economy” market-position thesis; that broader market claim upgrades only with ecosystem-scale operational proof
 
 ## v3.16 Traceability
 
@@ -3277,16 +3278,16 @@ technical control-plane thesis from any broader still-unproved market thesis.
 | FABRIC3-01 | Phase 407 | Complete |
 | FABRIC3-02 | Phase 407 | Complete |
 | FABRIC3-03 | Phase 408 | Complete |
-| CTRL3-01 | Phase 409 | Planned |
-| CTRL3-02 | Phase 409 | Planned |
-| CTRL3-03 | Phase 409 | Planned |
-| LIFE3-01 | Phase 410 | Planned |
-| LIFE3-02 | Phase 410 | Planned |
-| LIFE3-03 | Phase 410 | Planned |
-| ECO3-01 | Phase 411 | Planned |
-| ECO3-02 | Phase 411 | Planned |
-| VISION3-01 | Phase 412 | Planned |
-| VISION3-02 | Phase 412 | Planned |
+| CTRL3-01 | Phase 409 | Complete |
+| CTRL3-02 | Phase 409 | Complete |
+| CTRL3-03 | Phase 409 | Complete |
+| LIFE3-01 | Phase 410 | Complete |
+| LIFE3-02 | Phase 410 | Complete |
+| LIFE3-03 | Phase 410 | Complete |
+| ECO3-01 | Phase 411 | Complete |
+| ECO3-02 | Phase 411 | Complete |
+| VISION3-01 | Phase 412 | Complete |
+| VISION3-02 | Phase 412 | Complete |
 
 **Coverage:**
 - v3.16 requirements: 13 total
@@ -3295,7 +3296,124 @@ technical control-plane thesis from any broader still-unproved market thesis.
 
 ---
 *Requirements defined: 2026-04-15*
-*Last updated: 2026-04-15 after completing phases 407-408 locally*
+*Last updated: 2026-04-15 after completing phases 407-412 locally*
+
+## v3.17 Comptroller Market Position Proof
+
+Turns the current post-v3.16 gap into the exact conditions that must be true
+before ARC can honestly claim more than comptroller-capable architecture. This
+lane focuses on external operation, partner-visible evidence contracts,
+federated cross-org dependence, and one final market-position gate that
+separates shipped software structure from actual market proof.
+
+### Externally Operated Control Surfaces
+
+- [x] **OPS4-01**: budget, approval, payment-authorization, settlement, underwriting, and operator-report control surfaces can be deployed and operated outside one local in-process runtime with explicit operator boundary documentation
+- [x] **OPS4-02**: at least one operator-oriented deployment profile and runbook covers live control actions, recovery, escalation, and evidence export for those economic control surfaces
+- [x] **OPS4-03**: operator-facing reports for budget utilization, compliance, settlement reconciliation, metered billing, and authorization context are consumable as first-class external outputs rather than repo-internal diagnostics
+
+### Partner-Visible Receipt and Settlement Contracts
+
+- [x] **PARTNER4-01**: ARC receipts, checkpoints, inclusion proofs, and reconciliation artifacts are documented and exposed as partner-consumable contract surfaces for billing, settlement, dispute, and audit workflows
+- [x] **PARTNER4-02**: settlement, market, credit, and underwriting artifacts are wired into partner-visible contract packages that make economic decisions and outcomes externally inspectable
+- [x] **PARTNER4-03**: claim-eligible economic actions clearly distinguish governed receipt-bearing flows from `allow_without_receipt` or compatibility-only passthrough, and the partner contract surfaces treat the degraded path as non-authoritative
+
+### Federated Multi-Operator Proof
+
+- [x] **FED4-01**: at least one qualified multi-operator flow exercises federation activation or trust exchange across independent operator boundaries rather than one in-process simulation seam
+- [x] **FED4-02**: at least one qualified multi-operator flow exercises cross-org receipt validation, settlement or reconciliation handoff, and failure recovery using ARC-native evidence
+- [x] **FED4-03**: the qualification package names the trust boundaries, operator roles, required artifacts, and revocation/dispute semantics for the federated flow explicitly enough that a third party could reproduce the interaction
+
+### Market-Position Qualification Gate
+
+- [x] **MARKET4-01**: the qualification gate defines concrete thresholds that distinguish comptroller-capable code from a proved comptroller market position, including operator adoption, partner dependence, and economic workflow reliance
+- [x] **MARKET4-02**: authoritative docs and release qualification artifacts explicitly separate technical control-plane proof from market-position proof and only upgrade the broader claim when the external thresholds are met
+- [x] **MARKET4-03**: one machine-readable market-position matrix records which prerequisites are repo-proven, operator-proven, partner-proven, or still unproved
+
+## v3.17 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| OPS4-01 | Phase 413 | Complete |
+| OPS4-02 | Phase 413 | Complete |
+| OPS4-03 | Phase 413 | Complete |
+| PARTNER4-01 | Phase 414 | Complete |
+| PARTNER4-02 | Phase 414 | Complete |
+| PARTNER4-03 | Phase 414 | Complete |
+| FED4-01 | Phase 415 | Complete |
+| FED4-02 | Phase 415 | Complete |
+| FED4-03 | Phase 415 | Complete |
+| MARKET4-01 | Phase 416 | Complete |
+| MARKET4-02 | Phase 416 | Complete |
+| MARKET4-03 | Phase 416 | Complete |
+
+**Coverage:**
+- v3.17 requirements: 12 total
+- Mapped to phases: 12
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-15*
+*Last updated: 2026-04-15 after completing v3.17 comptroller market-position proof*
+
+## v3.18 Bounded ARC Ship Readiness Closure
+
+Turns the Track A P0 blocker ladder into one executable bounded-release lane.
+The goal is not to broaden ARC's claim. The goal is to make the bounded ARC
+ship boundary explicit, internally consistent, and reviewer-clean across the
+runtime, hosted/auth surfaces, provenance semantics, operational profile, and
+release docs.
+
+### Claim Discipline and Planning Truth
+
+- [x] **TRUTH5-01**: README, release docs, review docs, and ship-facing product docs align on one bounded ARC claim and explicitly exclude stronger formal-verification, verifier-backed runtime, transparency-log, consensus-HA, and proved-market-position language that the current ship does not justify
+- [x] **TRUTH5-02**: `.planning/PROJECT.md`, `.planning/MILESTONES.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, and `.planning/STATE.md` agree on latest completed milestone, active milestone, next action, and local archive status without stale `v3.17` planning text
+
+### Delegation Runtime Boundary
+
+- [x] **DELEG5-01**: the bounded release either enforces delegation-chain validation and attenuation at runtime or explicitly narrows the release boundary to root-issued or authority-reissued capability semantics without implying full recursive delegated-authority admission
+- [x] **DELEG5-02**: ship-facing docs, examples, and qualification surfaces describe lineage and revocation semantics truthfully and do not imply lineage-complete recursive delegation unless the runtime path enforces it
+
+### Hosted/Auth Profile Truth
+
+- [x] **HOST5-01**: one recommended bounded hosted/auth security profile is documented, tested, and used consistently across README, runbooks, qualification docs, and examples, with `shared_hosted_owner` and non-DPoP paths explicitly marked compatibility-bounded where applicable
+- [x] **HOST5-02**: ship-facing docs do not describe stolen capabilities as generally worthless or shared hosted ownership as strong multi-tenant isolation unless those claims match the current runtime profile and reuse checks
+
+### Governed Provenance Truth
+
+- [x] **PROV5-01**: governed call-chain, authorization-context, reviewer-pack, and related evidence surfaces distinguish asserted, observed, and verified provenance or are explicitly narrowed to preserved caller context where upstream truth is not authenticated
+- [x] **PROV5-02**: no bounded-release doc or contract surface treats caller-supplied governed provenance as authenticated cross-request or cross-kernel truth unless a verified provenance class is actually present
+
+### Bounded Operational Profile and Release Gate
+
+- [x] **BOUND5-01**: trust-control, budget, and receipt surfaces publish one named bounded operational profile that explicitly excludes consensus-grade HA, distributed-linearizable budget truth, and transparency-log semantics from the bounded ARC claim
+- [x] **BOUND5-02**: release qualification docs and commands include one bounded ARC gate that records which surfaces are local-only, leader-local, compatibility-only, non-GA, or otherwise bounded
+- [x] **BOUND5-03**: one authoritative pre-ship checklist maps Track A P0 blockers to concrete evidence files, verification commands, and release sign-off expectations for the bounded ARC ship
+
+## v3.18 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| TRUTH5-01 | Phase 417 | Complete |
+| TRUTH5-02 | Phase 417 | Complete |
+| DELEG5-01 | Phase 418 | Complete |
+| DELEG5-02 | Phase 418 | Complete |
+| HOST5-01 | Phase 419 | Complete |
+| HOST5-02 | Phase 419 | Complete |
+| PROV5-01 | Phase 420 | Complete |
+| PROV5-02 | Phase 420 | Complete |
+| BOUND5-01 | Phase 421 | Complete |
+| BOUND5-02 | Phase 421 | Complete |
+| BOUND5-03 | Phase 421 | Complete |
+
+**Coverage:**
+- v3.18 requirements: 11 total
+- Mapped to phases: 11
+- Unmapped: 0 ✓
+
+---
+*Requirements defined: 2026-04-15*
+*Last updated: 2026-04-15 after completing the v3.18 bounded ARC ship-readiness closure*
 
 ## v4.0 WASM Guard Runtime Completion
 

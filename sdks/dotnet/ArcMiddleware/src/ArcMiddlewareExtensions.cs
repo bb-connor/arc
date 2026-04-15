@@ -2,7 +2,8 @@
 //
 // Intercepts all HTTP requests, extracts caller identity, sends evaluation
 // requests to the ARC sidecar kernel, and either allows the request to
-// proceed with a signed receipt or returns a structured deny response.
+// proceed with a signed receipt, allows a fail-open passthrough without a
+// receipt when configured, or returns a structured deny response.
 
 using System.Security.Cryptography;
 using System.Text;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.IO;
 
 namespace Backbay.Arc;
 
@@ -113,21 +115,22 @@ public class ArcProtectMiddleware
         if (request.ContentLength.HasValue && request.ContentLength.Value > 0)
         {
             request.EnableBuffering();
-            var bodyBytes = new byte[request.ContentLength.Value];
-            var bytesRead = await request.Body.ReadAsync(bodyBytes);
-            bodyLength = bytesRead;
-            if (bytesRead > 0)
+            await using var buffer = new MemoryStream();
+            await request.Body.CopyToAsync(buffer);
+            var bodyBytes = buffer.ToArray();
+            bodyLength = bodyBytes.LongLength;
+            if (bodyBytes.Length > 0)
             {
-                bodyHash = ArcIdentityExtractor.Sha256Hex(
-                    Encoding.UTF8.GetString(bodyBytes, 0, bytesRead)
-                );
+                bodyHash = ArcIdentityExtractor.Sha256Hex(bodyBytes);
             }
             request.Body.Position = 0;
         }
 
+        var capabilityToken = ResolveCapabilityToken(request);
+
         // Extract selected headers.
         var headers = new Dictionary<string, string>();
-        foreach (var headerName in new[] { "content-type", "content-length", "x-arc-capability" })
+        foreach (var headerName in new[] { "content-type", "content-length" })
         {
             if (request.Headers.TryGetValue(headerName, out var values))
             {
@@ -149,9 +152,7 @@ public class ArcProtectMiddleware
             Caller = caller,
             BodyHash = bodyHash,
             BodyLength = bodyLength,
-            CapabilityId = request.Headers.TryGetValue("X-Arc-Capability", out var capValues)
-                ? capValues.FirstOrDefault()
-                : null,
+            CapabilityId = CapabilityIdFromToken(capabilityToken),
             Timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
         };
 
@@ -159,12 +160,18 @@ public class ArcProtectMiddleware
         EvaluateResponse result;
         try
         {
-            result = await _client.EvaluateAsync(arcRequest);
+            result = await _client.EvaluateAsync(arcRequest, capabilityToken);
         }
         catch (ArcSidecarException ex)
         {
             if (_options.OnSidecarError == "allow")
             {
+                context.Items[ArcContextKeys.Passthrough] = new ArcPassthrough
+                {
+                    Mode = "allow_without_receipt",
+                    Error = ArcErrorCodes.SidecarUnreachable,
+                    Message = $"ARC sidecar error: {ex.Message}",
+                };
                 await _next(context);
                 return;
             }
@@ -180,6 +187,12 @@ public class ArcProtectMiddleware
         {
             if (_options.OnSidecarError == "allow")
             {
+                context.Items[ArcContextKeys.Passthrough] = new ArcPassthrough
+                {
+                    Mode = "allow_without_receipt",
+                    Error = ArcErrorCodes.SidecarUnreachable,
+                    Message = $"ARC sidecar error: {ex.Message}",
+                };
                 await _next(context);
                 return;
             }
@@ -204,7 +217,7 @@ public class ArcProtectMiddleware
                 Error = ArcErrorCodes.AccessDenied,
                 Message = result.Verdict.Reason ?? "denied",
                 ReceiptId = result.Receipt.Id,
-                Suggestion = "provide a valid capability token in the X-Arc-Capability header",
+                Suggestion = "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
             });
             return;
         }
@@ -218,6 +231,43 @@ public class ArcProtectMiddleware
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsJsonAsync(error, _jsonOptions);
+    }
+
+    private static string? CapabilityIdFromToken(string? rawToken)
+    {
+        if (string.IsNullOrWhiteSpace(rawToken))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(rawToken);
+            return doc.RootElement.TryGetProperty("id", out var idElement)
+                && idElement.ValueKind == JsonValueKind.String
+                ? idElement.GetString()
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? ResolveCapabilityToken(HttpRequest request)
+    {
+        if (request.Headers.TryGetValue("X-Arc-Capability", out var capabilityValues))
+        {
+            var headerToken = capabilityValues.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(headerToken))
+            {
+                return headerToken;
+            }
+        }
+
+        return request.Query.TryGetValue("arc_capability", out var queryCapability)
+            ? queryCapability.FirstOrDefault()
+            : null;
     }
 }
 

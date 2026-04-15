@@ -2,44 +2,68 @@
 
 ## Active Milestone
 
-### v3.14 Universal Fabric and Kernel Convergence
+### v3.18 Bounded ARC Ship Readiness Closure
 
-**Status:** planned -- requirements and roadmap are defined, `v3.13` remains
-complete locally pending archival, `v4.0` remains parallel, and `v2.83`
-remains an unresolved local closeout lane
-**Executable phases:** 397-402
-**Goal:** Close the remaining gap between ARC's qualified cross-protocol
-execution substrate and the stronger original vision by implementing a true
-protocol-to-protocol fabric, converging supported HTTP/API surfaces on a
-literal kernel authority path, completing or truthfully narrowing the
-remaining lifecycle surfaces, and reconciling the historical milestone ledger
-with the claim gate ARC wants to defend.
+**Status:** complete locally 2026-04-15; pending archival
+**Executable phases:** 417-421
+**Goal:** Turn the Track A P0 blocker list into an explicit bounded-release
+closure lane so ARC can ship one honest bounded control-plane product without
+overclaiming stronger recursive delegation, verifier-backed runtime assurance,
+non-repudiation, HA, or market-position properties.
 
-**Why this milestone matters:** The v3.13 review still converged on the same
-answer: ARC has a real breakthrough, but it is not yet honest to claim the
-full original vision. The missing pieces are now narrow and concrete rather
-than vague: universal protocol fabric instead of edge-to-native collapse, one
-literal kernel story across HTTP/API surfaces, lifecycle-equivalent mediation
-where ARC still claims it, and a planning/archive ledger that can actually
-serve as evidence.
+**Why this milestone matters:** The repo is now close to shipping one honest
+bounded ARC release, but the remaining Track A P0 gaps are still release
+blockers: claim drift, planning drift, stronger-than-runtime delegation
+language, stronger-than-runtime provenance language, hosted/auth profile drift,
+and operational-profile overstatement around HA budgets and receipts. `v3.18`
+turns those blockers into one explicit pre-ship lane instead of leaving them in
+review prose.
 
 **Key intended outcomes:**
-- a registry-driven protocol-to-protocol fabric that can target non-native
-  protocols without collapsing every authoritative execution to `Native`
-- a literal kernel-backed authority/evidence path shared by `arc-api-protect`,
-  `arc-tower`, and the representative HTTP/API SDK substrates
-- lifecycle-equivalent A2A/ACP mediation for the public surfaces ARC wants to
-  claim, with compatibility bypasses retired or strongly isolated
-- v3.0-v3.13 milestone, roadmap, requirements, and archival truth reconciled
-  into one auditable planning story
-- one final qualification gate that either upgrades ARC's top-level claim to
-  the stronger original vision or records the exact remaining blockers
+- one coherent bounded ARC claim across README, release docs, review docs, and
+  planning state
+- one explicit delegated-authority and governed-provenance boundary that is
+  truthful relative to the current runtime
+- one named recommended hosted/auth profile for bounded ship, with
+  compatibility-only modes clearly demoted
+- one named bounded operational profile for trust-control, budgets, and
+  receipts
+- one authoritative bounded ARC pre-ship checklist and qualification gate
+
+## Latest Completed Milestone
+
+### v3.18 Bounded ARC Ship Readiness Closure
+
+**Status:** complete locally 2026-04-15; pending archival
+**Executable phases:** 417-421
+**Goal:** Turn the Track A P0 blocker list into an explicit bounded-release
+closure lane so ARC can ship one honest bounded control-plane product without
+overclaiming stronger recursive delegation, verifier-backed runtime assurance,
+non-repudiation, HA, or market-position properties.
+
+**Why this milestone matters:** `v3.18` turns the lingering Track A P0 release
+blockers into an explicit ship closure. It does not broaden ARC's claim. It
+makes the bounded ARC release boundary explicit, qualified, and internally
+consistent.
+
+## Latest Archived Milestone
+
+### v3.14 Universal Fabric and Kernel Convergence
+
+**Status:** complete locally and archived locally 2026-04-14
+**Executable phases:** 397-402
+**Goal:** Extend the orchestrator from edge-to-native execution into the first
+protocol-to-protocol fabric lane, converge supported HTTP/API surfaces on the
+shared kernel-backed authority path, harden representative SDK evidence
+semantics, narrow unsupported lifecycle claims truthfully, reconcile the local
+archive/ledger enough for a claim-gate rerun, and record the strongest honest
+post-v3.14 claim.
 
 ## Planned Milestones
 
 ### v3.0 Universal Security Kernel Foundation
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 319-322
 **Goal:** Build the shared HTTP security types (`arc-http-core`), OpenAPI
 import (`arc-openapi`), minimal unified configuration (`arc.yaml`), and the
@@ -64,7 +88,7 @@ later substrate, SDK, and framework wrapper depends on.
 
 ### v3.1 Attestation Completion
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 323-326
 **Goal:** Promote ACP proxy events from unsigned audit entries to fully signed
 ARC receipts, implement session compliance certificate generation and
@@ -89,7 +113,7 @@ connects ARC to existing observability infrastructure.
 
 ### v3.2 Python Adoption
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 327-330
 **Goal:** Ship a Python SDK, ASGI middleware, FastAPI wrapper, Django
 middleware, and LangChain integration so Python developers can adopt ARC with
@@ -115,7 +139,7 @@ largest developer segment building agent systems.
 
 ### v3.3 TypeScript Adoption
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 331-334
 **Goal:** Ship a Node/Bun HTTP substrate, Express middleware, Fastify plugin,
 and Elysia lifecycle hook so TypeScript developers can adopt ARC natively.
@@ -137,7 +161,7 @@ two-language adoption path that captures most agent developers.
 
 ### v3.4 Guard Expansion
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 335-338
 **Goal:** Add session journal for multi-step context, post-invocation response
 hooks, and new deterministic and advisory guards that close the runtime
@@ -165,7 +189,7 @@ session-aware context close the gap between "authorized the request" and
 
 ### v3.5 Protocol Breadth
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 339-342
 **Goal:** Complete MCP adapter coverage, build the OpenAPI-to-MCP bridge, ship
 A2A and ACP outward edge crates, and add an OpenAI function-calling adapter.
@@ -189,7 +213,7 @@ documented HTTP API from MCP clients.
 
 ### v3.6 Platform Extensions
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 343-346
 **Goal:** Ship Go SDK with net/http middleware, Kubernetes admission controller
 and sidecar injector, Rust tower::Layer middleware, and JVM and .NET
@@ -215,7 +239,7 @@ deployment policy.
 
 ### v3.7 Strategic Bets
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 347-350
 **Goal:** Ship WASM guard runtime, receipt metering surface, AG-UI proxy, and
 skill/workflow authority extensions for advanced economic and orchestration
@@ -240,7 +264,7 @@ emerging agent-to-user and orchestrated workflow surfaces.
 
 ### v3.8 Normative Specification Alignment
 
-**Status:** planned
+**Status:** implemented locally; audit pending
 **Executable phases:** 351-358
 **Goal:** Bring the v3.x public specification, schema, and SDK documentation
 into line with the shipped universal security kernel so external consumers can
@@ -261,8 +285,7 @@ This milestone makes the v3.x kernel consumable by external implementers.
 
 ### v3.9 Runtime Correctness and Contract Remediation
 
-**Status:** complete locally -- verification is green and the follow-on truth /
-credibility work now lives in `v3.12`
+**Status:** implemented locally -- verification is green; audit pending
 **Executable phases:** 359-363
 **Goal:** Close the highest-severity v3.x review gaps by restoring
 kernel-mediated OpenAI execution, aligning certificate serialization with the
@@ -287,8 +310,7 @@ claims.
 
 ### v3.10 HTTP Sidecar and Cross-SDK Contract Completion
 
-**Status:** complete locally -- verification is green and the follow-on truth /
-credibility work now lives in `v3.12`
+**Status:** implemented locally -- verification is green; audit pending
 **Executable phases:** 364-367
 **Goal:** Finish the residual v3.x HTTP substrate work by exposing the
 normative `/arc/*` sidecar interface in Rust, migrating Python onto that
@@ -314,8 +336,7 @@ the last external-consumption blockers in the HTTP/kernel adoption path.
 
 ### v3.11 Sidecar Entrypoint and Body-Integrity Completion
 
-**Status:** complete locally -- verification is green and the follow-on truth /
-credibility work now lives in `v3.12`
+**Status:** implemented locally -- verification is green; audit pending
 **Executable phases:** 368-372
 **Goal:** Finish the final shippability and request-integrity gaps by
 shipping the documented `arc api protect` operator entrypoint, preserving
@@ -345,7 +366,7 @@ deployments.
 
 ### v3.12 Cross-Protocol Integrity and Truth Completion
 
-**Status:** complete locally, pending archival
+**Status:** complete locally and archived locally 2026-04-14
 **Executable phases:** 377-381
 **Goal:** Finish the remaining work needed for ARC's cross-protocol vision to
 be stated honestly: ACP live-path cryptographic enforcement, kernel-mediated
@@ -374,8 +395,8 @@ milestone closeout rather than further v3.12 implementation.
 
 ### v3.13 Universal Orchestration Closure
 
-**Status:** complete locally -- phases `390` through `396` complete; pending
-archival
+**Status:** runtime/substrate closure complete locally and archived locally
+2026-04-14
 **Executable phases:** 390-396
 **Depends on:** v3.12 Cross-Protocol Integrity and Truth Completion (phases
 377-381)
@@ -407,7 +428,7 @@ theoretical. This milestone closes it directly.
 
 ### v3.14 Universal Fabric and Kernel Convergence
 
-**Status:** planned
+**Status:** complete locally and archived locally 2026-04-14
 **Executable phases:** 397-402
 **Depends on:** v3.13 Universal Orchestration Closure (phases 390-396)
 **Goal:** Close the final documented gap between ARC's current qualified
@@ -565,7 +586,7 @@ v3.0 (Kernel Foundation)
   |--- v3.3 (TypeScript)        [parallel]
   |--- v3.4 (Guards)            [parallel]
   |--- v3.5 (Protocol)          [mostly parallel -- most phases need v3.0 only; edge crates need v3.1]
-  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity) ---> v3.12 (Integrity + Truth) ---> v3.13 (Orchestration Closure) ---> v3.14 (Fabric + Kernel Convergence)
+  v3.5 ---> v3.6 (Platform) ---> v3.7 (Strategic) ---> v3.8 (Spec Alignment) ---> v3.9 (Remediation) ---> v3.10 (HTTP Contract Completion) ---> v3.11 (Entrypoint + Body Integrity) ---> v3.12 (Integrity + Truth) ---> v3.13 (Orchestration Closure) ---> v3.14 (Fabric + Kernel Convergence) ---> v3.15 (Protocol Fabric Realization) ---> v3.16 (Control-Plane Thesis) ---> v3.17 (Market Proof) ---> v3.18 (Bounded Ship Closure)
 ```
 
 v4.0 (WASM Guard Runtime) ---> v4.1 (Guard SDK) ---> v4.2 (WIT + Multi-Language)    [parallel strategic lane -- no dependency on the v3.12 credibility-closeout chain]
@@ -595,15 +616,15 @@ and multi-language SDKs require the raw ABI to be validated first).
 
 ## Latest Completed Milestone
 
-### v2.82 Normative Protocol Specification and Conformance
+### v3.13 Universal Orchestration Closure
 
-**Status:** complete locally 2026-04-13; phases `311` through `314` are
-implemented, verified, audited, and archived locally.
-**Executable phases:** 311-314
-**Goal:** Write an implementer-facing wire protocol specification with formal
-message schemas, define version negotiation and error taxonomy, produce a
-standalone threat model for the agent-kernel-tool boundary, and extend the
-conformance suite to cover native ARC protocol behavior.
+**Status:** complete locally 2026-04-14; archived locally 2026-04-14.
+**Executable phases:** 390-396
+**Goal:** Close the post-v3.12 runtime and truth gaps by landing the shared
+cross-protocol orchestrator substrate, authoritative edge unification,
+truthful fidelity/publication semantics, HTTP authority/evidence convergence,
+truthful lifecycle surfaces, and the first executable cross-protocol runtime
+claim gate.
 
 ## Earlier Completed Milestones
 

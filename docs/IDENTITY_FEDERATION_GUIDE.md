@@ -213,6 +213,49 @@ DELETE /v1/federation/providers/{provider_id}
 and trust-boundary metadata so operators can debug incomplete or rejected
 configs without guessing from logs.
 
+## SCIM Lifecycle Automation
+
+When `arc trust serve` is started with both `--enterprise-providers-file` and
+`--scim-lifecycle-file`, trust-control exposes a bounded SCIM lifecycle
+surface for validated `scim` provider-admin records:
+
+```bash
+arc trust serve \
+  --listen 127.0.0.1:8940 \
+  --service-token <service-token> \
+  --enterprise-providers-file ./enterprise-providers.json \
+  --scim-lifecycle-file ./scim-lifecycle.json \
+  --receipt-db ./receipts.sqlite3 \
+  --revocation-db ./revocations.sqlite3 \
+  --authority-seed-file ./authority-seed.txt
+```
+
+HTTP surface:
+
+```text
+POST   /scim/v2/Users
+DELETE /scim/v2/Users/{id}
+```
+
+The `POST /scim/v2/Users` body must include the core SCIM user schema plus ARC's
+SCIM extension identifying the validated `providerId`. Trust-control validates
+that provider against the shared provider-admin registry, derives the ARC
+enterprise identity context, persists the provisioned user in the operator-owned
+SCIM lifecycle registry, and returns a SCIM user resource annotated with ARC
+identity metadata.
+
+`DELETE /scim/v2/Users/{id}` marks the stored SCIM identity inactive, revokes
+every tracked capability issued through the SCIM-governed federated-issue lane,
+and appends a signed deprovisioning receipt into the canonical receipt store.
+
+When the SCIM lifecycle registry is configured, `arc trust federated-issue`
+also changes behavior for validated `scim` providers: issuance requires a
+matching active SCIM identity, successful issuance binds the new capability ID
+back to that identity, and later issuance fails closed after deprovisioning.
+
+Health output now reports SCIM lifecycle storage availability and counts under
+`federation.scimLifecycle`.
+
 ## Operational Behavior
 
 - Same federated principal + same seed file => same derived ARC subject key.
@@ -296,9 +339,10 @@ operator can see which provider, organization, group, or role inputs failed.
   with confidential-client auth, and admin trust-surface verification for
   direct JWT, Azure-profile OIDC discovery, and introspected opaque tokens.
 - It now supports explicit `scim` and `saml` provider record types plus
-  fail-closed identity normalization and policy gating, but it does not yet
-  implement automatic SCIM provisioning lifecycle or reusable IdP-specific
-  management workflows beyond the shared provider-admin registry.
+  fail-closed identity normalization and policy gating. For `scim` providers,
+  trust-control now ships bounded lifecycle automation for `POST /Users` and
+  `DELETE /Users/{id}` over an operator-owned registry, but reusable IdP sync
+  orchestration and the broader SCIM management surface remain out of scope.
 - It now propagates enterprise identity into portable passport credentials,
   passport verification/presentation outputs, and the federated-issue response
   surface, but enterprise identity still does not silently widen local

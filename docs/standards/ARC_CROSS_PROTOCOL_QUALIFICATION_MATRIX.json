@@ -1,0 +1,230 @@
+{
+  "version": "2026-04-15",
+  "scope": "cross_protocol_runtime_qualification",
+  "status": "bounded_fabric_claim_qualified",
+  "claimLevel": "bounded_protocol_aware_execution_fabric",
+  "decision": "bounded_claim_qualified_use_universal_control_plane_gate_for_stronger_claim",
+  "qualifiedClaim": {
+    "summary": "ARC ships a cryptographically signed, fail-closed governance kernel and a bounded protocol-aware cross-protocol execution fabric across HTTP APIs, MCP, OpenAI tool execution, A2A skills, and ACP capabilities.",
+    "constraints": [
+      "Only the supported authoritative paths are claim-eligible.",
+      "Lifecycle and bridge-fidelity limits remain explicit on published surfaces, including the deferred-task A2A/ACP authoritative lifecycle path.",
+      "Compatibility helpers are non-authoritative and non-claim-eligible.",
+      "Protocol selection is explicit and registry-backed for supported targets, but the claim does not imply a universal multi-hop fabric or proved market-control position."
+    ]
+  },
+  "nonQualifiedClaims": [
+    "technical control-plane qualification without also running the universal control-plane gate",
+    "a proved comptroller-of-the-agent-economy market position"
+  ],
+  "remainingBlockers": [
+    "This matrix is intentionally the lower bounded-runtime gate and does not by itself prove the stronger technical control-plane thesis.",
+    "The stronger technical control-plane claim is owned by the successor gate in ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json.",
+    "The strategic market-position thesis still lacks ecosystem-scale operational proof beyond the qualified local/runtime evidence lane."
+  ],
+  "gateConditions": [
+    {
+      "id": "FABRIC-01",
+      "summary": "CrossProtocolOrchestrator resolves authoritative non-native targets through an explicit executor seam rather than collapsing every path to Native.",
+      "witnesses": [
+        "crates/arc-cross-protocol/src/lib.rs",
+        "crates/arc-mcp-edge/src/runtime.rs"
+      ]
+    },
+    {
+      "id": "FABRIC-02",
+      "summary": "At least one authoritative bridge path executes protocol-to-protocol without terminating immediately in DiscoveryProtocol::Native.",
+      "witnesses": [
+        "crates/arc-acp-edge/src/lib.rs",
+        "crates/arc-mcp-edge/src/runtime.rs"
+      ]
+    },
+    {
+      "id": "FABRIC-03",
+      "summary": "Bridge execution preserves attenuation, trace lineage, fidelity semantics, and receipt references across the authoritative path.",
+      "witnesses": [
+        "crates/arc-cross-protocol/src/lib.rs",
+        "crates/arc-acp-edge/src/lib.rs",
+        "crates/arc-a2a-edge/src/lib.rs"
+      ]
+    },
+    {
+      "id": "KERNEL-01",
+      "summary": "arc-api-protect routes HTTP authorization through the shared embedded kernel-backed authority path.",
+      "witnesses": [
+        "crates/arc-http-core/src/authority.rs",
+        "crates/arc-api-protect/src/evaluator.rs"
+      ]
+    },
+    {
+      "id": "KERNEL-02",
+      "summary": "arc-tower uses the same shared kernel-backed HTTP authority/evidence path as arc-api-protect.",
+      "witnesses": [
+        "crates/arc-http-core/src/authority.rs",
+        "crates/arc-tower/src/evaluator.rs",
+        "crates/arc-tower/src/service.rs"
+      ]
+    },
+    {
+      "id": "KERNEL-03",
+      "summary": "Representative SDK substrates expose governed receipts truthfully and surface degraded fail-open behavior as explicit allow_without_receipt state rather than synthetic receipts.",
+      "witnesses": [
+        "sdks/typescript/packages/node-http/src/interceptor.ts",
+        "sdks/typescript/packages/express/src/middleware.ts",
+        "sdks/go/arc-go-http/arc.go",
+        "sdks/python/arc-asgi/src/arc_asgi/middleware.py",
+        "sdks/python/arc-django/src/arc_django/middleware.py",
+        "sdks/python/arc-fastapi/src/arc_fastapi/dependencies.py",
+        "sdks/jvm/arc-spring-boot/src/main/kotlin/io/backbay/arc/ArcFilter.kt",
+        "sdks/dotnet/ArcMiddleware/src/ArcMiddlewareExtensions.cs"
+      ]
+    },
+    {
+      "id": "KERNEL-04",
+      "summary": "The supported HTTP/API surfaces can now be described literally as sharing one kernel-backed authority story.",
+      "witnesses": [
+        "crates/arc-http-core/src/authority.rs",
+        "docs/sdk/PLATFORM.md",
+        "docs/sdk/GO.md",
+        "docs/sdk/PYTHON.md"
+      ]
+    },
+    {
+      "id": "LIFE-01",
+      "summary": "A2A authoritative mediation now exposes blocking send plus deferred-task stream/get/cancel lifecycle semantics without overstating push-stream behavior.",
+      "witnesses": [
+        "crates/arc-a2a-edge/src/lib.rs"
+      ]
+    },
+    {
+      "id": "LIFE-02",
+      "summary": "ACP authoritative mediation now exposes preview plus blocking invoke and deferred-task stream/cancel/resume lifecycle semantics on the authoritative path.",
+      "witnesses": [
+        "crates/arc-acp-edge/src/lib.rs"
+      ]
+    },
+    {
+      "id": "LIFE-03",
+      "summary": "Compatibility helpers are isolated from the default authoritative claim surface.",
+      "witnesses": [
+        "crates/arc-a2a-edge/src/lib.rs",
+        "crates/arc-acp-edge/src/lib.rs"
+      ]
+    },
+    {
+      "id": "LEDGER-01",
+      "summary": "The planning stack agrees on active milestone, latest completed milestone, and execution state.",
+      "witnesses": [
+        ".planning/STATE.md",
+        ".planning/PROJECT.md",
+        ".planning/MILESTONES.md",
+        ".planning/ROADMAP.md",
+        ".planning/REQUIREMENTS.md"
+      ]
+    },
+    {
+      "id": "LEDGER-02",
+      "summary": "Early and mid-v3 summary tables no longer describe locally implemented work as blanket Planned placeholders.",
+      "witnesses": [
+        ".planning/ROADMAP.md",
+        ".planning/MILESTONES.md"
+      ]
+    },
+    {
+      "id": "LEDGER-03",
+      "summary": "Late-v3 requirements, summaries, and milestone audits reconcile to the same implementation truth.",
+      "witnesses": [
+        ".planning/REQUIREMENTS.md",
+        ".planning/v3.13-MILESTONE-AUDIT.md",
+        ".planning/milestones/v3.13-MILESTONE-AUDIT.md"
+      ]
+    },
+    {
+      "id": "LEDGER-04",
+      "summary": "v3.12, v3.13, and v3.14 are archived locally with snapshot artifacts and archived phase directories.",
+      "witnesses": [
+        ".planning/milestones/v3.12-ROADMAP.md",
+        ".planning/milestones/v3.13-ROADMAP.md",
+        ".planning/milestones/v3.14-ROADMAP.md",
+        ".planning/milestones/v3.12-phases",
+        ".planning/milestones/v3.13-phases",
+        ".planning/milestones/v3.14-phases"
+      ]
+    },
+    {
+      "id": "VISION-01",
+      "summary": "Qualification evidence covers the authoritative protocol fabric, unified HTTP authority, and representative SDK surfaces without overstating unsupported paths.",
+      "commands": [
+        "cargo test -p arc-cross-protocol -p arc-mcp-edge -p arc-acp-edge -p arc-a2a-edge",
+        "cargo test -p arc-http-core -p arc-api-protect -p arc-tower",
+        "cargo test -p arc-openai-adapter",
+        "cargo test -p arc-acp-proxy",
+        "npm test (sdks/typescript/packages/node-http)",
+        "npm test (sdks/typescript/packages/express)",
+        "go test ./... (sdks/go/arc-go-http)",
+        "pytest representative Python SDK suites",
+        "./gradlew test --no-daemon (sdks/jvm/arc-spring-boot)",
+        "dotnet test ArcMiddleware.sln (sdks/dotnet/ArcMiddleware)"
+      ]
+    },
+    {
+      "id": "VISION-02",
+      "summary": "Protocol, release, standards, and top-level vision docs make the same strongest honest claim.",
+      "witnesses": [
+        "docs/VISION.md",
+        "docs/protocols/STRATEGIC-VISION.md",
+        "docs/release/QUALIFICATION.md",
+        "docs/release/RELEASE_AUDIT.md"
+      ]
+    },
+    {
+      "id": "VISION-03",
+      "summary": "The repo records one authoritative claim-gate decision and names the exact remaining blockers when the stronger claim is not yet qualified.",
+      "witnesses": [
+        "docs/protocols/STRATEGIC-VISION.md",
+        "docs/release/RELEASE_AUDIT.md",
+        "docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json"
+      ]
+    },
+    {
+      "id": "VISION-04",
+      "summary": "Economic/control-plane language is bounded to strategic thesis rather than implied as current shipped proof.",
+      "witnesses": [
+        "docs/VISION.md",
+        "docs/protocols/STRATEGIC-VISION.md"
+      ]
+    }
+  ],
+  "artifactBundle": {
+    "root": "target/release-qualification/cross-protocol-runtime",
+    "requiredFiles": [
+      "artifact-manifest.json",
+      "qualification-report.md",
+      "ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json",
+      "SHA256SUMS",
+      "logs/arc-cross-protocol.log",
+      "logs/arc-mcp-edge.log",
+      "logs/arc-acp-edge.log",
+      "logs/arc-a2a-edge.log",
+      "logs/arc-http-core.log",
+      "logs/arc-api-protect.log",
+      "logs/arc-tower.log",
+      "logs/arc-openai.log",
+      "logs/arc-acp-proxy.log",
+      "logs/ts-node-http.log",
+      "logs/ts-express.log",
+      "logs/go-sdk.log",
+      "logs/python-sdk.log",
+      "logs/python-asgi.log",
+      "logs/python-django.log",
+      "logs/python-fastapi.log",
+      "logs/jvm-sdk.log",
+      "logs/dotnet-sdk.log"
+    ]
+  },
+  "entrypoint": "./scripts/qualify-cross-protocol-runtime.sh",
+  "successorGate": {
+    "entrypoint": "./scripts/qualify-universal-control-plane.sh",
+    "matrix": "docs/standards/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json"
+  }
+}

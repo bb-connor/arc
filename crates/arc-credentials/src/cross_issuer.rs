@@ -60,6 +60,21 @@ pub struct SignedCrossIssuerMigration {
     pub signature: Signature,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CreateSignedCrossIssuerMigrationArgs {
+    pub migration_id: String,
+    pub attester: String,
+    pub from_issuer: String,
+    pub to_issuer: String,
+    pub from_subject: String,
+    pub to_subject: String,
+    pub prior_passport_ids: Vec<String>,
+    pub reason: String,
+    pub continuity_ref: String,
+    pub issued_at: u64,
+    pub expires_at: Option<u64>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CrossIssuerTrustPackPolicy {
@@ -167,33 +182,35 @@ pub struct CrossIssuerPortfolioEvaluation {
     pub entry_results: Vec<CrossIssuerPortfolioEntryEvaluation>,
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn create_signed_cross_issuer_migration(
     signer: &Keypair,
-    migration_id: impl Into<String>,
-    attester: impl Into<String>,
-    from_issuer: impl Into<String>,
-    to_issuer: impl Into<String>,
-    from_subject: impl Into<String>,
-    to_subject: impl Into<String>,
-    prior_passport_ids: Vec<String>,
-    reason: impl Into<String>,
-    continuity_ref: impl Into<String>,
-    issued_at: u64,
-    expires_at: Option<u64>,
+    args: CreateSignedCrossIssuerMigrationArgs,
 ) -> Result<SignedCrossIssuerMigration, CredentialError> {
+    let CreateSignedCrossIssuerMigrationArgs {
+        migration_id,
+        attester,
+        from_issuer,
+        to_issuer,
+        from_subject,
+        to_subject,
+        prior_passport_ids,
+        reason,
+        continuity_ref,
+        issued_at,
+        expires_at,
+    } = args;
     let body = SignedCrossIssuerMigrationBody {
         schema: CROSS_ISSUER_MIGRATION_SCHEMA.to_string(),
-        migration_id: migration_id.into(),
-        attester: attester.into(),
+        migration_id,
+        attester,
         signer_public_key: signer.public_key(),
-        from_issuer: from_issuer.into(),
-        to_issuer: to_issuer.into(),
-        from_subject: from_subject.into(),
-        to_subject: to_subject.into(),
+        from_issuer,
+        to_issuer,
+        from_subject,
+        to_subject,
         prior_passport_ids,
-        reason: reason.into(),
-        continuity_ref: continuity_ref.into(),
+        reason,
+        continuity_ref,
         issued_at,
         expires_at,
     };

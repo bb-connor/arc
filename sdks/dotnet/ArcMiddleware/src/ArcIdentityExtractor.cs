@@ -24,8 +24,16 @@ public static class ArcIdentityExtractor
     /// </summary>
     public static string Sha256Hex(string input)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
-        return Convert.ToHexStringLower(bytes);
+        return Sha256Hex(Encoding.UTF8.GetBytes(input));
+    }
+
+    /// <summary>
+    /// Compute SHA-256 hex digest of raw bytes.
+    /// </summary>
+    public static string Sha256Hex(byte[] input)
+    {
+        var bytes = SHA256.HashData(input);
+        return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
     /// <summary>

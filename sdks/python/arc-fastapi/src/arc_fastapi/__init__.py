@@ -3,6 +3,7 @@
 from arc_fastapi.decorators import arc_requires, arc_approval, arc_budget
 from arc_fastapi.dependencies import (
     get_arc_client,
+    get_arc_passthrough,
     get_arc_receipt,
     get_caller_identity,
 )
@@ -13,6 +14,7 @@ __all__ = [
     "arc_approval",
     "arc_budget",
     "get_arc_client",
+    "get_arc_passthrough",
     "get_arc_receipt",
     "get_caller_identity",
     "ArcErrorCode",

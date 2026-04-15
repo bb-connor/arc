@@ -2,6 +2,13 @@ use std::sync::atomic::Ordering;
 
 use super::*;
 
+pub(crate) struct FinalizeToolOutputCostContext<'a> {
+    pub(crate) charge_result: Option<BudgetChargeResult>,
+    pub(crate) reported_cost: Option<ToolInvocationCost>,
+    pub(crate) payment_authorization: Option<PaymentAuthorization>,
+    pub(crate) cap: &'a CapabilityToken,
+}
+
 impl ArcKernel {
     /// denial reason is monetary budget exhaustion.
     pub(crate) fn build_monetary_deny_response(
@@ -11,6 +18,25 @@ impl ArcKernel {
         timestamp: u64,
         matching_grants: &[MatchingGrant<'_>],
         cap: &CapabilityToken,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_monetary_deny_response_with_metadata(
+            request,
+            reason,
+            timestamp,
+            matching_grants,
+            cap,
+            None,
+        )
+    }
+
+    pub(crate) fn build_monetary_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matching_grants: &[MatchingGrant<'_>],
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         // Look for a monetary grant among the matching candidates to populate metadata.
         let monetary_grant = matching_grants.iter().find(|m| {
@@ -57,8 +83,11 @@ impl ArcKernel {
 
             let metadata = merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(mg.index)),
-                    Some(serde_json::json!({ "financial": financial_meta })),
+                    merge_metadata_objects(
+                        receipt_attribution_metadata(cap, Some(mg.index)),
+                        Some(serde_json::json!({ "financial": financial_meta })),
+                    ),
+                    extra_metadata.clone(),
                 ),
                 governed_request_metadata(
                     request,
@@ -100,7 +129,7 @@ impl ArcKernel {
         }
 
         // No monetary grant -- standard deny.
-        self.build_deny_response(request, reason, timestamp, None)
+        self.build_deny_response_with_metadata(request, reason, timestamp, None, extra_metadata)
     }
 
     pub(crate) fn build_pre_execution_monetary_deny_response(
@@ -111,6 +140,27 @@ impl ArcKernel {
         charge: &BudgetChargeResult,
         total_cost_charged_after_release: u64,
         cap: &CapabilityToken,
+    ) -> Result<ToolCallResponse, KernelError> {
+        self.build_pre_execution_monetary_deny_response_with_metadata(
+            request,
+            reason,
+            timestamp,
+            charge,
+            total_cost_charged_after_release,
+            cap,
+            None,
+        )
+    }
+
+    pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        charge: &BudgetChargeResult,
+        total_cost_charged_after_release: u64,
+        cap: &CapabilityToken,
+        extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
         let delegation_depth = cap.delegation_chain.len() as u32;
         let root_budget_holder = cap.issuer.to_hex();
@@ -152,8 +202,11 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_attribution_metadata(cap, Some(charge.grant_index)),
-                    Some(serde_json::json!({ "financial": financial_meta })),
+                    merge_metadata_objects(
+                        receipt_attribution_metadata(cap, Some(charge.grant_index)),
+                        Some(serde_json::json!({ "financial": financial_meta })),
+                    ),
+                    extra_metadata,
                 ),
                 governed_request_metadata(
                     request,
@@ -184,33 +237,54 @@ impl ArcKernel {
         timestamp: u64,
         matched_grant_index: usize,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.finalize_tool_output_with_metadata(
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            None,
+        )
+    }
+
+    pub(crate) fn finalize_tool_output_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        matched_grant_index: usize,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
         match self.apply_stream_limits(output, elapsed)? {
-            ToolServerOutput::Value(value) => self.build_allow_response(
+            ToolServerOutput::Value(value) => self.build_allow_response_with_metadata(
                 request,
                 ToolCallOutput::Value(value),
                 timestamp,
                 Some(matched_grant_index),
+                extra_metadata.clone(),
             ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
-                .build_allow_response(
+                .build_allow_response_with_metadata(
                     request,
                     ToolCallOutput::Stream(stream),
                     timestamp,
                     Some(matched_grant_index),
+                    extra_metadata.clone(),
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
-                .build_incomplete_response_with_output(
+                .build_incomplete_response_with_output_and_metadata(
                     request,
                     Some(ToolCallOutput::Stream(stream)),
                     &reason,
                     timestamp,
                     Some(matched_grant_index),
+                    extra_metadata,
                 ),
         }
     }
 
     /// Finalize a tool output with optional monetary metadata injected into the receipt.
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize_tool_output_with_cost(
         &self,
         request: &ToolCallRequest,
@@ -218,19 +292,44 @@ impl ArcKernel {
         elapsed: Duration,
         timestamp: u64,
         matched_grant_index: usize,
-        charge_result: Option<BudgetChargeResult>,
-        reported_cost: Option<ToolInvocationCost>,
-        payment_authorization: Option<PaymentAuthorization>,
-        cap: &CapabilityToken,
+        cost_context: FinalizeToolOutputCostContext<'_>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.finalize_tool_output_with_cost_and_metadata(
+            request,
+            output,
+            elapsed,
+            timestamp,
+            matched_grant_index,
+            cost_context,
+            None,
+        )
+    }
+
+    pub(crate) fn finalize_tool_output_with_cost_and_metadata(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        matched_grant_index: usize,
+        cost_context: FinalizeToolOutputCostContext<'_>,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let FinalizeToolOutputCostContext {
+            charge_result,
+            reported_cost,
+            payment_authorization,
+            cap,
+        } = cost_context;
         let Some(charge) = charge_result else {
             // Non-monetary grant: use normal path.
-            return self.finalize_tool_output(
+            return self.finalize_tool_output_with_metadata(
                 request,
                 output,
                 elapsed,
                 timestamp,
                 matched_grant_index,
+                extra_metadata,
             );
         };
 
@@ -423,6 +522,8 @@ impl ArcKernel {
         };
 
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
+        let merged_extra_metadata =
+            merge_metadata_objects(financial_json, extra_metadata.clone());
 
         match limited_output {
             ToolServerOutput::Value(_)
@@ -432,7 +533,7 @@ impl ArcKernel {
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
-                    financial_json,
+                    merged_extra_metadata.clone(),
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -441,7 +542,7 @@ impl ArcKernel {
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    financial_json,
+                    merged_extra_metadata,
                 ),
         }
     }
@@ -511,6 +612,17 @@ impl ArcKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_deny_response_with_metadata(request, reason, timestamp, matched_grant_index, None)
+    }
+
+    pub(crate) fn build_deny_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -530,12 +642,15 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_content.metadata,
-                    governed_request_metadata(
-                        request,
-                        self.attestation_trust_policy.as_ref(),
-                        timestamp,
-                    )?,
+                    merge_metadata_objects(
+                        receipt_content.metadata,
+                        governed_request_metadata(
+                            request,
+                            self.attestation_trust_policy.as_ref(),
+                            timestamp,
+                        )?,
+                    ),
+                    extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
@@ -562,6 +677,23 @@ impl ArcKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.build_cancelled_response_with_metadata(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            None,
+        )
+    }
+
+    pub(crate) fn build_cancelled_response_with_metadata(
+        &self,
+        request: &ToolCallRequest,
+        reason: &str,
+        timestamp: u64,
+        matched_grant_index: Option<usize>,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
         let cap = &request.capability;
         let receipt_content = receipt_content_for_output(None, None)?;
 
@@ -580,12 +712,15 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata: merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_content.metadata,
-                    governed_request_metadata(
-                        request,
-                        self.attestation_trust_policy.as_ref(),
-                        timestamp,
-                    )?,
+                    merge_metadata_objects(
+                        receipt_content.metadata,
+                        governed_request_metadata(
+                            request,
+                            self.attestation_trust_policy.as_ref(),
+                            timestamp,
+                        )?,
+                    ),
+                    extra_metadata,
                 ),
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),

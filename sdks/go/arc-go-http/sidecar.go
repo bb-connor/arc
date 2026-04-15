@@ -48,7 +48,7 @@ func (e *SidecarError) Error() string {
 
 // Evaluate sends an HTTP request to the ARC sidecar for evaluation.
 // Returns the verdict, signed receipt, and guard evidence.
-func (c *SidecarClient) Evaluate(ctx context.Context, req ArcHTTPRequest) (*EvaluateResponse, error) {
+func (c *SidecarClient) Evaluate(ctx context.Context, req ArcHTTPRequest, capabilityToken string) (*EvaluateResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, &SidecarError{
@@ -66,6 +66,9 @@ func (c *SidecarClient) Evaluate(ctx context.Context, req ArcHTTPRequest) (*Eval
 		}
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	if capabilityToken != "" {
+		httpReq.Header.Set("X-Arc-Capability", capabilityToken)
+	}
 
 	resp, err := c.client.Do(httpReq)
 	if err != nil {

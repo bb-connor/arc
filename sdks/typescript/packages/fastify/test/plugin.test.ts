@@ -1,6 +1,62 @@
+import { createHash } from "node:crypto";
+import http from "node:http";
 import { describe, it, expect } from "vitest";
 import Fastify from "fastify";
 import { arc } from "../src/index.js";
+import type { EvaluateResponse } from "@arc-protocol/node-http";
+
+function allowResponse(): EvaluateResponse {
+  return {
+    verdict: { verdict: "allow" },
+    receipt: {
+      id: "rcpt-1",
+      request_id: "req-1",
+      route_pattern: "/echo",
+      method: "POST",
+      caller_identity_hash: "a".repeat(64),
+      verdict: { verdict: "allow" },
+      evidence: [],
+      response_status: 200,
+      timestamp: 1_700_000_000,
+      content_hash: "b".repeat(64),
+      policy_hash: "c".repeat(64),
+      kernel_key: "d".repeat(64),
+      signature: "e".repeat(128),
+    },
+    evidence: [],
+  };
+}
+
+async function startMockSidecar(
+  onEvaluate?: (requestBody: string) => void,
+): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/arc/evaluate") {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      req.on("end", () => {
+        onEvaluate?.(Buffer.concat(chunks).toString("utf-8"));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(allowResponse()));
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end();
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const addr = server.address();
+  if (addr == null || typeof addr === "string") {
+    throw new Error("sidecar not listening");
+  }
+
+  return {
+    server,
+    url: `http://127.0.0.1:${addr.port}`,
+  };
+}
 
 describe("arc fastify plugin", () => {
   it("exports arc as a function", () => {
@@ -111,6 +167,41 @@ describe("arc fastify plugin", () => {
     });
 
     expect(response.statusCode).toBe(200);
+    await fastify.close();
+  });
+
+  it("hashes the raw request bytes instead of reparsed JSON", async () => {
+    let observedBodyHash: string | undefined;
+    let observedBodyLength: number | undefined;
+    const sidecar = await startMockSidecar((requestBody) => {
+      const parsed = JSON.parse(requestBody) as { body_hash?: string; body_length?: number };
+      observedBodyHash = parsed.body_hash;
+      observedBodyLength = parsed.body_length;
+    });
+
+    const fastify = Fastify();
+    await fastify.register(arc, {
+      sidecarUrl: sidecar.url,
+    });
+
+    fastify.post("/echo", async (request) => request.body);
+
+    const payload = '{\n  "hello": "world",\n  "count": 2\n}';
+    const response = await fastify.inject({
+      method: "POST",
+      url: "/echo",
+      headers: { "content-type": "application/json" },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ hello: "world", count: 2 });
+    expect(observedBodyHash).toBe(
+      createHash("sha256").update(Buffer.from(payload, "utf-8")).digest("hex"),
+    );
+    expect(observedBodyLength).toBe(Buffer.byteLength(payload));
+
+    sidecar.server.close();
     await fastify.close();
   });
 });

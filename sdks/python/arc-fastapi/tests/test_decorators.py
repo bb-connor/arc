@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from arc_fastapi.decorators import arc_requires, arc_approval, arc_budget
 from arc_fastapi.dependencies import set_arc_client
 from arc_sdk.errors import ArcConnectionError, ArcDeniedError
-from arc_sdk.models import HttpReceipt, Verdict
+from arc_sdk.models import EvaluateResponse, HttpReceipt, Verdict
 
 
 def _make_receipt(allowed: bool = True) -> HttpReceipt:
@@ -34,6 +34,11 @@ def _make_receipt(allowed: bool = True) -> HttpReceipt:
         kernel_key="k",
         signature="s",
     )
+
+
+def _make_evaluation(allowed: bool = True) -> EvaluateResponse:
+    receipt = _make_receipt(allowed=allowed)
+    return EvaluateResponse(verdict=receipt.verdict, receipt=receipt, evidence=[])
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +66,7 @@ class TestArcRequires:
 
         mock_client = AsyncMock()
         mock_client.evaluate_http_request = AsyncMock(
-            return_value=_make_receipt(allowed=True)
+            return_value=_make_evaluation(allowed=True)
         )
         set_arc_client(mock_client)
 
@@ -86,7 +91,7 @@ class TestArcRequires:
 
         mock_client = AsyncMock()
         mock_client.evaluate_http_request = AsyncMock(
-            return_value=_make_receipt(allowed=False)
+            return_value=_make_evaluation(allowed=False)
         )
         set_arc_client(mock_client)
 
@@ -147,7 +152,7 @@ class TestArcRequires:
 
         mock_client = AsyncMock()
         mock_client.evaluate_http_request = AsyncMock(
-            return_value=_make_receipt(allowed=True)
+            return_value=_make_evaluation(allowed=True)
         )
         set_arc_client(mock_client)
 

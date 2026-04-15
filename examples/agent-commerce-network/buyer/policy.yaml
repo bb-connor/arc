@@ -1,0 +1,23 @@
+kernel:
+  max_capability_ttl: 3600
+  delegation_depth_limit: 4
+
+capabilities:
+  procurement_quote:
+    tools:
+      - server: provider-security-review
+        tool: request_quote
+        operations: [invoke]
+        ttl: 300
+  procurement_execute:
+    tools:
+      - server: provider-security-review
+        tool: execute_review
+        operations: [invoke]
+        ttl: 900
+  procurement_dispute:
+    tools:
+      - server: provider-security-review
+        tool: open_dispute
+        operations: [invoke]
+        ttl: 600

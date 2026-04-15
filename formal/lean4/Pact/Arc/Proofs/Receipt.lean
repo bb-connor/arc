@@ -1,0 +1,1 @@
+import Pact.Proofs.Receipt

@@ -1,6 +1,116 @@
+import { createHash } from "node:crypto";
+import http, { type IncomingHttpHeaders } from "node:http";
 import { describe, it, expect } from "vitest";
-import { buildArcHttpRequest, resolveConfig } from "../src/interceptor.js";
+import {
+  buildArcHttpRequest,
+  interceptNodeRequest,
+  interceptWebRequest,
+  resolveConfig,
+} from "../src/interceptor.js";
 import type { BuildRequestOptions } from "../src/interceptor.js";
+import type { EvaluateResponse } from "../src/types.js";
+
+function allowResponse(): EvaluateResponse {
+  return {
+    verdict: { verdict: "allow" },
+    receipt: {
+      id: "rcpt-1",
+      request_id: "req-1",
+      route_pattern: "/upload",
+      method: "POST",
+      caller_identity_hash: "a".repeat(64),
+      verdict: { verdict: "allow" },
+      evidence: [],
+      response_status: 200,
+      timestamp: 1_700_000_000,
+      content_hash: "b".repeat(64),
+      policy_hash: "c".repeat(64),
+      kernel_key: "d".repeat(64),
+      signature: "e".repeat(128),
+    },
+    evidence: [],
+  };
+}
+
+async function startMockSidecar(
+  onEvaluate?: (body: string) => void,
+): Promise<{ server: http.Server; url: string }> {
+  const server = http.createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/arc/evaluate") {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      req.on("end", () => {
+        onEvaluate?.(Buffer.concat(chunks).toString("utf-8"));
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(allowResponse()));
+      });
+      return;
+    }
+
+    if (req.method === "GET" && req.url === "/arc/health") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "healthy", version: "1.0.0" }));
+      return;
+    }
+
+    res.writeHead(404);
+    res.end();
+  });
+
+  await new Promise<void>((resolve) => server.listen(0, resolve));
+  const address = server.address();
+  if (address == null || typeof address === "string") {
+    throw new Error("server not listening");
+  }
+
+  return {
+    server,
+    url: `http://127.0.0.1:${address.port}`,
+  };
+}
+
+async function request(
+  server: http.Server,
+  method: string,
+  path: string,
+  body?: string,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; body: string; headers: IncomingHttpHeaders }> {
+  return new Promise((resolve, reject) => {
+    const addr = server.address();
+    if (addr == null || typeof addr === "string") {
+      reject(new Error("server not listening"));
+      return;
+    }
+
+    const req = http.request(
+      {
+        hostname: "127.0.0.1",
+        port: addr.port,
+        path,
+        method,
+        headers,
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            status: res.statusCode ?? 0,
+            body: Buffer.concat(chunks).toString("utf-8"),
+            headers: res.headers,
+          });
+        });
+      },
+    );
+
+    req.on("error", reject);
+    if (body != null) {
+      req.write(body);
+    }
+    req.end();
+  });
+}
 
 describe("buildArcHttpRequest", () => {
   it("creates a valid ArcHttpRequest", () => {
@@ -45,7 +155,7 @@ describe("buildArcHttpRequest", () => {
       headers: {
         "content-type": "application/json",
         authorization: "Bearer secret",
-        "x-arc-capability": "cap-123",
+        "x-arc-capability": "{\"id\":\"cap-123\"}",
         "x-custom-header": "should-not-appear",
       },
       caller: {
@@ -62,7 +172,7 @@ describe("buildArcHttpRequest", () => {
     const req = buildArcHttpRequest(opts);
 
     expect(req.headers["content-type"]).toBe("application/json");
-    expect(req.headers["x-arc-capability"]).toBe("cap-123");
+    expect(req.headers["x-arc-capability"]).toBeUndefined();
     // Authorization should NOT be forwarded (not in allowed set)
     expect(req.headers["authorization"]).toBeUndefined();
     // Custom headers should NOT be forwarded
@@ -82,7 +192,6 @@ describe("resolveConfig", () => {
     expect(resolved.forwardHeaders).toEqual([
       "content-type",
       "content-length",
-      "x-arc-capability",
     ]);
     expect(resolved.identityExtractor).toBeDefined();
     expect(resolved.routePatternResolver).toBeDefined();
@@ -97,5 +206,124 @@ describe("resolveConfig", () => {
   it("uses custom timeout", () => {
     const resolved = resolveConfig({ timeoutMs: 10000 });
     expect(resolved.timeoutMs).toBe(10000);
+  });
+});
+
+describe("request body preservation", () => {
+  it("preserves IncomingMessage bodies for downstream consumers", async () => {
+    const sidecar = await startMockSidecar();
+    const resolved = resolveConfig({ sidecarUrl: sidecar.url });
+
+    const server = http.createServer(async (req, res) => {
+      const outcome = await interceptNodeRequest(req, res, resolved);
+      if (outcome.responseSent) {
+        return;
+      }
+      expect(outcome.result).not.toBeNull();
+      expect(outcome.passthrough).toBeNull();
+
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      req.on("end", () => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.end(Buffer.concat(chunks).toString("utf-8"));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+
+    try {
+      const response = await request(
+        server,
+        "POST",
+        "/upload",
+        "hello world",
+        { "content-type": "text/plain" },
+      );
+      expect(response.status).toBe(200);
+      expect(response.body).toBe("hello world");
+    } finally {
+      server.close();
+      sidecar.server.close();
+    }
+  });
+
+  it("preserves Web Request bodies by reading from a clone", async () => {
+    let lastBodyHash: string | undefined;
+    const sidecar = await startMockSidecar((body) => {
+      lastBodyHash = JSON.parse(body).body_hash as string | undefined;
+    });
+    const resolved = resolveConfig({ sidecarUrl: sidecar.url });
+
+    try {
+      const request = new Request("http://example.com/upload?kind=text", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: "hello web",
+      });
+
+      const { response, result, passthrough } = await interceptWebRequest(request, resolved);
+      expect(response.status).toBe(200);
+      expect(result).not.toBeNull();
+      expect(passthrough).toBeNull();
+      expect(await request.text()).toBe("hello web");
+      expect(lastBodyHash).toBe(
+        createHash("sha256").update(Buffer.from("hello web", "utf-8")).digest("hex"),
+      );
+    } finally {
+      sidecar.server.close();
+    }
+  });
+
+  it("marks fail-open Node passthroughs without a synthetic receipt", async () => {
+    const resolved = resolveConfig({
+      sidecarUrl: "http://127.0.0.1:1",
+      onSidecarError: "allow",
+      timeoutMs: 200,
+    });
+
+    const server = http.createServer(async (req, res) => {
+      const outcome = await interceptNodeRequest(req, res, resolved);
+      expect(outcome.responseSent).toBe(false);
+      expect(outcome.result).toBeNull();
+      expect(outcome.passthrough).toEqual({
+        mode: "allow_without_receipt",
+        error: "arc_sidecar_unreachable",
+        message: expect.stringContaining("sidecar"),
+      });
+      expect(res.getHeader("X-Arc-Receipt-Id")).toBeUndefined();
+      res.writeHead(204);
+      res.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+
+    try {
+      const response = await request(server, "GET", "/health");
+      expect(response.status).toBe(204);
+      expect(response.headers["x-arc-receipt-id"]).toBeUndefined();
+    } finally {
+      server.close();
+    }
+  });
+
+  it("marks fail-open Web passthroughs without a synthetic receipt", async () => {
+    const resolved = resolveConfig({
+      sidecarUrl: "http://127.0.0.1:1",
+      onSidecarError: "allow",
+      timeoutMs: 200,
+    });
+
+    const { response, result, passthrough } = await interceptWebRequest(
+      new Request("http://example.com/health", { method: "GET" }),
+      resolved,
+    );
+
+    expect(response.status).toBe(200);
+    expect(result).toBeNull();
+    expect(passthrough).toEqual({
+      mode: "allow_without_receipt",
+      error: "arc_sidecar_unreachable",
+      message: expect.stringContaining("sidecar"),
+    });
+    expect(response.headers.get("X-Arc-Receipt-Id")).toBeNull();
   });
 });

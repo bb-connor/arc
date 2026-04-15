@@ -1,0 +1,13 @@
+[package]
+name = "hello-acp"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+arc-acp-edge = { path = "../../crates/arc-acp-edge" }
+arc-core = { path = "../../crates/arc-core" }
+arc-kernel = { path = "../../crates/arc-kernel" }
+arc-manifest = { path = "../../crates/arc-manifest" }
+serde_json = "1"

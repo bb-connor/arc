@@ -50,18 +50,21 @@ fn export_assurance_suite(output: &Path) -> Result<MercuryAssuranceSuiteExportSu
         write_json_file(&inquiry_package_path, &inquiry_package)?;
         write_verification_report(&inquiry_verification_path, &inquiry_report)?;
 
-        let review_package = build_assurance_review_package(
-            &governance_summary.workflow_id,
-            config.reviewer_population,
-            &relative_display(output, &disclosure_profile_path)?,
-            &relative_display(output, &proof_package_path)?,
-            &relative_display(output, &inquiry_package_path)?,
-            &relative_display(output, &inquiry_verification_path)?,
-            &relative_display(output, &reviewer_package_path)?,
-            &relative_display(output, &qualification_report_path)?,
-            &relative_display(output, &governance_decision_package_path)?,
-            config.verifier_equivalent,
-        )?;
+        let review_package = build_assurance_review_package(AssuranceReviewPackageArgs {
+            workflow_id: &governance_summary.workflow_id,
+            reviewer_population: config.reviewer_population,
+            disclosure_profile_file: &relative_display(output, &disclosure_profile_path)?,
+            proof_package_file: &relative_display(output, &proof_package_path)?,
+            inquiry_package_file: &relative_display(output, &inquiry_package_path)?,
+            inquiry_verification_file: &relative_display(output, &inquiry_verification_path)?,
+            reviewer_package_file: &relative_display(output, &reviewer_package_path)?,
+            qualification_report_file: &relative_display(output, &qualification_report_path)?,
+            governance_decision_package_file: &relative_display(
+                output,
+                &governance_decision_package_path,
+            )?,
+            verifier_equivalent: config.verifier_equivalent,
+        })?;
         let review_package_path = population_dir.join("review-package.json");
         write_json_file(&review_package_path, &review_package)?;
 

@@ -4,10 +4,13 @@
 > This document defines how ARC extends beyond protocol adapters (MCP, A2A, ACP)
 > to become the universal security kernel for any API surface.
 >
-> **Current-state note:** the repo does not currently ship `arc api protect`,
-> `arc-openapi`, `arc-asgi`, `arc-node-http`, `arc-go-http`, or the framework
-> packages named below. These names describe the proposed packaging strategy
-> around the existing Rust kernel and protocol adapters.
+> **Current-state note:** the repo now ships the core HTTP/kernel substrate:
+> `arc api protect`, `arc-openapi`, `arc-sdk-python`, `arc-asgi`,
+> `@arc-protocol/node-http`, `arc-go-http`, `arc-tower`,
+> `arc-spring-boot`, and `ArcMiddleware`, plus the thin FastAPI/Django and
+> Express/Fastify/Elysia wrappers. This document still mixes shipped packaging
+> with forward-looking DX direction. Generic cross-protocol orchestration
+> remains future architecture, not a shipped runtime.
 
 ## 1. The Problem: ARC Is Not "Just Another MCP Gateway"
 
@@ -53,7 +56,7 @@ of **substrate adapters** that cover families of frameworks.
 |-----------|--------|---------|
 | ASGI (Python) | FastAPI, Starlette, Litestar, async Python | `arc-asgi` |
 | WSGI/Django (Python) | Django, DRF, Flask (WSGI + ORM patterns) | `arc-django` |
-| Node/Bun HTTP (JS/TS) | Fastify, Express, Nest, Hono, Elysia | `arc-node-http` |
+| Node/Bun HTTP (JS/TS) | Fastify, Express, Nest, Hono, Elysia | `@arc-protocol/node-http` |
 | net/http (Go) | stdlib, Gin, Echo, Fiber, chi | `arc-go-http` |
 | Servlet/WebFlux (Java) | Spring Boot, Quarkus, Micronaut | `arc-jvm` |
 | ASP.NET Core (.NET) | Minimal APIs, MVC, Blazor | `arc-dotnet` |
@@ -169,7 +172,7 @@ each adding depth without breaking the previous level.
 
 ### Level 0: Reverse Proxy / Sidecar (Zero Code)
 
-Proposed CLI surface:
+Current shipped CLI surface:
 
 ```bash
 arc api protect --upstream http://localhost:8000 --spec openapi.yaml
@@ -178,21 +181,23 @@ arc api protect --upstream http://localhost:8000 --spec openapi.yaml
 What this does:
 - Reads the OpenAPI spec
 - Generates a default ARC manifest and policy
-- Starts a reverse proxy on port 8443
+- Starts a reverse proxy on the configured listen address
 - Every request gets: session binding, capability check, receipt signing
-- Side-effect routes (POST/PUT/DELETE) denied by default without capability token
-- GET routes allowed with session-scoped audit receipts
+- Safe routes (GET/HEAD/OPTIONS) are allowed with session-scoped audit receipts
+- Side-effect routes (POST/PUT/PATCH/DELETE) are denied by default without a
+  valid capability token
+- Raw request bytes are hashed before evaluation, and receipts can be persisted
+  durably when `--receipt-store` is configured
 
 **Friction**: zero code changes. Deploy as a sidecar in K8s or a local proxy.
 
-**Limitations**: best for coarse policy and fast rollout. Body inspection,
-auth-context normalization, and framework-level session semantics are weaker
-than native middleware unless the proxy is configured to buffer and enrich
-requests explicitly.
+**Limitations**: best for coarse policy and fast rollout. Framework-native
+identity normalization, route semantics, and rich session context remain weaker
+than substrate middleware because the proxy only sees normalized HTTP traffic.
 
 ### Level 1: Framework Middleware (One Import)
 
-Proposed package names:
+Current shipped package examples:
 
 Python (FastAPI):
 ```python
@@ -204,7 +209,7 @@ app.add_middleware(ArcMiddleware, config="arc.yaml")
 
 TypeScript (Elysia):
 ```typescript
-import { arc } from 'arc-elysia'
+import { arc } from '@arc-protocol/elysia'
 
 const app = new Elysia()
   .use(arc({ config: 'arc.yaml' }))
@@ -452,7 +457,7 @@ the kernel reachable for most developers.
 | Package | Language | Covers | Package Name |
 |---------|----------|--------|--------------|
 | `arc-sdk-python` / `arc-asgi` | Python | FastAPI, Starlette, Litestar | `sdks/python/arc-sdk-python`, `sdks/python/arc-asgi` |
-| `@arc-protocol/node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | `sdks/typescript/arc-node-http` |
+| `@arc-protocol/node-http` | JS/TS/Bun | Fastify, Express, Hono, Elysia | `sdks/typescript/packages/node-http` |
 | `arc-go-http` | Go | net/http, Gin, Echo, Fiber, chi | `sdks/go/arc-go-http` |
 
 ### Phase 3: Framework Wrappers (Thin) [Shipped]
@@ -461,9 +466,9 @@ the kernel reachable for most developers.
 |---------|-------|-----------|--------------|
 | `arc-fastapi` | FastAPI decorator/middleware | `arc-asgi` | `sdks/python/arc-fastapi` |
 | `arc-django` | Django/DRF middleware | WSGI-specific | `sdks/python/arc-django` |
-| `@arc-protocol/express` | Express middleware | `@arc-protocol/node-http` | `sdks/typescript/arc-express` |
-| `@arc-protocol/fastify` | Fastify plugin | `@arc-protocol/node-http` | `sdks/typescript/arc-fastify` |
-| `@arc-protocol/elysia` | Elysia lifecycle plugin | `@arc-protocol/node-http` | `sdks/typescript/arc-elysia` |
+| `@arc-protocol/express` | Express middleware | `@arc-protocol/node-http` | `sdks/typescript/packages/express` |
+| `@arc-protocol/fastify` | Fastify plugin | `@arc-protocol/node-http` | `sdks/typescript/packages/fastify` |
+| `@arc-protocol/elysia` | Elysia lifecycle plugin | `@arc-protocol/node-http` | `sdks/typescript/packages/elysia` |
 
 ### Phase 4: Session Journal + Stateful Guards [Shipped]
 
@@ -477,7 +482,7 @@ the kernel reachable for most developers.
 
 | Package | Language | Covers | Package Name |
 |---------|----------|--------|--------------|
-| `arc-tower` | Rust | Axum, Tonic (tower::Layer) | `crates/arc-tower` |
+| `arc-tower` | Rust | Axum and replayable Tower body types; current gRPC coverage is the generic Tower/HTTP2 path rather than a dedicated `tonic::body::Body` qualification | `crates/arc-tower` |
 | `arc-spring-boot` | Java/Kotlin | Spring Boot auto-configuration, ArcFilter servlet filter | `sdks/jvm/arc-spring-boot` |
 | `ArcMiddleware` | C# | ASP.NET Core middleware | `sdks/dotnet/ArcMiddleware` |
 

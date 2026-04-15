@@ -1,0 +1,11 @@
+{"plugins": [],
+ "package": "arc",
+ "options": {"autoImplicit": false},
+ "name": "Pact.Core.Scope",
+ "isModule": false,
+ "importArts":
+ {"Pact.Core.Capability":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Pact/Core/Capability.olean"],
+  "Arc.Core.Capability":
+  ["/Users/connor/Medica/backbay/standalone/arc/formal/lean4/Pact/.lake/build/lib/lean/Arc/Core/Capability.olean"]},
+ "dynlibs": []}

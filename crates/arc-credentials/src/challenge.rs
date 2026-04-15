@@ -7,6 +7,22 @@ pub struct PassportPresentationOptions {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct PassportPresentationChallengeArgs {
+    pub verifier: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_id: Option<String>,
+    pub nonce: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub options: PassportPresentationOptions,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_ref: Option<PassportVerifierPolicyReference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<PassportVerifierPolicy>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PassportPresentationChallenge {
     pub schema: String,
     pub verifier: String,
@@ -407,29 +423,31 @@ pub fn create_passport_presentation_challenge(
     options: PassportPresentationOptions,
     policy: Option<PassportVerifierPolicy>,
 ) -> Result<PassportPresentationChallenge, CredentialError> {
-    create_passport_presentation_challenge_with_reference(
+    create_passport_presentation_challenge_with_reference(PassportPresentationChallengeArgs {
+        verifier: verifier.into(),
+        challenge_id: None,
+        nonce: nonce.into(),
+        issued_at,
+        expires_at,
+        options,
+        policy_ref: None,
+        policy,
+    })
+}
+
+pub fn create_passport_presentation_challenge_with_reference(
+    args: PassportPresentationChallengeArgs,
+) -> Result<PassportPresentationChallenge, CredentialError> {
+    let PassportPresentationChallengeArgs {
         verifier,
-        None::<String>,
+        challenge_id,
         nonce,
         issued_at,
         expires_at,
         options,
-        None,
+        policy_ref,
         policy,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn create_passport_presentation_challenge_with_reference(
-    verifier: impl Into<String>,
-    challenge_id: Option<String>,
-    nonce: impl Into<String>,
-    issued_at: u64,
-    expires_at: u64,
-    options: PassportPresentationOptions,
-    policy_ref: Option<PassportVerifierPolicyReference>,
-    policy: Option<PassportVerifierPolicy>,
-) -> Result<PassportPresentationChallenge, CredentialError> {
+    } = args;
     if issued_at > expires_at {
         return Err(CredentialError::InvalidChallengeValidityWindow);
     }
@@ -439,9 +457,9 @@ pub fn create_passport_presentation_challenge_with_reference(
 
     Ok(PassportPresentationChallenge {
         schema: PASSPORT_PRESENTATION_CHALLENGE_SCHEMA.to_string(),
-        verifier: verifier.into(),
+        verifier,
         challenge_id,
-        nonce: nonce.into(),
+        nonce,
         issued_at: rfc3339_from_unix(issued_at)?,
         expires_at: rfc3339_from_unix(expires_at)?,
         issuer_allowlist: options.issuer_allowlist,

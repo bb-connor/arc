@@ -35,9 +35,13 @@ dev = [
     "pytest-asyncio>=0.23,<1",
 ]
 
+[tool.uv.sources]
+arc-sdk-python = { path = "../arc-sdk-python" }
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/arc_django"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["."]
 testpaths = ["tests"]

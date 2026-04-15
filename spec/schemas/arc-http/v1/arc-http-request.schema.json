@@ -46,7 +46,7 @@
       "description": "Extracted caller identity."
     },
     "body_hash": {
-      "type": "string",
+      "type": ["string", "null"],
       "pattern": "^[0-9a-f]{64}$",
       "description": "SHA-256 hex hash of the request body. Null for bodyless requests."
     },
@@ -57,11 +57,11 @@
       "description": "Content-Length of the request body in bytes."
     },
     "session_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Session ID this request belongs to."
     },
     "capability_id": {
-      "type": "string",
+      "type": ["string", "null"],
       "description": "Capability token ID presented with this request."
     },
     "timestamp": {

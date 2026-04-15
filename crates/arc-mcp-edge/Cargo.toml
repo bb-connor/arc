@@ -12,6 +12,7 @@ name = "arc_mcp_edge"
 
 [dependencies]
 arc-core = { package = "arc-core-types", path = "../arc-core-types" }
+arc-cross-protocol = { package = "arc-cross-protocol", path = "../arc-cross-protocol" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-manifest = { package = "arc-manifest", path = "../arc-manifest" }
 chrono = { workspace = true, features = ["clock"] }

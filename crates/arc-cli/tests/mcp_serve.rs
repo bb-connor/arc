@@ -5,18 +5,46 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::receipt::{ArcReceipt, Decision};
 use serde_json::{json, Value};
 
-fn unique_test_dir() -> PathBuf {
+struct TestDir {
+    path: PathBuf,
+    _guard: MutexGuard<'static, ()>,
+}
+
+impl std::ops::Deref for TestDir {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.path.as_path()
+    }
+}
+
+impl AsRef<Path> for TestDir {
+    fn as_ref(&self) -> &Path {
+        self.path.as_path()
+    }
+}
+
+fn unique_test_dir() -> TestDir {
+    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    let guard = TEST_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .expect("mcp_serve test lock poisoned");
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time before unix epoch")
         .as_nanos();
-    std::env::temp_dir().join(format!("arc-cli-mcp-serve-{nonce}"))
+    TestDir {
+        path: std::env::temp_dir().join(format!("arc-cli-mcp-serve-{nonce}")),
+        _guard: guard,
+    }
 }
 
 fn write_mock_server_script(dir: &Path) -> PathBuf {

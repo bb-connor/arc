@@ -73,6 +73,8 @@ export interface HttpReceipt {
   session_id?: string | undefined;
   verdict: Verdict;
   evidence: GuardEvidence[];
+  // ARC evaluation-time HTTP status; allow receipts may be signed before the
+  // downstream response exists.
   response_status: number;
   timestamp: number;
   content_hash: string;
@@ -108,6 +110,16 @@ export interface EvaluateResponse {
   evidence: GuardEvidence[];
 }
 
+/**
+ * Explicit passthrough state when ARC is configured fail-open and the sidecar
+ * could not produce a signed evaluation result.
+ */
+export interface ArcPassthrough {
+  mode: "allow_without_receipt";
+  error: typeof ARC_ERROR_CODES.SIDECAR_UNREACHABLE;
+  message: string;
+}
+
 // -- ARC middleware configuration --
 
 export interface ArcConfig {
@@ -136,6 +148,7 @@ export interface ArcConfig {
 
   /**
    * Called when the sidecar is unreachable. Defaults to deny (fail-closed).
+   * `allow` forwards the request without an ARC receipt.
    */
   onSidecarError?: "deny" | "allow" | undefined;
 
@@ -146,7 +159,7 @@ export interface ArcConfig {
 
   /**
    * Headers to forward to the sidecar for policy evaluation.
-   * Default: ["content-type", "content-length", "x-arc-capability"].
+   * Default: ["content-type", "content-length"].
    */
   forwardHeaders?: string[] | undefined;
 }

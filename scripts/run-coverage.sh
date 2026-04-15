@@ -20,10 +20,19 @@ coverage_timeout="${TARPAULIN_TIMEOUT_SECONDS:-600}"
 coverage_engine="${TARPAULIN_ENGINE:-llvm}"
 coverage_fail_under="${COVERAGE_FAIL_UNDER:-}"
 tarpaulin_docker_image="${TARPAULIN_DOCKER_IMAGE:-xd009642/tarpaulin}"
+docker_llvm_profile_file="${TARPAULIN_DOCKER_LLVM_PROFILE_FILE:-/tmp/build_rs_cov-%p-%m.profraw}"
+
+if [[ "${coverage_target_dir}" = /* ]]; then
+  local_llvm_profile_dir="${coverage_target_dir}"
+else
+  local_llvm_profile_dir="${repo_root}/${coverage_target_dir}"
+fi
+local_llvm_profile_file="${TARPAULIN_LOCAL_LLVM_PROFILE_FILE:-${local_llvm_profile_dir}/build_rs_cov-%p-%m.profraw}"
 
 mkdir -p "${coverage_root}" "${coverage_html_root}" "${coverage_target_dir}"
 find "${coverage_root}" -mindepth 1 ! -name README.md -exec rm -rf {} +
 mkdir -p "${coverage_html_root}"
+rm -f "${repo_root}/tarpaulin-report.html" "${repo_root}/tarpaulin-report.json" "${repo_root}/lcov.info"
 
 tarpaulin_args=(
   --workspace
@@ -50,7 +59,11 @@ if [[ -n "${coverage_fail_under}" ]]; then
 fi
 
 run_local_tarpaulin() {
-  cargo tarpaulin "${tarpaulin_args[@]}"
+  if [[ "${coverage_engine}" == "llvm" ]]; then
+    LLVM_PROFILE_FILE="${local_llvm_profile_file}" cargo tarpaulin "${tarpaulin_args[@]}"
+  else
+    cargo tarpaulin "${tarpaulin_args[@]}"
+  fi
 }
 
 run_docker_tarpaulin() {
@@ -59,36 +72,35 @@ run_docker_tarpaulin() {
     exit 1
   fi
 
-  if [[ -n "${TARPAULIN_DOCKER_PLATFORM:-}" ]]; then
-    docker run \
-      --rm \
-      --security-opt seccomp=unconfined \
-      --user "$(id -u):$(id -g)" \
-      --platform "${TARPAULIN_DOCKER_PLATFORM}" \
-      --volume "${repo_root}:/volume" \
-      --workdir /volume \
-      "${tarpaulin_docker_image}" \
-      cargo tarpaulin \
-      "${tarpaulin_args[@]}"
-  else
-    docker run \
-      --rm \
-      --security-opt seccomp=unconfined \
-      --user "$(id -u):$(id -g)" \
-      --volume "${repo_root}:/volume" \
-      --workdir /volume \
-      "${tarpaulin_docker_image}" \
-      cargo tarpaulin \
-      "${tarpaulin_args[@]}"
+  docker_args=(
+    --rm
+    --security-opt seccomp=unconfined
+    --user "$(id -u):$(id -g)"
+    --volume "${repo_root}:/volume"
+    --workdir /volume
+  )
+
+  if [[ "${coverage_engine}" == "llvm" ]]; then
+    docker_args+=(--env "LLVM_PROFILE_FILE=${docker_llvm_profile_file}")
   fi
+
+  if [[ -n "${TARPAULIN_DOCKER_PLATFORM:-}" ]]; then
+    docker_args+=(--platform "${TARPAULIN_DOCKER_PLATFORM}")
+  fi
+
+  docker run \
+      "${docker_args[@]}" \
+      "${tarpaulin_docker_image}" \
+      cargo tarpaulin \
+      "${tarpaulin_args[@]}"
 }
 
 if cargo tarpaulin --version >/dev/null 2>&1; then
   echo "running coverage with local cargo-tarpaulin"
-  run_local_tarpaulin | tee "${coverage_log}"
+  run_local_tarpaulin 2>&1 | tee "${coverage_log}"
 else
   echo "running coverage with docker image ${tarpaulin_docker_image}"
-  run_docker_tarpaulin | tee "${coverage_log}"
+  run_docker_tarpaulin 2>&1 | tee "${coverage_log}"
 fi
 
 if [[ ! -f "${repo_root}/tarpaulin-report.html" ]]; then

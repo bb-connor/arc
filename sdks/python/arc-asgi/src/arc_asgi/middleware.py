@@ -16,7 +16,7 @@ from typing import Any, Callable, Awaitable
 
 from arc_sdk.client import ArcClient
 from arc_sdk.errors import ArcConnectionError, ArcError, ArcTimeoutError
-from arc_sdk.models import CallerIdentity, HttpReceipt
+from arc_sdk.models import ArcPassthrough, CallerIdentity, HttpReceipt
 
 from arc_asgi.config import ArcASGIConfig
 from arc_asgi.extractors import CompositeExtractor, IdentityExtractor
@@ -147,17 +147,28 @@ class ArcASGIMiddleware:
         request_id = str(uuid.uuid4())
         try:
             client = self._get_client()
-            receipt = await client.evaluate_http_request(
+            result = await client.evaluate_http_request(
                 request_id=request_id,
                 method=method,
                 route_pattern=route_pattern,
                 path=path,
                 caller=caller,
+                query=_query_params(scope),
+                headers=_selected_headers(scope),
                 body_hash=body_hash,
-                capability_id=_extract_capability_id(scope),
+                body_length=len(b"".join(body_chunks)) if body_chunks else 0,
+                capability_token=_extract_capability_token(scope),
             )
         except (ArcConnectionError, ArcTimeoutError):
             if self._config.fail_open:
+                _attach_passthrough(
+                    scope,
+                    ArcPassthrough(
+                        mode="allow_without_receipt",
+                        error="arc_sidecar_unreachable",
+                        message="ARC sidecar unavailable",
+                    ),
+                )
                 await self._app(scope, replay_receive, send)
                 return
             await _send_error_response(
@@ -169,6 +180,8 @@ class ArcASGIMiddleware:
                 send, 502, str(exc), "SidecarError"
             )
             return
+
+        receipt = result.receipt
 
         # Fire receipt callback
         if self._on_receipt is not None:
@@ -203,15 +216,15 @@ class ArcASGIMiddleware:
         await self._app(scope, replay_receive, send_with_receipt)
 
 
-def _extract_capability_id(scope: Scope) -> str | None:
-    """Extract ARC capability ID from query string or header."""
+def _extract_capability_token(scope: Scope) -> str | None:
+    """Extract the presented ARC capability token from header or query string."""
     headers = {
         k.decode("latin-1").lower(): v.decode("latin-1")
         for k, v in scope.get("headers", [])
     }
-    cap_id = headers.get("x-arc-capability")
-    if cap_id:
-        return cap_id
+    capability_token = headers.get("x-arc-capability")
+    if capability_token:
+        return capability_token
 
     # Try query string
     qs = scope.get("query_string", b"").decode("latin-1")
@@ -219,6 +232,43 @@ def _extract_capability_id(scope: Scope) -> str | None:
         if param.startswith("arc_capability="):
             return param.split("=", 1)[1]
     return None
+
+
+def _attach_passthrough(scope: Scope, passthrough: ArcPassthrough) -> None:
+    scope["arc_passthrough"] = passthrough
+    state = scope.setdefault("state", {})
+    if isinstance(state, dict):
+        state["arc_passthrough"] = passthrough
+
+
+def _selected_headers(scope: Scope) -> dict[str, str]:
+    headers = {
+        k.decode("latin-1").lower(): v.decode("latin-1")
+        for k, v in scope.get("headers", [])
+    }
+    selected: dict[str, str] = {}
+    for key in ("content-type", "content-length"):
+        value = headers.get(key)
+        if value is not None:
+            selected[key] = value
+    return selected
+
+
+def _query_params(scope: Scope) -> dict[str, str]:
+    params: dict[str, str] = {}
+    qs = scope.get("query_string", b"").decode("latin-1")
+    if not qs:
+        return params
+
+    for param in qs.split("&"):
+        if not param:
+            continue
+        if "=" in param:
+            key, value = param.split("=", 1)
+        else:
+            key, value = param, ""
+        params[key] = value
+    return params
 
 
 async def _send_error_response(

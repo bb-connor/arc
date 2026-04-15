@@ -25,6 +25,7 @@ import { arc } from "@arc-protocol/express";
 
 const app = express();
 app.use(arc({ config: "arc.yaml" }));
+app.use(express.json());
 
 app.get("/pets", (_req, res) => {
   res.json([{ name: "Fido" }]);
@@ -40,7 +41,7 @@ All ARC TypeScript SDKs communicate with the ARC Rust kernel through localhost H
 - **Default URL**: `http://127.0.0.1:9090`
 - **Configurable via**: `ARC_SIDECAR_URL` environment variable or the `sidecarUrl` config option
 - **No native compilation or FFI**: pure TypeScript/JavaScript over HTTP (uses `fetch`)
-- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response. Set `onSidecarError: "allow"` to change this behavior.
+- **Fail-closed by default**: when the sidecar is unreachable, requests receive a 502 response. Set `onSidecarError: "allow"` to forward the request without synthesizing an ARC receipt.
 
 ---
 
@@ -114,7 +115,7 @@ interface HttpReceipt {
   session_id?: string;
   verdict: Verdict;
   evidence: GuardEvidence[];
-  response_status: number;
+  response_status: number; // ARC evaluation-time HTTP status, not guaranteed downstream response evidence for allow-path receipts
   timestamp: number;
   content_hash: string;
   policy_hash: string;
@@ -174,7 +175,7 @@ interface ArcConfig {
   routePatternResolver?: RoutePatternResolver;
   onSidecarError?: "deny" | "allow";  // Default: "deny" (fail-closed)
   timeoutMs?: number;              // Default: 5000
-  forwardHeaders?: string[];       // Default: ["content-type", "content-length", "x-arc-capability"]
+  forwardHeaders?: string[];       // Default: ["content-type", "content-length"]
 }
 ```
 
@@ -259,10 +260,14 @@ import { interceptNodeRequest, resolveConfig } from "@arc-protocol/node-http";
 
 const resolved = resolveConfig({ config: "arc.yaml" });
 
-// Returns EvaluateResponse on allow, null on deny (response already sent)
-const result = await interceptNodeRequest(req, res, resolved);
-if (result != null) {
-  // Request allowed -- proceed
+const outcome = await interceptNodeRequest(req, res, resolved);
+if (!outcome.responseSent) {
+  if (outcome.result) {
+    // Request allowed with a real ARC receipt.
+  }
+  if (outcome.passthrough) {
+    // Fail-open passthrough. No ARC receipt exists for this request.
+  }
 }
 ```
 
@@ -273,9 +278,11 @@ import { interceptWebRequest, resolveConfig } from "@arc-protocol/node-http";
 
 const resolved = resolveConfig({ config: "arc.yaml" });
 
-const { response, result } = await interceptWebRequest(request, resolved);
+const { response, result, passthrough } = await interceptWebRequest(request, resolved);
 if (result != null) {
-  // Allowed -- serve the actual response
+  // Allowed with a real ARC receipt. The original Request body remains readable.
+} else if (passthrough != null) {
+  // Fail-open passthrough. No ARC receipt exists for this request.
 } else {
   // Denied -- return the error response
   return response;
@@ -355,7 +362,7 @@ app.use(arc({
 
 ### Accessing Results
 
-The evaluation result is attached to the request:
+The evaluation result is attached to the request when ARC evaluation succeeds:
 
 ```ts
 import type { ArcRequest } from "@arc-protocol/express";
@@ -364,6 +371,9 @@ app.get("/pets", (req, res) => {
   const arcReq = req as ArcRequest;
   if (arcReq.arcResult) {
     console.log("Receipt ID:", arcReq.arcResult.receipt.id);
+  }
+  if (arcReq.arcPassthrough) {
+    console.log("ARC passthrough mode:", arcReq.arcPassthrough.mode);
   }
   res.json([]);
 });
@@ -429,7 +439,7 @@ await fastify.register(arc, {
 
 ### Accessing Results
 
-The ARC evaluation result is available on the Fastify request object:
+The ARC evaluation result is available on the Fastify request object when ARC evaluation succeeds:
 
 ```ts
 fastify.get("/pets", async (request, reply) => {

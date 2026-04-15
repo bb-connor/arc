@@ -20,18 +20,27 @@ they have the same epistemic weight:
   evidence by themselves.
 
 Where a surface is only proposed, this document now labels it explicitly. In
-particular: `arc mcp serve`, `arc mcp serve-http`, and the receipt dashboard
-ship today; `arc start --config arc.yaml` and cross-protocol ACP attestation
-remain proposed.
+particular: `arc mcp serve`, `arc mcp serve-http`, `arc api protect`, the
+HTTP/framework substrate packages, ACP live-path cryptographic receipts, and
+the receipt dashboard ship today. `arc start --config arc.yaml` and the
+stronger market-position claims remain strategic or proposed rather than
+current runtime fact. The shared `CrossProtocolOrchestrator` substrate is no
+longer purely proposed; the stronger technical control-plane thesis is now
+qualified on the supported authoritative surfaces, while the broader
+partner/ecosystem thesis remains future.
 
 ---
 
 ## 1. The One-Sentence Vision
 
-ARC is the comptroller of the agent economy -- a system designed to provide
-cryptographically signed, cross-protocol attestation of what AI agents actually
-did across MCP, A2A, and ACP, with a liability market for pricing the residual
-risk as a long-term extension.
+**Current defensible claim:** ARC is a cryptographically signed, fail-closed,
+intent-aware governance control plane on the qualified authoritative HTTP, MCP,
+OpenAI, A2A, and ACP surfaces.
+
+**Strategic thesis:** ARC could become the comptroller of the agent economy --
+but only if the broader cross-protocol, economic, federated-governance, and
+external market-adoption layers are proven in production rather than assumed
+by narrative.
 
 ---
 
@@ -135,8 +144,10 @@ one:
 3. **Dynamic governance.** Optional future controls that use live context,
    drift signals, and intent/risk scoring to change what is allowed mid-session.
 
-Today ARC is strongest in layers 1 and 2. Layer 3 is strategic expansion, not a
-claim of fully shipped intent-aware runtime intervention.
+Today ARC ships layers 1 and 2 broadly and now qualifies a bounded but real
+form of layer 3 on the claim-eligible authoritative surfaces. Broader
+ecosystem-wide dynamic governance remains strategic expansion rather than a
+market-qualified claim.
 
 ### Three Protocol Adapters, One Kernel
 
@@ -153,14 +164,16 @@ same trusted kernel. The kernel validates capability tokens, runs the guard
 pipeline, and signs receipts -- regardless of which protocol originated the
 request.
 
-### Target Signed Receipts Across All Three Protocols
+### Current Signed Receipt Posture Across Shipped Protocol Surfaces
 
 The receipt log is protocol-agnostic. An MCP tool call, an A2A task
-delegation, and a future ACP filesystem write are intended to produce the same
-`ArcReceipt` structure: signed, timestamped, capability-bound, and append-only.
-Today that is fully shipped for MCP and A2A; ACP receipt promotion remains a
-Tier 1 design/implementation gap. Nested operations produce parent-child
-receipt chains that preserve the full lineage across protocol boundaries.
+delegation, ACP live-path action, and ARC-governed HTTP/API call all use the
+same signed evidence model: timestamped, capability-bound, and append-only.
+Today that is shipped on the live paths that actually reach the kernel. What is
+still future is the full protocol-to-protocol fabric and literal
+kernel-convergence work that would make every bridge hop flow through one
+reusable orchestration layer by construction, not merely the existence of a
+shared orchestrator substrate.
 
 ### The Receipt Log as the Deepest Long-Term Moat
 
@@ -191,9 +204,11 @@ an Azure-only niche. The better contrast is:
   attested lineage and third-party-verifiable evidence, not if it relies on a
   weak competitor caricature.
 
-Cross-protocol signed receipts are fully shipped for MCP and A2A adapters.
-ACP proxy kernel integration remains the largest open attestation gap and is a
-Tier 1 priority (see `ACP-KERNEL-INTEGRATION.md`).
+Cross-protocol signed receipts are now shipped for the live MCP, A2A, ACP, and
+HTTP/API substrate paths that execute through the kernel. The remaining gap is
+not ACP receipt promotion itself; it is the more generic orchestration layer
+described in `CROSS-PROTOCOL-BRIDGING.md`, plus broader deployment proof that
+the multi-surface story holds under real operator workloads.
 
 ### ARC's Differentiation Thesis Today
 
@@ -201,11 +216,11 @@ Tier 1 priority (see `ACP-KERNEL-INTEGRATION.md`).
 |------|--------------|-----------------|
 | **Capability tokens** | Attenuated, time-bounded, subject-bound, revocable, formally verified (Lean 4 P1) | Shipped in the core model |
 | **Guard evidence** | Composable fail-closed guards with signed evidence capture | Shipped; advanced stateful guards remain planned |
-| **Receipt signing** | Kernel-signed receipts for MCP/A2A, with ACP as the major remaining gap | Partial today, important Tier 1 gap |
+| **Receipt signing** | Kernel-signed receipts on shipped MCP, A2A, ACP live-path, OpenAI, and HTTP/API substrate flows | Shipped on current live paths; generic orchestration remains future |
 | **Merkle commitment** | Append-only receipt log with checkpoint publication | Shipped in the receipt architecture |
 | **Formal verification** | Capability monotonicity and cascade revocation proofs in Lean 4 | Real but scoped to specific subsystems |
 | **Economic primitives** | Budgets, settlement hooks, and insurance-linked framing in the security path | Mixed: some pieces shipped, broader market story is a strategic bet |
-| **Cross-protocol lineage** | One evidence model spanning MCP, A2A, ACP, and future native/API surfaces | Strong thesis; ACP completion and HTTP/native packaging still needed |
+| **Cross-protocol lineage** | One evidence model spanning MCP, A2A, ACP, HTTP/API substrates, and future native surfaces | Shipped evidence model on current live paths; generic orchestrator and larger-scale operator proof still needed |
 
 The adjacent comparison set is broader than one product. Runtime governance
 toolkits, policy engines, API-security platforms, and observability systems all
@@ -231,11 +246,10 @@ shipping surface.
 | Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` | [Shipped] |
 | Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` | |
 
-**Why Tier 1 first:** The ACP proxy currently generates unsigned audit entries.
-Promoting those to signed ARC receipts completes the three-protocol attestation
-story. The wrapped MCP edge already exists; the near-term DX work is making the
-current CLI easier to adopt and documenting proposed future entry points
-honestly.
+**Why Tier 1 first:** ACP live-path cryptographic enforcement is now landed, so
+the remaining Tier 1 work is about adoption clarity: wrapped MCP DX polish and
+truthful documentation for the proposed future entry points that still do not
+ship.
 
 **Runtime-security framing:** Tier 1 is about making deterministic governance
 and signed observability easy to adopt. It is intentionally not framed as full
@@ -418,6 +432,59 @@ The billing ledger is not a separate system. It is the receipt log.
 This is a strategic thesis, not a present-day claim that a multi-protocol tool
 store or liability-linked billing surface is already implemented.
 
+---
+
+## 6.5 Claim Gate
+
+ARC can honestly claim a stronger breakthrough today:
+
+- ARC ships a cryptographically signed, fail-closed, intent-aware governance
+  control plane with shared executor registry resolution, signed
+  route-selection evidence, receipt-bearing multi-hop route execution, and a
+  shared lifecycle contract across the qualified authoritative HTTP, MCP,
+  OpenAI tool execution, A2A skills, and ACP capabilities
+- ARC ships a cryptographically signed, fail-closed governance kernel and a
+  bounded protocol-aware cross-protocol execution fabric across HTTP APIs,
+  MCP, OpenAI tool execution, A2A skills, and ACP capabilities
+- the shipped orchestrator now supports explicit metadata-driven qualified
+  non-native authoritative bridge execution through registered target
+  executors rather than collapsing every authoritative path directly to
+  `Native`
+- on the supported authoritative paths, execution is kernel-mediated,
+  receipt-bearing, and explicit about lifecycle and fidelity limits, including
+  the authoritative deferred-task mediation ARC now exposes on A2A and ACP
+  public surfaces
+- the repo ships multi-language substrate packages that preserve that kernel
+  contract across Python, TypeScript, Go, Rust, JVM, and .NET surfaces
+- ARC now also ships explicit operator-facing economic control surfaces,
+  partner-visible receipt and settlement contract packages, and bounded
+  federated multi-operator proof bundles that justify calling the software
+  **comptroller-capable** on qualified local evidence
+
+ARC should not yet claim:
+
+- a proved comptroller-of-the-agent-economy market position
+- "comptroller of the agent economy" as a proved market position rather than a
+  strategic thesis
+
+Broader market-position claims require at least these additional proofs:
+
+- independent external operators running ARC as a live economic control plane
+- partners consuming ARC-issued receipts, checkpoints, reconciliation, or
+  settlement artifacts as authoritative workflow inputs
+- external evidence that meaningful economic workflows would fail or lose
+  partner acceptance without ARC
+- stronger ecosystem and economic validation for the market-position story
+
+The authoritative machine-readable gates now split these levels explicitly:
+
+- bounded runtime substrate:
+  `docs/standards/ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json`
+- stronger technical control-plane thesis:
+  `docs/standards/ARC_UNIVERSAL_CONTROL_PLANE_QUALIFICATION_MATRIX.json`
+- comptroller-capable market-position boundary:
+  `docs/standards/ARC_COMPTROLLER_MARKET_POSITION_MATRIX.json`
+
 The reason this matters to runtime security is simple: if tools and skills can
 be invoked through multiple protocols or through native APIs, security
 architecture cannot stop at MCP chokepoints alone.
@@ -572,15 +639,15 @@ already proven.
 
 ## 9. Integration Roadmap
 
-Planned integrations, ordered by expected adoption impact.
+Current shipped and planned integrations, ordered by expected adoption impact.
 
 | Integration | Description | Status |
 |-------------|-------------|--------|
-| **OpenAI function calling adapter** | Wrap OpenAI-style function calls through the ARC kernel | Planned |
-| **HTTP/OpenAPI sidecar** | Reverse-proxy adoption path for any documented API, with manifest generation from OpenAPI and `x-arc-*` policy hints | Proposed |
-| **Python / TypeScript / Go substrate SDKs** | Multi-language middleware and wrapper packages around the Rust kernel | Planned |
+| **OpenAI function calling adapter** | Wrap OpenAI-style function calls through the ARC kernel | Shipped |
+| **HTTP/OpenAPI sidecar** | Reverse-proxy adoption path for any documented API, with manifest generation from OpenAPI and `x-arc-*` policy hints | Shipped |
+| **Python / TypeScript / Go substrate SDKs** | Multi-language middleware and wrapper packages around the Rust kernel | Shipped |
 | **LangChain / LlamaIndex wrappers** | Python packages that inject ARC authorization into existing agent frameworks | Planned |
-| **Kubernetes admission controller** | Enforce ARC capability policies at pod deployment, reject workloads without valid tokens | Planned |
+| **Kubernetes admission controller** | Enforce ARC capability policies at pod deployment, reject workloads without valid tokens from trusted ARC issuers | Shipped |
 | **WASM guard runtime** | Execute custom guards compiled to WASM in a sandboxed runtime | Planned |
 | **HSM integration** | Hardware Security Module support for kernel signing keys (PKCS#11, AWS CloudHSM, Azure HSM) | Planned |
 | **TEE / confidential computing** | Run the ARC kernel inside a Trusted Execution Environment (Intel SGX, AMD SEV, ARM CCA) | Research |

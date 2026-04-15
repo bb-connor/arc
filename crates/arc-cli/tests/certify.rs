@@ -19,8 +19,9 @@ use arc_credentials::{
     evaluate_portable_reputation, PortableNegativeEventEvidenceKind,
     PortableNegativeEventEvidenceReference, PortableNegativeEventIssueRequest,
     PortableNegativeEventKind, PortableReputationEvaluationRequest, PortableReputationFindingCode,
-    PortableReputationSummaryIssueRequest, PortableReputationWeightingProfile,
-    SignedPortableNegativeEvent, SignedPortableReputationSummary,
+    PortableReputationSummaryArtifactContext, PortableReputationSummaryIssueRequest,
+    PortableReputationWeightingProfile, SignedPortableNegativeEvent,
+    SignedPortableReputationSummary,
 };
 use arc_reputation::{
     BoundaryPressureMetrics, DelegationHygieneMetrics, HistoryDepthMetrics,
@@ -3419,7 +3420,6 @@ fn certify_adversarial_multi_operator_open_market_preserves_visibility_without_t
     let local_summary = SignedPortableReputationSummary::sign(
         build_portable_reputation_summary_artifact(
             &base_url,
-            Some("Origin Operator".to_string()),
             &PortableReputationSummaryIssueRequest {
                 subject_key: subject_key.clone(),
                 since: Some(generated_at.saturating_sub(600)),
@@ -3429,11 +3429,14 @@ fn certify_adversarial_multi_operator_open_market_preserves_visibility_without_t
                 note: Some("local reputation summary".to_string()),
             },
             &sample_portable_reputation_scorecard(&subject_key, 0.82),
-            0.82,
-            false,
-            Some(0),
-            Some(0),
-            generated_at,
+            PortableReputationSummaryArtifactContext {
+                issuer_operator_name: Some("Origin Operator".to_string()),
+                effective_score: 0.82,
+                probationary: false,
+                imported_signal_count: Some(0),
+                accepted_imported_signal_count: Some(0),
+                issued_at: generated_at,
+            },
         )
         .expect("build local reputation summary"),
         &Keypair::generate(),

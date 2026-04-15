@@ -14,9 +14,14 @@ use arc_core::session::{
     ResourceTemplateDefinition, RootDefinition, SessionAuthContext, SessionId, SessionOperation,
     SessionTransport, TaskOwnershipSnapshot, ToolCallOperation,
 };
+use arc_cross_protocol::{
+    route_selection_metadata, BridgeError, CrossProtocolTargetExecution,
+    CrossProtocolTargetRequest, DiscoveryProtocol, TargetExecutionHop,
+    TargetProtocolExecutor,
+};
 use arc_kernel::{
     ArcKernel, LateSessionEvent, NestedFlowClient, PeerCapabilities, SessionOperationResponse,
-    ToolCallOutput, ToolCallStream, ToolServerEvent, Verdict,
+    ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolCallStream, ToolServerEvent, Verdict,
 };
 use arc_manifest::{LatencyHint, ToolDefinition, ToolManifest};
 use chrono::{SecondsFormat, Utc};
@@ -82,6 +87,120 @@ impl Default for McpEdgeConfig {
     }
 }
 
+/// Bridge-only request for projecting an ARC tool invocation through MCP session semantics.
+#[derive(Debug, Clone)]
+pub struct BridgeMcpToolCallRequest {
+    pub request_id: String,
+    pub capability: CapabilityToken,
+    pub server_id: String,
+    pub tool_name: String,
+    pub arguments: Value,
+    pub agent_id: String,
+    pub route_selection_metadata: Option<Value>,
+    pub peer_supports_arc_tool_streaming: bool,
+}
+
+/// Bridge-only MCP tool-call execution result.
+#[derive(Debug)]
+pub struct BridgeMcpToolCall {
+    pub response: ToolCallResponse,
+    pub mcp_result: Value,
+    pub notifications: Vec<Value>,
+}
+
+/// Default non-native protocol executor for MCP target projections.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct McpTargetExecutor {
+    pub peer_supports_arc_tool_streaming: bool,
+}
+
+impl TargetProtocolExecutor for McpTargetExecutor {
+    fn target_protocol(&self) -> DiscoveryProtocol {
+        DiscoveryProtocol::Mcp
+    }
+
+    fn execute(
+        &self,
+        request: CrossProtocolTargetRequest<'_>,
+    ) -> Result<CrossProtocolTargetExecution, BridgeError> {
+        let bridge = execute_bridge_mcp_tool_call(
+            request.kernel,
+            BridgeMcpToolCallRequest {
+                request_id: request.execution.kernel_request_id.clone(),
+                capability: request.execution.capability.clone(),
+                server_id: request.execution.target_server_id.clone(),
+                tool_name: request.execution.target_tool_name.clone(),
+                arguments: request.execution.arguments.clone(),
+                agent_id: request.execution.agent_id.clone(),
+                route_selection_metadata: Some(route_selection_metadata(
+                    request.route_selection,
+                )?),
+                peer_supports_arc_tool_streaming: self.peer_supports_arc_tool_streaming,
+            },
+        )
+        .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?;
+        let receipt_id = bridge.response.receipt.id.clone();
+
+        Ok(CrossProtocolTargetExecution {
+            response: bridge.response,
+            protocol_result: Some(bridge.mcp_result),
+            protocol_notifications: bridge.notifications,
+            route_hops: vec![
+                TargetExecutionHop {
+                    protocol: DiscoveryProtocol::Mcp,
+                    request_id: format!("{}:mcp", request.execution.kernel_request_id),
+                    receipt_id: None,
+                },
+                TargetExecutionHop {
+                    protocol: DiscoveryProtocol::Native,
+                    request_id: request.execution.kernel_request_id.clone(),
+                    receipt_id: Some(receipt_id),
+                },
+            ],
+        })
+    }
+}
+
+pub fn execute_bridge_mcp_tool_call(
+    kernel: &ArcKernel,
+    request: BridgeMcpToolCallRequest,
+) -> Result<BridgeMcpToolCall, AdapterError> {
+    let response = kernel
+        .evaluate_tool_call_blocking_with_metadata(
+            &ToolCallRequest {
+                request_id: request.request_id.clone(),
+                capability: request.capability,
+                tool_name: request.tool_name,
+                server_id: request.server_id,
+                agent_id: request.agent_id,
+                arguments: request.arguments,
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+            },
+            request.route_selection_metadata,
+        )
+        .map_err(|error| AdapterError::KernelRuntime(error.to_string()))?;
+
+    let mut notifications = Vec::new();
+    let mcp_result = kernel_response_to_tool_result(KernelResponseToToolResultArgs {
+        pending_notifications: &mut notifications,
+        request_id: &json!(request.request_id),
+        output: response.output.clone(),
+        reason: response.reason.clone(),
+        verdict: response.verdict,
+        terminal_state: &response.terminal_state,
+        peer_supports_arc_tool_streaming: request.peer_supports_arc_tool_streaming,
+        related_task_id: None,
+    });
+
+    Ok(BridgeMcpToolCall {
+        response,
+        mcp_result,
+        notifications,
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum LogLevel {
     Debug,
@@ -142,17 +261,17 @@ fn arc_protocol_error_payload(
     })
 }
 
-#[allow(clippy::too_many_arguments)]
-fn jsonrpc_protocol_error(
-    id: Value,
-    jsonrpc_code: i64,
-    message: &str,
-    arc_code: i64,
-    name: &str,
-    retry_strategy: &str,
-    guidance: &str,
-    context: Option<Value>,
-) -> Value {
+fn jsonrpc_protocol_error(args: JsonRpcProtocolErrorArgs<'_>) -> Value {
+    let JsonRpcProtocolErrorArgs {
+        id,
+        jsonrpc_code,
+        message,
+        arc_code,
+        name,
+        retry_strategy,
+        guidance,
+        context,
+    } = args;
     let mut data = serde_json::Map::new();
     data.insert(
         "arcError".to_string(),
@@ -171,35 +290,35 @@ fn negotiate_protocol_version(id: &Value, params: &Value) -> Result<&'static str
         return Ok(MCP_PROTOCOL_VERSION);
     };
     let Some(requested) = requested.as_str() else {
-        return Err(jsonrpc_protocol_error(
-            id.clone(),
-            JSONRPC_INVALID_REQUEST,
-            "initialize.params.protocolVersion must be a string",
-            ARC_ERROR_INVALID_REQUEST_SHAPE,
-            "invalid_request_shape",
-            "do_not_retry",
-            "correct the initialize request shape before retrying",
-            Some(json!({
+        return Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
+            id: id.clone(),
+            jsonrpc_code: JSONRPC_INVALID_REQUEST,
+            message: "initialize.params.protocolVersion must be a string",
+            arc_code: ARC_ERROR_INVALID_REQUEST_SHAPE,
+            name: "invalid_request_shape",
+            retry_strategy: "do_not_retry",
+            guidance: "correct the initialize request shape before retrying",
+            context: Some(json!({
                 "parameter": "protocolVersion"
             })),
-        ));
+        }));
     };
     if SUPPORTED_MCP_PROTOCOL_VERSIONS.contains(&requested) {
         Ok(MCP_PROTOCOL_VERSION)
     } else {
-        Err(jsonrpc_protocol_error(
-            id.clone(),
-            JSONRPC_INVALID_REQUEST,
-            "unsupported protocolVersion",
-            ARC_ERROR_PROTOCOL_VERSION_UNSUPPORTED,
-            "protocol_version_unsupported",
-            "do_not_retry_until_version_change",
-            "retry only after selecting one of the server's supported protocol versions",
-            Some(json!({
+        Err(jsonrpc_protocol_error(JsonRpcProtocolErrorArgs {
+            id: id.clone(),
+            jsonrpc_code: JSONRPC_INVALID_REQUEST,
+            message: "unsupported protocolVersion",
+            arc_code: ARC_ERROR_PROTOCOL_VERSION_UNSUPPORTED,
+            name: "protocol_version_unsupported",
+            retry_strategy: "do_not_retry_until_version_change",
+            guidance: "retry only after selecting one of the server's supported protocol versions",
+            context: Some(json!({
                 "requestedProtocolVersion": requested,
                 "supportedProtocolVersions": SUPPORTED_MCP_PROTOCOL_VERSIONS,
             })),
-        ))
+        }))
     }
 }
 
@@ -304,6 +423,35 @@ enum ToolCallEdgeOutcome {
         message: String,
         data: Option<Value>,
     },
+}
+
+struct JsonRpcProtocolErrorArgs<'a> {
+    id: Value,
+    jsonrpc_code: i64,
+    message: &'a str,
+    arc_code: i64,
+    name: &'a str,
+    retry_strategy: &'a str,
+    guidance: &'a str,
+    context: Option<Value>,
+}
+
+struct ToolCallRequestContext<'a> {
+    id: &'a Value,
+    session_id: &'a SessionId,
+    context: &'a OperationContext,
+    operation: &'a ToolCallOperation,
+    related_task_id: Option<&'a str>,
+}
+
+struct KernelToolResultArgs<'a> {
+    client_request_id: &'a Value,
+    session_id: &'a SessionId,
+    output: Option<ToolCallOutput>,
+    reason: Option<String>,
+    verdict: Verdict,
+    terminal_state: &'a OperationTerminalState,
+    related_task_id: Option<&'a str>,
 }
 
 impl EdgeTask {
@@ -511,6 +659,8 @@ impl ArcMcpEdge {
         Ok(self.take_pending_notifications())
     }
 
+    // Retained for embedders that drive the edge through a custom transport
+    // loop instead of the default session-owned path.
     #[allow(dead_code)]
     fn handle_jsonrpc_with_transport<R: BufRead, W: Write>(
         &mut self,
@@ -690,6 +840,8 @@ impl ArcMcpEdge {
         }
     }
 
+    // Retained for embedders that drive the edge through a custom transport
+    // loop instead of the default session-owned path.
     #[allow(dead_code)]
     fn handle_request_with_transport<R: BufRead, W: Write>(
         &mut self,
@@ -1028,15 +1180,15 @@ impl ArcMcpEdge {
         let operation = SessionOperation::ToolCall(operation.clone());
         match self.kernel.evaluate_session_operation(context, &operation) {
             Ok(SessionOperationResponse::ToolCall(response)) => self
-                .tool_result_for_kernel_response(
-                    id,
+                .tool_result_for_kernel_response(KernelToolResultArgs {
+                    client_request_id: id,
                     session_id,
-                    response.output,
-                    response.reason,
-                    response.verdict,
-                    &response.terminal_state,
+                    output: response.output,
+                    reason: response.reason,
+                    verdict: response.verdict,
+                    terminal_state: &response.terminal_state,
                     related_task_id,
-                ),
+                }),
             Ok(
                 SessionOperationResponse::RootList { .. }
                 | SessionOperationResponse::ResourceList { .. }
@@ -1068,17 +1220,19 @@ impl ArcMcpEdge {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn evaluate_tool_call_operation_with_transport<R: BufRead, W: Write>(
         &mut self,
-        id: &Value,
-        session_id: &SessionId,
-        context: &OperationContext,
-        operation: &ToolCallOperation,
+        request: ToolCallRequestContext<'_>,
         reader: &mut R,
         writer: &mut W,
-        related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let ToolCallRequestContext {
+            id,
+            session_id,
+            context,
+            operation,
+            related_task_id,
+        } = request;
         let mut parent_progress_step = 0;
         let mut accepted_url_elicitations = Vec::new();
         let mut nested_flow_client = EdgeNestedFlowClient {
@@ -1103,15 +1257,15 @@ impl ArcMcpEdge {
                 operation,
                 &mut nested_flow_client,
             ) {
-            Ok(response) => self.tool_result_for_kernel_response(
-                id,
+            Ok(response) => self.tool_result_for_kernel_response(KernelToolResultArgs {
+                client_request_id: id,
                 session_id,
-                response.output,
-                response.reason,
-                response.verdict,
-                &response.terminal_state,
+                output: response.output,
+                reason: response.reason,
+                verdict: response.verdict,
+                terminal_state: &response.terminal_state,
                 related_task_id,
-            ),
+            }),
             Err(error) => {
                 self.emit_log_with_related_task(
                     LogLevel::Error,
@@ -1129,18 +1283,20 @@ impl ArcMcpEdge {
         outcome
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn evaluate_tool_call_operation_with_transport_channel<W: Write>(
         &mut self,
-        id: &Value,
-        session_id: &SessionId,
-        context: &OperationContext,
-        operation: &ToolCallOperation,
+        request: ToolCallRequestContext<'_>,
         client_rx: &mpsc::Receiver<ClientInbound>,
         cancel_rx: &mpsc::Receiver<Value>,
         writer: &mut W,
-        related_task_id: Option<&str>,
     ) -> ToolCallEdgeOutcome {
+        let ToolCallRequestContext {
+            id,
+            session_id,
+            context,
+            operation,
+            related_task_id,
+        } = request;
         let mut parent_progress_step = 0;
         let mut accepted_url_elicitations = Vec::new();
         let mut nested_flow_client = QueuedEdgeNestedFlowClient {
@@ -1166,15 +1322,15 @@ impl ArcMcpEdge {
                 operation,
                 &mut nested_flow_client,
             ) {
-            Ok(response) => self.tool_result_for_kernel_response(
-                id,
+            Ok(response) => self.tool_result_for_kernel_response(KernelToolResultArgs {
+                client_request_id: id,
                 session_id,
-                response.output,
-                response.reason,
-                response.verdict,
-                &response.terminal_state,
+                output: response.output,
+                reason: response.reason,
+                verdict: response.verdict,
+                terminal_state: &response.terminal_state,
                 related_task_id,
-            ),
+            }),
             Err(error) => {
                 self.emit_log_with_related_task(
                     LogLevel::Error,
@@ -1257,6 +1413,8 @@ impl ArcMcpEdge {
         )
     }
 
+    // Retained for embedders that drive the edge through a custom transport
+    // loop instead of the default session-owned path.
     #[allow(dead_code)]
     fn handle_tools_call_with_transport<R: BufRead, W: Write>(
         &mut self,
@@ -1287,13 +1445,15 @@ impl ArcMcpEdge {
         tool_call_outcome_to_jsonrpc(
             id.clone(),
             self.evaluate_tool_call_operation_with_transport(
-                &id,
-                &session_id,
-                &context,
-                &operation,
+                ToolCallRequestContext {
+                    id: &id,
+                    session_id: &session_id,
+                    context: &context,
+                    operation: &operation,
+                    related_task_id: None,
+                },
                 reader,
                 writer,
-                None,
             ),
         )
     }
@@ -1328,14 +1488,16 @@ impl ArcMcpEdge {
         tool_call_outcome_to_jsonrpc(
             id.clone(),
             self.evaluate_tool_call_operation_with_transport_channel(
-                &id,
-                &session_id,
-                &context,
-                &operation,
+                ToolCallRequestContext {
+                    id: &id,
+                    session_id: &session_id,
+                    context: &context,
+                    operation: &operation,
+                    related_task_id: None,
+                },
                 client_rx,
                 cancel_rx,
                 writer,
-                None,
             ),
         )
     }
@@ -1552,13 +1714,15 @@ impl ArcMcpEdge {
         self.dequeue_background_task(&task_id);
         if !task.is_terminal() {
             let result = self.evaluate_tool_call_operation_with_transport(
-                &id,
-                &session_id,
-                &task.context,
-                &task.operation,
+                ToolCallRequestContext {
+                    id: &id,
+                    session_id: &session_id,
+                    context: &task.context,
+                    operation: &task.operation,
+                    related_task_id: Some(task_id.as_str()),
+                },
                 reader,
                 writer,
-                Some(task_id.as_str()),
             );
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
@@ -1614,14 +1778,16 @@ impl ArcMcpEdge {
         self.dequeue_background_task(&task_id);
         if !task.is_terminal() {
             let result = self.evaluate_tool_call_operation_with_transport_channel(
-                &id,
-                &session_id,
-                &task.context,
-                &task.operation,
+                ToolCallRequestContext {
+                    id: &id,
+                    session_id: &session_id,
+                    context: &task.context,
+                    operation: &task.operation,
+                    related_task_id: Some(task_id.as_str()),
+                },
                 client_rx,
                 cancel_rx,
                 writer,
-                Some(task_id.as_str()),
             );
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {
@@ -2237,6 +2403,8 @@ impl ArcMcpEdge {
         result
     }
 
+    // Retained for embedders that drive the edge through a custom transport
+    // loop instead of the default session-owned path.
     #[allow(dead_code)]
     fn process_pending_actions<R: BufRead, W: Write>(
         &mut self,
@@ -2310,6 +2478,8 @@ impl ArcMcpEdge {
             .push(EdgeAction::RefreshRoots { session_id, reason });
     }
 
+    // Retained for embedders that drive the edge through a custom transport
+    // loop instead of the default session-owned path.
     #[allow(dead_code)]
     fn refresh_roots_from_client<R: BufRead, W: Write>(
         &mut self,
@@ -2520,28 +2690,30 @@ impl ArcMcpEdge {
             .unwrap_or(false)
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn tool_result_for_kernel_response(
         &mut self,
-        client_request_id: &Value,
-        session_id: &SessionId,
-        output: Option<ToolCallOutput>,
-        reason: Option<String>,
-        verdict: Verdict,
-        terminal_state: &OperationTerminalState,
-        related_task_id: Option<&str>,
+        args: KernelToolResultArgs<'_>,
     ) -> ToolCallEdgeOutcome {
-        let peer_supports_arc_tool_streaming = self.peer_supports_arc_tool_streaming(session_id);
-        let result = kernel_response_to_tool_result(
-            &mut self.pending_notifications,
+        let KernelToolResultArgs {
             client_request_id,
+            session_id,
+            output,
+            reason,
+            verdict,
+            terminal_state,
+            related_task_id,
+        } = args;
+        let peer_supports_arc_tool_streaming = self.peer_supports_arc_tool_streaming(session_id);
+        let result = kernel_response_to_tool_result(KernelResponseToToolResultArgs {
+            pending_notifications: &mut self.pending_notifications,
+            request_id: client_request_id,
             output,
             reason,
             verdict,
             terminal_state,
             peer_supports_arc_tool_streaming,
             related_task_id,
-        );
+        });
 
         if let Some(reason) = cancellation_reason_from_tool_result(&result) {
             return ToolCallEdgeOutcome::Cancelled { reason };
@@ -2814,14 +2986,16 @@ impl ArcMcpEdge {
             }
 
             let result = self.evaluate_tool_call_operation_with_transport_channel(
-                &Value::String(task.task_id.clone()),
-                &task.session_id,
-                &task.context,
-                &task.operation,
+                ToolCallRequestContext {
+                    id: &Value::String(task.task_id.clone()),
+                    session_id: &task.session_id,
+                    context: &task.context,
+                    operation: &task.operation,
+                    related_task_id: Some(task.task_id.as_str()),
+                },
                 client_rx,
                 cancel_rx,
                 writer,
-                Some(task.task_id.as_str()),
             );
             let mut task_view = None;
             if let Some(task) = self.tasks.get_mut(&task_id) {

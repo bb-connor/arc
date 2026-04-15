@@ -12,7 +12,13 @@
 
 use std::collections::BTreeMap;
 
-use arc_kernel::ToolServerConnection;
+use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
+use arc_core::receipt::ArcReceipt;
+use arc_cross_protocol::{
+    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol,
+    TargetProtocolRegistry,
+};
+use arc_kernel::{dpop, ArcKernel, ToolCallOutput, ToolCallRequest, Verdict as KernelVerdict};
 use arc_manifest::{ToolDefinition, ToolManifest};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -93,6 +99,9 @@ pub struct ToolCallResult {
     /// Receipt reference (if generated).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub receipt_ref: Option<String>,
+    /// Signed receipt returned by the kernel (if generated).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<ArcReceipt>,
 }
 
 /// A Responses API function call output.
@@ -120,17 +129,30 @@ pub struct OpenAiAdapterConfig {
     pub public_key: String,
 }
 
+/// Execution context required to route OpenAI tool calls through the kernel.
+#[derive(Debug, Clone)]
+pub struct OpenAiExecutionContext {
+    /// Capability token authorizing the requested tools.
+    pub capability: CapabilityToken,
+    /// Hex-encoded public key or stable agent identifier for subject binding.
+    pub agent_id: String,
+    /// Optional DPoP proof bound to this invocation.
+    pub dpop_proof: Option<dpop::DpopProof>,
+    /// Optional governed transaction intent.
+    pub governed_intent: Option<GovernedTransactionIntent>,
+    /// Optional governed approval token.
+    pub approval_token: Option<GovernedApprovalToken>,
+}
+
 /// The OpenAI adapter.
 ///
 /// Wraps ARC tool manifests and processes OpenAI-style function calls
 /// through the kernel guard pipeline.
 #[derive(Debug)]
 pub struct ArcOpenAiAdapter {
-    config: OpenAiAdapterConfig,
     manifest: ToolManifest,
     /// Maps function name to (server_id, tool_name).
     function_bindings: BTreeMap<String, (String, String)>,
-    call_counter: u64,
 }
 
 impl ArcOpenAiAdapter {
@@ -174,10 +196,8 @@ impl ArcOpenAiAdapter {
         arc_manifest::validate_manifest(&manifest)?;
 
         Ok(Self {
-            config,
             manifest,
             function_bindings,
-            call_counter: 0,
         })
     }
 
@@ -217,28 +237,20 @@ impl ArcOpenAiAdapter {
         self.manifest.tools.iter().find(|t| t.name == name)
     }
 
-    /// Allocate a receipt reference.
-    fn next_receipt_ref(&mut self) -> String {
-        self.call_counter += 1;
-        format!(
-            "arc-receipt-{}-{}",
-            self.config.server_id, self.call_counter
-        )
-    }
-
     /// Execute an OpenAI tool call through the ARC kernel.
     ///
     /// This is the core interception point. Every function call produces
     /// a signed receipt via the kernel guard pipeline.
     pub fn execute_tool_call(
-        &mut self,
+        &self,
         tool_call: &OpenAiToolCall,
-        server: &dyn ToolServerConnection,
+        kernel: &ArcKernel,
+        execution: &OpenAiExecutionContext,
     ) -> ToolCallResult {
-        let tool_name = {
+        let (server_id, tool_name) = {
             let binding = self.function_bindings.get(&tool_call.function.name);
             match binding {
-                Some((_server_id, name)) => name.clone(),
+                Some((server_id, name)) => (server_id.clone(), name.clone()),
                 None => {
                     return ToolCallResult {
                         tool_call_id: tool_call.id.clone(),
@@ -246,6 +258,7 @@ impl ArcOpenAiAdapter {
                         content: format!("Error: function '{}' not found", tool_call.function.name),
                         denied: true,
                         receipt_ref: None,
+                        receipt: None,
                     };
                 }
             }
@@ -260,26 +273,69 @@ impl ArcOpenAiAdapter {
                     content: format!("Error: failed to parse arguments: {e}"),
                     denied: true,
                     receipt_ref: None,
+                    receipt: None,
                 };
             }
         };
 
-        let receipt_ref = self.next_receipt_ref();
+        let request = ToolCallRequest {
+            request_id: format!("openai-{}", tool_call.id),
+            capability: execution.capability.clone(),
+            tool_name,
+            server_id,
+            agent_id: execution.agent_id.clone(),
+            arguments,
+            dpop_proof: execution.dpop_proof.clone(),
+            governed_intent: execution.governed_intent.clone(),
+            approval_token: execution.approval_token.clone(),
+        };
 
-        match server.invoke(&tool_name, arguments, None) {
-            Ok(result) => {
-                let content = if let Some(text) = result.as_str() {
-                    text.to_string()
-                } else {
-                    serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+        let route_plan = match plan_authoritative_route(
+            &request.request_id,
+            DiscoveryProtocol::OpenAi,
+            DiscoveryProtocol::Native,
+            execution.governed_intent.as_ref(),
+            &TargetProtocolRegistry::new(DiscoveryProtocol::Native),
+            &BTreeMap::new(),
+        ) {
+            Ok(plan) => plan,
+            Err(error) => {
+                return ToolCallResult {
+                    tool_call_id: tool_call.id.clone(),
+                    name: tool_call.function.name.clone(),
+                    content: format!("Error: failed to plan authoritative route: {error}"),
+                    denied: true,
+                    receipt_ref: None,
+                    receipt: None,
                 };
+            }
+        };
+        let route_metadata = match route_selection_metadata(&route_plan.evidence) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                return ToolCallResult {
+                    tool_call_id: tool_call.id.clone(),
+                    name: tool_call.function.name.clone(),
+                    content: format!("Error: failed to serialize route selection: {error}"),
+                    denied: true,
+                    receipt_ref: None,
+                    receipt: None,
+                };
+            }
+        };
 
+        match kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(route_metadata)) {
+            Ok(response) => {
+                let denied = matches!(response.verdict, KernelVerdict::Deny);
+                let content = render_response_content(&response.output, response.reason.as_deref());
+                let receipt_ref = Some(response.receipt.id.clone());
                 ToolCallResult {
                     tool_call_id: tool_call.id.clone(),
                     name: tool_call.function.name.clone(),
                     content,
-                    denied: false,
-                    receipt_ref: Some(receipt_ref),
+                    denied,
+                    receipt_ref,
+                    receipt: Some(response.receipt),
                 }
             }
             Err(error) => ToolCallResult {
@@ -287,20 +343,22 @@ impl ArcOpenAiAdapter {
                 name: tool_call.function.name.clone(),
                 content: format!("Error: {error}"),
                 denied: true,
-                receipt_ref: Some(receipt_ref),
+                receipt_ref: None,
+                receipt: None,
             },
         }
     }
 
     /// Execute multiple tool calls (batch processing).
     pub fn execute_tool_calls(
-        &mut self,
+        &self,
         tool_calls: &[OpenAiToolCall],
-        server: &dyn ToolServerConnection,
+        kernel: &ArcKernel,
+        execution: &OpenAiExecutionContext,
     ) -> Vec<ToolCallResult> {
         tool_calls
             .iter()
-            .map(|tc| self.execute_tool_call(tc, server))
+            .map(|tc| self.execute_tool_call(tc, kernel, execution))
             .collect()
     }
 
@@ -380,11 +438,40 @@ impl ArcOpenAiAdapter {
     }
 }
 
+fn render_response_content(output: &Option<ToolCallOutput>, reason: Option<&str>) -> String {
+    match output {
+        Some(ToolCallOutput::Value(result)) => {
+            if let Some(text) = result.as_str() {
+                text.to_string()
+            } else {
+                serde_json::to_string(result).unwrap_or_else(|_| "{}".to_string())
+            }
+        }
+        Some(ToolCallOutput::Stream(stream)) => {
+            let chunks = stream
+                .chunks
+                .iter()
+                .map(|chunk| chunk.data.clone())
+                .collect::<Vec<_>>();
+            serde_json::to_string(&chunks).unwrap_or_else(|_| "[]".to_string())
+        }
+        None => reason
+            .map(|message| format!("Error: {message}"))
+            .unwrap_or_else(|| "{}".to_string()),
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use arc_kernel::{KernelError, NestedFlowBridge};
+    use arc_core::capability::{ArcScope, Operation, ToolGrant};
+    use arc_core::crypto::Keypair;
+    use arc_kernel::{
+        ArcKernel, KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
+        DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+        DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    };
 
     struct MockToolServer {
         response: Value,
@@ -392,7 +479,7 @@ mod tests {
 
     impl ToolServerConnection for MockToolServer {
         fn server_id(&self) -> &str {
-            "mock-srv"
+            "test-srv"
         }
 
         fn tool_names(&self) -> Vec<String> {
@@ -500,6 +587,58 @@ mod tests {
         }
     }
 
+    fn test_kernel_config() -> KernelConfig {
+        KernelConfig {
+            keypair: Keypair::generate(),
+            ca_public_keys: Vec::new(),
+            max_delegation_depth: 8,
+            policy_hash: "test-policy".to_string(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        }
+    }
+
+    fn test_execution_context(
+        kernel: &ArcKernel,
+        agent_kp: &Keypair,
+        server_id: &str,
+        tool_name: &str,
+    ) -> OpenAiExecutionContext {
+        let capability = kernel
+            .issue_capability(
+                &agent_kp.public_key(),
+                ArcScope {
+                    grants: vec![ToolGrant {
+                        server_id: server_id.to_string(),
+                        tool_name: tool_name.to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                3600,
+            )
+            .expect("capability should issue");
+        OpenAiExecutionContext {
+            capability,
+            agent_id: agent_kp.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+        }
+    }
+
     // ---- Adapter creation tests ----
 
     #[test]
@@ -578,19 +717,43 @@ mod tests {
 
     #[test]
     fn execute_tool_call_success() {
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let server = test_server();
-        let result = adapter.execute_tool_call(&weather_tool_call(), &server);
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+        let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
         assert!(!result.denied);
         assert_eq!(result.tool_call_id, "call_abc123");
         assert!(result.content.contains("72"));
         assert!(result.receipt_ref.is_some());
+        assert!(result.receipt.is_some());
+        let route_selection = result
+            .receipt
+            .as_ref()
+            .and_then(|receipt| receipt.metadata.as_ref())
+            .and_then(|metadata| metadata.get("route_selection"));
+        assert_eq!(
+            route_selection
+                .and_then(|value| value.get("selectedTargetProtocol"))
+                .and_then(Value::as_str),
+            Some("native")
+        );
+        assert_eq!(
+            route_selection
+                .and_then(|value| value.get("decision"))
+                .and_then(Value::as_str),
+            Some("select")
+        );
     }
 
     #[test]
     fn execute_tool_call_unknown_function() {
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let server = test_server();
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
         let call = OpenAiToolCall {
             id: "call_unknown".to_string(),
             call_type: "function".to_string(),
@@ -599,15 +762,19 @@ mod tests {
                 arguments: "{}".to_string(),
             },
         };
-        let result = adapter.execute_tool_call(&call, &server);
+        let result = adapter.execute_tool_call(&call, &kernel, &execution);
         assert!(result.denied);
         assert!(result.content.contains("not found"));
+        assert!(result.receipt.is_none());
     }
 
     #[test]
     fn execute_tool_call_invalid_arguments() {
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let server = test_server();
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
         let call = OpenAiToolCall {
             id: "call_bad".to_string(),
             call_type: "function".to_string(),
@@ -616,9 +783,10 @@ mod tests {
                 arguments: "not valid json".to_string(),
             },
         };
-        let result = adapter.execute_tool_call(&call, &server);
+        let result = adapter.execute_tool_call(&call, &kernel, &execution);
         assert!(result.denied);
         assert!(result.content.contains("parse arguments"));
+        assert!(result.receipt.is_none());
     }
 
     #[test]
@@ -641,8 +809,11 @@ mod tests {
             required_permissions: None,
             public_key: "aabb".to_string(),
         };
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![manifest]).unwrap();
-        let server = FailingServer;
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![manifest]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(FailingServer));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "fail-srv", "fail");
         let call = OpenAiToolCall {
             id: "call_fail".to_string(),
             call_type: "function".to_string(),
@@ -651,17 +822,21 @@ mod tests {
                 arguments: "{}".to_string(),
             },
         };
-        let result = adapter.execute_tool_call(&call, &server);
+        let result = adapter.execute_tool_call(&call, &kernel, &execution);
         assert!(result.denied);
         assert!(result.receipt_ref.is_some());
+        assert!(result.receipt.is_some());
     }
 
     #[test]
     fn execute_tool_call_generates_unique_receipts() {
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let server = test_server();
-        let r1 = adapter.execute_tool_call(&weather_tool_call(), &server);
-        let r2 = adapter.execute_tool_call(&weather_tool_call(), &server);
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+        let r1 = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+        let r2 = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
         assert_ne!(r1.receipt_ref, r2.receipt_ref);
     }
 
@@ -669,8 +844,11 @@ mod tests {
 
     #[test]
     fn execute_tool_calls_batch() {
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let server = test_server();
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "*");
         let calls = vec![
             weather_tool_call(),
             OpenAiToolCall {
@@ -682,7 +860,7 @@ mod tests {
                 },
             },
         ];
-        let results = adapter.execute_tool_calls(&calls, &server);
+        let results = adapter.execute_tool_calls(&calls, &kernel, &execution);
         assert_eq!(results.len(), 2);
         assert!(!results[0].denied);
         assert!(!results[1].denied);
@@ -698,6 +876,7 @@ mod tests {
             content: "sunny".to_string(),
             denied: false,
             receipt_ref: Some("receipt-1".to_string()),
+            receipt: None,
         }];
         let messages = ArcOpenAiAdapter::results_to_messages(&results);
         assert_eq!(messages.len(), 1);
@@ -715,6 +894,7 @@ mod tests {
                 content: "r1".to_string(),
                 denied: false,
                 receipt_ref: None,
+                receipt: None,
             },
             ToolCallResult {
                 tool_call_id: "c2".to_string(),
@@ -722,6 +902,7 @@ mod tests {
                 content: "r2".to_string(),
                 denied: false,
                 receipt_ref: None,
+                receipt: None,
             },
         ];
         let messages = ArcOpenAiAdapter::results_to_messages(&results);
@@ -738,6 +919,7 @@ mod tests {
             content: "sunny".to_string(),
             denied: false,
             receipt_ref: Some("receipt-1".to_string()),
+            receipt: None,
         }];
         let outputs = ArcOpenAiAdapter::results_to_responses_api(&results);
         assert_eq!(outputs.len(), 1);
@@ -889,6 +1071,7 @@ mod tests {
             content: "ok".to_string(),
             denied: false,
             receipt_ref: Some("receipt-1".to_string()),
+            receipt: None,
         };
         let json = serde_json::to_value(&result).unwrap();
         assert_eq!(json["tool_call_id"], "call_1");
@@ -903,6 +1086,7 @@ mod tests {
             content: "ok".to_string(),
             denied: false,
             receipt_ref: None,
+            receipt: None,
         };
         let json = serde_json::to_value(&result).unwrap();
         assert!(json.get("receipt_ref").is_none());
@@ -941,8 +1125,12 @@ mod tests {
         let server = MockToolServer {
             response: json!("hello world"),
         };
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let result = adapter.execute_tool_call(&weather_tool_call(), &server);
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(server));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+        let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
         assert_eq!(result.content, "hello world");
     }
 
@@ -951,8 +1139,12 @@ mod tests {
         let server = MockToolServer {
             response: json!({"temp": 72}),
         };
-        let mut adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
-        let result = adapter.execute_tool_call(&weather_tool_call(), &server);
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(server));
+        let agent_kp = Keypair::generate();
+        let execution = test_execution_context(&kernel, &agent_kp, "test-srv", "get_weather");
+        let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
         assert!(result.content.contains("72"));
     }
 }

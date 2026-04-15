@@ -53,16 +53,20 @@ public class ArcSidecarClient : IDisposable
     /// <summary>
     /// Evaluate an HTTP request against the ARC kernel.
     /// </summary>
-    public async Task<EvaluateResponse> EvaluateAsync(ArcHttpRequest request)
+    public async Task<EvaluateResponse> EvaluateAsync(ArcHttpRequest request, string? capabilityToken = null)
     {
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient.PostAsJsonAsync(
-                $"{_baseUrl}/arc/evaluate",
-                request,
-                _jsonOptions
-            );
+            using var message = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/arc/evaluate")
+            {
+                Content = JsonContent.Create(request, options: _jsonOptions)
+            };
+            if (!string.IsNullOrWhiteSpace(capabilityToken))
+            {
+                message.Headers.Add("X-Arc-Capability", capabilityToken);
+            }
+            response = await _httpClient.SendAsync(message);
         }
         catch (Exception ex)
         {

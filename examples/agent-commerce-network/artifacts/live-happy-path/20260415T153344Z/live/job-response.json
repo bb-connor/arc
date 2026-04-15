@@ -1,0 +1,1 @@
+{"error":"arc_access_denied","message":"side-effect route requires a capability token","receipt_id":"019d91c6-ffb4-7d20-aaa8-8c48fac079be","suggestion":"provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter"}

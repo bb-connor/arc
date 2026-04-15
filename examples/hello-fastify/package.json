@@ -1,0 +1,12 @@
+{
+  "name": "hello-fastify",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@arc-protocol/fastify": "file:../../sdks/typescript/packages/fastify",
+    "fastify": "^5.3.3"
+  }
+}

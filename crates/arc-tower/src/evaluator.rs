@@ -4,12 +4,12 @@
 //! and signing receipts.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::GuardEvidence;
 use arc_http_core::{
-    ArcHttpRequest, CallerIdentity, HttpMethod, HttpReceipt, HttpReceiptBody, Verdict,
+    CallerIdentity, HttpAuthority, HttpAuthorityError, HttpAuthorityInput, HttpAuthorityPolicy,
+    HttpMethod, HttpReceipt, PreparedHttpEvaluation, Verdict,
 };
 
 use crate::error::ArcTowerError;
@@ -25,6 +25,19 @@ pub struct EvaluationResult {
     pub evidence: Vec<GuardEvidence>,
 }
 
+/// Input payload for evaluating a single HTTP request.
+pub struct EvaluationInput<'a> {
+    pub method: &'a str,
+    pub path: &'a str,
+    pub query: &'a HashMap<String, String>,
+    pub caller: CallerIdentity,
+    pub headers: &'a http::HeaderMap,
+    pub body_hash: Option<String>,
+    pub body_length: u64,
+}
+
+pub(crate) type PreparedEvaluation = PreparedHttpEvaluation;
+
 /// Route pattern resolver function type.
 pub type RouteResolver = fn(&str, &str) -> String;
 
@@ -33,10 +46,9 @@ fn default_route_resolver(_method: &str, path: &str) -> String {
     path.to_string()
 }
 
-/// ARC request evaluator. Holds the kernel keypair and policy configuration.
+/// ARC request evaluator. Holds the shared HTTP authority and tower-specific hooks.
 pub struct ArcEvaluator {
-    keypair: Arc<Keypair>,
-    policy_hash: String,
+    authority: HttpAuthority,
     identity_extractor: IdentityExtractor,
     route_resolver: RouteResolver,
     /// When true, sidecar errors allow the request through (fail-open).
@@ -48,8 +60,7 @@ impl ArcEvaluator {
     /// Create a new evaluator with the given keypair and policy hash.
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
         Self {
-            keypair: Arc::new(keypair),
-            policy_hash,
+            authority: HttpAuthority::new(keypair, policy_hash),
             identity_extractor: crate::identity::extract_identity,
             route_resolver: default_route_resolver,
             fail_open: false,
@@ -93,113 +104,109 @@ impl ArcEvaluator {
     }
 
     /// Evaluate an HTTP request, producing a verdict and signed receipt.
-    pub fn evaluate(
+    pub fn evaluate(&self, input: EvaluationInput<'_>) -> Result<EvaluationResult, ArcTowerError> {
+        let prepared = self.prepare(input)?;
+        let receipt = self.sign_decision_receipt(&prepared)?;
+        Ok(EvaluationResult {
+            verdict: prepared.verdict,
+            receipt,
+            evidence: prepared.evidence,
+        })
+    }
+
+    pub(crate) fn prepare(
         &self,
-        method: &str,
-        path: &str,
-        caller: CallerIdentity,
-        headers: &http::HeaderMap,
-        body_hash: Option<String>,
-        body_length: u64,
-    ) -> Result<EvaluationResult, ArcTowerError> {
+        input: EvaluationInput<'_>,
+    ) -> Result<PreparedEvaluation, ArcTowerError> {
+        let EvaluationInput {
+            method,
+            path,
+            query,
+            caller,
+            headers,
+            body_hash,
+            body_length,
+        } = input;
         let http_method = parse_method(method)?;
         let route_pattern = (self.route_resolver)(method, path);
-        let request_id = uuid::Uuid::now_v7().to_string();
+        self.authority
+            .prepare(HttpAuthorityInput {
+                request_id: uuid::Uuid::now_v7().to_string(),
+                method: http_method,
+                route_pattern,
+                path,
+                query,
+                caller,
+                body_hash,
+                body_length,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: extract_presented_capability(headers, query),
+                policy: policy_mode(http_method),
+            })
+            .map_err(Into::into)
+    }
 
-        let mut evidence = Vec::new();
+    pub(crate) fn sign_decision_receipt(
+        &self,
+        prepared: &PreparedEvaluation,
+    ) -> Result<HttpReceipt, ArcTowerError> {
+        self.authority
+            .sign_decision_receipt(prepared)
+            .map_err(Into::into)
+    }
 
-        // Determine verdict based on method safety and capability token.
-        let verdict = if http_method.is_safe() {
-            evidence.push(GuardEvidence {
-                guard_name: "DefaultPolicyGuard".to_string(),
-                verdict: true,
-                details: Some("safe method, session-scoped allow".to_string()),
-            });
-            Verdict::Allow
-        } else {
-            // Check for capability token.
-            let has_capability = headers.get("x-arc-capability").is_some()
-                || headers.get("X-Arc-Capability").is_some();
-            if has_capability {
-                evidence.push(GuardEvidence {
-                    guard_name: "CapabilityGuard".to_string(),
-                    verdict: true,
-                    details: Some("capability token presented".to_string()),
-                });
-                Verdict::Allow
-            } else {
-                evidence.push(GuardEvidence {
-                    guard_name: "CapabilityGuard".to_string(),
-                    verdict: false,
-                    details: Some("side-effect route requires X-Arc-Capability header".to_string()),
-                });
-                Verdict::deny(
-                    "side-effect route requires a capability token",
-                    "CapabilityGuard",
-                )
+    pub(crate) fn finalize_receipt(
+        &self,
+        prepared: &PreparedEvaluation,
+        response_status: u16,
+    ) -> Result<HttpReceipt, ArcTowerError> {
+        self.authority
+            .finalize_receipt(prepared, response_status, None)
+            .map_err(Into::into)
+    }
+}
+
+fn extract_presented_capability<'a>(
+    headers: &'a http::HeaderMap,
+    query: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    headers
+        .get("x-arc-capability")
+        .or_else(|| headers.get("X-Arc-Capability"))
+        .and_then(|value| value.to_str().ok())
+        .or_else(|| query.get("arc_capability").map(String::as_str))
+}
+
+fn policy_mode(method: HttpMethod) -> HttpAuthorityPolicy {
+    if method.is_safe() {
+        HttpAuthorityPolicy::SessionAllow
+    } else {
+        HttpAuthorityPolicy::DenyByDefault
+    }
+}
+
+impl From<HttpAuthorityError> for ArcTowerError {
+    fn from(value: HttpAuthorityError) -> Self {
+        match value {
+            HttpAuthorityError::CallerIdentity(message) => {
+                Self::IdentityExtraction(format!("hash failed: {message}"))
             }
-        };
-
-        let response_status = if verdict.is_allowed() { 200 } else { 403 };
-
-        let caller_identity_hash = caller
-            .identity_hash()
-            .map_err(|e| ArcTowerError::IdentityExtraction(format!("hash failed: {e}")))?;
-
-        let arc_request = ArcHttpRequest {
-            request_id: request_id.clone(),
-            method: http_method,
-            route_pattern: route_pattern.clone(),
-            path: path.to_string(),
-            query: HashMap::new(),
-            headers: HashMap::new(),
-            caller,
-            body_hash: body_hash.clone(),
-            body_length,
-            session_id: None,
-            capability_id: None,
-            timestamp: chrono::Utc::now().timestamp() as u64,
-        };
-
-        let content_hash = arc_request
-            .content_hash()
-            .map_err(|e| ArcTowerError::Evaluation(format!("content hash failed: {e}")))?;
-
-        let receipt_id = uuid::Uuid::now_v7().to_string();
-        let body = HttpReceiptBody {
-            id: receipt_id,
-            request_id,
-            route_pattern,
-            method: http_method,
-            caller_identity_hash,
-            session_id: None,
-            verdict: verdict.clone(),
-            evidence: evidence.clone(),
-            response_status,
-            timestamp: arc_request.timestamp,
-            content_hash,
-            policy_hash: self.policy_hash.clone(),
-            capability_id: None,
-            metadata: None,
-            kernel_key: self.keypair.public_key(),
-        };
-
-        let receipt = HttpReceipt::sign(body, &self.keypair)
-            .map_err(|e| ArcTowerError::ReceiptSign(format!("signing failed: {e}")))?;
-
-        Ok(EvaluationResult {
-            verdict,
-            receipt,
-            evidence,
-        })
+            HttpAuthorityError::ContentHash(message) => {
+                Self::Evaluation(format!("content hash failed: {message}"))
+            }
+            HttpAuthorityError::Kernel(message) => Self::Evaluation(message),
+            HttpAuthorityError::ReceiptSign(message) => {
+                Self::ReceiptSign(format!("signing failed: {message}"))
+            }
+        }
     }
 }
 
 impl Clone for ArcEvaluator {
     fn clone(&self) -> Self {
         Self {
-            keypair: Arc::clone(&self.keypair),
-            policy_hash: self.policy_hash.clone(),
+            authority: self.authority.clone(),
             identity_extractor: self.identity_extractor,
             route_resolver: self.route_resolver,
             fail_open: self.fail_open,
@@ -226,6 +233,48 @@ fn parse_method(method: &str) -> Result<HttpMethod, ArcTowerError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
+    use arc_http_core::{
+        http_status_scope, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL,
+    };
+
+    fn valid_capability_token_json(id: &str) -> String {
+        let issuer = Keypair::generate();
+        let now = chrono::Utc::now().timestamp() as u64;
+        let token = CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: id.to_string(),
+                issuer: issuer.public_key(),
+                subject: issuer.public_key(),
+                scope: ArcScope::default(),
+                issued_at: now.saturating_sub(60),
+                expires_at: now + 3600,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap_or_else(|e| panic!("token sign failed: {e}"));
+        serde_json::to_string(&token).unwrap_or_else(|e| panic!("token serialize failed: {e}"))
+    }
+
+    fn evaluate(
+        evaluator: &ArcEvaluator,
+        method: &str,
+        path: &str,
+        query: &HashMap<String, String>,
+        caller: CallerIdentity,
+        headers: &http::HeaderMap,
+    ) -> Result<EvaluationResult, ArcTowerError> {
+        evaluator.evaluate(EvaluationInput {
+            method,
+            path,
+            query,
+            caller,
+            headers,
+            body_hash: None,
+            body_length: 0,
+        })
+    }
 
     #[test]
     fn evaluate_safe_method_allowed() {
@@ -234,15 +283,25 @@ mod tests {
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
-        let result = evaluator
-            .evaluate("GET", "/pets", caller, &headers, None, 0)
-            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        let result = evaluate(
+            &evaluator,
+            "GET",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
 
         assert!(result.verdict.is_allowed());
         assert!(result
             .receipt
             .verify_signature()
             .unwrap_or_else(|e| panic!("verify failed: {e}")));
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
     }
 
     #[test]
@@ -252,9 +311,15 @@ mod tests {
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
-        let result = evaluator
-            .evaluate("POST", "/pets", caller, &headers, None, 0)
-            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        let result = evaluate(
+            &evaluator,
+            "POST",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
 
         assert!(result.verdict.is_denied());
         assert_eq!(result.receipt.response_status, 403);
@@ -262,6 +327,10 @@ mod tests {
             .receipt
             .verify_signature()
             .unwrap_or_else(|e| panic!("verify failed: {e}")));
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
     }
 
     #[test]
@@ -272,14 +341,26 @@ mod tests {
         let mut headers = http::HeaderMap::new();
         headers.insert(
             "x-arc-capability",
-            http::HeaderValue::from_static("cap-123"),
+            http::HeaderValue::from_str(&valid_capability_token_json("cap-123"))
+                .unwrap_or_else(|e| panic!("header build failed: {e}")),
         );
 
-        let result = evaluator
-            .evaluate("POST", "/pets", caller, &headers, None, 0)
-            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        let result = evaluate(
+            &evaluator,
+            "POST",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
 
         assert!(result.verdict.is_allowed());
+        assert_eq!(result.receipt.capability_id.as_deref(), Some("cap-123"));
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
     }
 
     #[test]
@@ -289,7 +370,14 @@ mod tests {
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
-        let err = evaluator.evaluate("FOOBAR", "/pets", caller, &headers, None, 0);
+        let err = evaluate(
+            &evaluator,
+            "FOOBAR",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        );
         assert!(err.is_err());
     }
 
@@ -301,9 +389,15 @@ mod tests {
 
         for method in &["GET", "HEAD", "OPTIONS"] {
             let caller = CallerIdentity::anonymous();
-            let result = evaluator
-                .evaluate(method, "/test", caller, &headers, None, 0)
-                .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
+            let result = evaluate(
+                &evaluator,
+                method,
+                "/test",
+                &HashMap::new(),
+                caller,
+                &headers,
+            )
+            .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
             assert!(result.verdict.is_allowed(), "{method} should be allowed");
         }
     }
@@ -316,9 +410,15 @@ mod tests {
 
         for method in &["POST", "PUT", "PATCH", "DELETE"] {
             let caller = CallerIdentity::anonymous();
-            let result = evaluator
-                .evaluate(method, "/test", caller, &headers, None, 0)
-                .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
+            let result = evaluate(
+                &evaluator,
+                method,
+                "/test",
+                &HashMap::new(),
+                caller,
+                &headers,
+            )
+            .unwrap_or_else(|e| panic!("evaluation failed for {method}: {e}"));
             assert!(
                 result.verdict.is_denied(),
                 "{method} should be denied without capability"
@@ -345,9 +445,15 @@ mod tests {
 
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
-        let result = evaluator
-            .evaluate("GET", "/pets/", caller, &headers, None, 0)
-            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        let result = evaluate(
+            &evaluator,
+            "GET",
+            "/pets/",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
         assert!(result.verdict.is_allowed());
         // Route pattern should have trailing slash stripped
         assert_eq!(result.receipt.route_pattern, "/pets");
@@ -370,16 +476,109 @@ mod tests {
         let caller = CallerIdentity::anonymous();
         let headers = http::HeaderMap::new();
 
-        let r1 = evaluator
-            .evaluate("GET", "/test", caller.clone(), &headers, None, 0)
-            .unwrap_or_else(|e| panic!("r1 failed: {e}"));
-        let r2 = cloned
-            .evaluate("GET", "/test", caller, &headers, None, 0)
+        let r1 = evaluate(
+            &evaluator,
+            "GET",
+            "/test",
+            &HashMap::new(),
+            caller.clone(),
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("r1 failed: {e}"));
+        let r2 = evaluate(&cloned, "GET", "/test", &HashMap::new(), caller, &headers)
             .unwrap_or_else(|e| panic!("r2 failed: {e}"));
 
         // Both should produce valid receipts with the same kernel key.
         assert!(r1.verdict.is_allowed());
         assert!(r2.verdict.is_allowed());
         assert_eq!(r1.receipt.kernel_key, r2.receipt.kernel_key);
+    }
+
+    #[test]
+    fn evaluate_invalid_capability_is_denied() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let caller = CallerIdentity::anonymous();
+        let mut headers = http::HeaderMap::new();
+        headers.insert(
+            "x-arc-capability",
+            http::HeaderValue::from_static("not-json"),
+        );
+
+        let result = evaluate(
+            &evaluator,
+            "POST",
+            "/pets",
+            &HashMap::new(),
+            caller,
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            http_status_scope(result.receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_DECISION)
+        );
+    }
+
+    #[test]
+    fn evaluate_query_parameters_affect_content_hash() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let caller = CallerIdentity::anonymous();
+        let headers = http::HeaderMap::new();
+        let mut query_a = HashMap::new();
+        query_a.insert("q".to_string(), "cats".to_string());
+        let mut query_b = HashMap::new();
+        query_b.insert("q".to_string(), "dogs".to_string());
+
+        let result_a = evaluate(
+            &evaluator,
+            "GET",
+            "/search",
+            &query_a,
+            caller.clone(),
+            &headers,
+        )
+        .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+        let result_b = evaluate(&evaluator, "GET", "/search", &query_b, caller, &headers)
+            .unwrap_or_else(|e| panic!("evaluation failed: {e}"));
+
+        assert_ne!(result_a.receipt.content_hash, result_b.receipt.content_hash);
+    }
+
+    #[test]
+    fn finalize_receipt_marks_final_scope() {
+        let keypair = Keypair::generate();
+        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let caller = CallerIdentity::anonymous();
+        let headers = http::HeaderMap::new();
+        let query = HashMap::new();
+
+        let prepared = evaluator
+            .prepare(EvaluationInput {
+                method: "GET",
+                path: "/pets",
+                query: &query,
+                caller,
+                headers: &headers,
+                body_hash: None,
+                body_length: 0,
+            })
+            .unwrap_or_else(|e| panic!("prepare failed: {e}"));
+        let receipt = evaluator
+            .finalize_receipt(&prepared, 201)
+            .unwrap_or_else(|e| panic!("finalize failed: {e}"));
+
+        assert_eq!(receipt.response_status, 201);
+        assert_eq!(
+            http_status_scope(receipt.metadata.as_ref()),
+            Some(ARC_HTTP_STATUS_SCOPE_FINAL)
+        );
+        assert!(receipt
+            .verify_signature()
+            .unwrap_or_else(|e| panic!("verify failed: {e}")));
     }
 }

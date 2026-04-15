@@ -22,7 +22,7 @@ Usage in settings.py::
 from __future__ import annotations
 
 import hashlib
-import json
+import time
 import uuid
 from typing import Any, Callable
 
@@ -30,11 +30,20 @@ import httpx
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
-from arc_sdk.models import AuthMethod, CallerIdentity
+from arc_sdk.models import ArcPassthrough, AuthMethod, CallerIdentity, CapabilityToken
 
 
 def _sha256_hex(data: str) -> str:
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def _capability_id_from_token(raw_token: str | None) -> str | None:
+    if raw_token is None:
+        return None
+    try:
+        return CapabilityToken.model_validate_json(raw_token).id
+    except Exception:
+        return None
 
 
 def _extract_caller(request: HttpRequest) -> CallerIdentity:
@@ -83,7 +92,7 @@ class ArcDjangoMiddleware:
     - ``ARC_EXCLUDE_PATHS``: list of paths to skip (default ``[]``)
     - ``ARC_EXCLUDE_METHODS``: list of methods to skip (default ``["OPTIONS"]``)
     - ``ARC_RECEIPT_HEADER``: response header for receipt ID (default ``X-Arc-Receipt``)
-    - ``ARC_TIMEOUT``: request timeout in seconds (default 10)
+    - ``ARC_TIMEOUT``: request timeout in seconds (default 5)
     """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
@@ -101,7 +110,7 @@ class ArcDjangoMiddleware:
         self._receipt_header: str = getattr(
             settings, "ARC_RECEIPT_HEADER", "X-Arc-Receipt"
         )
-        self._timeout: float = getattr(settings, "ARC_TIMEOUT", 10.0)
+        self._timeout: float = getattr(settings, "ARC_TIMEOUT", 5.0)
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         method = request.method or "GET"
@@ -120,11 +129,12 @@ class ArcDjangoMiddleware:
         if request.body:
             body_hash = hashlib.sha256(request.body).hexdigest()
 
-        # Extract capability ID
-        cap_id = (
+        # Extract presented capability token
+        capability_token = (
             request.headers.get("X-Arc-Capability")
             or request.GET.get("arc_capability")
         )
+        capability_id = _capability_id_from_token(capability_token)
 
         # Evaluate via sidecar (synchronous httpx)
         request_id = str(uuid.uuid4())
@@ -133,21 +143,45 @@ class ArcDjangoMiddleware:
             "method": method,
             "route_pattern": request.path,
             "path": request.path,
+            "query": {
+                key: request.GET.get(key, "")
+                for key in request.GET.keys()
+            },
+            "headers": {
+                key.lower(): value
+                for key, value in (
+                    ("content-type", request.headers.get("Content-Type")),
+                    ("content-length", request.headers.get("Content-Length")),
+                )
+                if value is not None
+            },
             "caller": caller.model_dump(exclude_none=True),
+            "body_length": len(request.body),
+            "timestamp": int(time.time()),
         }
         if body_hash is not None:
             payload["body_hash"] = body_hash
-        if cap_id is not None:
-            payload["capability_id"] = cap_id
+        if capability_id is not None:
+            payload["capability_id"] = capability_id
+
+        request_headers: dict[str, str] | None = None
+        if capability_token is not None:
+            request_headers = {"X-Arc-Capability": capability_token}
 
         try:
             resp = httpx.post(
-                f"{self._sidecar_url}/v1/evaluate-http",
+                f"{self._sidecar_url}/arc/evaluate",
                 json=payload,
+                headers=request_headers,
                 timeout=self._timeout,
             )
         except (httpx.ConnectError, httpx.TimeoutException):
             if self._fail_open:
+                request.arc_passthrough = ArcPassthrough(  # type: ignore[attr-defined]
+                    mode="allow_without_receipt",
+                    error="arc_sidecar_unreachable",
+                    message="ARC sidecar unavailable",
+                )
                 return self.get_response(request)
             return JsonResponse(
                 {
@@ -157,19 +191,6 @@ class ArcDjangoMiddleware:
                     }
                 },
                 status=503,
-            )
-
-        if resp.status_code == 403:
-            data = resp.json()
-            return JsonResponse(
-                {
-                    "error": {
-                        "code": "ARC_GUARD_DENIED",
-                        "message": data.get("message", "denied"),
-                        "guard": data.get("guard", "ArcGuard"),
-                    }
-                },
-                status=403,
             )
 
         if resp.status_code >= 400:
@@ -183,8 +204,9 @@ class ArcDjangoMiddleware:
                 status=502,
             )
 
-        receipt_data = resp.json()
-        verdict = receipt_data.get("verdict", {})
+        evaluation = resp.json()
+        verdict = evaluation.get("verdict", {})
+        receipt_data = evaluation.get("receipt", {})
 
         if verdict.get("verdict") == "deny":
             status = verdict.get("http_status", 403)
@@ -201,6 +223,7 @@ class ArcDjangoMiddleware:
 
         # Store receipt data on request for downstream views
         request.arc_receipt = receipt_data  # type: ignore[attr-defined]
+        request.arc_evaluation = evaluation  # type: ignore[attr-defined]
 
         # Forward to view and attach receipt header
         response = self.get_response(request)

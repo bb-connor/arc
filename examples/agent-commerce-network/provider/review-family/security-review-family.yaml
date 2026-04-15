@@ -1,0 +1,35 @@
+family_id: security-review
+provider_id: contoso-red-team
+summary: >
+  One priced service family for release-bound security review across code,
+  infrastructure, and deployment artifacts.
+offers:
+  - offer_id: code-review
+    summary: Focused code and dependency review for one release branch
+    indicative_price_minor: 25000
+    currency: USD
+    approval_threshold_minor: 100000
+    fulfillment_target_hours: 24
+  - offer_id: cloud-review
+    summary: Infrastructure and cloud configuration review
+    indicative_price_minor: 40000
+    currency: USD
+    approval_threshold_minor: 100000
+    fulfillment_target_hours: 24
+  - offer_id: release-review
+    summary: Combined code plus cloud release review
+    indicative_price_minor: 125000
+    currency: USD
+    approval_threshold_minor: 100000
+    fulfillment_target_hours: 48
+authoritative_paths:
+  - quote_generation
+  - governed_review_execution
+  - fulfillment_package
+  - dispute_response
+degraded_paths:
+  - allow_without_receipt
+  - compatibility_passthrough
+non_authoritative_note: >
+  Degraded paths are useful for compatibility and exploration, but they do not
+  qualify as authoritative billing, settlement, dispute, or audit evidence.

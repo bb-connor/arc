@@ -120,7 +120,16 @@ export function arc(config: ArcElysiaConfig = {}) {
         }
       }
 
-      const capabilityId = rawHeaders["x-arc-capability"] ?? undefined;
+      const capabilityToken = rawHeaders["x-arc-capability"] ?? query["arc_capability"] ?? undefined;
+      let capabilityId: string | undefined;
+      if (capabilityToken != null) {
+        try {
+          const parsed = JSON.parse(capabilityToken) as { id?: unknown };
+          capabilityId = typeof parsed.id === "string" ? parsed.id : undefined;
+        } catch {
+          capabilityId = undefined;
+        }
+      }
 
       const arcReq = buildArcHttpRequest({
         method: httpMethod,
@@ -135,7 +144,7 @@ export function arc(config: ArcElysiaConfig = {}) {
       });
 
       try {
-        const result = await resolved.client.evaluate(arcReq);
+        const result = await resolved.client.evaluate(arcReq, rawHeaders["x-arc-capability"] ?? undefined);
 
         // Set receipt header
         set.headers["X-Arc-Receipt-Id"] = result.receipt.id;
@@ -146,7 +155,7 @@ export function arc(config: ArcElysiaConfig = {}) {
             error: ARC_ERROR_CODES.ACCESS_DENIED,
             message: result.verdict.reason,
             receipt_id: result.receipt.id,
-            suggestion: "provide a valid capability token in the X-Arc-Capability header",
+            suggestion: "provide a valid capability token in the X-Arc-Capability header or arc_capability query parameter",
           };
         }
 

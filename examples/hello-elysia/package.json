@@ -1,0 +1,13 @@
+{
+  "name": "hello-elysia",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@arc-protocol/elysia": "file:../../sdks/typescript/packages/elysia",
+    "elysia": "^1.4.28"
+  }
+}
+

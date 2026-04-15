@@ -485,11 +485,15 @@ struct RemoteBudgetStore {
 }
 
 impl TrustServiceState {
+    // Retained for enterprise-provider validation paths that share this state
+    // shape even though current readers do not call the helper directly.
     #[allow(dead_code)]
     fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
         self.enterprise_provider_registry.as_deref()
     }
 
+    // Retained for enterprise-provider validation paths that share this state
+    // shape even though current readers do not call the helper directly.
     #[allow(dead_code)]
     fn validated_enterprise_provider(
         &self,

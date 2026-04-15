@@ -1,0 +1,16 @@
+kernel:
+  keypair: ./keys/acme-buyer.ed25519
+  policy: ./policy.yaml
+
+# This file now mirrors the first live slice. The buyer API lives in
+# `buyer/app.py`, the API sidecar runs via `buyer/run-sidecar.sh`, and the
+# provider edge is expected at `http://127.0.0.1:8931` by default.
+
+receipts:
+  store: ./state/buyer-receipts.sqlite
+
+adapters:
+  mcp:
+    - id: provider-security-review
+      command: "../provider/run-edge.sh"
+      args: []

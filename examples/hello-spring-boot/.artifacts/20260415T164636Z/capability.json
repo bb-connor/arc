@@ -1,0 +1,21 @@
+{
+  "capability": {
+    "id": "cap-019d9209-e022-7f31-b804-2d31d31ddfdc",
+    "issuer": "bbfb0e37cd3c7743301ff00998d17bf6699fb9d1759477a9453a75b229279d78",
+    "subject": "0000000000000000000000000000000000000000000000000000000000000000",
+    "scope": {
+      "grants": [
+        {
+          "server_id": "http-sidecar-client",
+          "tool_name": "hello_spring_write",
+          "operations": [
+            "invoke"
+          ]
+        }
+      ]
+    },
+    "issued_at": 1776271613,
+    "expires_at": 1776275213,
+    "signature": "cb91c32d881694465d92bd47fa077fc22927d1be880211baee8d84f78214f00ea9c1c3cd45b00b3352865cf5282f5260c8d99c676ab3b179c03f861a02918601"
+  }
+}

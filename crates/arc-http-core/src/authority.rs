@@ -1,17 +1,33 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use arc_core_types::capability::CapabilityToken;
-use arc_core_types::crypto::Keypair;
+use arc_core_types::capability::{ArcScope, CapabilityToken, Operation, ToolGrant};
+use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
+use arc_cross_protocol::{
+    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol,
+    TargetProtocolRegistry,
+};
+use arc_kernel::{
+    ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallRequest,
+    ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use thiserror::Error;
 
 use crate::{
     http_status_metadata_decision, http_status_metadata_final, ArcHttpRequest, CallerIdentity,
-    HttpMethod, HttpReceipt, HttpReceiptBody, Verdict,
+    HttpMethod, HttpReceipt, HttpReceiptBody, Verdict, ARC_KERNEL_RECEIPT_ID_KEY,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+const HTTP_AUTHORITY_SERVER_ID: &str = "arc_http_authority";
+const HTTP_AUTHORITY_TOOL_NAME: &str = "authorize_http_request";
+const HTTP_AUTHORITY_TTL_SECS: u64 = 60;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum HttpAuthorityPolicy {
     SessionAllow,
     DenyByDefault,
@@ -21,12 +37,16 @@ pub enum HttpAuthorityPolicy {
 pub struct HttpAuthority {
     keypair: Arc<Keypair>,
     policy_hash: String,
+    kernel: Arc<ArcKernel>,
+    kernel_subject: PublicKey,
+    kernel_agent_id: String,
 }
 
 impl std::fmt::Debug for HttpAuthority {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HttpAuthority")
             .field("policy_hash", &self.policy_hash)
+            .field("kernel_agent_id", &self.kernel_agent_id)
             .finish_non_exhaustive()
     }
 }
@@ -57,6 +77,8 @@ pub struct PreparedHttpEvaluation {
     pub content_hash: String,
     pub session_id: Option<String>,
     pub capability_id: Option<String>,
+    pub kernel_receipt_id: String,
+    pub route_selection_metadata: Option<Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -74,16 +96,131 @@ pub enum HttpAuthorityError {
     #[error("failed to compute content hash: {0}")]
     ContentHash(String),
 
+    #[error("kernel-backed authorization failed: {0}")]
+    Kernel(String),
+
     #[error("failed to sign receipt: {0}")]
     ReceiptSign(String),
+}
+
+#[derive(Debug, Clone)]
+struct PresentedCapabilityState {
+    capability_id: Option<String>,
+    invalid_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HttpKernelAuthorizationRequest {
+    request_id: String,
+    method: HttpMethod,
+    route_pattern: String,
+    path: String,
+    content_hash: String,
+    caller_identity_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    session_id: Option<String>,
+    policy: HttpAuthorityPolicy,
+    capability: HttpKernelCapabilityState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct HttpKernelCapabilityState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    invalid_reason: Option<String>,
+}
+
+struct HttpAuthorizationServer;
+
+impl ToolServerConnection for HttpAuthorizationServer {
+    fn server_id(&self) -> &str {
+        HTTP_AUTHORITY_SERVER_ID
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec![HTTP_AUTHORITY_TOOL_NAME.to_string()]
+    }
+
+    fn invoke(
+        &self,
+        tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn arc_kernel::NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        if tool_name != HTTP_AUTHORITY_TOOL_NAME {
+            return Err(KernelError::Internal(format!(
+                "unsupported HTTP authority tool: {tool_name}"
+            )));
+        }
+        Ok(serde_json::json!({ "authorized": true }))
+    }
+}
+
+struct HttpProjectionGuard;
+
+impl Guard for HttpProjectionGuard {
+    fn name(&self) -> &str {
+        "http_projection_policy"
+    }
+
+    fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<KernelVerdict, KernelError> {
+        let projected: HttpKernelAuthorizationRequest =
+            serde_json::from_value(ctx.request.arguments.clone()).map_err(|error| {
+                KernelError::Internal(format!(
+                    "failed to decode projected HTTP authorization request: {error}"
+                ))
+            })?;
+
+        if let Some(reason) = projected.capability.invalid_reason {
+            return Err(KernelError::GuardDenied(reason));
+        }
+
+        match projected.policy {
+            HttpAuthorityPolicy::SessionAllow => Ok(KernelVerdict::Allow),
+            HttpAuthorityPolicy::DenyByDefault => {
+                if projected.capability.id.is_some() {
+                    Ok(KernelVerdict::Allow)
+                } else {
+                    Err(KernelError::GuardDenied(
+                        "side-effect route requires a capability token".to_string(),
+                    ))
+                }
+            }
+        }
+    }
 }
 
 impl HttpAuthority {
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
+        let keypair = Arc::new(keypair);
+        let kernel_subject = Keypair::generate().public_key();
+        let kernel_agent_id = kernel_subject.to_hex();
+
+        let mut kernel = ArcKernel::new(KernelConfig {
+            keypair: keypair.as_ref().clone(),
+            ca_public_keys: vec![keypair.public_key()],
+            max_delegation_depth: 8,
+            policy_hash: policy_hash.clone(),
+            allow_sampling: false,
+            allow_sampling_tool_use: false,
+            allow_elicitation: false,
+            max_stream_duration_secs: DEFAULT_MAX_STREAM_DURATION_SECS,
+            max_stream_total_bytes: DEFAULT_MAX_STREAM_TOTAL_BYTES,
+            require_web3_evidence: false,
+            checkpoint_batch_size: DEFAULT_CHECKPOINT_BATCH_SIZE,
+            retention_config: None,
+        });
+        kernel.register_tool_server(Box::new(HttpAuthorizationServer));
+        kernel.add_guard(Box::new(HttpProjectionGuard));
+
         Self {
-            keypair: Arc::new(keypair),
+            keypair,
             policy_hash,
+            kernel: Arc::new(kernel),
+            kernel_subject,
+            kernel_agent_id,
         }
     }
 
@@ -104,73 +241,8 @@ impl HttpAuthority {
         &self,
         input: HttpAuthorityInput<'_>,
     ) -> Result<PreparedHttpEvaluation, HttpAuthorityError> {
-        let mut evidence = Vec::new();
-        let capability_id = match resolve_capability_id(
-            input.capability_id_hint,
-            input.presented_capability,
-        ) {
-            Ok(capability_id) => capability_id,
-            Err(error) => {
-                evidence.push(GuardEvidence {
-                    guard_name: "CapabilityGuard".to_string(),
-                    verdict: false,
-                    details: Some(error.clone()),
-                });
-                let verdict = Verdict::deny(&error, "CapabilityGuard");
-                return self.build_prepared(input, verdict, evidence, None);
-            }
-        };
-
-        let verdict = evaluate_policy(input.policy, &capability_id, &mut evidence);
-        self.build_prepared(input, verdict, evidence, capability_id)
-    }
-
-    pub fn sign_decision_receipt(
-        &self,
-        prepared: &PreparedHttpEvaluation,
-    ) -> Result<HttpReceipt, HttpAuthorityError> {
-        self.sign_receipt(
-            prepared,
-            decision_status(&prepared.verdict),
-            Some(http_status_metadata_decision()),
-        )
-    }
-
-    pub fn finalize_receipt(
-        &self,
-        prepared: &PreparedHttpEvaluation,
-        response_status: u16,
-        decision_receipt_id: Option<&str>,
-    ) -> Result<HttpReceipt, HttpAuthorityError> {
-        self.sign_receipt(
-            prepared,
-            response_status,
-            Some(http_status_metadata_final(decision_receipt_id)),
-        )
-    }
-
-    pub fn finalize_decision_receipt(
-        &self,
-        decision_receipt: &HttpReceipt,
-        response_status: u16,
-    ) -> Result<HttpReceipt, HttpAuthorityError> {
-        let mut body = decision_receipt.body();
-        let decision_receipt_id = body.id.clone();
-        body.id = uuid::Uuid::now_v7().to_string();
-        body.response_status = response_status;
-        body.timestamp = chrono::Utc::now().timestamp() as u64;
-        body.metadata = Some(http_status_metadata_final(Some(&decision_receipt_id)));
-        HttpReceipt::sign(body, self.keypair.as_ref())
-            .map_err(|e| HttpAuthorityError::ReceiptSign(e.to_string()))
-    }
-
-    fn build_prepared(
-        &self,
-        input: HttpAuthorityInput<'_>,
-        verdict: Verdict,
-        evidence: Vec<GuardEvidence>,
-        capability_id: Option<String>,
-    ) -> Result<PreparedHttpEvaluation, HttpAuthorityError> {
+        let presented_capability =
+            validate_presented_capability(input.capability_id_hint, input.presented_capability);
         let caller_identity_hash = input
             .caller
             .identity_hash()
@@ -187,13 +259,44 @@ impl HttpAuthority {
             body_hash: input.body_hash,
             body_length: input.body_length,
             session_id: input.session_id.clone(),
-            capability_id: capability_id.clone(),
+            capability_id: presented_capability.capability_id.clone(),
             timestamp: chrono::Utc::now().timestamp() as u64,
         };
 
         let content_hash = arc_request
             .content_hash()
             .map_err(|e| HttpAuthorityError::ContentHash(e.to_string()))?;
+
+        let kernel_response = self.authorize_via_kernel(
+            &input.request_id,
+            input.method,
+            &input.route_pattern,
+            input.path,
+            &content_hash,
+            &caller_identity_hash,
+            input.session_id.as_deref(),
+            input.policy,
+            &presented_capability,
+        )?;
+
+        let verdict = projected_verdict(input.policy, &presented_capability);
+        let expected_allowed = verdict.is_allowed();
+        match (kernel_response.verdict, expected_allowed) {
+            (KernelVerdict::Allow, true) | (KernelVerdict::Deny, false) => {}
+            (KernelVerdict::Allow, false) => {
+                return Err(HttpAuthorityError::Kernel(
+                    "kernel allowed an HTTP projection that should have been denied".to_string(),
+                ));
+            }
+            (KernelVerdict::Deny, true) => {
+                let reason = kernel_response
+                    .reason
+                    .unwrap_or_else(|| "kernel denied an allowed HTTP projection".to_string());
+                return Err(HttpAuthorityError::Kernel(reason));
+            }
+        }
+
+        let evidence = projected_evidence(input.policy, &presented_capability);
 
         Ok(PreparedHttpEvaluation {
             verdict,
@@ -204,15 +307,135 @@ impl HttpAuthority {
             caller_identity_hash,
             content_hash,
             session_id: input.session_id,
-            capability_id,
+            capability_id: presented_capability.capability_id,
+            kernel_receipt_id: kernel_response.receipt.id,
+            route_selection_metadata: metadata_value(
+                kernel_response.receipt.metadata.as_ref(),
+                "route_selection",
+            )
+            .cloned(),
         })
+    }
+
+    pub fn sign_decision_receipt(
+        &self,
+        prepared: &PreparedHttpEvaluation,
+    ) -> Result<HttpReceipt, HttpAuthorityError> {
+        self.sign_receipt(
+            prepared,
+            decision_status(&prepared.verdict),
+            decision_metadata(
+                Some(&prepared.kernel_receipt_id),
+                prepared.route_selection_metadata.as_ref(),
+            ),
+        )
+    }
+
+    pub fn finalize_receipt(
+        &self,
+        prepared: &PreparedHttpEvaluation,
+        response_status: u16,
+        decision_receipt_id: Option<&str>,
+    ) -> Result<HttpReceipt, HttpAuthorityError> {
+        self.sign_receipt(
+            prepared,
+            response_status,
+            final_metadata(
+                decision_receipt_id,
+                Some(&prepared.kernel_receipt_id),
+                prepared.route_selection_metadata.as_ref(),
+            ),
+        )
+    }
+
+    pub fn finalize_decision_receipt(
+        &self,
+        decision_receipt: &HttpReceipt,
+        response_status: u16,
+    ) -> Result<HttpReceipt, HttpAuthorityError> {
+        let mut body = decision_receipt.body();
+        let decision_receipt_id = body.id.clone();
+        let kernel_receipt_id = metadata_string(body.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY)
+            .map(ToOwned::to_owned);
+        let route_selection = metadata_value(body.metadata.as_ref(), "route_selection").cloned();
+        body.id = uuid::Uuid::now_v7().to_string();
+        body.response_status = response_status;
+        body.timestamp = chrono::Utc::now().timestamp() as u64;
+        body.metadata = final_metadata(
+            Some(&decision_receipt_id),
+            kernel_receipt_id.as_deref(),
+            route_selection.as_ref(),
+        );
+        HttpReceipt::sign(body, self.keypair.as_ref())
+            .map_err(|e| HttpAuthorityError::ReceiptSign(e.to_string()))
+    }
+
+    fn authorize_via_kernel(
+        &self,
+        request_id: &str,
+        method: HttpMethod,
+        route_pattern: &str,
+        path: &str,
+        content_hash: &str,
+        caller_identity_hash: &str,
+        session_id: Option<&str>,
+        policy: HttpAuthorityPolicy,
+        presented_capability: &PresentedCapabilityState,
+    ) -> Result<arc_kernel::ToolCallResponse, HttpAuthorityError> {
+        let capability = self
+            .kernel
+            .issue_capability(&self.kernel_subject, kernel_scope(), HTTP_AUTHORITY_TTL_SECS)
+            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+
+        let projected = HttpKernelAuthorizationRequest {
+            request_id: request_id.to_string(),
+            method,
+            route_pattern: route_pattern.to_string(),
+            path: path.to_string(),
+            content_hash: content_hash.to_string(),
+            caller_identity_hash: caller_identity_hash.to_string(),
+            session_id: session_id.map(ToOwned::to_owned),
+            policy,
+            capability: HttpKernelCapabilityState {
+                id: presented_capability.capability_id.clone(),
+                invalid_reason: presented_capability.invalid_reason.clone(),
+            },
+        };
+
+        let request = ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability,
+            tool_name: HTTP_AUTHORITY_TOOL_NAME.to_string(),
+            server_id: HTTP_AUTHORITY_SERVER_ID.to_string(),
+            agent_id: self.kernel_agent_id.clone(),
+            arguments: serde_json::to_value(projected)
+                .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?,
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+        };
+        let route_plan = plan_authoritative_route(
+            request_id,
+            DiscoveryProtocol::Http,
+            DiscoveryProtocol::Native,
+            None,
+            &TargetProtocolRegistry::new(DiscoveryProtocol::Native),
+            &BTreeMap::new(),
+        )
+        .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        let route_metadata = route_selection_metadata(&route_plan.evidence)
+            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+
+        self.kernel
+            .evaluate_tool_call_blocking_with_metadata(&request, Some(route_metadata))
+            .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))
     }
 
     fn sign_receipt(
         &self,
         prepared: &PreparedHttpEvaluation,
         response_status: u16,
-        metadata: Option<serde_json::Value>,
+        metadata: Option<Value>,
     ) -> Result<HttpReceipt, HttpAuthorityError> {
         let body = HttpReceiptBody {
             id: uuid::Uuid::now_v7().to_string(),
@@ -237,6 +460,23 @@ impl HttpAuthority {
     }
 }
 
+fn kernel_scope() -> ArcScope {
+    ArcScope {
+        grants: vec![ToolGrant {
+            server_id: HTTP_AUTHORITY_SERVER_ID.to_string(),
+            tool_name: HTTP_AUTHORITY_TOOL_NAME.to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: Some(1),
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        resource_grants: Vec::new(),
+        prompt_grants: Vec::new(),
+    }
+}
+
 fn decision_status(verdict: &Verdict) -> u16 {
     match verdict {
         Verdict::Allow => 200,
@@ -245,42 +485,91 @@ fn decision_status(verdict: &Verdict) -> u16 {
     }
 }
 
-fn evaluate_policy(
-    policy: HttpAuthorityPolicy,
-    capability_id: &Option<String>,
-    evidence: &mut Vec<GuardEvidence>,
-) -> Verdict {
-    match policy {
-        HttpAuthorityPolicy::SessionAllow => {
-            evidence.push(GuardEvidence {
-                guard_name: "DefaultPolicyGuard".to_string(),
-                verdict: true,
-                details: Some("safe method, session-scoped allow".to_string()),
-            });
-            Verdict::Allow
+fn validate_presented_capability(
+    capability_id_hint: Option<&str>,
+    presented_capability: Option<&str>,
+) -> PresentedCapabilityState {
+    let Some(raw_capability) = presented_capability else {
+        return PresentedCapabilityState {
+            capability_id: None,
+            invalid_reason: None,
+        };
+    };
+
+    match validate_capability_token(raw_capability) {
+        Ok(token) => {
+            if let Some(hint) = capability_id_hint {
+                if hint != token.id {
+                    return PresentedCapabilityState {
+                        capability_id: None,
+                        invalid_reason: Some(
+                            "capability_id does not match the presented capability token"
+                                .to_string(),
+                        ),
+                    };
+                }
+            }
+            PresentedCapabilityState {
+                capability_id: Some(token.id),
+                invalid_reason: None,
+            }
         }
-        HttpAuthorityPolicy::DenyByDefault => match capability_id {
-            Some(_) => {
-                evidence.push(GuardEvidence {
-                    guard_name: "CapabilityGuard".to_string(),
-                    verdict: true,
-                    details: Some("valid capability token presented".to_string()),
-                });
-                Verdict::Allow
-            }
-            None => {
-                evidence.push(GuardEvidence {
-                    guard_name: "CapabilityGuard".to_string(),
-                    verdict: false,
-                    details: Some(
-                        "side-effect route requires a valid capability token".to_string(),
-                    ),
-                });
-                Verdict::deny(
-                    "side-effect route requires a capability token",
-                    "CapabilityGuard",
-                )
-            }
+        Err(reason) => PresentedCapabilityState {
+            capability_id: None,
+            invalid_reason: Some(reason),
+        },
+    }
+}
+
+fn projected_verdict(
+    policy: HttpAuthorityPolicy,
+    presented_capability: &PresentedCapabilityState,
+) -> Verdict {
+    if let Some(reason) = &presented_capability.invalid_reason {
+        return Verdict::deny(reason, "CapabilityGuard");
+    }
+
+    match policy {
+        HttpAuthorityPolicy::SessionAllow => Verdict::Allow,
+        HttpAuthorityPolicy::DenyByDefault => match &presented_capability.capability_id {
+            Some(_) => Verdict::Allow,
+            None => Verdict::deny(
+                "side-effect route requires a capability token",
+                "CapabilityGuard",
+            ),
+        },
+    }
+}
+
+fn projected_evidence(
+    policy: HttpAuthorityPolicy,
+    presented_capability: &PresentedCapabilityState,
+) -> Vec<GuardEvidence> {
+    if let Some(reason) = &presented_capability.invalid_reason {
+        return vec![GuardEvidence {
+            guard_name: "CapabilityGuard".to_string(),
+            verdict: false,
+            details: Some(reason.clone()),
+        }];
+    }
+
+    match policy {
+        HttpAuthorityPolicy::SessionAllow => vec![GuardEvidence {
+            guard_name: "DefaultPolicyGuard".to_string(),
+            verdict: true,
+            details: Some("safe method, session-scoped allow".to_string()),
+        }],
+        HttpAuthorityPolicy::DenyByDefault => match &presented_capability.capability_id {
+            Some(_) => vec![GuardEvidence {
+                guard_name: "CapabilityGuard".to_string(),
+                verdict: true,
+                details: Some("valid capability token presented".to_string()),
+            }],
+            None => vec![GuardEvidence {
+                guard_name: "CapabilityGuard".to_string(),
+                verdict: false,
+                details: Some("side-effect route requires a valid capability token".to_string()),
+            }],
         },
     }
 }
@@ -300,28 +589,69 @@ fn validate_capability_token(raw: &str) -> Result<CapabilityToken, String> {
     Ok(token)
 }
 
-fn resolve_capability_id(
-    capability_id_hint: Option<&str>,
-    presented_capability: Option<&str>,
-) -> Result<Option<String>, String> {
-    let Some(raw_capability) = presented_capability else {
-        return Ok(None);
-    };
+fn decision_metadata(kernel_receipt_id: Option<&str>, route_selection: Option<&Value>) -> Option<Value> {
+    let mut metadata = http_status_metadata_decision();
+    insert_metadata_string(&mut metadata, ARC_KERNEL_RECEIPT_ID_KEY, kernel_receipt_id);
+    insert_metadata_value(&mut metadata, "route_selection", route_selection);
+    Some(metadata)
+}
 
-    let token = validate_capability_token(raw_capability)?;
-    if let Some(hint) = capability_id_hint {
-        if hint != token.id {
-            return Err("capability_id does not match the presented capability token".to_string());
-        }
+fn final_metadata(
+    decision_receipt_id: Option<&str>,
+    kernel_receipt_id: Option<&str>,
+    route_selection: Option<&Value>,
+) -> Option<Value> {
+    let mut metadata = http_status_metadata_final(decision_receipt_id);
+    insert_metadata_string(&mut metadata, ARC_KERNEL_RECEIPT_ID_KEY, kernel_receipt_id);
+    insert_metadata_value(&mut metadata, "route_selection", route_selection);
+    Some(metadata)
+}
+
+fn insert_metadata_string(metadata: &mut Value, key: &str, value: Option<&str>) {
+    let Some(value) = value else {
+        return;
+    };
+    if let Value::Object(map) = metadata {
+        map.insert(key.to_string(), Value::String(value.to_string()));
+    } else {
+        let mut map = Map::new();
+        map.insert(key.to_string(), Value::String(value.to_string()));
+        *metadata = Value::Object(map);
     }
-    Ok(Some(token.id))
+}
+
+fn insert_metadata_value(metadata: &mut Value, key: &str, value: Option<&Value>) {
+    let Some(value) = value else {
+        return;
+    };
+    if let Value::Object(map) = metadata {
+        map.insert(key.to_string(), value.clone());
+    } else {
+        let mut map = Map::new();
+        map.insert(key.to_string(), value.clone());
+        *metadata = Value::Object(map);
+    }
+}
+
+fn metadata_string<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a str> {
+    metadata
+        .and_then(Value::as_object)
+        .and_then(|map| map.get(key))
+        .and_then(Value::as_str)
+}
+
+fn metadata_value<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a Value> {
+    metadata.and_then(Value::as_object).and_then(|map| map.get(key))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        http_status_scope, AuthMethod, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
+        ARC_HTTP_STATUS_SCOPE_FINAL,
+    };
     use arc_core_types::capability::{ArcScope, CapabilityTokenBody};
-    use crate::{http_status_scope, AuthMethod, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL};
 
     fn valid_capability_token_json(id: &str) -> String {
         let issuer = Keypair::generate();
@@ -381,6 +711,15 @@ mod tests {
             http_status_scope(result.receipt.metadata.as_ref()),
             Some(ARC_HTTP_STATUS_SCOPE_DECISION)
         );
+        assert!(
+            metadata_string(result.receipt.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY).is_some()
+        );
+        assert_eq!(
+            metadata_value(result.receipt.metadata.as_ref(), "route_selection")
+                .and_then(|value| value.get("selectedTargetProtocol"))
+                .and_then(Value::as_str),
+            Some("native")
+        );
     }
 
     #[test]
@@ -408,6 +747,31 @@ mod tests {
     }
 
     #[test]
+    fn invalid_presented_capability_denies_even_safe_route() {
+        let query = HashMap::new();
+        let result = authority()
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-invalid".to_string(),
+                method: HttpMethod::Get,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: None,
+                body_length: 0,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some("{not-json"),
+                policy: HttpAuthorityPolicy::SessionAllow,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(result.receipt.evidence.len(), 1);
+        assert_eq!(result.receipt.evidence[0].guard_name, "CapabilityGuard");
+    }
+
+    #[test]
     fn valid_capability_allows_deny_by_default() {
         let query = HashMap::new();
         let capability = valid_capability_token_json("cap-123");
@@ -431,6 +795,9 @@ mod tests {
         assert!(result.verdict.is_allowed());
         assert_eq!(result.receipt.capability_id.as_deref(), Some("cap-123"));
         assert_eq!(result.receipt.session_id.as_deref(), Some("session-1"));
+        assert!(
+            metadata_string(result.receipt.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY).is_some()
+        );
     }
 
     #[test]
@@ -459,7 +826,7 @@ mod tests {
     }
 
     #[test]
-    fn finalized_receipt_links_decision_receipt() {
+    fn finalized_receipt_links_decision_receipt_and_kernel_receipt() {
         let query = HashMap::new();
         let shared = authority();
         let decision = shared
@@ -479,6 +846,9 @@ mod tests {
             })
             .unwrap()
             .receipt;
+        let kernel_receipt_id = metadata_string(decision.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY)
+            .map(ToOwned::to_owned)
+            .unwrap();
         let final_receipt = shared.finalize_decision_receipt(&decision, 204).unwrap();
 
         assert_ne!(final_receipt.id, decision.id);
@@ -494,6 +864,16 @@ mod tests {
                 .and_then(|metadata| metadata.get(ARC_DECISION_RECEIPT_ID_KEY))
                 .and_then(serde_json::Value::as_str),
             Some(decision.id.as_str())
+        );
+        assert_eq!(
+            metadata_string(final_receipt.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY),
+            Some(kernel_receipt_id.as_str())
+        );
+        assert_eq!(
+            metadata_value(final_receipt.metadata.as_ref(), "route_selection")
+                .and_then(|value| value.get("selectedTargetProtocol"))
+                .and_then(Value::as_str),
+            Some("native")
         );
     }
 }

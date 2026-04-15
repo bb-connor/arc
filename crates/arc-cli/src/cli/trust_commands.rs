@@ -1,3 +1,148 @@
+struct QueryBackend<'a> {
+    json_output: bool,
+    receipt_db_path: Option<&'a Path>,
+    control_url: Option<&'a str>,
+    control_token: Option<&'a str>,
+}
+
+struct BudgetQueryBackend<'a> {
+    query: QueryBackend<'a>,
+    budget_db_path: Option<&'a Path>,
+    certification_registry_file: Option<&'a Path>,
+}
+
+struct SignedQueryBackend<'a> {
+    query: QueryBackend<'a>,
+    budget_db_path: Option<&'a Path>,
+    authority_seed_path: Option<&'a Path>,
+    authority_db_path: Option<&'a Path>,
+    certification_registry_file: Option<&'a Path>,
+}
+
+struct CreditLossLifecycleListArgs<'a> {
+    event_id: Option<&'a str>,
+    bond_id: Option<&'a str>,
+    facility_id: Option<&'a str>,
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    event_kind: Option<&'a str>,
+    limit: usize,
+}
+
+struct CreditBacktestExportArgs<'a> {
+    agent_subject: &'a str,
+    capability_id: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    decision_limit: usize,
+    window_seconds: u64,
+    window_count: usize,
+    stale_after_seconds: u64,
+}
+
+struct ProviderRiskPackageExportArgs<'a> {
+    agent_subject: &'a str,
+    capability_id: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+    decision_limit: usize,
+    recent_loss_limit: usize,
+}
+
+struct LiabilityMarketListArgs<'a> {
+    quote_request_id: Option<&'a str>,
+    provider_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    jurisdiction: Option<&'a str>,
+    coverage_class: Option<&'a str>,
+    currency: Option<&'a str>,
+    limit: usize,
+}
+
+struct LiabilityClaimsListArgs<'a> {
+    claim_id: Option<&'a str>,
+    provider_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    jurisdiction: Option<&'a str>,
+    policy_number: Option<&'a str>,
+    limit: usize,
+}
+
+struct UnderwritingPolicyInputArgs<'a> {
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    receipt_limit: usize,
+}
+
+struct UnderwritingDecisionSimulateArgs<'a> {
+    input: UnderwritingPolicyInputArgs<'a>,
+    policy_file: &'a Path,
+}
+
+struct UnderwritingDecisionIssueArgs<'a> {
+    input: UnderwritingPolicyInputArgs<'a>,
+    supersedes_decision_id: Option<&'a str>,
+}
+
+struct UnderwritingDecisionListArgs<'a> {
+    decision_id: Option<&'a str>,
+    capability_id: Option<&'a str>,
+    agent_subject: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    outcome: Option<&'a str>,
+    lifecycle_state: Option<&'a str>,
+    appeal_status: Option<&'a str>,
+    limit: usize,
+}
+
+struct UnderwritingAppealResolveArgs<'a> {
+    appeal_id: &'a str,
+    resolution: &'a str,
+    resolved_by: &'a str,
+    note: Option<&'a str>,
+    replacement_decision_id: Option<&'a str>,
+}
+
+struct ReceiptListArgs<'a> {
+    capability: Option<&'a str>,
+    tool_server: Option<&'a str>,
+    tool_name: Option<&'a str>,
+    outcome: Option<&'a str>,
+    since: Option<u64>,
+    until: Option<u64>,
+    min_cost: Option<u64>,
+    max_cost: Option<u64>,
+    limit: usize,
+    cursor: Option<u64>,
+}
+
+fn build_underwriting_policy_input_query(
+    args: &UnderwritingPolicyInputArgs<'_>,
+) -> arc_kernel::UnderwritingPolicyInputQuery {
+    arc_kernel::UnderwritingPolicyInputQuery {
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+    }
+}
+
 fn cmd_trust_credit_loss_lifecycle_evaluate(
     bond_id: &str,
     event_kind: &str,
@@ -133,41 +278,30 @@ fn cmd_trust_credit_loss_lifecycle_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_loss_lifecycle_list(
-    event_id: Option<&str>,
-    bond_id: Option<&str>,
-    facility_id: Option<&str>,
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    event_kind: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditLossLifecycleListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CreditLossLifecycleListQuery {
-        event_id: event_id.map(ToOwned::to_owned),
-        bond_id: bond_id.map(ToOwned::to_owned),
-        facility_id: facility_id.map(ToOwned::to_owned),
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        event_kind: event_kind
+        event_id: args.event_id.map(ToOwned::to_owned),
+        bond_id: args.bond_id.map(ToOwned::to_owned),
+        facility_id: args.facility_id.map(ToOwned::to_owned),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        event_kind: args
+            .event_kind
             .map(parse_credit_loss_lifecycle_event_kind)
             .transpose()?,
-        limit: Some(limit),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.list_credit_loss_lifecycle(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit loss lifecycle list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -176,7 +310,7 @@ fn cmd_trust_credit_loss_lifecycle_list(
         trust_control::list_credit_loss_lifecycle(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
@@ -221,45 +355,29 @@ fn cmd_trust_credit_loss_lifecycle_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_credit_backtest_export(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    window_seconds: u64,
-    window_count: usize,
-    stale_after_seconds: u64,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: CreditBacktestExportArgs<'_>,
+    backend: BudgetQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CreditBacktestQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-        window_seconds: Some(window_seconds),
-        window_count: Some(window_count),
-        stale_after_seconds: Some(stale_after_seconds),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: Some(args.agent_subject.to_string()),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+        decision_limit: Some(args.decision_limit),
+        window_seconds: Some(args.window_seconds),
+        window_count: Some(args.window_count),
+        stale_after_seconds: Some(args.stale_after_seconds),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.credit_backtest(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "credit backtest export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -267,19 +385,19 @@ fn cmd_trust_credit_backtest_export(
         })?;
         trust_control::build_credit_backtest_report(
             receipt_db_path,
-            budget_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.certification_registry_file,
             None,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.schema);
         println!("generated_at:           {}", report.generated_at);
-        println!("subject_key:            {}", agent_subject);
+        println!("subject_key:            {}", args.agent_subject);
         println!(
             "windows_evaluated:      {}",
             report.summary.windows_evaluated
@@ -299,43 +417,27 @@ fn cmd_trust_credit_backtest_export(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_provider_risk_package_export(
-    agent_subject: &str,
-    capability_id: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    decision_limit: usize,
-    recent_loss_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: ProviderRiskPackageExportArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::CreditProviderRiskPackageQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: Some(agent_subject.to_string()),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-        decision_limit: Some(decision_limit),
-        recent_loss_limit: Some(recent_loss_limit),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: Some(args.agent_subject.to_string()),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        since: args.since,
+        until: args.until,
+        receipt_limit: Some(args.receipt_limit),
+        decision_limit: Some(args.decision_limit),
+        recent_loss_limit: Some(args.recent_loss_limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.credit_provider_risk_package(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "provider risk package export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -343,16 +445,16 @@ fn cmd_trust_provider_risk_package_export(
         })?;
         trust_control::build_signed_credit_provider_risk_package(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
+            backend.certification_registry_file,
             None,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.body.schema);
@@ -1205,37 +1307,28 @@ fn cmd_trust_liability_claim_settlement_receipt_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_liability_market_list(
-    quote_request_id: Option<&str>,
-    provider_id: Option<&str>,
-    agent_subject: Option<&str>,
-    jurisdiction: Option<&str>,
-    coverage_class: Option<&str>,
-    currency: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: LiabilityMarketListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::LiabilityMarketWorkflowQuery {
-        quote_request_id: quote_request_id.map(ToOwned::to_owned),
-        provider_id: provider_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        jurisdiction: jurisdiction.map(ToOwned::to_owned),
-        coverage_class: coverage_class
+        quote_request_id: args.quote_request_id.map(ToOwned::to_owned),
+        provider_id: args.provider_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        jurisdiction: args.jurisdiction.map(ToOwned::to_owned),
+        coverage_class: args
+            .coverage_class
             .map(parse_liability_coverage_class)
             .transpose()?,
-        currency: currency.map(ToOwned::to_owned),
-        limit: Some(limit),
+        currency: args.currency.map(ToOwned::to_owned),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.liability_market_workflows(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "liability market list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1244,7 +1337,7 @@ fn cmd_trust_liability_market_list(
         trust_control::list_liability_market_workflows(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
@@ -1307,33 +1400,24 @@ fn cmd_trust_liability_market_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_liability_claims_list(
-    claim_id: Option<&str>,
-    provider_id: Option<&str>,
-    agent_subject: Option<&str>,
-    jurisdiction: Option<&str>,
-    policy_number: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: LiabilityClaimsListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::LiabilityClaimWorkflowQuery {
-        claim_id: claim_id.map(ToOwned::to_owned),
-        provider_id: provider_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        jurisdiction: jurisdiction.map(ToOwned::to_owned),
-        policy_number: policy_number.map(ToOwned::to_owned),
-        limit: Some(limit),
+        claim_id: args.claim_id.map(ToOwned::to_owned),
+        provider_id: args.provider_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        jurisdiction: args.jurisdiction.map(ToOwned::to_owned),
+        policy_number: args.policy_number.map(ToOwned::to_owned),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.liability_claim_workflows(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "liability claims list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1342,7 +1426,7 @@ fn cmd_trust_liability_claims_list(
         trust_control::list_liability_claim_workflows(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("matching_claims:       {}", report.summary.matching_claims);
@@ -1431,39 +1515,17 @@ fn cmd_trust_liability_claims_list(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_input_export(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingPolicyInputArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::UnderwritingPolicyInputQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-    };
+    let query = build_underwriting_policy_input_query(&args);
 
-    let input = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let input = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.underwriting_policy_input(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting input export requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1471,15 +1533,15 @@ fn cmd_trust_underwriting_input_export(
         })?;
         trust_control::build_signed_underwriting_policy_input(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
+            backend.certification_registry_file,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&input)?);
     } else {
         println!("schema:                 {}", input.body.schema);
@@ -1521,37 +1583,17 @@ fn cmd_trust_underwriting_input_export(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_decision_evaluate(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingPolicyInputArgs<'_>,
+    backend: BudgetQueryBackend<'_>,
 ) -> Result<(), CliError> {
-    let query = arc_kernel::UnderwritingPolicyInputQuery {
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        since,
-        until,
-        receipt_limit: Some(receipt_limit),
-    };
+    let query = build_underwriting_policy_input_query(&args);
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.underwriting_decision(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting decision evaluation requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1559,13 +1601,13 @@ fn cmd_trust_underwriting_decision_evaluate(
         })?;
         trust_control::build_underwriting_decision_report(
             receipt_db_path,
-            budget_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.certification_registry_file,
             &query,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.schema);
@@ -1592,41 +1634,20 @@ fn cmd_trust_underwriting_decision_evaluate(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_decision_simulate(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    policy_file: &Path,
-    certification_registry_file: Option<&Path>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingDecisionSimulateArgs<'_>,
+    backend: BudgetQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request = arc_kernel::UnderwritingSimulationRequest {
-        query: arc_kernel::UnderwritingPolicyInputQuery {
-            capability_id: capability_id.map(ToOwned::to_owned),
-            agent_subject: agent_subject.map(ToOwned::to_owned),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            since,
-            until,
-            receipt_limit: Some(receipt_limit),
-        },
-        policy: load_underwriting_decision_policy(policy_file)?,
+        query: build_underwriting_policy_input_query(&args.input),
+        policy: load_underwriting_decision_policy(args.policy_file)?,
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.simulate_underwriting_decision(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting simulation requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -1634,13 +1655,13 @@ fn cmd_trust_underwriting_decision_simulate(
         })?;
         trust_control::build_underwriting_simulation_report(
             receipt_db_path,
-            budget_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.certification_registry_file,
             &request,
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!("schema:                 {}", report.schema);
@@ -2115,43 +2136,20 @@ fn cmd_trust_runtime_attestation_appraisal_import(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_decision_issue(
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    receipt_limit: usize,
-    supersedes_decision_id: Option<&str>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    budget_db_path: Option<&Path>,
-    authority_seed_path: Option<&Path>,
-    authority_db_path: Option<&Path>,
-    certification_registry_file: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingDecisionIssueArgs<'_>,
+    backend: SignedQueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request = trust_control::UnderwritingDecisionIssueRequest {
-        query: arc_kernel::UnderwritingPolicyInputQuery {
-            capability_id: capability_id.map(ToOwned::to_owned),
-            agent_subject: agent_subject.map(ToOwned::to_owned),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            since,
-            until,
-            receipt_limit: Some(receipt_limit),
-        },
-        supersedes_decision_id: supersedes_decision_id.map(ToOwned::to_owned),
+        query: build_underwriting_policy_input_query(&args.input),
+        supersedes_decision_id: args.supersedes_decision_id.map(ToOwned::to_owned),
     };
 
-    let decision = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let decision = if let Some(url) = backend.query.control_url {
+        let token = require_control_token(backend.query.control_token)?;
         trust_control::build_client(url, token)?.issue_underwriting_decision(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.query.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting decision issuance requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -2159,16 +2157,16 @@ fn cmd_trust_underwriting_decision_issue(
         })?;
         trust_control::issue_signed_underwriting_decision(
             receipt_db_path,
-            budget_db_path,
-            authority_seed_path,
-            authority_db_path,
-            certification_registry_file,
+            backend.budget_db_path,
+            backend.authority_seed_path,
+            backend.authority_db_path,
+            backend.certification_registry_file,
             &request.query,
             request.supersedes_decision_id.as_deref(),
         )?
     };
 
-    if json_output {
+    if backend.query.json_output {
         println!("{}", serde_json::to_string_pretty(&decision)?);
     } else {
         println!("schema:                 {}", decision.body.schema);
@@ -2187,45 +2185,36 @@ fn cmd_trust_underwriting_decision_issue(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_decision_list(
-    decision_id: Option<&str>,
-    capability_id: Option<&str>,
-    agent_subject: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    outcome: Option<&str>,
-    lifecycle_state: Option<&str>,
-    appeal_status: Option<&str>,
-    limit: usize,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingDecisionListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let query = arc_kernel::UnderwritingDecisionQuery {
-        decision_id: decision_id.map(ToOwned::to_owned),
-        capability_id: capability_id.map(ToOwned::to_owned),
-        agent_subject: agent_subject.map(ToOwned::to_owned),
-        tool_server: tool_server.map(ToOwned::to_owned),
-        tool_name: tool_name.map(ToOwned::to_owned),
-        outcome: outcome
+        decision_id: args.decision_id.map(ToOwned::to_owned),
+        capability_id: args.capability_id.map(ToOwned::to_owned),
+        agent_subject: args.agent_subject.map(ToOwned::to_owned),
+        tool_server: args.tool_server.map(ToOwned::to_owned),
+        tool_name: args.tool_name.map(ToOwned::to_owned),
+        outcome: args
+            .outcome
             .map(parse_underwriting_decision_outcome)
             .transpose()?,
-        lifecycle_state: lifecycle_state
+        lifecycle_state: args
+            .lifecycle_state
             .map(parse_underwriting_lifecycle_state)
             .transpose()?,
-        appeal_status: appeal_status
+        appeal_status: args
+            .appeal_status
             .map(parse_underwriting_appeal_status)
             .transpose()?,
-        limit: Some(limit),
+        limit: Some(args.limit),
     };
 
-    let report = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let report = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.list_underwriting_decisions(&query)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting decision list requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -2234,7 +2223,7 @@ fn cmd_trust_underwriting_decision_list(
         trust_control::list_underwriting_decisions(receipt_db_path, &query)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         println!(
@@ -2300,30 +2289,22 @@ fn cmd_trust_underwriting_appeal_create(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_trust_underwriting_appeal_resolve(
-    appeal_id: &str,
-    resolution: &str,
-    resolved_by: &str,
-    note: Option<&str>,
-    replacement_decision_id: Option<&str>,
-    json_output: bool,
-    receipt_db_path: Option<&Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: UnderwritingAppealResolveArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
     let request = arc_kernel::UnderwritingAppealResolveRequest {
-        appeal_id: appeal_id.to_string(),
-        resolution: parse_underwriting_appeal_resolution(resolution)?,
-        resolved_by: resolved_by.to_string(),
-        note: note.map(ToOwned::to_owned),
-        replacement_decision_id: replacement_decision_id.map(ToOwned::to_owned),
+        appeal_id: args.appeal_id.to_string(),
+        resolution: parse_underwriting_appeal_resolution(args.resolution)?,
+        resolved_by: args.resolved_by.to_string(),
+        note: args.note.map(ToOwned::to_owned),
+        replacement_decision_id: args.replacement_decision_id.map(ToOwned::to_owned),
     };
-    let record = if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    let record = if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         trust_control::build_client(url, token)?.resolve_underwriting_appeal(&request)?
     } else {
-        let receipt_db_path = receipt_db_path.ok_or_else(|| {
+        let receipt_db_path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "underwriting appeal resolve requires --receipt-db <path> when --control-url is not set"
                     .to_string(),
@@ -2332,7 +2313,7 @@ fn cmd_trust_underwriting_appeal_resolve(
         trust_control::resolve_underwriting_appeal(receipt_db_path, &request)?
     };
 
-    if json_output {
+    if backend.json_output {
         println!("{}", serde_json::to_string_pretty(&record)?);
     } else {
         println!("appeal_id:              {}", record.appeal_id);
@@ -2345,36 +2326,24 @@ fn cmd_trust_underwriting_appeal_resolve(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn cmd_receipt_list(
-    capability: Option<&str>,
-    tool_server: Option<&str>,
-    tool_name: Option<&str>,
-    outcome: Option<&str>,
-    since: Option<u64>,
-    until: Option<u64>,
-    min_cost: Option<u64>,
-    max_cost: Option<u64>,
-    limit: usize,
-    cursor: Option<u64>,
-    receipt_db: Option<&std::path::Path>,
-    control_url: Option<&str>,
-    control_token: Option<&str>,
+    args: ReceiptListArgs<'_>,
+    backend: QueryBackend<'_>,
 ) -> Result<(), CliError> {
-    if let Some(url) = control_url {
-        let token = require_control_token(control_token)?;
+    if let Some(url) = backend.control_url {
+        let token = require_control_token(backend.control_token)?;
         let client = trust_control::build_client(url, token)?;
         let query = trust_control::ReceiptQueryHttpQuery {
-            capability_id: capability.map(ToOwned::to_owned),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            outcome: outcome.map(ToOwned::to_owned),
-            since,
-            until,
-            min_cost,
-            max_cost,
-            cursor,
-            limit: Some(limit),
+            capability_id: args.capability.map(ToOwned::to_owned),
+            tool_server: args.tool_server.map(ToOwned::to_owned),
+            tool_name: args.tool_name.map(ToOwned::to_owned),
+            outcome: args.outcome.map(ToOwned::to_owned),
+            since: args.since,
+            until: args.until,
+            min_cost: args.min_cost,
+            max_cost: args.max_cost,
+            cursor: args.cursor,
+            limit: Some(args.limit),
             agent_subject: None,
         };
         let response = client.query_receipts(&query)?;
@@ -2388,23 +2357,23 @@ fn cmd_receipt_list(
             );
         }
     } else {
-        let path = receipt_db.ok_or_else(|| {
+        let path = backend.receipt_db_path.ok_or_else(|| {
             CliError::Other(
                 "receipt commands require --receipt-db <path> or --control-url".to_string(),
             )
         })?;
         let store = arc_store_sqlite::SqliteReceiptStore::open(path)?;
         let kernel_query = arc_kernel::ReceiptQuery {
-            capability_id: capability.map(ToOwned::to_owned),
-            tool_server: tool_server.map(ToOwned::to_owned),
-            tool_name: tool_name.map(ToOwned::to_owned),
-            outcome: outcome.map(ToOwned::to_owned),
-            since,
-            until,
-            min_cost,
-            max_cost,
-            cursor,
-            limit,
+            capability_id: args.capability.map(ToOwned::to_owned),
+            tool_server: args.tool_server.map(ToOwned::to_owned),
+            tool_name: args.tool_name.map(ToOwned::to_owned),
+            outcome: args.outcome.map(ToOwned::to_owned),
+            since: args.since,
+            until: args.until,
+            min_cost: args.min_cost,
+            max_cost: args.max_cost,
+            cursor: args.cursor,
+            limit: args.limit,
             agent_subject: None,
         };
         let result = store.query_receipts(&kernel_query)?;

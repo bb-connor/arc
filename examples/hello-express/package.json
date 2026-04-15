@@ -1,0 +1,13 @@
+{
+  "name": "hello-express",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@arc-protocol/express": "file:../../sdks/typescript/packages/express",
+    "express": "^5.1.0"
+  }
+}
+
