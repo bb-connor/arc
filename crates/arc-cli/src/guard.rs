@@ -170,8 +170,119 @@ fn format_size(bytes: u64) -> String {
     }
 }
 
-pub(crate) fn cmd_guard_inspect(_path: &Path) -> Result<(), CliError> {
-    Err(CliError::Other("not yet implemented".to_string()))
+pub(crate) fn cmd_guard_inspect(path: &Path) -> Result<(), CliError> {
+    let wasm_bytes = fs::read(path).map_err(|e| {
+        CliError::Other(format!("failed to read {}: {e}", path.display()))
+    })?;
+
+    let file_size = wasm_bytes.len() as u64;
+
+    // Parse the WASM binary
+    let parser = wasmparser::Parser::new(0);
+    let mut export_list: Vec<(String, &str)> = Vec::new();
+    let mut memory_info: Vec<String> = Vec::new();
+
+    for payload in parser.parse_all(&wasm_bytes) {
+        let payload = payload.map_err(|e| {
+            CliError::Other(format!("wasm parse error: {e}"))
+        })?;
+        match payload {
+            wasmparser::Payload::ExportSection(reader) => {
+                for export in reader {
+                    let export = export.map_err(|e| {
+                        CliError::Other(format!("wasm export parse error: {e}"))
+                    })?;
+                    let kind_str = match export.kind {
+                        wasmparser::ExternalKind::Func => "function",
+                        wasmparser::ExternalKind::Memory => "memory",
+                        wasmparser::ExternalKind::Table => "table",
+                        wasmparser::ExternalKind::Global => "global",
+                        wasmparser::ExternalKind::Tag => "tag",
+                    };
+                    export_list.push((export.name.to_string(), kind_str));
+                }
+            }
+            wasmparser::Payload::MemorySection(reader) => {
+                for memory in reader {
+                    let memory = memory.map_err(|e| {
+                        CliError::Other(format!("wasm memory parse error: {e}"))
+                    })?;
+                    let initial_pages = memory.initial;
+                    let max_str = memory
+                        .maximum
+                        .map(|m| format!("{m}"))
+                        .unwrap_or_else(|| "unbounded".to_string());
+                    let initial_kib = initial_pages * 64;
+                    memory_info.push(format!(
+                        "initial={initial_pages} pages ({initial_kib} KiB), max={max_str} pages"
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Print header
+    println!("=== WASM Guard Inspection ===");
+    println!();
+    println!("File: {}", path.display());
+    println!("Size: {}", format_size(file_size));
+    println!();
+
+    // Print exported functions
+    println!("Exported functions:");
+    if export_list.is_empty() {
+        println!("  (none)");
+    } else {
+        // Find the longest export name for alignment
+        let max_name_len = export_list
+            .iter()
+            .map(|(name, _)| name.len())
+            .max()
+            .unwrap_or(0);
+        for (name, kind) in &export_list {
+            println!("  {name:<width$} ({kind})", width = max_name_len);
+        }
+    }
+    println!();
+
+    // ABI compatibility check
+    let required_abi = ["evaluate", "arc_alloc", "arc_deny_reason"];
+    let exported_func_names: Vec<&str> = export_list
+        .iter()
+        .filter(|(_, kind)| *kind == "function")
+        .map(|(name, _)| name.as_str())
+        .collect();
+
+    let all_present = required_abi
+        .iter()
+        .all(|name| exported_func_names.contains(name));
+
+    if all_present {
+        println!("ABI compatibility: COMPATIBLE");
+    } else {
+        println!("ABI compatibility: INCOMPATIBLE");
+    }
+    for name in &required_abi {
+        if exported_func_names.contains(name) {
+            println!("  [+] {name}");
+        } else {
+            println!("  [-] {name} (MISSING)");
+        }
+    }
+    println!();
+
+    // Memory info
+    println!("Memory:");
+    if memory_info.is_empty() {
+        println!("  (no memory section found)");
+    } else {
+        for info in &memory_info {
+            println!("  {info}");
+        }
+    }
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
