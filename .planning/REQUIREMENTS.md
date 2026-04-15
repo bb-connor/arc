@@ -3447,7 +3447,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 - [x] **TSDK-01**: TypeScript guard SDK (`packages/sdk/arc-guard-ts`) provides typed `GuardRequest` and `GuardVerdict` interfaces matching the WIT contract
 - [x] **TSDK-02**: TypeScript guards compile to WASM components via `jco` / ComponentizeJS
 - [x] **TSDK-03**: TypeScript SDK includes example guard with build instructions
-- [ ] **TSDK-04**: TypeScript-compiled guard loads and evaluates correctly in the host dual-mode runtime
+- [x] **TSDK-04**: TypeScript-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Python SDK
 
@@ -3491,7 +3491,7 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | TSDK-01 | Phase 382 | Complete |
 | TSDK-02 | Phase 382 | Complete |
 | TSDK-03 | Phase 382 | Complete |
-| TSDK-04 | Phase 382 | Pending |
+| TSDK-04 | Phase 382 | Complete |
 | PYDK-01 | Phase 383 | Pending |
 | PYDK-02 | Phase 383 | Pending |
 | PYDK-03 | Phase 383 | Pending |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.15` exists because the post-v3.14 audit still found a bounded
-stopped_at: Completed 387-01-PLAN.md (TypeScript guard SDK scaffold and build pipeline)
-last_updated: "2026-04-15T03:02:15.747Z"
+stopped_at: Completed 387-02-PLAN.md (TypeScript guard host integration tests)
+last_updated: "2026-04-15T03:11:56.362Z"
 last_activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
 progress:
   total_phases: 359
-  completed_phases: 272
+  completed_phases: 273
   total_plans: 758
-  completed_plans: 794
+  completed_plans: 795
   percent: 76
 ---
 
@@ -156,6 +156,7 @@ Progress: [########--] 76%
 - [Phase 387]: jco types (not guest-types) generates correct export-side .d.ts bindings for the guard world
 - [Phase 387]: dist/tool-gate.wasm is 11 MiB (SpiderMonkey engine); ComponentBackend max_module_size may need adjustment
 - [Phase 387]: TypeScript guard pattern: import jco-generated types, export evaluate(GuardRequest): Verdict, compile via esbuild+componentize-js
+- [Phase 387]: ComponentBackend::with_limits(16 MiB memory, 15 MiB module) for jco-compiled TS guards exceeding default 10 MiB max_module_size
 
 ### Roadmap Evolution
 
@@ -214,7 +215,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T03:02:15.730Z
-Stopped at: Completed 387-01-PLAN.md (TypeScript guard SDK scaffold and build pipeline)
+Last session: 2026-04-15T03:11:56.342Z
+Stopped at: Completed 387-02-PLAN.md (TypeScript guard host integration tests)
 Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None

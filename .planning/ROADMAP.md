@@ -11421,7 +11421,7 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 ### Phases
 
 - [x] **Phase 386: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package (completed 2026-04-15)
-- [ ] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation
+- [x] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation (completed 2026-04-15)
 - [ ] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation
 - [ ] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
 
@@ -11491,6 +11491,6 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 386 | 2/2 | Complete    | 2026-04-15 |
-| 387 | 1/2 | In Progress|  |
+| 387 | 2/2 | Complete   | 2026-04-15 |
 | 388 | v4.2 | Python and Go Guard SDKs | Not started |
 | 389 | v4.2 | Cross-Language Conformance Suite | Not started |
