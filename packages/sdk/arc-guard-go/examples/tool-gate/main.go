@@ -8,8 +8,8 @@
 package main
 
 import (
+	"github.com/backbay-labs/arc/packages/sdk/arc-guard-go/internal/arc/guard/guard"
 	"github.com/backbay-labs/arc/packages/sdk/arc-guard-go/internal/arc/guard/types"
-	"github.com/backbay-labs/arc/packages/sdk/arc-guard-go/internal/arc/guard_go/guard"
 )
 
 // blockedTools is the set of tools that this guard denies.
@@ -25,7 +25,7 @@ func init() {
 
 // evaluate inspects the tool name and returns deny for blocked tools,
 // allow for everything else.
-func evaluate(request types.GuardRequest) types.Verdict {
+func evaluate(request guard.GuardRequest) guard.Verdict {
 	if blockedTools[request.ToolName] {
 		return types.VerdictDeny("tool is blocked by policy")
 	}
