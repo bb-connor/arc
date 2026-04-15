@@ -15,6 +15,7 @@ path = "src/bin/arc.rs"
 
 [dependencies]
 arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
+arc-api-protect = { package = "arc-api-protect", path = "../arc-api-protect" }
 arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plane" }
 arc-acp-proxy = { package = "arc-acp-proxy", path = "../arc-acp-proxy" }
 arc-core = { package = "arc-core", path = "../arc-core" }
@@ -60,6 +61,7 @@ p384 = { version = "0.13", features = ["ecdsa"] }
 arc-credit = { package = "arc-credit", path = "../arc-credit" }
 arc-open-market = { package = "arc-open-market", path = "../arc-open-market" }
 arc-underwriting = { package = "arc-underwriting", path = "../arc-underwriting" }
+tempfile = "3"
 
 [features]
 siem = ["arc-siem"]
