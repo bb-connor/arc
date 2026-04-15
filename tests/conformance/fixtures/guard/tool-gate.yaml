@@ -1,0 +1,77 @@
+# Conformance fixtures for the tool-gate deny-list policy.
+#
+# All four language guards (Rust, TypeScript, Python, Go) implement identical
+# deny-list logic: tools named "dangerous_tool", "rm_rf", or "drop_database"
+# are denied with reason "blocked by policy"; everything else is allowed.
+#
+# Each fixture uses the TestFixture shape from arc-cli/src/guard.rs.
+
+- name: "allow_safe_tool"
+  request:
+    tool_name: "read_file"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "allow"
+
+- name: "deny_dangerous_tool"
+  request:
+    tool_name: "dangerous_tool"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "deny"
+  deny_reason_contains: "blocked by policy"
+
+- name: "deny_rm_rf"
+  request:
+    tool_name: "rm_rf"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "deny"
+  deny_reason_contains: "blocked by policy"
+
+- name: "deny_drop_database"
+  request:
+    tool_name: "drop_database"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "deny"
+  deny_reason_contains: "blocked by policy"
+
+- name: "allow_unknown_tool"
+  request:
+    tool_name: "some_random_tool"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "allow"
+
+- name: "allow_with_scopes"
+  request:
+    tool_name: "read_file"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes:
+      - "conformance-server:read_file"
+      - "conformance-server:list_files"
+  expected_verdict: "allow"
+
+- name: "allow_with_arguments"
+  request:
+    tool_name: "safe_tool"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments:
+      path: "/home/user/doc.txt"
+      mode: "read"
+    scopes: []
+  expected_verdict: "allow"

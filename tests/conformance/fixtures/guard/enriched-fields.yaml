@@ -1,0 +1,51 @@
+# Conformance fixtures for the enriched-inspector guard (Rust only).
+#
+# The enriched-inspector guard uses action_type and extracted_path fields
+# to enforce file-write restrictions. It blocks file_write actions to /etc
+# and allows everything else.
+#
+# These fixtures target the Rust enriched-inspector WASM only; other
+# language SDKs do not implement this policy.
+
+- name: "allow_non_file_write"
+  request:
+    tool_name: "any_tool"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+  expected_verdict: "allow"
+
+- name: "allow_file_read"
+  request:
+    tool_name: "read_file"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+    action_type: "file_access"
+    extracted_path: "/etc/passwd"
+  expected_verdict: "allow"
+
+- name: "deny_write_to_etc"
+  request:
+    tool_name: "write_file"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+    action_type: "file_write"
+    extracted_path: "/etc/passwd"
+  expected_verdict: "deny"
+  deny_reason_contains: "write to /etc blocked"
+
+- name: "allow_write_to_tmp"
+  request:
+    tool_name: "write_file"
+    server_id: "conformance-server"
+    agent_id: "conformance-agent"
+    arguments: {}
+    scopes: []
+    action_type: "file_write"
+    extracted_path: "/tmp/data.txt"
+  expected_verdict: "allow"
