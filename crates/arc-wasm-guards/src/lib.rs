@@ -34,6 +34,8 @@ pub mod abi;
 pub mod config;
 pub mod error;
 #[cfg(feature = "wasmtime-runtime")]
+pub mod component;
+#[cfg(feature = "wasmtime-runtime")]
 pub mod host;
 pub mod manifest;
 pub mod runtime;
@@ -43,6 +45,8 @@ pub mod wiring;
 pub use abi::{GuardRequest, GuardVerdict, WasmGuardAbi};
 pub use config::WasmGuardConfig;
 pub use error::WasmGuardError;
+#[cfg(feature = "wasmtime-runtime")]
+pub use component::ComponentBackend;
 #[cfg(feature = "wasmtime-runtime")]
 pub use host::WasmHostState;
 pub use manifest::{GuardManifest, MANIFEST_FILENAME, SUPPORTED_ABI_VERSIONS};

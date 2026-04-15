@@ -84,6 +84,7 @@ impl WasmHostState {
 pub fn create_shared_engine() -> Result<Arc<Engine>, WasmGuardError> {
     let mut config = wasmtime::Config::new();
     config.consume_fuel(true);
+    config.wasm_component_model(true);
     let engine = Engine::new(&config).map_err(|e| WasmGuardError::Compilation(e.to_string()))?;
     Ok(Arc::new(engine))
 }
