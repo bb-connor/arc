@@ -10624,52 +10624,52 @@ final.
 
 ## Phase Summary (v3.0-v3.11)
 
-Legacy note: rows `319-358` still reflect pre-reconciliation planning labels.
-Phase `393` is the explicit owner for converting that early/mid-v3 section from
-flat `Planned` placeholders into truthful implementation and audit status.
+Legacy note: rows `319-358` were historically left as pre-reconciliation
+planning labels. `v3.14/401` is the explicit owner for making the early/mid-v3
+ledger and archival story fully evidence-grade.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
-| 319 | v3.0 | arc-http-core Types and Request Model | Planned |
-| 320 | v3.0 | arc-openapi Parsing and Manifest Generation | Planned |
-| 321 | v3.0 | arc.yaml Unified Configuration | Planned |
-| 322 | v3.0 | arc api protect CLI | Planned |
-| 323 | v3.1 | ReceiptSigner and CapabilityChecker Traits | Planned |
-| 324 | v3.1 | ACP Kernel Integration | Planned |
-| 325 | v3.1 | Session Compliance Certificate | Planned |
-| 326 | v3.1 | OpenTelemetry Export | Planned |
-| 327 | v3.2 | arc-sdk-python Core | Planned |
-| 328 | v3.2 | arc-asgi Middleware | Planned |
-| 329 | v3.2 | arc-fastapi and arc-django Wrappers | Planned |
-| 330 | v3.2 | arc-langchain Integration and Conformance | Planned |
-| 331 | v3.3 | @arc-protocol/node-http Substrate | Planned |
-| 332 | v3.3 | Express and Fastify Wrappers | Planned |
-| 333 | v3.3 | Elysia Wrapper and npm Packaging | Planned |
-| 334 | v3.3 | TypeScript Conformance | Planned |
-| 335 | v3.4 | Session Journal | Planned |
-| 336 | v3.4 | Deterministic Guards | Planned |
-| 337 | v3.4 | Post-Invocation Hooks and Response Guards | Planned |
-| 338 | v3.4 | Advisory Signals | Planned |
-| 339 | v3.5 | MCP Adapter Completion | Planned |
-| 340 | v3.5 | OpenAPI-to-MCP Bridge | Planned |
-| 341 | v3.5 | A2A and ACP Edge Crates | Planned |
-| 342 | v3.5 | arc-openai Adapter | Planned |
-| 343 | v3.6 | Go SDK and net/http Middleware | Planned |
-| 344 | v3.6 | Kubernetes Controller and Injector | Planned |
-| 345 | v3.6 | arc-tower Rust Middleware | Planned |
-| 346 | v3.6 | JVM and .NET Substrates | Planned |
-| 347 | v3.7 | WASM Guard Runtime | Planned |
-| 348 | v3.7 | Receipt Metering and Economics | Planned |
-| 349 | v3.7 | AG-UI Proxy | Planned |
-| 350 | v3.7 | Skill and Workflow Authority | Planned |
-| 351 | v3.8 | HTTP Substrate Specification | Planned |
-| 352 | v3.8 | OpenAPI Integration Specification | Planned |
-| 353 | v3.8 | PROTOCOL.md v3 Addendum | Planned |
-| 354 | v3.8 | Guard Taxonomy and Security Model Update | Planned |
-| 355 | v3.8 | Configuration and Compliance Specification | Planned |
-| 356 | v3.8 | SDK Reference Documentation | Planned |
-| 357 | v3.8 | Protocol Bridge and Edge Documentation | Planned |
-| 358 | v3.8 | Strategic Vision and Design Doc Reconciliation | Planned |
+| 319 | v3.0 | arc-http-core Types and Request Model | Implemented / audit pending |
+| 320 | v3.0 | arc-openapi Parsing and Manifest Generation | Implemented / audit pending |
+| 321 | v3.0 | arc.yaml Unified Configuration | Implemented / audit pending |
+| 322 | v3.0 | arc api protect CLI | Implemented / audit pending |
+| 323 | v3.1 | ReceiptSigner and CapabilityChecker Traits | Implemented / audit pending |
+| 324 | v3.1 | ACP Kernel Integration | Implemented / audit pending |
+| 325 | v3.1 | Session Compliance Certificate | Implemented / audit pending |
+| 326 | v3.1 | OpenTelemetry Export | Implemented / audit pending |
+| 327 | v3.2 | arc-sdk-python Core | Implemented / audit pending |
+| 328 | v3.2 | arc-asgi Middleware | Implemented / audit pending |
+| 329 | v3.2 | arc-fastapi and arc-django Wrappers | Implemented / audit pending |
+| 330 | v3.2 | arc-langchain Integration and Conformance | Implemented / audit pending |
+| 331 | v3.3 | @arc-protocol/node-http Substrate | Implemented / audit pending |
+| 332 | v3.3 | Express and Fastify Wrappers | Implemented / audit pending |
+| 333 | v3.3 | Elysia Wrapper and npm Packaging | Implemented / audit pending |
+| 334 | v3.3 | TypeScript Conformance | Implemented / audit pending |
+| 335 | v3.4 | Session Journal | Implemented / audit pending |
+| 336 | v3.4 | Deterministic Guards | Implemented / audit pending |
+| 337 | v3.4 | Post-Invocation Hooks and Response Guards | Implemented / audit pending |
+| 338 | v3.4 | Advisory Signals | Implemented / audit pending |
+| 339 | v3.5 | MCP Adapter Completion | Implemented / audit pending |
+| 340 | v3.5 | OpenAPI-to-MCP Bridge | Implemented / audit pending |
+| 341 | v3.5 | A2A and ACP Edge Crates | Implemented / audit pending |
+| 342 | v3.5 | arc-openai Adapter | Implemented / audit pending |
+| 343 | v3.6 | Go SDK and net/http Middleware | Implemented / audit pending |
+| 344 | v3.6 | Kubernetes Controller and Injector | Implemented / audit pending |
+| 345 | v3.6 | arc-tower Rust Middleware | Implemented / audit pending |
+| 346 | v3.6 | JVM and .NET Substrates | Implemented / audit pending |
+| 347 | v3.7 | WASM Guard Runtime | Implemented / audit pending |
+| 348 | v3.7 | Receipt Metering and Economics | Implemented / audit pending |
+| 349 | v3.7 | AG-UI Proxy | Implemented / audit pending |
+| 350 | v3.7 | Skill and Workflow Authority | Implemented / audit pending |
+| 351 | v3.8 | HTTP Substrate Specification | Implemented / audit pending |
+| 352 | v3.8 | OpenAPI Integration Specification | Implemented / audit pending |
+| 353 | v3.8 | PROTOCOL.md v3 Addendum | Implemented / audit pending |
+| 354 | v3.8 | Guard Taxonomy and Security Model Update | Implemented / audit pending |
+| 355 | v3.8 | Configuration and Compliance Specification | Implemented / audit pending |
+| 356 | v3.8 | SDK Reference Documentation | Implemented / audit pending |
+| 357 | v3.8 | Protocol Bridge and Edge Documentation | Implemented / audit pending |
+| 358 | v3.8 | Strategic Vision and Design Doc Reconciliation | Implemented / audit pending |
 | 359 | v3.9 | OpenAI Adapter Kernel Execution | Implemented / reconciliation pending |
 | 360 | v3.9 | Compliance Certificate Wire Format Alignment | Implemented / reconciliation pending |
 | 361 | v3.9 | HTTP Adapter Request Binding and Capability Validation | Implemented / reconciliation pending |
@@ -10887,9 +10887,10 @@ ledger with code and claim reality.
 
 **Dependency:** Follows v3.12's credibility-closeout lane. `v4.1` and `v4.2`
 already reserved phases `382-389`, so this follow-on v3 milestone begins at
-phase `390`. It can execute in parallel with the v4.x WASM lane because the
-work targets cross-protocol orchestration and truth closure rather than guard
-runtime internals.
+phase `390`. Its runtime/substrate closure landed locally, but the remaining
+ledger/archive closeout is now carried by `v3.14/401`. It can execute in
+parallel with the v4.x WASM lane because the work targets cross-protocol
+orchestration and truth closure rather than guard runtime internals.
 
 **Parallelism:** Phase 390 establishes the reusable orchestration/runtime
 contract. Phase 391 moves A2A and ACP authoritative execution onto that path
@@ -10906,7 +10907,8 @@ authoritative runtime behavior defined by the earlier ones.
 **Goal**: Implement `CrossProtocolOrchestrator` and `CapabilityBridge` as reusable runtime architecture so bridged protocol execution no longer depends on bespoke per-edge authority flow
 **Depends on**: Phase 381 (the narrow breakthrough claim and its gaps are explicitly qualified)
 **Requirements**: ORCH-01, ORCH-02, ORCH-03
-**Status**: complete locally 2026-04-14
+**Status**: partial locally 2026-04-14 -- runtime/doc reconciliation landed,
+remaining ledger/archive closeout carried by `v3.14/401`
 **Success Criteria** (what must be TRUE):
   1. A reusable `CrossProtocolOrchestrator` exists and is the default runtime for bridged A2A/ACP execution rather than edge-local bespoke logic
   2. `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
@@ -11010,7 +11012,7 @@ Plans:
 | 390 | v3.13 | Generic Cross-Protocol Orchestrator | Complete |
 | 391 | v3.13 | Authoritative Edge Unification | Complete |
 | 392 | v3.13 | Fidelity Semantics and Publication Gating | Complete |
-| 393 | v3.13 | Ledger and Narrative Reconciliation | Complete |
+| 393 | v3.13 | Ledger and Narrative Reconciliation | Partial / rolled into v3.14-401 |
 | 394 | v3.13 | HTTP Authority and Evidence Convergence | Complete |
 | 395 | v3.13 | Protocol Lifecycle and Authority-Surface Closure | Complete |
 | 396 | v3.13 | Claim Upgrade Qualification | Complete |
@@ -11271,7 +11273,7 @@ Plans:
 | 382 | 2/2 | Complete    | 2026-04-14 |
 | 383 | 3/3 | Complete    | 2026-04-15 |
 | 384 | 2/2 | Complete    | 2026-04-15 |
-| 385 | 2/2 | Complete   | 2026-04-15 |
+| 385 | 2/2 | Complete    | 2026-04-15 |
 
 ---
 

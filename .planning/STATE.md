@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.14` now owns protocol-to-protocol fabric runtime, literal kernel
 stopped_at: Completed 385-02-PLAN.md (guard pack and install CLI commands)
-last_updated: "2026-04-15T01:42:31.232Z"
+last_updated: "2026-04-15T01:50:56.109Z"
 last_activity: 2026-04-14 -- continued `v3.14 Universal Fabric and Kernel
 progress:
   total_phases: 355
