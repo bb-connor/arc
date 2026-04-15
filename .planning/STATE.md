@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.15` exists because the post-v3.14 audit still found a bounded
-stopped_at: Completed 388-01-PLAN.md
-last_updated: "2026-04-15T03:34:59.899Z"
-last_activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
+stopped_at: Completed 388-03-PLAN.md
+last_updated: "2026-04-15T03:47:03.712Z"
+last_activity: 2026-04-14 -- completed `v3.15/405` and advanced the next
 progress:
   total_phases: 359
-  completed_phases: 275
+  completed_phases: 276
   total_plans: 763
-  completed_plans: 799
-  percent: 76
+  completed_plans: 800
+  percent: 75
 ---
 
 # Project State
@@ -25,25 +25,26 @@ authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
 **Current focus:** `v3.15 Universal Protocol Fabric Realization` is now the
-active local milestone. `v3.14` is complete locally, but the latest audit
-showed that protocol-aware fabric routing, lifecycle-equivalent mediation, and
-final v3 ledger/archive closure still need one more execution lane before the
-strongest claim can be re-qualified honestly.
+active local milestone. `v3.14` is complete and archived locally, and phases
+`403` through `405` have now closed the protocol-aware fabric routing,
+lifecycle-equivalent mediation, and final v3 ledger/archive closure lanes.
+The remaining work is the final requalification pass in `406`.
 
 ## Current Position
 
-Phase: 405 planned / ready to execute
-Plan: finish v3 ledger and archive truth so the milestone stack becomes a
-coherent source of evidence before the final requalification pass
+Phase: 406 planned / ready to execute
+Plan: rerun the strongest claim gate against the post-v3.15 runtime, docs,
+and planning state
 Status: `v3.15` exists because the post-v3.14 audit still found a bounded
-fabric story, lifecycle-equivalent mediation was not yet landed, and
-planning/archive truth debt remained. Phases 403-404 are now complete
-locally, and the current claim remains the narrower qualified
-substrate/fabric claim until this lane proves otherwise.
-Last activity: 2026-04-14 -- started `v3.15 Universal Protocol Fabric
-Realization` after the v3.14 review identified remaining execution gaps.
+fabric story, missing lifecycle symmetry, and planning/archive truth debt.
+Phases 403-405 are now complete locally, including the `v3.14` archive
+snapshot and live planning-ledger reconciliation. The current claim remains
+the narrower qualified substrate/fabric claim until phase `406` proves a
+stronger one honestly.
+Last activity: 2026-04-14 -- completed `v3.15/405` and advanced the next
+executable target to `406`.
 
-Progress: [########--] 76%
+Progress: [########--] 75%
 
 ## Performance Metrics
 
@@ -107,8 +108,8 @@ Progress: [########--] 76%
   late-v3 ledger reconciliation.
 - v3.13 exists specifically to close those four remaining gaps even though
   v4.0 was already planned in parallel and v2.83 remains locally unarchived;
-  its runtime/substrate closure landed locally, but final ledger/archive
-  closeout rolled forward into `v3.14/401`.
+  its runtime/substrate closure landed locally, and the remaining
+  ledger/archive closeout was completed in archived `v3.14`.
 - Phase `390` is now complete: `arc-cross-protocol` landed as the shared
   runtime home, and the default authoritative A2A/ACP execution paths now emit
   orchestrator-labeled lineage metadata instead of edge-local kernel metadata.
@@ -117,9 +118,9 @@ Progress: [########--] 76%
   unpublished, and adapted bridges carry tested caveats for approval,
   streaming, cancellation, and partial-output semantics.
 - Phase `393` was expanded before execution to explicitly own late-v3 ledger
-  truth, stale planning metadata, and doc/runtime claim mismatches, but the
-  remaining historical ledger/archive closure work is still carried by
-  `v3.14/401` rather than being treated as fully closed in `v3.13`.
+  truth, stale planning metadata, and doc/runtime claim mismatches, while the
+  remaining historical ledger/archive closure work ultimately completed in
+  archived `v3.14`.
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 - [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
 - [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
@@ -162,6 +163,8 @@ Progress: [########--] 76%
 - [Phase 388]: Extended WIT world lists WASI imports individually (environment, stdin, stdout, stderr, clocks, filesystem, random) for TinyGo compatibility; wasi-virt strips them post-compilation
 - [Phase 388]: componentize-py --world-module guard used to name generated bindings 'guard' for ergonomic imports; entrypoint renamed to app.py because APP_NAME must not clash with world module
 - [Phase 388]: componentize-py 0.22.1 generates Guard protocol class (not Evaluate); dist/tool-gate.wasm is 17.6 MiB Component Model binary (version 0x0d)
+- [Phase 388]: Python guard limits: 40 MiB module, 64 MiB memory (CPython needs more than SpiderMonkey); Go guards fit default 10 MiB limits
+- [Phase 388]: Go guard tests use runtime path existence checks instead of #[ignore] for informative skip messages with build instructions
 
 ### Roadmap Evolution
 
@@ -176,15 +179,14 @@ Progress: [########--] 76%
 
 ### Pending Todos
 
-- Execute phase `403` for `v3.15 Universal Protocol Fabric Realization`.
-- Archive `v3.14` once the follow-on qualification lane is stable.
+- Execute phase `406` for `v3.15 Universal Protocol Fabric Realization`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
-- `v3.12` and `v3.13` are complete locally but not yet archived, so the repo
-  still carries milestone-closeout debt alongside the new `v3.14` lane and
-  the parallel v4.0 lane.
+- `v3.12`, `v3.13`, and `v3.14` are now archived locally, but the broader
+  v3 planning story still should not be treated as a stronger top-level claim
+  until phase `406` reruns the qualification gate explicitly.
 - `v2.83` is still partially complete locally because phase `316` remains
   pending, so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
@@ -220,17 +222,18 @@ glue, and expanded prelude
 
 ## v4.2 Multi-Language Guard SDKs
 
-Phase: 388 (in progress -- 01 of 03 plans done)
-Plan: 01 of 3 complete
-Status: Phase 388-01 complete -- Python guard SDK with typed dataclasses
-matching all 10 WIT guard-request fields, example tool-gate guard compiles
-to 17.6 MiB Component Model WASM binary via componentize-py --stub-wasi.
-Last activity: 2026-04-15 -- completed 388-01 with Python SDK package,
-build scripts, and compiled WASM binary
+Phase: 388 (complete -- 03 of 03 plans done)
+Plan: 03 of 3 complete
+Status: Phase 388 complete -- Python SDK, Go SDK, and integration tests for
+both languages. Python guard (18 MiB CPython-embedded) loads and evaluates
+correctly with raised limits. Go guard tests conditional on TinyGo toolchain.
+All three language SDKs (TS, Python, Go) have integration test coverage.
+Last activity: 2026-04-15 -- completed 388-03 with Python and Go guard
+integration tests
 
 ## Session Continuity
 
-Last session: 2026-04-15T03:34:59.882Z
-Stopped at: Completed 388-01-PLAN.md
+Last session: 2026-04-15T03:47:03.692Z
+Stopped at: Completed 388-03-PLAN.md
 Next action: execute 388-02-PLAN.md
 Resume file: None

@@ -2,11 +2,11 @@
 
 **Defined:** 2026-03-27
 **Latest completed milestone:** v3.14 Universal Fabric and Kernel Convergence
-(completed locally 2026-04-14; pending archival)
-**Latest archived milestone:** v3.13 Universal Orchestration Closure
-(completed locally 2026-04-14; archived locally 2026-04-14)
+(completed locally and archived locally 2026-04-14)
+**Latest archived milestone:** v3.14 Universal Fabric and Kernel Convergence
+(completed locally and archived locally 2026-04-14)
 **Most recent implemented milestone:** v3.14 Universal Fabric and Kernel
-Convergence (completed locally 2026-04-14; pending archival)
+Convergence (completed locally and archived locally 2026-04-14)
 **Active milestone:** v3.15 Universal Protocol Fabric Realization
 **Planned milestones:** v3.0 through v3.15 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
@@ -3003,9 +3003,10 @@ defend.
 ### Ledger and Narrative Reconciliation
 
 - Late-v3 note: phase-local checkbox sections here remain historical artifacts.
-  The authoritative read is that `v3.9-v3.11` are implemented locally but
-  still under reconciliation, and `v3.13` landed its runtime/substrate work
-  while final ledger/archive closure rolled into `v3.14/401`.
+  The authoritative read is that `v3.9-v3.11` are implemented locally with
+  audit debt rather than runtime debt, and `v3.13` landed its
+  runtime/substrate work before the final ledger/archive closure completed in
+  archived `v3.14`.
 - [x] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
 - [x] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
 - [x] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
@@ -3092,36 +3093,36 @@ decided from one honest source of record.
 
 ### Protocol-to-Protocol Fabric
 
-- [ ] **FABRIC-01**: `CrossProtocolOrchestrator` resolves target protocols through an explicit bridge registry and bridge metadata instead of collapsing every authoritative execution to `Native`
-- [ ] **FABRIC-02**: At least one authoritative bridge path executes protocol-to-protocol without terminating immediately in `DiscoveryProtocol::Native`
-- [ ] **FABRIC-03**: Multi-hop bridge execution preserves attenuation, trace lineage, fidelity semantics, and receipt/evidence references across each hop
+- [x] **FABRIC-01**: `CrossProtocolOrchestrator` resolves target protocols through an explicit bridge registry and bridge metadata instead of collapsing every authoritative execution to `Native`
+- [x] **FABRIC-02**: At least one authoritative bridge path executes protocol-to-protocol without terminating immediately in `DiscoveryProtocol::Native`
+- [x] **FABRIC-03**: Multi-hop bridge execution preserves attenuation, trace lineage, fidelity semantics, and receipt/evidence references across each hop
 
 ### Kernel-First HTTP and SDK Convergence
 
-- [ ] **KERNEL-01**: `arc-api-protect` routes authorization and receipt finalization through one shared kernel-backed authority path instead of a local evaluator/signer
-- [ ] **KERNEL-02**: `arc-tower` uses the same shared kernel-backed authority/evidence path as `arc-api-protect` rather than a parallel evaluator implementation
-- [ ] **KERNEL-03**: Representative HTTP/API SDK substrates (TypeScript, Python, Go, JVM, and .NET) converge on the shared authority/evidence contract and do not synthesize misleading fail-open receipts
-- [ ] **KERNEL-04**: For the supported HTTP/API surfaces ARC publicly claims, governed invocations can be described literally and truthfully as flowing through one shared kernel authority story
+- [x] **KERNEL-01**: `arc-api-protect` routes authorization and receipt finalization through one shared kernel-backed authority path instead of a local evaluator/signer
+- [x] **KERNEL-02**: `arc-tower` uses the same shared kernel-backed authority/evidence path as `arc-api-protect` rather than a parallel evaluator implementation
+- [x] **KERNEL-03**: Representative HTTP/API SDK substrates (TypeScript, Python, Go, JVM, and .NET) converge on the shared authority/evidence contract and do not synthesize misleading fail-open receipts
+- [x] **KERNEL-04**: For the supported HTTP/API surfaces ARC publicly claims, governed invocations can be described literally and truthfully as flowing through one shared kernel authority story
 
 ### Lifecycle-Equivalent Protocol Mediation
 
 - [x] **LIFE-01**: A2A authoritative execution distinguishes blocking and streaming/task lifecycles strongly enough to justify the public surface ARC claims
 - [x] **LIFE-02**: ACP authoritative execution supports the invoke/stream/cancel/resume lifecycle ARC claims, or the official ACP profile is narrowed with no contradictory public surface
-- [ ] **LIFE-03**: Non-authoritative A2A/ACP compatibility helpers are internalized, feature-gated, or otherwise isolated so public/default surfaces cannot be mistaken for receipt-bearing authority
+- [x] **LIFE-03**: Non-authoritative A2A/ACP compatibility helpers are internalized, feature-gated, or otherwise isolated so public/default surfaces cannot be mistaken for receipt-bearing authority
 
 ### Ledger and Archival Truth
 
-- [ ] **LEDGER-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, and `ROADMAP.md` agree on the active milestone, latest completed milestone, archival status, and next executable phase
-- [ ] **LEDGER-02**: v3.0-v3.8 milestone and phase summaries reflect implementation/audit-pending truth rather than blanket `Planned` placeholders
-- [ ] **LEDGER-03**: v3.9-v3.13 requirement checklists, traceability tables, and milestone status summaries reconcile to the same implementation and verification truth
-- [ ] **LEDGER-04**: v3.12 and v3.13 archival is complete locally, and any remaining local-only milestone state is called out explicitly rather than implicitly
+- [x] **LEDGER-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `REQUIREMENTS.md`, and `ROADMAP.md` agree on the active milestone, latest completed milestone, archival status, and next executable phase
+- [x] **LEDGER-02**: v3.0-v3.8 milestone and phase summaries reflect implementation/audit-pending truth rather than blanket `Planned` placeholders
+- [x] **LEDGER-03**: v3.9-v3.13 requirement checklists, traceability tables, and milestone status summaries reconcile to the same implementation and verification truth
+- [x] **LEDGER-04**: v3.12 and v3.13 archival is complete locally, and any remaining local-only milestone state is called out explicitly rather than implicitly
 
 ### Full-Vision Qualification
 
-- [ ] **VISION-01**: Qualification evidence covers protocol-to-protocol bridge execution, unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle surfaces without overstating unsupported paths
-- [ ] **VISION-02**: `docs/protocols/`, `docs/release/`, `docs/standards/`, and `docs/VISION.md` all make the same strongest honest claim about ARC's current state
-- [ ] **VISION-03**: If ARC can now honestly claim the stronger original vision, the repo ships the evidence and exact claim text needed to do so; otherwise one authoritative claim-gate document names the remaining blockers
-- [ ] **VISION-04**: Economic/control-plane language is either bounded to strategic research or tied to explicit shipped/runtime qualification evidence rather than aspirational prose
+- [x] **VISION-01**: Qualification evidence covers protocol-to-protocol bridge execution, unified HTTP/API kernel authority, and the supported A2A/ACP lifecycle surfaces without overstating unsupported paths
+- [x] **VISION-02**: `docs/protocols/`, `docs/release/`, `docs/standards/`, and `docs/VISION.md` all make the same strongest honest claim about ARC's current state
+- [x] **VISION-03**: If ARC can now honestly claim the stronger original vision, the repo ships the evidence and exact claim text needed to do so; otherwise one authoritative claim-gate document names the remaining blockers
+- [x] **VISION-04**: Economic/control-plane language is either bounded to strategic research or tied to explicit shipped/runtime qualification evidence rather than aspirational prose
 
 ## v3.14 Out of Scope
 
@@ -3162,7 +3163,7 @@ decided from one honest source of record.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after completing milestone v3.14 Universal Fabric and Kernel Convergence locally*
+*Last updated: 2026-04-14 after archiving milestone v3.14 Universal Fabric and Kernel Convergence locally*
 
 ## v3.15 Universal Protocol Fabric Realization
 
@@ -3188,9 +3189,9 @@ qualification pass.
 
 ### Ledger and Archival Truth Closure
 
-- [ ] **LEDGER2-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `ROADMAP.md`, and `REQUIREMENTS.md` all identify `v3.15` as the active lane, `v3.14` as the most recent implemented lane, and the archived milestone boundary truthfully
-- [ ] **LEDGER2-02**: `v3.14` is archived locally once the follow-on lane is stable, and any remaining non-archived v3 milestones are called out explicitly
-- [ ] **LEDGER2-03**: early-v3 top-level milestone labels, detailed phase tables, and per-milestone requirement sections now tell one coherent implementation/audit-pending story
+- [x] **LEDGER2-01**: `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `ROADMAP.md`, and `REQUIREMENTS.md` all identify `v3.15` as the active lane, `v3.14` as the most recent implemented lane, and the archived milestone boundary truthfully
+- [x] **LEDGER2-02**: `v3.14` is archived locally once the follow-on lane is stable, and any remaining non-archived v3 milestones are called out explicitly
+- [x] **LEDGER2-03**: early-v3 top-level milestone labels, detailed phase tables, and per-milestone requirement sections now tell one coherent implementation/audit-pending story
 
 ### Full-Vision Requalification
 
@@ -3216,9 +3217,9 @@ qualification pass.
 | LIFE2-01 | Phase 404 | Complete |
 | LIFE2-02 | Phase 404 | Complete |
 | LIFE2-03 | Phase 404 | Complete |
-| LEDGER2-01 | Phase 405 | Planned |
-| LEDGER2-02 | Phase 405 | Planned |
-| LEDGER2-03 | Phase 405 | Planned |
+| LEDGER2-01 | Phase 405 | Complete |
+| LEDGER2-02 | Phase 405 | Complete |
+| LEDGER2-03 | Phase 405 | Complete |
 | QUAL2-01 | Phase 406 | Planned |
 | QUAL2-02 | Phase 406 | Planned |
 | QUAL2-03 | Phase 406 | Planned |
@@ -3230,7 +3231,7 @@ qualification pass.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 at milestone start*
+*Last updated: 2026-04-14 after completing phase 405 final v3 ledger and archive closure locally*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3454,14 +3455,14 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 - [x] **PYDK-01**: Python guard SDK (`packages/sdk/arc-guard-py`) provides typed dataclasses matching the WIT contract
 - [x] **PYDK-02**: Python guards compile to WASM components via `componentize-py`
 - [x] **PYDK-03**: Python SDK includes example guard with build instructions
-- [ ] **PYDK-04**: Python-compiled guard loads and evaluates correctly in the host dual-mode runtime
+- [x] **PYDK-04**: Python-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Go SDK
 
 - [x] **GODK-01**: Go guard SDK (`packages/sdk/arc-guard-go`) provides typed structs matching the WIT contract
 - [x] **GODK-02**: Go guards compile to WASM components via TinyGo with `wasip2` target
 - [x] **GODK-03**: Go SDK includes example guard with build instructions
-- [ ] **GODK-04**: Go-compiled guard loads and evaluates correctly in the host dual-mode runtime
+- [x] **GODK-04**: Go-compiled guard loads and evaluates correctly in the host dual-mode runtime
 
 ### Conformance
 
@@ -3495,11 +3496,11 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | PYDK-01 | Phase 383 | Complete |
 | PYDK-02 | Phase 383 | Complete |
 | PYDK-03 | Phase 383 | Complete |
-| PYDK-04 | Phase 383 | Pending |
+| PYDK-04 | Phase 383 | Complete |
 | GODK-01 | Phase 383 | Complete |
 | GODK-02 | Phase 383 | Complete |
 | GODK-03 | Phase 383 | Complete |
-| GODK-04 | Phase 383 | Pending |
+| GODK-04 | Phase 383 | Complete |
 | CONF-01 | Phase 384 | Pending |
 | CONF-02 | Phase 384 | Pending |
 | CONF-03 | Phase 384 | Pending |

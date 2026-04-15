@@ -182,21 +182,19 @@
 - [ ] **v3.8 Normative Specification Alignment** - Phases 351-358
   (implemented locally 2026-04-13/14; audit pending)
 - [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
-  (implemented locally 2026-04-14; reconciliation pending in v3.14/401)
+  (implemented locally 2026-04-14; audit pending)
 - [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
-  364-367 (implemented locally 2026-04-14; reconciliation pending in
-  v3.14/401)
+  364-367 (implemented locally 2026-04-14; audit pending)
 - [ ] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
-  368-372 (implemented locally 2026-04-14; reconciliation pending in
-  v3.14/401)
+  368-372 (implemented locally 2026-04-14; audit pending)
 - [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
   (completed locally 2026-04-14; archived locally 2026-04-14)
 - [x] **v3.13 Universal Orchestration Closure** - Phases 390-396
   (completed locally 2026-04-14; archived locally 2026-04-14)
 - [x] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
-  (completed locally 2026-04-14; pending archival / next milestone)
+  (completed locally and archived locally 2026-04-14)
 - [ ] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
-  (active locally 2026-04-14)
+  (active locally 2026-04-14; phases 403-405 complete)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -10633,8 +10631,9 @@ final.
 ## Phase Summary (v3.0-v3.11)
 
 Legacy note: rows `319-358` were historically left as pre-reconciliation
-planning labels. `v3.14/401` is the explicit owner for making the early/mid-v3
-ledger and archival story fully evidence-grade.
+planning labels. Phase `405` closed the remaining v3 archival and ledger
+truth so the early/mid-v3 story now reads as implemented with audit debt
+rather than as speculative planning.
 
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
@@ -10678,20 +10677,20 @@ ledger and archival story fully evidence-grade.
 | 356 | v3.8 | SDK Reference Documentation | Implemented / audit pending |
 | 357 | v3.8 | Protocol Bridge and Edge Documentation | Implemented / audit pending |
 | 358 | v3.8 | Strategic Vision and Design Doc Reconciliation | Implemented / audit pending |
-| 359 | v3.9 | OpenAI Adapter Kernel Execution | Implemented / reconciliation pending |
-| 360 | v3.9 | Compliance Certificate Wire Format Alignment | Implemented / reconciliation pending |
-| 361 | v3.9 | HTTP Adapter Request Binding and Capability Validation | Implemented / reconciliation pending |
-| 362 | v3.9 | Test Stabilization and Invariant Enforcement | Implemented / reconciliation pending |
-| 363 | v3.9 | Residual SDK and Spec Drift Cleanup | Implemented / reconciliation pending |
-| 364 | v3.10 | Rust HTTP Sidecar Surface | Implemented / reconciliation pending |
-| 365 | v3.10 | Python HTTP Substrate Alignment | Implemented / reconciliation pending |
-| 366 | v3.10 | Cross-SDK Capability Presentation Alignment | Implemented / reconciliation pending |
-| 367 | v3.10 | HTTP Receipt Conversion Safety | Implemented / reconciliation pending |
-| 368 | v3.11 | Shippable `arc api protect` Entrypoint | Implemented / reconciliation pending |
-| 369 | v3.11 | TypeScript Request-Body Preservation | Implemented / reconciliation pending |
-| 370 | v3.11 | JVM Request-Body Preservation and Raw-Byte Hashing | Implemented / reconciliation pending |
-| 371 | v3.11 | Cross-SDK Raw-Byte Binding and EvaluateResponse Contract | Implemented / reconciliation pending |
-| 372 | v3.11 | HTTP Schema and Platform Doc Consistency | Implemented / reconciliation pending |
+| 359 | v3.9 | OpenAI Adapter Kernel Execution | Implemented / audit pending |
+| 360 | v3.9 | Compliance Certificate Wire Format Alignment | Implemented / audit pending |
+| 361 | v3.9 | HTTP Adapter Request Binding and Capability Validation | Implemented / audit pending |
+| 362 | v3.9 | Test Stabilization and Invariant Enforcement | Implemented / audit pending |
+| 363 | v3.9 | Residual SDK and Spec Drift Cleanup | Implemented / audit pending |
+| 364 | v3.10 | Rust HTTP Sidecar Surface | Implemented / audit pending |
+| 365 | v3.10 | Python HTTP Substrate Alignment | Implemented / audit pending |
+| 366 | v3.10 | Cross-SDK Capability Presentation Alignment | Implemented / audit pending |
+| 367 | v3.10 | HTTP Receipt Conversion Safety | Implemented / audit pending |
+| 368 | v3.11 | Shippable `arc api protect` Entrypoint | Implemented / audit pending |
+| 369 | v3.11 | TypeScript Request-Body Preservation | Implemented / audit pending |
+| 370 | v3.11 | JVM Request-Body Preservation and Raw-Byte Hashing | Implemented / audit pending |
+| 371 | v3.11 | Cross-SDK Raw-Byte Binding and EvaluateResponse Contract | Implemented / audit pending |
+| 372 | v3.11 | HTTP Schema and Platform Doc Consistency | Implemented / audit pending |
 
 ---
 
@@ -10896,7 +10895,7 @@ ledger with code and claim reality.
 **Dependency:** Follows v3.12's credibility-closeout lane. `v4.1` and `v4.2`
 already reserved phases `382-389`, so this follow-on v3 milestone begins at
 phase `390`. Its runtime/substrate closure landed locally, but the remaining
-ledger/archive closeout is now carried by `v3.14/401`. It can execute in
+ledger/archive closeout was completed in archived `v3.14`. It can execute in
 parallel with the v4.x WASM lane because the work targets cross-protocol
 orchestration and truth closure rather than guard runtime internals.
 
@@ -10915,8 +10914,8 @@ authoritative runtime behavior defined by the earlier ones.
 **Goal**: Implement `CrossProtocolOrchestrator` and `CapabilityBridge` as reusable runtime architecture so bridged protocol execution no longer depends on bespoke per-edge authority flow
 **Depends on**: Phase 381 (the narrow breakthrough claim and its gaps are explicitly qualified)
 **Requirements**: ORCH-01, ORCH-02, ORCH-03
-**Status**: partial locally 2026-04-14 -- runtime/doc reconciliation landed,
-remaining ledger/archive closeout carried by `v3.14/401`
+**Status**: complete locally 2026-04-14 -- runtime/doc reconciliation landed,
+and the remaining ledger/archive closeout later completed in archived `v3.14`
 **Success Criteria** (what must be TRUE):
   1. A reusable `CrossProtocolOrchestrator` exists and is the default runtime for bridged A2A/ACP execution rather than edge-local bespoke logic
   2. `CapabilityBridge` plus a cross-protocol capability reference/envelope contract are implemented with provenance, attenuation, and protocol-context fields
@@ -11245,7 +11244,7 @@ Plans:
 archive truth so planning becomes a clean source of evidence
 **Depends on**: Phase 403 (new active milestone and bridge truth are explicit)
 **Requirements**: LEDGER2-01, LEDGER2-02, LEDGER2-03
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `ROADMAP.md`, and
      `REQUIREMENTS.md` agree on active, implemented, and archived milestones
@@ -11254,7 +11253,9 @@ archive truth so planning becomes a clean source of evidence
   3. Early-v3 top-level labels and detailed phase tables now tell one coherent
      implementation/audit-pending story
 **Estimated complexity**: M
-**Plans**: 0 plans
+**Plans**: 1/1 plan complete
+Plans:
+- [x] 405-01-PLAN.md -- archive `v3.14`, reconcile live milestone headers, and close late-v3 ledger truth across roadmap and requirements
 
 ### Phase 406: Full Original-Vision Requalification
 **Goal**: Re-run the strongest claim gate after the protocol-aware routing,
@@ -11281,7 +11282,7 @@ honestly upgrade beyond the narrower substrate claim
 |-------|-----------|------|--------|
 | 403 | v3.15 | Protocol-Aware Bridge Binding and Registry Generalization | Complete |
 | 404 | v3.15 | Lifecycle-Equivalent A2A/ACP Mediation | Complete |
-| 405 | v3.15 | Final v3 Ledger and Archive Closure | Planned |
+| 405 | v3.15 | Final v3 Ledger and Archive Closure | Complete |
 | 406 | v3.15 | Full Original-Vision Requalification | Planned |
 
 ---
@@ -11424,7 +11425,7 @@ language targets that both depend only on Phase 386's WIT foundation. Phase
 
 - [x] **Phase 386: WIT Interface and Dual-Mode Host** - Define `arc:guard@0.1.0` WIT interface, implement Component Model host via `wasmtime::component::bindgen!`, add dual-mode loading (raw + Component), publish WIT package (completed 2026-04-15)
 - [x] **Phase 387: TypeScript Guard SDK** - Ship `arc-guard-ts` with typed interfaces matching WIT, jco/ComponentizeJS compilation, example guard, and host integration validation (completed 2026-04-15)
-- [ ] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation
+- [x] **Phase 388: Python and Go Guard SDKs** - Ship `arc-guard-py` (componentize-py) and `arc-guard-go` (TinyGo wasip2) with typed bindings, example guards, and host integration validation (completed 2026-04-15)
 - [ ] **Phase 389: Cross-Language Conformance Suite** - Shared YAML fixtures, all-four-language test runner, fuel-consumption parity validation
 
 ### Phase 386: WIT Interface and Dual-Mode Host
@@ -11496,5 +11497,5 @@ Plans:
 |-------|-----------|------|--------|
 | 386 | 2/2 | Complete    | 2026-04-15 |
 | 387 | 2/2 | Complete    | 2026-04-15 |
-| 388 | 2/3 | In Progress|  |
+| 388 | 3/3 | Complete   | 2026-04-15 |
 | 389 | v4.2 | Cross-Language Conformance Suite | Not started |
