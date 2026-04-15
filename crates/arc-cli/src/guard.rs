@@ -567,12 +567,18 @@ fn format_number(n: u64) -> String {
 }
 
 pub(crate) fn cmd_guard_pack() -> Result<(), CliError> {
-    // Implemented in Plan 02.
+    pack_from_dir(Path::new("."))
+}
+
+fn pack_from_dir(project_dir: &Path) -> Result<(), CliError> {
+    // TODO: implement in GREEN phase
+    let _ = project_dir;
     Err(CliError::Other("guard pack not yet implemented".to_string()))
 }
 
-pub(crate) fn cmd_guard_install(_path: &Path, _target_dir: &Path) -> Result<(), CliError> {
-    // Implemented in Plan 02.
+pub(crate) fn cmd_guard_install(archive_path: &Path, target_dir: &Path) -> Result<(), CliError> {
+    // TODO: implement in GREEN phase
+    let _ = (archive_path, target_dir);
     Err(CliError::Other("guard install not yet implemented".to_string()))
 }
 
@@ -967,5 +973,121 @@ mod tests {
         assert_eq!(format_number(1000), "1,000");
         assert_eq!(format_number(1_000_000), "1,000,000");
         assert_eq!(format_number(12_345), "12,345");
+    }
+
+    // --- Pack / Install tests ---
+
+    #[test]
+    fn test_pack_and_install_round_trip() {
+        let project_dir = tempfile::tempdir().unwrap();
+
+        // Create a minimal guard-manifest.yaml
+        let manifest_content = r#"name: test-guard
+version: "0.1.0"
+abi_version: "1"
+wasm_path: "test_guard.wasm"
+wasm_sha256: "deadbeef"
+"#;
+        fs::write(
+            project_dir.path().join("guard-manifest.yaml"),
+            manifest_content,
+        )
+        .unwrap();
+
+        // Create a fake .wasm file
+        let wasm_content = b"\x00asm\x01\x00\x00\x00fake wasm content for round-trip test";
+        fs::write(project_dir.path().join("test_guard.wasm"), wasm_content).unwrap();
+
+        // Pack
+        pack_from_dir(project_dir.path()).unwrap();
+
+        // Verify archive exists
+        let archive_path = project_dir.path().join("test-guard-0.1.0.arcguard");
+        assert!(
+            archive_path.exists(),
+            "archive should exist at {}",
+            archive_path.display()
+        );
+        assert!(
+            archive_path.metadata().unwrap().len() > 0,
+            "archive should be non-empty"
+        );
+
+        // Install to a separate directory
+        let install_dir = tempfile::tempdir().unwrap();
+        cmd_guard_install(&archive_path, install_dir.path()).unwrap();
+
+        // Verify extracted files exist in {target_dir}/test-guard/
+        let guard_dir = install_dir.path().join("test-guard");
+        assert!(guard_dir.exists(), "guard subdirectory should exist");
+
+        let extracted_manifest = guard_dir.join("guard-manifest.yaml");
+        assert!(
+            extracted_manifest.exists(),
+            "extracted manifest should exist"
+        );
+
+        let extracted_wasm = guard_dir.join("test_guard.wasm");
+        assert!(extracted_wasm.exists(), "extracted wasm should exist");
+
+        // Verify wasm content is identical
+        let extracted_wasm_bytes = fs::read(&extracted_wasm).unwrap();
+        assert_eq!(
+            extracted_wasm_bytes, wasm_content,
+            "extracted wasm content should match original"
+        );
+
+        // Verify manifest has updated wasm_path pointing to co-located filename
+        let extracted_manifest_content = fs::read_to_string(&extracted_manifest).unwrap();
+        assert!(
+            extracted_manifest_content.contains("wasm_path"),
+            "extracted manifest should contain wasm_path"
+        );
+        // The wasm_path in the extracted manifest should point to the local filename
+        let parsed: serde_yml::Value =
+            serde_yml::from_str(&extracted_manifest_content).unwrap();
+        let wasm_path_val = parsed.get("wasm_path").unwrap();
+        assert_eq!(
+            wasm_path_val.as_str().unwrap(),
+            "test_guard.wasm",
+            "extracted manifest wasm_path should be the co-located filename"
+        );
+    }
+
+    #[test]
+    fn test_pack_fails_without_manifest() {
+        let project_dir = tempfile::tempdir().unwrap();
+        // No guard-manifest.yaml created
+        let result = pack_from_dir(project_dir.path());
+        assert!(result.is_err(), "pack should fail without manifest");
+    }
+
+    #[test]
+    fn test_pack_fails_with_missing_wasm() {
+        let project_dir = tempfile::tempdir().unwrap();
+
+        // Create manifest pointing to a .wasm that does not exist
+        let manifest_content = r#"name: test-guard
+version: "0.1.0"
+abi_version: "1"
+wasm_path: "nonexistent.wasm"
+wasm_sha256: "deadbeef"
+"#;
+        fs::write(
+            project_dir.path().join("guard-manifest.yaml"),
+            manifest_content,
+        )
+        .unwrap();
+
+        let result = pack_from_dir(project_dir.path());
+        assert!(result.is_err(), "pack should fail with missing wasm");
+    }
+
+    #[test]
+    fn test_install_fails_with_missing_archive() {
+        let install_dir = tempfile::tempdir().unwrap();
+        let bogus_path = install_dir.path().join("nonexistent.arcguard");
+        let result = cmd_guard_install(&bogus_path, install_dir.path());
+        assert!(result.is_err(), "install should fail with missing archive");
     }
 }
