@@ -93,6 +93,14 @@ None - no external service configuration required.
 - The guard CLI module is complete and ready for end-to-end testing (requires wasm32-unknown-unknown target installed)
 - Phase 384 is now complete (both plans done)
 
+## Self-Check: PASSED
+
+- FOUND: crates/arc-cli/src/guard.rs
+- FOUND: crates/arc-cli/Cargo.toml
+- FOUND: 384-02-SUMMARY.md
+- FOUND: f91bfb3 (Task 1 commit)
+- FOUND: cd2a4f4 (Task 2 commit)
+
 ---
 *Phase: 384-cli-scaffolding-new-build-inspect*
 *Completed: 2026-04-14*
