@@ -289,13 +289,143 @@ pub(crate) fn cmd_guard_inspect(path: &Path) -> Result<(), CliError> {
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Test fixtures
+// ---------------------------------------------------------------------------
+
+/// A single test fixture entry loaded from a YAML file.
+#[derive(Debug, Deserialize)]
+struct TestFixture {
+    /// Human-readable fixture name.
+    name: String,
+    /// Request fields matching GuardRequest shape.
+    request: GuardRequest,
+    /// Expected verdict: "allow" or "deny".
+    expected_verdict: String,
+    /// If verdict is deny, the deny reason must contain this substring.
+    #[serde(default)]
+    deny_reason_contains: Option<String>,
+}
+
 pub(crate) fn cmd_guard_test(
-    _wasm_path: &Path,
-    _fixture_paths: &[PathBuf],
-    _fuel_limit: u64,
+    wasm_path: &Path,
+    fixture_paths: &[PathBuf],
+    fuel_limit: u64,
 ) -> Result<(), CliError> {
-    // Implemented in Task 2.
-    Err(CliError::Other("guard test not yet implemented".to_string()))
+    let wasm_bytes = fs::read(wasm_path).map_err(|e| {
+        CliError::Other(format!("failed to read {}: {e}", wasm_path.display()))
+    })?;
+
+    let mut total = 0u32;
+    let mut passed = 0u32;
+    let mut failed = 0u32;
+
+    for fixture_path in fixture_paths {
+        let yaml_content = fs::read_to_string(fixture_path).map_err(|e| {
+            CliError::Other(format!(
+                "failed to read fixture file {}: {e}",
+                fixture_path.display()
+            ))
+        })?;
+        let fixtures: Vec<TestFixture> = serde_yml::from_str(&yaml_content).map_err(|e| {
+            CliError::Other(format!(
+                "failed to parse fixture file {}: {e}",
+                fixture_path.display()
+            ))
+        })?;
+
+        for fixture in &fixtures {
+            total += 1;
+
+            // Create a fresh backend per fixture to reset fuel and memory state.
+            let mut backend = WasmtimeBackend::new().map_err(|e| {
+                CliError::Other(format!("failed to create wasmtime backend: {e}"))
+            })?;
+            backend.load_module(&wasm_bytes, fuel_limit).map_err(|e| {
+                CliError::Other(format!("failed to load wasm module: {e}"))
+            })?;
+
+            match backend.evaluate(&fixture.request) {
+                Ok(verdict) => {
+                    let result = check_verdict(&fixture.name, &verdict, fixture);
+                    match result {
+                        FixtureResult::Pass => {
+                            passed += 1;
+                            println!("[PASS] {}", fixture.name);
+                        }
+                        FixtureResult::Fail(reason) => {
+                            failed += 1;
+                            println!("[FAIL] {}: {reason}", fixture.name);
+                        }
+                    }
+                }
+                Err(e) => {
+                    failed += 1;
+                    println!("[FAIL] {}: evaluation error: {e}", fixture.name);
+                }
+            }
+        }
+    }
+
+    println!();
+    println!("{passed} passed, {failed} failed out of {total} total");
+
+    if failed > 0 {
+        Err(CliError::Other(format!("{failed} test(s) failed")))
+    } else {
+        Ok(())
+    }
+}
+
+enum FixtureResult {
+    Pass,
+    Fail(String),
+}
+
+fn check_verdict(
+    _name: &str,
+    verdict: &GuardVerdict,
+    fixture: &TestFixture,
+) -> FixtureResult {
+    match fixture.expected_verdict.as_str() {
+        "allow" => {
+            if verdict.is_allow() {
+                FixtureResult::Pass
+            } else {
+                let reason = match verdict {
+                    GuardVerdict::Deny { reason } => reason
+                        .as_deref()
+                        .unwrap_or("(no reason)")
+                        .to_string(),
+                    _ => String::new(),
+                };
+                FixtureResult::Fail(format!("expected allow, got deny: {reason}"))
+            }
+        }
+        "deny" => match verdict {
+            GuardVerdict::Allow => {
+                FixtureResult::Fail("expected deny, got allow".to_string())
+            }
+            GuardVerdict::Deny { reason } => {
+                if let Some(expected_substr) = &fixture.deny_reason_contains {
+                    let actual = reason.as_deref().unwrap_or("");
+                    if actual.contains(expected_substr.as_str()) {
+                        FixtureResult::Pass
+                    } else {
+                        FixtureResult::Fail(format!(
+                            "deny reason '{}' does not contain '{expected_substr}'",
+                            actual
+                        ))
+                    }
+                } else {
+                    FixtureResult::Pass
+                }
+            }
+        },
+        other => FixtureResult::Fail(format!(
+            "unknown expected_verdict '{other}' (use 'allow' or 'deny')"
+        )),
+    }
 }
 
 pub(crate) fn cmd_guard_bench(
@@ -432,5 +562,226 @@ mod tests {
 
         let result = cmd_guard_new(project_path.to_str().unwrap());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_fixture_yaml_deserializes() {
+        let yaml = r#"
+- name: "allows read in /home"
+  request:
+    tool_name: read_file
+    server_id: fs-server
+    agent_id: agent-1
+    arguments:
+      path: "/home/user/doc.txt"
+    scopes:
+      - "fs-server:read_file"
+    action_type: file_access
+    extracted_path: "/home/user/doc.txt"
+  expected_verdict: allow
+
+- name: "denies read in /etc"
+  request:
+    tool_name: read_file
+    server_id: fs-server
+    agent_id: agent-1
+    arguments:
+      path: "/etc/shadow"
+    scopes:
+      - "fs-server:read_file"
+    action_type: file_access
+    extracted_path: "/etc/shadow"
+  expected_verdict: deny
+  deny_reason_contains: "restricted"
+"#;
+
+        let fixtures: Vec<TestFixture> = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(fixtures.len(), 2);
+
+        // First fixture: allow
+        assert_eq!(fixtures[0].name, "allows read in /home");
+        assert_eq!(fixtures[0].request.tool_name, "read_file");
+        assert_eq!(fixtures[0].request.server_id, "fs-server");
+        assert_eq!(fixtures[0].request.agent_id, "agent-1");
+        assert_eq!(fixtures[0].request.scopes, vec!["fs-server:read_file"]);
+        assert_eq!(
+            fixtures[0].request.action_type.as_deref(),
+            Some("file_access")
+        );
+        assert_eq!(
+            fixtures[0].request.extracted_path.as_deref(),
+            Some("/home/user/doc.txt")
+        );
+        assert_eq!(fixtures[0].expected_verdict, "allow");
+        assert!(fixtures[0].deny_reason_contains.is_none());
+
+        // Second fixture: deny with reason substring
+        assert_eq!(fixtures[1].name, "denies read in /etc");
+        assert_eq!(fixtures[1].expected_verdict, "deny");
+        assert_eq!(
+            fixtures[1].deny_reason_contains.as_deref(),
+            Some("restricted")
+        );
+    }
+
+    #[test]
+    fn test_fixture_expected_verdict_values() {
+        let allow_yaml = r#"
+- name: "allow case"
+  request:
+    tool_name: t
+    server_id: s
+    agent_id: a
+    arguments: {}
+  expected_verdict: allow
+"#;
+        let deny_yaml = r#"
+- name: "deny case"
+  request:
+    tool_name: t
+    server_id: s
+    agent_id: a
+    arguments: {}
+  expected_verdict: deny
+"#;
+
+        let allow_fixtures: Vec<TestFixture> = serde_yml::from_str(allow_yaml).unwrap();
+        assert_eq!(allow_fixtures[0].expected_verdict, "allow");
+
+        let deny_fixtures: Vec<TestFixture> = serde_yml::from_str(deny_yaml).unwrap();
+        assert_eq!(deny_fixtures[0].expected_verdict, "deny");
+    }
+
+    #[test]
+    fn test_fixture_all_guard_request_fields() {
+        let yaml = r#"
+- name: "full fields"
+  request:
+    tool_name: write_file
+    server_id: fs-server
+    agent_id: agent-2
+    arguments:
+      content: "hello"
+    scopes:
+      - "fs-server:write_file"
+    action_type: file_write
+    extracted_path: "/tmp/out.txt"
+    extracted_target: "example.com"
+    filesystem_roots:
+      - "/tmp"
+      - "/home"
+    matched_grant_index: 3
+  expected_verdict: allow
+"#;
+
+        let fixtures: Vec<TestFixture> = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(fixtures.len(), 1);
+        let req = &fixtures[0].request;
+        assert_eq!(req.tool_name, "write_file");
+        assert_eq!(req.server_id, "fs-server");
+        assert_eq!(req.agent_id, "agent-2");
+        assert_eq!(req.action_type.as_deref(), Some("file_write"));
+        assert_eq!(req.extracted_path.as_deref(), Some("/tmp/out.txt"));
+        assert_eq!(req.extracted_target.as_deref(), Some("example.com"));
+        assert_eq!(req.filesystem_roots, vec!["/tmp", "/home"]);
+        assert_eq!(req.matched_grant_index, Some(3));
+    }
+
+    #[test]
+    fn test_check_verdict_allow_pass() {
+        let fixture = TestFixture {
+            name: "test".to_string(),
+            request: make_test_request(),
+            expected_verdict: "allow".to_string(),
+            deny_reason_contains: None,
+        };
+        let verdict = GuardVerdict::Allow;
+        match check_verdict("test", &verdict, &fixture) {
+            FixtureResult::Pass => {}
+            FixtureResult::Fail(reason) => panic!("expected pass, got fail: {reason}"),
+        }
+    }
+
+    #[test]
+    fn test_check_verdict_deny_pass() {
+        let fixture = TestFixture {
+            name: "test".to_string(),
+            request: make_test_request(),
+            expected_verdict: "deny".to_string(),
+            deny_reason_contains: None,
+        };
+        let verdict = GuardVerdict::Deny {
+            reason: Some("blocked".to_string()),
+        };
+        match check_verdict("test", &verdict, &fixture) {
+            FixtureResult::Pass => {}
+            FixtureResult::Fail(reason) => panic!("expected pass, got fail: {reason}"),
+        }
+    }
+
+    #[test]
+    fn test_check_verdict_allow_but_denied_fails() {
+        let fixture = TestFixture {
+            name: "test".to_string(),
+            request: make_test_request(),
+            expected_verdict: "allow".to_string(),
+            deny_reason_contains: None,
+        };
+        let verdict = GuardVerdict::Deny {
+            reason: Some("nope".to_string()),
+        };
+        match check_verdict("test", &verdict, &fixture) {
+            FixtureResult::Pass => panic!("expected fail, got pass"),
+            FixtureResult::Fail(_) => {}
+        }
+    }
+
+    #[test]
+    fn test_check_verdict_deny_reason_contains_match() {
+        let fixture = TestFixture {
+            name: "test".to_string(),
+            request: make_test_request(),
+            expected_verdict: "deny".to_string(),
+            deny_reason_contains: Some("restricted".to_string()),
+        };
+        let verdict = GuardVerdict::Deny {
+            reason: Some("path is restricted zone".to_string()),
+        };
+        match check_verdict("test", &verdict, &fixture) {
+            FixtureResult::Pass => {}
+            FixtureResult::Fail(reason) => panic!("expected pass, got fail: {reason}"),
+        }
+    }
+
+    #[test]
+    fn test_check_verdict_deny_reason_contains_mismatch() {
+        let fixture = TestFixture {
+            name: "test".to_string(),
+            request: make_test_request(),
+            expected_verdict: "deny".to_string(),
+            deny_reason_contains: Some("restricted".to_string()),
+        };
+        let verdict = GuardVerdict::Deny {
+            reason: Some("blocked by policy".to_string()),
+        };
+        match check_verdict("test", &verdict, &fixture) {
+            FixtureResult::Pass => panic!("expected fail, got pass"),
+            FixtureResult::Fail(_) => {}
+        }
+    }
+
+    fn make_test_request() -> GuardRequest {
+        GuardRequest {
+            tool_name: "test_tool".to_string(),
+            server_id: "test-server".to_string(),
+            agent_id: "test-agent".to_string(),
+            arguments: serde_json::json!({}),
+            scopes: Vec::new(),
+            action_type: None,
+            extracted_path: None,
+            extracted_target: None,
+            filesystem_roots: Vec::new(),
+            matched_grant_index: None,
+        }
     }
 }
