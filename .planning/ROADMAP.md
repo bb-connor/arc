@@ -173,20 +173,16 @@
 - [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
 - [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
 - [ ] **v3.8 Normative Specification Alignment** - Phases 351-358 (planned)
-- [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
-  (implemented locally 2026-04-14; ledger reconciliation pending under v3.13
-  phase 393)
-- [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
-  364-367 (implemented locally 2026-04-14; ledger reconciliation pending under
-  v3.13 phase 393)
-- [ ] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
-  368-372 (implemented locally 2026-04-14; ledger reconciliation pending under
-  v3.13 phase 393)
+- [x] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
+  (completed locally 2026-04-14)
+- [x] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
+  364-367 (completed locally 2026-04-14)
+- [x] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
+  368-372 (completed locally 2026-04-14)
 - [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
   (completed locally 2026-04-14; pending archival)
-- [ ] **v3.13 Universal Orchestration Closure** - Phases 390-396
-  (active locally 2026-04-14; follows v3.12 and can execute in parallel with
-  v4.x)
+- [x] **v3.13 Universal Orchestration Closure** - Phases 390-396
+  (completed locally 2026-04-14; pending archival)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -10959,45 +10955,45 @@ Plans:
 **Goal**: Close the remaining HTTP-side authority, evidence, and proxy/runtime convergence gaps that still block the strongest production-ready ARC claim
 **Depends on**: Phase 393 (ledger and docs reflect the current truth before runtime closure resumes)
 **Requirements**: HTTP-01, HTTP-02, HTTP-03, HTTP-04
-**Status**: in progress -- OpenAPI override enforcement landed 2026-04-14; receipt semantics, proxy header fidelity, and arc-tower convergence remain
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. HTTP receipt semantics reflect actual downstream response evidence or are explicitly renamed and documented as evaluation-time semantics across the runtime and SDK surfaces
   2. `arc-api-protect` honors OpenAPI extension-aware policy overrides and forwards the request headers needed for real protected reverse-proxy behavior
   3. `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator
   4. The Rust HTTP lane can be described as one coherent authority story rather than a sidecar path plus a divergent in-process path
 **Estimated complexity**: L
-**Plans**: 1 plan
+**Plans**: 1/1 plan complete
 Plans:
-- [ ] 394-01-PLAN.md -- receipt-status semantics, OpenAPI override enforcement, proxy header fidelity, and arc-tower authority convergence
+- [x] 394-01-PLAN.md -- receipt-status semantics, OpenAPI override enforcement, proxy header fidelity, and arc-tower authority convergence
 
 ### Phase 395: Protocol Lifecycle and Authority-Surface Closure
 **Goal**: Make A2A and ACP lifecycle claims as truthful as their execution authority by either implementing missing lifecycle semantics or narrowing the public surface and docs to what really exists
 **Depends on**: Phase 394 (HTTP authority/evidence gaps no longer undermine the shared kernel story)
 **Requirements**: SURFACE-01, SURFACE-02, SURFACE-03, SURFACE-04
-**Status**: not started
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. A2A lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
   2. ACP lifecycle semantics are either implemented distinctly enough to justify the advertised surface or narrowed/documented to the truthful blocking semantics
   3. Non-authoritative compatibility APIs are isolated strongly enough that public/default authority surfaces cannot be confused with receipt-bearing mediation
   4. Discovery collisions and outward publication edge cases are handled deterministically and truthfully rather than by silent dropping
 **Estimated complexity**: M
-**Plans**: 1 plan
+**Plans**: 1/1 plan complete
 Plans:
-- [ ] 395-01-PLAN.md -- A2A/ACP lifecycle truth, compatibility-surface isolation, and discovery collision handling
+- [x] 395-01-PLAN.md -- A2A/ACP lifecycle truth, compatibility-surface isolation, and discovery collision handling
 
 ### Phase 396: Claim Upgrade Qualification
 **Goal**: Qualify the strongest honest post-v3 ARC claim with orchestrated end-to-end tests and operator-facing evidence after ledger, HTTP, and lifecycle closure
 **Depends on**: Phase 395 (runtime and docs now reflect the strongest truthful implementation state)
 **Requirements**: UPGRADE-01, UPGRADE-02, UPGRADE-03
-**Status**: not started
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops and the lifecycle/evidence semantics ARC still advertises
   2. Operator-facing claim-gate docs state the strongest honest claim ARC can make after orchestration and explicitly distinguish the shipped edge-to-native substrate from future full protocol-to-protocol fabric
   3. Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, receipt continuity, and non-misleading protocol claims under real runtime flows
 **Estimated complexity**: M
-**Plans**: 1 plan
+**Plans**: 1/1 plan complete
 Plans:
-- [ ] 396-01-PLAN.md -- end-to-end claim qualification tests, operator claim-gate docs, and fail-closed evidence validation
+- [x] 396-01-PLAN.md -- end-to-end claim qualification tests, operator claim-gate docs, and fail-closed evidence validation
 
 ---
 
@@ -11009,9 +11005,9 @@ Plans:
 | 391 | v3.13 | Authoritative Edge Unification | Complete |
 | 392 | v3.13 | Fidelity Semantics and Publication Gating | Complete |
 | 393 | v3.13 | Ledger and Narrative Reconciliation | Complete |
-| 394 | v3.13 | HTTP Authority and Evidence Convergence | Not started |
-| 395 | v3.13 | Protocol Lifecycle and Authority-Surface Closure | Not started |
-| 396 | v3.13 | Claim Upgrade Qualification | Not started |
+| 394 | v3.13 | HTTP Authority and Evidence Convergence | Complete |
+| 395 | v3.13 | Protocol Lifecycle and Authority-Surface Closure | Complete |
+| 396 | v3.13 | Claim Upgrade Qualification | Complete |
 
 ---
 
@@ -11106,7 +11102,7 @@ Plans:
 | Phase | Milestone | Name | Status |
 |-------|-----------|------|--------|
 | 382 | 2/2 | Complete    | 2026-04-14 |
-| 383 | 2/3 | In Progress|  |
+| 383 | 3/3 | Complete   | 2026-04-15 |
 | 384 | v4.1 | CLI Scaffolding -- New, Build, Inspect | Not started |
 | 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
 

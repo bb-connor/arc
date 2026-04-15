@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: completed
-stopped_at: Completed 383-02-PLAN.md (example guard crates)
-last_updated: "2026-04-14T23:58:15.050Z"
-last_activity: 2026-04-14 -- began phase 394 by landing OpenAPI override
+stopped_at: Completed 383-03-PLAN.md (integration tests for example guards)
+last_updated: "2026-04-15T00:02:43.450Z"
+last_activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
 progress:
   total_phases: 349
-  completed_phases: 262
+  completed_phases: 263
   total_plans: 743
-  completed_plans: 773
-  percent: 57
+  completed_plans: 774
+  percent: 100
 ---
 
 # Project State
@@ -24,31 +24,26 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** v3.13 Universal Orchestration Closure is now the active
-execution lane. Phases `390` through `393` are complete, so the immediate task
-is executing phase `394` (`HTTP Authority and Evidence Convergence`) while
-keeping v3.12 in the locally complete pending-archive state and v4.0 as a
-parallel strategic lane.
+**Current focus:** v3.13 Universal Orchestration Closure is complete locally.
+The immediate follow-up is archival/closeout for `v3.12` and `v3.13`, while
+`v4.0` remains the parallel strategic lane.
 
 ## Current Position
 
-Phase: 394 (in progress)
-Plan: 01 (in progress)
-Status: v3.13 is active. Phases `390` through `393` are complete and landed
-the shared orchestrator substrate, authoritative ACP live-path guarding,
-explicit compatibility-only A2A/ACP passthrough surfaces, and truthful bridge
-publication gates with tested caveats. Phase `393` then reconciled the late-v3
-ledger, stale planning metadata, and older overclaiming narrative material.
-Phase `394` is now in progress: the first runtime slice landed by preserving
-`x-arc-side-effects` and `x-arc-approval-required` overrides when
-`arc-api-protect` builds its route table from OpenAPI. Remaining 394 work is
-receipt-status semantics, proxy header fidelity, and `arc-tower`
-authority/evidence convergence. Phases `395` and `396` remain queued behind
-that runtime work.
-Last activity: 2026-04-14 -- began phase 394 by landing OpenAPI override
-enforcement and focused proxy tests.
+Phase: 396 (complete locally)
+Plan: 01 (complete)
+Status: v3.13 is complete locally. Phases `390` through `393` landed the
+shared orchestrator substrate, authoritative edge unification, truthful bridge
+publication semantics, and ledger/doc reconciliation. Phase `394` then closed
+HTTP receipt/evidence convergence across `arc-http-core`, `arc-api-protect`,
+and `arc-tower`. Phase `395` narrowed A2A/ACP lifecycle claims to the
+truthful authoritative surfaces. Phase `396` added the executable
+cross-protocol runtime qualification lane, machine-readable claim matrix, and
+release/protocol claim-gate updates.
+Last activity: 2026-04-14 -- completed `./scripts/qualify-cross-protocol-runtime.sh`
+and generated the runtime evidence bundle.
 
-Progress: [#####-----] 57%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
@@ -146,6 +141,7 @@ Progress: [#####-----] 57%
 - [Phase 382]: const thread_local initializer pattern (RefCell::new(None)) used consistently across alloc.rs and glue.rs for Rust 1.93 clippy compliance
 - [Phase 383]: Proc-macro crate generates path references (arc_guard_sdk::*) instead of depending on arc-guard-sdk; user fn renamed to __arc_guard_user_{name} for ABI symbol isolation
 - [Phase 383]: Example guard crate template: cdylib crate-type under examples/guards/, arc-guard-sdk + arc-guard-sdk-macros deps, #[arc_guard] fn evaluate pattern
+- [Phase 383]: Integration test pattern: load_example_wasm(artifact_name) with CARGO_MANIFEST_DIR-relative path, fresh WasmtimeBackend per test, match on GuardVerdict::Deny for reason assertions
 
 ### Roadmap Evolution
 
@@ -155,21 +151,19 @@ Progress: [#####-----] 57%
 - Phase `394` now owns HTTP authority/evidence convergence.
 - Phase `395` now owns A2A/ACP lifecycle and authority-surface closure.
 - Phase `396` now owns the final post-closure claim qualification.
+- Phases `394` through `396` are now complete locally; the remaining work is
+  milestone archival rather than more v3.13 implementation.
 
 ### Pending Todos
 
-- Continue executing phase `394` (`HTTP Authority and Evidence Convergence`) on
-  top of the landed shared orchestrator, unified authoritative edge path,
-  truthful bridge publication semantics, completed phase `393`
-  reconciliation, and the newly landed OpenAPI override enforcement slice.
 - Archive `v3.12` now that phases `377` through `381` are complete locally.
-- Execute the runtime closure items owned by phases `394` through `396`.
+- Archive `v3.13` now that phases `390` through `396` are complete locally.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
-- `v3.12` is complete locally but not yet archived, so the repo still carries
-  milestone-closeout debt alongside the active v3.13 execution lane.
+- `v3.12` and `v3.13` are complete locally but not yet archived, so the repo
+  still carries milestone-closeout debt alongside the parallel v4.0 lane.
 - `v2.83` is still partially complete locally (phases `316` and `317` remain
   pending), so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
@@ -205,7 +199,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-14T23:58:15.034Z
-Stopped at: Completed 383-02-PLAN.md (example guard crates)
+Last session: 2026-04-15T00:02:43.413Z
+Stopped at: Completed 383-03-PLAN.md (integration tests for example guards)
 Next action: begin Phase 383 (proc macro and example guards)
 Resume file: None

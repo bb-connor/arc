@@ -3000,30 +3000,30 @@ defend.
 ### Ledger and Narrative Reconciliation
 
 - [ ] **LEDGER-01**: v3.9-v3.11 requirements, roadmap phase tables, and milestone statuses reconcile to actual implementation and verification truth
-- [ ] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
+- [x] **LEDGER-02**: Planning headers and state metadata consistently identify the latest completed milestone, active milestone, true phase status, true plan counts, and the current execution lane
 - [ ] **LEDGER-03**: v3.0-v3.8 milestone and phase summaries no longer flatten obviously implemented surfaces into unqualified `Planned` placeholders; they either reflect implementation/audit-pending truth or are explicitly deferred for audit
-- [ ] **TRUTH-05**: Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
-- [ ] **TRUTH-06**: Protocol/design docs no longer describe the shipped cross-protocol substrate or current A2A/ACP edge baseline as unimplemented
+- [x] **TRUTH-05**: Older vision and release material no longer overstates formal verification, economic end-state, or shipped protocol maturity relative to the current claim gate
+- [x] **TRUTH-06**: Protocol/design docs no longer describe the shipped cross-protocol substrate or current A2A/ACP edge baseline as unimplemented
 
 ### HTTP Authority and Evidence Convergence
 
-- [ ] **HTTP-01**: `HttpReceipt.response_status` and corresponding SDK/runtime receipt fields reflect actual downstream response evidence, or are explicitly renamed/documented as evaluation-time semantics instead of proxied response evidence
-- [ ] **HTTP-02**: `arc-api-protect` honors OpenAPI extension-aware policy overrides (`x-arc-side-effects`, `x-arc-approval-required`, and related runtime policy inputs) during evaluation instead of method defaults alone
-- [ ] **HTTP-03**: `arc-api-protect` forwards the headers required for real protected reverse-proxy operation rather than a minimal demo subset, with any intentional exclusions documented and tested
-- [ ] **HTTP-04**: `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator with divergent receipt semantics
+- [x] **HTTP-01**: `HttpReceipt.response_status` and corresponding SDK/runtime receipt fields reflect actual downstream response evidence, or are explicitly renamed/documented as evaluation-time semantics instead of proxied response evidence
+- [x] **HTTP-02**: `arc-api-protect` honors OpenAPI extension-aware policy overrides (`x-arc-side-effects`, `x-arc-approval-required`, and related runtime policy inputs) during evaluation instead of method defaults alone
+- [x] **HTTP-03**: `arc-api-protect` forwards the headers required for real protected reverse-proxy operation rather than a minimal demo subset, with any intentional exclusions documented and tested
+- [x] **HTTP-04**: `arc-tower` converges on the shared authority/evidence model instead of a separate embedded evaluator with divergent receipt semantics
 
 ### Protocol Lifecycle and Authority-Surface Closure
 
-- [ ] **SURFACE-01**: A2A either implements distinct lifecycle semantics for the streamed/task surface it advertises or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
-- [ ] **SURFACE-02**: ACP either implements the richer session/update/cancel lifecycle it advertises in design material or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
-- [ ] **SURFACE-03**: Public non-authoritative compatibility APIs are isolated strongly enough that default/public authority surfaces cannot reasonably be mistaken for receipt-bearing mediation
-- [ ] **SURFACE-04**: Outward discovery handles duplicate tool/capability names and similar publication collisions deterministically and truthfully rather than by silent dropping
+- [x] **SURFACE-01**: A2A either implements distinct lifecycle semantics for the streamed/task surface it advertises or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
+- [x] **SURFACE-02**: ACP either implements the richer session/update/cancel lifecycle it advertises in design material or narrows the advertised/doc surface to the truthful blocking semantics it actually supports
+- [x] **SURFACE-03**: Public non-authoritative compatibility APIs are isolated strongly enough that default/public authority surfaces cannot reasonably be mistaken for receipt-bearing mediation
+- [x] **SURFACE-04**: Outward discovery handles duplicate tool/capability names and similar publication collisions deterministically and truthfully rather than by silent dropping
 
 ### Claim Upgrade Qualification
 
-- [ ] **UPGRADE-01**: End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops
-- [ ] **UPGRADE-02**: Operator-facing claim-gate docs state the strongest honest post-v3 claim ARC can make, explicitly distinguishing the shipped edge-to-native substrate from future full protocol-to-protocol orchestration and broader economic thesis
-- [ ] **UPGRADE-03**: Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, and receipt continuity under real runtime flows
+- [x] **UPGRADE-01**: End-to-end tests cover orchestrated MCP/A2A/ACP/HTTP lineage with signed receipt continuity across bridge hops
+- [x] **UPGRADE-02**: Operator-facing claim-gate docs state the strongest honest post-v3 claim ARC can make, explicitly distinguishing the shipped edge-to-native substrate from future full protocol-to-protocol orchestration and broader economic thesis
+- [x] **UPGRADE-03**: Qualification evidence proves the orchestrator and unified edges preserve fail-closed behavior, authority-path clarity, and receipt continuity under real runtime flows
 
 ## v3.13 Out of Scope
 
@@ -3050,19 +3050,19 @@ defend.
 | LEDGER-01 | Phase 393 | Complete |
 | LEDGER-02 | Phase 393 | Complete |
 | LEDGER-03 | Phase 393 | Complete |
-| TRUTH-05 | Phase 393 | Complete |
-| TRUTH-06 | Phase 393 | Complete |
-| HTTP-01 | Phase 394 | Planned |
-| HTTP-02 | Phase 394 | Planned |
-| HTTP-03 | Phase 394 | Planned |
-| HTTP-04 | Phase 394 | Planned |
-| SURFACE-01 | Phase 395 | Planned |
-| SURFACE-02 | Phase 395 | Planned |
-| SURFACE-03 | Phase 395 | Planned |
-| SURFACE-04 | Phase 395 | Planned |
-| UPGRADE-01 | Phase 396 | Planned |
-| UPGRADE-02 | Phase 396 | Planned |
-| UPGRADE-03 | Phase 396 | Planned |
+| TRUTH-05 | Phase 393 / 396 | Complete |
+| TRUTH-06 | Phase 393 / 396 | Complete |
+| HTTP-01 | Phase 394 | Complete |
+| HTTP-02 | Phase 394 | Complete |
+| HTTP-03 | Phase 394 | Complete |
+| HTTP-04 | Phase 394 | Complete |
+| SURFACE-01 | Phase 395 | Complete |
+| SURFACE-02 | Phase 395 | Complete |
+| SURFACE-03 | Phase 395 | Complete |
+| SURFACE-04 | Phase 395 | Complete |
+| UPGRADE-01 | Phase 396 | Complete |
+| UPGRADE-02 | Phase 396 | Complete |
+| UPGRADE-03 | Phase 396 | Complete |
 
 **Coverage:**
 - v3.13 requirements: 25 total
@@ -3071,7 +3071,7 @@ defend.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after completing phase 392 and extending v3.13 to capture the remaining audited gaps explicitly*
+*Last updated: 2026-04-14 after completing phases 394-396 and qualifying the cross-protocol runtime gate*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3210,7 +3210,7 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 - [x] **GEXM-02**: An example guard using the SDK demonstrates reading `action_type` and `extracted_path` from the enriched GuardRequest
 - [x] **GEXM-03**: An example guard using the SDK demonstrates calling `arc::log` and `arc::get_config` host functions
 - [x] **GEXM-04**: Example guards compile to `wasm32-unknown-unknown` and produce valid .wasm binaries
-- [ ] **GEXM-05**: Integration test loads an example guard .wasm into WasmtimeBackend, evaluates it against test requests, and verifies correct Allow/Deny verdicts
+- [x] **GEXM-05**: Integration test loads an example guard .wasm into WasmtimeBackend, evaluates it against test requests, and verifies correct Allow/Deny verdicts
 
 ### CLI Scaffolding
 
@@ -3251,7 +3251,7 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GEXM-02 | Phase 378 | Complete |
 | GEXM-03 | Phase 378 | Complete |
 | GEXM-04 | Phase 378 | Complete |
-| GEXM-05 | Phase 378 | Pending |
+| GEXM-05 | Phase 378 | Complete |
 | GCLI-01 | Phase 379 | Pending |
 | GCLI-02 | Phase 379 | Pending |
 | GCLI-03 | Phase 379 | Pending |
