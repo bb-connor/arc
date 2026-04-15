@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: `v3.15` existed because the post-v3.14 audit still found a bounded
-stopped_at: Completed 388-03-PLAN.md
-last_updated: "2026-04-15T03:52:45.447Z"
+stopped_at: Completed 389-01-PLAN.md
+last_updated: "2026-04-15T04:12:14.062Z"
 last_activity: 2026-04-14 -- completed `v3.15/406` and closed the milestone's
 progress:
   total_phases: 359
-  completed_phases: 277
-  total_plans: 764
-  completed_plans: 801
+  completed_phases: 278
+  total_plans: 766
+  completed_plans: 803
   percent: 100
 ---
 
@@ -32,16 +32,13 @@ workflow step is milestone archival or the next milestone start.
 
 ## Current Position
 
-Phase: milestone complete locally / pending archival
-Plan: archive `v3.15` or open the next milestone
-Status: `v3.15` existed because the post-v3.14 audit still found a bounded
-fabric story, missing lifecycle symmetry, and planning/archive truth debt.
-Phases `403-406` are now complete locally. The final claim gate did not
-upgrade ARC to the full original-vision claim, but it did strengthen the
-defended narrow claim to a bounded protocol-aware fabric on the qualified
-authoritative paths.
-Last activity: 2026-04-14 -- completed `v3.15/406` and closed the milestone's
-execution phases locally.
+Phase: 389-cross-language-conformance-suite
+Plan: 01 of 2 complete
+Status: 389-01 complete -- shared YAML conformance fixtures and cross-language
+runner proving Rust, TypeScript, and Python guards produce identical verdicts
+against 11 test cases. Go guard gracefully skipped (no TinyGo binary).
+Last activity: 2026-04-15 -- completed 389-01 with conformance fixtures and
+runner integration test.
 
 Progress: [##########] 100%
 
@@ -164,6 +161,8 @@ Progress: [##########] 100%
 - [Phase 388]: componentize-py 0.22.1 generates Guard protocol class (not Evaluate); dist/tool-gate.wasm is 17.6 MiB Component Model binary (version 0x0d)
 - [Phase 388]: Python guard limits: 40 MiB module, 64 MiB memory (CPython needs more than SpiderMonkey); Go guards fit default 10 MiB limits
 - [Phase 388]: Go guard tests use runtime path existence checks instead of #[ignore] for informative skip messages with build instructions
+- [Phase 389]: Fresh backend per fixture for fuel state isolation in conformance runner
+- [Phase 389]: GuardEntry carries wasm_bytes + factory fn for deferred loading; Rust guard mandatory, TS/Python/Go optional with graceful skip
 
 ### Roadmap Evolution
 
@@ -232,7 +231,7 @@ integration tests
 
 ## Session Continuity
 
-Last session: 2026-04-15T03:47:03.692Z
-Stopped at: Completed 388-03-PLAN.md
+Last session: 2026-04-15T04:12:14.044Z
+Stopped at: Completed 389-01-PLAN.md
 Next action: execute 388-02-PLAN.md
 Resume file: None

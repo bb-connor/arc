@@ -1,12 +1,12 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v3.14 Universal Fabric and Kernel Convergence
-(completed locally and archived locally 2026-04-14)
+**Latest completed milestone:** v3.15 Universal Protocol Fabric Realization
+(completed locally 2026-04-14; pending archival)
 **Latest archived milestone:** v3.14 Universal Fabric and Kernel Convergence
 (completed locally and archived locally 2026-04-14)
-**Most recent implemented milestone:** v3.14 Universal Fabric and Kernel
-Convergence (completed locally and archived locally 2026-04-14)
+**Most recent implemented milestone:** v3.15 Universal Protocol Fabric
+Realization (completed locally 2026-04-14; pending archival)
 **Active milestone:** v3.15 Universal Protocol Fabric Realization
 **Planned milestones:** v3.0 through v3.15 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
@@ -3195,9 +3195,9 @@ qualification pass.
 
 ### Full-Vision Requalification
 
-- [ ] **QUAL2-01**: `STRATEGIC-VISION.md`, `QUALIFICATION.md`, `RELEASE_AUDIT.md`, and `ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json` are rerun against the post-v3.15 runtime instead of older bounded-fabric assumptions
-- [ ] **QUAL2-02**: ARC upgrades to the stronger original-vision claim only if protocol-aware fabric routing, lifecycle-equivalent mediation, and ledger/archive truth are all demonstrably complete
-- [ ] **QUAL2-03**: if the stronger claim still does not qualify, one authoritative blocker list explains exactly what remains without conflicting docs or milestone state
+- [x] **QUAL2-01**: `STRATEGIC-VISION.md`, `QUALIFICATION.md`, `RELEASE_AUDIT.md`, and `ARC_CROSS_PROTOCOL_QUALIFICATION_MATRIX.json` are rerun against the post-v3.15 runtime instead of older bounded-fabric assumptions
+- [x] **QUAL2-02**: ARC upgrades to the stronger original-vision claim only if protocol-aware fabric routing, lifecycle-equivalent mediation, and ledger/archive truth are all demonstrably complete
+- [x] **QUAL2-03**: if the stronger claim still does not qualify, one authoritative blocker list explains exactly what remains without conflicting docs or milestone state
 
 ## v3.15 Out of Scope
 
@@ -3220,9 +3220,9 @@ qualification pass.
 | LEDGER2-01 | Phase 405 | Complete |
 | LEDGER2-02 | Phase 405 | Complete |
 | LEDGER2-03 | Phase 405 | Complete |
-| QUAL2-01 | Phase 406 | Planned |
-| QUAL2-02 | Phase 406 | Planned |
-| QUAL2-03 | Phase 406 | Planned |
+| QUAL2-01 | Phase 406 | Complete |
+| QUAL2-02 | Phase 406 | Complete |
+| QUAL2-03 | Phase 406 | Complete |
 
 **Coverage:**
 - v3.15 requirements: 12 total
@@ -3231,7 +3231,7 @@ qualification pass.
 
 ---
 *Requirements defined: 2026-04-14*
-*Last updated: 2026-04-14 after completing phase 405 final v3 ledger and archive closure locally*
+*Last updated: 2026-04-14 after completing phase 406 full original-vision requalification locally*
 
 ## v4.0 WASM Guard Runtime Completion
 
@@ -3466,8 +3466,8 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 
 ### Conformance
 
-- [ ] **CONF-01**: Cross-language conformance test suite with shared YAML fixtures exercising Allow, Deny, deny-reason, host function calls, and enriched request fields
-- [ ] **CONF-02**: Conformance suite runs all four language guards (Rust, TypeScript, Python, Go) against the same fixture set and reports pass/fail per guard per fixture
+- [x] **CONF-01**: Cross-language conformance test suite with shared YAML fixtures exercising Allow, Deny, deny-reason, host function calls, and enriched request fields
+- [x] **CONF-02**: Conformance suite runs all four language guards (Rust, TypeScript, Python, Go) against the same fixture set and reports pass/fail per guard per fixture
 - [ ] **CONF-03**: Conformance suite validates that fuel consumption is within 2x across languages for the same fixture
 
 ## v4.2 Out of Scope
@@ -3501,8 +3501,8 @@ Design docs: `docs/guards/02-WASM-RUNTIME-LANDSCAPE.md` Sections 3-4,
 | GODK-02 | Phase 383 | Complete |
 | GODK-03 | Phase 383 | Complete |
 | GODK-04 | Phase 383 | Complete |
-| CONF-01 | Phase 384 | Pending |
-| CONF-02 | Phase 384 | Pending |
+| CONF-01 | Phase 384 | Complete |
+| CONF-02 | Phase 384 | Complete |
 | CONF-03 | Phase 384 | Pending |
 
 **Coverage:**
