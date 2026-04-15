@@ -2,9 +2,9 @@ pub use arc_control_plane::{
     authority_public_key_from_seed_file, build_kernel, certify, configure_budget_store,
     configure_capability_authority, configure_receipt_store, configure_revocation_store,
     enterprise_federation, evidence_export, federation_policy, issuance,
-    scim_lifecycle,
     issue_default_capabilities, load_or_create_authority_keypair, passport_verifier, policy,
-    reputation, require_control_token, rotate_authority_keypair, trust_control, CliError,
+    reputation, require_control_token, rotate_authority_keypair, scim_lifecycle, trust_control,
+    CliError,
 };
 pub use arc_hosted_mcp as remote_mcp;
 
@@ -18,6 +18,7 @@ use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use tracing::{debug, error, info, warn};
 
+use arc_api_protect::{ProtectConfig, ProtectProxy};
 use arc_core::appraisal::{
     RuntimeAttestationAppraisalImportRequest, RuntimeAttestationAppraisalRequest,
     RuntimeAttestationAppraisalResultExportRequest, RuntimeAttestationImportedAppraisalPolicy,
@@ -46,15 +47,26 @@ use crate::policy::load_policy;
 ///
 /// Runtime security enforcement for AI agents via capability-based
 /// authorization and signed audit receipts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
+enum OutputFormat {
+    #[default]
+    Human,
+    Json,
+}
+
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Output format: human-readable or JSON.
-    #[arg(long, global = true, default_value = "false")]
+    /// Backward-compatible alias for `--format json`.
+    #[arg(long, global = true, default_value_t = false)]
     json: bool,
+
+    /// Output format for command results and terminal error reporting.
+    #[arg(long, global = true, value_enum, default_value_t = OutputFormat::Human)]
+    format: OutputFormat,
 
     /// Optional SQLite database path for durable receipt persistence.
     #[arg(long, global = true)]
@@ -87,6 +99,12 @@ struct Cli {
     /// Bearer token used to authenticate to the shared trust-control service.
     #[arg(long, global = true)]
     control_token: Option<String>,
+}
+
+impl Cli {
+    fn json_output(&self) -> bool {
+        self.json || matches!(self.format, OutputFormat::Json)
+    }
 }
 
 #[derive(Subcommand)]
@@ -125,6 +143,12 @@ enum Commands {
     Init {
         /// Directory to create for the scaffolded project.
         path: PathBuf,
+    },
+
+    /// Protect an HTTP API with ARC using an OpenAPI spec-backed sidecar.
+    Api {
+        #[command(subcommand)]
+        command: ApiCommands,
     },
 
     /// Serve an MCP-compatible edge backed by the ARC kernel.
@@ -179,6 +203,31 @@ enum Commands {
     Cert {
         #[command(subcommand)]
         command: CertCommands,
+    },
+
+    /// Guard development lifecycle: scaffold, build, and inspect WASM guards.
+    Guard {
+        #[command(subcommand)]
+        command: GuardCommands,
+    },
+}
+
+/// Guard development lifecycle commands.
+#[derive(Subcommand)]
+enum GuardCommands {
+    /// Scaffold a new guard project with Cargo.toml, src/lib.rs, and guard-manifest.yaml.
+    New {
+        /// Name of the guard project to create.
+        name: String,
+    },
+
+    /// Compile the guard in the current directory to wasm32-unknown-unknown.
+    Build,
+
+    /// Inspect a compiled .wasm guard binary and print exports, ABI compatibility, and memory config.
+    Inspect {
+        /// Path to the .wasm file to inspect.
+        path: PathBuf,
     },
 }
 
@@ -352,6 +401,28 @@ enum McpCommands {
         /// The wrapped MCP server command and its arguments.
         #[arg(trailing_var_arg = true, required = true)]
         command: Vec<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ApiCommands {
+    /// Start the ARC HTTP sidecar/reverse proxy.
+    Protect {
+        /// Upstream base URL to proxy to.
+        #[arg(long)]
+        upstream: String,
+
+        /// Optional local OpenAPI spec path. Auto-discovered when omitted.
+        #[arg(long)]
+        spec: Option<PathBuf>,
+
+        /// Address to listen on.
+        #[arg(long, default_value = "127.0.0.1:9090")]
+        listen: String,
+
+        /// Optional SQLite receipt store path.
+        #[arg(long = "receipt-store")]
+        receipt_store: Option<PathBuf>,
     },
 }
 
@@ -2611,8 +2682,8 @@ enum PassportIssuanceCommands {
         #[arg(long)]
         credential_configuration_id: Option<String>,
         /// Optional format override used for fail-closed validation.
-        #[arg(long)]
-        format: Option<String>,
+        #[arg(long = "credential-format")]
+        credential_format: Option<String>,
     },
 }
 
