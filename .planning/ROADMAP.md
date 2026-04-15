@@ -193,8 +193,8 @@
   (completed locally 2026-04-14; archived locally 2026-04-14)
 - [x] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
   (completed locally and archived locally 2026-04-14)
-- [ ] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
-  (active locally 2026-04-14; phases 403-405 complete)
+- [x] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
+  (completed locally 2026-04-14; pending archival)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11263,7 +11263,7 @@ lifecycle, and ledger/archive closure work to decide whether ARC can now
 honestly upgrade beyond the narrower substrate claim
 **Depends on**: Phases 404 and 405
 **Requirements**: QUAL2-01, QUAL2-02, QUAL2-03
-**Status**: planned
+**Status**: complete locally 2026-04-14
 **Success Criteria** (what must be TRUE):
   1. Qualification evidence reflects the post-v3.15 runtime instead of older
      bounded-fabric assumptions
@@ -11272,7 +11272,9 @@ honestly upgrade beyond the narrower substrate claim
   3. If the stronger claim still does not qualify, one authoritative blocker
      list explains exactly what remains
 **Estimated complexity**: M
-**Plans**: 0 plans
+**Plans**: 1/1 plan complete
+Plans:
+- [x] 406-01-PLAN.md -- rerun the post-v3.15 claim gate, update the authoritative decision docs, and record the retained blockers if the full vision still does not qualify
 
 ---
 
@@ -11283,7 +11285,7 @@ honestly upgrade beyond the narrower substrate claim
 | 403 | v3.15 | Protocol-Aware Bridge Binding and Registry Generalization | Complete |
 | 404 | v3.15 | Lifecycle-Equivalent A2A/ACP Mediation | Complete |
 | 405 | v3.15 | Final v3 Ledger and Archive Closure | Complete |
-| 406 | v3.15 | Full Original-Vision Requalification | Planned |
+| 406 | v3.15 | Full Original-Vision Requalification | Complete |
 
 ---
 
@@ -11497,5 +11499,5 @@ Plans:
 |-------|-----------|------|--------|
 | 386 | 2/2 | Complete    | 2026-04-15 |
 | 387 | 2/2 | Complete    | 2026-04-15 |
-| 388 | 3/3 | Complete   | 2026-04-15 |
+| 388 | 3/3 | Complete    | 2026-04-15 |
 | 389 | v4.2 | Cross-Language Conformance Suite | Not started |

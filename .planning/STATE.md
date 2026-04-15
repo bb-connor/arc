@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: `v3.15` exists because the post-v3.14 audit still found a bounded
+status: `v3.15` existed because the post-v3.14 audit still found a bounded
 stopped_at: Completed 388-03-PLAN.md
-last_updated: "2026-04-15T03:47:03.712Z"
-last_activity: 2026-04-14 -- completed `v3.15/405` and advanced the next
+last_updated: "2026-04-15T03:52:45.447Z"
+last_activity: 2026-04-14 -- completed `v3.15/406` and closed the milestone's
 progress:
   total_phases: 359
-  completed_phases: 276
-  total_plans: 763
-  completed_plans: 800
-  percent: 75
+  completed_phases: 277
+  total_plans: 764
+  completed_plans: 801
+  percent: 100
 ---
 
 # Project State
@@ -24,27 +24,26 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.15 Universal Protocol Fabric Realization` is now the
-active local milestone. `v3.14` is complete and archived locally, and phases
-`403` through `405` have now closed the protocol-aware fabric routing,
-lifecycle-equivalent mediation, and final v3 ledger/archive closure lanes.
-The remaining work is the final requalification pass in `406`.
+**Current focus:** `v3.15 Universal Protocol Fabric Realization` is complete
+locally. `v3.14` is archived locally, and phases `403` through `406` have now
+closed the protocol-aware fabric routing, lifecycle-equivalent mediation,
+final v3 ledger/archive closure, and post-v3.15 claim-gate rerun. The next
+workflow step is milestone archival or the next milestone start.
 
 ## Current Position
 
-Phase: 406 planned / ready to execute
-Plan: rerun the strongest claim gate against the post-v3.15 runtime, docs,
-and planning state
-Status: `v3.15` exists because the post-v3.14 audit still found a bounded
+Phase: milestone complete locally / pending archival
+Plan: archive `v3.15` or open the next milestone
+Status: `v3.15` existed because the post-v3.14 audit still found a bounded
 fabric story, missing lifecycle symmetry, and planning/archive truth debt.
-Phases 403-405 are now complete locally, including the `v3.14` archive
-snapshot and live planning-ledger reconciliation. The current claim remains
-the narrower qualified substrate/fabric claim until phase `406` proves a
-stronger one honestly.
-Last activity: 2026-04-14 -- completed `v3.15/405` and advanced the next
-executable target to `406`.
+Phases `403-406` are now complete locally. The final claim gate did not
+upgrade ARC to the full original-vision claim, but it did strengthen the
+defended narrow claim to a bounded protocol-aware fabric on the qualified
+authoritative paths.
+Last activity: 2026-04-14 -- completed `v3.15/406` and closed the milestone's
+execution phases locally.
 
-Progress: [########--] 75%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
@@ -179,14 +178,14 @@ Progress: [########--] 75%
 
 ### Pending Todos
 
-- Execute phase `406` for `v3.15 Universal Protocol Fabric Realization`.
+- Archive `v3.15 Universal Protocol Fabric Realization`.
 - Resume `v4.0` planning/execution in parallel as capacity allows.
 
 ### Blockers/Concerns
 
-- `v3.12`, `v3.13`, and `v3.14` are now archived locally, but the broader
-  v3 planning story still should not be treated as a stronger top-level claim
-  until phase `406` reruns the qualification gate explicitly.
+- `v3.12`, `v3.13`, and `v3.14` are now archived locally, and `v3.15` is
+  complete locally but not yet archived. The stronger full original-vision
+  claim is still not qualified after the post-v3.15 rerun.
 - `v2.83` is still partially complete locally because phase `316` remains
   pending, so it should stay marked as unresolved prior-lane debt instead of
   silently reading as either archived or active.
