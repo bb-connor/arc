@@ -164,15 +164,23 @@
 - [ ] **v2.83 Coverage, Hardening, and Production Qualification** - Phases
   315-318 (active locally 2026-04-13 after `v2.82` archive)
 - [ ] **v3.0 Universal Security Kernel Foundation** - Phases 319-322
-  (planned)
-- [ ] **v3.1 Attestation Completion** - Phases 323-326 (planned)
-- [ ] **v3.2 Python Adoption** - Phases 327-330 (planned)
-- [ ] **v3.3 TypeScript Adoption** - Phases 331-334 (planned)
-- [ ] **v3.4 Guard Expansion** - Phases 335-338 (planned)
-- [ ] **v3.5 Protocol Breadth** - Phases 339-342 (planned)
-- [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
-- [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
-- [ ] **v3.8 Normative Specification Alignment** - Phases 351-358 (planned)
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.1 Attestation Completion** - Phases 323-326
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.2 Python Adoption** - Phases 327-330
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.3 TypeScript Adoption** - Phases 331-334
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.4 Guard Expansion** - Phases 335-338
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.5 Protocol Breadth** - Phases 339-342
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.6 Platform Extensions** - Phases 343-346
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.7 Strategic Bets** - Phases 347-350
+  (implemented locally 2026-04-13/14; audit pending)
+- [ ] **v3.8 Normative Specification Alignment** - Phases 351-358
+  (implemented locally 2026-04-13/14; audit pending)
 - [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
   (implemented locally 2026-04-14; reconciliation pending in v3.14/401)
 - [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
@@ -187,6 +195,8 @@
   (completed locally 2026-04-14; archived locally 2026-04-14)
 - [x] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
   (completed locally 2026-04-14; pending archival / next milestone)
+- [ ] **v3.15 Universal Protocol Fabric Realization** - Phases 403-406
+  (active locally 2026-04-14)
 - [ ] **v4.0 WASM Guard Runtime Completion** - Phases 373-376 (planned;
   parallel with v2.83)
 - [ ] **v4.1 Guard SDK and Developer Experience** - Phases 382-385 (planned;
@@ -11172,6 +11182,108 @@ original vision claim
 
 ---
 
+## v3.15 Universal Protocol Fabric Realization (Phases 403-406)
+
+**Milestone Goal:** Close the remaining post-v3.14 gap between ARC's stronger
+qualified substrate claim and the full original vision by lifting
+target-protocol selection into shared bridge metadata and registry-driven
+bindings, pushing lifecycle-equivalent mediation on the public A2A/ACP
+surfaces ARC wants to claim as symmetric, and finishing the final v3
+ledger/archive truth closure before another full-vision qualification pass.
+
+**Dependency:** Follows v3.14's first protocol-to-protocol and
+kernel-convergence lane. This milestone exists because the latest review still
+found authoritative edge bindings hardcoded to `Native`, lifecycle symmetry
+not yet earned, and planning/archive truth not yet fully clean.
+
+**Parallelism:** Phase 403 generalizes protocol-aware binding and target
+selection on the authoritative edges. Phase 404 either lands real
+lifecycle-equivalent mediation or narrows the claim gate again with no public
+ambiguity. Phase 405 archives and reconciles the remaining v3 planning truth.
+Phase 406 reruns the strongest claim gate against the post-v3.15 runtime and
+planning state. Phase 403 should execute first; Phases 404 and 405 can proceed
+in parallel once the new binding substrate exists; Phase 406 depends on both.
+
+### Phase 403: Protocol-Aware Bridge Binding and Registry Generalization
+**Goal**: Lift target-protocol selection into shared bridge metadata and
+registry-driven authoritative bindings so A2A/ACP no longer default every
+published tool to `DiscoveryProtocol::Native`
+**Depends on**: Phase 402 (the bounded-fabric claim gate outcome is explicit)
+**Requirements**: FABRIC2-01, FABRIC2-02, FABRIC2-03
+**Status**: planned locally 2026-04-14; execution started
+**Success Criteria** (what must be TRUE):
+  1. Shared bridge metadata records authoritative target protocol explicitly
+     for outward bindings
+  2. A2A and ACP authoritative execution both select supported non-native
+     targets from that metadata without bespoke helper-only paths
+  3. `CROSS-PROTOCOL-BRIDGING.md` describes the shipped protocol-aware
+     substrate and the still-future universal multi-hop fabric without stale
+     contradictions
+**Estimated complexity**: M
+**Plans**: 1 plan
+
+### Phase 404: Lifecycle-Equivalent A2A/ACP Mediation
+**Goal**: Earn the lifecycle-equivalent claim on the public A2A/ACP surfaces,
+or narrow the claim gate again with no remaining public ambiguity
+**Depends on**: Phase 403 (protocol-aware fabric selection exists)
+**Requirements**: LIFE2-01, LIFE2-02, LIFE2-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. A2A either ships receipt-bearing stream/task lifecycle semantics or the
+     official claim gate excludes lifecycle equivalence explicitly
+  2. ACP either ships truthful invoke/stream/cancel/resume mediation or the
+     official claim gate excludes lifecycle equivalence explicitly
+  3. Compatibility-only bypasses are isolated strongly enough that default
+     public surfaces cannot be mistaken for the authoritative path
+**Estimated complexity**: L
+**Plans**: 0 plans
+
+### Phase 405: Final v3 Ledger and Archive Closure
+**Goal**: Finish the remaining v3 milestone, roadmap, requirements, and
+archive truth so planning becomes a clean source of evidence
+**Depends on**: Phase 403 (new active milestone and bridge truth are explicit)
+**Requirements**: LEDGER2-01, LEDGER2-02, LEDGER2-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. `STATE.md`, `PROJECT.md`, `MILESTONES.md`, `ROADMAP.md`, and
+     `REQUIREMENTS.md` agree on active, implemented, and archived milestones
+  2. `v3.14` archival and any remaining local-only milestone state are called
+     out explicitly
+  3. Early-v3 top-level labels and detailed phase tables now tell one coherent
+     implementation/audit-pending story
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+### Phase 406: Full Original-Vision Requalification
+**Goal**: Re-run the strongest claim gate after the protocol-aware routing,
+lifecycle, and ledger/archive closure work to decide whether ARC can now
+honestly upgrade beyond the narrower substrate claim
+**Depends on**: Phases 404 and 405
+**Requirements**: QUAL2-01, QUAL2-02, QUAL2-03
+**Status**: planned
+**Success Criteria** (what must be TRUE):
+  1. Qualification evidence reflects the post-v3.15 runtime instead of older
+     bounded-fabric assumptions
+  2. The stronger original-vision claim is upgraded only if the runtime and
+     ledger really justify it
+  3. If the stronger claim still does not qualify, one authoritative blocker
+     list explains exactly what remains
+**Estimated complexity**: M
+**Plans**: 0 plans
+
+---
+
+## Phase Summary (v3.15)
+
+| Phase | Milestone | Name | Status |
+|-------|-----------|------|--------|
+| 403 | v3.15 | Protocol-Aware Bridge Binding and Registry Generalization | Planned / started |
+| 404 | v3.15 | Lifecycle-Equivalent A2A/ACP Mediation | Planned |
+| 405 | v3.15 | Final v3 Ledger and Archive Closure | Planned |
+| 406 | v3.15 | Full Original-Vision Requalification | Planned |
+
+---
+
 ## v4.1 Guard SDK and Developer Experience (Phases 382-385)
 
 **Milestone Goal:** Ship the guest-side Rust SDK, proc macro, example guards,
@@ -11340,8 +11452,8 @@ Plans:
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
-- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
-- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
+- [ ] 387-01-PLAN.md -- SDK scaffold, WIT type generation, example guard, build pipeline
+- [ ] 387-02-PLAN.md -- Rust integration test proving host loads TS-compiled WASM
 
 ### Phase 388: Python and Go Guard SDKs
 **Goal**: Guard authors can write policy guards in Python or Go, compile them to WASM components via componentize-py or TinyGo, and load them in the ARC host runtime alongside Rust and TypeScript guards
