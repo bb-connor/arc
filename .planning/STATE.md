@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
-status: v3.14 has been defined from the post-v3 debate. The new milestone owns
-stopped_at: Completed 385-01-PLAN.md (guard test and bench CLI commands)
-last_updated: "2026-04-15T01:29:32.506Z"
-last_activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
+status: `v3.14` now owns protocol-to-protocol fabric runtime, literal kernel
+stopped_at: Completed 385-02-PLAN.md (guard pack and install CLI commands)
+last_updated: "2026-04-15T01:42:31.232Z"
+last_activity: 2026-04-14 -- continued `v3.14 Universal Fabric and Kernel
 progress:
   total_phases: 355
-  completed_phases: 264
+  completed_phases: 265
   total_plans: 747
-  completed_plans: 784
+  completed_plans: 785
   percent: 0
 ---
 
@@ -24,21 +24,27 @@ See: .planning/PROJECT.md (updated 2026-04-14)
 authority with auditable outcomes, bounded spend, and cryptographic proof
 artifacts that enable economic security, regulatory compliance, and portable
 trust.
-**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` is now
-defined. The next execution step is Phase `397`, while `v3.12`/`v3.13`
-archival and the parallel `v4.x` guard lane remain separate follow-up work.
+**Current focus:** `v3.14 Universal Fabric and Kernel Convergence` is active.
+Protocol-fabric runtime, HTTP/kernel convergence, SDK authority/evidence
+convergence, and lifecycle-surface closure are the live execution lanes, while
+`v3.12`/`v3.13` archival and the parallel `v4.x` guard lane remain separate
+follow-up work.
 
 ## Current Position
 
-Phase: Not started (next planned phase 397)
-Plan: —
-Status: v3.14 has been defined from the post-v3 debate. The new milestone owns
-protocol-to-protocol fabric runtime, literal kernel convergence across
-HTTP/API surfaces, SDK authority/evidence parity, lifecycle-equivalent
-protocol mediation, historical ledger/archive closure, and the final
-full-vision claim decision.
-Last activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
-Kernel Convergence` and routed the next execution step to phase `397`.
+Phase: v3.14 execution in progress (`397`, `398`, and `400` actively
+advancing; `399` partially landed; `401-402` pending)
+Plan: continue runtime execution first, then close ledger/archive truth and the
+full-vision claim gate
+Status: `v3.14` now owns protocol-to-protocol fabric runtime, literal kernel
+convergence across HTTP/API surfaces, SDK authority/evidence parity,
+lifecycle-equivalent protocol mediation, historical ledger/archive closure,
+and the final full-vision claim decision. The runtime lanes have active local
+code/test progress; the remaining closeout work is primarily in phases `401`
+and `402`.
+Last activity: 2026-04-14 -- continued `v3.14 Universal Fabric and Kernel
+Convergence` execution after landing active runtime progress across the 397 /
+398 / 399 / 400 lanes.
 
 Progress: [----------] 0%
 
@@ -103,7 +109,9 @@ Progress: [----------] 0%
   orchestration, authoritative edge unification, bridge-fidelity truth, and
   late-v3 ledger reconciliation.
 - v3.13 exists specifically to close those four remaining gaps even though
-  v4.0 was already planned in parallel and v2.83 remains locally unarchived.
+  v4.0 was already planned in parallel and v2.83 remains locally unarchived;
+  its runtime/substrate closure landed locally, but final ledger/archive
+  closeout rolled forward into `v3.14/401`.
 - Phase `390` is now complete: `arc-cross-protocol` landed as the shared
   runtime home, and the default authoritative A2A/ACP execution paths now emit
   orchestrator-labeled lineage metadata instead of edge-local kernel metadata.
@@ -112,10 +120,9 @@ Progress: [----------] 0%
   unpublished, and adapted bridges carry tested caveats for approval,
   streaming, cancellation, and partial-output semantics.
 - Phase `393` was expanded before execution to explicitly own late-v3 ledger
-  truth, stale planning metadata, and doc/runtime claim mismatches; the
-  remaining implementation gaps now live in phase `394` (HTTP convergence),
-  phase `395` (protocol lifecycle and authority-surface closure), and phase
-  `396` (claim upgrade qualification).
+  truth, stale planning metadata, and doc/runtime claim mismatches, but the
+  remaining historical ledger/archive closure work is still carried by
+  `v3.14/401` rather than being treated as fully closed in `v3.13`.
 - [Phase 373]: Phase 373-02 established the optional guest export probing pattern: get_typed_func().ok() returns None when export absent, enabling graceful degradation for both arc_alloc (allocator) and arc_deny_reason (structured deny reasons).
 - [Phase 374]: trap_on_grow_failure(true) chosen for fail-closed memory enforcement in WASM guards
 - [Phase 374]: Import validation after Module::new() leverages wasmtime's import introspection; module size validation before Module::new() avoids unnecessary compilation
@@ -145,6 +152,7 @@ Progress: [----------] 0%
 - [Phase 385]: TestFixture YAML format uses flat list with GuardRequest shape for request field, expected_verdict (allow/deny), and optional deny_reason_contains
 - [Phase 385]: Percentile uses index = len * pct / 100 clamped to len-1 for non-interpolating semantics
 - [Phase 385]: Fresh WasmtimeBackend per fixture/iteration for fuel and memory state isolation in test and bench commands
+- [Phase 385]: pack_from_dir takes explicit path for testability; archive stores wasm as filename-only for portability; install uses temp-dir extraction for gzip stream compatibility
 
 ### Roadmap Evolution
 
@@ -204,7 +212,7 @@ glue, and expanded prelude
 
 ## Session Continuity
 
-Last session: 2026-04-15T01:29:29.350Z
-Stopped at: Completed 385-01-PLAN.md (guard test and bench CLI commands)
+Last session: 2026-04-15T01:42:31.215Z
+Stopped at: Completed 385-02-PLAN.md (guard pack and install CLI commands)
 Next action: execute 385-02-PLAN.md (guard pack and install CLI commands)
 Resume file: None

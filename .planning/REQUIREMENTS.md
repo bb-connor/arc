@@ -1,8 +1,11 @@
 # Requirements: ARC
 
 **Defined:** 2026-03-27
-**Latest completed milestone:** v3.13 Universal Orchestration Closure
-(completed locally 2026-04-14; pending archival)
+**Latest completed milestone:** v3.12 Cross-Protocol Integrity and Truth
+Completion (completed locally 2026-04-14; pending archival)
+**Most recent implemented milestone:** v3.13 Universal Orchestration Closure
+(runtime/substrate closure landed locally 2026-04-14; ledger/archive closeout
+still pending)
 **Active milestone:** v3.14 Universal Fabric and Kernel Convergence
 **Planned milestones:** v3.0 through v3.14 (Universal Security Kernel era)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external inputs)
@@ -3306,8 +3309,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 - [x] **GCLI-04**: `arc guard test` loads a compiled .wasm and runs it against YAML test fixture files with expected verdicts
 - [x] **GCLI-05**: Test fixture YAML format specifies request fields, expected verdict (allow/deny), and optional expected deny reason substring
 - [x] **GCLI-06**: `arc guard bench <path>` measures fuel consumption and execution time on sample requests and reports p50/p99
-- [ ] **GCLI-07**: `arc guard pack` creates a distributable `.arcguard` archive (gzipped tar) from guard-manifest.yaml + .wasm binary
-- [ ] **GCLI-08**: `arc guard install <path>` extracts an `.arcguard` archive to the configured guard directory
+- [x] **GCLI-07**: `arc guard pack` creates a distributable `.arcguard` archive (gzipped tar) from guard-manifest.yaml + .wasm binary
+- [x] **GCLI-08**: `arc guard install <path>` extracts an `.arcguard` archive to the configured guard directory
 
 ## v4.1 Out of Scope
 
@@ -3341,8 +3344,8 @@ Design docs: `docs/guards/03-IMPLEMENTATION-PLAN.md` Phases 2-3.
 | GCLI-04 | Phase 380 | Complete |
 | GCLI-05 | Phase 380 | Complete |
 | GCLI-06 | Phase 380 | Complete |
-| GCLI-07 | Phase 380 | Pending |
-| GCLI-08 | Phase 380 | Pending |
+| GCLI-07 | Phase 380 | Complete |
+| GCLI-08 | Phase 380 | Complete |
 
 **Coverage:**
 - v4.1 requirements: 19 total

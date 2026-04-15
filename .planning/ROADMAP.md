@@ -173,16 +173,19 @@
 - [ ] **v3.6 Platform Extensions** - Phases 343-346 (planned)
 - [ ] **v3.7 Strategic Bets** - Phases 347-350 (planned)
 - [ ] **v3.8 Normative Specification Alignment** - Phases 351-358 (planned)
-- [x] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
-  (completed locally 2026-04-14)
-- [x] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
-  364-367 (completed locally 2026-04-14)
-- [x] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
-  368-372 (completed locally 2026-04-14)
+- [ ] **v3.9 Runtime Correctness and Contract Remediation** - Phases 359-363
+  (implemented locally 2026-04-14; reconciliation pending in v3.14/401)
+- [ ] **v3.10 HTTP Sidecar and Cross-SDK Contract Completion** - Phases
+  364-367 (implemented locally 2026-04-14; reconciliation pending in
+  v3.14/401)
+- [ ] **v3.11 Sidecar Entrypoint and Body-Integrity Completion** - Phases
+  368-372 (implemented locally 2026-04-14; reconciliation pending in
+  v3.14/401)
 - [x] **v3.12 Cross-Protocol Integrity and Truth Completion** - Phases 377-381
   (completed locally 2026-04-14; pending archival)
-- [x] **v3.13 Universal Orchestration Closure** - Phases 390-396
-  (completed locally 2026-04-14; pending archival)
+- [ ] **v3.13 Universal Orchestration Closure** - Phases 390-396
+  (runtime/substrate closure landed locally 2026-04-14; final ledger/archive
+  closeout still pending in v3.14/401)
 - [ ] **v3.14 Universal Fabric and Kernel Convergence** - Phases 397-402
   (planned; follows v3.13, can execute in parallel with v4.x and archival
   closeout work)
@@ -11268,7 +11271,7 @@ Plans:
 | 382 | 2/2 | Complete    | 2026-04-14 |
 | 383 | 3/3 | Complete    | 2026-04-15 |
 | 384 | 2/2 | Complete    | 2026-04-15 |
-| 385 | 1/2 | In Progress|  |
+| 385 | 2/2 | Complete   | 2026-04-15 |
 
 ---
 
