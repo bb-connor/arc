@@ -11488,8 +11488,8 @@ Plans:
 **Estimated complexity**: M
 **Plans**: 2 plans
 Plans:
-- [ ] 384-01-PLAN.md -- Guard CLI wiring and arc guard new scaffold command
-- [ ] 384-02-PLAN.md -- arc guard build and arc guard inspect commands
+- [ ] 389-01-PLAN.md -- Shared YAML fixtures and conformance runner with verdict checking
+- [ ] 389-02-PLAN.md -- Fuel consumption measurement and 2x parity validation
 
 ---
 
