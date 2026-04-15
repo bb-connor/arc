@@ -11267,7 +11267,7 @@ Plans:
 |-------|-----------|------|--------|
 | 382 | 2/2 | Complete    | 2026-04-14 |
 | 383 | 3/3 | Complete    | 2026-04-15 |
-| 384 | 2/2 | Complete   | 2026-04-15 |
+| 384 | 2/2 | Complete    | 2026-04-15 |
 | 385 | v4.1 | CLI Test, Bench, Pack, and Install | Not started |
 
 ---

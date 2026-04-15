@@ -4,7 +4,7 @@ milestone: v2.66
 milestone_name: Test Coverage for Untested Crates
 status: v3.14 has been defined from the post-v3 debate. The new milestone owns
 stopped_at: Completed 384-02-PLAN.md (guard build and inspect CLI commands)
-last_updated: "2026-04-15T00:36:17.282Z"
+last_updated: "2026-04-15T00:44:34.487Z"
 last_activity: 2026-04-14 -- defined milestone `v3.14 Universal Fabric and
 progress:
   total_phases: 355
