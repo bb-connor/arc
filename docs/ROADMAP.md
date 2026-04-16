@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**29 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**30 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -44,7 +44,7 @@ roadmap phase.
 | 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
-| 6 (Framework SDKs) | 6.1, 6.2, 6.4 | 6.3 | -- |
+| 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1 | -- | 9.2 |
@@ -607,7 +607,7 @@ chat delegation.
 **Acceptance**: An AutoGen GroupChat where registered functions are
 ARC-governed. Nested chat spawns get attenuated capability tokens.
 
-### 6.3 arc-llamaindex
+### 6.3 arc-llamaindex [SHIPPED 1dd8361]
 
 **What**: FunctionTool wrapper, QueryEngineTool scoping for RAG pipelines.
 
