@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**25 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**26 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -51,7 +51,7 @@ roadmap phase.
 | 10 (Orchestration) | -- | -- | 10.1, 10.2, 10.3 |
 | 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
 | 12 (Observability) | 12.1, 12.2 | -- | 12.3 |
-| 13 (External guards) | -- | 13.1 | 13.2, 13.3 |
+| 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.2, 15.3, 15.4, 15.5 | 15.1 | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
@@ -60,7 +60,7 @@ roadmap phase.
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
 
-**Wave 3a in flight**: 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
+**Wave 3a in flight**: 15.1 FIPS crypto path.
 
 ---
 
@@ -955,7 +955,7 @@ tool name, verdict, guard evidence, and cost metadata.
 > **Refs**: `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md`,
 > `docs/protocols/ARCHITECTURAL-EXTENSIONS.md` section 3
 
-### 13.1 AsyncGuardAdapter Infrastructure
+### 13.1 AsyncGuardAdapter Infrastructure [SHIPPED 6104a8c]
 
 **What**: `ExternalGuard` trait, `AsyncGuardAdapter` with circuit breaker,
 token bucket, TtlCache, retry with jitter.
