@@ -1,0 +1,63 @@
+# syntax=docker/dockerfile:1.7
+#
+# Minimal runtime image for the ARC sidecar binary.
+#
+# Build:
+#   docker build -f Dockerfile.sidecar -t arc-sidecar:local .
+#
+# Run:
+#   docker run --rm -p 8939:8939 arc-sidecar:local
+#
+# Default entrypoint is `arc run`. Override with `docker run <image> <args>`.
+
+ARG RUST_VERSION=1.93
+ARG ALPINE_VERSION=3.22
+
+############################
+# Stage 1: build the binary
+############################
+FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} AS builder
+RUN apk add --no-cache build-base cmake perl pkgconf musl-dev
+WORKDIR /workspace
+
+# Copy the full workspace so path dependencies resolve.
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY examples ./examples
+COPY formal ./formal
+COPY tests ./tests
+
+# Build a release binary, locked to the committed Cargo.lock.
+RUN cargo build --release --locked --package arc-cli --bin arc \
+ && strip target/release/arc \
+ && cp target/release/arc /arc
+
+############################
+# Stage 2: minimal runtime
+############################
+FROM alpine:${ALPINE_VERSION} AS runtime
+
+# ca-certificates for outbound TLS, tini for correct signal handling,
+# libgcc/libstdc++ for the Rust runtime.
+RUN apk add --no-cache ca-certificates tini libgcc libstdc++ \
+ && addgroup -S -g 10001 arc \
+ && adduser  -S -u 10001 -G arc -h /home/arc -s /sbin/nologin arc \
+ && mkdir -p /var/lib/arc /etc/arc \
+ && chown -R arc:arc /var/lib/arc /etc/arc /home/arc
+
+COPY --from=builder /arc /usr/local/bin/arc
+RUN chmod 0755 /usr/local/bin/arc
+
+USER arc:arc
+WORKDIR /home/arc
+ENV ARC_HOME=/var/lib/arc \
+    RUST_LOG=info
+
+# OCI metadata (overridden by build workflow).
+LABEL org.opencontainers.image.title="arc-sidecar" \
+      org.opencontainers.image.description="ARC sidecar runtime (capability kernel)" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/backbay/arc"
+
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/arc"]
+CMD ["run"]
