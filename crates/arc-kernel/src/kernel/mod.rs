@@ -1540,6 +1540,7 @@ impl ArcKernel {
             &request.tool_name,
             &request.server_id,
             &request.arguments,
+            request.model_metadata.as_ref(),
         ) {
             Ok(grants) if !grants.is_empty() => grants,
             Ok(_) => {
@@ -1957,6 +1958,7 @@ impl ArcKernel {
             &request.tool_name,
             &request.server_id,
             &request.arguments,
+            request.model_metadata.as_ref(),
         ) {
             Ok(grants) if !grants.is_empty() => grants,
             Ok(_) => {

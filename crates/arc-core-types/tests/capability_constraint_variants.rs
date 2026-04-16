@@ -10,7 +10,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use arc_core_types::capability::{
-    Constraint, ContentReviewTier, ModelSafetyTier, SqlOperationClass,
+    Constraint, ContentReviewTier, ModelMetadata, ModelSafetyTier, SqlOperationClass,
 };
 use serde_json::{json, Value};
 
@@ -181,6 +181,52 @@ fn memory_write_deny_patterns_roundtrips() {
     let value = to_value(&constraint);
     assert_eq!(value["type"], "memory_write_deny_patterns");
     assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+/// Phase 2.3: `ModelMetadata` carries the calling model's identity and
+/// safety tier on `ToolCallRequest`. It must round-trip through serde
+/// so wire edges (HTTP, A2A, MCP) can transport it verbatim.
+#[test]
+fn model_metadata_roundtrips_full() {
+    let metadata = ModelMetadata {
+        model_id: "claude-opus-4".to_string(),
+        safety_tier: Some(ModelSafetyTier::High),
+        provider: Some("anthropic".to_string()),
+    };
+    let value = serde_json::to_value(&metadata).expect("metadata serializes");
+    assert_eq!(
+        value,
+        json!({
+            "model_id": "claude-opus-4",
+            "safety_tier": "high",
+            "provider": "anthropic",
+        })
+    );
+    let round: ModelMetadata = serde_json::from_value(value).expect("metadata deserializes");
+    assert_eq!(round, metadata);
+}
+
+#[test]
+fn model_metadata_omits_absent_optional_fields() {
+    let metadata = ModelMetadata {
+        model_id: "small-uncensored".to_string(),
+        safety_tier: None,
+        provider: None,
+    };
+    let value = serde_json::to_value(&metadata).expect("metadata serializes");
+    assert_eq!(value, json!({"model_id": "small-uncensored"}));
+    let round: ModelMetadata = serde_json::from_value(value).expect("metadata deserializes");
+    assert_eq!(round, metadata);
+}
+
+#[test]
+fn model_metadata_accepts_legacy_payload_without_optional_fields() {
+    // A legacy edge that only populates `model_id` must still decode.
+    let value = json!({"model_id": "gpt-5"});
+    let metadata: ModelMetadata = serde_json::from_value(value).expect("decodes");
+    assert_eq!(metadata.model_id, "gpt-5");
+    assert!(metadata.safety_tier.is_none());
+    assert!(metadata.provider.is_none());
 }
 
 /// Existing variants must still decode from their on-wire form after

@@ -197,6 +197,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         }
     }
 

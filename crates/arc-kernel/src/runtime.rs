@@ -1,4 +1,6 @@
-use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
+use arc_core::capability::{
+    CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent, ModelMetadata,
+};
 use arc_core::receipt::ArcReceipt;
 use arc_core::session::{
     CreateElicitationOperation, CreateElicitationResult, CreateMessageOperation,
@@ -42,6 +44,12 @@ pub struct ToolCallRequest {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional approval token authorizing this governed invocation.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Optional metadata describing the model executing the calling
+    /// agent. Consumed by `Constraint::ModelConstraint` enforcement.
+    ///
+    /// Absent in legacy callers; when the matched grant carries a
+    /// `ModelConstraint` with any requirement, the call is denied.
+    pub model_metadata: Option<ModelMetadata>,
 }
 
 /// The kernel's response to a tool call request.

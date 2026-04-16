@@ -174,6 +174,7 @@ pub fn execute_bridge_mcp_tool_call(
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             },
             request.route_selection_metadata,
         )

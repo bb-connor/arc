@@ -668,6 +668,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 0)
@@ -740,6 +741,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -827,6 +829,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -894,6 +897,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 150)
@@ -933,6 +937,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
 
         let metadata =
@@ -992,6 +997,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
         let _scope =
             scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -1052,6 +1058,7 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         };
         let _scope =
             scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));

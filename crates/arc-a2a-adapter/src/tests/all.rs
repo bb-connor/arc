@@ -1782,6 +1782,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -1843,6 +1844,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate query-auth A2A tool call");
 
@@ -1903,6 +1905,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate basic-auth A2A tool call");
 
@@ -1972,6 +1975,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate mTLS A2A tool call");
 
@@ -2058,6 +2062,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate initial A2A tool call");
         assert_eq!(initial.verdict, Verdict::Allow);
@@ -2084,6 +2089,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate follow-up A2A tool call");
 
@@ -2150,6 +2156,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate cancel-task A2A tool call");
 
@@ -2209,6 +2216,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate streaming A2A tool call");
 
@@ -2268,6 +2276,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate incomplete streaming A2A tool call");
 
@@ -2327,6 +2336,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate subscribe-to-task A2A tool call");
 
@@ -2389,6 +2399,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate incomplete subscribe-to-task A2A tool call");
 
@@ -2448,6 +2459,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -2505,6 +2517,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .expect("evaluate OAuth-backed A2A tool call");
 

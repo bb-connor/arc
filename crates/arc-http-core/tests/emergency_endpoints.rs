@@ -115,6 +115,7 @@ fn make_request(id: &str, cap: &CapabilityToken) -> ToolCallRequest {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     }
 }
 

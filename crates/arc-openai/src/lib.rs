@@ -287,6 +287,7 @@ impl ArcOpenAiAdapter {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: None,
         };
 
         let route_plan = match plan_authoritative_route(

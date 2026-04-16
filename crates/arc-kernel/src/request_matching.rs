@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_core::capability::{ModelMetadata, ModelSafetyTier};
 use regex::Regex;
 
 use super::*;
@@ -201,7 +202,7 @@ pub fn capability_matches_request(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<bool, KernelError> {
-    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments)?.is_empty())
+    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments, None)?.is_empty())
 }
 
 pub fn capability_matches_resource_request(
@@ -252,11 +253,12 @@ pub(super) fn resolve_matching_grants<'a>(
     tool_name: &str,
     server_id: &str,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<Vec<MatchingGrant<'a>>, KernelError> {
     let mut matches = Vec::new();
 
     for (index, grant) in cap.scope.grants.iter().enumerate() {
-        if !grant_matches_request(grant, tool_name, server_id, arguments)? {
+        if !grant_matches_request(grant, tool_name, server_id, arguments, model_metadata)? {
             continue;
         }
 
@@ -286,11 +288,12 @@ fn grant_matches_request(
     tool_name: &str,
     server_id: &str,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     Ok(matches_server(&grant.server_id, server_id)
         && matches_name(&grant.tool_name, tool_name)
         && grant.operations.contains(&Operation::Invoke)
-        && constraints_match(&grant.constraints, arguments)?)
+        && constraints_match(&grant.constraints, arguments, model_metadata)?)
 }
 
 fn matches_server(pattern: &str, server_id: &str) -> bool {
@@ -304,9 +307,10 @@ fn matches_name(pattern: &str, name: &str) -> bool {
 fn constraints_match(
     constraints: &[Constraint],
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     for constraint in constraints {
-        if !constraint_matches(constraint, arguments)? {
+        if !constraint_matches(constraint, arguments, model_metadata)? {
             return Ok(false);
         }
     }
@@ -316,6 +320,7 @@ fn constraints_match(
 fn constraint_matches(
     constraint: &Constraint,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     let string_leaves = collect_string_leaves(arguments);
 
@@ -373,8 +378,20 @@ fn constraint_matches(
         | Constraint::OperationClass(_)
         | Constraint::ContentReviewTier(_)
         | Constraint::MaxTransactionAmountUsd(_)
-        | Constraint::RequireDualApproval(_)
-        | Constraint::ModelConstraint { .. } => Ok(true),
+        | Constraint::RequireDualApproval(_) => Ok(true),
+
+        // Phase 2.3: evaluate the model-routing constraint against the
+        // request-supplied `model_metadata`. A grant is admitted only
+        // when the calling model satisfies both the allowlist (if any)
+        // and the minimum safety tier (if set).
+        Constraint::ModelConstraint {
+            allowed_model_ids,
+            min_safety_tier,
+        } => Ok(model_constraint_matches(
+            allowed_model_ids,
+            *min_safety_tier,
+            model_metadata,
+        )),
 
         Constraint::AudienceAllowlist(allowed) => {
             Ok(audience_allowlist_matches(arguments, allowed))
@@ -386,6 +403,54 @@ fn constraint_matches(
             memory_write_deny_patterns_match(arguments, patterns)
         }
     }
+}
+
+/// Evaluate `Constraint::ModelConstraint` against the request-supplied
+/// `model_metadata`.
+///
+/// Denies (returns `false`) when:
+/// - the constraint carries any requirement (non-empty `allowed_model_ids`
+///   or `Some(min_safety_tier)`) and `model_metadata` is absent;
+/// - `allowed_model_ids` is non-empty and the request's `model_id` is
+///   not in the list;
+/// - `min_safety_tier` is `Some` and the request's `safety_tier` is
+///   `None` or strictly below the required tier (the ordering comes
+///   from the `Ord` derive on `ModelSafetyTier`).
+///
+/// A constraint that specifies neither requirement is vacuously
+/// satisfied and returns `true` regardless of whether metadata is
+/// present.
+fn model_constraint_matches(
+    allowed_model_ids: &[String],
+    min_safety_tier: Option<ModelSafetyTier>,
+    model_metadata: Option<&ModelMetadata>,
+) -> bool {
+    let has_allowlist = !allowed_model_ids.is_empty();
+    let has_tier_floor = min_safety_tier.is_some();
+    if !has_allowlist && !has_tier_floor {
+        return true;
+    }
+
+    let Some(metadata) = model_metadata else {
+        return false;
+    };
+
+    if has_allowlist
+        && !allowed_model_ids
+            .iter()
+            .any(|allowed| allowed == &metadata.model_id)
+    {
+        return false;
+    }
+
+    if let Some(required_tier) = min_safety_tier {
+        match metadata.safety_tier {
+            Some(actual) if actual >= required_tier => {}
+            _ => return false,
+        }
+    }
+
+    true
 }
 
 /// Returns true when no recipient-style argument is present, or when

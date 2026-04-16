@@ -1481,6 +1481,7 @@ guards:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let session_roots = vec!["/workspace/project".to_string()];
         let ctx = arc_kernel::GuardContext {

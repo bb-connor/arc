@@ -24,7 +24,7 @@ pub use capability::{
     DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
     GovernedCommerceContext, GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode, ModelSafetyTier, MonetaryAmount, Operation, PromptGrant,
+    MeteredSettlementMode, ModelMetadata, ModelSafetyTier, MonetaryAmount, Operation, PromptGrant,
     ResolvedRuntimeAssurance, ResourceGrant, RuntimeAssuranceTier, RuntimeAttestationEvidence,
     SqlOperationClass, ToolGrant, WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError,
     WorkloadIdentityScheme,

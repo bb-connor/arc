@@ -48,6 +48,7 @@ fn make_request(
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     (scope, agent_id, server_id, request)

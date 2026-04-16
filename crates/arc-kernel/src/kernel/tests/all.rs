@@ -618,6 +618,7 @@ fn make_request_with_arguments(
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     }
 }
 
@@ -1871,6 +1872,7 @@ fn untrusted_issuer_denied() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -5098,6 +5100,7 @@ fn monetary_denial_exceeds_per_invocation_cap() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     // 5 invocations: 5 * 100 = 500 total -- all should pass.
@@ -5144,6 +5147,7 @@ fn monetary_denial_receipt_contains_financial_metadata() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     // First invocation uses up the entire budget (100 of 100).
@@ -5222,6 +5226,7 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let denied_response = kernel
@@ -5294,6 +5299,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5345,6 +5351,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5392,6 +5399,7 @@ fn monetary_allow_receipt_contains_financial_metadata() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5449,6 +5457,7 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5514,6 +5523,7 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5586,6 +5596,7 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5658,6 +5669,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5720,6 +5732,7 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5797,6 +5810,7 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5882,6 +5896,7 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -5973,6 +5988,7 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6041,6 +6057,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
     let asserted_governed = asserted_response
@@ -6103,6 +6120,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
     let observed_governed = observed_response
@@ -6194,6 +6212,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             dpop_proof: None,
             governed_intent: Some(verified_intent),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
     let verified_governed = verified_response
@@ -6293,6 +6312,7 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6371,6 +6391,7 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6453,6 +6474,7 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                     context: None,
                 }),
                 approval_token: None,
+                model_metadata: None,
             },
             &mut client,
         )
@@ -6580,6 +6602,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6649,6 +6672,7 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6699,6 +6723,7 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6750,6 +6775,7 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6820,6 +6846,7 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6872,6 +6899,7 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -6951,6 +6979,7 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7007,6 +7036,7 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7071,6 +7101,7 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7127,6 +7158,7 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7187,6 +7219,7 @@ fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7260,6 +7293,7 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7321,6 +7355,7 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7399,6 +7434,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7477,6 +7513,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7523,6 +7560,7 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7609,6 +7647,7 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7708,6 +7747,7 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7812,6 +7852,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -7933,6 +7974,7 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8042,6 +8084,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8110,6 +8153,7 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8150,6 +8194,7 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8190,6 +8235,7 @@ fn monetary_tool_server_error_releases_precharged_budget() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8230,6 +8276,7 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let r1 = kernel
@@ -8282,6 +8329,7 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let _ = kernel
@@ -8387,6 +8435,7 @@ async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let task_a = {
@@ -8490,6 +8539,7 @@ fn matched_grant_index_populated_in_guard_context() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -8556,6 +8606,7 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     // First two invocations allowed.
@@ -8615,6 +8666,7 @@ fn checkpoint_triggers_at_100_receipts() {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .unwrap();
     }
@@ -8664,6 +8716,7 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             })
             .unwrap();
     }
@@ -8763,6 +8816,7 @@ fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8810,6 +8864,7 @@ fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settl
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         })
         .unwrap();
 
@@ -8937,6 +8992,7 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         dpop_proof: Some(proof),
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -8965,6 +9021,7 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -9008,6 +9065,7 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         dpop_proof: Some(proof),
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

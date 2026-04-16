@@ -158,6 +158,235 @@ fn kernel_records_constraint_and_defers_to_data_guard() {
     );
 }
 
+// ---- Phase 2.3: ModelConstraint evaluation -------------------------------
+
+/// A model listed in `allowed_model_ids` is admitted.
+#[test]
+fn kernel_allows_tool_call_when_model_is_in_allowlist() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["invoke"])));
+
+    let agent_kp = make_keypair();
+    let scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "invoke".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::ModelConstraint {
+                allowed_model_ids: vec![
+                    "claude-opus-4".to_string(),
+                    "gpt-5".to_string(),
+                ],
+                min_safety_tier: None,
+            }],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let mut request = make_request_with_arguments(
+        "req-model-allow",
+        &cap,
+        "invoke",
+        "srv",
+        serde_json::json!({"payload": "hello"}),
+    );
+    request.model_metadata = Some(arc_core::capability::ModelMetadata {
+        model_id: "claude-opus-4".to_string(),
+        safety_tier: Some(arc_core::capability::ModelSafetyTier::High),
+        provider: Some("anthropic".to_string()),
+    });
+
+    assert_eq!(
+        kernel
+            .evaluate_tool_call_blocking(&request)
+            .unwrap()
+            .verdict,
+        Verdict::Allow,
+    );
+}
+
+/// A model not in `allowed_model_ids` is denied.
+#[test]
+fn kernel_denies_tool_call_when_model_is_not_in_allowlist() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["invoke"])));
+
+    let agent_kp = make_keypair();
+    let scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "invoke".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::ModelConstraint {
+                allowed_model_ids: vec!["claude-opus-4".to_string()],
+                min_safety_tier: None,
+            }],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let mut request = make_request_with_arguments(
+        "req-model-deny",
+        &cap,
+        "invoke",
+        "srv",
+        serde_json::json!({"payload": "hello"}),
+    );
+    request.model_metadata = Some(arc_core::capability::ModelMetadata {
+        model_id: "small-uncensored".to_string(),
+        safety_tier: Some(arc_core::capability::ModelSafetyTier::Low),
+        provider: None,
+    });
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("not in capability scope"),
+        "unexpected deny reason: {:?}",
+        response.reason,
+    );
+}
+
+/// A model whose declared safety tier is below `min_safety_tier` is
+/// denied. This is the roadmap acceptance criterion.
+#[test]
+fn kernel_denies_tool_call_when_model_safety_tier_is_below_minimum() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["invoke"])));
+
+    let agent_kp = make_keypair();
+    let scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "invoke".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::ModelConstraint {
+                allowed_model_ids: Vec::new(),
+                min_safety_tier: Some(arc_core::capability::ModelSafetyTier::Standard),
+            }],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let mut request = make_request_with_arguments(
+        "req-model-low-tier",
+        &cap,
+        "invoke",
+        "srv",
+        serde_json::json!({"payload": "hello"}),
+    );
+    request.model_metadata = Some(arc_core::capability::ModelMetadata {
+        model_id: "small-uncensored".to_string(),
+        safety_tier: Some(arc_core::capability::ModelSafetyTier::Low),
+        provider: None,
+    });
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+}
+
+/// When the grant carries a `ModelConstraint` with any requirement and
+/// the request omits `model_metadata`, the kernel must deny. This
+/// protects against a caller forgetting to declare their model.
+#[test]
+fn kernel_denies_tool_call_when_model_metadata_is_missing_but_required() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["invoke"])));
+
+    let agent_kp = make_keypair();
+    let scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "invoke".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: vec![Constraint::ModelConstraint {
+                allowed_model_ids: vec!["claude-opus-4".to_string()],
+                min_safety_tier: Some(arc_core::capability::ModelSafetyTier::Standard),
+            }],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let request = make_request_with_arguments(
+        "req-model-missing",
+        &cap,
+        "invoke",
+        "srv",
+        serde_json::json!({"payload": "hello"}),
+    );
+    // model_metadata remains None.
+
+    let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+}
+
+/// Wire back-compat: when the grant has no `ModelConstraint`, a
+/// request that omits `model_metadata` must still be accepted. This
+/// preserves the existing invocation shape used by every current call
+/// site.
+#[test]
+fn kernel_allows_tool_call_without_model_metadata_when_grant_has_no_model_constraint() {
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv", vec!["invoke"])));
+
+    let agent_kp = make_keypair();
+    let scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv".to_string(),
+            tool_name: "invoke".to_string(),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let cap = make_capability(&kernel, &agent_kp, scope, 300);
+
+    let request = make_request_with_arguments(
+        "req-legacy",
+        &cap,
+        "invoke",
+        "srv",
+        serde_json::json!({"payload": "hello"}),
+    );
+    // model_metadata remains None.
+
+    assert_eq!(
+        kernel
+            .evaluate_tool_call_blocking(&request)
+            .unwrap()
+            .verdict,
+        Verdict::Allow,
+    );
+}
+
 /// `MemoryWriteDenyPatterns` should deny a write whose arguments
 /// contain a string matching any supplied regex pattern.
 #[test]

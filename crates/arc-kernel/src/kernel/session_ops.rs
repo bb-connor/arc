@@ -543,6 +543,7 @@ impl ArcKernel {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = self.evaluate_tool_call_with_nested_flow_client(context, &request, client);
@@ -611,6 +612,7 @@ impl ArcKernel {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 };
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;

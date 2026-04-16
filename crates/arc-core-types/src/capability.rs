@@ -1879,6 +1879,24 @@ pub enum Constraint {
     MemoryWriteDenyPatterns(Vec<String>),
 }
 
+/// Metadata describing the model executing a tool-bearing agent.
+///
+/// Carried on `ToolCallRequest` so the kernel can evaluate
+/// `Constraint::ModelConstraint` against the calling model's identity
+/// and safety tier.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ModelMetadata {
+    /// Model identifier (e.g. `"claude-opus-4"`, `"gpt-5"`).
+    pub model_id: String,
+    /// Declared safety tier, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety_tier: Option<ModelSafetyTier>,
+    /// Optional provider label (e.g. `"anthropic"`, `"openai"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+}
+
 /// A link in the delegation chain, recording that `delegator` granted a
 /// narrowed capability to `delegatee`.
 #[derive(Debug, Clone, Serialize, Deserialize)]

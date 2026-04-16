@@ -75,6 +75,7 @@ fn handle_agent_message(
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 };
 
                 match make_error_receipt(kernel, &request) {
@@ -550,6 +551,7 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = restarted.evaluate_tool_call_blocking(&request).unwrap();
@@ -748,6 +750,7 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -790,6 +793,7 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -919,6 +923,7 @@ capabilities:
             server_id: "srv-b".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/app/src/main.rs"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -979,6 +984,7 @@ capabilities:
             server_id: "srv-a".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/app/src/main.rs"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1030,6 +1036,7 @@ capabilities:
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
+            model_metadata: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1038,6 +1045,7 @@ capabilities:
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1118,6 +1126,7 @@ guards:
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
+            model_metadata: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1126,6 +1135,7 @@ guards:
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1189,6 +1199,7 @@ capabilities:
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1245,6 +1256,7 @@ capabilities:
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1299,6 +1311,7 @@ capabilities:
             server_id: "*".to_string(),
             tool: "bash".to_string(),
             params: serde_json::json!({"command": "rm -rf /"}),
+            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();

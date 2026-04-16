@@ -783,6 +783,7 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
                     dpop_proof: request.execution.dpop_proof.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
+                    model_metadata: None,
                 },
                 Some(route_metadata),
             )
@@ -955,6 +956,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         dpop_proof: request.dpop_proof.clone(),
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
+                        model_metadata: None,
                     },
                     &deny_reason,
                     Some(route_selection_metadata(&planning.evidence)?),
@@ -1058,6 +1060,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         dpop_proof: request.dpop_proof.clone(),
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
+                        model_metadata: None,
                     },
                     Some(route_metadata),
                 )
@@ -1528,6 +1531,7 @@ mod tests {
                         dpop_proof: request.execution.dpop_proof.clone(),
                         governed_intent: request.execution.governed_intent.clone(),
                         approval_token: request.execution.approval_token.clone(),
+                        model_metadata: None,
                     },
                     Some(route_metadata),
                 )
