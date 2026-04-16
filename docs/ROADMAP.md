@@ -23,6 +23,45 @@ Phases are ordered by dependency. Within a phase, stories can generally
 be parallelized unless noted. Some phases can overlap with others where
 there are no hard dependencies.
 
+Phase headers marked `[SHIPPED <sha>]` are complete on `project/full-roadmap`.
+Headers marked `[PARTIAL <sha>]` shipped the core feature but have one or
+more follow-up gaps noted in the phase body. Headers with no marker are
+unstarted or in-flight.
+
+---
+
+## Shipment Status (2026-04-16)
+
+**23 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
+roadmap phase.
+
+| Phase group | Shipped | In flight | Pending |
+|---|---|---|---|
+| 0 (DX) | 0.3, 0.5 | 0.4 | 0.1, 0.2 |
+| 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
+| 2 (Types) | 2.1, 2.2 | -- | 2.3, 2.4 |
+| 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
+| 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
+| 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
+| 6 (Framework SDKs) | -- | 6.1 | 6.2, 6.3, 6.4 |
+| 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
+| 8 (Code exec) | -- | -- | 8.1, 8.2 |
+| 9 (Service mesh) | 9.1 | -- | 9.2 |
+| 10 (Orchestration) | -- | -- | 10.1, 10.2, 10.3 |
+| 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
+| 12 (Observability) | 12.1, 12.2 | -- | 12.3 |
+| 13 (External guards) | -- | 13.1 | 13.2, 13.3 |
+| 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
+| 15 (Compliance) | 15.2, 15.3, 15.4, 15.5 | 15.1 | -- |
+| 16 (Economics) | 16.1, 16.2 | -- | -- |
+| 17 (Workflow orchestrators) | 17.6 | -- | 17.1, 17.2, 17.3, 17.4, 17.5 |
+| 18 (Memory) | -- | -- | 18.1, 18.2 |
+| 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
+| 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
+
+**Wave 3a in flight**: 0.4 binary distribution, 6.1 arc-crewai, 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
+
 ---
 
 ## Phase 0: Developer Experience Foundation
@@ -62,7 +101,7 @@ there are no hard dependencies.
 
 **Acceptance**: `npm install @arc-protocol/node-http` works.
 
-### 0.3 MockArcClient for Testing
+### 0.3 MockArcClient for Testing [SHIPPED 788f69c]
 
 **What**: Ship test fixtures so developers can write unit tests without
 a running sidecar.
@@ -91,7 +130,7 @@ don't need the Rust toolchain.
 
 **Acceptance**: `brew install arc` or `docker run ghcr.io/backbay/arc-sidecar:latest` works without Rust installed.
 
-### 0.5 Error Message Improvements
+### 0.5 Error Message Improvements [SHIPPED 224a05c]
 
 **What**: `ArcDeniedError` includes what was denied, what scope was needed
 vs granted, which guard denied, and a next-steps suggestion.
@@ -130,7 +169,7 @@ window between evaluate() and execution.
 **Acceptance**: A tool call presented >30s after evaluation is rejected.
 A tool call with a replayed nonce is rejected.
 
-### 1.2 Trust Level Taxonomy
+### 1.2 Trust Level Taxonomy [SHIPPED 27488eb]
 
 **What**: Define three trust levels (Mediated, Verified, Advisory).
 Record trust level on every receipt. Document which integration pattern
@@ -146,7 +185,7 @@ provides which trust level.
 **Acceptance**: Receipts from mediated evaluations are distinguishable
 from advisory ones. Operators can filter receipts by trust level.
 
-### 1.3 WASM Guard Module Signing
+### 1.3 WASM Guard Module Signing [SHIPPED 3e258a3]
 
 **What**: Require Ed25519 signatures on `.wasm` guard binaries. Verify
 at load time. Reject unsigned modules unless explicitly opted out.
@@ -161,7 +200,7 @@ at load time. Reject unsigned modules unless explicitly opted out.
 **Acceptance**: Loading an unsigned WASM guard fails with a clear error.
 `arc guard sign` produces a signed module that loads successfully.
 
-### 1.4 Emergency Kill Switch
+### 1.4 Emergency Kill Switch [SHIPPED 225193d]
 
 **What**: `kernel.emergency_stop()` revokes all active capabilities,
 rejects all new evaluate() calls. `kernel.emergency_resume()` re-enables.
@@ -211,7 +250,7 @@ not files that already have this feature.
 > **Depends on**: Nothing (can run parallel to Phases 0-1).
 > **Refs**: `docs/protocols/ADR-TYPE-EVOLUTION.md` (canonical shapes)
 
-### 2.1 New ToolAction Variants
+### 2.1 New ToolAction Variants [SHIPPED f5a8a58]
 
 **What**: Add `CodeExecution`, `BrowserAction`, `DatabaseQuery`,
 `ExternalApiCall`, `MemoryWrite` to the `ToolAction` enum. Update
@@ -226,7 +265,7 @@ not files that already have this feature.
 **Acceptance**: `extract_action("sql_query", args)` returns `ToolAction::DatabaseQuery { ... }`.
 Existing guards continue to work (Unknown fallback unchanged).
 
-### 2.2 New Constraint Variants
+### 2.2 New Constraint Variants [SHIPPED f6a8820]
 
 **What**: Add data layer, communication, financial, model routing, and
 memory governance constraints to the `Constraint` enum.
@@ -279,7 +318,7 @@ and guards, returns per-step verdicts before any execute.
 > **Refs**: `docs/guards/06-CONTENT-SAFETY-ABSORPTION.md`,
 > `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md`
 
-### 3.1 PromptInjectionGuard (Port from ClawdStrike)
+### 3.1 PromptInjectionGuard (Port from ClawdStrike) [SHIPPED 3d55e18]
 
 **What**: Port ClawdStrike's 6-signal prompt injection detector to ARC's
 sync Guard trait. Includes text canonicalization and fingerprint dedup.
@@ -513,7 +552,7 @@ types in the compilation pipeline.
 **Acceptance**: `compile_policy(yaml)` produces a Vec<Box<dyn Guard>>
 that includes all 12 guard types.
 
-### 5.6 Custom Guard Registry: WASM Merge
+### 5.6 Custom Guard Registry: WASM Merge [SHIPPED c381458]
 
 **What**: Add policy-driven WASM guard loading. Placeholder resolution for
 env vars in guard config. Capability intersection on load.
@@ -602,7 +641,7 @@ via sidecar without breaking `ReadableStream` / SSE streaming.
 > **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md`,
 > `docs/protocols/DATA-LAYER-INTEGRATION.md`
 
-### 7.1 SqlQueryGuard
+### 7.1 SqlQueryGuard [SHIPPED b3666a9]
 
 **What**: Parses SQL using `sqlparser-rs`. Checks tables, columns,
 operations, predicates, LIMIT clauses. Fail-closed on parse failure.
@@ -619,7 +658,7 @@ Blocks DELETE/UPDATE without WHERE.
 **Acceptance**: `SELECT * FROM users` denied when `ColumnDenylist` is active.
 `DELETE FROM users` denied (no WHERE). `SELECT name FROM users WHERE tenant_id = 'acme' LIMIT 100` allowed.
 
-### 7.2 VectorDbGuard
+### 7.2 VectorDbGuard [SHIPPED 102c805]
 
 **What**: Collection/namespace scoping, operation class, top_k limits,
 embedding exfiltration protection.
@@ -633,7 +672,7 @@ embedding exfiltration protection.
 Cross-namespace access denied. Upsert denied when operation class is
 ReadOnly. `top_k=500` denied when `MaxRowsReturned=50`.
 
-### 7.3 WarehouseCostGuard
+### 7.3 WarehouseCostGuard [SHIPPED 5a0da48]
 
 **What**: Pre-execution cost estimation via dry-run results in tool
 arguments. MaxBytesScanned and MaxCostPerQuery enforcement.
@@ -649,7 +688,12 @@ arguments. MaxBytesScanned and MaxCostPerQuery enforcement.
 Query estimating $0.25 allowed when `MaxCostPerQuery=$5.00`. Receipt
 records `CostDimension::WarehouseQuery` with actual bytes and cost.
 
-### 7.4 QueryResultGuard (Post-Invocation)
+### 7.4 QueryResultGuard (Post-Invocation) [PARTIAL d8e4514]
+
+> Shipped as `redact_result` transform and `PostInvocationPipeline` adapter.
+> Kernel post-invocation hook wiring is deferred until the kernel exposes
+> that surface.
+
 
 **What**: Row count enforcement, column redaction, PII pattern matching
 on query results.
@@ -709,7 +753,7 @@ Deny.
 > **Depends on**: Nothing (uses existing sidecar endpoint).
 > **Refs**: `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md`
 
-### 9.1 gRPC ext_authz Adapter
+### 9.1 gRPC ext_authz Adapter [SHIPPED 7f4d0d7]
 
 **What**: Implement `envoy.service.auth.v3.Authorization/Check` as a thin
 shim over ARC's `/evaluate` endpoint.
@@ -858,7 +902,7 @@ Resource types outside granted scopes are denied.
 > **Depends on**: Nothing.
 > **Refs**: `docs/guards/11-SIEM-OBSERVABILITY-COMPLETION.md`
 
-### 12.1 Missing SIEM Exporters
+### 12.1 Missing SIEM Exporters [SHIPPED 4c8472b]
 
 **What**: Port Datadog, Sumo Logic, webhook, and alerting exporters from
 ClawdStrike.
@@ -877,7 +921,7 @@ Datadog exporter sends to Datadog Logs API. Webhook exporter delivers
 to a configurable URL with retry. Alerting fires PagerDuty/OpsGenie
 on high-severity guard denials.
 
-### 12.2 OCSF Receipt Format
+### 12.2 OCSF Receipt Format [SHIPPED dec8378]
 
 **What**: Map ARC receipts to OCSF Authorization event class (3002).
 
@@ -1057,7 +1101,7 @@ with P-256 verify correctly. Capability tokens signed with P-256 are
 accepted by the kernel. Existing Ed25519 signatures continue to work
 (backward compatible). Algorithm identifier present in serialized artifacts.
 
-### 15.2 NIST AI RMF Mapping
+### 15.2 NIST AI RMF Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to NIST AI RMF Govern/Map/Measure/Manage functions.
 
@@ -1070,7 +1114,7 @@ accepted by the kernel. Existing Ed25519 signatures continue to work
 ARC controls (capability tokens, guards, receipts, budgets). Reviewed
 by compliance-focused contributor.
 
-### 15.3 PCI DSS v4.0 Mapping
+### 15.3 PCI DSS v4.0 Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to PCI DSS requirements.
 
@@ -1083,7 +1127,7 @@ by compliance-focused contributor.
 shows ARC controls that satisfy it, gaps requiring additional work, and
 customer responsibilities.
 
-### 15.4 ISO 42001 Mapping
+### 15.4 ISO 42001 Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to ISO 42001 AI management system clauses.
 
@@ -1096,7 +1140,7 @@ customer responsibilities.
 (ARC provides technical controls, customer provides organizational).
 Annex A control mapping included.
 
-### 15.5 OWASP LLM Top 10 Coverage Matrix
+### 15.5 OWASP LLM Top 10 Coverage Matrix [SHIPPED 98252dd]
 
 **What**: Document which of the 10 risks ARC addresses, which are gaps,
 which are out of scope.
@@ -1122,7 +1166,7 @@ Reviewed by at least one security-focused contributor.
 > **Depends on**: Nothing.
 > **Refs**: `docs/protocols/ECONOMIC-LAYER-OVERVIEW.md`
 
-### 16.1 Economic Layer Developer Guide
+### 16.1 Economic Layer Developer Guide [SHIPPED f7c738f]
 
 **What**: How-to guide for using metering, budgets, credit, and settlement.
 
@@ -1134,7 +1178,7 @@ Reviewed by at least one security-focused contributor.
 **Acceptance**: A developer can follow the guide to set up per-agent
 budget limits, track tool call costs, and export billing records.
 
-### 16.2 Hierarchical Budget Governance
+### 16.2 Hierarchical Budget Governance [SHIPPED 8234a4d]
 
 **What**: Tree-structured budget policies for enterprise fleet management
 (department -> team -> agent). **This is product work, not documentation.**
@@ -1211,7 +1255,7 @@ methods. Calls outside granted scope are denied.
 **Acceptance**: A K8s Job with `arc.protocol/governed: "true"` label gets
 a capability grant at creation and release on completion.
 
-### 17.6 Cloud Run / ECS Sidecar Reference Patterns
+### 17.6 Cloud Run / ECS Sidecar Reference Patterns [SHIPPED 8a0b933]
 
 **What**: Reference deployment configs for running ARC sidecar alongside
 application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
