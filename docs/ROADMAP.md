@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**39 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**40 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -49,7 +49,7 @@ roadmap phase.
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
 | 10 (Orchestration) | 10.1, 10.2 | -- | 10.3 |
-| 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
+| 11 (Content / streaming / IaC) | 11.2 | -- | 11.1, 11.3 |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
@@ -866,7 +866,7 @@ per-service.
 A Stripe charge above `RequireApprovalAbove` threshold triggers HITL.
 Guard evidence includes detected PII categories.
 
-### 11.2 arc-streaming (Kafka Consumer Middleware)
+### 11.2 arc-streaming (Kafka Consumer Middleware) [SHIPPED d42eb02]
 
 **What**: `ArcConsumerMiddleware` for Kafka. Consumer-side evaluation,
 transactional receipt commit, DLQ governance.
