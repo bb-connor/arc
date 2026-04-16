@@ -160,9 +160,7 @@ pub const ENVOY_SERVER_ID: &str = "envoy";
 /// Translate an Envoy `CheckRequest` into an ARC [`ToolCallRequest`]. Returns
 /// [`TranslateError`] when the request is malformed. The adapter treats a
 /// translation error as an internal fault and denies fail-closed.
-pub fn check_request_to_tool_call(
-    check: &CheckRequest,
-) -> Result<ToolCallRequest, TranslateError> {
+pub fn check_request_to_tool_call(check: &CheckRequest) -> Result<ToolCallRequest, TranslateError> {
     let attrs = check
         .attributes
         .as_ref()
@@ -328,10 +326,7 @@ fn bearer_token(headers: &std::collections::HashMap<String, String>) -> Option<S
     }
 }
 
-fn header_value(
-    headers: &std::collections::HashMap<String, String>,
-    name: &str,
-) -> Option<String> {
+fn header_value(headers: &std::collections::HashMap<String, String>, name: &str) -> Option<String> {
     headers
         .iter()
         .find(|(k, _)| k.eq_ignore_ascii_case(name))
@@ -395,9 +390,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use crate::proto::envoy::service::auth::v3::attribute_context::{
-        HttpRequest, Peer, Request,
-    };
+    use crate::proto::envoy::service::auth::v3::attribute_context::{HttpRequest, Peer, Request};
 
     fn mk_check(
         method: &str,

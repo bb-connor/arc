@@ -105,9 +105,7 @@ mod tests {
             "stop registration must exist and use POST"
         );
 
-        let status = registrations
-            .iter()
-            .find(|r| r.name == "emergency_status");
+        let status = registrations.iter().find(|r| r.name == "emergency_status");
         assert!(
             matches!(status, Some(r) if matches!(r.method, HttpMethod::Get)),
             "status registration must exist and use GET"

@@ -1977,7 +1977,9 @@ mod tests {
         )
         .expect_err("missing publication records should fail closed");
         assert!(
-            missing_error.to_string().contains("claim boundary does not match"),
+            missing_error
+                .to_string()
+                .contains("claim boundary does not match"),
             "unexpected missing-publication error: {missing_error}"
         );
 

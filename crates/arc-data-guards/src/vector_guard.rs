@@ -294,9 +294,10 @@ impl VectorGuardConfig {
     pub fn looks_like_vector(&self, database: &str, tool: &str) -> bool {
         let db = database.to_ascii_lowercase();
         let tl = tool.to_ascii_lowercase();
-        self.vendor_markers
-            .iter()
-            .any(|m| !m.is_empty() && (db.contains(&m.to_ascii_lowercase()) || tl.contains(&m.to_ascii_lowercase())))
+        self.vendor_markers.iter().any(|m| {
+            !m.is_empty()
+                && (db.contains(&m.to_ascii_lowercase()) || tl.contains(&m.to_ascii_lowercase()))
+        })
     }
 }
 
@@ -339,11 +340,7 @@ impl VectorDbGuard {
     /// policy and the active capability scope.
     ///
     /// Returns `Ok(())` to allow; `Err(VectorGuardDenyReason)` to deny.
-    pub fn check(
-        &self,
-        call: &VectorCall,
-        scope: &ArcScope,
-    ) -> Result<(), VectorGuardDenyReason> {
+    pub fn check(&self, call: &VectorCall, scope: &ArcScope) -> Result<(), VectorGuardDenyReason> {
         if self.config.allow_all {
             return Ok(());
         }
@@ -428,10 +425,7 @@ impl VectorDbGuard {
         if let Some(max) = scope_max_rows(scope) {
             match call.top_k {
                 Some(k) if k > max => {
-                    return Err(VectorGuardDenyReason::TopKExceedsLimit {
-                        requested: k,
-                        max,
-                    });
+                    return Err(VectorGuardDenyReason::TopKExceedsLimit { requested: k, max });
                 }
                 None => {
                     // A ceiling is set but the call did not declare top_k.
@@ -708,7 +702,9 @@ mod tests {
             operation: Some("upsert".into()),
             top_k: None,
         };
-        let scope = scope_with(vec![Constraint::OperationClass(SqlOperationClass::ReadOnly)]);
+        let scope = scope_with(vec![Constraint::OperationClass(
+            SqlOperationClass::ReadOnly,
+        )]);
         let err = g.check(&call, &scope).unwrap_err();
         assert!(matches!(
             err,
@@ -832,10 +828,7 @@ mod tests {
 
     #[test]
     fn reason_codes_are_stable() {
-        assert_eq!(
-            VectorGuardDenyReason::NoConfig.code(),
-            "no_config"
-        );
+        assert_eq!(VectorGuardDenyReason::NoConfig.code(), "no_config");
         assert_eq!(
             VectorGuardDenyReason::CollectionNotAllowed {
                 collection: "x".into(),

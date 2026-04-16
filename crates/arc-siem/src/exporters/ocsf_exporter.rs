@@ -171,9 +171,10 @@ impl Exporter for OcsfExporter {
                 request = request.header("Authorization", format!("Bearer {token}"));
             }
 
-            let response = request.send().await.map_err(|e| {
-                ExportError::HttpError(format!("OCSF sink request failed: {e}"))
-            })?;
+            let response = request
+                .send()
+                .await
+                .map_err(|e| ExportError::HttpError(format!("OCSF sink request failed: {e}")))?;
 
             let status = response.status();
             if !status.is_success() {

@@ -12,8 +12,8 @@ use crate::error::KernelError;
 use crate::proto::envoy::config::core::v3::{HeaderValue, HeaderValueOption};
 use crate::proto::envoy::r#type::v3::{HttpStatus, StatusCode as EnvoyStatusCode};
 use crate::proto::envoy::service::auth::v3::{
-    authorization_server::Authorization, check_response::HttpResponse, CheckRequest,
-    CheckResponse, DeniedHttpResponse, OkHttpResponse,
+    authorization_server::Authorization, check_response::HttpResponse, CheckRequest, CheckResponse,
+    DeniedHttpResponse, OkHttpResponse,
 };
 use crate::proto::google::rpc::Status as RpcStatus;
 use crate::translate::{check_request_to_tool_call, ToolCallRequest, Verdict};
@@ -277,7 +277,10 @@ mod tests {
     fn envoy_status_code_falls_back_to_forbidden() {
         assert_eq!(envoy_status_code(999), EnvoyStatusCode::Forbidden as i32);
         assert_eq!(envoy_status_code(403), EnvoyStatusCode::Forbidden as i32);
-        assert_eq!(envoy_status_code(429), EnvoyStatusCode::TooManyRequests as i32);
+        assert_eq!(
+            envoy_status_code(429),
+            EnvoyStatusCode::TooManyRequests as i32
+        );
     }
 
     #[test]

@@ -29,7 +29,10 @@ pub enum ToolAction {
     /// Code execution via an interpreter (language, code snippet).
     CodeExecution { language: String, code: String },
     /// Browser automation action (verb, optional target URL).
-    BrowserAction { verb: String, target: Option<String> },
+    BrowserAction {
+        verb: String,
+        target: Option<String>,
+    },
     /// Database query (database/engine identifier, raw query text).
     DatabaseQuery { database: String, query: String },
     /// External API call (service name, endpoint/path).

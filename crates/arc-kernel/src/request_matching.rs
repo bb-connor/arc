@@ -399,7 +399,9 @@ fn audience_allowlist_matches(arguments: &serde_json::Value, allowed: &[String])
     if observed.is_empty() {
         return true;
     }
-    observed.iter().all(|value| allowed.iter().any(|a| a == value))
+    observed
+        .iter()
+        .all(|value| allowed.iter().any(|a| a == value))
 }
 
 fn collect_audience_values(arguments: &serde_json::Value, out: &mut Vec<String>) {
@@ -449,7 +451,9 @@ fn memory_store_allowlist_matches(arguments: &serde_json::Value, allowed: &[Stri
     if observed.is_empty() {
         return true;
     }
-    observed.iter().all(|value| allowed.iter().any(|a| a == value))
+    observed
+        .iter()
+        .all(|value| allowed.iter().any(|a| a == value))
 }
 
 fn collect_memory_store_values(arguments: &serde_json::Value, out: &mut Vec<String>) {

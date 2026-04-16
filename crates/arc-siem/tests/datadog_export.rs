@@ -2,9 +2,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use arc_core::crypto::Keypair;
-use arc_core::receipt::{
-    ArcReceipt, ArcReceiptBody, Decision, GuardEvidence, ToolCallAction,
-};
+use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, GuardEvidence, ToolCallAction};
 use arc_siem::event::SiemEvent;
 use arc_siem::exporter::ExportError;
 use arc_siem::exporters::datadog::{DatadogConfig, DatadogExporter};
@@ -113,14 +111,8 @@ async fn datadog_posts_log_array_with_api_key_header() {
 
     // First entry is an allow.
     assert_eq!(arr[0].get("status").and_then(|v| v.as_str()), Some("info"));
-    assert_eq!(
-        arr[0].get("ddsource").and_then(|v| v.as_str()),
-        Some("arc")
-    );
-    assert_eq!(
-        arr[0].get("service").and_then(|v| v.as_str()),
-        Some("arc")
-    );
+    assert_eq!(arr[0].get("ddsource").and_then(|v| v.as_str()), Some("arc"));
+    assert_eq!(arr[0].get("service").and_then(|v| v.as_str()), Some("arc"));
     let tags0 = arr[0]
         .get("ddtags")
         .and_then(|v| v.as_str())
@@ -129,10 +121,7 @@ async fn datadog_posts_log_array_with_api_key_header() {
     assert!(tags0.contains("outcome:allow"));
 
     // Second entry is a deny on a High-severity guard.
-    assert_eq!(
-        arr[1].get("status").and_then(|v| v.as_str()),
-        Some("error")
-    );
+    assert_eq!(arr[1].get("status").and_then(|v| v.as_str()), Some("error"));
     let tags1 = arr[1]
         .get("ddtags")
         .and_then(|v| v.as_str())

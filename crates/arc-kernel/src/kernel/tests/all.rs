@@ -9,18 +9,18 @@ use std::thread;
 use arc_core::capability::{
     ArcScope, CallChainContinuationAudience, CallChainContinuationToken,
     CallChainContinuationTokenBody, CapabilityToken, CapabilityTokenBody, Constraint,
-    DelegationLink, DelegationLinkBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
-    GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY, GovernedApprovalDecision,
-    GovernedApprovalToken, GovernedApprovalTokenBody, GovernedAutonomyContext,
-    GovernedAutonomyTier, GovernedCallChainContext, GovernedTransactionIntent,
-    GovernedUpstreamCallChainProof, GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation,
-    PromptGrant, ResourceGrant, ToolGrant,
+    DelegationLink, DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken,
+    GovernedApprovalTokenBody, GovernedAutonomyContext, GovernedAutonomyTier,
+    GovernedCallChainContext, GovernedTransactionIntent, GovernedUpstreamCallChainProof,
+    GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation, PromptGrant, ResourceGrant,
+    ToolGrant, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+    GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
 };
 use arc_core::credit::{
-    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CreditBondArtifact,
-    CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites, CreditBondReport,
-    CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
+    CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
+    CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
     CreditScorecardSummary, ExposureLedgerQuery, ExposureLedgerSummary, SignedCreditBond,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
 };
 use arc_core::crypto::{Keypair, PublicKey};
 use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
@@ -35,7 +35,7 @@ use arc_core::{
     ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
 };
 use arc_link::{ExchangeRate, PriceOracle, PriceOracleError};
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 struct SqliteReceiptStore {
     connection: Connection,
@@ -1614,13 +1614,11 @@ fn path_prefix_constraint_is_enforced() {
     );
     let denied_response = kernel.evaluate_tool_call_blocking(&denied).unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
-    assert!(
-        denied_response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("not in capability scope")
-    );
+    assert!(denied_response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("not in capability scope"));
 }
 
 #[test]
@@ -1962,13 +1960,11 @@ fn revoked_ancestor_capability_denies_descendant() {
     let request = make_request("req-1", &child, "read_file", "srv-a");
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains(&parent.id)
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains(&parent.id));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2070,13 +2066,11 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("missing capability snapshot")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("missing capability snapshot"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2125,13 +2119,11 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("does not authorize delegated tool grant")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2191,13 +2183,11 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("does not authorize delegated tool grant")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2253,13 +2243,11 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("delegatee")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("delegatee"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2327,13 +2315,11 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
         .evaluate_tool_call_blocking(&make_request("req-max-depth", &child, "read_file", "srv-a"))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("delegation depth 2 exceeds maximum 1")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("delegation depth 2 exceeds maximum 1"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2404,13 +2390,11 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("stored depth")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("stored depth"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2534,11 +2518,9 @@ fn web3_evidence_required_activation_rejects_append_only_receipt_store() {
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
-    assert!(
-        error
-            .to_string()
-            .contains("append-only remote receipt mirrors are unsupported")
-    );
+    assert!(error
+        .to_string()
+        .contains("append-only remote receipt mirrors are unsupported"));
 }
 
 #[test]
@@ -3685,13 +3667,11 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
         response.terminal_state,
         OperationTerminalState::Incomplete { .. }
     ));
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("max total bytes")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("max total bytes"));
 
     let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
     assert_eq!(output_stream.chunk_count(), 1);
@@ -4067,11 +4047,9 @@ fn subscribe_session_resource_requires_subscribe_operation() {
         )
         .unwrap();
 
-    assert!(
-        kernel
-            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-            .unwrap()
-    );
+    assert!(kernel
+        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .unwrap());
 }
 
 #[test]
@@ -4107,11 +4085,9 @@ fn unsubscribe_session_resource_is_idempotent() {
         .unsubscribe_session_resource(&session_id, "repo://docs/roadmap")
         .unwrap();
 
-    assert!(
-        !kernel
-            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-            .unwrap()
-    );
+    assert!(!kernel
+        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .unwrap());
 }
 
 #[test]
@@ -4751,6 +4727,27 @@ fn make_trusted_google_runtime_attestation() -> arc_core::capability::RuntimeAtt
     }
 }
 
+fn make_trusted_nitro_runtime_attestation() -> arc_core::capability::RuntimeAttestationEvidence {
+    let now = current_unix_timestamp();
+    arc_core::capability::RuntimeAttestationEvidence {
+        schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+        verifier: "https://nitro.aws.example/".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(5),
+        expires_at: now + 300,
+        evidence_sha256: "digest-nitro-attestation".to_string(),
+        runtime_identity: None,
+        workload_identity: None,
+        claims: Some(serde_json::json!({
+            "awsNitro": {
+                "moduleId": "nitro-enclave-1",
+                "digest": "sha384:aws-measurement",
+                "pcrs": { "0": "0123" }
+            }
+        })),
+    }
+}
+
 fn make_attestation_trust_policy() -> arc_core::capability::AttestationTrustPolicy {
     arc_core::capability::AttestationTrustPolicy {
         rules: vec![
@@ -4778,6 +4775,19 @@ fn make_attestation_trust_policy() -> arc_core::capability::AttestationTrustPoli
                     ("hardwareModel".to_string(), "GCP_AMD_SEV".to_string()),
                     ("secureBoot".to_string(), "enabled".to_string()),
                 ]),
+            },
+            arc_core::capability::AttestationTrustRule {
+                name: "aws-nitro".to_string(),
+                schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+                verifier: "https://nitro.aws.example".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AwsNitro),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: Vec::new(),
+                required_assertions: std::collections::BTreeMap::from([(
+                    "moduleId".to_string(),
+                    "nitro-enclave-1".to_string(),
+                )]),
             },
         ],
     }
@@ -5652,12 +5662,10 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("metered billing provider must not be empty"))
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
     let usage = kernel
         .budget_store
@@ -6695,12 +6703,10 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_ref()
-            .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty"))
-    );
+    assert!(response
+        .reason
+        .as_ref()
+        .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty")));
 }
 
 #[test]
@@ -7139,6 +7145,71 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
 }
 
 #[test]
+fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
+    let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = with_minimum_runtime_assurance(
+        make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
+        RuntimeAssuranceTier::Verified,
+    );
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request_id = "req-governed-assurance-nitro-verified";
+    let mut intent = make_governed_intent(
+        "intent-governed-assurance-nitro-verified",
+        "cost-srv",
+        "compute",
+        "execute governed payout",
+        100,
+        "USD",
+    );
+    intent.runtime_attestation = Some(make_trusted_nitro_runtime_attestation());
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap,
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "invoice_id": "inv-1006" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: Some(approval_token),
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
+    assert_eq!(governed["runtime_assurance"]["verifierFamily"], "aws_nitro");
+    assert_eq!(
+        governed["runtime_assurance"]["verifier"],
+        "https://nitro.aws.example"
+    );
+    assert_eq!(
+        governed["runtime_assurance"]["evidenceSha256"],
+        "digest-nitro-attestation"
+    );
+}
+
+#[test]
 fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
     let mut kernel = ArcKernel::new(make_monetary_config());
     kernel.set_attestation_trust_policy(make_attestation_trust_policy());
@@ -7193,12 +7264,10 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") })
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") }));
 }
 
 #[test]
@@ -7334,12 +7403,10 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("is expired"))
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("is expired")));
 }
 
 #[test]
@@ -8983,11 +9050,9 @@ fn kernel_error_report_includes_out_of_scope_context() {
     assert_eq!(report.code, "ARC-KERNEL-OUT-OF-SCOPE-TOOL");
     assert_eq!(report.context["tool"], "read_file");
     assert_eq!(report.context["server"], "fs");
-    assert!(
-        report
-            .suggested_fix
-            .contains("Issue a capability that grants this tool")
-    );
+    assert!(report
+        .suggested_fix
+        .contains("Issue a capability that grants this tool"));
 }
 
 #[test]

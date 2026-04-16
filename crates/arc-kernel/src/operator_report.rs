@@ -1202,7 +1202,7 @@ mod tests {
     use super::*;
     use arc_core::capability::{GovernedCallChainContext, GovernedProvenanceEvidenceClass};
     use arc_core::receipt::{
-        FinancialBudgetAuthorizeReceiptMetadata, FinancialBudgetAuthorityReceiptMetadata,
+        FinancialBudgetAuthorityReceiptMetadata, FinancialBudgetAuthorizeReceiptMetadata,
         FinancialBudgetHoldAuthorityMetadata, FinancialBudgetTerminalReceiptMetadata,
     };
 

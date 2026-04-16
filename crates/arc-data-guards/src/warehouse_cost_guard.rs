@@ -208,9 +208,10 @@ impl WarehouseCostGuardConfig {
     pub fn looks_like_warehouse(&self, database: &str, tool: &str) -> bool {
         let db = database.to_ascii_lowercase();
         let tl = tool.to_ascii_lowercase();
-        self.warehouse_markers
-            .iter()
-            .any(|m| !m.is_empty() && (db.contains(&m.to_ascii_lowercase()) || tl.contains(&m.to_ascii_lowercase())))
+        self.warehouse_markers.iter().any(|m| {
+            !m.is_empty()
+                && (db.contains(&m.to_ascii_lowercase()) || tl.contains(&m.to_ascii_lowercase()))
+        })
     }
 }
 
@@ -272,22 +273,25 @@ impl WarehouseCostGuard {
         let bytes_path = self.config.field_paths.bytes_scanned.clone();
         let cost_path = self.config.field_paths.estimated_cost_usd.clone();
 
-        let bytes_raw = lookup_path(arguments, &bytes_path)
-            .ok_or(WarehouseCostDenyReason::MissingEstimate { path: bytes_path.clone() })?;
-        let cost_raw = lookup_path(arguments, &cost_path)
-            .ok_or(WarehouseCostDenyReason::MissingEstimate { path: cost_path.clone() })?;
+        let bytes_raw = lookup_path(arguments, &bytes_path).ok_or(
+            WarehouseCostDenyReason::MissingEstimate {
+                path: bytes_path.clone(),
+            },
+        )?;
+        let cost_raw =
+            lookup_path(arguments, &cost_path).ok_or(WarehouseCostDenyReason::MissingEstimate {
+                path: cost_path.clone(),
+            })?;
 
-        let bytes_scanned = coerce_u64(bytes_raw).ok_or_else(|| {
-            WarehouseCostDenyReason::ParseError {
+        let bytes_scanned =
+            coerce_u64(bytes_raw).ok_or_else(|| WarehouseCostDenyReason::ParseError {
                 error: format!("{bytes_path} is not a non-negative integer"),
-            }
-        })?;
+            })?;
 
-        let estimated_cost_usd = coerce_decimal_string(cost_raw).ok_or_else(|| {
-            WarehouseCostDenyReason::ParseError {
+        let estimated_cost_usd =
+            coerce_decimal_string(cost_raw).ok_or_else(|| WarehouseCostDenyReason::ParseError {
                 error: format!("{cost_path} is not a non-negative decimal string"),
-            }
-        })?;
+            })?;
 
         Ok(DryRunEstimate {
             bytes_scanned,
@@ -297,10 +301,7 @@ impl WarehouseCostGuard {
 
     /// Evaluate an estimate against the configured policy.  Returns
     /// `Ok(())` to allow, `Err(...)` to deny.
-    pub fn check(
-        &self,
-        estimate: &DryRunEstimate,
-    ) -> Result<(), WarehouseCostDenyReason> {
+    pub fn check(&self, estimate: &DryRunEstimate) -> Result<(), WarehouseCostDenyReason> {
         if self.config.allow_all {
             return Ok(());
         }
@@ -715,7 +716,10 @@ mod tests {
         let g = WarehouseCostGuard::new(cfg_1gb_5usd());
         let args = serde_json::json!({"query": "SELECT 1"});
         let err = g.extract_estimate(&args).unwrap_err();
-        assert!(matches!(err, WarehouseCostDenyReason::MissingEstimate { .. }));
+        assert!(matches!(
+            err,
+            WarehouseCostDenyReason::MissingEstimate { .. }
+        ));
     }
 
     #[test]

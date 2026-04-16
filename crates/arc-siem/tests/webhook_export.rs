@@ -8,9 +8,7 @@ use arc_core::crypto::Keypair;
 use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
 use arc_siem::event::SiemEvent;
 use arc_siem::exporter::ExportError;
-use arc_siem::exporters::webhook::{
-    WebhookAuth, WebhookConfig, WebhookExporter, WebhookRetry,
-};
+use arc_siem::exporters::webhook::{WebhookAuth, WebhookConfig, WebhookExporter, WebhookRetry};
 use arc_siem::AlertSeverity;
 use arc_siem::Exporter;
 use wiremock::matchers::{header, method, path};
@@ -147,7 +145,10 @@ async fn webhook_retries_on_5xx_then_succeeds() {
 
     let events = vec![SiemEvent::from_receipt(allow_receipt("wh-retry"))];
     let result = exporter.export_batch(&events).await;
-    assert!(result.is_ok(), "export_batch should succeed after retry: {result:?}");
+    assert!(
+        result.is_ok(),
+        "export_batch should succeed after retry: {result:?}"
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 2, "should have retried once");
 }
 
@@ -240,7 +241,10 @@ async fn webhook_exclude_guards_drops_matching_events() {
     };
     let exporter = WebhookExporter::new(config).expect("builds");
 
-    let events = vec![SiemEvent::from_receipt(deny_receipt("wh-excl", "NoisyGuard"))];
+    let events = vec![SiemEvent::from_receipt(deny_receipt(
+        "wh-excl",
+        "NoisyGuard",
+    ))];
     let result = exporter.export_batch(&events).await.expect("ok");
     assert_eq!(result, 1);
 }

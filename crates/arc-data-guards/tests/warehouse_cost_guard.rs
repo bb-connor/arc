@@ -18,7 +18,10 @@ use arc_data_guards::{
 use arc_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 use arc_metering::CostDimension;
 
-fn make_request(tool: &str, args: serde_json::Value) -> (ArcScope, String, String, ToolCallRequest) {
+fn make_request(
+    tool: &str,
+    args: serde_json::Value,
+) -> (ArcScope, String, String, ToolCallRequest) {
     let kp = Keypair::generate();
     let scope = ArcScope::default();
     let agent_id = kp.public_key().to_hex();
@@ -50,11 +53,7 @@ fn make_request(tool: &str, args: serde_json::Value) -> (ArcScope, String, Strin
     (scope, agent_id, server_id, request)
 }
 
-fn evaluate(
-    guard: &WarehouseCostGuard,
-    tool: &str,
-    args: serde_json::Value,
-) -> Verdict {
+fn evaluate(guard: &WarehouseCostGuard, tool: &str, args: serde_json::Value) -> Verdict {
     let (scope, agent_id, server_id, request) = make_request(tool, args);
     let ctx = GuardContext {
         request: &request,
@@ -129,22 +128,14 @@ fn denies_query_above_cost_limit() {
 #[test]
 fn denies_missing_dry_run_metadata() {
     let guard = WarehouseCostGuard::new(limits_1gb_5usd());
-    let verdict = evaluate(
-        &guard,
-        "bigquery",
-        serde_json::json!({"query": "SELECT 1"}),
-    );
+    let verdict = evaluate(&guard, "bigquery", serde_json::json!({"query": "SELECT 1"}));
     assert_eq!(verdict, Verdict::Deny);
 }
 
 #[test]
 fn passes_through_non_warehouse_tools() {
     let guard = WarehouseCostGuard::new(limits_1gb_5usd());
-    let verdict = evaluate(
-        &guard,
-        "postgres",
-        serde_json::json!({"query": "SELECT 1"}),
-    );
+    let verdict = evaluate(&guard, "postgres", serde_json::json!({"query": "SELECT 1"}));
     assert_eq!(verdict, Verdict::Allow);
 }
 

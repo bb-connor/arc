@@ -170,10 +170,7 @@ pub fn receipt_to_ocsf(receipt: &ArcReceipt) -> Value {
             event.insert("status".into(), json!("Unknown"));
             if let Some(unmapped) = event.get_mut("unmapped") {
                 if let Some(obj) = unmapped.as_object_mut() {
-                    obj.insert(
-                        "raw_data_error".into(),
-                        Value::String(format!("{err}")),
-                    );
+                    obj.insert("raw_data_error".into(), Value::String(format!("{err}")));
                 }
             }
         }
@@ -331,7 +328,10 @@ fn build_unmapped(receipt: &ArcReceipt) -> Value {
     arc_map.insert("tool.name".into(), json!(receipt.tool_name));
     arc_map.insert("content.hash".into(), json!(receipt.content_hash));
     arc_map.insert("policy.hash".into(), json!(receipt.policy_hash));
-    arc_map.insert("action.parameter_hash".into(), json!(receipt.action.parameter_hash));
+    arc_map.insert(
+        "action.parameter_hash".into(),
+        json!(receipt.action.parameter_hash),
+    );
     arc_map.insert(
         "trust_level".into(),
         json!(trust_level_str(receipt.trust_level)),

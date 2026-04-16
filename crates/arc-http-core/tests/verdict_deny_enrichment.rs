@@ -164,8 +164,7 @@ fn with_deny_details_attaches_context_to_existing_verdict() {
         ..DenyDetails::default()
     };
 
-    let v =
-        Verdict::deny("tenant mismatch", "TenantGuard").with_deny_details(details.clone());
+    let v = Verdict::deny("tenant mismatch", "TenantGuard").with_deny_details(details.clone());
 
     let Verdict::Deny {
         details: attached, ..

@@ -58,8 +58,8 @@ pub mod translate;
 pub use error::{KernelError, TranslateError};
 pub use service::{ArcExtAuthzService, EnvoyKernel};
 pub use translate::{
-    check_request_to_tool_call, AuthMethod, CallerIdentity, HttpMethod, ToolCallRequest,
-    Verdict, ENVOY_SERVER_ID,
+    check_request_to_tool_call, AuthMethod, CallerIdentity, HttpMethod, ToolCallRequest, Verdict,
+    ENVOY_SERVER_ID,
 };
 
 /// Generated protobuf bindings for the vendored Envoy ext_authz v3 service.

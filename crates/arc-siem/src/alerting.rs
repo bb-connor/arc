@@ -168,9 +168,7 @@ pub trait AlertBackend: Send + Sync {
     fn dispatch<'a>(
         &'a self,
         alert: &'a Alert,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>,
-    >;
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>;
 }
 
 /// A structured alert payload passed to every [`AlertBackend`].
@@ -236,9 +234,8 @@ impl AlertBackend for PagerDutyBackend {
     fn dispatch<'a>(
         &'a self,
         alert: &'a Alert,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
         Box::pin(async move {
             let url = format!("{}/v2/enqueue", self.endpoint.trim_end_matches('/'));
             let payload = serde_json::json!({
@@ -263,9 +260,7 @@ impl AlertBackend for PagerDutyBackend {
                 .json(&payload)
                 .send()
                 .await
-                .map_err(|e| {
-                    ExportError::HttpError(format!("PagerDuty request failed: {e}"))
-                })?;
+                .map_err(|e| ExportError::HttpError(format!("PagerDuty request failed: {e}")))?;
 
             let status = response.status();
             if status.is_success() || status.as_u16() == 202 {
@@ -333,9 +328,8 @@ impl AlertBackend for OpsGenieBackend {
     fn dispatch<'a>(
         &'a self,
         alert: &'a Alert,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
         Box::pin(async move {
             let url = format!("{}/v2/alerts", self.endpoint.trim_end_matches('/'));
 
@@ -364,9 +358,7 @@ impl AlertBackend for OpsGenieBackend {
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| {
-                    ExportError::HttpError(format!("OpsGenie request failed: {e}"))
-                })?;
+                .map_err(|e| ExportError::HttpError(format!("OpsGenie request failed: {e}")))?;
 
             let status = response.status();
             if status.is_success() || status.as_u16() == 202 {

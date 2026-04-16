@@ -19,12 +19,12 @@ use arc_http_core::{
     EmergencyStatusResponse, EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH,
     EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH,
 };
+use arc_kernel::Verdict as KernelVerdict;
 use arc_kernel::{
     ArcKernel, KernelConfig, KernelError, NestedFlowBridge, ServerId, ToolCallRequest,
     ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, EMERGENCY_STOP_DENY_REASON,
 };
-use arc_kernel::Verdict as KernelVerdict;
 
 const ADMIN_TOKEN: &str = "unit-test-admin-token";
 
@@ -141,8 +141,8 @@ fn stop_then_evaluate_returns_deny() {
 
     // POST /emergency-stop with a valid body engages the switch.
     let body = serde_json::to_vec(&serde_json::json!({"reason": "drill"})).unwrap();
-    let response = handle_emergency_stop(&admin, Some(ADMIN_TOKEN), &body)
-        .expect("stop should succeed");
+    let response =
+        handle_emergency_stop(&admin, Some(ADMIN_TOKEN), &body).expect("stop should succeed");
     assert!(response.stopped);
 
     // Now every evaluate must deny with the emergency reason.
@@ -168,8 +168,8 @@ fn resume_restores_normal_operation() {
         .expect("evaluate while stopped");
     assert_eq!(denied.verdict, KernelVerdict::Deny);
 
-    let resume = handle_emergency_resume(&admin, Some(ADMIN_TOKEN), b"")
-        .expect("resume should succeed");
+    let resume =
+        handle_emergency_resume(&admin, Some(ADMIN_TOKEN), b"").expect("resume should succeed");
     assert!(!resume.stopped);
 
     let allow = admin
@@ -184,8 +184,7 @@ fn missing_admin_token_returns_unauthorized() {
     let admin = admin(build_kernel());
 
     let body = serde_json::to_vec(&serde_json::json!({"reason": "x"})).unwrap();
-    let error = handle_emergency_stop(&admin, None, &body)
-        .expect_err("missing token must fail");
+    let error = handle_emergency_stop(&admin, None, &body).expect_err("missing token must fail");
     assert_eq!(error.status(), 401);
     assert_eq!(error, EmergencyHandlerError::Unauthorized);
 
@@ -193,12 +192,12 @@ fn missing_admin_token_returns_unauthorized() {
     // trip the kill switch.
     assert!(!admin.kernel().is_emergency_stopped());
 
-    let wrong = handle_emergency_resume(&admin, Some("wrong"), b"")
-        .expect_err("wrong token must fail");
+    let wrong =
+        handle_emergency_resume(&admin, Some("wrong"), b"").expect_err("wrong token must fail");
     assert_eq!(wrong.status(), 401);
 
-    let status_unauth = handle_emergency_status(&admin, None)
-        .expect_err("status requires auth too");
+    let status_unauth =
+        handle_emergency_status(&admin, None).expect_err("status requires auth too");
     assert_eq!(status_unauth.status(), 401);
 }
 
@@ -278,18 +277,12 @@ fn resume_ignores_body_bytes() {
 fn error_body_is_stable_json_shape() {
     let admin = admin(build_kernel());
 
-    let unauth = handle_emergency_status(&admin, Some("wrong-token"))
-        .expect_err("wrong token");
+    let unauth = handle_emergency_status(&admin, Some("wrong-token")).expect_err("wrong token");
     let payload = unauth.body();
     assert_eq!(payload["error"], "unauthorized");
-    assert!(
-        payload["message"]
-            .as_str()
-            .is_some_and(|m| !m.is_empty())
-    );
+    assert!(payload["message"].as_str().is_some_and(|m| !m.is_empty()));
 
-    let bad_body = handle_emergency_stop(&admin, Some(ADMIN_TOKEN), b"x")
-        .expect_err("bad body");
+    let bad_body = handle_emergency_stop(&admin, Some(ADMIN_TOKEN), b"x").expect_err("bad body");
     let payload = bad_body.body();
     assert_eq!(payload["error"], "bad_request");
 }

@@ -25,8 +25,7 @@ use arc_kernel::{ArcKernel, KernelError};
 use serde::{Deserialize, Serialize};
 
 use crate::routes::{
-    EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH,
-    EMERGENCY_ADMIN_TOKEN_HEADER,
+    EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH,
 };
 
 /// Canonical JSON body for `POST /emergency-stop`.
@@ -114,9 +113,7 @@ impl EmergencyHandlerError {
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::Unauthorized => {
-                "missing or invalid X-Admin-Token header".to_string()
-            }
+            Self::Unauthorized => "missing or invalid X-Admin-Token header".to_string(),
             Self::BadRequest(reason) | Self::Kernel(reason) => reason.clone(),
         }
     }
@@ -201,10 +198,9 @@ pub fn handle_emergency_stop(
 ) -> Result<EmergencyStopResponse, EmergencyHandlerError> {
     admin.authorize(admin_token)?;
 
-    let parsed: EmergencyStopRequest = serde_json::from_slice(body)
-        .map_err(|error| EmergencyHandlerError::BadRequest(format!(
-            "invalid emergency-stop request body: {error}"
-        )))?;
+    let parsed: EmergencyStopRequest = serde_json::from_slice(body).map_err(|error| {
+        EmergencyHandlerError::BadRequest(format!("invalid emergency-stop request body: {error}"))
+    })?;
 
     admin.kernel.emergency_stop(&parsed.reason)?;
 
@@ -240,8 +236,7 @@ pub fn handle_emergency_status(
             // i64 is what chrono expects; secs fit comfortably for any
             // realistic operator timestamp.
             let secs = i64::try_from(unix_secs).ok()?;
-            chrono::DateTime::<chrono::Utc>::from_timestamp(secs, 0)
-                .map(|dt| dt.to_rfc3339())
+            chrono::DateTime::<chrono::Utc>::from_timestamp(secs, 0).map(|dt| dt.to_rfc3339())
         });
     let reason = admin.kernel.emergency_stop_reason();
 

@@ -361,17 +361,11 @@ mod tests {
             tool_name: Some("write_file".into()),
             tool_server: Some("filesystem".into()),
             requested_action: Some("write_file(path=.env)".into()),
-            required_scope: Some(
-                "ToolGrant(server_id=filesystem, tool_name=write_file)".into(),
-            ),
-            granted_scope: Some(
-                "ToolGrant(server_id=filesystem, tool_name=read_file)".into(),
-            ),
+            required_scope: Some("ToolGrant(server_id=filesystem, tool_name=write_file)".into()),
+            granted_scope: Some("ToolGrant(server_id=filesystem, tool_name=read_file)".into()),
             reason_code: Some("scope.missing".into()),
             receipt_id: Some("arc-receipt-7f3a9b2c".into()),
-            hint: Some(
-                "Request scope filesystem::write_file from the authority.".into(),
-            ),
+            hint: Some("Request scope filesystem::write_file from the authority.".into()),
             docs_url: Some("https://docs.arc-protocol.dev/errors/ARC-DENIED".into()),
         };
         let v = Verdict::deny_detailed("scope check failed", "ScopeGuard", details);
@@ -389,7 +383,10 @@ mod tests {
         // so that older SDKs keep parsing the payload.
         let v = Verdict::deny("no capability", "CapabilityGuard");
         let json = serde_json::to_string(&v).expect("serializes");
-        assert!(!json.contains("details"), "unexpected details in JSON: {json}");
+        assert!(
+            !json.contains("details"),
+            "unexpected details in JSON: {json}"
+        );
         assert!(json.contains("\"verdict\":\"deny\""));
         assert!(json.contains("\"reason\":\"no capability\""));
         assert!(json.contains("\"guard\":\"CapabilityGuard\""));

@@ -215,7 +215,10 @@ mod tests {
 
     #[test]
     fn canonicalize_collapses_separators() {
-        assert_eq!(canonicalize("ignore---all___previous"), "ignore all previous");
+        assert_eq!(
+            canonicalize("ignore---all___previous"),
+            "ignore all previous"
+        );
     }
 
     #[test]

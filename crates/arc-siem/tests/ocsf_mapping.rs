@@ -11,9 +11,7 @@ use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, Decision, GuardEvidence, ToolCallAction, TrustLevel,
 };
 use arc_siem::event::SiemEvent;
-use arc_siem::ocsf::{
-    receipt_to_ocsf, OCSF_CATEGORY_UID, OCSF_CLASS_UID, OCSF_SCHEMA_VERSION,
-};
+use arc_siem::ocsf::{receipt_to_ocsf, OCSF_CATEGORY_UID, OCSF_CLASS_UID, OCSF_SCHEMA_VERSION};
 use arc_siem::{OcsfExporter, OcsfExporterConfig, OcsfPayloadFormat};
 use serde_json::Value;
 
@@ -47,7 +45,13 @@ fn receipt_with(
 }
 
 fn allow_receipt() -> ArcReceipt {
-    receipt_with("rc-allow-1", Decision::Allow, TrustLevel::Mediated, vec![], None)
+    receipt_with(
+        "rc-allow-1",
+        Decision::Allow,
+        TrustLevel::Mediated,
+        vec![],
+        None,
+    )
 }
 
 fn deny_receipt() -> ArcReceipt {
@@ -95,7 +99,10 @@ fn deny_receipt_maps_to_failure_event() {
     assert_eq!(ev["severity_id"], 4, "Deny -> High");
     assert_eq!(ev["severity"], "High");
     assert_eq!(ev["status_detail"], "forbidden path");
-    assert_eq!(ev["unmapped"]["arc"]["decision.guard"], "ForbiddenPathGuard");
+    assert_eq!(
+        ev["unmapped"]["arc"]["decision.guard"],
+        "ForbiddenPathGuard"
+    );
 }
 
 #[test]
@@ -259,13 +266,7 @@ fn unknown_decision_yields_non_panicking_event_with_defined_status() {
             reason: "i".to_string(),
         },
     ] {
-        let receipt = receipt_with(
-            "rc-variant",
-            decision,
-            TrustLevel::Mediated,
-            vec![],
-            None,
-        );
+        let receipt = receipt_with("rc-variant", decision, TrustLevel::Mediated, vec![], None);
         let ev = receipt_to_ocsf(&receipt);
         assert_eq!(ev["class_uid"], OCSF_CLASS_UID);
         assert!(

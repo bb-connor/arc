@@ -183,10 +183,7 @@ impl DatadogExporter {
                 "severity:{}",
                 sanitize_tag_value(severity.as_tag())
             ));
-            tags.push(format!(
-                "outcome:{}",
-                if allow { "allow" } else { "deny" }
-            ));
+            tags.push(format!("outcome:{}", if allow { "allow" } else { "deny" }));
 
             for guard in &receipt.evidence {
                 tags.push(format!(
@@ -238,9 +235,7 @@ impl Exporter for DatadogExporter {
                 .json(&logs)
                 .send()
                 .await
-                .map_err(|e| {
-                    ExportError::HttpError(format!("Datadog logs request failed: {e}"))
-                })?;
+                .map_err(|e| ExportError::HttpError(format!("Datadog logs request failed: {e}")))?;
 
             let status = response.status();
             // Datadog returns 202 Accepted on success.

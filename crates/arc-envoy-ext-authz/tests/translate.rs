@@ -20,9 +20,7 @@ use arc_envoy_ext_authz::proto::envoy::service::auth::v3::authorization_client::
 use arc_envoy_ext_authz::proto::envoy::service::auth::v3::authorization_server::AuthorizationServer;
 use arc_envoy_ext_authz::proto::envoy::service::auth::v3::check_response::HttpResponse;
 use arc_envoy_ext_authz::proto::envoy::service::auth::v3::{AttributeContext, CheckRequest};
-use arc_envoy_ext_authz::{
-    ArcExtAuthzService, EnvoyKernel, KernelError, ToolCallRequest, Verdict,
-};
+use arc_envoy_ext_authz::{ArcExtAuthzService, EnvoyKernel, KernelError, ToolCallRequest, Verdict};
 use async_trait::async_trait;
 use tokio::net::TcpListener;
 use tonic::transport::{Channel, Endpoint, Server};
@@ -47,10 +45,7 @@ struct MockKernel {
 
 #[async_trait]
 impl EnvoyKernel for MockKernel {
-    async fn evaluate(
-        &self,
-        request: ToolCallRequest,
-    ) -> Result<Verdict, KernelError> {
+    async fn evaluate(&self, request: ToolCallRequest) -> Result<Verdict, KernelError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if let Ok(mut slot) = self.last_tool.lock() {
             *slot = Some(request.tool.clone());
@@ -111,12 +106,7 @@ async fn spawn_server(
 
 /// Build a minimal valid `CheckRequest` for `GET <path>`. Extra headers
 /// can be provided for identity tests.
-fn make_check(
-    method: &str,
-    path: &str,
-    headers: &[(&str, &str)],
-    body: &str,
-) -> CheckRequest {
+fn make_check(method: &str, path: &str, headers: &[(&str, &str)], body: &str) -> CheckRequest {
     let mut header_map = std::collections::HashMap::new();
     for (k, v) in headers {
         header_map.insert((*k).to_string(), (*v).to_string());
@@ -194,18 +184,19 @@ async fn deny_verdict_returns_forbidden_response() {
                 EnvoyStatusCode::Forbidden as i32
             );
             assert!(denied.body.contains("scope check failed"));
-            let reason_header = denied
-                .headers
-                .iter()
-                .find_map(|HeaderValueOption { header, .. }| {
-                    header.as_ref().and_then(|h| {
-                        if h.key == "x-arc-denial-reason" {
-                            Some(h.value.clone())
-                        } else {
-                            None
-                        }
-                    })
-                });
+            let reason_header =
+                denied
+                    .headers
+                    .iter()
+                    .find_map(|HeaderValueOption { header, .. }| {
+                        header.as_ref().and_then(|h| {
+                            if h.key == "x-arc-denial-reason" {
+                                Some(h.value.clone())
+                            } else {
+                                None
+                            }
+                        })
+                    });
             assert_eq!(reason_header.as_deref(), Some("scope check failed"));
         }
         other => panic!("expected DeniedResponse, got {other:?}"),
@@ -236,10 +227,8 @@ async fn deny_verdict_honours_custom_http_status() {
 
 #[tokio::test]
 async fn kernel_error_fails_closed_with_500() {
-    let (mut client, calls, _) = spawn_server(MockBehavior::Error(
-        "downstream exploded".to_string(),
-    ))
-    .await;
+    let (mut client, calls, _) =
+        spawn_server(MockBehavior::Error("downstream exploded".to_string())).await;
     let check = make_check("GET", "/resource", &[], "");
     let response = client.check(check).await.unwrap().into_inner();
 

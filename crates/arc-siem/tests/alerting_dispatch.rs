@@ -9,9 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use arc_core::crypto::Keypair;
-use arc_core::receipt::{
-    ArcReceipt, ArcReceiptBody, Decision, GuardEvidence, ToolCallAction,
-};
+use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, GuardEvidence, ToolCallAction};
 use arc_siem::alerting::{
     Alert, AlertBackend, AlertSeverity, AlertingConfig, AlertingExporter, OpsGenieBackend,
     PagerDutyBackend,
@@ -107,9 +105,8 @@ impl AlertBackend for RecordingBackend {
     fn dispatch<'a>(
         &'a self,
         alert: &'a Alert,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>,
-    > {
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+    {
         let alerts = self.alerts.clone();
         let alert = alert.clone();
         Box::pin(async move {
@@ -153,7 +150,10 @@ async fn medium_severity_deny_does_not_fire_by_default() {
     ))];
     let _ = exporter.export_batch(&events).await.expect("ok");
 
-    assert!(recorded.lock().unwrap().is_empty(), "medium should not page");
+    assert!(
+        recorded.lock().unwrap().is_empty(),
+        "medium should not page"
+    );
 }
 
 #[tokio::test]
@@ -277,9 +277,8 @@ async fn partial_failure_across_two_backends_surfaces_partial_failure_error() {
         fn dispatch<'a>(
             &'a self,
             _: &'a Alert,
-        ) -> std::pin::Pin<
-            Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>,
-        > {
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ExportError>> + Send + 'a>>
+        {
             let counter = self.1.clone();
             Box::pin(async move {
                 counter.fetch_add(1, Ordering::SeqCst);

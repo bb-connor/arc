@@ -216,7 +216,7 @@ impl ArcKernel {
                 receipt_attribution_metadata(&operation.capability, None),
             ),
             timestamp: current_unix_timestamp(),
-        trust_level: arc_core::TrustLevel::default(),
+            trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;

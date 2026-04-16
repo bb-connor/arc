@@ -1756,7 +1756,6 @@ pub enum Constraint {
     // model-routing, and memory-governance policy. They participate in
     // the existing tagged serde envelope
     // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
-
     /// Data layer: database tables the grant may reference.
     ///
     /// Evaluated against parsed SQL by `arc-data-guards`; the kernel

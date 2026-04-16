@@ -22,8 +22,8 @@ pub use authority::{
 };
 pub use emergency::{
     handle_emergency_resume, handle_emergency_status, handle_emergency_stop, EmergencyAdmin,
-    EmergencyHandlerError, EmergencyResumeResponse, EmergencyStatusResponse,
-    EmergencyStopRequest, EmergencyStopResponse,
+    EmergencyHandlerError, EmergencyResumeResponse, EmergencyStatusResponse, EmergencyStopRequest,
+    EmergencyStopResponse,
 };
 pub use evaluation::{EvaluateResponse, HealthResponse, SidecarStatus, VerifyReceiptResponse};
 pub use identity::{AuthMethod, CallerIdentity};

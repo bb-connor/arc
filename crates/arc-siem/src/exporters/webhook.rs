@@ -189,10 +189,7 @@ impl WebhookExporter {
         true
     }
 
-    fn build_request(
-        &self,
-        event: &SiemEvent,
-    ) -> Result<reqwest::RequestBuilder, ExportError> {
+    fn build_request(&self, event: &SiemEvent) -> Result<reqwest::RequestBuilder, ExportError> {
         let mut req = match self.config.method {
             WebhookMethod::Post => self.client.post(&self.config.url),
             WebhookMethod::Put => self.client.put(&self.config.url),

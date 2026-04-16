@@ -656,8 +656,7 @@ pub fn verify_checkpoint_transparency_records(
             .copied()
         else {
             return Err(CheckpointError::Continuity(
-                "checkpoint publication records do not match the signed checkpoint set"
-                    .to_string(),
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
             ));
         };
         let expected = match publication.trust_anchor_binding.clone() {
@@ -677,8 +676,7 @@ pub fn verify_checkpoint_transparency_records(
         };
         if publication != &expected {
             return Err(CheckpointError::Continuity(
-                "checkpoint publication records do not match the signed checkpoint set"
-                    .to_string(),
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
             ));
         }
         normalized_publications.push(expected);
@@ -1097,13 +1095,13 @@ mod tests {
     #[test]
     fn verify_checkpoint_transparency_records_rejects_duplicate_publication_coverage() {
         let kp = Keypair::generate();
-        let first = build_checkpoint(1, 1, 2, &make_receipt_bytes(2), &kp)
-            .expect("first checkpoint");
+        let first =
+            build_checkpoint(1, 1, 2, &make_receipt_bytes(2), &kp).expect("first checkpoint");
         let second =
             build_checkpoint_with_previous(2, 3, 4, &make_receipt_bytes(2), &kp, Some(&first))
                 .expect("second checkpoint");
-        let derived =
-            validate_checkpoint_transparency(&[first.clone(), second.clone()]).expect("transparency");
+        let derived = validate_checkpoint_transparency(&[first.clone(), second.clone()])
+            .expect("transparency");
         let supplied = CheckpointTransparencySummary {
             publications: vec![
                 derived.publications[0].clone(),
@@ -1117,7 +1115,9 @@ mod tests {
         let error = verify_checkpoint_transparency_records(&[first, second], &supplied)
             .expect_err("duplicate publication coverage should fail");
         assert!(
-            error.to_string().contains("duplicate checkpoint publication record"),
+            error
+                .to_string()
+                .contains("duplicate checkpoint publication record"),
             "unexpected error: {error}"
         );
     }

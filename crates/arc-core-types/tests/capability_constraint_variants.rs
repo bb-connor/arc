@@ -84,10 +84,8 @@ fn max_rows_returned_roundtrips() {
 
 #[test]
 fn audience_allowlist_accepts_string_list() {
-    let constraint = Constraint::AudienceAllowlist(vec![
-        "#ops".to_string(),
-        "alerts@example.com".to_string(),
-    ]);
+    let constraint =
+        Constraint::AudienceAllowlist(vec!["#ops".to_string(), "alerts@example.com".to_string()]);
     let value = to_value(&constraint);
     assert_eq!(value["type"], "audience_allowlist");
     assert_eq!(value["value"][0], "#ops");
