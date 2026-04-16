@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**31 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**32 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -47,7 +47,7 @@ roadmap phase.
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
-| 9 (Service mesh) | 9.1 | -- | 9.2 |
+| 9 (Service mesh) | 9.1, 9.2 | -- | -- |
 | 10 (Orchestration) | -- | -- | 10.1, 10.2, 10.3 |
 | 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
 | 12 (Observability) | 12.1, 12.2 | -- | 12.3 |
@@ -769,7 +769,7 @@ shim over ARC's `/evaluate` endpoint.
 **Acceptance**: An Envoy sidecar with ext_authz pointing at ARC correctly
 allows/denies traffic based on ARC capability evaluation.
 
-### 9.2 Istio Integration Example
+### 9.2 Istio Integration Example [SHIPPED 929e4ab]
 
 **What**: Reference `AuthorizationPolicy` + ext_authz provider config.
 
