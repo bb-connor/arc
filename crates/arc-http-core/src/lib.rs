@@ -28,7 +28,7 @@ pub use receipt::{
 };
 pub use request::ArcHttpRequest;
 pub use session::SessionContext;
-pub use verdict::Verdict;
+pub use verdict::{DenyDetails, Verdict};
 
 // Re-export types from arc-core-types that HTTP adapters commonly need.
 pub use arc_core_types::canonical::{canonical_json_bytes, canonical_json_string};
