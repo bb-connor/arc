@@ -36,6 +36,7 @@ members = [
     "crates/arc-guard-sdk",
     "crates/arc-guard-sdk-macros",
     "crates/arc-guards",
+    "crates/arc-data-guards",
     "crates/arc-http-session",
     "crates/arc-policy",
     "crates/arc-cli",
