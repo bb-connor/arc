@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**32 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**33 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -48,7 +48,7 @@ roadmap phase.
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
-| 10 (Orchestration) | -- | -- | 10.1, 10.2, 10.3 |
+| 10 (Orchestration) | 10.1 | 10.2 | 10.3 |
 | 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
 | 12 (Observability) | 12.1, 12.2 | -- | 12.3 |
 | 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
@@ -796,7 +796,7 @@ appears on responses passing through the mesh.
 > `docs/protocols/AWS-LAMBDA-INTEGRATION.md`,
 > `docs/protocols/LANGGRAPH-INTEGRATION.md`
 
-### 10.1 arc-temporal (Python)
+### 10.1 arc-temporal (Python) [SHIPPED 811fbb8]
 
 **What**: `ArcActivityInterceptor`, `WorkflowGrant`, receipt aggregation.
 Basic version ships without HITL; approval-aware activities added after
