@@ -1,9 +1,9 @@
 {
-  "quote_id": "quote_req_acme_001",
-  "buyer_id": "acme-platform-security",
-  "provider_id": "contoso-red-team",
+  "quote_id": "quote_req_lattice_001",
+  "buyer_id": "lattice-platform-security",
+  "provider_id": "vanguard-security",
   "service_family": "security-review",
   "requested_scope": "release-review",
-  "target": "git://acme.example/payments-api",
+  "target": "git://lattice.example/payments-api",
   "release_window": "2026-05-01T16:00:00Z"
 }

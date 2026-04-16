@@ -1,0 +1,13 @@
+hushspec: "0.1.0"
+name: incident-network-pagerduty
+description: >
+  Guards for the customer PagerDuty MCP server. Read-only access to
+  on-call state, incident timeline, and escalation policy.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - get_oncall_state
+      - get_escalation_timeline

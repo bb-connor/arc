@@ -1,11 +1,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use arc_core::crypto::{canonical_json_bytes, sha256_hex};
 use arc_core::session::{
     CompletionResult, CreateElicitationOperation, NormalizedRoot, OperationContext, OperationKind,
     OperationTerminalState, ProgressToken, PromptDefinition, PromptResult, RequestId,
     RequestOwnershipSnapshot, ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
-    RootDefinition, SessionAuthContext, SessionId,
+    RootDefinition, SessionAnchorReference, SessionAuthContext, SessionId,
 };
 use arc_core::{AgentId, CapabilityToken};
 
@@ -55,6 +56,7 @@ pub struct InflightRequest {
     pub request_id: RequestId,
     pub parent_request_id: Option<RequestId>,
     pub operation_kind: OperationKind,
+    pub session_anchor_id: String,
     pub started_at: Instant,
     pub progress_token: Option<ProgressToken>,
     pub cancellation_requested: bool,
@@ -78,6 +80,7 @@ impl InflightRegistry {
         &mut self,
         context: &OperationContext,
         operation_kind: OperationKind,
+        session_anchor_id: &str,
         cancellable: bool,
     ) -> Result<(), SessionError> {
         if self.requests.contains_key(&context.request_id) {
@@ -92,6 +95,7 @@ impl InflightRegistry {
                 request_id: context.request_id.clone(),
                 parent_request_id: context.parent_request_id.clone(),
                 operation_kind,
+                session_anchor_id: session_anchor_id.to_string(),
                 started_at: Instant::now(),
                 progress_token: context.progress_token.clone(),
                 cancellation_requested: false,
@@ -281,6 +285,9 @@ pub enum SessionError {
     #[error("request {request_id} is already in flight")]
     DuplicateInflightRequest { request_id: RequestId },
 
+    #[error("request {request_id} already has authoritative lineage in this session")]
+    DuplicateRequestLineage { request_id: RequestId },
+
     #[error("request {request_id} is not in flight")]
     RequestNotInflight { request_id: RequestId },
 
@@ -292,6 +299,68 @@ pub enum SessionError {
         request_id: RequestId,
         parent_request_id: RequestId,
     },
+
+    #[error(
+        "parent request {parent_request_id} for child request {request_id} belongs to stale session anchor {parent_session_anchor_id}, current anchor is {current_session_anchor_id}"
+    )]
+    ParentRequestAnchorMismatch {
+        request_id: RequestId,
+        parent_request_id: RequestId,
+        parent_session_anchor_id: String,
+        current_session_anchor_id: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionAnchorState {
+    id: String,
+    auth_epoch: u64,
+    auth_context_hash: String,
+    issued_at: u64,
+}
+
+impl SessionAnchorState {
+    fn new(session_id: &SessionId, auth_context: &SessionAuthContext, auth_epoch: u64) -> Self {
+        let auth_context_hash = auth_context_hash(auth_context);
+        let hash_prefix = &auth_context_hash[..12.min(auth_context_hash.len())];
+        Self {
+            id: format!("{session_id}:anchor:{auth_epoch}:{hash_prefix}"),
+            auth_epoch,
+            auth_context_hash,
+            issued_at: current_unix_timestamp(),
+        }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn auth_epoch(&self) -> u64 {
+        self.auth_epoch
+    }
+
+    pub fn auth_context_hash(&self) -> &str {
+        &self.auth_context_hash
+    }
+
+    pub fn issued_at(&self) -> u64 {
+        self.issued_at
+    }
+
+    pub fn reference(&self) -> SessionAnchorReference {
+        SessionAnchorReference::new(self.id.clone(), self.auth_context_hash.clone())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RequestLineageRecord {
+    pub request_id: RequestId,
+    pub session_anchor_id: String,
+    pub auth_epoch: u64,
+    pub parent_request_id: Option<RequestId>,
+    pub operation_kind: OperationKind,
+    pub started_at: u64,
+    pub terminal_state: Option<OperationTerminalState>,
 }
 
 /// Session host object owned by the kernel.
@@ -300,6 +369,7 @@ pub struct Session {
     id: SessionId,
     agent_id: AgentId,
     state: SessionState,
+    session_anchor: SessionAnchorState,
     auth_context: SessionAuthContext,
     peer_capabilities: PeerCapabilities,
     roots: Vec<RootDefinition>,
@@ -308,6 +378,7 @@ pub struct Session {
     inflight: InflightRegistry,
     subscriptions: SubscriptionRegistry,
     terminal: TerminalRegistry,
+    request_lineage: HashMap<RequestId, RequestLineageRecord>,
     pending_url_elicitations: HashMap<String, PendingUrlElicitation>,
     late_events: VecDeque<LateSessionEvent>,
 }
@@ -318,11 +389,14 @@ impl Session {
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
     ) -> Self {
+        let auth_context = SessionAuthContext::in_process_anonymous();
+        let session_anchor = SessionAnchorState::new(&id, &auth_context, 0);
         Self {
             id,
             agent_id,
             state: SessionState::Initializing,
-            auth_context: SessionAuthContext::in_process_anonymous(),
+            session_anchor,
+            auth_context,
             peer_capabilities: PeerCapabilities::default(),
             roots: Vec::new(),
             normalized_roots: Vec::new(),
@@ -330,6 +404,7 @@ impl Session {
             inflight: InflightRegistry::default(),
             subscriptions: SubscriptionRegistry::default(),
             terminal: TerminalRegistry::default(),
+            request_lineage: HashMap::new(),
             pending_url_elicitations: HashMap::new(),
             late_events: VecDeque::new(),
         }
@@ -349,6 +424,14 @@ impl Session {
 
     pub fn auth_context(&self) -> &SessionAuthContext {
         &self.auth_context
+    }
+
+    pub fn session_anchor(&self) -> &SessionAnchorState {
+        &self.session_anchor
+    }
+
+    pub fn request_lineage(&self, request_id: &RequestId) -> Option<&RequestLineageRecord> {
+        self.request_lineage.get(request_id)
     }
 
     pub fn peer_capabilities(&self) -> &PeerCapabilities {
@@ -470,8 +553,14 @@ impl Session {
         self.subscriptions.contains_resource(uri)
     }
 
-    pub fn set_auth_context(&mut self, auth_context: SessionAuthContext) {
+    pub fn set_auth_context(&mut self, auth_context: SessionAuthContext) -> bool {
+        let rotated = self.auth_context != auth_context;
+        if rotated {
+            let next_epoch = self.session_anchor.auth_epoch.saturating_add(1);
+            self.session_anchor = SessionAnchorState::new(&self.id, &auth_context, next_epoch);
+        }
         self.auth_context = auth_context;
+        rotated
     }
 
     pub fn set_peer_capabilities(&mut self, peer_capabilities: PeerCapabilities) {
@@ -538,14 +627,32 @@ impl Session {
     ) -> Result<(), SessionError> {
         self.validate_context(context)?;
         if let Some(parent_request_id) = &context.parent_request_id {
-            if self.inflight.get(parent_request_id).is_none() {
-                return Err(SessionError::ParentRequestNotInflight {
-                    request_id: context.request_id.clone(),
-                    parent_request_id: parent_request_id.clone(),
-                });
-            }
+            self.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
         }
-        self.inflight.track(context, operation_kind, cancellable)
+        if self.request_lineage.contains_key(&context.request_id) {
+            return Err(SessionError::DuplicateRequestLineage {
+                request_id: context.request_id.clone(),
+            });
+        }
+        self.inflight.track(
+            context,
+            operation_kind,
+            self.session_anchor.id(),
+            cancellable,
+        )?;
+        self.request_lineage.insert(
+            context.request_id.clone(),
+            RequestLineageRecord {
+                request_id: context.request_id.clone(),
+                session_anchor_id: self.session_anchor.id().to_string(),
+                auth_epoch: self.session_anchor.auth_epoch(),
+                parent_request_id: context.parent_request_id.clone(),
+                operation_kind,
+                started_at: current_unix_timestamp(),
+                terminal_state: None,
+            },
+        );
+        Ok(())
     }
 
     pub fn complete_request(
@@ -561,12 +668,44 @@ impl Session {
         terminal_state: OperationTerminalState,
     ) -> Result<InflightRequest, SessionError> {
         let inflight = self.inflight.complete(request_id)?;
-        self.terminal.record(request_id.clone(), terminal_state);
+        self.terminal
+            .record(request_id.clone(), terminal_state.clone());
+        if let Some(lineage) = self.request_lineage.get_mut(request_id) {
+            lineage.terminal_state = Some(terminal_state);
+        }
         Ok(inflight)
     }
 
     pub fn request_cancellation(&mut self, request_id: &RequestId) -> Result<(), SessionError> {
         self.inflight.mark_cancellation_requested(request_id)
+    }
+
+    pub fn validate_parent_request_lineage(
+        &self,
+        request_id: &RequestId,
+        parent_request_id: &RequestId,
+    ) -> Result<&RequestLineageRecord, SessionError> {
+        let Some(parent_inflight) = self.inflight.get(parent_request_id) else {
+            return Err(SessionError::ParentRequestNotInflight {
+                request_id: request_id.clone(),
+                parent_request_id: parent_request_id.clone(),
+            });
+        };
+        let Some(parent_lineage) = self.request_lineage.get(parent_request_id) else {
+            return Err(SessionError::ParentRequestNotInflight {
+                request_id: request_id.clone(),
+                parent_request_id: parent_request_id.clone(),
+            });
+        };
+        if parent_lineage.session_anchor_id != self.session_anchor.id() {
+            return Err(SessionError::ParentRequestAnchorMismatch {
+                request_id: request_id.clone(),
+                parent_request_id: parent_request_id.clone(),
+                parent_session_anchor_id: parent_inflight.session_anchor_id.clone(),
+                current_session_anchor_id: self.session_anchor.id().to_string(),
+            });
+        }
+        Ok(parent_lineage)
     }
 
     fn transition(&mut self, next: SessionState) -> Result<(), SessionError> {
@@ -608,6 +747,19 @@ impl Session {
 
         Ok(())
     }
+}
+
+fn current_unix_timestamp() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn auth_context_hash(auth_context: &SessionAuthContext) -> String {
+    canonical_json_bytes(auth_context)
+        .map(|bytes| sha256_hex(&bytes))
+        .unwrap_or_else(|_| "session-auth-context-hash-unavailable".to_string())
 }
 
 /// Session-aware kernel response, decoupled from the current wire protocol.
@@ -904,24 +1056,76 @@ mod tests {
     }
 
     #[test]
-    fn auth_context_defaults_to_in_process_and_can_be_replaced() {
+    fn session_anchor_rotates_on_auth_context_change() {
         let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let initial_anchor = session.session_anchor().clone();
         assert_eq!(
             session.auth_context(),
             &SessionAuthContext::in_process_anonymous()
         );
 
-        session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+        let rotated = session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
             "static-bearer:abcd1234",
             "cafebabe",
             Some("http://localhost:3000".to_string()),
         ));
 
+        assert!(rotated);
         assert!(session.auth_context().is_authenticated());
         assert_eq!(
             session.auth_context().principal(),
             Some("static-bearer:abcd1234")
         );
+        assert_ne!(session.session_anchor().id(), initial_anchor.id());
+        assert_eq!(session.session_anchor().auth_epoch(), 1);
+        assert_ne!(
+            session.session_anchor().auth_context_hash(),
+            initial_anchor.auth_context_hash()
+        );
+    }
+
+    #[test]
+    fn session_anchor_does_not_rotate_when_auth_context_is_unchanged() {
+        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let auth_context = SessionAuthContext::streamable_http_static_bearer(
+            "static-bearer:abcd1234",
+            "cafebabe",
+            Some("http://localhost:3000".to_string()),
+        );
+
+        assert!(session.set_auth_context(auth_context.clone()));
+        let rotated_anchor = session.session_anchor().clone();
+        assert!(!session.set_auth_context(auth_context));
+
+        assert_eq!(session.session_anchor(), &rotated_anchor);
+    }
+
+    #[test]
+    fn child_request_is_rejected_after_parent_anchor_rotation() {
+        let mut session = Session::new(SessionId::new("sess-1"), "agent-1".to_string(), Vec::new());
+        let parent_context = make_context("req-parent");
+        let mut child_context = make_context("req-child");
+        child_context.parent_request_id = Some(parent_context.request_id.clone());
+
+        session.activate().unwrap();
+        session
+            .track_request(&parent_context, OperationKind::ToolCall, true)
+            .unwrap();
+        assert!(
+            session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                "static-bearer:abcd1234",
+                "cafebabe",
+                Some("http://localhost:3000".to_string()),
+            ))
+        );
+
+        let err = session
+            .track_request(&child_context, OperationKind::CreateMessage, true)
+            .unwrap_err();
+        assert!(matches!(
+            err,
+            SessionError::ParentRequestAnchorMismatch { .. }
+        ));
     }
 
     #[test]

@@ -221,7 +221,7 @@ fn hosted_mcp_rejects_expired_or_mismatched_auth_during_session_reuse_without_pa
     assert!(mismatched
         .text()
         .expect("mismatched body")
-        .contains("authenticated principal does not match session"));
+        .contains("authenticated authorization context does not match session"));
 
     let tools = server.list_tools_with_token(&valid_token, &session);
     assert_eq!(

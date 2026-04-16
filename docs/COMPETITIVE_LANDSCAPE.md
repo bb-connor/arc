@@ -433,13 +433,16 @@ client-server model that the entire ecosystem is built on.
 ARC capability tokens carry an ordered `delegation_chain` field listing
 every ancestor capability ID from root to leaf. When any ancestor is
 presented as part of that chain is revoked, the descendant presentation is
-rejected. The current bounded release checks the leaf capability plus the
-presented ancestor IDs against revocation state on every presentation; it does
-not claim authenticated recursive ancestry beyond the caller-presented chain.
+rejected. The current shipped runtime goes further than simple caller-presented
+revocation coverage: the kernel validates delegation-link signatures, requires
+persisted ancestor capability snapshots for every referenced parent, checks
+delegator/delegatee continuity at every hop, enforces delegated scope ceilings
+plus declared attenuations, and rejects the leaf if any recursive ancestor is
+missing, revoked, or structurally inconsistent.
 
 UCAN's Revocation spec defines MUST-level cascade semantics at the spec level.
-ARC's shipped boundary is narrower: it preserves delegation lineage and checks
-presented ancestor IDs in the kernel. This is distinct
+ARC's shipped boundary is still distinct: it relies on locally trusted ancestor
+snapshots rather than globally replicated lineage state. This is distinct
 from OAuth refresh token rotation, where revoking a refresh token does not
 automatically invalidate downstream tokens issued via token exchange.
 

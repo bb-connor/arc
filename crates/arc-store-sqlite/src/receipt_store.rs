@@ -5,7 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::{ArcScope, CapabilityToken};
-use arc_core::crypto::Signature;
+use arc_core::crypto::{sha256_hex, Signature};
 use arc_core::receipt::{
     ArcReceipt, ChildRequestReceipt, Decision, FinancialReceiptMetadata,
     GovernedTransactionReceiptMetadata, ReceiptAttributionMetadata, SettlementStatus,
@@ -45,6 +45,7 @@ use arc_kernel::receipt_analytics::{
     ReceiptAnalyticsResponse, TimeAnalyticsRow, ToolAnalyticsRow, MAX_ANALYTICS_GROUP_LIMIT,
 };
 use arc_kernel::receipt_query::{ReceiptQuery, ReceiptQueryResult, MAX_QUERY_LIMIT};
+use arc_kernel::receipt_store::{ReceiptLineageStatementLink, ReceiptLineageVerification};
 use arc_kernel::{
     CapabilitySnapshot, CreditBondDisposition, CreditBondLifecycleState, CreditBondListQuery,
     CreditBondListReport, CreditBondListSummary, CreditBondRow, CreditFacilityDisposition,

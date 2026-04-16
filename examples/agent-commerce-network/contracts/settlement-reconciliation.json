@@ -1,6 +1,6 @@
 {
-  "settlement_id": "settlement_acme_contoso_001",
-  "job_id": "job_acme_001",
+  "settlement_id": "settlement_lattice_vanguard_001",
+  "job_id": "job_lattice_001",
   "quoted_amount_minor": 125000,
   "approved_amount_minor": 125000,
   "settled_amount_minor": 125000,

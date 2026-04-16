@@ -3371,8 +3371,8 @@ release docs.
 
 ### Delegation Runtime Boundary
 
-- [x] **DELEG5-01**: the bounded release either enforces delegation-chain validation and attenuation at runtime or explicitly narrows the release boundary to root-issued or authority-reissued capability semantics without implying full recursive delegated-authority admission
-- [x] **DELEG5-02**: ship-facing docs, examples, and qualification surfaces describe lineage and revocation semantics truthfully and do not imply lineage-complete recursive delegation unless the runtime path enforces it
+- [x] **DELEG5-01**: the bounded release enforces fail-closed recursive delegation admission at runtime by validating chain signatures, requiring persisted ancestor snapshots, checking delegator/delegatee continuity, and enforcing delegated scope ceilings plus declared attenuations
+- [x] **DELEG5-02**: ship-facing docs, examples, and qualification surfaces describe the shipped recursive delegated-authority admission semantics truthfully, including the requirement for persisted ancestor snapshots
 
 ### Hosted/Auth Profile Truth
 

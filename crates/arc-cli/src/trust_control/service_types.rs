@@ -60,6 +60,12 @@ use arc_credentials::{
     OID4VP_VERIFIER_METADATA_PATH,
 };
 use arc_did::DidArc;
+use arc_kernel::budget_store::{
+    AuthorizedBudgetHold, BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest,
+    BudgetCommitMetadata, BudgetEventAuthority, BudgetGuaranteeLevel, BudgetHoldMutationDecision,
+    BudgetMutationKind, BudgetMutationRecord, BudgetReconcileHoldRequest, BudgetReleaseHoldRequest,
+    BudgetReverseHoldRequest, DeniedBudgetHold,
+};
 use arc_kernel::{
     build_generic_governance_case_artifact, build_generic_governance_charter_artifact,
     build_generic_trust_activation_artifact, build_open_market_fee_schedule_artifact,
@@ -195,7 +201,7 @@ use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
@@ -323,9 +329,9 @@ const TOOL_RECEIPTS_PATH: &str = "/v1/receipts/tools";
 const CHILD_RECEIPTS_PATH: &str = "/v1/receipts/children";
 const BUDGETS_PATH: &str = "/v1/budgets";
 const BUDGET_INCREMENT_PATH: &str = "/v1/budgets/increment";
-const BUDGET_CHARGE_PATH: &str = "/v1/budgets/charge";
-const BUDGET_REVERSE_PATH: &str = "/v1/budgets/reverse-charge";
-const BUDGET_REDUCE_PATH: &str = "/v1/budgets/reduce-charge";
+const BUDGET_AUTHORIZE_EXPOSURE_PATH: &str = "/v1/budgets/authorize-exposure";
+const BUDGET_RELEASE_EXPOSURE_PATH: &str = "/v1/budgets/release-exposure";
+const BUDGET_RECONCILE_SPEND_PATH: &str = "/v1/budgets/reconcile-spend";
 const INTERNAL_CLUSTER_STATUS_PATH: &str = "/v1/internal/cluster/status";
 const INTERNAL_CLUSTER_SNAPSHOT_PATH: &str = "/v1/internal/cluster/snapshot";
 const INTERNAL_CLUSTER_PARTITION_PATH: &str = "/v1/internal/cluster/partition";
@@ -482,6 +488,7 @@ struct RemoteReceiptStore {
 
 struct RemoteBudgetStore {
     client: TrustControlClient,
+    cached_usage: Mutex<HashMap<(String, u32), BudgetUsageRecord>>,
 }
 
 impl TrustServiceState {
@@ -514,6 +521,9 @@ struct ClusterRuntimeState {
     peers: HashMap<String, PeerSyncState>,
     election_term: u64,
     last_leader_url: Option<String>,
+    term_started_at: Option<u64>,
+    lease_expires_at: Option<u64>,
+    lease_ttl_ms: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -521,6 +531,7 @@ struct PeerSyncState {
     health: PeerHealth,
     partitioned: bool,
     last_error: Option<String>,
+    last_contact_at: Option<u64>,
     tool_seq: u64,
     child_seq: u64,
     lineage_seq: u64,
@@ -613,6 +624,7 @@ impl Default for PeerSyncState {
             health: PeerHealth::Unknown,
             partitioned: false,
             last_error: None,
+            last_contact_at: None,
             tool_seq: 0,
             child_seq: 0,
             lineage_seq: 0,
@@ -1612,16 +1624,83 @@ pub struct BudgetQuery {
     pub limit: Option<usize>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 pub struct BudgetUsageView {
     pub capability_id: String,
     pub grant_index: u32,
     pub invocation_count: u32,
-    pub total_cost_charged: u64,
+    pub total_cost_exposed: u64,
+    pub total_cost_realized_spend: u64,
     pub updated_at: i64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seq: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetUsageViewWire<'a> {
+    capability_id: &'a str,
+    grant_index: u32,
+    invocation_count: u32,
+    total_exposure_charged: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_realized_spend: Option<u64>,
+    updated_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    seq: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetUsageViewWireInput {
+    capability_id: String,
+    grant_index: u32,
+    invocation_count: u32,
+    #[serde(default)]
+    total_exposure_charged: Option<u64>,
+    #[serde(default)]
+    total_realized_spend: Option<u64>,
+    updated_at: i64,
+    #[serde(default)]
+    seq: Option<u64>,
+}
+
+impl Serialize for BudgetUsageView {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        BudgetUsageViewWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            invocation_count: self.invocation_count,
+            total_exposure_charged: self.total_cost_exposed,
+            total_realized_spend: Some(self.total_cost_realized_spend),
+            updated_at: self.updated_at,
+            seq: self.seq,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for BudgetUsageView {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = BudgetUsageViewWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            invocation_count: wire.invocation_count,
+            total_cost_exposed: require_budget_amount(
+                wire.total_exposure_charged,
+                "`totalExposureCharged`",
+            )?,
+            total_cost_realized_spend: wire.total_realized_spend.unwrap_or(0),
+            updated_at: wire.updated_at,
+            seq: wire.seq,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1646,6 +1725,8 @@ struct ClusterStatusResponse {
     quorum_size: usize,
     reachable_nodes: usize,
     election_term: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authority_lease: Option<ClusterAuthorityLeaseView>,
     replication: ClusterReplicationHeadsView,
     peers: Vec<PeerStatusView>,
 }
@@ -1658,6 +1739,8 @@ struct PeerStatusView {
     partitioned: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_contact_at: Option<u64>,
     tool_seq: u64,
     child_seq: u64,
     lineage_seq: u64,
@@ -1687,7 +1770,11 @@ struct ClusterReplicationHeadsView {
 #[serde(rename_all = "camelCase")]
 struct ClusterStateSnapshotResponse {
     generated_at: u64,
+    #[serde(default)]
+    election_term: u64,
     replication: ClusterReplicationHeadsView,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authority_lease: Option<ClusterAuthorityLeaseView>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     authority: Option<AuthoritySnapshotView>,
     revocations: Vec<RevocationRecordView>,
@@ -1695,6 +1782,8 @@ struct ClusterStateSnapshotResponse {
     child_receipts: Vec<StoredReceiptView>,
     lineage: Vec<StoredLineageView>,
     budgets: Vec<BudgetUsageView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    budget_mutation_events: Vec<BudgetMutationEventView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1716,6 +1805,23 @@ struct ClusterPartitionResponse {
     reachable_nodes: usize,
     quorum_size: usize,
     election_term: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authority_lease: Option<ClusterAuthorityLeaseView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ClusterAuthorityLeaseView {
+    authority_id: String,
+    leader_url: String,
+    term: u64,
+    lease_id: String,
+    lease_epoch: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    term_started_at: Option<u64>,
+    lease_expires_at: u64,
+    lease_ttl_ms: u64,
+    lease_valid: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1732,6 +1838,43 @@ struct BudgetCursorView {
     updated_at: i64,
     capability_id: String,
     grant_index: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetMutationAuthorityView {
+    authority_id: String,
+    lease_id: String,
+    lease_epoch: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetMutationEventView {
+    event_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hold_id: Option<String>,
+    capability_id: String,
+    grant_index: u32,
+    kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    allowed: Option<bool>,
+    recorded_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    usage_seq: Option<u64>,
+    exposure_units: u64,
+    realized_spend_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_invocations: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_cost_per_invocation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_total_cost_units: Option<u64>,
+    invocation_count_after: u32,
+    total_cost_exposed_after: u64,
+    total_cost_realized_spend_after: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authority: Option<BudgetMutationAuthorityView>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1817,6 +1960,38 @@ struct BudgetDeltaQuery {
 #[serde(rename_all = "camelCase")]
 struct BudgetDeltaResponse {
     records: Vec<BudgetUsageView>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    mutation_events: Vec<BudgetMutationEventView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetWriteCommitView {
+    budget_seq: u64,
+    commit_index: u64,
+    quorum_committed: bool,
+    quorum_size: usize,
+    committed_nodes: usize,
+    witness_urls: Vec<String>,
+    authority_id: String,
+    budget_term: u64,
+    lease_id: String,
+    lease_epoch: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetAuthorityMetadataView {
+    authority_id: String,
+    leader_url: String,
+    budget_term: u64,
+    lease_id: String,
+    lease_epoch: u64,
+    lease_expires_at: u64,
+    lease_ttl_ms: u64,
+    guarantee_level: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_commit_index: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1835,10 +2010,11 @@ struct TryIncrementBudgetResponse {
     allowed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     invocation_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<BudgetAuthorityMetadataView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 struct TryChargeCostRequest {
     capability_id: String,
     grant_index: usize,
@@ -1846,53 +2022,516 @@ struct TryChargeCostRequest {
     cost_units: u64,
     max_cost_per_invocation: Option<u64>,
     max_total_cost_units: Option<u64>,
+    hold_id: Option<String>,
+    event_id: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 struct TryChargeCostResponse {
     capability_id: String,
+    grant_index: usize,
+    allowed: bool,
+    invocation_count: Option<u32>,
+    total_cost_exposed: Option<u64>,
+    total_cost_realized_spend: Option<u64>,
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    budget_commit: Option<BudgetWriteCommitView>,
+}
+
+#[derive(Debug)]
+struct ReverseChargeCostRequest {
+    capability_id: String,
+    grant_index: usize,
+    cost_units: u64,
+    hold_id: Option<String>,
+    event_id: Option<String>,
+}
+
+#[derive(Debug)]
+struct ReverseChargeCostResponse {
+    capability_id: String,
+    grant_index: usize,
+    invocation_count: Option<u32>,
+    total_cost_exposed: Option<u64>,
+    total_cost_realized_spend: Option<u64>,
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    budget_commit: Option<BudgetWriteCommitView>,
+}
+
+#[derive(Debug)]
+struct ReduceChargeCostRequest {
+    capability_id: String,
+    grant_index: usize,
+    cost_units: u64,
+    exposure_units: Option<u64>,
+    realized_spend_units: Option<u64>,
+    hold_id: Option<String>,
+    event_id: Option<String>,
+}
+
+#[derive(Debug)]
+struct ReduceChargeCostResponse {
+    capability_id: String,
+    grant_index: usize,
+    invocation_count: Option<u32>,
+    total_cost_exposed: Option<u64>,
+    total_cost_realized_spend: Option<u64>,
+    released_exposure_units: Option<u64>,
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    budget_commit: Option<BudgetWriteCommitView>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TryChargeCostRequestWire<'a> {
+    capability_id: &'a str,
+    grant_index: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_invocations: Option<u32>,
+    exposure_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_exposure_per_invocation: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    max_total_exposure_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hold_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    event_id: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TryChargeCostRequestWireInput {
+    capability_id: String,
+    grant_index: usize,
+    #[serde(default)]
+    max_invocations: Option<u32>,
+    #[serde(default)]
+    exposure_units: Option<u64>,
+    #[serde(default)]
+    max_exposure_per_invocation: Option<u64>,
+    #[serde(default)]
+    max_total_exposure_units: Option<u64>,
+    #[serde(default)]
+    hold_id: Option<String>,
+    #[serde(default)]
+    event_id: Option<String>,
+}
+
+impl Serialize for TryChargeCostRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        TryChargeCostRequestWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            max_invocations: self.max_invocations,
+            exposure_units: self.cost_units,
+            max_exposure_per_invocation: self.max_cost_per_invocation,
+            max_total_exposure_units: self.max_total_cost_units,
+            hold_id: self.hold_id.as_deref(),
+            event_id: self.event_id.as_deref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TryChargeCostRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = TryChargeCostRequestWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            max_invocations: wire.max_invocations,
+            cost_units: require_budget_amount(wire.exposure_units, "`exposureUnits`")?,
+            max_cost_per_invocation: wire.max_exposure_per_invocation,
+            max_total_cost_units: wire.max_total_exposure_units,
+            hold_id: wire.hold_id,
+            event_id: wire.event_id,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TryChargeCostResponseWire<'a> {
+    capability_id: &'a str,
     grant_index: usize,
     allowed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     invocation_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    total_cost_charged: Option<u64>,
-}
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReverseChargeCostRequest {
-    capability_id: String,
-    grant_index: usize,
-    cost_units: u64,
+    total_exposure_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_realized_spend: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<&'a BudgetAuthorityMetadataView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_commit: Option<&'a BudgetWriteCommitView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReverseChargeCostResponse {
+struct TryChargeCostResponseWireInput {
     capability_id: String,
+    grant_index: usize,
+    allowed: bool,
+    #[serde(default)]
+    invocation_count: Option<u32>,
+    #[serde(default)]
+    total_exposure_charged: Option<u64>,
+    #[serde(default)]
+    total_realized_spend: Option<u64>,
+    #[serde(default)]
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    #[serde(default)]
+    budget_commit: Option<BudgetWriteCommitView>,
+}
+
+impl Serialize for TryChargeCostResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        TryChargeCostResponseWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            allowed: self.allowed,
+            invocation_count: self.invocation_count,
+            total_exposure_charged: self.total_cost_exposed,
+            total_realized_spend: self.total_cost_realized_spend,
+            budget_authority: self.budget_authority.as_ref(),
+            budget_commit: self.budget_commit.as_ref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for TryChargeCostResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = TryChargeCostResponseWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            allowed: wire.allowed,
+            invocation_count: wire.invocation_count,
+            total_cost_exposed: wire.total_exposure_charged,
+            total_cost_realized_spend: wire.total_realized_spend,
+            budget_authority: wire.budget_authority,
+            budget_commit: wire.budget_commit,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReverseChargeCostRequestWire<'a> {
+    capability_id: &'a str,
+    grant_index: usize,
+    exposure_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hold_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    event_id: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReverseChargeCostRequestWireInput {
+    capability_id: String,
+    grant_index: usize,
+    #[serde(default)]
+    exposure_units: Option<u64>,
+    #[serde(default)]
+    hold_id: Option<String>,
+    #[serde(default)]
+    event_id: Option<String>,
+}
+
+impl Serialize for ReverseChargeCostRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        ReverseChargeCostRequestWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            exposure_units: self.cost_units,
+            hold_id: self.hold_id.as_deref(),
+            event_id: self.event_id.as_deref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ReverseChargeCostRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ReverseChargeCostRequestWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            cost_units: require_budget_amount(wire.exposure_units, "`exposureUnits`")?,
+            hold_id: wire.hold_id,
+            event_id: wire.event_id,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReverseChargeCostResponseWire<'a> {
+    capability_id: &'a str,
     grant_index: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     invocation_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    total_cost_charged: Option<u64>,
+    total_exposure_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_realized_spend: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<&'a BudgetAuthorityMetadataView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_commit: Option<&'a BudgetWriteCommitView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct ReduceChargeCostRequest {
+struct ReverseChargeCostResponseWireInput {
     capability_id: String,
     grant_index: usize,
-    cost_units: u64,
+    #[serde(default)]
+    invocation_count: Option<u32>,
+    #[serde(default)]
+    total_exposure_charged: Option<u64>,
+    #[serde(default)]
+    total_realized_spend: Option<u64>,
+    #[serde(default)]
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    #[serde(default)]
+    budget_commit: Option<BudgetWriteCommitView>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl Serialize for ReverseChargeCostResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        ReverseChargeCostResponseWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            invocation_count: self.invocation_count,
+            total_exposure_charged: self.total_cost_exposed,
+            total_realized_spend: self.total_cost_realized_spend,
+            budget_authority: self.budget_authority.as_ref(),
+            budget_commit: self.budget_commit.as_ref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ReverseChargeCostResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ReverseChargeCostResponseWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            invocation_count: wire.invocation_count,
+            total_cost_exposed: wire.total_exposure_charged,
+            total_cost_realized_spend: wire.total_realized_spend,
+            budget_authority: wire.budget_authority,
+            budget_commit: wire.budget_commit,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ReduceChargeCostResponse {
+struct ReduceChargeCostRequestWire<'a> {
+    capability_id: &'a str,
+    grant_index: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    authorized_exposure_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    realized_spend_units: Option<u64>,
+    reduction_units: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hold_id: Option<&'a str>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    event_id: Option<&'a str>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReduceChargeCostRequestWireInput {
     capability_id: String,
+    grant_index: usize,
+    #[serde(default)]
+    authorized_exposure_units: Option<u64>,
+    #[serde(default)]
+    realized_spend_units: Option<u64>,
+    #[serde(default)]
+    reduction_units: Option<u64>,
+    #[serde(default)]
+    hold_id: Option<String>,
+    #[serde(default)]
+    event_id: Option<String>,
+}
+
+impl ReduceChargeCostRequest {
+    fn release_units(&self) -> u64 {
+        self.cost_units
+    }
+}
+
+impl Serialize for ReduceChargeCostRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        ReduceChargeCostRequestWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            authorized_exposure_units: self.exposure_units,
+            realized_spend_units: self.realized_spend_units,
+            reduction_units: self.cost_units,
+            hold_id: self.hold_id.as_deref(),
+            event_id: self.event_id.as_deref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ReduceChargeCostRequest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ReduceChargeCostRequestWireInput::deserialize(deserializer)?;
+        let exposure_units = wire.authorized_exposure_units;
+        let cost_units = match wire.reduction_units {
+            Some(cost_units) => cost_units,
+            None => {
+                let authorized_exposure_units = exposure_units.ok_or_else(|| {
+                    serde::de::Error::missing_field(
+                        "one of `reductionUnits` or `authorizedExposureUnits`",
+                    )
+                })?;
+                let realized_spend_units = wire
+                    .realized_spend_units
+                    .ok_or_else(|| serde::de::Error::missing_field("`realizedSpendUnits`"))?;
+                authorized_exposure_units
+                    .checked_sub(realized_spend_units)
+                    .ok_or_else(|| {
+                        serde::de::Error::custom(
+                            "`realizedSpendUnits` cannot exceed `authorizedExposureUnits`",
+                        )
+                    })?
+            }
+        };
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            cost_units,
+            exposure_units,
+            realized_spend_units: wire.realized_spend_units,
+            hold_id: wire.hold_id,
+            event_id: wire.event_id,
+        })
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReduceChargeCostResponseWire<'a> {
+    capability_id: &'a str,
     grant_index: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     invocation_count: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    total_cost_charged: Option<u64>,
+    released_exposure_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_exposure_charged: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total_realized_spend: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_authority: Option<&'a BudgetAuthorityMetadataView>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    budget_commit: Option<&'a BudgetWriteCommitView>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReduceChargeCostResponseWireInput {
+    capability_id: String,
+    grant_index: usize,
+    #[serde(default)]
+    invocation_count: Option<u32>,
+    #[serde(default)]
+    released_exposure_units: Option<u64>,
+    #[serde(default)]
+    total_exposure_charged: Option<u64>,
+    #[serde(default)]
+    total_realized_spend: Option<u64>,
+    #[serde(default)]
+    budget_authority: Option<BudgetAuthorityMetadataView>,
+    #[serde(default)]
+    budget_commit: Option<BudgetWriteCommitView>,
+}
+
+impl Serialize for ReduceChargeCostResponse {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        ReduceChargeCostResponseWire {
+            capability_id: &self.capability_id,
+            grant_index: self.grant_index,
+            invocation_count: self.invocation_count,
+            released_exposure_units: self.released_exposure_units,
+            total_exposure_charged: self.total_cost_exposed,
+            total_realized_spend: self.total_cost_realized_spend,
+            budget_authority: self.budget_authority.as_ref(),
+            budget_commit: self.budget_commit.as_ref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ReduceChargeCostResponse {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = ReduceChargeCostResponseWireInput::deserialize(deserializer)?;
+        Ok(Self {
+            capability_id: wire.capability_id,
+            grant_index: wire.grant_index,
+            invocation_count: wire.invocation_count,
+            total_cost_exposed: wire.total_exposure_charged,
+            total_cost_realized_spend: wire.total_realized_spend,
+            released_exposure_units: wire.released_exposure_units,
+            budget_authority: wire.budget_authority,
+            budget_commit: wire.budget_commit,
+        })
+    }
+}
+
+fn require_budget_amount<E>(amount: Option<u64>, missing_field_name: &str) -> Result<u64, E>
+where
+    E: serde::de::Error,
+{
+    amount.ok_or_else(|| E::custom(format!("missing required field {missing_field_name}")))
 }

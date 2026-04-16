@@ -16,7 +16,7 @@ use tracing::{info, warn};
 use arc_core_types::crypto::Keypair;
 use arc_http_core::{
     ArcHttpRequest, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, SidecarStatus,
-    VerifyReceiptResponse, Verdict,
+    Verdict, VerifyReceiptResponse,
 };
 use arc_openapi::{ArcExtensions, DefaultPolicy};
 
@@ -287,12 +287,16 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
     if result.verdict.is_denied() {
         let denied_status = StatusCode::from_u16(verdict_http_status(&result.verdict))
             .unwrap_or(StatusCode::FORBIDDEN);
-        let final_receipt =
-            match finalize_and_record_receipt(&state, &result.receipt, denied_status.as_u16()).await
-            {
-                Ok(receipt) => receipt,
-                Err(response) => return response,
-            };
+        let final_receipt = match finalize_and_record_receipt(
+            &state,
+            &result.receipt,
+            denied_status.as_u16(),
+        )
+        .await
+        {
+            Ok(receipt) => receipt,
+            Err(response) => return response,
+        };
         let error_body = serde_json::json!({
             "error": "arc_access_denied",
             "message": match &result.verdict {
@@ -369,12 +373,14 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
                 Ok(body) => response_builder
                     .body(Body::from(body))
                     .unwrap_or_else(|_| (StatusCode::BAD_GATEWAY, "bad gateway").into_response()),
-                Err(error) => finalize_bad_gateway(
-                    &state,
-                    &result.receipt,
-                    format!("failed to read upstream response: {error}"),
-                )
-                .await,
+                Err(error) => {
+                    finalize_bad_gateway(
+                        &state,
+                        &result.receipt,
+                        format!("failed to read upstream response: {error}"),
+                    )
+                    .await
+                }
             }
         }
         Err(e) => {
@@ -1166,7 +1172,8 @@ paths:
 
     #[tokio::test]
     async fn proxy_handler_strips_query_capability_before_forwarding_upstream() {
-        let server = MockUpstreamServer::spawn(200, vec![("content-type", "application/json")], "{}");
+        let server =
+            MockUpstreamServer::spawn(200, vec![("content-type", "application/json")], "{}");
         let state = test_state(
             vec![RouteEntry {
                 pattern: "/pets".to_string(),

@@ -7,7 +7,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::canonical::canonical_json_bytes;
-use crate::capability::{RuntimeAssuranceTier, RuntimeAttestationEvidence, WorkloadIdentity};
+use crate::capability::{
+    canonicalize_attestation_verifier, AttestationTrustError, AttestationTrustPolicy,
+    RuntimeAssuranceTier, RuntimeAttestationEvidence, WorkloadIdentity, WorkloadIdentityError,
+};
 use crate::crypto::sha256_hex;
 use crate::error::Result as ArcResult;
 use crate::receipt::SignedExportEnvelope;
@@ -371,6 +374,22 @@ pub struct RuntimeAttestationTrustBundleVerification {
 pub enum RuntimeAttestationAppraisalError {
     #[error("runtime attestation schema `{schema}` is not recognized by the canonical appraisal boundary")]
     UnsupportedSchema { schema: String },
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum RuntimeAttestationVerificationError {
+    #[error("runtime attestation workload identity is invalid: {0}")]
+    InvalidWorkloadIdentity(#[from] WorkloadIdentityError),
+    #[error("runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})")]
+    StaleEvidence {
+        now: u64,
+        issued_at: u64,
+        expires_at: u64,
+    },
+    #[error(transparent)]
+    Appraisal(#[from] RuntimeAttestationAppraisalError),
+    #[error("runtime attestation evidence rejected by local trust policy: {0}")]
+    TrustPolicy(#[from] AttestationTrustError),
 }
 
 pub struct RuntimeAttestationVerifierDescriptorArgs<'a> {
@@ -1023,6 +1042,49 @@ pub struct RuntimeAttestationPolicyOutcome {
     pub effective_tier: RuntimeAssuranceTier,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifiedRuntimeAttestationProvenance {
+    pub verifier_family: AttestationVerifierFamily,
+    pub verifier_adapter: String,
+    pub canonical_verifier: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_trust_rule: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifiedRuntimeAttestationRecord {
+    pub evidence: RuntimeAttestationEvidence,
+    pub appraisal: RuntimeAttestationAppraisal,
+    pub policy_outcome: RuntimeAttestationPolicyOutcome,
+    pub subject: RuntimeAttestationAppraisalResultSubject,
+    pub provenance: VerifiedRuntimeAttestationProvenance,
+    pub verified_at: u64,
+}
+
+impl VerifiedRuntimeAttestationRecord {
+    #[must_use]
+    pub fn is_locally_accepted(&self) -> bool {
+        self.policy_outcome.accepted
+    }
+
+    #[must_use]
+    pub fn effective_tier(&self) -> RuntimeAssuranceTier {
+        self.policy_outcome.effective_tier
+    }
+
+    #[must_use]
+    pub fn workload_identity(&self) -> Option<&WorkloadIdentity> {
+        self.subject.workload_identity.as_ref()
+    }
+
+    #[must_use]
+    pub fn matched_trust_rule(&self) -> Option<&str> {
+        self.provenance.matched_trust_rule.as_deref()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1884,6 +1946,91 @@ pub fn derive_runtime_attestation_appraisal(
     }
 }
 
+pub fn verify_runtime_attestation_record(
+    evidence: &RuntimeAttestationEvidence,
+    trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+) -> Result<VerifiedRuntimeAttestationRecord, RuntimeAttestationVerificationError> {
+    let appraisal = derive_runtime_attestation_appraisal(evidence)?;
+    let subject = verified_runtime_attestation_subject(evidence)?;
+    let policy_outcome = verify_runtime_attestation_policy_outcome(evidence, trust_policy, now)?;
+    Ok(VerifiedRuntimeAttestationRecord {
+        evidence: evidence.clone(),
+        provenance: VerifiedRuntimeAttestationProvenance {
+            verifier_family: appraisal.verifier_family,
+            verifier_adapter: appraisal.adapter.clone(),
+            canonical_verifier: canonicalize_attestation_verifier(&evidence.verifier),
+            matched_trust_rule: policy_outcome.matched_trust_rule.clone(),
+        },
+        appraisal,
+        policy_outcome: policy_outcome.outcome,
+        subject,
+        verified_at: now,
+    })
+}
+
+fn verified_runtime_attestation_subject(
+    evidence: &RuntimeAttestationEvidence,
+) -> Result<RuntimeAttestationAppraisalResultSubject, RuntimeAttestationVerificationError> {
+    Ok(RuntimeAttestationAppraisalResultSubject {
+        runtime_identity: evidence.runtime_identity.clone(),
+        workload_identity: evidence.normalized_workload_identity()?,
+    })
+}
+
+#[derive(Debug, Clone)]
+struct VerifiedRuntimeAttestationPolicyVerification {
+    outcome: RuntimeAttestationPolicyOutcome,
+    matched_trust_rule: Option<String>,
+}
+
+fn verify_runtime_attestation_policy_outcome(
+    evidence: &RuntimeAttestationEvidence,
+    trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+) -> Result<VerifiedRuntimeAttestationPolicyVerification, RuntimeAttestationVerificationError> {
+    let trust_policy_configured = trust_policy.is_some_and(|policy| !policy.rules.is_empty());
+    if trust_policy_configured {
+        let resolved = evidence
+            .resolve_effective_runtime_assurance(trust_policy, now)
+            .map_err(RuntimeAttestationVerificationError::TrustPolicy)?;
+        let matched_trust_rule = resolved.matched_rule.clone();
+        return Ok(VerifiedRuntimeAttestationPolicyVerification {
+            outcome: RuntimeAttestationPolicyOutcome {
+                trust_policy_configured: true,
+                accepted: true,
+                effective_tier: resolved.effective_tier,
+                reason: matched_trust_rule
+                    .as_ref()
+                    .map(|rule| format!("matched attestation trust rule `{rule}`")),
+            },
+            matched_trust_rule,
+        });
+    }
+
+    evidence.validate_workload_identity_binding()?;
+    if !evidence.is_valid_at(now) {
+        return Err(RuntimeAttestationVerificationError::StaleEvidence {
+            now,
+            issued_at: evidence.issued_at,
+            expires_at: evidence.expires_at,
+        });
+    }
+
+    Ok(VerifiedRuntimeAttestationPolicyVerification {
+        outcome: RuntimeAttestationPolicyOutcome {
+            trust_policy_configured: false,
+            accepted: false,
+            effective_tier: RuntimeAssuranceTier::None,
+            reason: Some(
+                "runtime attestation evidence did not cross a local verified trust boundary"
+                    .to_string(),
+            ),
+        },
+        matched_trust_rule: None,
+    })
+}
+
 fn extract_vendor_claims(
     evidence: &RuntimeAttestationEvidence,
     vendor_key: &str,
@@ -2006,7 +2153,8 @@ fn push_workload_identity_assertions(
 mod tests {
     use super::*;
     use crate::capability::{
-        RuntimeAssuranceTier, RuntimeAttestationEvidence, WorkloadCredentialKind, WorkloadIdentity,
+        AttestationTrustPolicy, AttestationTrustRule, RuntimeAssuranceTier,
+        RuntimeAttestationEvidence, WorkloadCredentialKind, WorkloadIdentity,
         WorkloadIdentityScheme,
     };
     use serde_json::json;
@@ -2032,6 +2180,21 @@ mod tests {
                     "attestationType": "sgx"
                 }
             })),
+        }
+    }
+
+    fn sample_trust_policy() -> AttestationTrustPolicy {
+        AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "azure-contoso".to_string(),
+                schema: AZURE_MAA_ATTESTATION_SCHEMA.to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(AttestationVerifierFamily::AzureMaa),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: vec!["sgx".to_string()],
+                required_assertions: BTreeMap::new(),
+            }],
         }
     }
 
@@ -2125,6 +2288,78 @@ mod tests {
         };
         RuntimeAttestationAppraisalResult::from_report("did:arc:test:issuer", &report)
             .expect("result from sample report")
+    }
+
+    #[test]
+    fn verified_runtime_attestation_record_requires_local_trust_boundary_for_tier_promotion() {
+        let verified =
+            verify_runtime_attestation_record(&sample_evidence(), None, 150).expect("record");
+
+        assert_eq!(verified.verified_at, 150);
+        assert_eq!(
+            verified.subject.runtime_identity.as_deref(),
+            Some("spiffe://contoso.test/runtime/worker")
+        );
+        assert_eq!(
+            verified
+                .workload_identity()
+                .expect("verified record should carry canonical workload identity")
+                .trust_domain,
+            "contoso.test"
+        );
+        assert_eq!(
+            verified.appraisal.effective_tier,
+            RuntimeAssuranceTier::Attested
+        );
+        assert!(!verified.policy_outcome.trust_policy_configured);
+        assert!(!verified.policy_outcome.accepted);
+        assert!(!verified.is_locally_accepted());
+        assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::None);
+        assert_eq!(
+            verified.provenance.verifier_adapter,
+            AZURE_MAA_VERIFIER_ADAPTER
+        );
+        assert_eq!(
+            verified.provenance.canonical_verifier,
+            "https://maa.contoso.test"
+        );
+        assert_eq!(verified.matched_trust_rule(), None);
+        assert_eq!(
+            verified.policy_outcome.effective_tier,
+            RuntimeAssuranceTier::None
+        );
+        assert_eq!(
+            verified.policy_outcome.reason.as_deref(),
+            Some("runtime attestation evidence did not cross a local verified trust boundary")
+        );
+    }
+
+    #[test]
+    fn verified_runtime_attestation_record_promotes_tier_only_after_local_policy_verification() {
+        let verified = verify_runtime_attestation_record(
+            &sample_evidence(),
+            Some(&sample_trust_policy()),
+            150,
+        )
+        .expect("trusted record");
+
+        assert!(verified.policy_outcome.trust_policy_configured);
+        assert!(verified.policy_outcome.accepted);
+        assert!(verified.is_locally_accepted());
+        assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);
+        assert_eq!(
+            verified.provenance.verifier_family,
+            AttestationVerifierFamily::AzureMaa
+        );
+        assert_eq!(verified.matched_trust_rule(), Some("azure-contoso"));
+        assert_eq!(
+            verified.policy_outcome.effective_tier,
+            RuntimeAssuranceTier::Verified
+        );
+        assert_eq!(
+            verified.policy_outcome.reason.as_deref(),
+            Some("matched attestation trust rule `azure-contoso`")
+        );
     }
 
     #[test]

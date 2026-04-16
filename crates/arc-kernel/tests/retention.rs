@@ -21,6 +21,7 @@ mod retention {
     use arc_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 
     use arc_kernel::build_checkpoint;
+    use arc_kernel::build_checkpoint_with_previous;
     use arc_kernel::build_inclusion_proof;
     use arc_kernel::verify_checkpoint_signature;
     use arc_kernel::{ReceiptStore, RetentionConfig};
@@ -311,7 +312,15 @@ mod retention {
             .receipts_canonical_bytes_range(batch2_seqs[0], batch2_seqs[9])
             .unwrap();
         let bv2: Vec<Vec<u8>> = bytes2.iter().map(|(_, b)| b.clone()).collect();
-        let cp2 = build_checkpoint(2, batch2_seqs[0], batch2_seqs[9], &bv2, &kp).unwrap();
+        let cp2 = build_checkpoint_with_previous(
+            2,
+            batch2_seqs[0],
+            batch2_seqs[9],
+            &bv2,
+            &kp,
+            Some(&cp1),
+        )
+        .unwrap();
         store.store_checkpoint(&cp2).unwrap();
 
         // Archive only batch 1 receipts (cutoff = 150, timestamps 100-109 < 150).

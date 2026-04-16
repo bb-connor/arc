@@ -1,0 +1,2 @@
+[2m2026-04-16T00:27:32.788185Z[0m [33m WARN[0m [2marc_control_plane::trust_control[0m[2m:[0m dashboard/dist/index.html not found -- dashboard UI will not be served. Run 'npm run build' in crates/arc-cli/dashboard/ to enable.
+ARC trust control service listening on http://127.0.0.1:64875

@@ -1,0 +1,12 @@
+{
+  "summary": {
+    "matchingReceipts": 0,
+    "returnedReceipts": 0,
+    "pendingReceipts": 0,
+    "failedReceipts": 0,
+    "actionableReceipts": 0,
+    "reconciledReceipts": 0,
+    "truncated": false
+  },
+  "receipts": []
+}

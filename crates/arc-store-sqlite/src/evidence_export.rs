@@ -1,14 +1,20 @@
 use std::collections::BTreeMap;
 
 use arc_core::merkle::MerkleTree;
+use arc_core::receipt::CheckpointPublicationTrustAnchorBinding;
 use arc_kernel::capability_lineage::CapabilitySnapshot;
-use arc_kernel::checkpoint::{build_inclusion_proof, KernelCheckpoint, ReceiptInclusionProof};
+use arc_kernel::checkpoint::{
+    build_inclusion_proof, build_trust_anchored_checkpoint_publication,
+    validate_checkpoint_transparency, CheckpointPublication, CheckpointTransparencySummary,
+    KernelCheckpoint, ReceiptInclusionProof,
+};
 use arc_kernel::evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
     EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
     EvidenceUncheckpointedReceipt,
 };
-use rusqlite::params;
+use arc_kernel::ReceiptStoreError;
+use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -46,6 +52,57 @@ impl SqliteReceiptStore {
             uncheckpointed_receipts,
             retention,
         })
+    }
+
+    pub fn build_evidence_export_transparency_summary(
+        &self,
+        checkpoints: &[KernelCheckpoint],
+    ) -> Result<CheckpointTransparencySummary, EvidenceExportError> {
+        let mut summary = validate_checkpoint_transparency(checkpoints)?;
+        if summary.publications.is_empty() {
+            return Ok(summary);
+        }
+
+        let checkpoint_by_seq = checkpoints
+            .iter()
+            .map(|checkpoint| (checkpoint.body.checkpoint_seq, checkpoint))
+            .collect::<BTreeMap<_, _>>();
+        let connection = self.connection()?;
+        for publication in &mut summary.publications {
+            let Some(checkpoint) = checkpoint_by_seq.get(&publication.checkpoint_seq).copied()
+            else {
+                return Err(EvidenceExportError::ReceiptStore(
+                    ReceiptStoreError::Conflict(format!(
+                        "checkpoint {} is missing while deriving publication summary",
+                        publication.checkpoint_seq
+                    )),
+                ));
+            };
+            let persisted =
+                load_checkpoint_publication_core(&connection, publication.checkpoint_seq)?
+                    .ok_or_else(|| {
+                        EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(format!(
+                            "checkpoint {} is missing persisted publication metadata",
+                            publication.checkpoint_seq
+                        )))
+                    })?;
+            if !publication_core_matches(publication, &persisted) {
+                return Err(EvidenceExportError::ReceiptStore(
+                    ReceiptStoreError::Conflict(format!(
+                        "checkpoint {} publication metadata diverges from persisted projection",
+                        publication.checkpoint_seq
+                    )),
+                ));
+            }
+            if let Some(binding) = load_checkpoint_publication_trust_anchor_binding(
+                &connection,
+                publication.checkpoint_seq,
+            )? {
+                *publication = build_trust_anchored_checkpoint_publication(checkpoint, binding)?;
+            }
+        }
+
+        Ok(summary)
     }
 
     fn collect_tool_receipts_for_export(
@@ -153,6 +210,8 @@ impl SqliteReceiptStore {
             }
         }
 
+        validate_checkpoint_transparency(&checkpoints)?;
+
         Ok(checkpoints)
     }
 
@@ -237,6 +296,93 @@ impl SqliteReceiptStore {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PersistedCheckpointPublicationCore {
+    publication_schema: String,
+    merkle_root: String,
+    published_at: u64,
+    kernel_key: String,
+    log_tree_size: u64,
+    entry_start_seq: u64,
+    entry_end_seq: u64,
+    previous_checkpoint_sha256: Option<String>,
+}
+
+fn load_checkpoint_publication_core(
+    connection: &Connection,
+    checkpoint_seq: u64,
+) -> Result<Option<PersistedCheckpointPublicationCore>, EvidenceExportError> {
+    let checkpoint_seq = i64::try_from(checkpoint_seq).map_err(|_| {
+        EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(
+            "checkpoint_seq exceeds SQLite INTEGER range".to_string(),
+        ))
+    })?;
+    connection
+        .query_row(
+            r#"
+            SELECT publication_schema, merkle_root, published_at, kernel_key,
+                   log_tree_size, entry_start_seq, entry_end_seq, previous_checkpoint_sha256
+            FROM checkpoint_publication_metadata
+            WHERE checkpoint_seq = ?1
+            "#,
+            params![checkpoint_seq as i64],
+            |row| {
+                Ok(PersistedCheckpointPublicationCore {
+                    publication_schema: row.get::<_, String>(0)?,
+                    merkle_root: row.get::<_, String>(1)?,
+                    published_at: row.get::<_, i64>(2)?.max(0) as u64,
+                    kernel_key: row.get::<_, String>(3)?,
+                    log_tree_size: row.get::<_, i64>(4)?.max(0) as u64,
+                    entry_start_seq: row.get::<_, i64>(5)?.max(0) as u64,
+                    entry_end_seq: row.get::<_, i64>(6)?.max(0) as u64,
+                    previous_checkpoint_sha256: row.get::<_, Option<String>>(7)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(EvidenceExportError::from)
+}
+
+fn load_checkpoint_publication_trust_anchor_binding(
+    connection: &Connection,
+    checkpoint_seq: u64,
+) -> Result<Option<CheckpointPublicationTrustAnchorBinding>, EvidenceExportError> {
+    let checkpoint_seq = i64::try_from(checkpoint_seq).map_err(|_| {
+        EvidenceExportError::ReceiptStore(ReceiptStoreError::Conflict(
+            "checkpoint_seq exceeds SQLite INTEGER range".to_string(),
+        ))
+    })?;
+    let binding_json = connection
+        .query_row(
+            r#"
+            SELECT binding_json
+            FROM checkpoint_publication_trust_anchor_bindings
+            WHERE checkpoint_seq = ?1
+            "#,
+            params![checkpoint_seq as i64],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    binding_json
+        .map(|value| serde_json::from_str::<CheckpointPublicationTrustAnchorBinding>(&value))
+        .transpose()
+        .map_err(EvidenceExportError::from)
+}
+
+fn publication_core_matches(
+    publication: &CheckpointPublication,
+    persisted: &PersistedCheckpointPublicationCore,
+) -> bool {
+    publication.schema == persisted.publication_schema
+        && publication.merkle_root.to_hex() == persisted.merkle_root
+        && publication.published_at == persisted.published_at
+        && publication.kernel_key.to_hex() == persisted.kernel_key
+        && publication.log_tree_size == persisted.log_tree_size
+        && publication.entry_start_seq == persisted.entry_start_seq
+        && publication.entry_end_seq == persisted.entry_end_seq
+        && publication.previous_checkpoint_sha256 == persisted.previous_checkpoint_sha256
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
@@ -252,6 +398,7 @@ mod tests {
         ToolCallAction,
     };
     use arc_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+    use arc_kernel::checkpoint::validate_checkpoint_transparency;
     use arc_kernel::{build_checkpoint, ReceiptStore};
 
     use super::*;
@@ -410,6 +557,11 @@ mod tests {
         assert!(bundle.uncheckpointed_receipts.is_empty());
         assert_eq!(bundle.capability_lineage.len(), 2);
         assert!(bundle.retention.live_db_size_bytes > 0);
+
+        let transparency = validate_checkpoint_transparency(&bundle.checkpoints).unwrap();
+        assert_eq!(transparency.publications.len(), 1);
+        assert!(transparency.witnesses.is_empty());
+        assert!(transparency.equivocations.is_empty());
 
         let _ = std::fs::remove_file(path);
     }

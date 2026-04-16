@@ -7,6 +7,7 @@ Support directories such as [`_shared/`](./_shared/), [`policies/`](./policies/)
 | Example | Kind | ARC surfaces taught | What it demonstrates | Primary run path |
 | --- | --- | --- | --- | --- |
 | [`agent-commerce-network/`](./agent-commerce-network/) | Flagship | `trust serve`, `api protect`, MCP edge, evidence review, federation-style artifact flow | Real multi-party economic workflow with approvals, budgets, settlement, disputes, and reviewer verification | [`README.md`](./agent-commerce-network/README.md) |
+| [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/) | Flagship | recursive delegation, OpenAI SDK orchestration, MCP internal tools, ACP external jobs, offline evidence review | Cross-org incident response with a live happy path for customer-to-provider authority narrowing and “internet of agents” execution contracts | [`README.md`](./internet-of-agents-incident-network/README.md) |
 | [`hello-tool/`](./hello-tool/) | Native service | Native ARC service builder, manifest signing, manifest pricing | Native ARC tool/resource/prompt registration without wrapped MCP | [`README.md`](./hello-tool/README.md) |
 | [`docker/`](./docker/) | Quickstart topology | `trust serve`, hosted MCP edge, receipt dashboard | Smallest containerized governed call path with live receipt inspection | [`README.md`](./docker/README.md) |
 | [`anthropic-sdk/`](./anthropic-sdk/) | Ecosystem client | Hosted ARC session, tool mapping, trust receipt lookup | Claude tool use over ARC-governed hosted tools | [`README.md`](./anthropic-sdk/README.md) |
@@ -37,3 +38,4 @@ Support directories such as [`_shared/`](./_shared/), [`policies/`](./policies/)
 4. [`hello-mcp/`](./hello-mcp/), [`hello-a2a/`](./hello-a2a/), or [`hello-acp/`](./hello-acp/) for protocol-native surfaces.
 5. [`hello-tool/`](./hello-tool/) when you want to move from wrapped adapters to a native ARC service.
 6. [`agent-commerce-network/`](./agent-commerce-network/) when you want the full real-world composition.
+7. [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/) when you want the full recursive delegation and cross-org “internet of agents” composition.

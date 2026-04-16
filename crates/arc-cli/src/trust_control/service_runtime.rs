@@ -261,9 +261,12 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
         )
         .route(BUDGETS_PATH, get(handle_list_budgets))
         .route(BUDGET_INCREMENT_PATH, post(handle_try_increment_budget))
-        .route(BUDGET_CHARGE_PATH, post(handle_try_charge_cost))
-        .route(BUDGET_REVERSE_PATH, post(handle_reverse_charge_cost))
-        .route(BUDGET_REDUCE_PATH, post(handle_reduce_charge_cost))
+        .route(BUDGET_AUTHORIZE_EXPOSURE_PATH, post(handle_try_charge_cost))
+        .route(
+            BUDGET_RELEASE_EXPOSURE_PATH,
+            post(handle_reverse_charge_cost),
+        )
+        .route(BUDGET_RECONCILE_SPEND_PATH, post(handle_reduce_charge_cost))
         .route(
             INTERNAL_CLUSTER_STATUS_PATH,
             get(handle_internal_cluster_status),
@@ -1137,6 +1140,7 @@ pub fn build_remote_budget_store(
 ) -> Result<Box<dyn BudgetStore>, CliError> {
     Ok(Box::new(RemoteBudgetStore {
         client: build_client(control_url, control_token)?,
+        cached_usage: Mutex::new(HashMap::new()),
     }))
 }
 
@@ -2163,8 +2167,31 @@ impl TrustControlClient {
         max_cost_per_invocation: Option<u64>,
         max_total_cost_units: Option<u64>,
     ) -> Result<TryChargeCostResponse, CliError> {
+        self.try_charge_cost_with_ids(
+            capability_id,
+            grant_index,
+            max_invocations,
+            cost_units,
+            max_cost_per_invocation,
+            max_total_cost_units,
+            None,
+            None,
+        )
+    }
+
+    fn try_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<TryChargeCostResponse, CliError> {
         self.post_json(
-            BUDGET_CHARGE_PATH,
+            BUDGET_AUTHORIZE_EXPOSURE_PATH,
             &TryChargeCostRequest {
                 capability_id: capability_id.to_string(),
                 grant_index,
@@ -2172,6 +2199,8 @@ impl TrustControlClient {
                 cost_units,
                 max_cost_per_invocation,
                 max_total_cost_units,
+                hold_id: hold_id.map(ToOwned::to_owned),
+                event_id: event_id.map(ToOwned::to_owned),
             },
         )
     }
@@ -2182,12 +2211,25 @@ impl TrustControlClient {
         grant_index: usize,
         cost_units: u64,
     ) -> Result<ReverseChargeCostResponse, CliError> {
+        self.reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
+    }
+
+    fn reverse_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<ReverseChargeCostResponse, CliError> {
         self.post_json(
-            BUDGET_REVERSE_PATH,
+            BUDGET_RELEASE_EXPOSURE_PATH,
             &ReverseChargeCostRequest {
                 capability_id: capability_id.to_string(),
                 grant_index,
                 cost_units,
+                hold_id: hold_id.map(ToOwned::to_owned),
+                event_id: event_id.map(ToOwned::to_owned),
             },
         )
     }
@@ -2198,12 +2240,75 @@ impl TrustControlClient {
         grant_index: usize,
         cost_units: u64,
     ) -> Result<ReduceChargeCostResponse, CliError> {
+        self.reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, None, None)
+    }
+
+    fn reduce_charge_cost_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
         self.post_json(
-            BUDGET_REDUCE_PATH,
+            BUDGET_RECONCILE_SPEND_PATH,
             &ReduceChargeCostRequest {
                 capability_id: capability_id.to_string(),
                 grant_index,
                 cost_units,
+                exposure_units: None,
+                realized_spend_units: None,
+                hold_id: hold_id.map(ToOwned::to_owned),
+                event_id: event_id.map(ToOwned::to_owned),
+            },
+        )
+    }
+
+    fn reconcile_budget_spend(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        authorized_exposure_units: u64,
+        realized_spend_units: u64,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
+        self.reconcile_budget_spend_with_ids(
+            capability_id,
+            grant_index,
+            authorized_exposure_units,
+            realized_spend_units,
+            None,
+            None,
+        )
+    }
+
+    fn reconcile_budget_spend_with_ids(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        authorized_exposure_units: u64,
+        realized_spend_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<ReduceChargeCostResponse, CliError> {
+        let released_exposure_units = authorized_exposure_units
+            .checked_sub(realized_spend_units)
+            .ok_or_else(|| {
+                CliError::Other(
+                    "realized spend cannot exceed authorized exposure during reconciliation"
+                        .to_string(),
+                )
+            })?;
+        self.post_json(
+            BUDGET_RECONCILE_SPEND_PATH,
+            &ReduceChargeCostRequest {
+                capability_id: capability_id.to_string(),
+                grant_index,
+                cost_units: released_exposure_units,
+                exposure_units: Some(authorized_exposure_units),
+                realized_spend_units: Some(realized_spend_units),
+                hold_id: hold_id.map(ToOwned::to_owned),
+                event_id: event_id.map(ToOwned::to_owned),
             },
         )
     }
@@ -2755,7 +2860,17 @@ impl BudgetStore for RemoteBudgetStore {
     ) -> Result<bool, BudgetStoreError> {
         self.client
             .try_increment_budget(capability_id, grant_index, max_invocations)
-            .map(|response| response.allowed)
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(response.budget_authority.as_ref(), None),
+                    response.invocation_count,
+                    None,
+                    None,
+                );
+                response.allowed
+            })
             .map_err(into_budget_store_error)
     }
 
@@ -2777,7 +2892,59 @@ impl BudgetStore for RemoteBudgetStore {
                 max_cost_per_invocation,
                 max_total_cost_units,
             )
-            .map(|response| response.allowed)
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+                response.allowed
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn try_charge_cost_with_ids(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+        cost_units: u64,
+        max_cost_per_invocation: Option<u64>,
+        max_total_cost_units: Option<u64>,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<bool, BudgetStoreError> {
+        self.client
+            .try_charge_cost_with_ids(
+                capability_id,
+                grant_index,
+                max_invocations,
+                cost_units,
+                max_cost_per_invocation,
+                max_total_cost_units,
+                hold_id,
+                event_id,
+            )
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+                response.allowed
+            })
             .map_err(into_budget_store_error)
     }
 
@@ -2789,7 +2956,45 @@ impl BudgetStore for RemoteBudgetStore {
     ) -> Result<(), BudgetStoreError> {
         self.client
             .reverse_charge_cost(capability_id, grant_index, cost_units)
-            .map(|_| ())
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn reverse_charge_cost_with_ids(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reverse_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
             .map_err(into_budget_store_error)
     }
 
@@ -2801,8 +3006,290 @@ impl BudgetStore for RemoteBudgetStore {
     ) -> Result<(), BudgetStoreError> {
         self.client
             .reduce_charge_cost(capability_id, grant_index, cost_units)
-            .map(|_| ())
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
             .map_err(into_budget_store_error)
+    }
+
+    fn reduce_charge_cost_with_ids(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reduce_charge_cost_with_ids(capability_id, grant_index, cost_units, hold_id, event_id)
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn settle_charge_cost(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reconcile_budget_spend(
+                capability_id,
+                grant_index,
+                exposed_cost_units,
+                realized_cost_units,
+            )
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn settle_charge_cost_with_ids(
+        &mut self,
+        capability_id: &str,
+        grant_index: usize,
+        exposed_cost_units: u64,
+        realized_cost_units: u64,
+        hold_id: Option<&str>,
+        event_id: Option<&str>,
+    ) -> Result<(), BudgetStoreError> {
+        self.client
+            .reconcile_budget_spend_with_ids(
+                capability_id,
+                grant_index,
+                exposed_cost_units,
+                realized_cost_units,
+                hold_id,
+                event_id,
+            )
+            .map(|response| {
+                self.cache_usage(
+                    capability_id,
+                    grant_index,
+                    response_budget_commit_index(
+                        response.budget_authority.as_ref(),
+                        response.budget_commit.as_ref(),
+                    ),
+                    response.invocation_count,
+                    response.total_cost_exposed,
+                    response.total_cost_realized_spend,
+                );
+            })
+            .map_err(into_budget_store_error)
+    }
+
+    fn authorize_budget_hold(
+        &mut self,
+        request: BudgetAuthorizeHoldRequest,
+    ) -> Result<BudgetAuthorizeHoldDecision, BudgetStoreError> {
+        let response = self
+            .client
+            .try_charge_cost_with_ids(
+                &request.capability_id,
+                request.grant_index,
+                request.max_invocations,
+                request.requested_exposure_units,
+                request.max_cost_per_invocation,
+                request.max_total_cost_units,
+                request.hold_id.as_deref(),
+                request.event_id.as_deref(),
+            )
+            .map_err(into_budget_store_error)?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            response_budget_commit_index(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+            ),
+            response.invocation_count,
+            response.total_cost_exposed,
+            response.total_cost_realized_spend,
+        );
+        let usage = self.cached_usage_or_default(&request.capability_id, request.grant_index);
+        let metadata = self.remote_budget_commit_metadata(
+            response.budget_authority.as_ref(),
+            response.budget_commit.as_ref(),
+            request.authority.as_ref(),
+            request.event_id.clone(),
+        );
+        if response.allowed {
+            Ok(BudgetAuthorizeHoldDecision::Authorized(
+                AuthorizedBudgetHold {
+                    hold_id: request.hold_id,
+                    authorized_exposure_units: request.requested_exposure_units,
+                    committed_cost_units_after: usage.committed_cost_units()?,
+                    invocation_count_after: usage.invocation_count,
+                    metadata,
+                },
+            ))
+        } else {
+            Ok(BudgetAuthorizeHoldDecision::Denied(DeniedBudgetHold {
+                hold_id: request.hold_id,
+                attempted_exposure_units: request.requested_exposure_units,
+                committed_cost_units_after: usage.committed_cost_units()?,
+                invocation_count_after: usage.invocation_count,
+                metadata,
+            }))
+        }
+    }
+
+    fn reverse_budget_hold(
+        &mut self,
+        request: BudgetReverseHoldRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let response = self
+            .client
+            .reverse_charge_cost_with_ids(
+                &request.capability_id,
+                request.grant_index,
+                request.reversed_exposure_units,
+                request.hold_id.as_deref(),
+                request.event_id.as_deref(),
+            )
+            .map_err(into_budget_store_error)?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            response_budget_commit_index(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+            ),
+            response.invocation_count,
+            response.total_cost_exposed,
+            response.total_cost_realized_spend,
+        );
+        let usage = self.cached_usage_or_default(&request.capability_id, request.grant_index);
+        Ok(BudgetHoldMutationDecision {
+            hold_id: request.hold_id,
+            exposure_units: request.reversed_exposure_units,
+            realized_spend_units: 0,
+            committed_cost_units_after: usage.committed_cost_units()?,
+            invocation_count_after: usage.invocation_count,
+            metadata: self.remote_budget_commit_metadata(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+                request.authority.as_ref(),
+                request.event_id,
+            ),
+        })
+    }
+
+    fn release_budget_hold(
+        &mut self,
+        request: BudgetReleaseHoldRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let response = self
+            .client
+            .reduce_charge_cost_with_ids(
+                &request.capability_id,
+                request.grant_index,
+                request.released_exposure_units,
+                request.hold_id.as_deref(),
+                request.event_id.as_deref(),
+            )
+            .map_err(into_budget_store_error)?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            response_budget_commit_index(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+            ),
+            response.invocation_count,
+            response.total_cost_exposed,
+            response.total_cost_realized_spend,
+        );
+        let usage = self.cached_usage_or_default(&request.capability_id, request.grant_index);
+        Ok(BudgetHoldMutationDecision {
+            hold_id: request.hold_id,
+            exposure_units: request.released_exposure_units,
+            realized_spend_units: 0,
+            committed_cost_units_after: usage.committed_cost_units()?,
+            invocation_count_after: usage.invocation_count,
+            metadata: self.remote_budget_commit_metadata(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+                request.authority.as_ref(),
+                request.event_id,
+            ),
+        })
+    }
+
+    fn reconcile_budget_hold(
+        &mut self,
+        request: BudgetReconcileHoldRequest,
+    ) -> Result<BudgetHoldMutationDecision, BudgetStoreError> {
+        let response = self
+            .client
+            .reconcile_budget_spend_with_ids(
+                &request.capability_id,
+                request.grant_index,
+                request.exposed_cost_units,
+                request.realized_spend_units,
+                request.hold_id.as_deref(),
+                request.event_id.as_deref(),
+            )
+            .map_err(into_budget_store_error)?;
+        self.cache_usage(
+            &request.capability_id,
+            request.grant_index,
+            response_budget_commit_index(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+            ),
+            response.invocation_count,
+            response.total_cost_exposed,
+            response.total_cost_realized_spend,
+        );
+        let usage = self.cached_usage_or_default(&request.capability_id, request.grant_index);
+        Ok(BudgetHoldMutationDecision {
+            hold_id: request.hold_id,
+            exposure_units: request.exposed_cost_units,
+            realized_spend_units: request.realized_spend_units,
+            committed_cost_units_after: usage.committed_cost_units()?,
+            invocation_count_after: usage.invocation_count,
+            metadata: self.remote_budget_commit_metadata(
+                response.budget_authority.as_ref(),
+                response.budget_commit.as_ref(),
+                request.authority.as_ref(),
+                request.event_id,
+            ),
+        })
     }
 
     fn list_usages(
@@ -2816,7 +3303,7 @@ impl BudgetStore for RemoteBudgetStore {
                 limit: Some(limit),
             })
             .map(|response| {
-                response
+                let usages: Vec<_> = response
                     .usages
                     .into_iter()
                     .map(|usage| BudgetUsageRecord {
@@ -2825,9 +3312,12 @@ impl BudgetStore for RemoteBudgetStore {
                         invocation_count: usage.invocation_count,
                         updated_at: usage.updated_at,
                         seq: usage.seq.unwrap_or(0),
-                        total_cost_charged: usage.total_cost_charged,
+                        total_cost_exposed: usage.total_cost_exposed,
+                        total_cost_realized_spend: usage.total_cost_realized_spend,
                     })
-                    .collect()
+                    .collect();
+                self.replace_cached_usages(capability_id, &usages);
+                usages
             })
             .map_err(into_budget_store_error)
     }
@@ -2837,12 +3327,196 @@ impl BudgetStore for RemoteBudgetStore {
         capability_id: &str,
         grant_index: usize,
     ) -> Result<Option<BudgetUsageRecord>, BudgetStoreError> {
+        if let Some(cached) = self.cached_usage(capability_id, grant_index) {
+            return Ok(Some(cached));
+        }
         self.list_usages(MAX_LIST_LIMIT, Some(capability_id))
             .map(|usages| {
                 usages
                     .into_iter()
                     .find(|usage| usage.grant_index == grant_index as u32)
             })
+    }
+}
+
+impl RemoteBudgetStore {
+    fn cache_usage(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+        seq: Option<u64>,
+        invocation_count: Option<u32>,
+        total_cost_exposed: Option<u64>,
+        total_cost_realized_spend: Option<u64>,
+    ) {
+        let mut cached_usage = self
+            .cached_usage
+            .lock()
+            .expect("remote budget usage cache poisoned");
+        let key = (capability_id.to_string(), grant_index as u32);
+        let updated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_secs() as i64)
+            .unwrap_or(0);
+
+        match (
+            invocation_count,
+            total_cost_exposed,
+            total_cost_realized_spend,
+        ) {
+            (None, None, None) => {
+                cached_usage.remove(&key);
+            }
+            _ => {
+                let entry = cached_usage
+                    .entry(key)
+                    .or_insert_with(|| BudgetUsageRecord {
+                        capability_id: capability_id.to_string(),
+                        grant_index: grant_index as u32,
+                        invocation_count: 0,
+                        updated_at,
+                        seq: seq.unwrap_or(0),
+                        total_cost_exposed: 0,
+                        total_cost_realized_spend: 0,
+                    });
+                if let Some(seq) = seq {
+                    entry.seq = seq;
+                }
+                if let Some(invocation_count) = invocation_count {
+                    entry.invocation_count = invocation_count;
+                }
+                if let Some(total_cost_exposed) = total_cost_exposed {
+                    entry.total_cost_exposed = total_cost_exposed;
+                }
+                if let Some(total_cost_realized_spend) = total_cost_realized_spend {
+                    entry.total_cost_realized_spend = total_cost_realized_spend;
+                }
+                entry.updated_at = updated_at;
+            }
+        }
+    }
+
+    fn cached_usage(&self, capability_id: &str, grant_index: usize) -> Option<BudgetUsageRecord> {
+        self.cached_usage
+            .lock()
+            .expect("remote budget usage cache poisoned")
+            .get(&(capability_id.to_string(), grant_index as u32))
+            .cloned()
+    }
+
+    fn replace_cached_usages(&self, capability_id: Option<&str>, usages: &[BudgetUsageRecord]) {
+        let mut cached_usage = self
+            .cached_usage
+            .lock()
+            .expect("remote budget usage cache poisoned");
+
+        if let Some(capability_id) = capability_id {
+            cached_usage
+                .retain(|(cached_capability_id, _), _| cached_capability_id != capability_id);
+        } else {
+            cached_usage.clear();
+        }
+
+        for usage in usages {
+            cached_usage.insert(
+                (usage.capability_id.clone(), usage.grant_index),
+                usage.clone(),
+            );
+        }
+    }
+
+    fn cached_usage_or_default(
+        &self,
+        capability_id: &str,
+        grant_index: usize,
+    ) -> BudgetUsageRecord {
+        self.cached_usage(capability_id, grant_index)
+            .unwrap_or_else(|| BudgetUsageRecord {
+                capability_id: capability_id.to_string(),
+                grant_index: grant_index as u32,
+                invocation_count: 0,
+                updated_at: SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|duration| duration.as_secs() as i64)
+                    .unwrap_or(0),
+                seq: 0,
+                total_cost_exposed: 0,
+                total_cost_realized_spend: 0,
+            })
+    }
+
+    fn remote_budget_commit_metadata(
+        &self,
+        authority: Option<&BudgetAuthorityMetadataView>,
+        commit: Option<&BudgetWriteCommitView>,
+        fallback_authority: Option<&BudgetEventAuthority>,
+        event_id: Option<String>,
+    ) -> BudgetCommitMetadata {
+        BudgetCommitMetadata {
+            authority: remote_budget_event_authority(authority, commit)
+                .or_else(|| fallback_authority.cloned()),
+            guarantee_level: remote_budget_guarantee_level(authority, commit),
+            budget_profile: self.budget_authority_profile(),
+            metering_profile: self.budget_metering_profile(),
+            budget_commit_index: response_budget_commit_index(authority, commit),
+            event_id,
+        }
+    }
+}
+
+fn response_budget_commit_index(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+) -> Option<u64> {
+    commit
+        .map(|commit| commit.commit_index)
+        .or_else(|| authority.and_then(|authority| authority.budget_commit_index))
+}
+
+fn remote_budget_event_authority(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+) -> Option<BudgetEventAuthority> {
+    authority
+        .map(|authority| BudgetEventAuthority {
+            authority_id: authority.authority_id.clone(),
+            lease_id: authority.lease_id.clone(),
+            lease_epoch: authority.lease_epoch,
+        })
+        .or_else(|| {
+            commit.map(|commit| BudgetEventAuthority {
+                authority_id: commit.authority_id.clone(),
+                lease_id: commit.lease_id.clone(),
+                lease_epoch: commit.lease_epoch,
+            })
+        })
+}
+
+fn remote_budget_guarantee_level(
+    authority: Option<&BudgetAuthorityMetadataView>,
+    commit: Option<&BudgetWriteCommitView>,
+) -> BudgetGuaranteeLevel {
+    match authority.map(|authority| authority.guarantee_level.as_str()) {
+        Some("single_node_atomic") => BudgetGuaranteeLevel::SingleNodeAtomic,
+        Some("ha_quorum_commit") | Some("ha_linearizable") => BudgetGuaranteeLevel::HaLinearizable,
+        Some("partition_escrowed") => BudgetGuaranteeLevel::PartitionEscrowed,
+        Some("ha_leader_visible") | Some("advisory_posthoc") => {
+            BudgetGuaranteeLevel::AdvisoryPosthoc
+        }
+        Some(_) => {
+            if commit.is_some_and(|commit| commit.quorum_committed) {
+                BudgetGuaranteeLevel::HaLinearizable
+            } else {
+                BudgetGuaranteeLevel::AdvisoryPosthoc
+            }
+        }
+        None => {
+            if commit.is_some_and(|commit| commit.quorum_committed) {
+                BudgetGuaranteeLevel::HaLinearizable
+            } else {
+                BudgetGuaranteeLevel::SingleNodeAtomic
+            }
+        }
     }
 }
 
@@ -2956,10 +3630,7 @@ mod service_runtime_tests {
         }
 
         fn requests(&self) -> Vec<CapturedRequest> {
-            self.captured
-                .lock()
-                .expect("captured requests")
-                .clone()
+            self.captured.lock().expect("captured requests").clone()
         }
     }
 
@@ -3046,7 +3717,11 @@ mod service_runtime_tests {
         fragments: &[&str],
     ) {
         assert_eq!(request.method, method);
-        assert!(request.target.starts_with(path_prefix), "unexpected target: {}", request.target);
+        assert!(
+            request.target.starts_with(path_prefix),
+            "unexpected target: {}",
+            request.target
+        );
         for fragment in fragments {
             assert!(
                 request.target.contains(fragment),
@@ -3372,7 +4047,12 @@ mod service_runtime_tests {
 
         let requests = server.requests();
         assert_eq!(requests.len(), 26);
-        assert_bearer_request(&requests[0], "GET", REVOCATIONS_PATH, &["capabilityId=cap-1", "limit=2"]);
+        assert_bearer_request(
+            &requests[0],
+            "GET",
+            REVOCATIONS_PATH,
+            &["capabilityId=cap-1", "limit=2"],
+        );
         assert_bearer_request(
             &requests[1],
             "GET",
@@ -3455,9 +4135,24 @@ mod service_runtime_tests {
                 "decisionLimit=8",
             ],
         );
-        assert_bearer_request(&requests[7], "GET", CREDIT_SCORECARD_PATH, &["capabilityId=cap-exposure"]);
-        assert_bearer_request(&requests[8], "GET", CREDIT_FACILITY_REPORT_PATH, &["capabilityId=cap-exposure"]);
-        assert_bearer_request(&requests[9], "GET", CREDIT_BOND_REPORT_PATH, &["capabilityId=cap-exposure"]);
+        assert_bearer_request(
+            &requests[7],
+            "GET",
+            CREDIT_SCORECARD_PATH,
+            &["capabilityId=cap-exposure"],
+        );
+        assert_bearer_request(
+            &requests[8],
+            "GET",
+            CREDIT_FACILITY_REPORT_PATH,
+            &["capabilityId=cap-exposure"],
+        );
+        assert_bearer_request(
+            &requests[9],
+            "GET",
+            CREDIT_BOND_REPORT_PATH,
+            &["capabilityId=cap-exposure"],
+        );
         assert_bearer_request(
             &requests[10],
             "GET",
@@ -3551,14 +4246,24 @@ mod service_runtime_tests {
                 "authorizationLimit=26",
             ],
         );
-        assert_bearer_request(&requests[18], "GET", METERED_BILLING_REPORT_PATH, &["meteredLimit=25"]);
+        assert_bearer_request(
+            &requests[18],
+            "GET",
+            METERED_BILLING_REPORT_PATH,
+            &["meteredLimit=25"],
+        );
         assert_bearer_request(
             &requests[19],
             "GET",
             AUTHORIZATION_CONTEXT_REPORT_PATH,
             &["authorizationLimit=26"],
         );
-        assert_bearer_request(&requests[20], "GET", AUTHORIZATION_PROFILE_METADATA_PATH, &[]);
+        assert_bearer_request(
+            &requests[20],
+            "GET",
+            AUTHORIZATION_PROFILE_METADATA_PATH,
+            &[],
+        );
         assert_bearer_request(
             &requests[21],
             "GET",
@@ -3658,37 +4363,43 @@ mod service_runtime_tests {
             expires_at: Some(290),
             note: Some("summary note".to_string()),
         });
-        let _ = client.issue_portable_negative_event(&arc_credentials::PortableNegativeEventIssueRequest {
-            subject_key: "subject-post".to_string(),
-            kind: arc_credentials::PortableNegativeEventKind::FraudSignal,
-            severity: 0.9,
-            observed_at: 300,
-            published_at: Some(310),
-            expires_at: Some(320),
-            evidence_refs: vec![arc_credentials::PortableNegativeEventEvidenceReference {
-                kind: arc_credentials::PortableNegativeEventEvidenceKind::External,
-                reference_id: "case-1".to_string(),
-                uri: Some("https://issuer.example/cases/1".to_string()),
-                sha256: None,
-            }],
-            note: Some("negative event".to_string()),
-        });
-        let _ = client.evaluate_portable_reputation(&arc_credentials::PortableReputationEvaluationRequest {
-            subject_key: "subject-post".to_string(),
-            summaries: Vec::new(),
-            negative_events: Vec::new(),
-            weighting_profile: arc_credentials::PortableReputationWeightingProfile {
-                profile_id: "profile-1".to_string(),
-                allowed_issuer_operator_ids: vec!["https://issuer.example".to_string()],
-                issuer_weights: BTreeMap::from([("https://issuer.example".to_string(), 1.0)]),
-                max_summary_age_secs: 3600,
-                max_event_age_secs: 3600,
-                reject_probationary: false,
-                negative_event_weight: 0.5,
-                blocking_event_kinds: vec![arc_credentials::PortableNegativeEventKind::FraudSignal],
+        let _ = client.issue_portable_negative_event(
+            &arc_credentials::PortableNegativeEventIssueRequest {
+                subject_key: "subject-post".to_string(),
+                kind: arc_credentials::PortableNegativeEventKind::FraudSignal,
+                severity: 0.9,
+                observed_at: 300,
+                published_at: Some(310),
+                expires_at: Some(320),
+                evidence_refs: vec![arc_credentials::PortableNegativeEventEvidenceReference {
+                    kind: arc_credentials::PortableNegativeEventEvidenceKind::External,
+                    reference_id: "case-1".to_string(),
+                    uri: Some("https://issuer.example/cases/1".to_string()),
+                    sha256: None,
+                }],
+                note: Some("negative event".to_string()),
             },
-            evaluated_at: Some(330),
-        });
+        );
+        let _ = client.evaluate_portable_reputation(
+            &arc_credentials::PortableReputationEvaluationRequest {
+                subject_key: "subject-post".to_string(),
+                summaries: Vec::new(),
+                negative_events: Vec::new(),
+                weighting_profile: arc_credentials::PortableReputationWeightingProfile {
+                    profile_id: "profile-1".to_string(),
+                    allowed_issuer_operator_ids: vec!["https://issuer.example".to_string()],
+                    issuer_weights: BTreeMap::from([("https://issuer.example".to_string(), 1.0)]),
+                    max_summary_age_secs: 3600,
+                    max_event_age_secs: 3600,
+                    reject_probationary: false,
+                    negative_event_weight: 0.5,
+                    blocking_event_kinds: vec![
+                        arc_credentials::PortableNegativeEventKind::FraudSignal,
+                    ],
+                },
+                evaluated_at: Some(330),
+            },
+        );
         let _ = client.local_reputation(
             "subject/key post",
             &LocalReputationQuery {
@@ -3702,32 +4413,52 @@ mod service_runtime_tests {
         assert_json_post(
             &requests[0],
             CREDIT_FACILITY_ISSUE_PATH,
-            &["\"supersedesFacilityId\":\"facility-prev\"", "\"capabilityId\":\"cap-post-facility\""],
+            &[
+                "\"supersedesFacilityId\":\"facility-prev\"",
+                "\"capabilityId\":\"cap-post-facility\"",
+            ],
         );
         assert_json_post(
             &requests[1],
             CREDIT_BOND_ISSUE_PATH,
-            &["\"supersedesBondId\":\"bond-prev\"", "\"capabilityId\":\"cap-post-bond\""],
+            &[
+                "\"supersedesBondId\":\"bond-prev\"",
+                "\"capabilityId\":\"cap-post-bond\"",
+            ],
         );
         assert_json_post(
             &requests[2],
             UNDERWRITING_DECISION_ISSUE_PATH,
-            &["\"supersedesDecisionId\":\"decision-prev\"", "\"capabilityId\":\"cap-post-underwriting\""],
+            &[
+                "\"supersedesDecisionId\":\"decision-prev\"",
+                "\"capabilityId\":\"cap-post-underwriting\"",
+            ],
         );
         assert_json_post(
             &requests[3],
             PORTABLE_REPUTATION_SUMMARY_ISSUE_PATH,
-            &["\"subjectKey\":\"subject-post\"", "\"note\":\"summary note\""],
+            &[
+                "\"subjectKey\":\"subject-post\"",
+                "\"note\":\"summary note\"",
+            ],
         );
         assert_json_post(
             &requests[4],
             PORTABLE_NEGATIVE_EVENT_ISSUE_PATH,
-            &["\"subjectKey\":\"subject-post\"", "\"referenceId\":\"case-1\"", "\"severity\":0.9"],
+            &[
+                "\"subjectKey\":\"subject-post\"",
+                "\"referenceId\":\"case-1\"",
+                "\"severity\":0.9",
+            ],
         );
         assert_json_post(
             &requests[5],
             PORTABLE_REPUTATION_EVALUATE_PATH,
-            &["\"subjectKey\":\"subject-post\"", "\"profileId\":\"profile-1\"", "\"negativeEventWeight\":0.5"],
+            &[
+                "\"subjectKey\":\"subject-post\"",
+                "\"profileId\":\"profile-1\"",
+                "\"negativeEventWeight\":0.5",
+            ],
         );
         assert_bearer_request(
             &requests[6],
@@ -3735,6 +4466,210 @@ mod service_runtime_tests {
             &path_with_encoded_param(LOCAL_REPUTATION_PATH, "subject_key", "subject/key post"),
             &["since=340", "until=350"],
         );
+    }
+
+    #[test]
+    fn budget_wrappers_use_split_budget_routes() {
+        let server = StaticResponseServer::spawn(200, "{}", "application/json", 3);
+        let client = build_client(&server.url, "secret").expect("build client");
+
+        let _ = client.try_charge_cost("cap-budget", 2, Some(9), 120, Some(150), Some(900));
+        let _ = client.reverse_charge_cost("cap-budget", 2, 120);
+        let _ = client.reconcile_budget_spend("cap-budget", 2, 120, 75);
+
+        let requests = server.requests();
+        assert_eq!(requests.len(), 3);
+        assert_json_post(
+            &requests[0],
+            BUDGET_AUTHORIZE_EXPOSURE_PATH,
+            &[
+                "\"exposureUnits\":120",
+                "\"maxExposurePerInvocation\":150",
+                "\"maxTotalExposureUnits\":900",
+            ],
+        );
+        assert_json_post(
+            &requests[1],
+            BUDGET_RELEASE_EXPOSURE_PATH,
+            &["\"exposureUnits\":120"],
+        );
+        assert_json_post(
+            &requests[2],
+            BUDGET_RECONCILE_SPEND_PATH,
+            &[
+                "\"authorizedExposureUnits\":120",
+                "\"realizedSpendUnits\":75",
+                "\"reductionUnits\":45",
+            ],
+        );
+    }
+
+    #[test]
+    fn budget_wrappers_include_budget_event_identity_when_provided() {
+        let server = StaticResponseServer::spawn(200, "{}", "application/json", 3);
+        let client = build_client(&server.url, "secret").expect("build client");
+
+        let _ = client.try_charge_cost_with_ids(
+            "cap-budget",
+            2,
+            Some(9),
+            120,
+            Some(150),
+            Some(900),
+            Some("hold-budget"),
+            Some("hold-budget:authorize"),
+        );
+        let _ = client.reverse_charge_cost_with_ids(
+            "cap-budget",
+            2,
+            120,
+            Some("hold-budget"),
+            Some("hold-budget:reverse"),
+        );
+        let _ = client.reconcile_budget_spend_with_ids(
+            "cap-budget",
+            2,
+            120,
+            75,
+            Some("hold-budget"),
+            Some("hold-budget:reconcile"),
+        );
+
+        let requests = server.requests();
+        assert_eq!(requests.len(), 3);
+        assert_json_post(
+            &requests[0],
+            BUDGET_AUTHORIZE_EXPOSURE_PATH,
+            &[
+                "\"holdId\":\"hold-budget\"",
+                "\"eventId\":\"hold-budget:authorize\"",
+            ],
+        );
+        assert_json_post(
+            &requests[1],
+            BUDGET_RELEASE_EXPOSURE_PATH,
+            &[
+                "\"holdId\":\"hold-budget\"",
+                "\"eventId\":\"hold-budget:reverse\"",
+            ],
+        );
+        assert_json_post(
+            &requests[2],
+            BUDGET_RECONCILE_SPEND_PATH,
+            &[
+                "\"holdId\":\"hold-budget\"",
+                "\"eventId\":\"hold-budget:reconcile\"",
+            ],
+        );
+    }
+
+    #[test]
+    fn budget_usage_view_round_trips_split_and_aggregate_fields() {
+        let usage: BudgetUsageView = serde_json::from_value(serde_json::json!({
+            "capabilityId": "cap-budget",
+            "grantIndex": 3,
+            "invocationCount": 4,
+            "totalExposureCharged": 75,
+            "totalRealizedSpend": 60,
+            "updatedAt": 1234,
+            "seq": 9
+        }))
+        .expect("parse split budget usage view");
+
+        assert_eq!(usage.capability_id, "cap-budget");
+        assert_eq!(usage.grant_index, 3);
+        assert_eq!(usage.invocation_count, 4);
+        assert_eq!(usage.total_cost_exposed, 75);
+        assert_eq!(usage.total_cost_realized_spend, 60);
+        assert_eq!(usage.updated_at, 1234);
+        assert_eq!(usage.seq, Some(9));
+
+        let encoded = serde_json::to_value(&usage).expect("serialize budget usage view");
+        assert_eq!(encoded["totalExposureCharged"], 75);
+        assert_eq!(encoded["totalRealizedSpend"], 60);
+        assert!(encoded.get("totalCostCharged").is_none());
+    }
+
+    #[test]
+    fn remote_budget_store_preserves_authority_term_and_commit_metadata() {
+        let body = serde_json::json!({
+            "capabilityId": "cap-budget",
+            "grantIndex": 2,
+            "allowed": true,
+            "invocationCount": 5,
+            "totalExposureCharged": 120,
+            "totalRealizedSpend": 75,
+            "budgetAuthority": {
+                "authorityId": "http://leader-a",
+                "leaderUrl": "http://leader-a",
+                "budgetTerm": 7,
+                "leaseId": "http://leader-a#term-7",
+                "leaseEpoch": 7,
+                "leaseExpiresAt": 5000,
+                "leaseTtlMs": 750,
+                "guaranteeLevel": "ha_quorum_commit",
+                "budgetCommitIndex": 41
+            },
+            "budgetCommit": {
+                "budgetSeq": 41,
+                "commitIndex": 41,
+                "quorumCommitted": true,
+                "quorumSize": 2,
+                "committedNodes": 2,
+                "witnessUrls": ["http://leader-a", "http://peer-b"],
+                "authorityId": "http://leader-a",
+                "budgetTerm": 7,
+                "leaseId": "http://leader-a#term-7",
+                "leaseEpoch": 7
+            }
+        })
+        .to_string();
+        let server = StaticResponseServer::spawn(200, &body, "application/json", 1);
+        let mut store =
+            build_remote_budget_store(&server.url, "secret").expect("build remote budget store");
+
+        let decision = store
+            .authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                capability_id: "cap-budget".to_string(),
+                grant_index: 2,
+                max_invocations: Some(9),
+                requested_exposure_units: 120,
+                max_cost_per_invocation: Some(150),
+                max_total_cost_units: Some(900),
+                hold_id: Some("hold-budget".to_string()),
+                event_id: Some("hold-budget:authorize".to_string()),
+                authority: None,
+            })
+            .expect("authorize remote budget hold");
+
+        let BudgetAuthorizeHoldDecision::Authorized(authorized) = decision else {
+            panic!("expected remote authorize to succeed");
+        };
+        let authority = authorized
+            .metadata
+            .authority
+            .expect("budget authority metadata");
+        assert_eq!(authority.authority_id, "http://leader-a");
+        assert_eq!(authority.lease_id, "http://leader-a#term-7");
+        assert_eq!(authority.lease_epoch, 7);
+        assert_eq!(authorized.metadata.budget_commit_index, Some(41));
+        assert_eq!(
+            authorized.metadata.guarantee_level,
+            BudgetGuaranteeLevel::HaLinearizable
+        );
+        assert_eq!(
+            authorized.metadata.event_id.as_deref(),
+            Some("hold-budget:authorize")
+        );
+
+        let usage = store
+            .get_usage("cap-budget", 2)
+            .expect("get cached usage")
+            .expect("cached usage record");
+        assert_eq!(usage.seq, 41);
+        assert_eq!(usage.invocation_count, 5);
+        assert_eq!(usage.total_cost_exposed, 120);
+        assert_eq!(usage.total_cost_realized_spend, 75);
     }
 
     #[test]

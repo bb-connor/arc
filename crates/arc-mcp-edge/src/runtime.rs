@@ -16,8 +16,7 @@ use arc_core::session::{
 };
 use arc_cross_protocol::{
     route_selection_metadata, BridgeError, CrossProtocolTargetExecution,
-    CrossProtocolTargetRequest, DiscoveryProtocol, TargetExecutionHop,
-    TargetProtocolExecutor,
+    CrossProtocolTargetRequest, DiscoveryProtocol, TargetExecutionHop, TargetProtocolExecutor,
 };
 use arc_kernel::{
     ArcKernel, LateSessionEvent, NestedFlowClient, PeerCapabilities, SessionOperationResponse,
@@ -132,9 +131,7 @@ impl TargetProtocolExecutor for McpTargetExecutor {
                 tool_name: request.execution.target_tool_name.clone(),
                 arguments: request.execution.arguments.clone(),
                 agent_id: request.execution.agent_id.clone(),
-                route_selection_metadata: Some(route_selection_metadata(
-                    request.route_selection,
-                )?),
+                route_selection_metadata: Some(route_selection_metadata(request.route_selection)?),
                 peer_supports_arc_tool_streaming: self.peer_supports_arc_tool_streaming,
             },
         )

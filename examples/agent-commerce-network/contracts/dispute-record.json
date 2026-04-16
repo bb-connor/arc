@@ -1,6 +1,6 @@
 {
-  "dispute_id": "dispute_acme_contoso_001",
-  "job_id": "job_acme_001",
+  "dispute_id": "dispute_lattice_vanguard_001",
+  "job_id": "job_lattice_001",
   "reason_code": "quality_issue",
   "summary": "Provider report was missing exploitability context for two findings.",
   "status": "opened",

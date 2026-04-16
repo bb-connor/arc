@@ -187,13 +187,12 @@ not.
 
 **Current evidence**
 
-- helper validators exist in
-  `crates/arc-core-types/src/capability.rs:1218-1268`
-- the live kernel path still reduces revocation to the leaf plus the presented
-  chain IDs in `crates/arc-kernel/src/kernel/mod.rs:2049`
-- the dedicated review memo still describes the runtime as not invoking
-  `validate_delegation_chain` or `validate_attenuation` at admission time
-  (`docs/review/02-delegation-enforcement-remediation.md:26-54`)
+- Closed in the current tree. The kernel now treats delegation as a fail-closed
+  admission invariant: it validates delegation-link signatures, requires
+  ancestor capability snapshots from the receipt store, checks
+  delegator/delegatee continuity, enforces delegated scope ceilings plus
+  declared attenuations, and rejects missing or revoked ancestors during
+  admission.
 
 **Primary remediation doc**
 
@@ -201,9 +200,8 @@ not.
 
 **Acceptable ship exits**
 
-- implement a real fail-closed lineage verifier in the kernel
-- or narrow the ship boundary to root-issued / authority-reissued capability
-  semantics and remove strong recursive delegation language
+- implemented: the runtime now ships a real fail-closed lineage verifier in the
+  kernel
 
 **Not acceptable**
 
@@ -421,6 +419,11 @@ allowed public phrases.
 Stronger security claims are impossible while delegation enforcement is still
 mostly helper-level and documentation-level rather than a fail-closed kernel
 acceptance condition.
+
+**Current status**
+
+- Closed in the current tree by the recursive delegated-authority admission
+  path now enforced in `crates/arc-kernel/src/kernel/mod.rs`.
 
 **Primary remediation doc**
 

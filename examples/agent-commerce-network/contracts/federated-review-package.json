@@ -1,8 +1,8 @@
 {
-  "review_id": "federated_review_northwind_001",
-  "source_operator": "acme-platform-security",
-  "counterparty_operator": "contoso-red-team",
-  "reviewer": "northwind-assurance",
+  "review_id": "federated_review_sentinel_001",
+  "source_operator": "lattice-platform-security",
+  "counterparty_operator": "vanguard-security",
+  "reviewer": "sentinel-assurance",
   "import_mode": "bounded_evidence_import",
   "artifacts": [
     "receipts.json",

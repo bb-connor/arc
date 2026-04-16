@@ -278,6 +278,8 @@ pub struct Web3CheckpointStatement {
     pub tree_size: u64,
     pub merkle_root: Hash,
     pub issued_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_checkpoint_sha256: Option<String>,
     pub kernel_key: PublicKey,
     pub signature: Signature,
 }
@@ -1380,6 +1382,8 @@ struct Web3CheckpointStatementBody {
     tree_size: u64,
     merkle_root: Hash,
     issued_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    previous_checkpoint_sha256: Option<String>,
     kernel_key: PublicKey,
 }
 
@@ -1392,6 +1396,7 @@ fn checkpoint_statement_body(statement: &Web3CheckpointStatement) -> Web3Checkpo
         tree_size: statement.tree_size,
         merkle_root: statement.merkle_root,
         issued_at: statement.issued_at,
+        previous_checkpoint_sha256: statement.previous_checkpoint_sha256.clone(),
         kernel_key: statement.kernel_key.clone(),
     }
 }
@@ -1630,6 +1635,7 @@ mod tests {
             tree_size: 1,
             merkle_root,
             issued_at: 1_743_292_800,
+            previous_checkpoint_sha256: None,
             kernel_key: operator.public_key(),
             signature: Signature::from_hex(
                 "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",

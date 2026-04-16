@@ -25,10 +25,10 @@ use std::collections::BTreeMap;
 use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
 use arc_cross_protocol::{
     runtime_lifecycle_contract, runtime_lifecycle_metadata, semantic_hints_for_tool,
-    target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity,
-    CapabilityBridge, CrossProtocolCapabilityRef, CrossProtocolExecutionRequest,
-    CrossProtocolOrchestrator, DiscoveryProtocol, OpenAiTargetExecutor,
-    OrchestratedToolCall, RuntimeLifecycleSurface, TargetProtocolRegistry,
+    target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity, CapabilityBridge,
+    CrossProtocolCapabilityRef, CrossProtocolExecutionRequest, CrossProtocolOrchestrator,
+    DiscoveryProtocol, OpenAiTargetExecutor, OrchestratedToolCall, RuntimeLifecycleSurface,
+    TargetProtocolRegistry,
 };
 #[cfg(any(test, feature = "compatibility-surface"))]
 use arc_kernel::ToolServerConnection;
@@ -602,7 +602,10 @@ impl ArcA2aEdge {
             status: TaskStatus::Working,
             status_message: Some("Task accepted for authoritative deferred execution.".to_string()),
             message: None,
-            metadata: Some(pending_task_metadata("cross_protocol_orchestrator", "deferred_task_poll")),
+            metadata: Some(pending_task_metadata(
+                "cross_protocol_orchestrator",
+                "deferred_task_poll",
+            )),
         };
         self.tasks.insert(
             task_id,
@@ -950,7 +953,10 @@ impl ArcA2aEdge {
         id: Value,
     ) -> Value {
         let Some(task) = self.tasks.get(task_id).cloned() else {
-            return Self::jsonrpc_error_response(id, A2aEdgeError::ToolNotFound(task_id.to_string()));
+            return Self::jsonrpc_error_response(
+                id,
+                A2aEdgeError::ToolNotFound(task_id.to_string()),
+            );
         };
         if task.owner_agent_id != execution.agent_id {
             return Self::jsonrpc_error_response(
@@ -992,7 +998,10 @@ impl ArcA2aEdge {
         };
 
         let Some(task) = self.tasks.get_mut(task_id) else {
-            return Self::jsonrpc_error_response(id, A2aEdgeError::ToolNotFound(task_id.to_string()));
+            return Self::jsonrpc_error_response(
+                id,
+                A2aEdgeError::ToolNotFound(task_id.to_string()),
+            );
         };
         if task.owner_agent_id != execution.agent_id {
             return Self::jsonrpc_error_response(
@@ -1004,7 +1013,10 @@ impl ArcA2aEdge {
             TaskStatus::Working => {
                 task.response.status = TaskStatus::Cancelled;
                 task.response.status_message = Some("Task cancelled by caller.".to_string());
-                task.response.metadata = Some(cancelled_task_metadata("cross_protocol_orchestrator", "deferred_task_poll"));
+                task.response.metadata = Some(cancelled_task_metadata(
+                    "cross_protocol_orchestrator",
+                    "deferred_task_poll",
+                ));
                 json!({
                     "jsonrpc": "2.0",
                     "id": id,
@@ -1018,7 +1030,9 @@ impl ArcA2aEdge {
             }),
             status => Self::jsonrpc_error_response(
                 id,
-                A2aEdgeError::InvalidRequest(format!("cannot cancel task in terminal status `{status:?}`")),
+                A2aEdgeError::InvalidRequest(format!(
+                    "cannot cancel task in terminal status `{status:?}`"
+                )),
             ),
         }
     }
@@ -1167,8 +1181,9 @@ fn build_skill_candidate(
     tool: &ToolDefinition,
     requires_qualification: bool,
 ) -> Result<SkillCandidate, A2aEdgeError> {
-    let target_protocol = target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
-        .map_err(A2aEdgeError::InvalidRequest)?;
+    let target_protocol =
+        target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
+            .map_err(A2aEdgeError::InvalidRequest)?;
     let fidelity = evaluate_bridge_fidelity(tool, target_protocol);
     let (published_id, lookup_alias, display_name, mut tags, description) =
         if requires_qualification {
@@ -1200,13 +1215,11 @@ fn build_skill_candidate(
     }
 
     Ok(SkillCandidate {
-        binding: fidelity
-            .published_by_default()
-            .then(|| SkillBinding {
-                target_protocol,
-                server_id: manifest.server_id.clone(),
-                tool_name: tool.name.clone(),
-            }),
+        binding: fidelity.published_by_default().then(|| SkillBinding {
+            target_protocol,
+            server_id: manifest.server_id.clone(),
+            tool_name: tool.name.clone(),
+        }),
         published_id,
         lookup_alias,
         display_name,
@@ -1482,12 +1495,12 @@ mod tests {
 
     use arc_core::capability::{ArcScope, CapabilityTokenBody, Operation, ToolGrant};
     use arc_core::crypto::Keypair;
-    use arc_manifest::LatencyHint;
     use arc_kernel::{
         ArcKernel, KernelConfig, KernelError, NestedFlowBridge, ToolCallChunk, ToolCallStream,
         ToolServerStreamResult, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
         DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
+    use arc_manifest::LatencyHint;
 
     struct MockToolServer {
         server_id: String,
@@ -1959,7 +1972,8 @@ mod tests {
         };
         assert!(caveats
             .iter()
-            .any(|c| c.contains("cancellation is available only for deferred `message/stream` tasks")));
+            .any(|c| c
+                .contains("cancellation is available only for deferred `message/stream` tasks")));
     }
 
     #[test]
@@ -1981,12 +1995,8 @@ mod tests {
         let BridgeFidelity::Adapted { caveats } = &skill.bridge_fidelity else {
             panic!("expected adapted fidelity");
         };
-        assert!(caveats
-            .iter()
-            .any(|c| c.contains("deferred tasks")));
-        assert!(caveats
-            .iter()
-            .any(|c| c.contains("terminal task payload")));
+        assert!(caveats.iter().any(|c| c.contains("deferred tasks")));
+        assert!(caveats.iter().any(|c| c.contains("terminal task payload")));
     }
 
     // ---- Skill lookup tests ----
@@ -2673,8 +2683,8 @@ mod tests {
 
     #[test]
     fn authoritative_send_uses_protocol_aware_target_binding() {
-        let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![mcp_target_manifest()])
-            .unwrap();
+        let mut edge =
+            ArcA2aEdge::new(A2aEdgeConfig::default(), vec![mcp_target_manifest()]).unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ArcKernel::new(config);
@@ -2727,8 +2737,8 @@ mod tests {
 
     #[test]
     fn authoritative_send_supports_openai_target_binding() {
-        let mut edge = ArcA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()])
-            .unwrap();
+        let mut edge =
+            ArcA2aEdge::new(A2aEdgeConfig::default(), vec![openai_target_manifest()]).unwrap();
         let config = test_kernel_config();
         let kernel_issuer = config.keypair.clone();
         let mut kernel = ArcKernel::new(config);

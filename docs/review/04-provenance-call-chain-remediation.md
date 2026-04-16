@@ -32,49 +32,54 @@ as if all three had the same evidentiary strength.
 
 ## Current Evidence
 
-The current implementation has useful building blocks, but they do not yet form
-an authenticated provenance chain.
+The current implementation now has a real local provenance upgrade path, but it
+still stops short of a durable cross-kernel authenticity model.
 
-- `crates/arc-core-types/src/capability.rs` defines
-  `GovernedCallChainContext` as five strings:
-  `chain_id`, `parent_request_id`, optional `parent_receipt_id`,
-  `origin_subject`, and `delegator_subject`.
-- `crates/arc-kernel/src/lib.rs` `validate_governed_call_chain_context`
-  only checks non-empty fields and forbids
-  `parent_request_id == request_id`.
-- `crates/arc-kernel/src/receipt_support.rs` copies
-  `intent.call_chain` directly into signed `governed_transaction` receipt
-  metadata.
-- `crates/arc-core-types/src/session.rs` `OperationContext` only carries
-  `session_id`, `request_id`, `agent_id`, optional `parent_request_id`, and
-  `progress_token`.
+- `crates/arc-core-types/src/capability.rs` still defines the raw
+  `GovernedCallChainContext`, but receipts and reports now carry
+  `GovernedCallChainProvenance` with an explicit evidence class:
+  `asserted`, `observed`, or `verified`.
+- `crates/arc-kernel/src/kernel/mod.rs`
+  `validate_governed_call_chain_context` now rejects empty fields, rejects
+  self-referential parent requests, binds nested flows to the locally
+  authenticated parent request when present, enforces delegator-subject
+  consistency against capability lineage, and optionally validates a signed
+  upstream delegator proof for coherence, signature, and time bounds.
+- `crates/arc-kernel/src/receipt_support.rs` upgrades
+  `governed_transaction.call_chain` from `asserted` to `observed` when the
+  kernel can corroborate local parent request lineage, local parent receipt
+  linkage, or capability-lineage subjects, and upgrades to `verified` only when
+  a signed upstream delegator proof also validates.
 - `crates/arc-kernel/src/request_matching.rs`
-  `begin_child_request_in_sessions` sets `parent_request_id` for local nested
-  flows, but only inside one live kernel session.
-- `crates/arc-kernel/src/session.rs` `Session::validate_context` only checks
-  `session_id` and `agent_id`; it does not bind request lineage to the richer
-  `SessionAuthContext`.
-- `crates/arc-store-sqlite/src/receipt_store.rs` validates that the enterprise
-  authorization projection contains non-empty call-chain fields, but it does
-  not authenticate their upstream truth.
+  `begin_child_request_in_sessions` still only records parent request lineage
+  inside one live kernel session.
+- `crates/arc-kernel/src/session.rs`, `crates/arc-core-types/src/session.rs`,
+  and `crates/arc-kernel/src/kernel/session_ops.rs` now mint signed session
+  anchors, track local request lineage, and persist those records for local
+  session continuity and nested-flow provenance.
+- `crates/arc-store-sqlite/src/receipt_store/support.rs` and
+  `crates/arc-store-sqlite/src/receipt_store/reports.rs` now keep the
+  call-chain evidence class visible and fail closed on sender binding:
+  asserted call-chain provenance does not count as delegated sender-bound truth.
 - `crates/arc-core-types/src/capability.rs` and
-  `crates/arc-kernel/src/capability_lineage.rs` already provide capability
-  lineage primitives that can be reused, but governed call-chain validation
-  does not currently join against them.
+  `crates/arc-kernel/src/capability_lineage.rs` now participate in governed
+  call-chain corroboration, but signed receipt-lineage statements are still not
+  emitted pervasively enough to make every child edge independently portable.
 - `crates/arc-kernel/src/receipt_support.rs`
-  `build_child_request_receipt` already records local `parent_request_id` for
-  child receipts, which is the right direction for local lineage, but this is
-  not unified with governed cross-request provenance.
+  `build_child_request_receipt` still records local `parent_request_id` for
+  child receipts, but parent/child receipt linkage remains implicit rather than
+  a separate signed lineage artifact.
 
 The repo therefore has:
 
+- typed governed call-chain provenance classes
 - local parent-child request bookkeeping
-- signed receipts
-- capability lineage snapshots
-- session auth context storage
-- report-time projection validation
+- local parent receipt lookup
+- capability lineage corroboration
+- fail-closed authorization-context projection for asserted provenance
 
-but not authenticated end-to-end provenance linkage across those layers.
+but not durable authenticated end-to-end provenance linkage across sessions,
+kernels, and trust domains.
 
 ## Why Claims Overreach
 
@@ -85,25 +90,62 @@ strong for the current runtime.
 
 The overreach is structural:
 
-- `call_chain` is approval-bound intent context, not authenticated parent
-  evidence.
-- a receipt signature currently proves that ARC signed the metadata, not that
-  the upstream metadata was independently verified.
-- the authorization-context report is derived from signed receipt metadata, so
-  it inherits this weakness rather than fixing it.
-- local child-request lineage and governed call-chain lineage are separate
-  mechanisms with no shared authenticity model.
-- session continuity is not cryptographically represented at all.
-- delegation linkage is not enforced between `call_chain` subjects and the
-  actual capability lineage used by the request.
+- `call_chain` still enters the system as caller or approval-bound context and
+  becomes stronger only when ARC can corroborate it locally.
+- a receipt signature proves ARC signed the metadata and any corroborated local
+  evidence ARC checked, but it still does not prove missing parent artifacts,
+  session continuity, or replay-safe cross-kernel handoff.
+- the authorization-context report now preserves the evidence class and no
+  longer upgrades asserted lineage into sender-bound truth, but it still lacks
+  complete outward request-lineage and receipt-lineage evidence coverage to
+  support stronger public claims.
+- local child-request lineage and governed call-chain lineage still are not one
+  durable provenance DAG.
+- session continuity is now represented locally through session anchors and
+  request-lineage records, but that proof is not yet carried end to end across
+  every outward surface or cross-kernel handoff.
+- there is no replay-protected continuation artifact carrying parent receipt
+  hash, session anchor, and delegation bindings across kernels.
 
 The honest claim today is narrower:
 
-- ARC can preserve caller-supplied delegated transaction context inside a
-  signed receipt.
-- ARC can prove local request execution and local receipt integrity.
-- ARC cannot yet prove that the signed delegated context corresponds to an
-  authenticated upstream request, receipt, session, or delegation edge.
+- ARC can preserve caller-supplied delegated transaction context as `asserted`
+  provenance inside a signed receipt.
+- ARC can upgrade that provenance to `observed` from local parent request or
+  parent receipt evidence plus capability-lineage corroboration, and to
+  `verified` when a signed upstream delegator proof matches the validated
+  capability lineage.
+- ARC can prove local request execution, local receipt integrity, and local
+  session/request continuity through persisted session anchors and
+  request-lineage records.
+- ARC cannot yet prove every parent-child receipt edge or cross-kernel handoff
+  from a complete set of signed lineage artifacts.
+
+## Phase 1 Execution Order
+
+The provenance upgrade order now present in the repo is:
+
+1. `asserted`
+   - caller-supplied `call_chain` context is preserved, but it is only caller
+     assertion at this stage.
+2. `observed`
+   - ARC upgrades the same context when it can corroborate one or more local
+     facts:
+     live-session parent request lineage, locally present parent receipt
+     linkage, or capability-lineage subject matches.
+3. `verified`
+   - ARC upgrades only when a signed upstream delegator proof also validates
+     against the asserted context and the executing capability lineage.
+4. report gate
+   - the authorization-context projection sets
+     `delegatedCallChainBound = true` only for corroborated provenance;
+     asserted-only lineage remains visible but non-normative.
+
+What is still missing after this order:
+
+- signed receipt-lineage statements
+- consistent outward session-anchor and request-lineage references
+- replay-protected cross-kernel continuation tokens and their trust policy
 
 ## Target End-State
 
@@ -546,7 +588,8 @@ Do not restore strong provenance claims until the release gate includes:
 
 ### M5. Report And Hosted Auth Hardening
 
-- upgrade authorization-context projection to require verified lineage
+- require corroborated observed or verified lineage for sender-bound delegated
+  call-chain claims
 - expose asserted lineage only in non-normative diagnostics
 - update reviewer packs and partner proof docs
 
@@ -555,6 +598,24 @@ Do not restore strong provenance claims until the release gate includes:
 - update protocol safety properties
 - add formal model for provenance authenticity core
 - make provenance authenticity part of release qualification
+
+Current repo state:
+
+- `M1` is real for receipt and report semantics: evidence classes ship and
+  asserted provenance no longer counts as delegated sender-bound truth.
+- `M2` is materially real for local provenance: session anchors and
+  request-lineage records are emitted and persisted for local session and
+  nested-flow lineage, but outward references are not yet complete everywhere.
+- `M3` is partially real: capability-lineage subject consistency and signed
+  upstream delegator proof validation exist, and the store can persist
+  receipt-lineage statements, but the kernel does not yet emit a complete
+  signed receipt-lineage proof for every child edge and parent-receipt hash
+  verification remains incomplete.
+- `M4` is partially real: continuation-token shapes and validation hooks exist,
+  but replay-safe cross-kernel trust distribution and qualification remain open.
+- `M5` is materially real for authorization-context truthfulness, but
+  reviewer-pack and partner-proof semantics still depend on the missing
+  artifacts above.
 
 ## Acceptance Criteria
 
@@ -571,7 +632,7 @@ are true:
   validated against actual capability/session lineage rather than accepted as
   unchecked strings.
 - enterprise authorization reports set `delegatedCallChainBound = true` only
-  for verified lineage.
+  for corroborated observed or verified lineage.
 - an independent verifier can reconstruct a child-to-parent lineage edge from
   signed artifacts without trusting mutable operator prose.
 - legacy unverifiable rows are downgraded to `asserted` rather than silently

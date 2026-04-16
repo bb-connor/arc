@@ -47,10 +47,10 @@ Bounded ARC is ready to ship only when every item below is either:
 
 ## Phase 418: Delegation Runtime Boundary Closure
 
-- [ ] `DELEG5-01` The bounded release either ships runtime delegation-chain plus attenuation enforcement or explicitly narrows the release to root-issued or authority-reissued semantics.
-- [ ] `DELEG5-01` The runtime and qualification boundary agree on what revocation and lineage guarantees are actually enforced.
-- [ ] `DELEG5-02` Ship-facing docs stop implying lineage-complete recursive delegation unless that stronger runtime path is implemented.
-- [ ] `DELEG5-02` Examples and qualification docs teach only the bounded delegation semantics that actually ship.
+- [x] `DELEG5-01` The runtime ships fail-closed delegation-chain admission: the kernel validates chain signatures, requires persisted ancestor snapshots, enforces delegator/delegatee continuity, checks delegated scope ceilings plus declared attenuations, and rejects missing or revoked ancestors.
+- [x] `DELEG5-01` The runtime and qualification boundary now agree on the delegated-authority guarantees that are actually enforced.
+- [x] `DELEG5-02` Ship-facing docs describe recursive delegated-authority admission only to the extent the runtime now enforces it.
+- [x] `DELEG5-02` Examples and qualification docs no longer teach weaker caller-presented lineage semantics than the shipped kernel.
 
 **Primary evidence files**
 

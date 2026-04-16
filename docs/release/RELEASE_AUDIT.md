@@ -52,9 +52,10 @@ Qualified claim:
   not consensus-grade HA.
 - ARC's supported monetary budget story is single-node atomic with an explicit
   clustered overrun bound, not distributed-linearizable spend truth.
-- ARC's supported public evidence story is signed local audit evidence and
-  signed visibility snapshots, not public transparency-log or strong
-  non-repudiation semantics.
+- ARC's supported public evidence story is signed local audit evidence plus one
+  bounded trust-anchor or witness publication path with explicit publication
+  policy, freshness, and conflict visibility; it is not yet a general public
+  transparency-log or strong non-repudiation surface.
 
 Not yet qualified:
 

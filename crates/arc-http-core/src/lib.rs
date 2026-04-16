@@ -22,9 +22,9 @@ pub use evaluation::{EvaluateResponse, HealthResponse, SidecarStatus, VerifyRece
 pub use identity::{AuthMethod, CallerIdentity};
 pub use method::HttpMethod;
 pub use receipt::{
-    http_status_metadata_decision, http_status_metadata_final, http_status_scope,
-    HttpReceipt, HttpReceiptBody, ARC_DECISION_RECEIPT_ID_KEY, ARC_KERNEL_RECEIPT_ID_KEY,
-    ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL, ARC_HTTP_STATUS_SCOPE_KEY,
+    http_status_metadata_decision, http_status_metadata_final, http_status_scope, HttpReceipt,
+    HttpReceiptBody, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
+    ARC_HTTP_STATUS_SCOPE_FINAL, ARC_HTTP_STATUS_SCOPE_KEY, ARC_KERNEL_RECEIPT_ID_KEY,
 };
 pub use request::ArcHttpRequest;
 pub use session::SessionContext;

@@ -18,19 +18,19 @@ if [[ -n "${ARC_BIN:-}" ]]; then
       mcp serve-http \
       --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
       --server-id provider-security-review \
-      --server-name "Contoso Security Review" \
+      --server-name "Vanguard Security Review" \
       --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
       --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
       --session-db "${SESSION_DB}" \
       -- \
-      python3 "${EXAMPLE_ROOT}/provider/mock_review_mcp_server.py"
+      python3 "${EXAMPLE_ROOT}/provider/review_server.py"
   fi
 
   exec "${ARC_BIN}" \
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
     --server-id provider-security-review \
-    --server-name "Contoso Security Review" \
+    --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
     --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
     --receipt-db "${STATE_DIR}/receipts.sqlite3" \
@@ -38,7 +38,7 @@ if [[ -n "${ARC_BIN:-}" ]]; then
     --authority-db "${STATE_DIR}/authority.sqlite3" \
     --session-db "${SESSION_DB}" \
     -- \
-    python3 "${EXAMPLE_ROOT}/provider/mock_review_mcp_server.py"
+    python3 "${EXAMPLE_ROOT}/provider/review_server.py"
 fi
 
 if [[ -n "${ARC_CONTROL_URL:-}" ]]; then
@@ -48,19 +48,19 @@ if [[ -n "${ARC_CONTROL_URL:-}" ]]; then
     mcp serve-http \
     --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
     --server-id provider-security-review \
-    --server-name "Contoso Security Review" \
+    --server-name "Vanguard Security Review" \
     --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
     --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
     --session-db "${SESSION_DB}" \
     -- \
-    python3 "${EXAMPLE_ROOT}/provider/mock_review_mcp_server.py"
+    python3 "${EXAMPLE_ROOT}/provider/review_server.py"
 fi
 
 exec cargo run --bin arc -- \
   mcp serve-http \
   --policy "${EXAMPLE_ROOT}/provider/policy.yaml" \
   --server-id provider-security-review \
-  --server-name "Contoso Security Review" \
+  --server-name "Vanguard Security Review" \
   --listen "${PROVIDER_EDGE_LISTEN:-127.0.0.1:8931}" \
   --auth-token "${ARC_EDGE_TOKEN:-demo-token}" \
   --receipt-db "${STATE_DIR}/receipts.sqlite3" \
@@ -68,4 +68,4 @@ exec cargo run --bin arc -- \
   --authority-db "${STATE_DIR}/authority.sqlite3" \
   --session-db "${SESSION_DB}" \
   -- \
-  python3 "${EXAMPLE_ROOT}/provider/mock_review_mcp_server.py"
+  python3 "${EXAMPLE_ROOT}/provider/review_server.py"

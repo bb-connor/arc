@@ -26,10 +26,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
 use arc_cross_protocol::{
     runtime_lifecycle_contract, runtime_lifecycle_metadata, semantic_hints_for_tool,
-    target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity,
-    CapabilityBridge, CrossProtocolCapabilityRef, CrossProtocolExecutionRequest,
-    CrossProtocolOrchestrator, DiscoveryProtocol, OpenAiTargetExecutor,
-    OrchestratedToolCall, RuntimeLifecycleSurface, TargetProtocolRegistry,
+    target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity, CapabilityBridge,
+    CrossProtocolCapabilityRef, CrossProtocolExecutionRequest, CrossProtocolOrchestrator,
+    DiscoveryProtocol, OpenAiTargetExecutor, OrchestratedToolCall, RuntimeLifecycleSurface,
+    TargetProtocolRegistry,
 };
 #[cfg(any(test, feature = "compatibility-surface"))]
 use arc_kernel::ToolServerConnection;
@@ -307,11 +307,9 @@ impl ArcAcpEdge {
                     continue;
                 }
 
-                let target_protocol = target_protocol_for_tool_with_registry(
-                    tool,
-                    &authoritative_target_registry(),
-                )
-                .map_err(AcpEdgeError::InvalidRequest)?;
+                let target_protocol =
+                    target_protocol_for_tool_with_registry(tool, &authoritative_target_registry())
+                        .map_err(AcpEdgeError::InvalidRequest)?;
                 let category = infer_acp_category(tool, config.default_category);
                 let fidelity = evaluate_bridge_fidelity(tool, category, target_protocol);
                 capability_fidelity.insert(cap_id.clone(), fidelity.clone());
@@ -931,7 +929,9 @@ impl ArcAcpEdge {
             AcpTaskStatus::Working => {
                 task.task.status = AcpTaskStatus::Cancelled;
                 task.task.status_message = Some("Task cancelled by caller.".to_string());
-                task.task.metadata = Some(cancelled_stream_task_metadata("cross_protocol_orchestrator"));
+                task.task.metadata = Some(cancelled_stream_task_metadata(
+                    "cross_protocol_orchestrator",
+                ));
                 Ok(task.task.clone())
             }
             AcpTaskStatus::Cancelled => Ok(task.task.clone()),
@@ -1397,11 +1397,11 @@ mod tests {
     use super::*;
     use arc_core::capability::{ArcScope, CapabilityTokenBody, Operation, ToolGrant};
     use arc_core::crypto::Keypair;
-    use arc_manifest::LatencyHint;
     use arc_kernel::{
         ArcKernel, KernelConfig, KernelError, NestedFlowBridge, DEFAULT_CHECKPOINT_BATCH_SIZE,
         DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
     };
+    use arc_manifest::LatencyHint;
 
     struct MockToolServer {
         server_id: String,
@@ -1910,7 +1910,9 @@ mod tests {
         let BridgeFidelity::Adapted { caveats } = &cap.bridge_fidelity else {
             panic!("expected adapted fidelity");
         };
-        assert!(caveats.iter().any(|c| c.contains("deferred `tool/stream` tasks")));
+        assert!(caveats
+            .iter()
+            .any(|c| c.contains("deferred `tool/stream` tasks")));
         assert!(caveats
             .iter()
             .any(|c| c.contains("partial output is preserved")));
@@ -2241,7 +2243,9 @@ mod tests {
             .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
             .unwrap();
 
-        let metadata = result.metadata.expect("protocol-aware invoke should attach metadata");
+        let metadata = result
+            .metadata
+            .expect("protocol-aware invoke should attach metadata");
         assert_eq!(
             metadata["arc"]["bridge"]["targetProtocol"].as_str(),
             Some("mcp")
@@ -2274,7 +2278,9 @@ mod tests {
             .invoke("read_file", json!({"path": "/tmp"}), &kernel, &execution)
             .unwrap();
 
-        let metadata = result.metadata.expect("protocol-aware invoke should attach metadata");
+        let metadata = result
+            .metadata
+            .expect("protocol-aware invoke should attach metadata");
         assert_eq!(
             metadata["arc"]["bridge"]["targetProtocol"].as_str(),
             Some("open_ai")
@@ -2559,7 +2565,10 @@ mod tests {
             &kernel,
             &execution,
         );
-        assert_eq!(response["result"]["task"]["status"].as_str(), Some("working"));
+        assert_eq!(
+            response["result"]["task"]["status"].as_str(),
+            Some("working")
+        );
         let task_id = response["result"]["task"]["id"]
             .as_str()
             .expect("tool/stream should create task")
@@ -2569,7 +2578,8 @@ mod tests {
             Some(true)
         );
         assert_eq!(
-            response["result"]["task"]["metadata"]["arc"]["runtimeLifecycle"]["streamEntrypoint"].as_str(),
+            response["result"]["task"]["metadata"]["arc"]["runtimeLifecycle"]["streamEntrypoint"]
+                .as_str(),
             Some("tool/stream")
         );
 
@@ -2585,7 +2595,10 @@ mod tests {
             &kernel,
             &execution,
         );
-        assert_eq!(resumed["result"]["task"]["status"].as_str(), Some("completed"));
+        assert_eq!(
+            resumed["result"]["task"]["status"].as_str(),
+            Some("completed")
+        );
         assert_eq!(
             resumed["result"]["result"]["metadata"]["arc"]["receiptId"]
                 .as_str()
@@ -2623,7 +2636,10 @@ mod tests {
             &kernel,
             &execution,
         );
-        let task_id = created["result"]["task"]["id"].as_str().unwrap().to_string();
+        let task_id = created["result"]["task"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
 
         let cancelled = edge.handle_jsonrpc(
             json!({
@@ -2637,7 +2653,10 @@ mod tests {
             &kernel,
             &execution,
         );
-        assert_eq!(cancelled["result"]["task"]["status"].as_str(), Some("cancelled"));
+        assert_eq!(
+            cancelled["result"]["task"]["status"].as_str(),
+            Some("cancelled")
+        );
         assert_eq!(
             cancelled["result"]["task"]["metadata"]["arc"]["decision"].as_str(),
             Some("cancelled")

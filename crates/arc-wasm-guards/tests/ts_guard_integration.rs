@@ -82,7 +82,8 @@ fn make_request(tool_name: &str) -> GuardRequest {
 fn load_ts_backend() -> Box<dyn WasmGuardAbi> {
     let wasm_bytes = load_ts_guard_wasm();
     let engine = create_shared_engine().unwrap();
-    let mut backend = ComponentBackend::with_engine(engine).with_limits(TS_MAX_MEMORY, TS_MAX_MODULE_SIZE);
+    let mut backend =
+        ComponentBackend::with_engine(engine).with_limits(TS_MAX_MEMORY, TS_MAX_MODULE_SIZE);
     backend.load_module(&wasm_bytes, 1_000_000_000).unwrap();
     Box::new(backend)
 }

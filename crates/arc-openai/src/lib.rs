@@ -15,8 +15,7 @@ use std::collections::BTreeMap;
 use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
 use arc_core::receipt::ArcReceipt;
 use arc_cross_protocol::{
-    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol,
-    TargetProtocolRegistry,
+    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol, TargetProtocolRegistry,
 };
 use arc_kernel::{dpop, ArcKernel, ToolCallOutput, ToolCallRequest, Verdict as KernelVerdict};
 use arc_manifest::{ToolDefinition, ToolManifest};

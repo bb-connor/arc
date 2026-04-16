@@ -1,4 +1,5 @@
 use arc_core::web3::{verify_anchor_inclusion_proof, AnchorInclusionProof};
+use arc_kernel::checkpoint::{describe_checkpoint_equivocation, CheckpointTransparencySummary};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -124,4 +125,37 @@ pub fn verify_proof_bundle(
         verified: true,
         lanes,
     })
+}
+
+pub fn verify_checkpoint_publication_records(
+    transparency: &CheckpointTransparencySummary,
+) -> Result<(), AnchorError> {
+    if let Some(equivocation) = transparency.equivocations.first() {
+        return Err(AnchorError::Verification(format!(
+            "checkpoint publication conflict detected: {}",
+            describe_checkpoint_equivocation(equivocation)
+        )));
+    }
+
+    for publication in &transparency.publications {
+        if let Some(binding) = publication.trust_anchor_binding.as_ref() {
+            binding
+                .validate()
+                .map_err(|error| AnchorError::Verification(error.to_string()))?;
+            continue;
+        }
+
+        let has_successor_witness = transparency.witnesses.iter().any(|witness| {
+            witness.log_id == publication.log_id
+                && witness.checkpoint_seq == publication.checkpoint_seq
+        });
+        if !has_successor_witness {
+            return Err(AnchorError::Verification(format!(
+                "checkpoint publication {} requires a trust-anchor binding or successor witness",
+                publication.checkpoint_seq
+            )));
+        }
+    }
+
+    Ok(())
 }

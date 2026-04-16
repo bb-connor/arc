@@ -8,6 +8,12 @@ use serde::{Deserialize, Serialize};
 
 use arc_core::receipt::ArcReceipt;
 use arc_core::{canonical_json_bytes, sha256_hex, PublicKey, Signature};
+use arc_kernel::checkpoint::{
+    checkpoint_body_sha256, validate_checkpoint_transparency, CheckpointConsistencyProof,
+    CheckpointEquivocation, CheckpointPublication, CheckpointTransparencySummary,
+    CheckpointWitness,
+};
+use arc_kernel::evidence_export::{build_evidence_transparency_claims, EvidenceTransparencyClaims};
 use arc_kernel::{
     is_supported_checkpoint_schema, verify_checkpoint_signature, CapabilitySnapshot,
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
@@ -127,6 +133,8 @@ pub struct RemoteEvidenceExportRequest {
 pub struct RemoteEvidenceExportResponse {
     pub bundle: EvidenceExportBundle,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transparency: Option<CheckpointTransparencySummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub federation_policy: Option<FederationPolicyDocument>,
 }
 
@@ -135,6 +143,8 @@ pub struct RemoteEvidenceExportResponse {
 pub struct EvidenceImportPackage {
     manifest: EvidenceExportManifest,
     bundle: EvidenceExportBundle,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    transparency: Option<CheckpointTransparencySummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     federation_policy: Option<FederationPolicyDocument>,
 }
@@ -154,6 +164,7 @@ pub struct RemoteEvidenceImportResponse {
 #[derive(Debug, Clone)]
 pub struct VerifiedEvidencePackage {
     pub bundle: EvidenceExportBundle,
+    pub transparency: Option<CheckpointTransparencySummary>,
     pub manifest_schema: String,
     pub exported_at: u64,
     pub manifest_hash: String,
@@ -175,6 +186,8 @@ struct EvidenceExportManifest {
     counts: EvidenceExportCounts,
     proof_coverage: EvidenceProofCoverage,
     child_receipt_scope: EvidenceChildReceiptScope,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    claim_boundary: Option<EvidenceTransparencyClaims>,
     files: Vec<EvidenceExportFileHash>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     policy: Option<PolicyAttachmentMetadata>,
@@ -190,11 +203,16 @@ struct EvidenceVerificationResult {
     tool_receipts: u64,
     child_receipts: u64,
     checkpoints: u64,
+    checkpoint_publications: u64,
+    checkpoint_witnesses: u64,
+    checkpoint_consistency_proofs: u64,
+    checkpoint_equivocations: u64,
     capability_lineage: u64,
     inclusion_proofs: u64,
     uncheckpointed_receipts: u64,
     verified_files: u64,
     child_receipt_scope: EvidenceChildReceiptScope,
+    claim_boundary: EvidenceTransparencyClaims,
 }
 
 fn unix_now() -> u64 {
@@ -308,7 +326,23 @@ fn read_ndjson_file<T: for<'de> Deserialize<'de>>(
         .collect()
 }
 
-fn render_readme(bundle: &EvidenceExportBundle) -> String {
+fn read_optional_ndjson_file<T: for<'de> Deserialize<'de>>(
+    input_dir: &Path,
+    relative_path: &str,
+) -> Result<Vec<T>, CliError> {
+    let path = input_dir.join(relative_path);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    read_ndjson_file(input_dir, relative_path)
+}
+
+fn render_readme(
+    bundle: &EvidenceExportBundle,
+    transparency: &CheckpointTransparencySummary,
+    claim_boundary: &EvidenceTransparencyClaims,
+) -> String {
+    let trust_anchor = claim_boundary.trust_anchor.as_deref().unwrap_or("none");
     let child_scope = match bundle.child_receipt_scope {
         EvidenceChildReceiptScope::FullQueryWindow => {
             "Child receipts include the full export query window."
@@ -329,19 +363,38 @@ This directory is a local SQLite export assembled by `arc evidence export`.
 It contains signed receipts, checkpoints, inclusion proofs, capability lineage,
 and retention metadata for offline review.
 
+Audit claims in this package are limited to local receipt verification,
+signed checkpoint continuity, and inclusion-proof coverage.
+Publication state: {}
+Trust anchor: {}
+Transparency log identity and append-only growth remain preview-only unless
+the package itself carries verifiable trust-anchor publication material.
+
 Tool receipts: {}
 Child receipts: {}
 Checkpoints: {}
 Inclusion proofs: {}
 Uncheckpointed receipts: {}
+Checkpoint publications: {}
+Checkpoint witnesses: {}
+Checkpoint consistency proofs: {}
+Checkpoint equivocations: {}
+Transparency preview logs: {}
 
 {}
 ",
+        claim_boundary.publication_state.as_str(),
+        trust_anchor,
         bundle.tool_receipts.len(),
         bundle.child_receipts.len(),
         bundle.checkpoints.len(),
         bundle.inclusion_proofs.len(),
         bundle.uncheckpointed_receipts.len(),
+        transparency.publications.len(),
+        transparency.witnesses.len(),
+        transparency.consistency_proofs.len(),
+        transparency.equivocations.len(),
+        claim_boundary.transparency_preview.len(),
         child_scope
     )
 }
@@ -746,7 +799,7 @@ fn verify_child_receipts(child_receipts: &[EvidenceChildReceiptRecord]) -> Resul
 fn verify_checkpoints(
     checkpoints: &[KernelCheckpoint],
 ) -> Result<BTreeMap<u64, &KernelCheckpoint>, CliError> {
-    let mut by_seq = BTreeMap::new();
+    let mut by_seq = BTreeMap::<u64, &KernelCheckpoint>::new();
     for checkpoint in checkpoints {
         if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
             return Err(CliError::Other(format!(
@@ -760,15 +813,25 @@ fn verify_checkpoints(
                 checkpoint.body.checkpoint_seq
             )));
         }
-        if by_seq
-            .insert(checkpoint.body.checkpoint_seq, checkpoint)
-            .is_some()
-        {
+        if let Some(existing) = by_seq.get(&checkpoint.body.checkpoint_seq) {
+            let existing_sha256 = checkpoint_body_sha256(&existing.body).map_err(|error| {
+                CliError::Other(format!("checkpoint digest computation failed: {error}"))
+            })?;
+            let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body).map_err(|error| {
+                CliError::Other(format!("checkpoint digest computation failed: {error}"))
+            })?;
+            if existing_sha256 != checkpoint_sha256 {
+                return Err(CliError::Other(format!(
+                    "checkpoint transparency equivocation detected: checkpoint_seq {} has conflicting digests {} and {}",
+                    checkpoint.body.checkpoint_seq, existing_sha256, checkpoint_sha256
+                )));
+            }
             return Err(CliError::Other(format!(
                 "duplicate checkpoint_seq in evidence package: {}",
                 checkpoint.body.checkpoint_seq
             )));
         }
+        by_seq.insert(checkpoint.body.checkpoint_seq, checkpoint);
     }
     Ok(by_seq)
 }
@@ -789,6 +852,59 @@ fn verify_lineage(
         }
     }
     Ok(by_capability)
+}
+
+fn validate_checkpoint_transparency_summary(
+    checkpoints: &[KernelCheckpoint],
+) -> Result<CheckpointTransparencySummary, CliError> {
+    validate_checkpoint_transparency(checkpoints).map_err(|error| {
+        CliError::Other(format!(
+            "checkpoint transparency verification failed: {error}"
+        ))
+    })
+}
+
+fn verify_checkpoint_transparency_records(
+    checkpoints: &[KernelCheckpoint],
+    publications: &[CheckpointPublication],
+    witnesses: &[CheckpointWitness],
+    consistency_proofs: &[CheckpointConsistencyProof],
+    equivocations: &[CheckpointEquivocation],
+) -> Result<CheckpointTransparencySummary, CliError> {
+    arc_kernel::checkpoint::verify_checkpoint_transparency_records(
+        checkpoints,
+        &CheckpointTransparencySummary {
+            publications: publications.to_vec(),
+            witnesses: witnesses.to_vec(),
+            consistency_proofs: consistency_proofs.to_vec(),
+            equivocations: equivocations.to_vec(),
+        },
+    )
+    .map_err(|error| {
+        CliError::Other(format!(
+            "checkpoint transparency verification failed: {error}"
+        ))
+    })
+}
+
+fn verify_transparency_claim_boundary(
+    expected: Option<&EvidenceTransparencyClaims>,
+    bundle: &EvidenceExportBundle,
+    transparency: &CheckpointTransparencySummary,
+) -> Result<(), CliError> {
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+    expected.validate().map_err(CliError::Other)?;
+    let actual =
+        build_evidence_transparency_claims(bundle, transparency, expected.trust_anchor.as_deref());
+    if expected != &actual {
+        return Err(CliError::Other(
+            "evidence package transparency claim boundary does not match the exported data"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn verify_inclusion_proofs(
@@ -1005,6 +1121,23 @@ pub(crate) fn validate_import_package_data(
     let tool_receipts_by_seq = verify_tool_receipts(&package.bundle.tool_receipts)?;
     verify_child_receipts(&package.bundle.child_receipts)?;
     let checkpoints_by_seq = verify_checkpoints(&package.bundle.checkpoints)?;
+    let transparency = match package.transparency.as_ref() {
+        Some(summary) => arc_kernel::checkpoint::verify_checkpoint_transparency_records(
+            &package.bundle.checkpoints,
+            summary,
+        )
+        .map_err(|error| {
+            CliError::Other(format!(
+                "checkpoint transparency verification failed: {error}"
+            ))
+        })?,
+        None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
+    };
+    verify_transparency_claim_boundary(
+        package.manifest.claim_boundary.as_ref(),
+        &package.bundle,
+        &transparency,
+    )?;
     verify_inclusion_proofs(
         &tool_receipts_by_seq,
         &checkpoints_by_seq,
@@ -1046,6 +1179,14 @@ fn load_verified_evidence_package(input: &Path) -> Result<EvidenceImportPackage,
     let child_receipts: Vec<EvidenceChildReceiptRecord> =
         read_ndjson_file(input, "child-receipts.ndjson")?;
     let checkpoints: Vec<KernelCheckpoint> = read_ndjson_file(input, "checkpoints.ndjson")?;
+    let checkpoint_publications: Vec<CheckpointPublication> =
+        read_optional_ndjson_file(input, "checkpoint-publications.ndjson")?;
+    let checkpoint_witnesses: Vec<CheckpointWitness> =
+        read_optional_ndjson_file(input, "checkpoint-witnesses.ndjson")?;
+    let checkpoint_consistency_proofs: Vec<CheckpointConsistencyProof> =
+        read_optional_ndjson_file(input, "checkpoint-consistency-proofs.ndjson")?;
+    let checkpoint_equivocations: Vec<CheckpointEquivocation> =
+        read_optional_ndjson_file(input, "checkpoint-equivocations.ndjson")?;
     let capability_lineage: Vec<CapabilitySnapshot> =
         read_ndjson_file(input, "capability-lineage.ndjson")?;
     let inclusion_proofs: Vec<ReceiptInclusionProof> =
@@ -1074,12 +1215,32 @@ fn load_verified_evidence_package(input: &Path) -> Result<EvidenceImportPackage,
     let tool_receipts_by_seq = verify_tool_receipts(&tool_receipts)?;
     verify_child_receipts(&child_receipts)?;
     let checkpoints_by_seq = verify_checkpoints(&checkpoints)?;
+    let child_receipt_scope = manifest.child_receipt_scope;
+    let transparency = verify_checkpoint_transparency_records(
+        &checkpoints,
+        &checkpoint_publications,
+        &checkpoint_witnesses,
+        &checkpoint_consistency_proofs,
+        &checkpoint_equivocations,
+    )?;
     verify_inclusion_proofs(
         &tool_receipts_by_seq,
         &checkpoints_by_seq,
         &inclusion_proofs,
         manifest.counts.uncheckpointed_receipts,
     )?;
+    let bundle = EvidenceExportBundle {
+        query,
+        tool_receipts,
+        child_receipts,
+        child_receipt_scope,
+        checkpoints,
+        capability_lineage,
+        inclusion_proofs,
+        uncheckpointed_receipts: Vec::new(),
+        retention,
+    };
+    verify_transparency_claim_boundary(manifest.claim_boundary.as_ref(), &bundle, &transparency)?;
 
     let federation_policy = if manifest.federation_policy.is_some() {
         Some(read_federation_policy(
@@ -1088,21 +1249,10 @@ fn load_verified_evidence_package(input: &Path) -> Result<EvidenceImportPackage,
     } else {
         None
     };
-    let child_receipt_scope = manifest.child_receipt_scope;
-
     let package = EvidenceImportPackage {
         manifest,
-        bundle: EvidenceExportBundle {
-            query,
-            tool_receipts,
-            child_receipts,
-            child_receipt_scope,
-            checkpoints,
-            capability_lineage,
-            inclusion_proofs,
-            uncheckpointed_receipts: Vec::new(),
-            retention,
-        },
+        bundle,
+        transparency: Some(transparency),
         federation_policy,
     };
     validate_import_package_data(&package)?;
@@ -1116,6 +1266,7 @@ pub fn load_verified_evidence_package_summary(
     let manifest_hash = sha256_hex(&canonical_json_bytes(&package.manifest)?);
     Ok(VerifiedEvidencePackage {
         bundle: package.bundle,
+        transparency: package.transparency,
         manifest_schema: package.manifest.schema,
         exported_at: package.manifest.exported_at,
         manifest_hash,
@@ -1165,10 +1316,25 @@ pub(crate) fn build_federated_share_import(
 fn write_evidence_package(
     output: &Path,
     bundle: EvidenceExportBundle,
+    transparency: Option<CheckpointTransparencySummary>,
     policy_file: Option<&Path>,
     federation_policy: Option<&FederationPolicyDocument>,
 ) -> Result<(), CliError> {
     ensure_clean_output_dir(output)?;
+    let transparency = match transparency {
+        Some(summary) => {
+            verify_checkpoint_transparency_records(
+                &bundle.checkpoints,
+                &summary.publications,
+                &summary.witnesses,
+                &summary.consistency_proofs,
+                &summary.equivocations,
+            )?;
+            summary
+        }
+        None => validate_checkpoint_transparency_summary(&bundle.checkpoints)?,
+    };
+    let claim_boundary = build_evidence_transparency_claims(&bundle, &transparency, None);
 
     let mut file_hashes = Vec::new();
     write_json_file(output, "query.json", &bundle.query, &mut file_hashes)?;
@@ -1192,6 +1358,30 @@ fn write_evidence_package(
     )?;
     write_ndjson_file(
         output,
+        "checkpoint-publications.ndjson",
+        &transparency.publications,
+        &mut file_hashes,
+    )?;
+    write_ndjson_file(
+        output,
+        "checkpoint-witnesses.ndjson",
+        &transparency.witnesses,
+        &mut file_hashes,
+    )?;
+    write_ndjson_file(
+        output,
+        "checkpoint-consistency-proofs.ndjson",
+        &transparency.consistency_proofs,
+        &mut file_hashes,
+    )?;
+    write_ndjson_file(
+        output,
+        "checkpoint-equivocations.ndjson",
+        &transparency.equivocations,
+        &mut file_hashes,
+    )?;
+    write_ndjson_file(
+        output,
         "capability-lineage.ndjson",
         &bundle.capability_lineage,
         &mut file_hashes,
@@ -1211,7 +1401,7 @@ fn write_evidence_package(
     write_bytes_file(
         output,
         "README.txt",
-        render_readme(&bundle).as_bytes(),
+        render_readme(&bundle, &transparency, &claim_boundary).as_bytes(),
         &mut file_hashes,
     )?;
 
@@ -1259,6 +1449,7 @@ fn write_evidence_package(
         counts,
         proof_coverage,
         child_receipt_scope: bundle.child_receipt_scope,
+        claim_boundary: Some(claim_boundary),
         files: file_hashes,
         policy,
         federation_policy,
@@ -1375,9 +1566,12 @@ pub fn cmd_evidence_export(
         (Some(receipt_db), None) => {
             let store = SqliteReceiptStore::open(receipt_db)?;
             let bundle = store.build_evidence_export_bundle(&prepared.query)?;
+            let transparency =
+                store.build_evidence_export_transparency_summary(&bundle.checkpoints)?;
             validate_evidence_bundle_requirements(&bundle, prepared.require_proofs)?;
             RemoteEvidenceExportResponse {
                 bundle,
+                transparency: Some(transparency),
                 federation_policy: prepared.federation_policy,
             }
         }
@@ -1401,6 +1595,7 @@ pub fn cmd_evidence_export(
     write_evidence_package(
         output,
         response.bundle,
+        response.transparency,
         policy_file,
         response.federation_policy.as_ref(),
     )
@@ -1460,6 +1655,19 @@ pub fn cmd_evidence_import(
 pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliError> {
     let package = load_verified_evidence_package(input)?;
     let manifest = package.manifest;
+    let transparency = match package.transparency.as_ref() {
+        Some(summary) => arc_kernel::checkpoint::verify_checkpoint_transparency_records(
+            &package.bundle.checkpoints,
+            summary,
+        )
+        .map_err(|error| {
+            CliError::Other(format!(
+                "checkpoint transparency verification failed: {error}"
+            ))
+        })?,
+        None => validate_checkpoint_transparency_summary(&package.bundle.checkpoints)?,
+    };
+    let claim_boundary = build_evidence_transparency_claims(&package.bundle, &transparency, None);
 
     let result = EvidenceVerificationResult {
         schema: manifest.schema,
@@ -1467,11 +1675,16 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
         tool_receipts: manifest.counts.tool_receipts,
         child_receipts: manifest.counts.child_receipts,
         checkpoints: manifest.counts.checkpoints,
+        checkpoint_publications: transparency.publications.len() as u64,
+        checkpoint_witnesses: transparency.witnesses.len() as u64,
+        checkpoint_consistency_proofs: transparency.consistency_proofs.len() as u64,
+        checkpoint_equivocations: transparency.equivocations.len() as u64,
         capability_lineage: manifest.counts.capability_lineage,
         inclusion_proofs: manifest.counts.inclusion_proofs,
         uncheckpointed_receipts: manifest.counts.uncheckpointed_receipts,
         verified_files: manifest.files.len() as u64,
         child_receipt_scope: manifest.child_receipt_scope,
+        claim_boundary,
     };
 
     if json_output {
@@ -1481,6 +1694,19 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
         println!("tool_receipts:          {}", result.tool_receipts);
         println!("child_receipts:         {}", result.child_receipts);
         println!("checkpoints:            {}", result.checkpoints);
+        println!(
+            "checkpoint_publications: {}",
+            result.checkpoint_publications
+        );
+        println!("checkpoint_witnesses:   {}", result.checkpoint_witnesses);
+        println!(
+            "checkpoint_consistency_proofs: {}",
+            result.checkpoint_consistency_proofs
+        );
+        println!(
+            "checkpoint_equivocations: {}",
+            result.checkpoint_equivocations
+        );
         println!("capability_lineage:     {}", result.capability_lineage);
         println!("inclusion_proofs:       {}", result.inclusion_proofs);
         println!(
@@ -1489,7 +1715,286 @@ pub fn cmd_evidence_verify(input: &Path, json_output: bool) -> Result<(), CliErr
         );
         println!("verified_files:         {}", result.verified_files);
         println!("child_receipt_scope:    {:?}", result.child_receipt_scope);
+        println!(
+            "transparency_preview_logs: {}",
+            result.claim_boundary.transparency_preview.len()
+        );
+        println!(
+            "publication_state:      {}",
+            result.claim_boundary.publication_state.as_str()
+        );
+        if let Some(trust_anchor) = result.claim_boundary.trust_anchor.as_deref() {
+            println!("trust_anchor:          {}", trust_anchor);
+        }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    use arc_core::crypto::Keypair;
+    use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
+    use arc_kernel::{build_checkpoint, build_checkpoint_with_previous};
+    use arc_kernel::{
+        EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
+        EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+    };
+
+    fn sample_receipt() -> ArcReceipt {
+        let keypair = Keypair::generate();
+        ArcReceipt::sign(
+            ArcReceiptBody {
+                id: "receipt-export-1".to_string(),
+                timestamp: 1_775_137_626,
+                capability_id: "cap-export-1".to_string(),
+                tool_server: "export".to_string(),
+                tool_name: "publish".to_string(),
+                action: ToolCallAction::from_parameters(
+                    serde_json::json!({"release":"candidate-1"}),
+                )
+                .expect("action"),
+                decision: Decision::Allow,
+                content_hash: "content-export-1".to_string(),
+                policy_hash: "policy-export-1".to_string(),
+                evidence: Vec::new(),
+                metadata: None,
+                kernel_key: keypair.public_key(),
+            },
+            &keypair,
+        )
+        .expect("sign receipt")
+    }
+
+    fn sample_bundle() -> EvidenceExportBundle {
+        let receipt = sample_receipt();
+        let canonical = canonical_json_bytes(&receipt).expect("canonical receipt");
+        let checkpoint_keypair = Keypair::generate();
+        let checkpoint = build_checkpoint(1, 1, 1, &[canonical.clone()], &checkpoint_keypair)
+            .expect("checkpoint");
+        let tree = arc_core::merkle::MerkleTree::from_leaves(&[canonical]).expect("merkle tree");
+        let proof = arc_kernel::build_inclusion_proof(&tree, 0, checkpoint.body.checkpoint_seq, 1)
+            .expect("proof");
+        EvidenceExportBundle {
+            query: EvidenceExportQuery::default(),
+            tool_receipts: vec![EvidenceToolReceiptRecord { seq: 1, receipt }],
+            child_receipts: Vec::new(),
+            child_receipt_scope: EvidenceChildReceiptScope::OmittedNoJoinPath,
+            checkpoints: vec![checkpoint],
+            capability_lineage: Vec::new(),
+            inclusion_proofs: vec![proof],
+            uncheckpointed_receipts: Vec::new(),
+            retention: EvidenceRetentionMetadata {
+                live_db_size_bytes: 512,
+                oldest_live_receipt_timestamp: Some(1_775_137_626),
+            },
+        }
+    }
+
+    #[test]
+    fn checkpoint_transparency_records_match_derived_chain() {
+        let kp = Keypair::generate();
+        let first = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &kp)
+            .expect("first checkpoint");
+        let second = build_checkpoint_with_previous(
+            2,
+            3,
+            4,
+            &[b"three".to_vec(), b"four".to_vec()],
+            &kp,
+            Some(&first),
+        )
+        .expect("second checkpoint");
+        let checkpoints = vec![first, second];
+
+        let summary =
+            validate_checkpoint_transparency_summary(&checkpoints).expect("transparency summary");
+        verify_checkpoint_transparency_records(
+            &checkpoints,
+            &summary.publications,
+            &summary.witnesses,
+            &summary.consistency_proofs,
+            &summary.equivocations,
+        )
+        .expect("matching transparency records");
+    }
+
+    #[test]
+    fn checkpoint_transparency_verification_fails_closed_on_equivocation() {
+        let kp = Keypair::generate();
+        let first = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &kp)
+            .expect("first checkpoint");
+        let second = build_checkpoint_with_previous(
+            2,
+            3,
+            4,
+            &[b"three".to_vec(), b"four".to_vec()],
+            &kp,
+            Some(&first),
+        )
+        .expect("second checkpoint");
+        let fork = build_checkpoint_with_previous(
+            2,
+            3,
+            4,
+            &[b"five".to_vec(), b"six".to_vec()],
+            &kp,
+            Some(&first),
+        )
+        .expect("fork checkpoint");
+
+        let error = validate_checkpoint_transparency_summary(&[first, second, fork])
+            .expect_err("forked checkpoints should fail");
+        assert!(
+            error.to_string().contains("equivocation"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn anchored_transparency_claims_fail_closed_during_export_verification() {
+        let bundle = sample_bundle();
+        let transparency =
+            validate_checkpoint_transparency_summary(&bundle.checkpoints).expect("summary");
+        let anchored_claims = EvidenceTransparencyClaims {
+            schema: arc_kernel::evidence_export::EVIDENCE_TRANSPARENCY_CLAIMS_SCHEMA.to_string(),
+            publication_state: arc_kernel::evidence_export::EvidencePublicationState::TrustAnchored,
+            trust_anchor: Some("anchor-root-1".to_string()),
+            audit: arc_kernel::evidence_export::EvidenceAuditClaims {
+                checkpoint_logs: transparency
+                    .publications
+                    .iter()
+                    .map(|publication| publication.log_id.clone())
+                    .collect(),
+                signed_checkpoints: bundle.checkpoints.len() as u64,
+                checkpoint_publications: transparency.publications.len() as u64,
+                checkpoint_witnesses: transparency.witnesses.len() as u64,
+                checkpoint_consistency_proofs: transparency.consistency_proofs.len() as u64,
+                inclusion_proofs: bundle.inclusion_proofs.len() as u64,
+                capability_lineage_records: bundle.capability_lineage.len() as u64,
+            },
+            transparency_preview: Vec::new(),
+        };
+
+        let error =
+            verify_transparency_claim_boundary(Some(&anchored_claims), &bundle, &transparency)
+                .expect_err("anchored claims should fail closed");
+
+        assert!(
+            error.to_string().contains("claim boundary does not match"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn anchored_transparency_claims_verify_when_publications_carry_valid_bindings() {
+        let bundle = sample_bundle();
+        let checkpoint = bundle
+            .checkpoints
+            .first()
+            .cloned()
+            .expect("sample checkpoint");
+        let mut transparency =
+            validate_checkpoint_transparency_summary(&bundle.checkpoints).expect("summary");
+        let binding = arc_core::receipt::CheckpointPublicationTrustAnchorBinding {
+            publication_identity: arc_core::receipt::CheckpointPublicationIdentity::new(
+                arc_core::receipt::CheckpointPublicationIdentityKind::LocalLog,
+                transparency.publications[0].log_id.clone(),
+            ),
+            trust_anchor_identity: arc_core::receipt::CheckpointTrustAnchorIdentity::new(
+                arc_core::receipt::CheckpointTrustAnchorIdentityKind::TransparencyRoot,
+                "root-set-1",
+            ),
+            trust_anchor_ref: "anchor-root-1".to_string(),
+            signer_cert_ref: "cert-chain-1".to_string(),
+            publication_profile_version: "phase4-pilot".to_string(),
+        };
+        transparency.publications = vec![
+            arc_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+                &checkpoint,
+                binding,
+            )
+            .expect("anchored publication"),
+        ];
+        let anchored_claims =
+            build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
+
+        verify_checkpoint_transparency_records(
+            &bundle.checkpoints,
+            &transparency.publications,
+            &transparency.witnesses,
+            &transparency.consistency_proofs,
+            &transparency.equivocations,
+        )
+        .expect("bound publication records should verify");
+        verify_transparency_claim_boundary(Some(&anchored_claims), &bundle, &transparency)
+            .expect("bound transparency claims should verify");
+    }
+
+    #[test]
+    fn evidence_export_fails_closed_on_stale_or_missing_publication() {
+        let bundle = sample_bundle();
+        let checkpoint = bundle
+            .checkpoints
+            .first()
+            .cloned()
+            .expect("sample checkpoint");
+        let mut transparency =
+            validate_checkpoint_transparency_summary(&bundle.checkpoints).expect("summary");
+        let binding = arc_core::receipt::CheckpointPublicationTrustAnchorBinding {
+            publication_identity: arc_core::receipt::CheckpointPublicationIdentity::new(
+                arc_core::receipt::CheckpointPublicationIdentityKind::LocalLog,
+                transparency.publications[0].log_id.clone(),
+            ),
+            trust_anchor_identity: arc_core::receipt::CheckpointTrustAnchorIdentity::new(
+                arc_core::receipt::CheckpointTrustAnchorIdentityKind::TransparencyRoot,
+                "root-set-1",
+            ),
+            trust_anchor_ref: "anchor-root-1".to_string(),
+            signer_cert_ref: "cert-chain-1".to_string(),
+            publication_profile_version: "phase4-pilot".to_string(),
+        };
+        transparency.publications = vec![
+            arc_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+                &checkpoint,
+                binding,
+            )
+            .expect("anchored publication"),
+        ];
+        let anchored_claims =
+            build_evidence_transparency_claims(&bundle, &transparency, Some("anchor-root-1"));
+
+        let missing_publication =
+            validate_checkpoint_transparency_summary(&bundle.checkpoints).expect("missing");
+        let missing_error = verify_transparency_claim_boundary(
+            Some(&anchored_claims),
+            &bundle,
+            &missing_publication,
+        )
+        .expect_err("missing publication records should fail closed");
+        assert!(
+            missing_error.to_string().contains("claim boundary does not match"),
+            "unexpected missing-publication error: {missing_error}"
+        );
+
+        let mut stale_publications = transparency.publications.clone();
+        stale_publications[0].log_tree_size += 1;
+        let stale_error = verify_checkpoint_transparency_records(
+            &bundle.checkpoints,
+            &stale_publications,
+            &transparency.witnesses,
+            &transparency.consistency_proofs,
+            &transparency.equivocations,
+        )
+        .expect_err("stale publication metadata should fail closed");
+        assert!(
+            stale_error
+                .to_string()
+                .contains("checkpoint transparency verification failed"),
+            "unexpected stale-publication error: {stale_error}"
+        );
+    }
 }

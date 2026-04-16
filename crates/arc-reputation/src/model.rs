@@ -225,6 +225,33 @@ pub struct LocalReputationScorecard {
     pub effective_weight_sum: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedIssuerIdentity {
+    pub issuer: String,
+    pub signer_public_key: String,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedTrustMode {
+    BilateralEvidenceShare,
+    NetworkCleared,
+}
+
+impl Default for ImportedTrustMode {
+    fn default() -> Self {
+        Self::BilateralEvidenceShare
+    }
+}
+
+impl ImportedTrustMode {
+    #[must_use]
+    pub fn satisfies(self, required: Self) -> bool {
+        matches!(required, Self::BilateralEvidenceShare) || self == required
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedReputationProvenance {
@@ -244,10 +271,16 @@ pub struct ImportedReputationProvenance {
 pub struct ImportedTrustPolicy {
     pub attenuation_factor: f64,
     pub require_proofs: bool,
+    #[serde(default = "default_require_signer_identity")]
+    pub require_signer_identity: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_signal_age_days: Option<u32>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allowed_issuers: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_signer_public_keys: Vec<String>,
+    #[serde(default)]
+    pub required_trust_mode: ImportedTrustMode,
 }
 
 impl Default for ImportedTrustPolicy {
@@ -255,17 +288,26 @@ impl Default for ImportedTrustPolicy {
         Self {
             attenuation_factor: 0.50,
             require_proofs: true,
+            require_signer_identity: default_require_signer_identity(),
             max_signal_age_days: Some(30),
             allowed_issuers: Vec::new(),
+            allowed_signer_public_keys: Vec::new(),
+            required_trust_mode: ImportedTrustMode::BilateralEvidenceShare,
         }
     }
+}
+
+fn default_require_signer_identity() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedReputationSignal {
     pub provenance: ImportedReputationProvenance,
+    pub issuer_identity: ImportedIssuerIdentity,
     pub policy: ImportedTrustPolicy,
+    pub trust_mode: ImportedTrustMode,
     pub accepted: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reasons: Vec<String>,

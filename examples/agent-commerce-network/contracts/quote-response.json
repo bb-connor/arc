@@ -1,6 +1,6 @@
 {
-  "quote_id": "quote_contoso_001",
-  "request_id": "quote_req_acme_001",
+  "quote_id": "quote_vanguard_001",
+  "request_id": "quote_req_lattice_001",
   "service_family": "security-review",
   "offer_id": "release-review",
   "price_minor": 125000,

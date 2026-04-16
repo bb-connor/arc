@@ -1,0 +1,13 @@
+hushspec: "0.1.0"
+name: incident-network-provider-ops
+description: >
+  Guards for the provider operations MCP server. Write access to edge
+  rule management -- the most sensitive tool surface in the network.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - disable_edge_rule
+      - get_edge_policy

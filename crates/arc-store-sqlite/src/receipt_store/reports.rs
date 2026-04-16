@@ -1,5 +1,173 @@
 use super::*;
 
+use arc_core::capability::GovernedProvenanceEvidenceClass;
+use arc_kernel::evidence_export::EvidenceLineageReferences;
+use arc_kernel::operator_report::GovernedTransactionDiagnostics;
+
+#[derive(Debug, Clone)]
+struct GovernedTransactionProjection {
+    strong: GovernedTransactionReceiptMetadata,
+    diagnostics: Option<GovernedTransactionDiagnostics>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PersistedLineageReferences {
+    statement_id: Option<String>,
+    session_anchor_id: Option<String>,
+}
+
+fn extract_governed_transaction_diagnostics(
+    receipt: &ArcReceipt,
+) -> Option<GovernedTransactionDiagnostics> {
+    let diagnostics = receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction_diagnostics"))
+        .cloned()
+        .and_then(|value| serde_json::from_value::<GovernedTransactionDiagnostics>(value).ok())
+        .unwrap_or_default();
+
+    (!diagnostics.is_empty()).then_some(diagnostics)
+}
+
+fn sanitize_governed_transaction_projection(
+    receipt: &ArcReceipt,
+    governed: &GovernedTransactionReceiptMetadata,
+) -> GovernedTransactionProjection {
+    let mut strong = governed.clone();
+    let mut diagnostics = extract_governed_transaction_diagnostics(receipt).unwrap_or_default();
+
+    if let Some(call_chain) = strong
+        .call_chain
+        .clone()
+        .filter(|call_chain| call_chain.evidence_class == GovernedProvenanceEvidenceClass::Asserted)
+    {
+        strong.call_chain = None;
+        if diagnostics.asserted_call_chain.is_none() {
+            diagnostics.asserted_call_chain = Some(call_chain);
+        }
+    }
+
+    if diagnostics.lineage_references.session_anchor_id.is_none() {
+        diagnostics.lineage_references.session_anchor_id = strong
+            .call_chain
+            .as_ref()
+            .and_then(|call_chain| call_chain.session_anchor_id.clone())
+            .or_else(|| {
+                diagnostics
+                    .asserted_call_chain
+                    .as_ref()
+                    .and_then(|call_chain| call_chain.session_anchor_id.clone())
+            });
+    }
+    if diagnostics
+        .lineage_references
+        .receipt_lineage_statement_id
+        .is_none()
+    {
+        diagnostics.lineage_references.receipt_lineage_statement_id = strong
+            .call_chain
+            .as_ref()
+            .and_then(|call_chain| call_chain.receipt_lineage_statement_id.clone())
+            .or_else(|| {
+                diagnostics
+                    .asserted_call_chain
+                    .as_ref()
+                    .and_then(|call_chain| call_chain.receipt_lineage_statement_id.clone())
+            });
+    }
+
+    GovernedTransactionProjection {
+        strong,
+        diagnostics: (!diagnostics.is_empty()).then_some(diagnostics),
+    }
+}
+
+fn apply_persisted_lineage_references(
+    projection: &mut GovernedTransactionProjection,
+    persisted: &PersistedLineageReferences,
+) {
+    if persisted.statement_id.is_none() && persisted.session_anchor_id.is_none() {
+        return;
+    }
+
+    if let Some(call_chain) = projection.strong.call_chain.as_mut() {
+        if call_chain.session_anchor_id.is_none() {
+            call_chain.session_anchor_id = persisted.session_anchor_id.clone();
+        }
+        if call_chain.receipt_lineage_statement_id.is_none() {
+            call_chain.receipt_lineage_statement_id = persisted.statement_id.clone();
+        }
+    }
+
+    let diagnostics = projection
+        .diagnostics
+        .get_or_insert_with(GovernedTransactionDiagnostics::default);
+    if let Some(call_chain) = diagnostics.asserted_call_chain.as_mut() {
+        if call_chain.session_anchor_id.is_none() {
+            call_chain.session_anchor_id = persisted.session_anchor_id.clone();
+        }
+        if call_chain.receipt_lineage_statement_id.is_none() {
+            call_chain.receipt_lineage_statement_id = persisted.statement_id.clone();
+        }
+    }
+    if diagnostics.lineage_references.session_anchor_id.is_none() {
+        diagnostics.lineage_references.session_anchor_id = persisted.session_anchor_id.clone();
+    }
+    if diagnostics
+        .lineage_references
+        .receipt_lineage_statement_id
+        .is_none()
+    {
+        diagnostics.lineage_references.receipt_lineage_statement_id =
+            persisted.statement_id.clone();
+    }
+    if diagnostics.is_empty() {
+        projection.diagnostics = None;
+    }
+}
+
+fn call_chain_evidence_class(
+    projection: &GovernedTransactionProjection,
+) -> Option<GovernedProvenanceEvidenceClass> {
+    projection
+        .strong
+        .call_chain
+        .as_ref()
+        .map(|call_chain| call_chain.evidence_class)
+        .or_else(|| {
+            projection
+                .diagnostics
+                .as_ref()
+                .and_then(|diagnostics| diagnostics.asserted_call_chain.as_ref())
+                .map(|call_chain| call_chain.evidence_class)
+        })
+}
+
+fn lineage_references_from_projection(
+    projection: &GovernedTransactionProjection,
+) -> Option<&EvidenceLineageReferences> {
+    projection
+        .diagnostics
+        .as_ref()
+        .map(|diagnostics| &diagnostics.lineage_references)
+        .filter(|references| !references.is_empty())
+}
+
+fn authorization_transaction_context_from_projection(
+    projection: &GovernedTransactionProjection,
+) -> arc_kernel::operator_report::GovernedAuthorizationTransactionContext {
+    let mut transaction_context =
+        authorization_transaction_context_from_governed_metadata(&projection.strong);
+    if transaction_context.call_chain.is_none() {
+        transaction_context.call_chain = projection
+            .diagnostics
+            .as_ref()
+            .and_then(|diagnostics| diagnostics.asserted_call_chain.clone());
+    }
+    transaction_context
+}
+
 impl SqliteReceiptStore {
     pub fn query_receipt_analytics(
         &self,
@@ -416,6 +584,7 @@ impl SqliteReceiptStore {
                     budget_remaining: Some(financial.budget_remaining),
                     settlement_status: Some(financial.settlement_status),
                     payment_reference: financial.payment_reference.clone(),
+                    budget_authority: receipt.financial_budget_authority_metadata(),
                     lineage_complete,
                     chain,
                 });
@@ -1044,6 +1213,7 @@ impl SqliteReceiptStore {
                 evidence.as_ref(),
                 reconciliation_state,
             );
+            let budget_authority = receipt.financial_budget_authority_metadata();
 
             receipts.push(MeteredBillingReconciliationRow {
                 receipt_id: receipt.id,
@@ -1061,6 +1231,7 @@ impl SqliteReceiptStore {
                 max_billed_units: metered.max_billed_units,
                 financial_cost_charged: financial.as_ref().map(|value| value.cost_charged),
                 financial_currency: financial.as_ref().map(|value| value.currency.clone()),
+                budget_authority,
                 evidence,
                 reconciliation_state,
                 action_required: analysis.action_required,
@@ -1184,7 +1355,8 @@ impl SqliteReceiptStore {
                 json_extract(r.raw_json, '$.metadata.financial.currency'),
                 COALESCE(sr.reconciliation_state, 'open'),
                 sr.note,
-                sr.updated_at
+                sr.updated_at,
+                r.raw_json
             FROM arc_tool_receipts r
             LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
             LEFT JOIN settlement_reconciliations sr ON r.receipt_id = sr.receipt_id
@@ -1226,6 +1398,7 @@ impl SqliteReceiptStore {
                     row.get::<_, String>(10)?,
                     row.get::<_, Option<String>>(11)?,
                     row.get::<_, Option<i64>>(12)?,
+                    row.get::<_, String>(13)?,
                 ))
             },
         )?;
@@ -1246,7 +1419,9 @@ impl SqliteReceiptStore {
                 reconciliation_state_text,
                 note,
                 updated_at,
+                raw_json,
             ) = row?;
+            let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
             let settlement_status = parse_settlement_status(&settlement_status_text)?;
             let reconciliation_state =
                 parse_settlement_reconciliation_state(&reconciliation_state_text)?;
@@ -1265,6 +1440,7 @@ impl SqliteReceiptStore {
                 settlement_status,
                 cost_charged: cost_charged.map(|value| value.max(0) as u64),
                 currency,
+                budget_authority: receipt.financial_budget_authority_metadata(),
                 reconciliation_state,
                 action_required,
                 note,
@@ -1361,7 +1537,7 @@ impl SqliteReceiptStore {
             commerce_receipts,
             metered_billing_receipts,
             runtime_assurance_receipts,
-            call_chain_receipts,
+            _call_chain_receipts,
             max_amount_receipts,
         ) = self.connection()?.query_row(
             summary_sql,
@@ -1395,9 +1571,12 @@ impl SqliteReceiptStore {
                 cl.subject_key,
                 cl.issuer_key,
                 r.grant_index,
-                cl.grants_json
+                cl.grants_json,
+                rls.statement_id,
+                rls.session_anchor_id
             FROM arc_tool_receipts r
             LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
+            LEFT JOIN receipt_lineage_statements rls ON r.receipt_id = rls.receipt_id
             WHERE json_type(r.raw_json, '$.metadata.governed_transaction') = 'object'
               AND (?1 IS NULL OR r.capability_id = ?1)
               AND (?2 IS NULL OR r.tool_server = ?2)
@@ -1428,6 +1607,8 @@ impl SqliteReceiptStore {
                     row.get::<_, Option<String>>(4)?,
                     row.get::<_, Option<i64>>(5)?,
                     row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
                 ))
             },
         )?;
@@ -1436,6 +1617,13 @@ impl SqliteReceiptStore {
         let mut dpop_bound_receipts = 0_u64;
         let mut runtime_assurance_bound_receipts = 0_u64;
         let mut delegated_sender_bound_receipts = 0_u64;
+        let mut call_chain_receipts = 0_u64;
+        let mut asserted_call_chain_receipts = 0_u64;
+        let mut observed_call_chain_receipts = 0_u64;
+        let mut verified_call_chain_receipts = 0_u64;
+        let mut session_anchor_receipts = 0_u64;
+        let mut request_lineage_receipts = 0_u64;
+        let mut receipt_lineage_statement_receipts = 0_u64;
         let mut receipts = Vec::new();
         for row in rows {
             let (
@@ -1446,6 +1634,8 @@ impl SqliteReceiptStore {
                 lineage_issuer_key,
                 persisted_grant_index,
                 grants_json,
+                persisted_statement_id,
+                persisted_session_anchor_id,
             ) = row?;
             let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
             let governed = extract_governed_transaction_metadata(&receipt).ok_or_else(|| {
@@ -1454,9 +1644,17 @@ impl SqliteReceiptStore {
                     receipt.id
                 ))
             })?;
+            let mut projection = sanitize_governed_transaction_projection(&receipt, &governed);
+            apply_persisted_lineage_references(
+                &mut projection,
+                &PersistedLineageReferences {
+                    statement_id: persisted_statement_id,
+                    session_anchor_id: persisted_session_anchor_id,
+                },
+            );
             let attribution = extract_receipt_attribution(&receipt);
             let transaction_context =
-                authorization_transaction_context_from_governed_metadata(&governed);
+                authorization_transaction_context_from_projection(&projection);
             let sender_constraint = derive_authorization_sender_constraint(
                 &receipt.id,
                 AuthorizationSenderConstraintArgs {
@@ -1482,11 +1680,39 @@ impl SqliteReceiptStore {
                 tool_server: receipt.tool_server,
                 tool_name: receipt.tool_name,
                 decision: receipt.decision,
-                authorization_details: authorization_details_from_governed_metadata(&governed),
+                authorization_details: authorization_details_from_governed_metadata(
+                    &projection.strong,
+                ),
                 transaction_context,
+                governed_transaction_diagnostics: projection.diagnostics.clone(),
                 sender_constraint,
             };
             validate_arc_oauth_authorization_row(&authorization_row)?;
+            if let Some(evidence_class) = call_chain_evidence_class(&projection) {
+                call_chain_receipts += 1;
+                match evidence_class {
+                    GovernedProvenanceEvidenceClass::Asserted => {
+                        asserted_call_chain_receipts += 1;
+                    }
+                    GovernedProvenanceEvidenceClass::Observed => {
+                        observed_call_chain_receipts += 1;
+                    }
+                    GovernedProvenanceEvidenceClass::Verified => {
+                        verified_call_chain_receipts += 1;
+                    }
+                }
+            }
+            if let Some(lineage_references) = lineage_references_from_projection(&projection) {
+                if lineage_references.session_anchor_id.is_some() {
+                    session_anchor_receipts += 1;
+                }
+                if lineage_references.request_lineage_id.is_some() {
+                    request_lineage_receipts += 1;
+                }
+                if lineage_references.receipt_lineage_statement_id.is_some() {
+                    receipt_lineage_statement_receipts += 1;
+                }
+            }
             sender_bound_receipts += 1;
             if authorization_row.sender_constraint.proof_required {
                 dpop_bound_receipts += 1;
@@ -1517,11 +1743,17 @@ impl SqliteReceiptStore {
                 metered_billing_receipts,
                 runtime_assurance_receipts,
                 call_chain_receipts,
+                asserted_call_chain_receipts,
+                observed_call_chain_receipts,
+                verified_call_chain_receipts,
                 max_amount_receipts,
                 sender_bound_receipts,
                 dpop_bound_receipts,
                 runtime_assurance_bound_receipts,
                 delegated_sender_bound_receipts,
+                session_anchor_receipts,
+                request_lineage_receipts,
+                receipt_lineage_statement_receipts,
                 truncated: matching_receipts > receipts.len() as u64,
             },
             receipts,
@@ -1607,11 +1839,26 @@ impl SqliteReceiptStore {
                         signed_receipt.id
                     ))
                 })?;
+            let mut projection =
+                sanitize_governed_transaction_projection(&signed_receipt, &governed_transaction);
+            if let Some(diagnostics) = row.governed_transaction_diagnostics.as_ref() {
+                apply_persisted_lineage_references(
+                    &mut projection,
+                    &PersistedLineageReferences {
+                        statement_id: diagnostics
+                            .lineage_references
+                            .receipt_lineage_statement_id
+                            .clone(),
+                        session_anchor_id: diagnostics.lineage_references.session_anchor_id.clone(),
+                    },
+                );
+            }
             records.push(ArcOAuthAuthorizationReviewPackRecord {
                 receipt_id: row.receipt_id.clone(),
                 capability_id: row.capability_id.clone(),
                 authorization_context: row,
-                governed_transaction,
+                governed_transaction: projection.strong,
+                governed_transaction_diagnostics: projection.diagnostics,
                 signed_receipt,
             });
         }
@@ -1631,6 +1878,20 @@ impl SqliteReceiptStore {
                 delegated_call_chain_receipts: authorization_context
                     .summary
                     .delegated_sender_bound_receipts,
+                asserted_call_chain_receipts: authorization_context
+                    .summary
+                    .asserted_call_chain_receipts,
+                observed_call_chain_receipts: authorization_context
+                    .summary
+                    .observed_call_chain_receipts,
+                verified_call_chain_receipts: authorization_context
+                    .summary
+                    .verified_call_chain_receipts,
+                session_anchor_receipts: authorization_context.summary.session_anchor_receipts,
+                request_lineage_receipts: authorization_context.summary.request_lineage_receipts,
+                receipt_lineage_statement_receipts: authorization_context
+                    .summary
+                    .receipt_lineage_statement_receipts,
                 truncated: authorization_context.summary.truncated,
             },
             records,
@@ -1952,6 +2213,9 @@ impl SqliteReceiptStore {
         };
         let financial = extract_financial_metadata(&receipt);
         let governed = extract_governed_transaction_metadata(&receipt);
+        let governed_projection = governed
+            .as_ref()
+            .map(|metadata| sanitize_governed_transaction_projection(&receipt, metadata));
         let metered_reconciliation = governed
             .as_ref()
             .and_then(|metadata| metadata.metered_billing.as_ref())
@@ -2015,6 +2279,7 @@ impl SqliteReceiptStore {
             settlement_status.clone(),
             reconciliation_state,
         );
+        let budget_authority = receipt.financial_budget_authority_metadata();
 
         Ok(BehavioralFeedReceiptRow {
             receipt_id: receipt.id,
@@ -2039,7 +2304,12 @@ impl SqliteReceiptStore {
                 .as_ref()
                 .and_then(|metadata| metadata.attempted_cost),
             currency: financial.as_ref().map(|metadata| metadata.currency.clone()),
-            governed,
+            budget_authority,
+            governed: governed_projection
+                .as_ref()
+                .map(|projection| projection.strong.clone()),
+            governed_transaction_diagnostics: governed_projection
+                .and_then(|projection| projection.diagnostics),
             metered_reconciliation,
         })
     }

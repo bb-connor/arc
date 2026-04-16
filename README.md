@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/MSRV-1.93-orange?style=flat-square&logo=rust" alt="MSRV: 1.93">
 </p>
 
-<h1 align="center">chio</h1>
+<h1 align="center">ARC</h1>
 
 <p align="center">
   <strong>Clearinghouse for Intelligent Operations</strong><br/>
@@ -21,9 +21,10 @@
   <img src="assets/icons/pill-liability.svg" height="24" alt="Liability coverage" />
   <img src="assets/icons/pill-credit.svg" height="24" alt="Credit facilities" />
   <img src="assets/icons/pill-exposure.svg" height="24" alt="Exposure ledger" />
-  <img src="assets/icons/pill-merkle.svg" height="24" alt="Signed receipt checkpoints" />
+  <img src="assets/icons/pill-merkle.svg" height="24" alt="Merkle-committed receipts" />
   <img src="assets/icons/pill-passport.svg" height="24" alt="Agent passports" />
   <img src="assets/icons/pill-attestation.svg" height="24" alt="Multi-cloud attestation" />
+  <img src="assets/icons/pill-lean4.svg" height="24" alt="Lean 4 verified" />
 </p>
 
 <p align="center">
@@ -41,7 +42,7 @@
 
 ## What Is ARC
 
-chio (Clearinghouse for Intelligent Operations) is a trust-and-economics control plane for governed agent actions. At a high level, it is a secure middle layer between an AI and the actions it takes in the real world. When an AI decides to act (e.g. tool call, handoff, etc), ARC validates permissions and authorization, enforces stateful policies and monetary budgets, can bond execution, and can block actions or revoke authority when the AI breaks the rules or violates its specified capabilities. The current bounded release is qualification-backed rather than proof-branded: ARC ships a fail-closed kernel, signed receipts, explicit operational profiles, and bounded protocol, hosted-auth, and economic surfaces. ARC then builds on that governed execution substrate to give developers primitives for bonds, credit, federation, liability, passports, underwriting, and settlement.
+chio (Clearinghouse for Intelligent Operations) is a trust-and-economics control plane for governed agent actions. At a high level, it is just a secure middle layer between an AI and the actions it takes in the real world. When an AI decides to act (e.g. tool call, handoff, etc), ARC validates permissions and authorization, enforces stateful policies and monetary budgets, can bond execution, and can block actions or revoke authority at any moment the AI breaks the rules or violates its specified capabilities. The magic is in how it achieves this through a formally verified protocol specification that survives across recursive delegation chains, execution environments, and trust boundaries. ARC then builds upon this universal security guarantee to give developers a viable set of primitives to work with in building the future agent economy: bonds, credit, federation, liability, passports, underwriting, and settlement.
 
 ## Why ARC
 
@@ -55,21 +56,21 @@ An agent that can spend, transact, broadcast, modify state, or recursively deleg
 
 ARC exists to provide a layer to address these shortcomings.
 
-ARC inserts a fail-closed kernel between agents and the outside world and treats every invocation as a governed act. Capability tokens define delegated rights. Policy and constraint checks determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into explicit audit evidence rather than an ordinary log event.
+ARC inserts a fail-closed kernel between agents and the outside world and treats every invocation as a governed act. Capability tokens define delegated rights. Policy and constraint checks determine whether those rights are valid in context. Budget enforcement makes authority economically bounded rather than merely syntactically scoped. Signed receipts turn each decision into non-repudiable evidence rather than an ordinary log event.
 
 The result is a stronger primitive than transport, payment, or audit alone. A capability in ARC is not just permission to call a function. It is a programmable authorization instrument. A delegation chain is not just access-control metadata. It is a cost-responsibility chain. A receipt log is not just telemetry. It has the structure of an audit trail, a billing ledger, and a compliance record at once. That is why ARC belongs above payment rails and below agent frameworks: it is the layer that can prove an agent was authorized to do something consequential, under what constraints, at what cost, and with what outcome.
 
 ## How It Works
 
-An agent never talks to a tool directly. Every call goes through the **kernel** -- a trusted mediator that validates a signed capability token, runs the guard pipeline, checks monetary budgets, dispatches the call, and returns the result alongside a signed receipt. The receipt is the evidence. It covers allows and denies, is independently verifiable, and can be exported with checkpoint material for operator-local audit and review.
+An agent never talks to a tool directly. Every call goes through the **kernel** -- a trusted mediator that validates a signed capability token, runs the guard pipeline, checks monetary budgets, dispatches the call, and returns the result alongside a signed receipt. The receipt is the proof. It covers allows and denies, is independently verifiable, and feeds into a Merkle-committed append-only log.
 
 The system has five pieces:
 
 - **Agent** -- the untrusted LLM process. It holds capability tokens but has zero ambient authority.
 - **Runtime Kernel** -- the TCB. Validates capabilities, enforces guards and budgets, signs every receipt. Fail-closed: if anything goes wrong, access is denied.
 - **Tool Servers** -- sandboxed, isolated processes that implement tools. They never see each other or the agent directly.
-- **Capability Authority** -- issues and revokes time-bounded, scope-limited tokens. The bounded release preserves presented delegation lineage and checks the leaf capability plus any presented ancestor IDs against revocation state; it does not claim authenticated recursive delegation ancestry beyond that boundary.
-- **Receipt Plane** -- signed receipts plus checkpoint and export surfaces. Every decision is signed and can be reviewed with operator-local storage, checkpoint bundles, and inclusion-proof material.
+- **Capability Authority** -- issues and revokes time-bounded, scope-limited, delegation-tracked tokens. Revocation cascades through the entire delegation chain.
+- **Receipt Log** -- append-only, Merkle-committed. Every decision is signed and checkpointed. Inclusion proofs let you verify a single receipt without replaying the full log.
 
 ## Quick Start
 
@@ -186,7 +187,7 @@ arc mcp serve-http \
   <command>...
 ```
 
-Exposes the same kernel-backed MCP edge over Streamable HTTP with session management and authenticated admission. The bounded release recommends dedicated-per-session hosted profiles with explicit sender-constrained access tokens where available; compatibility bearer modes remain supported but non-primary. Includes operator admin endpoints for receipts, revocations, authority rotation, and budget queries.
+Exposes the same kernel-backed MCP edge over Streamable HTTP with session management, multiple concurrent clients, and authenticated admission (static bearer, JWT, or hosted OAuth with PKCE). Includes operator admin endpoints for receipts, revocations, authority rotation, and budget queries.
 
 ### `arc trust serve` -- distributed trust control plane
 
@@ -194,7 +195,7 @@ Exposes the same kernel-backed MCP edge over Streamable HTTP with session manage
 arc trust serve --listen 127.0.0.1:8940 --service-token <token> [--peer-url <peer>]
 ```
 
-Runs a shared trust-control service that centralizes capability issuance, revocation, receipt ingestion, and budget accounting. The bounded release supports local and leader-local clustered operation with deterministic leader selection and background repair-sync; it does not claim consensus-grade HA.
+Runs a shared trust-control service that centralizes capability issuance, revocation, receipt ingestion, and budget accounting. Supports HA clustering with deterministic leader election and background repair-sync.
 
 ## Policy
 
@@ -233,9 +234,9 @@ See [examples/policies/](examples/policies/) for starter templates.
 
 Most agent frameworks treat authorization and payment as separate concerns -- one system decides whether a call is allowed, another tracks what it costs. ARC fuses them. A capability token is simultaneously a permission grant and a spending authorization. The delegation chain that tracks who gave an agent access is the same structure that tracks cost responsibility. The receipt log that proves what happened is already a pre-audited billing ledger.
 
-Concretely: each `ToolGrant` carries optional `max_cost_per_invocation` and `max_total_cost` fields (minor-unit integers + ISO 4217 currency code). The kernel enforces both atomically on a single node and embeds financial metadata directly into the signed receipt. Delegation attenuates budgets monotonically at issuance time -- a child grant can tighten a spending cap but never loosen one. Selected grants can also require DPoP proof-of-possession, binding use of that grant to the agent's keypair instead of treating PoP as universal.
+Concretely: each `ToolGrant` carries optional `max_cost_per_invocation` and `max_total_cost` fields (minor-unit integers + ISO 4217 currency code). The kernel enforces both atomically at evaluation time and embeds financial metadata directly into the signed receipt. Delegation attenuates budgets monotonically -- a child grant can tighten a spending cap but never loosen one. DPoP proof-of-possession binds tokens to the agent's keypair, so a stolen capability is worthless without the corresponding private key.
 
-Receipts are batched into signed checkpoints. Inclusion proofs let you verify a single receipt against its checkpoint root without replaying the full receipt set. The trust-control API and CLI (`arc receipt list`) expose eight-dimension filtered queries with cursor pagination. Archived receipts rotate by time and size but remain verifiable against their original checkpoint roots.
+Receipts are batched into Merkle-committed checkpoints. Inclusion proofs let you verify a single receipt against its checkpoint root without replaying the full log. The trust-control API and CLI (`arc receipt list`) expose eight-dimension filtered queries with cursor pagination. Archived receipts rotate by time and size but remain verifiable against their original checkpoint roots.
 
 ## Portable Trust and Identity
 
@@ -320,17 +321,12 @@ arc/
 
 ## Status
 
-Current bounded ARC release candidate. The protocol spec in
-[spec/PROTOCOL.md](spec/PROTOCOL.md) describes the shipped repository profile.
-See [docs/release/QUALIFICATION.md](docs/release/QUALIFICATION.md),
-[docs/release/RELEASE_AUDIT.md](docs/release/RELEASE_AUDIT.md), and
-[docs/review/14-bounded-arc-pre-ship-checklist.md](docs/review/14-bounded-arc-pre-ship-checklist.md)
-for the current ship boundary and retained non-claims.
+Production candidate (`v2.5`). The protocol spec in [spec/PROTOCOL.md](spec/PROTOCOL.md) describes the shipped repository profile. See [docs/release/RELEASE_CANDIDATE.md](docs/release/RELEASE_CANDIDATE.md) for the full release qualification surface.
 
 **Not yet finished:**
 
 - Multi-region consensus replication (current HA is deterministic leader/follower)
-- Permissionless or auto-trusting certification marketplace semantics
+- Public certification marketplace discovery
 - Automatic SCIM lifecycle management
 - Synthetic cross-issuer passport trust aggregation
 - Theorem-prover completion for every protocol claim

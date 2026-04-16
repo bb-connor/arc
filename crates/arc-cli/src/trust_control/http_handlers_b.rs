@@ -39,7 +39,13 @@ async fn handle_evidence_export(
     let bundle = match store.build_evidence_export_bundle(&prepared.query) {
         Ok(bundle) => bundle,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    let transparency = match store.build_evidence_export_transparency_summary(&bundle.checkpoints) {
+        Ok(transparency) => transparency,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
     if let Err(error) =
@@ -49,6 +55,7 @@ async fn handle_evidence_export(
     }
     Json(evidence_export::RemoteEvidenceExportResponse {
         bundle,
+        transparency: Some(transparency),
         federation_policy: prepared.federation_policy,
     })
     .into_response()
@@ -196,7 +203,7 @@ async fn handle_exposure_ledger_report(
     ) {
         Ok(keypair) => keypair,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -237,7 +244,7 @@ async fn handle_credit_scorecard_report(
     ) {
         Ok(keypair) => keypair,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -275,7 +282,7 @@ async fn handle_capital_book_report(
     ) {
         Ok(keypair) => keypair,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -684,7 +691,7 @@ async fn handle_credit_provider_risk_package_report(
     ) {
         Ok(keypair) => keypair,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -1451,7 +1458,7 @@ async fn handle_underwriting_policy_input(
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting input queries",
-            )
+            );
         }
     };
     let receipt_store = match open_receipt_store(&state.config) {
@@ -1464,7 +1471,7 @@ async fn handle_underwriting_policy_input(
     ) {
         Ok(keypair) => keypair,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -1498,7 +1505,7 @@ async fn handle_underwriting_decision_report(
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting decision queries",
-            )
+            );
         }
     };
     let receipt_store = match open_receipt_store(&state.config) {
@@ -1533,7 +1540,7 @@ async fn handle_underwriting_simulation_report(
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting simulation queries",
-            )
+            );
         }
     };
     let receipt_store = match open_receipt_store(&state.config) {
@@ -1588,7 +1595,7 @@ async fn handle_issue_underwriting_decision(
             return plain_http_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "trust service is missing receipt_db_path for underwriting decision issuance",
-            )
+            );
         }
     };
 
@@ -1995,7 +2002,7 @@ async fn handle_agent_receipts(
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
     let receipts = match result
@@ -2006,7 +2013,7 @@ async fn handle_agent_receipts(
     {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
     Json(ReceiptQueryResponse {
@@ -2083,7 +2090,7 @@ async fn handle_list_budgets(
     let usages = match store.list_usages(list_limit(query.limit), query.capability_id.as_deref()) {
         Ok(usages) => usages,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
 
@@ -2098,7 +2105,8 @@ async fn handle_list_budgets(
                 capability_id: usage.capability_id,
                 grant_index: usage.grant_index,
                 invocation_count: usage.invocation_count,
-                total_cost_charged: usage.total_cost_charged,
+                total_cost_exposed: usage.total_cost_exposed,
+                total_cost_realized_spend: usage.total_cost_realized_spend,
                 updated_at: usage.updated_at,
                 seq: None,
             })
@@ -2131,7 +2139,7 @@ async fn handle_try_increment_budget(
     ) {
         Ok(allowed) => allowed,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
     respond_after_leader_visible_write(
@@ -2150,6 +2158,11 @@ async fn handle_try_increment_budget(
                     grant_index: payload.grant_index,
                     allowed,
                     invocation_count,
+                    budget_authority: budget_authority_metadata_view(
+                        &state,
+                        None,
+                        budget_authority_guarantee_level(&state, None),
+                    ),
                 }))
             } else {
                 Ok(None)
@@ -2166,53 +2179,118 @@ async fn handle_try_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_CHARGE_PATH, &payload).await {
+    match forward_post_to_leader(&state, BUDGET_AUTHORIZE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
+    let authority = match current_budget_event_authority(&state) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
     let mut store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };
-    let allowed = match store.try_charge_cost(
+    let allowed = match store.try_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
         payload.max_invocations,
         payload.cost_units,
         payload.max_cost_per_invocation,
         payload.max_total_cost_units,
+        payload.hold_id.as_deref(),
+        payload.event_id.as_deref(),
+        authority.as_ref(),
     ) {
         Ok(allowed) => allowed,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
     };
-    respond_after_leader_visible_write(
-        &state,
-        "monetary budget state was not visible on the leader after write",
-        || {
-            let usage = store
-                .get_usage(&payload.capability_id, payload.grant_index)
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })?;
-            let invocation_count = usage.as_ref().map(|usage| usage.invocation_count);
-            let total_cost_charged = usage.as_ref().map(|usage| usage.total_cost_charged);
-            let visible = if allowed { usage.is_some() } else { true };
-            if visible {
+    if allowed {
+        let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index)
+        {
+            Ok(Some(usage)) => Some((
+                TryChargeCostResponse {
+                    capability_id: payload.capability_id.clone(),
+                    grant_index: payload.grant_index,
+                    allowed,
+                    invocation_count: Some(usage.invocation_count),
+                    total_cost_exposed: Some(usage.total_cost_exposed),
+                    total_cost_realized_spend: Some(usage.total_cost_realized_spend),
+                    budget_authority: budget_authority_metadata_view(
+                        &state,
+                        Some(usage.seq),
+                        budget_authority_guarantee_level(&state, Some(usage.seq)),
+                    ),
+                    budget_commit: None,
+                },
+                usage.seq,
+            )),
+            Ok(None) => None,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            }
+        };
+        drop(store);
+        let Some((response, budget_seq)) = committed_response else {
+            return plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "budget exposure state was not visible on the leader after write",
+            );
+        };
+        let budget_commit = match wait_for_budget_write_quorum_commit(&state, budget_seq).await {
+            Ok(budget_commit) => budget_commit,
+            Err(_) => {
+                let rollback_result =
+                    rollback_budget_authorize_exposure(&state, &payload, authority.as_ref());
+                return match rollback_result {
+                    Ok(()) => plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &format!(
+                            "budget authorize became leader-visible at commit index {budget_seq} but failed quorum commit; local exposure rollback succeeded"
+                        ),
+                    ),
+                    Err(error) => plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &format!(
+                            "budget authorize became leader-visible at commit index {budget_seq} but failed quorum commit and local exposure rollback also failed: {error}"
+                        ),
+                    ),
+                };
+            }
+        };
+        json_response_with_leader_visibility_and_budget_commit(&state, response, budget_commit)
+    } else {
+        respond_after_leader_visible_write(
+            &state,
+            "budget exposure state was not visible on the leader after write",
+            || {
+                let usage = store
+                    .get_usage(&payload.capability_id, payload.grant_index)
+                    .map_err(|error| {
+                        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                    })?;
                 Ok(Some(TryChargeCostResponse {
                     capability_id: payload.capability_id.clone(),
                     grant_index: payload.grant_index,
                     allowed,
-                    invocation_count,
-                    total_cost_charged,
+                    invocation_count: usage.as_ref().map(|usage| usage.invocation_count),
+                    total_cost_exposed: usage.as_ref().map(|usage| usage.total_cost_exposed),
+                    total_cost_realized_spend: usage
+                        .as_ref()
+                        .map(|usage| usage.total_cost_realized_spend),
+                    budget_authority: budget_authority_metadata_view(
+                        &state,
+                        None,
+                        budget_authority_guarantee_level(&state, None),
+                    ),
+                    budget_commit: None,
                 }))
-            } else {
-                Ok(None)
-            }
-        },
-    )
+            },
+        )
+    }
 }
 
 async fn handle_reverse_charge_cost(
@@ -2223,39 +2301,58 @@ async fn handle_reverse_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_REVERSE_PATH, &payload).await {
+    match forward_post_to_leader(&state, BUDGET_RELEASE_EXPOSURE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
+    let authority = match current_budget_event_authority(&state) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
     let mut store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };
-    if let Err(error) = store.reverse_charge_cost(
+    if let Err(error) = store.reverse_charge_cost_with_ids_and_authority(
         &payload.capability_id,
         payload.grant_index,
         payload.cost_units,
+        payload.hold_id.as_deref(),
+        payload.event_id.as_deref(),
+        authority.as_ref(),
     ) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    respond_after_leader_visible_write(
-        &state,
-        "reversed monetary budget state was not visible on the leader after write",
-        || {
-            let usage = store
-                .get_usage(&payload.capability_id, payload.grant_index)
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })?;
-            Ok(Some(ReverseChargeCostResponse {
+    let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index) {
+        Ok(Some(usage)) => Some((
+            ReverseChargeCostResponse {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
-                invocation_count: usage.as_ref().map(|usage| usage.invocation_count),
-                total_cost_charged: usage.as_ref().map(|usage| usage.total_cost_charged),
-            }))
-        },
+                invocation_count: Some(usage.invocation_count),
+                total_cost_exposed: Some(usage.total_cost_exposed),
+                total_cost_realized_spend: Some(usage.total_cost_realized_spend),
+                budget_authority: budget_authority_metadata_view(
+                    &state,
+                    Some(usage.seq),
+                    budget_authority_guarantee_level(&state, Some(usage.seq)),
+                ),
+                budget_commit: None,
+            },
+            usage.seq,
+        )),
+        Ok(None) => None,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    drop(store);
+    respond_after_budget_write_quorum_commit(
+        &state,
+        "released budget exposure state was not visible on the leader after write",
+        committed_response,
     )
+    .await
 }
 
 async fn handle_reduce_charge_cost(
@@ -2266,37 +2363,73 @@ async fn handle_reduce_charge_cost(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    match forward_post_to_leader(&state, BUDGET_REDUCE_PATH, &payload).await {
+    let released_exposure_units = payload.release_units();
+    match forward_post_to_leader(&state, BUDGET_RECONCILE_SPEND_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
     }
+    let authority = match current_budget_event_authority(&state) {
+        Ok(authority) => authority,
+        Err(response) => return response,
+    };
     let mut store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };
-    if let Err(error) = store.reduce_charge_cost(
-        &payload.capability_id,
-        payload.grant_index,
-        payload.cost_units,
-    ) {
+    let reconcile_result = if let (Some(exposure_units), Some(realized_spend_units)) =
+        (payload.exposure_units, payload.realized_spend_units)
+    {
+        store.settle_charge_cost_with_ids_and_authority(
+            &payload.capability_id,
+            payload.grant_index,
+            exposure_units,
+            realized_spend_units,
+            payload.hold_id.as_deref(),
+            payload.event_id.as_deref(),
+            authority.as_ref(),
+        )
+    } else {
+        store.reduce_charge_cost_with_ids_and_authority(
+            &payload.capability_id,
+            payload.grant_index,
+            released_exposure_units,
+            payload.hold_id.as_deref(),
+            payload.event_id.as_deref(),
+            authority.as_ref(),
+        )
+    };
+    if let Err(error) = reconcile_result {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    respond_after_leader_visible_write(
-        &state,
-        "reduced monetary budget state was not visible on the leader after write",
-        || {
-            let usage = store
-                .get_usage(&payload.capability_id, payload.grant_index)
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })?;
-            Ok(Some(ReduceChargeCostResponse {
+    let committed_response = match store.get_usage(&payload.capability_id, payload.grant_index) {
+        Ok(Some(usage)) => Some((
+            ReduceChargeCostResponse {
                 capability_id: payload.capability_id.clone(),
                 grant_index: payload.grant_index,
-                invocation_count: usage.as_ref().map(|usage| usage.invocation_count),
-                total_cost_charged: usage.as_ref().map(|usage| usage.total_cost_charged),
-            }))
-        },
+                invocation_count: Some(usage.invocation_count),
+                total_cost_exposed: Some(usage.total_cost_exposed),
+                total_cost_realized_spend: Some(usage.total_cost_realized_spend),
+                released_exposure_units: Some(released_exposure_units),
+                budget_authority: budget_authority_metadata_view(
+                    &state,
+                    Some(usage.seq),
+                    budget_authority_guarantee_level(&state, Some(usage.seq)),
+                ),
+                budget_commit: None,
+            },
+            usage.seq,
+        )),
+        Ok(None) => None,
+        Err(error) => {
+            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
+    drop(store);
+    respond_after_budget_write_quorum_commit(
+        &state,
+        "reconciled budget spend state was not visible on the leader after write",
+        committed_response,
     )
+    .await
 }

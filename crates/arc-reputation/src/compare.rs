@@ -248,9 +248,26 @@ pub fn build_imported_reputation_signal(
     policy: &ImportedTrustPolicy,
 ) -> ImportedReputationSignal {
     let scorecard = compute_local_scorecard(subject_key, now, corpus, config);
+    let issuer_identity = ImportedIssuerIdentity {
+        issuer: provenance.issuer.trim().to_string(),
+        signer_public_key: provenance.signer_public_key.trim().to_string(),
+    };
+    let trust_mode = ImportedTrustMode::BilateralEvidenceShare;
     let mut accepted = true;
     let mut reasons = Vec::new();
 
+    if issuer_identity.issuer.is_empty() {
+        accepted = false;
+        reasons.push("imported evidence share is missing issuer identity".to_string());
+    }
+    if provenance.partner.trim().is_empty() {
+        accepted = false;
+        reasons.push("imported evidence share is missing partner boundary identity".to_string());
+    }
+    if policy.require_signer_identity && issuer_identity.signer_public_key.is_empty() {
+        accepted = false;
+        reasons.push("imported evidence share is missing signer identity".to_string());
+    }
     if policy.require_proofs && !provenance.require_proofs {
         accepted = false;
         reasons.push("imported evidence share did not require proofs".to_string());
@@ -267,6 +284,18 @@ pub fn build_imported_reputation_signal(
             provenance.issuer
         ));
     }
+    if !policy.allowed_signer_public_keys.is_empty()
+        && !policy
+            .allowed_signer_public_keys
+            .iter()
+            .any(|signer| signer == &issuer_identity.signer_public_key)
+    {
+        accepted = false;
+        reasons.push(format!(
+            "signer `{}` falls outside the imported-trust signer allowlist",
+            provenance.signer_public_key
+        ));
+    }
     if let Some(max_age_days) = policy.max_signal_age_days {
         let max_age_secs = max_age_days as u64 * SECONDS_PER_DAY;
         if now.saturating_sub(provenance.exported_at) > max_age_secs {
@@ -276,6 +305,18 @@ pub fn build_imported_reputation_signal(
                 max_age_days
             ));
         }
+    }
+    if provenance.imported_at < provenance.exported_at {
+        accepted = false;
+        reasons.push("imported evidence share timestamps are not monotonic".to_string());
+    }
+    if !trust_mode.satisfies(policy.required_trust_mode) {
+        accepted = false;
+        reasons.push(format!(
+            "imported trust mode `{}` does not satisfy required mode `{}`",
+            imported_trust_mode_label(trust_mode),
+            imported_trust_mode_label(policy.required_trust_mode)
+        ));
     }
 
     let attenuation_factor = clamp01(policy.attenuation_factor);
@@ -287,10 +328,121 @@ pub fn build_imported_reputation_signal(
 
     ImportedReputationSignal {
         provenance,
+        issuer_identity,
         policy: policy.clone(),
+        trust_mode,
         accepted,
         reasons,
         scorecard,
         attenuated_composite_score,
+    }
+}
+
+fn imported_trust_mode_label(mode: ImportedTrustMode) -> &'static str {
+    match mode {
+        ImportedTrustMode::BilateralEvidenceShare => "bilateral_evidence_share",
+        ImportedTrustMode::NetworkCleared => "network_cleared",
+    }
+}
+
+#[cfg(test)]
+mod imported_trust_tests {
+    use super::*;
+
+    fn sample_provenance() -> ImportedReputationProvenance {
+        ImportedReputationProvenance {
+            share_id: "share-1".to_string(),
+            issuer: "operator-alpha".to_string(),
+            partner: "operator-beta".to_string(),
+            signer_public_key: "ed25519:issuer-alpha".to_string(),
+            imported_at: 200,
+            exported_at: 100,
+            require_proofs: true,
+            tool_receipts: 2,
+            capability_lineage: 1,
+        }
+    }
+
+    #[test]
+    fn imported_signal_exposes_first_class_identity_and_mode() {
+        let signal = build_imported_reputation_signal(
+            "subject-1",
+            sample_provenance(),
+            &LocalReputationCorpus::default(),
+            300,
+            &ReputationConfig::default(),
+            &ImportedTrustPolicy::default(),
+        );
+
+        assert!(signal.accepted);
+        assert_eq!(signal.issuer_identity.issuer, "operator-alpha");
+        assert_eq!(
+            signal.issuer_identity.signer_public_key,
+            "ed25519:issuer-alpha"
+        );
+        assert_eq!(signal.trust_mode, ImportedTrustMode::BilateralEvidenceShare);
+    }
+
+    #[test]
+    fn imported_signal_rejects_disallowed_signer_identity() {
+        let mut policy = ImportedTrustPolicy::default();
+        policy.allowed_signer_public_keys = vec!["ed25519:other-signer".to_string()];
+
+        let signal = build_imported_reputation_signal(
+            "subject-1",
+            sample_provenance(),
+            &LocalReputationCorpus::default(),
+            300,
+            &ReputationConfig::default(),
+            &policy,
+        );
+
+        assert!(!signal.accepted);
+        assert!(signal
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("signer")));
+    }
+
+    #[test]
+    fn imported_signal_rejects_network_cleared_requirement_for_bilateral_share() {
+        let mut policy = ImportedTrustPolicy::default();
+        policy.required_trust_mode = ImportedTrustMode::NetworkCleared;
+
+        let signal = build_imported_reputation_signal(
+            "subject-1",
+            sample_provenance(),
+            &LocalReputationCorpus::default(),
+            300,
+            &ReputationConfig::default(),
+            &policy,
+        );
+
+        assert!(!signal.accepted);
+        assert!(signal
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("network_cleared")));
+    }
+
+    #[test]
+    fn imported_signal_rejects_non_monotonic_import_timestamps() {
+        let mut provenance = sample_provenance();
+        provenance.imported_at = provenance.exported_at.saturating_sub(1);
+
+        let signal = build_imported_reputation_signal(
+            "subject-1",
+            provenance,
+            &LocalReputationCorpus::default(),
+            300,
+            &ReputationConfig::default(),
+            &ImportedTrustPolicy::default(),
+        );
+
+        assert!(!signal.accepted);
+        assert!(signal
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("not monotonic")));
     }
 }

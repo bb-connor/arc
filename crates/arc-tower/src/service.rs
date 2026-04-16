@@ -290,9 +290,7 @@ mod tests {
         let inner = tower::service_fn(|_req: http::Request<TestBody>| async {
             let mut response = http::Response::new(Full::new(Bytes::new()));
             *response.status_mut() = http::StatusCode::CREATED;
-            Ok::<http::Response<TestBody>, Box<dyn std::error::Error + Send + Sync>>(
-                response,
-            )
+            Ok::<http::Response<TestBody>, Box<dyn std::error::Error + Send + Sync>>(response)
         });
 
         let mut service = ArcService::new(inner, evaluator);

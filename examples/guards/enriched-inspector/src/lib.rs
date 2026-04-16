@@ -25,9 +25,7 @@ fn evaluate(req: GuardRequest) -> GuardVerdict {
                 // Check against configured blocked path
                 if let Some(ref bp) = blocked_path {
                     if path.starts_with(bp.as_str()) {
-                        return GuardVerdict::deny(
-                            "write to protected path blocked by policy",
-                        );
+                        return GuardVerdict::deny("write to protected path blocked by policy");
                     }
                 }
 

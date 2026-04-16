@@ -301,6 +301,45 @@ impl AnchorRuntimeReport {
             incidents: Vec::new(),
         }
     }
+
+    #[must_use]
+    pub fn lane_incidents<'a>(
+        &'a self,
+        lane: AnchorLaneKind,
+        chain_id: Option<&str>,
+    ) -> Vec<&'a AnchorIncidentAlert> {
+        self.incidents
+            .iter()
+            .filter(|incident| {
+                incident.lane == lane
+                    && match (chain_id, incident.chain_id.as_deref()) {
+                        (Some(expected), Some(actual)) => expected == actual,
+                        (Some(_), None) => true,
+                        (None, _) => true,
+                    }
+            })
+            .collect()
+    }
+
+    #[must_use]
+    pub fn lane_has_active_conflict(&self, lane: AnchorLaneKind, chain_id: Option<&str>) -> bool {
+        self.lane_incidents(lane, chain_id)
+            .into_iter()
+            .any(anchor_incident_is_conflict)
+    }
+}
+
+#[must_use]
+pub fn anchor_incident_is_conflict(incident: &AnchorIncidentAlert) -> bool {
+    if incident.severity != AnchorAlertSeverity::Critical {
+        return false;
+    }
+    let code = incident.code.to_ascii_lowercase();
+    code.contains("equivocation")
+        || code.contains("conflict")
+        || code.contains("fork")
+        || code.contains("divergence")
+        || code.contains("reorg")
 }
 
 #[must_use]
@@ -357,10 +396,11 @@ pub fn ensure_anchor_operation_allowed(
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_anchor_lane, ensure_anchor_operation_allowed, AnchorControlState,
-        AnchorEmergencyControls, AnchorEmergencyMode, AnchorIndexerCursor,
-        AnchorIndexerCursorInput, AnchorIndexerStatus, AnchorLaneHealthStatus, AnchorOperationKind,
-        AnchorRuntimeReport, ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
+        anchor_incident_is_conflict, classify_anchor_lane, ensure_anchor_operation_allowed,
+        AnchorAlertSeverity, AnchorControlState, AnchorEmergencyControls, AnchorEmergencyMode,
+        AnchorIncidentAlert, AnchorIndexerCursor, AnchorIndexerCursorInput, AnchorIndexerStatus,
+        AnchorLaneHealthStatus, AnchorOperationKind, AnchorRuntimeReport,
+        ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
     };
     use crate::bundle::AnchorLaneKind;
 
@@ -454,5 +494,38 @@ mod tests {
             state.history[1].after.reason.as_deref(),
             Some("replay canonical head")
         );
+    }
+
+    #[test]
+    fn runtime_report_detects_lane_conflict_incident() {
+        let mut report =
+            AnchorRuntimeReport::new(1_712_337_200, AnchorEmergencyControls::normal(1));
+        report.incidents.push(AnchorIncidentAlert {
+            code: "checkpoint_equivocation_detected".to_string(),
+            severity: AnchorAlertSeverity::Critical,
+            lane: AnchorLaneKind::EvmPrimary,
+            chain_id: Some("eip155:8453".to_string()),
+            checkpoint_seq: Some(42),
+            observed_at: 1_712_337_199,
+            message: "conflicting checkpoint publication observed".to_string(),
+        });
+
+        assert!(report.lane_has_active_conflict(AnchorLaneKind::EvmPrimary, Some("eip155:8453")));
+        assert!(!report.lane_has_active_conflict(AnchorLaneKind::EvmPrimary, Some("eip155:42161")));
+    }
+
+    #[test]
+    fn non_critical_incident_is_not_treated_as_conflict() {
+        let incident = AnchorIncidentAlert {
+            code: "checkpoint_reorg_detected".to_string(),
+            severity: AnchorAlertSeverity::Warning,
+            lane: AnchorLaneKind::EvmPrimary,
+            chain_id: Some("eip155:8453".to_string()),
+            checkpoint_seq: Some(42),
+            observed_at: 1_712_337_199,
+            message: "reorg observed".to_string(),
+        };
+
+        assert!(!anchor_incident_is_conflict(&incident));
     }
 }

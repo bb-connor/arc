@@ -1,3 +1,0 @@
-error [ARC-CLI-IO]: i/o error: Address already in use (os error 48)
-context: {"source":"Address already in use (os error 48)"}
-suggested fix: Check file paths, permissions, and parent directories before retrying.

@@ -1,0 +1,32 @@
+[
+  {
+    "capability_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+    "subject_key": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+    "issuer_key": "77527a20b865ed8e77f9eed6d2a433c06b15e47ac3425365d8b57066518eed5f",
+    "issued_at": 1776300757,
+    "expires_at": 1776302557,
+    "grants_json": "{\"grants\":[{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_incident_summary\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"query_spans\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_deploy_timeline\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_slo_status\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"search_commits\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_diff\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_file\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_oncall_state\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_escalation_timeline\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"acp-broker\",\"tool_name\":\"create_task\",\"operations\":[\"invoke\",\"delegate\"]}]}",
+    "delegation_depth": 0,
+    "parent_capability_id": null
+  },
+  {
+    "capability_id": "inc-meridian-inference-gw-2026-04-15-0317z-vendor",
+    "subject_key": "1d82434f7bb7804f64e7f84d2b16f8ec8b846abaf7d57bf4ec13cee64c1c240c",
+    "issuer_key": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+    "issued_at": 1776300757,
+    "expires_at": 1776301657,
+    "grants_json": "{\"grants\":[{\"server_id\":\"acp-broker\",\"tool_name\":\"create_task\",\"operations\":[\"invoke\",\"delegate\"]}]}",
+    "delegation_depth": 1,
+    "parent_capability_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b"
+  },
+  {
+    "capability_id": "acp-task-ac4fc0fed5d7-provider-coordinator",
+    "subject_key": "d2b6613297632198ed8a05a1131e1dad42ac818ddb3b43034058581d2260fdbd",
+    "issuer_key": "1d82434f7bb7804f64e7f84d2b16f8ec8b846abaf7d57bf4ec13cee64c1c240c",
+    "issued_at": 1776300794,
+    "expires_at": 1776301394,
+    "grants_json": "{\"grants\":[{\"server_id\":\"provider-ops\",\"tool_name\":\"disable_edge_rule\",\"operations\":[\"invoke\",\"delegate\"]}]}",
+    "delegation_depth": 2,
+    "parent_capability_id": "inc-meridian-inference-gw-2026-04-15-0317z-vendor"
+  }
+]

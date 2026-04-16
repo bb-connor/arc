@@ -1,5 +1,128 @@
+use std::cell::RefCell;
+
 use super::*;
+use arc_appraisal::{verify_runtime_attestation_record, VerifiedRuntimeAttestationRecord};
+use arc_core::capability::{
+    GovernedCallChainContext, GovernedCallChainEvidenceSource, GovernedCallChainProvenance,
+    GovernedProvenanceEvidenceClass, GovernedUpstreamCallChainProof,
+};
 use uuid::Uuid;
+
+use crate::evidence_export::EvidenceLineageReferences;
+use crate::operator_report::GovernedTransactionDiagnostics;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct GovernedCallChainReceiptEvidence {
+    pub(crate) local_parent_request_id: Option<String>,
+    pub(crate) local_parent_receipt_id: Option<String>,
+    pub(crate) capability_delegator_subject: Option<String>,
+    pub(crate) capability_origin_subject: Option<String>,
+    pub(crate) upstream_proof: Option<GovernedUpstreamCallChainProof>,
+    pub(crate) continuation_token_id: Option<String>,
+    pub(crate) session_anchor_id: Option<String>,
+}
+
+thread_local! {
+    static GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE: RefCell<Option<GovernedCallChainReceiptEvidence>> =
+        const { RefCell::new(None) };
+}
+
+pub(crate) struct ScopedGovernedCallChainReceiptEvidence {
+    previous: Option<GovernedCallChainReceiptEvidence>,
+}
+
+impl Drop for ScopedGovernedCallChainReceiptEvidence {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE.with(|slot| {
+            slot.replace(previous);
+        });
+    }
+}
+
+pub(crate) fn scope_governed_call_chain_receipt_evidence(
+    evidence: Option<GovernedCallChainReceiptEvidence>,
+) -> ScopedGovernedCallChainReceiptEvidence {
+    let previous = GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE.with(|slot| slot.replace(evidence));
+    ScopedGovernedCallChainReceiptEvidence { previous }
+}
+
+fn current_governed_call_chain_receipt_evidence() -> Option<GovernedCallChainReceiptEvidence> {
+    GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE.with(|slot| slot.borrow().clone())
+}
+
+fn governed_call_chain_provenance(
+    context: GovernedCallChainContext,
+) -> GovernedCallChainProvenance {
+    let Some(evidence) = current_governed_call_chain_receipt_evidence() else {
+        return GovernedCallChainProvenance::asserted(context);
+    };
+
+    let upstream_proof = evidence.upstream_proof.clone();
+    let mut evidence_sources = Vec::new();
+
+    if evidence.local_parent_request_id.as_deref() == Some(context.parent_request_id.as_str()) {
+        evidence_sources.push(GovernedCallChainEvidenceSource::SessionParentRequestLineage);
+    }
+    if evidence.local_parent_receipt_id.is_some()
+        && evidence.local_parent_receipt_id.as_deref() == context.parent_receipt_id.as_deref()
+    {
+        evidence_sources.push(GovernedCallChainEvidenceSource::LocalParentReceiptLinkage);
+    }
+    if evidence.capability_delegator_subject.as_deref() == Some(context.delegator_subject.as_str())
+    {
+        evidence_sources.push(GovernedCallChainEvidenceSource::CapabilityDelegatorSubject);
+    }
+    if evidence.capability_origin_subject.as_deref() == Some(context.origin_subject.as_str()) {
+        evidence_sources.push(GovernedCallChainEvidenceSource::CapabilityOriginSubject);
+    }
+    if upstream_proof.is_some() {
+        evidence_sources.push(GovernedCallChainEvidenceSource::UpstreamDelegatorProof);
+    }
+
+    let mut provenance = GovernedCallChainProvenance::new(
+        context,
+        if upstream_proof.is_some() {
+            GovernedProvenanceEvidenceClass::Verified
+        } else if evidence_sources.is_empty() {
+            GovernedProvenanceEvidenceClass::Asserted
+        } else {
+            GovernedProvenanceEvidenceClass::Observed
+        },
+    )
+    .with_evidence_sources(evidence_sources);
+
+    if let Some(upstream_proof) = upstream_proof {
+        provenance = provenance.with_upstream_proof(upstream_proof);
+    }
+    if let Some(continuation_token_id) = evidence.continuation_token_id {
+        provenance = provenance.with_continuation_token_id(continuation_token_id);
+    }
+    if let Some(session_anchor_id) = evidence.session_anchor_id {
+        provenance = provenance.with_session_anchor_id(session_anchor_id);
+    }
+
+    provenance
+}
+
+fn governed_transaction_diagnostics(
+    call_chain: Option<&GovernedCallChainProvenance>,
+) -> Option<GovernedTransactionDiagnostics> {
+    let diagnostics = GovernedTransactionDiagnostics {
+        asserted_call_chain: call_chain.cloned().filter(|call_chain| {
+            call_chain.evidence_class == GovernedProvenanceEvidenceClass::Asserted
+        }),
+        lineage_references: EvidenceLineageReferences {
+            session_anchor_id: call_chain
+                .and_then(|call_chain| call_chain.session_anchor_id.clone()),
+            request_lineage_id: None,
+            receipt_lineage_statement_id: call_chain
+                .and_then(|call_chain| call_chain.receipt_lineage_statement_id.clone()),
+        },
+    };
+
+    (!diagnostics.is_empty()).then_some(diagnostics)
+}
 
 pub(super) fn build_child_request_receipt(
     policy_hash: &str,
@@ -59,6 +182,53 @@ pub(super) fn merge_metadata_objects(
     }
 }
 
+pub(super) fn verify_governed_runtime_attestation_record(
+    attestation: &arc_core::capability::RuntimeAttestationEvidence,
+    attestation_trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+) -> Result<VerifiedRuntimeAttestationRecord, KernelError> {
+    verify_runtime_attestation_record(attestation, attestation_trust_policy, now).map_err(|error| {
+        KernelError::GovernedTransactionDenied(format!(
+            "runtime attestation evidence rejected by local verification boundary: {error}"
+        ))
+    })
+}
+
+fn verified_runtime_assurance_receipt_metadata(
+    verified_runtime_attestation: &VerifiedRuntimeAttestationRecord,
+) -> Option<RuntimeAssuranceReceiptMetadata> {
+    if !verified_runtime_attestation.is_locally_accepted() {
+        return None;
+    }
+
+    Some(RuntimeAssuranceReceiptMetadata {
+        schema: verified_runtime_attestation.evidence.schema.clone(),
+        verifier_family: Some(verified_runtime_attestation.provenance.verifier_family),
+        tier: verified_runtime_attestation.effective_tier(),
+        verifier: verified_runtime_attestation
+            .provenance
+            .canonical_verifier
+            .clone(),
+        evidence_sha256: verified_runtime_attestation
+            .evidence
+            .evidence_sha256
+            .clone(),
+        workload_identity: verified_runtime_attestation.workload_identity().cloned(),
+    })
+}
+
+fn governed_runtime_assurance_receipt_metadata(
+    attestation: Option<&arc_core::capability::RuntimeAttestationEvidence>,
+    attestation_trust_policy: Option<&AttestationTrustPolicy>,
+    now: u64,
+) -> Option<RuntimeAssuranceReceiptMetadata> {
+    let attestation = attestation?;
+    let verified_runtime_attestation =
+        verify_governed_runtime_attestation_record(attestation, attestation_trust_policy, now)
+            .ok()?;
+    verified_runtime_assurance_receipt_metadata(&verified_runtime_attestation)
+}
+
 pub(super) fn governed_request_metadata(
     request: &ToolCallRequest,
     attestation_trust_policy: Option<&AttestationTrustPolicy>,
@@ -94,21 +264,11 @@ pub(super) fn governed_request_metadata(
                 max_billed_units: metered.max_billed_units,
                 usage_evidence: None,
             });
-    let runtime_assurance =
-        intent
-            .runtime_attestation
-            .as_ref()
-            .map(|attestation| RuntimeAssuranceReceiptMetadata {
-                schema: attestation.schema.clone(),
-                verifier_family: verifier_family_for_attestation_schema(&attestation.schema),
-                tier: attestation
-                    .resolve_effective_runtime_assurance(attestation_trust_policy, now)
-                    .map(|resolved| resolved.effective_tier)
-                    .unwrap_or(attestation.tier),
-                verifier: attestation.verifier.clone(),
-                evidence_sha256: attestation.evidence_sha256.clone(),
-                workload_identity: attestation.normalized_workload_identity().ok().flatten(),
-            });
+    let runtime_assurance = governed_runtime_assurance_receipt_metadata(
+        intent.runtime_attestation.as_ref(),
+        attestation_trust_policy,
+        now,
+    );
     let autonomy = intent
         .autonomy
         .as_ref()
@@ -116,6 +276,11 @@ pub(super) fn governed_request_metadata(
             tier: autonomy.tier,
             delegation_bond_id: autonomy.delegation_bond_id.clone(),
         });
+    let call_chain = intent
+        .call_chain
+        .clone()
+        .map(governed_call_chain_provenance);
+    let governed_transaction_diagnostics = governed_transaction_diagnostics(call_chain.as_ref());
     let metadata = GovernedTransactionReceiptMetadata {
         intent_id: intent.id.clone(),
         intent_hash: intent.binding_hash().map_err(|error| {
@@ -131,13 +296,30 @@ pub(super) fn governed_request_metadata(
         metered_billing,
         approval,
         runtime_assurance,
-        call_chain: intent.call_chain.clone(),
+        call_chain: call_chain.clone(),
         autonomy,
     };
 
-    Ok(Some(serde_json::json!({
-        "governed_transaction": metadata
-    })))
+    let mut metadata_object = serde_json::Map::from_iter([(
+        "governed_transaction".to_string(),
+        serde_json::to_value(metadata).map_err(|error| {
+            KernelError::ReceiptSigningFailed(format!(
+                "failed to serialize governed receipt metadata: {error}"
+            ))
+        })?,
+    )]);
+    if let Some(diagnostics) = governed_transaction_diagnostics {
+        metadata_object.insert(
+            "governed_transaction_diagnostics".to_string(),
+            serde_json::to_value(diagnostics).map_err(|error| {
+                KernelError::ReceiptSigningFailed(format!(
+                    "failed to serialize governed transaction diagnostics: {error}"
+                ))
+            })?,
+        );
+    }
+
+    Ok(Some(serde_json::Value::Object(metadata_object)))
 }
 
 pub(super) fn receipt_attribution_metadata(
@@ -302,4 +484,404 @@ pub(super) fn truncate_stream_to_byte_limit(
     }
 
     Ok((ToolCallStream { chunks: accepted }, total_bytes, truncated))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arc_core::capability::{
+        ArcScope, AttestationTrustPolicy, AttestationTrustRule, CapabilityToken,
+        CapabilityTokenBody, GovernedCallChainContext, GovernedProvenanceEvidenceClass,
+        GovernedTransactionIntent, GovernedUpstreamCallChainProof,
+        GovernedUpstreamCallChainProofBody, RuntimeAssuranceTier, RuntimeAttestationEvidence,
+    };
+    use arc_core::crypto::sha256_hex;
+
+    fn test_capability() -> CapabilityToken {
+        let keypair = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-test".to_string(),
+                issuer: keypair.public_key(),
+                subject: keypair.public_key(),
+                scope: ArcScope::default(),
+                issued_at: 100,
+                expires_at: 200,
+                delegation_chain: Vec::new(),
+            },
+            &keypair,
+        )
+        .expect("test capability should sign")
+    }
+
+    fn trusted_attestation_trust_policy() -> AttestationTrustPolicy {
+        AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "azure-contoso".to_string(),
+                schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
+                verifier: "https://maa.contoso.test".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: vec!["sgx".to_string()],
+                required_assertions: std::collections::BTreeMap::new(),
+            }],
+        }
+    }
+
+    fn raw_runtime_attestation() -> RuntimeAttestationEvidence {
+        RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.v1".to_string(),
+            verifier: "verifier.arc".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: sha256_hex(b"raw-runtime-attestation"),
+            runtime_identity: Some("spiffe://arc/runtime/test".to_string()),
+            workload_identity: None,
+            claims: None,
+        }
+    }
+
+    fn trusted_runtime_attestation() -> RuntimeAttestationEvidence {
+        RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
+            verifier: "https://maa.contoso.test/".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: sha256_hex(b"trusted-runtime-attestation"),
+            runtime_identity: Some("spiffe://arc/runtime/test".to_string()),
+            workload_identity: None,
+            claims: Some(serde_json::json!({
+                "azureMaa": {
+                    "attestationType": "sgx"
+                }
+            })),
+        }
+    }
+
+    #[test]
+    fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
+        let call_chain = GovernedCallChainContext {
+            chain_id: "chain-1".to_string(),
+            parent_request_id: "req-parent-1".to_string(),
+            parent_receipt_id: Some("rcpt-parent-1".to_string()),
+            origin_subject: "origin-subject".to_string(),
+            delegator_subject: "delegator-subject".to_string(),
+        };
+        let request = ToolCallRequest {
+            request_id: "req-current-1".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-1" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-1".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(call_chain.clone()),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        };
+
+        let metadata = governed_request_metadata(&request, None, 0)
+            .expect("metadata should build")
+            .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+        let governed_call_chain = governed
+            .call_chain
+            .expect("asserted call-chain should remain visible on the signed receipt");
+        assert_eq!(
+            governed_call_chain.evidence_class,
+            GovernedProvenanceEvidenceClass::Asserted
+        );
+        assert_eq!(
+            metadata["governed_transaction_diagnostics"]["assertedCallChain"]["evidenceClass"],
+            serde_json::json!("asserted")
+        );
+        assert_eq!(
+            metadata["governed_transaction_diagnostics"]["assertedCallChain"]["chainId"],
+            serde_json::json!("chain-1")
+        );
+        assert_eq!(
+            metadata["governed_transaction_diagnostics"]["assertedCallChain"]["parentRequestId"],
+            serde_json::json!("req-parent-1")
+        );
+        let diagnostics: GovernedTransactionDiagnostics =
+            serde_json::from_value(metadata["governed_transaction_diagnostics"].clone())
+                .expect("diagnostics should deserialize");
+        let provenance = diagnostics
+            .asserted_call_chain
+            .expect("asserted call-chain should be preserved in diagnostics");
+        assert_eq!(
+            provenance.evidence_class,
+            GovernedProvenanceEvidenceClass::Asserted
+        );
+        assert!(provenance.evidence_sources.is_empty());
+        assert_eq!(provenance.into_inner(), call_chain);
+    }
+
+    #[test]
+    fn governed_request_metadata_marks_matching_local_call_chain_evidence_as_observed() {
+        let call_chain = GovernedCallChainContext {
+            chain_id: "chain-2".to_string(),
+            parent_request_id: "req-parent-2".to_string(),
+            parent_receipt_id: Some("rcpt-parent-2".to_string()),
+            origin_subject: "subject-origin".to_string(),
+            delegator_subject: "subject-delegator".to_string(),
+        };
+        let request = ToolCallRequest {
+            request_id: "req-current-2".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-2" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-2".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(call_chain.clone()),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        };
+        let _scope =
+            scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
+                local_parent_request_id: Some("req-parent-2".to_string()),
+                local_parent_receipt_id: Some("rcpt-parent-2".to_string()),
+                capability_delegator_subject: Some("subject-delegator".to_string()),
+                capability_origin_subject: Some("subject-origin".to_string()),
+                upstream_proof: None,
+                continuation_token_id: None,
+                session_anchor_id: None,
+            }));
+
+        let metadata = governed_request_metadata(&request, None, 0)
+            .expect("metadata should build")
+            .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+        let provenance = governed
+            .call_chain
+            .expect("call-chain provenance should be present");
+
+        assert_eq!(
+            provenance.evidence_class,
+            GovernedProvenanceEvidenceClass::Observed
+        );
+        assert_eq!(
+            provenance.evidence_sources,
+            vec![
+                GovernedCallChainEvidenceSource::SessionParentRequestLineage,
+                GovernedCallChainEvidenceSource::LocalParentReceiptLinkage,
+                GovernedCallChainEvidenceSource::CapabilityDelegatorSubject,
+                GovernedCallChainEvidenceSource::CapabilityOriginSubject,
+            ]
+        );
+        assert_eq!(provenance.into_inner(), call_chain);
+        assert!(metadata.get("governed_transaction_diagnostics").is_none());
+    }
+
+    #[test]
+    fn governed_request_metadata_marks_validated_upstream_call_chain_proof_as_verified() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let call_chain = GovernedCallChainContext {
+            chain_id: "chain-verified".to_string(),
+            parent_request_id: "req-parent-verified".to_string(),
+            parent_receipt_id: Some("rcpt-parent-verified".to_string()),
+            origin_subject: "subject-origin".to_string(),
+            delegator_subject: "subject-delegator".to_string(),
+        };
+        let upstream_proof = GovernedUpstreamCallChainProof::sign(
+            GovernedUpstreamCallChainProofBody {
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: call_chain.chain_id.clone(),
+                parent_request_id: call_chain.parent_request_id.clone(),
+                parent_receipt_id: call_chain.parent_receipt_id.clone(),
+                origin_subject: call_chain.origin_subject.clone(),
+                delegator_subject: call_chain.delegator_subject.clone(),
+                issued_at: 100,
+                expires_at: 200,
+            },
+            &signer,
+        )
+        .expect("upstream proof should sign");
+        let request = ToolCallRequest {
+            request_id: "req-current-verified".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-verified" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-verified".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(call_chain.clone()),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        };
+        let _scope =
+            scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
+                local_parent_request_id: None,
+                local_parent_receipt_id: None,
+                capability_delegator_subject: None,
+                capability_origin_subject: None,
+                upstream_proof: Some(upstream_proof.clone()),
+                continuation_token_id: Some("continuation-verified".to_string()),
+                session_anchor_id: Some("anchor-verified".to_string()),
+            }));
+
+        let metadata = governed_request_metadata(&request, None, 0)
+            .expect("metadata should build")
+            .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+        let provenance = governed
+            .call_chain
+            .expect("call-chain provenance should be present");
+
+        assert_eq!(
+            provenance.evidence_class,
+            GovernedProvenanceEvidenceClass::Verified
+        );
+        assert_eq!(
+            provenance.evidence_sources,
+            vec![GovernedCallChainEvidenceSource::UpstreamDelegatorProof]
+        );
+        assert_eq!(provenance.upstream_proof, Some(upstream_proof));
+        assert_eq!(
+            provenance.continuation_token_id.as_deref(),
+            Some("continuation-verified")
+        );
+        assert_eq!(
+            provenance.session_anchor_id.as_deref(),
+            Some("anchor-verified")
+        );
+        assert_eq!(provenance.into_inner(), call_chain);
+        assert!(metadata.get("governed_transaction_diagnostics").is_none());
+    }
+
+    #[test]
+    fn governed_request_metadata_omits_unverified_runtime_assurance() {
+        let request = ToolCallRequest {
+            request_id: "req-current-3".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-3" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-3".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: Some(raw_runtime_attestation()),
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        };
+
+        let metadata = governed_request_metadata(&request, None, 150)
+            .expect("metadata should build")
+            .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+
+        assert!(
+            governed.runtime_assurance.is_none(),
+            "raw runtime attestation should not appear as verified receipt authority"
+        );
+    }
+
+    #[test]
+    fn governed_request_metadata_uses_verified_runtime_assurance_boundary() {
+        let request = ToolCallRequest {
+            request_id: "req-current-4".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-4" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-4".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: Some(trusted_runtime_attestation()),
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        };
+
+        let metadata =
+            governed_request_metadata(&request, Some(&trusted_attestation_trust_policy()), 150)
+                .expect("metadata should build")
+                .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+        let runtime_assurance = governed
+            .runtime_assurance
+            .expect("verified runtime assurance should be present");
+
+        assert_eq!(runtime_assurance.tier, RuntimeAssuranceTier::Verified);
+        assert_eq!(
+            runtime_assurance.verifier_family,
+            Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa)
+        );
+        assert_eq!(runtime_assurance.verifier, "https://maa.contoso.test");
+        assert_eq!(
+            runtime_assurance
+                .workload_identity
+                .expect("verified workload identity should be present")
+                .trust_domain,
+            "arc"
+        );
+    }
 }

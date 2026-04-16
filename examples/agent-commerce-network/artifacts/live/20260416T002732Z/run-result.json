@@ -1,0 +1,16 @@
+{
+  "artifact_dir": "/Users/connor/Medica/backbay/standalone/arc/examples/agent-commerce-network/artifacts/live/20260416T002732Z",
+  "summary": {
+    "example": "agent-commerce-network",
+    "scope": "hotfix-review",
+    "target": "git://lattice.example/payments-api",
+    "budget_minor": 90000,
+    "capability_id": "cap-019d93af-aa1e-7743-a08a-a4f4dc36cbec",
+    "final_status": "fulfilled",
+    "price_minor": 45000,
+    "currency": "USD",
+    "agent_mode": "openai_agents_sdk",
+    "tool_calls": 2,
+    "llm_mode": "openai"
+  }
+}

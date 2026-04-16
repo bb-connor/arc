@@ -1,6 +1,7 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_kernel::budget_store::BudgetEventAuthority;
 use arc_kernel::{AuthoritySnapshot, BudgetStore, RevocationRecord};
 use arc_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevocationStore};
 
@@ -16,6 +17,14 @@ fn cleanup_sqlite_files(path: &std::path::Path) {
     let _ = fs::remove_file(path);
     let _ = fs::remove_file(format!("{}-wal", path.display()));
     let _ = fs::remove_file(format!("{}-shm", path.display()));
+}
+
+fn authority(authority_id: &str, lease_id: &str, lease_epoch: u64) -> BudgetEventAuthority {
+    BudgetEventAuthority {
+        authority_id: authority_id.to_string(),
+        lease_id: lease_id.to_string(),
+        lease_epoch,
+    }
 }
 
 #[test]
@@ -79,7 +88,12 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
         .expect("load charged usage")
         .expect("charged usage exists");
     assert_eq!(charged.invocation_count, 1);
-    assert_eq!(charged.total_cost_charged, 5);
+    assert_eq!(
+        charged
+            .committed_cost_units()
+            .expect("derive charged total"),
+        5
+    );
 
     budget_store
         .reduce_charge_cost("cap-1", 0, 3)
@@ -88,7 +102,12 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
         .get_usage("cap-1", 0)
         .expect("reload reduced usage")
         .expect("reduced usage exists");
-    assert_eq!(reduced.total_cost_charged, 2);
+    assert_eq!(
+        reduced
+            .committed_cost_units()
+            .expect("derive reduced total"),
+        2
+    );
     assert_eq!(
         budget_store
             .list_usages_after(10, Some(0))
@@ -127,4 +146,140 @@ fn sqlite_budget_and_revocation_paths_cover_limits_and_ordering() {
 
     cleanup_sqlite_files(&budget_path);
     cleanup_sqlite_files(&revocation_path);
+}
+
+#[test]
+fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
+    let path = unique_db_path("arc-budget-authority-lease");
+    let hold_id = "hold-cap-lease-0";
+    let authorize_event_id = "hold-cap-lease-0:authorize";
+    let release_event_id = "hold-cap-lease-0:release";
+    let initial = authority("budget-primary", "lease-7", 7);
+    let advanced = authority("budget-primary", "lease-8", 8);
+
+    {
+        let mut store = SqliteBudgetStore::open(&path).expect("open budget store");
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-lease",
+                0,
+                Some(10),
+                100,
+                Some(200),
+                Some(1000),
+                Some(hold_id),
+                Some(authorize_event_id),
+                Some(&initial),
+            )
+            .expect("authorize hold with lease metadata"));
+    }
+
+    {
+        let mut store = SqliteBudgetStore::open(&path).expect("reopen budget store");
+        let events = store
+            .list_mutation_events(10, Some("cap-lease"), Some(0))
+            .expect("load events after reopen");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].authority.as_ref(), Some(&initial));
+
+        let error = store
+            .reduce_charge_cost_with_ids_and_authority(
+                "cap-lease",
+                0,
+                25,
+                Some(hold_id),
+                Some("hold-cap-lease-0:release-missing"),
+                None,
+            )
+            .expect_err("missing lease metadata should fail closed");
+        assert!(error
+            .to_string()
+            .contains("requires authority lease metadata"));
+
+        store
+            .reduce_charge_cost_with_ids_and_authority(
+                "cap-lease",
+                0,
+                25,
+                Some(hold_id),
+                Some(release_event_id),
+                Some(&advanced),
+            )
+            .expect("release hold with advanced lease metadata");
+
+        let usage = store
+            .get_usage("cap-lease", 0)
+            .expect("reload usage")
+            .expect("usage exists");
+        assert_eq!(usage.invocation_count, 1);
+        assert_eq!(usage.total_cost_exposed, 75);
+        assert_eq!(usage.total_cost_realized_spend, 0);
+
+        let events = store
+            .list_mutation_events(10, Some("cap-lease"), Some(0))
+            .expect("reload events after release");
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1].authority.as_ref(), Some(&advanced));
+    }
+
+    cleanup_sqlite_files(&path);
+}
+
+#[test]
+fn sqlite_budget_authorize_idempotency_persists_across_reopen() {
+    let path = unique_db_path("arc-budget-authority-idempotent");
+    let hold_id = "hold-cap-idempotent-0";
+    let authorize_event_id = "hold-cap-idempotent-0:authorize";
+    let authority = authority("budget-primary", "lease-12", 12);
+
+    {
+        let mut store = SqliteBudgetStore::open(&path).expect("open budget store");
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-idempotent",
+                0,
+                Some(10),
+                100,
+                Some(200),
+                Some(1000),
+                Some(hold_id),
+                Some(authorize_event_id),
+                Some(&authority),
+            )
+            .expect("authorize hold before reopen"));
+    }
+
+    {
+        let mut store = SqliteBudgetStore::open(&path).expect("reopen budget store");
+        assert!(store
+            .try_charge_cost_with_ids_and_authority(
+                "cap-idempotent",
+                0,
+                Some(10),
+                100,
+                Some(200),
+                Some(1000),
+                Some(hold_id),
+                Some(authorize_event_id),
+                Some(&authority),
+            )
+            .expect("replay identical authorize after reopen"));
+
+        let usage = store
+            .get_usage("cap-idempotent", 0)
+            .expect("reload usage")
+            .expect("usage exists");
+        assert_eq!(usage.invocation_count, 1);
+        assert_eq!(usage.total_cost_exposed, 100);
+        assert_eq!(usage.total_cost_realized_spend, 0);
+
+        let events = store
+            .list_mutation_events(10, Some("cap-idempotent"), Some(0))
+            .expect("reload events");
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_id, authorize_event_id);
+        assert_eq!(events[0].authority.as_ref(), Some(&authority));
+    }
+
+    cleanup_sqlite_files(&path);
 }

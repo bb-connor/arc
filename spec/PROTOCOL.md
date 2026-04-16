@@ -276,7 +276,7 @@ Tool-call requests may attach two optional governed artifacts:
   `tool_name`, `purpose`, optional `max_amount`, optional seller-scoped
   `commerce { seller, shared_payment_token_id }`, optional
   `metered_billing { settlement_mode, quote, max_billed_units }`, optional
-  `call_chain { chain_id, parent_request_id, parent_receipt_id?,
+  asserted `call_chain { chain_id, parent_request_id, parent_receipt_id?,
   origin_subject, delegator_subject }`, and optional structured context
 - `approval_token`, a signed approval artifact bound to one subject, one
   request id, and one governed intent hash
@@ -312,12 +312,42 @@ Approval tokens are verified against trusted authority keys and are bound to:
 - the canonical hash of the attached governed intent
 - approval-token `issued_at` and `expires_at` time bounds
 
+ARC's normative provenance model now distinguishes three evidence classes:
+
+- `asserted`: caller-supplied context that ARC preserves but has not
+  independently authenticated
+- `observed`: local lineage facts ARC directly observed inside one authenticated
+  session
+- `verified`: lineage ARC checked against signed artifacts such as
+  `arc.session_anchor.v1`, `arc.receipt_lineage_statement.v1`, or
+  `arc.call_chain_continuation.v1`
+
+The Phase 1 provenance substrate uses these versioned artifacts:
+
+- `arc.session_anchor.v1`: signed anchor binding `session_id`, `agent_id`,
+  transport/auth context, proof-binding material, and auth epoch
+- `arc.request_lineage_record.v1`: persisted request node keyed by
+  `request_id`, carrying session-anchor and capability lineage joins
+- `arc.receipt_lineage_statement.v1`: signed parent/child receipt edge
+- `arc.call_chain_continuation.v1`: signed cross-kernel continuation token
+
+The current bounded release emits session anchors and request-lineage records
+for local continuity and nested-flow provenance. Receipt-lineage statements and
+continuation tokens are the stronger receipt-to-receipt and cross-kernel proof
+forms when present; their absence must not be silently treated as verified
+upstream truth.
+
+Legacy `governed_intent.context.callChainUpstreamProof` remains a compatibility
+input during migration, but the stronger continuation artifact for new work is
+`governed_intent.context.callChainContinuation`.
+
 If `governed_intent.call_chain` is present, the kernel rejects empty fields and
-self-referential `parent_request_id == request_id` bindings. ARC treats
-delegated call-chain provenance as preserved caller context inside the
-approval-bound intent, not as a mutable reporting annotation. The bounded
-release does not automatically upgrade that preserved call-chain context into
-independently authenticated upstream truth.
+self-referential `parent_request_id == request_id` bindings. That input is
+always `asserted` provenance at admission time. ARC may only upgrade it to
+`observed` or `verified` when the runtime binds it to local request lineage,
+a signed receipt-lineage statement, or a verified continuation token scoped by
+the relevant session anchor. Reports and exports must preserve that evidence
+class boundary instead of silently upgrading caller input into proof.
 
 ### 5.3 Verification Rules
 
@@ -350,6 +380,17 @@ The current launch-candidate safety inventory is:
 - `P5` presented delegation-chain structural validity: delegation depth,
   connectivity, and timestamp monotonicity helpers define the bounded
   structural contract for a presented chain
+- `P6` local parent-link soundness: an `observed` local parent edge implies
+  the parent request existed in the same authenticated session when the child
+  request was created
+- `P7` receipt-lineage soundness: a `verified` receipt edge implies both
+  receipts verify and the linkage was signed by a trusted kernel
+- `P8` session continuity soundness: continued provenance can only claim
+  session continuity through a valid session anchor and continuation artifact
+- `P9` delegation/provenance consistency: verified call-chain subjects and
+  parent capability references remain consistent with capability lineage
+- `P10` report truthfulness: enterprise/report/export surfaces never label
+  `asserted` lineage as `verified`
 
 ARC intentionally distinguishes evidence classes for these claims:
 
@@ -441,12 +482,23 @@ block includes:
 - optional `approval { token_id, approver_key, approved }`
 - optional
   `runtime_assurance { tier, verifier, evidence_sha256, workload_identity? }`
-- optional `call_chain { chainId, parentRequestId, parentReceiptId?,
-  originSubject, delegatorSubject }`
+- optional
+  `call_chain { evidenceClass, evidenceSources[], assertedContext?,
+  continuationTokenId?, sessionAnchorId?, receiptLineageStatementId?,
+  upstreamProof?, chainId, parentRequestId, parentReceiptId?, originSubject,
+  delegatorSubject }`
 
 `governed_transaction.runtime_assurance.tier` records the accepted runtime
 assurance tier after any configured verifier trust-policy rebinding, not just
 the raw tier carried by the upstream attestation payload.
+
+When present, `governed_transaction.call_chain` records the strongest
+provenance projection ARC is willing to sign for that receipt. The flattened
+`chainId`, `parentRequestId`, `parentReceiptId`, `originSubject`, and
+`delegatorSubject` fields describe the effective observed or verified
+projection. If ARC also needs to preserve the original caller assertion, it
+stores that separately under `assertedContext`; downstream consumers must not
+collapse `assertedContext` into verified truth.
 
 Settlement reconciliation state is intentionally not written back into the
 signed receipt. Trust-control keeps mutable operator-side reconciliation state
@@ -465,6 +517,22 @@ adapter identity, evidence record identity, observed units, billed amount, and
 operator reconciliation state. That sidecar is queryable and exportable, but
 it is not merged back into the signed receipt JSON.
 
+### 6.3.1 Provenance Graph Artifacts
+
+The receipt plane now defines one provenance graph substrate even when different
+surfaces project different slices of it:
+
+- session anchors capture authenticated session continuity
+- request-lineage records capture request nodes and local parent edges
+- receipt-lineage statements capture authenticated receipt-to-receipt edges
+- continuation tokens capture authenticated cross-kernel or cross-session
+  provenance transfer
+
+Receipts prove kernel-observed evaluation events. Receipt-lineage statements
+and continuation tokens prove authenticated linkage between those events. None
+of these artifacts alone prove external real-world side effects beyond ARC's
+observation boundary.
+
 ### 6.4 Checkpoints
 
 Receipt batches can be committed to a Merkle checkpoint with primary schema:
@@ -479,6 +547,34 @@ compliance-oriented operator reporting. ARC's web3 anchoring and settlement
 lanes additionally require durable local receipt storage and kernel-signed
 checkpoint issuance; append-only remote receipt mirrors are insufficient when
 the runtime claims Merkle or Solana evidence readiness.
+
+The current bounded release treats checkpoints as local audit evidence with
+derived `log_id`, `log_tree_size`, predecessor-witness, and consistency-proof
+surfaces. Those proofs support audit and `transparency_preview` claims only.
+They do not yet justify public append-only or strong non-repudiation language,
+because checkpoint leaves still cover checkpointed tool-receipt batches rather
+than the full claimed receipt family, and external trust anchors or publication
+paths remain optional rather than required.
+
+On qualified paths, a checkpoint publication record may additionally carry a
+declared trust anchor, signer-chain reference, and publication-profile version.
+That optional `trust_anchor_binding` may now also carry typed
+`publication_identity` and `trust_anchor_identity` declarations to identify the
+intended publication surface and verifier root family. These fields remain
+descriptive until a verifier independently checks the declared publication path;
+they do not by themselves prove witness acceptance, immutable publication, or
+external real-world side effects.
+When all three validate, ARC may say that the checkpoint was published under
+declared trust anchors and publication policy. That is a trust-anchored
+publication statement, not an `append_only` promotion.
+
+In claim-boundary terms, `audit_only` remains local signed checkpoint evidence,
+`transparency_preview` remains the default continuity class for bounded preview
+surfaces, and trust-anchored publication is a narrower descriptive boundary
+inside that preview tier unless the full append-only gate is met. ARC MUST NOT
+use public append-only or strong non-repudiation language until the published
+surface is claim-complete, child-receipt-complete, anti-equivocation-capable,
+and qualified under the declared verifier policy.
 
 ### 6.5 HTTP Receipts
 
@@ -666,15 +762,17 @@ governed receipts into:
   tool action plus any explicit commerce or metered-billing scope
 - a separate `transaction_context` block carrying the signed `intent_id`,
   `intent_hash`, approval token identifiers, runtime-assurance context,
-  optional delegated `call_chain`, and one optional `identity_assertion`
-  continuity envelope
+  optional delegated `call_chain` provenance envelope, and one optional
+  `identity_assertion` continuity envelope
 
 That projection is always derived from the signed governed receipt metadata.
 Trust-control does not accept a second independently editable authorization
 document, because that would silently widen authority or billing scope outside
 the approval-bound intent hash. If delegated `call_chain` context is present in
-that projection, it remains preserved caller context unless an external system
-independently verifies it.
+that projection, it must preserve the provenance evidence class and may only be
+treated as sender-bound truth when backed by observed local lineage, a signed
+receipt-lineage statement, or a verified continuation token scoped by the
+relevant session anchor.
 
 The report now declares ARC's first normative enterprise-facing profile over
 that projection:
@@ -708,7 +806,9 @@ capability lineage. If the capability snapshot is missing, the grant cannot be
 resolved, the subject binding is inconsistent, or a required DPoP proof shape
 cannot be represented, the report fails closed instead of degrading silently.
 These reports describe bounded runtime truth; they do not transform asserted
-delegated call-chain fields into independently verified upstream provenance.
+delegated call-chain fields into independently verified upstream provenance,
+and `senderConstraint.delegatedCallChainBound` is reserved for observed or
+verified lineage only.
 
 ARC's hosted authorization edge now publishes and enforces the same bounded
 contract at request time. The published `arc_authorization_profile` includes:

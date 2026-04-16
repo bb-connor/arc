@@ -1,7 +1,0 @@
-HTTP/1.1 202 Accepted
-date: Wed, 15 Apr 2026 15:38:32 GMT
-server: uvicorn
-content-length: 590
-content-type: application/json
-x-arc-receipt-id: 019d91cb-50d9-72a1-ab56-951b94ce602e
-

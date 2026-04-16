@@ -138,7 +138,7 @@ impl ArcKernel {
         reason: &str,
         timestamp: u64,
         charge: &BudgetChargeResult,
-        total_cost_charged_after_release: u64,
+        committed_cost_after_release: u64,
         cap: &CapabilityToken,
     ) -> Result<ToolCallResponse, KernelError> {
         self.build_pre_execution_monetary_deny_response_with_metadata(
@@ -146,7 +146,7 @@ impl ArcKernel {
             reason,
             timestamp,
             charge,
-            total_cost_charged_after_release,
+            committed_cost_after_release,
             cap,
             None,
         )
@@ -158,7 +158,7 @@ impl ArcKernel {
         reason: &str,
         timestamp: u64,
         charge: &BudgetChargeResult,
-        total_cost_charged_after_release: u64,
+        committed_cost_after_release: u64,
         cap: &CapabilityToken,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
@@ -168,7 +168,7 @@ impl ArcKernel {
             ReceiptSettlement::not_applicable().into_receipt_parts();
         let budget_remaining = charge
             .budget_total
-            .saturating_sub(total_cost_charged_after_release);
+            .saturating_sub(committed_cost_after_release);
 
         let financial_meta = FinancialReceiptMetadata {
             grant_index: charge.grant_index as u32,
@@ -395,8 +395,8 @@ impl ArcKernel {
             );
         }
 
-        let running_total_cost_charged = if keep_provisional_charge || cost_overrun {
-            charge.new_total_cost_charged
+        let running_committed_cost_units = if keep_provisional_charge || cost_overrun {
+            charge.new_committed_cost_units
         } else {
             self.reduce_budget_charge_to_actual(&cap.id, &charge, actual_cost)?
         };
@@ -474,7 +474,7 @@ impl ArcKernel {
         // budget_remaining reflects cumulative spend across all prior invocations.
         let budget_remaining = charge
             .budget_total
-            .saturating_sub(running_total_cost_charged);
+            .saturating_sub(running_committed_cost_units);
         let delegation_depth = cap.delegation_chain.len() as u32;
         let root_budget_holder = cap.issuer.to_hex();
         let (payment_reference, settlement_status) = settlement.into_receipt_parts();
@@ -522,8 +522,7 @@ impl ArcKernel {
         };
 
         let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata =
-            merge_metadata_objects(financial_json, extra_metadata.clone());
+        let merged_extra_metadata = merge_metadata_objects(financial_json, extra_metadata.clone());
 
         match limited_output {
             ToolServerOutput::Value(_)
@@ -612,7 +611,13 @@ impl ArcKernel {
         timestamp: u64,
         matched_grant_index: Option<usize>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.build_deny_response_with_metadata(request, reason, timestamp, matched_grant_index, None)
+        self.build_deny_response_with_metadata(
+            request,
+            reason,
+            timestamp,
+            matched_grant_index,
+            None,
+        )
     }
 
     pub(crate) fn build_deny_response_with_metadata(
@@ -980,12 +985,20 @@ impl ArcKernel {
 
         let checkpoint_seq = self.checkpoint_seq_counter.fetch_add(1, Ordering::SeqCst) + 1;
 
-        let checkpoint = checkpoint::build_checkpoint(
+        let previous_checkpoint = if checkpoint_seq > 1 {
+            self.with_receipt_store(|store| Ok(store.load_checkpoint_by_seq(checkpoint_seq - 1)?))?
+                .flatten()
+        } else {
+            None
+        };
+
+        let checkpoint = checkpoint::build_checkpoint_with_previous(
             checkpoint_seq,
             batch_start_seq,
             batch_end_seq,
             &receipt_bytes,
             &self.config.keypair,
+            previous_checkpoint.as_ref(),
         )
         .map_err(|e| KernelError::Internal(format!("checkpoint build failed: {e}")))?;
 

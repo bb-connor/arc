@@ -500,6 +500,194 @@ impl SqliteReceiptStore {
             CREATE INDEX IF NOT EXISTS idx_arc_child_receipts_request
                 ON arc_child_receipts(request_id);
 
+            CREATE TABLE IF NOT EXISTS claim_receipt_log_entries (
+                entry_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+                receipt_id TEXT NOT NULL UNIQUE,
+                receipt_kind TEXT NOT NULL,
+                source_seq INTEGER NOT NULL,
+                timestamp INTEGER NOT NULL,
+                capability_id TEXT,
+                session_id TEXT,
+                parent_request_id TEXT,
+                request_id TEXT,
+                subject_key TEXT,
+                issuer_key TEXT,
+                tool_server TEXT,
+                tool_name TEXT,
+                raw_json TEXT NOT NULL,
+                CHECK (receipt_kind IN ('tool_receipt', 'child_receipt')),
+                CHECK (
+                    (receipt_kind = 'tool_receipt'
+                        AND capability_id IS NOT NULL
+                        AND session_id IS NULL
+                        AND parent_request_id IS NULL
+                        AND request_id IS NULL
+                        AND tool_server IS NOT NULL
+                        AND tool_name IS NOT NULL)
+                    OR
+                    (receipt_kind = 'child_receipt'
+                        AND capability_id IS NULL
+                        AND session_id IS NOT NULL
+                        AND parent_request_id IS NOT NULL
+                        AND request_id IS NOT NULL
+                        AND tool_server IS NULL
+                        AND tool_name IS NULL)
+                )
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_claim_receipt_log_kind_source
+                ON claim_receipt_log_entries(receipt_kind, source_seq);
+            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_timestamp
+                ON claim_receipt_log_entries(timestamp, entry_seq);
+            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_tool
+                ON claim_receipt_log_entries(tool_server, tool_name, timestamp)
+                WHERE receipt_kind = 'tool_receipt';
+            CREATE INDEX IF NOT EXISTS idx_claim_receipt_log_child_request
+                ON claim_receipt_log_entries(session_id, request_id, timestamp)
+                WHERE receipt_kind = 'child_receipt';
+
+            CREATE TRIGGER IF NOT EXISTS arc_tool_receipts_project_claim_log_entry
+            AFTER INSERT ON arc_tool_receipts
+            BEGIN
+                INSERT OR IGNORE INTO claim_receipt_log_entries (
+                    receipt_id,
+                    receipt_kind,
+                    source_seq,
+                    timestamp,
+                    capability_id,
+                    session_id,
+                    parent_request_id,
+                    request_id,
+                    subject_key,
+                    issuer_key,
+                    tool_server,
+                    tool_name,
+                    raw_json
+                ) VALUES (
+                    NEW.receipt_id,
+                    'tool_receipt',
+                    NEW.seq,
+                    NEW.timestamp,
+                    NEW.capability_id,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NEW.subject_key,
+                    NEW.issuer_key,
+                    NEW.tool_server,
+                    NEW.tool_name,
+                    NEW.raw_json
+                );
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS arc_child_receipts_project_claim_log_entry
+            AFTER INSERT ON arc_child_receipts
+            BEGIN
+                INSERT OR IGNORE INTO claim_receipt_log_entries (
+                    receipt_id,
+                    receipt_kind,
+                    source_seq,
+                    timestamp,
+                    capability_id,
+                    session_id,
+                    parent_request_id,
+                    request_id,
+                    subject_key,
+                    issuer_key,
+                    tool_server,
+                    tool_name,
+                    raw_json
+                ) VALUES (
+                    NEW.receipt_id,
+                    'child_receipt',
+                    NEW.seq,
+                    NEW.timestamp,
+                    NULL,
+                    NEW.session_id,
+                    NEW.parent_request_id,
+                    NEW.request_id,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NULL,
+                    NEW.raw_json
+                );
+            END;
+
+            CREATE TABLE IF NOT EXISTS session_anchors (
+                anchor_id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                auth_context_fingerprint TEXT NOT NULL,
+                issued_at INTEGER NOT NULL,
+                supersedes_anchor_id TEXT REFERENCES session_anchors(anchor_id),
+                is_current INTEGER NOT NULL DEFAULT 1,
+                source_kind TEXT NOT NULL,
+                json_sha256 TEXT NOT NULL,
+                raw_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_session_anchors_session
+                ON session_anchors(session_id, issued_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_session_anchors_supersedes
+                ON session_anchors(supersedes_anchor_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_session_anchors_current
+                ON session_anchors(session_id)
+                WHERE is_current = 1;
+
+            CREATE TABLE IF NOT EXISTS request_lineage (
+                session_id TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                parent_request_id TEXT,
+                session_anchor_id TEXT REFERENCES session_anchors(anchor_id),
+                recorded_at INTEGER NOT NULL,
+                request_fingerprint TEXT,
+                source_kind TEXT NOT NULL,
+                json_sha256 TEXT NOT NULL,
+                raw_json TEXT NOT NULL,
+                PRIMARY KEY (session_id, request_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_request_lineage_parent
+                ON request_lineage(session_id, parent_request_id);
+            CREATE INDEX IF NOT EXISTS idx_request_lineage_anchor
+                ON request_lineage(session_anchor_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_request_lineage_fingerprint
+                ON request_lineage(session_id, COALESCE(session_anchor_id, ''), request_fingerprint)
+                WHERE request_fingerprint IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS receipt_lineage_statements (
+                receipt_id TEXT PRIMARY KEY,
+                statement_id TEXT,
+                request_id TEXT,
+                session_id TEXT,
+                session_anchor_id TEXT REFERENCES session_anchors(anchor_id),
+                chain_id TEXT,
+                parent_request_id TEXT,
+                parent_receipt_id TEXT,
+                evidence_class TEXT,
+                evidence_sources_json TEXT,
+                verified_session_anchor INTEGER NOT NULL DEFAULT 0,
+                verified_parent_request INTEGER NOT NULL DEFAULT 0,
+                verified_parent_receipt INTEGER NOT NULL DEFAULT 0,
+                replay_protected INTEGER NOT NULL DEFAULT 0,
+                recorded_at INTEGER NOT NULL,
+                source_kind TEXT NOT NULL,
+                json_sha256 TEXT NOT NULL,
+                raw_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_request
+                ON receipt_lineage_statements(session_id, request_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
+                ON receipt_lineage_statements(statement_id)
+                WHERE statement_id IS NOT NULL;
+            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_request
+                ON receipt_lineage_statements(session_id, parent_request_id);
+            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_parent_receipt
+                ON receipt_lineage_statements(parent_receipt_id);
+            CREATE INDEX IF NOT EXISTS idx_receipt_lineage_anchor
+                ON receipt_lineage_statements(session_anchor_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_request_anchor
+                ON receipt_lineage_statements(session_id, COALESCE(session_anchor_id, ''), request_id)
+                WHERE session_id IS NOT NULL
+                  AND request_id IS NOT NULL;
+
             CREATE TABLE IF NOT EXISTS kernel_checkpoints (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 checkpoint_seq INTEGER NOT NULL UNIQUE,
@@ -514,6 +702,128 @@ impl SqliteReceiptStore {
             );
             CREATE INDEX IF NOT EXISTS idx_kernel_checkpoints_batch_end
                 ON kernel_checkpoints(batch_end_seq);
+
+            CREATE TABLE IF NOT EXISTS checkpoint_tree_heads (
+                checkpoint_seq INTEGER PRIMARY KEY
+                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
+                batch_start_seq INTEGER NOT NULL,
+                batch_end_seq INTEGER NOT NULL,
+                tree_size INTEGER NOT NULL,
+                merkle_root TEXT NOT NULL,
+                issued_at INTEGER NOT NULL,
+                kernel_key TEXT NOT NULL,
+                previous_checkpoint_sha256 TEXT,
+                statement_json TEXT NOT NULL,
+                signature TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_tree_heads_tree_size
+                ON checkpoint_tree_heads(tree_size);
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_tree_heads_previous
+                ON checkpoint_tree_heads(previous_checkpoint_sha256);
+
+            CREATE TABLE IF NOT EXISTS checkpoint_predecessor_witnesses (
+                predecessor_checkpoint_seq INTEGER NOT NULL
+                    REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
+                witness_checkpoint_seq INTEGER PRIMARY KEY
+                    REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
+                previous_checkpoint_sha256 TEXT NOT NULL,
+                witnessed_at INTEGER NOT NULL,
+                witness_statement_json TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_predecessor_witnesses_predecessor
+                ON checkpoint_predecessor_witnesses(predecessor_checkpoint_seq);
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_predecessor_witnesses_previous
+                ON checkpoint_predecessor_witnesses(previous_checkpoint_sha256);
+
+            CREATE TABLE IF NOT EXISTS checkpoint_publication_metadata (
+                checkpoint_seq INTEGER PRIMARY KEY
+                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
+                publication_schema TEXT NOT NULL,
+                merkle_root TEXT NOT NULL,
+                published_at INTEGER NOT NULL,
+                kernel_key TEXT NOT NULL,
+                log_tree_size INTEGER NOT NULL,
+                entry_start_seq INTEGER NOT NULL,
+                entry_end_seq INTEGER NOT NULL,
+                previous_checkpoint_sha256 TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_published_at
+                ON checkpoint_publication_metadata(published_at);
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_log_tree_size
+                ON checkpoint_publication_metadata(log_tree_size);
+            CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_previous
+                ON checkpoint_publication_metadata(previous_checkpoint_sha256);
+
+            CREATE TABLE IF NOT EXISTS checkpoint_publication_trust_anchor_bindings (
+                checkpoint_seq INTEGER PRIMARY KEY
+                    REFERENCES kernel_checkpoints(checkpoint_seq) ON DELETE CASCADE,
+                binding_json TEXT NOT NULL
+            );
+
+            CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_project_tree_head
+            AFTER INSERT ON kernel_checkpoints
+            BEGIN
+                INSERT OR IGNORE INTO checkpoint_tree_heads (
+                    checkpoint_seq,
+                    batch_start_seq,
+                    batch_end_seq,
+                    tree_size,
+                    merkle_root,
+                    issued_at,
+                    kernel_key,
+                    previous_checkpoint_sha256,
+                    statement_json,
+                    signature
+                ) VALUES (
+                    NEW.checkpoint_seq,
+                    NEW.batch_start_seq,
+                    NEW.batch_end_seq,
+                    NEW.tree_size,
+                    NEW.merkle_root,
+                    NEW.issued_at,
+                    NEW.kernel_key,
+                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT),
+                    NEW.statement_json,
+                    NEW.signature
+                );
+
+                INSERT OR IGNORE INTO checkpoint_predecessor_witnesses (
+                    predecessor_checkpoint_seq,
+                    witness_checkpoint_seq,
+                    previous_checkpoint_sha256,
+                    witnessed_at,
+                    witness_statement_json
+                )
+                SELECT
+                    NEW.checkpoint_seq - 1,
+                    NEW.checkpoint_seq,
+                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT),
+                    NEW.issued_at,
+                    NEW.statement_json
+                WHERE json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') IS NOT NULL;
+
+                INSERT OR IGNORE INTO checkpoint_publication_metadata (
+                    checkpoint_seq,
+                    publication_schema,
+                    merkle_root,
+                    published_at,
+                    kernel_key,
+                    log_tree_size,
+                    entry_start_seq,
+                    entry_end_seq,
+                    previous_checkpoint_sha256
+                ) VALUES (
+                    NEW.checkpoint_seq,
+                    'arc.checkpoint_publication.v1',
+                    NEW.merkle_root,
+                    NEW.issued_at,
+                    NEW.kernel_key,
+                    NEW.batch_end_seq,
+                    NEW.batch_start_seq,
+                    NEW.batch_end_seq,
+                    CAST(json_extract(NEW.statement_json, '$.previous_checkpoint_sha256') AS TEXT)
+                );
+            END;
 
             CREATE TABLE IF NOT EXISTS capability_lineage (
                 capability_id        TEXT PRIMARY KEY,
@@ -592,7 +902,12 @@ impl SqliteReceiptStore {
             "#,
         )?;
         ensure_tool_receipt_attribution_columns(&connection)?;
+        super::support::ensure_receipt_lineage_statement_columns(&connection)?;
         backfill_tool_receipt_attribution_columns(&connection)?;
+        super::support::backfill_provenance_lineage_tables(&mut connection)?;
+        super::support::backfill_claim_receipt_log_entries(&mut connection)?;
+        super::support::backfill_checkpoint_transparency_projections(&mut connection)?;
+        super::support::ensure_transparency_projection_guards(&connection)?;
 
         drop(connection);
 

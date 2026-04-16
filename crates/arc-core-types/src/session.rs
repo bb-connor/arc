@@ -11,6 +11,9 @@ use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::capability::ProvenanceEvidenceClass;
+use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
+use crate::error::Result;
 use crate::{AgentId, CapabilityToken, ServerId};
 
 /// Opaque identifier for a logical runtime session.
@@ -206,6 +209,21 @@ pub enum SessionAuthMethod {
     },
 }
 
+impl SessionAuthMethod {
+    #[must_use]
+    pub fn token_fingerprint(&self) -> Option<&str> {
+        match self {
+            Self::Anonymous => None,
+            Self::StaticBearer {
+                token_fingerprint, ..
+            } => Some(token_fingerprint.as_str()),
+            Self::OAuthBearer {
+                token_fingerprint, ..
+            } => token_fingerprint.as_deref(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OAuthBearerFederatedClaims {
@@ -296,7 +314,7 @@ pub struct ArcIdentityAssertion {
 }
 
 impl ArcIdentityAssertion {
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> std::result::Result<(), String> {
         if self.verifier_id.trim().is_empty() {
             return Err("identityAssertion.verifierId must not be empty".to_string());
         }
@@ -338,7 +356,7 @@ impl ArcIdentityAssertion {
         Ok(())
     }
 
-    pub fn validate_at(&self, now: u64) -> Result<(), String> {
+    pub fn validate_at(&self, now: u64) -> std::result::Result<(), String> {
         self.validate()?;
         if now > self.expires_at {
             return Err("identityAssertion is stale".to_string());
@@ -455,12 +473,336 @@ impl SessionAuthContext {
         !matches!(self.method, SessionAuthMethod::Anonymous)
     }
 
+    pub fn canonical_hash(&self) -> Result<String> {
+        let canonical = canonical_json_bytes(self)?;
+        Ok(sha256_hex(&canonical))
+    }
+
+    pub fn auth_method_hash(&self) -> Result<String> {
+        let canonical = canonical_json_bytes(&self.method)?;
+        Ok(sha256_hex(&canonical))
+    }
+
     pub fn principal(&self) -> Option<&str> {
         match &self.method {
             SessionAuthMethod::Anonymous => None,
             SessionAuthMethod::StaticBearer { principal, .. } => Some(principal.as_str()),
             SessionAuthMethod::OAuthBearer { principal, .. } => principal.as_deref(),
         }
+    }
+}
+
+/// Versioned schema identifier for signed session anchors.
+pub const ARC_SESSION_ANCHOR_SCHEMA: &str = "arc.session_anchor.v1";
+/// Versioned schema identifier for persisted request-lineage records.
+pub const ARC_REQUEST_LINEAGE_RECORD_SCHEMA: &str = "arc.request_lineage_record.v1";
+
+/// Optional proof-binding material that tightens session continuity semantics.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionProofBinding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_public_key_thumbprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mtls_thumbprint_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_attestation_sha256: Option<String>,
+}
+
+impl SessionProofBinding {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.token_fingerprint.is_none()
+            && self.dpop_public_key_thumbprint.is_none()
+            && self.mtls_thumbprint_sha256.is_none()
+            && self.runtime_attestation_sha256.is_none()
+    }
+
+    #[must_use]
+    pub fn from_auth_context(auth_context: &SessionAuthContext) -> Option<Self> {
+        let binding = Self {
+            token_fingerprint: auth_context.method.token_fingerprint().map(str::to_string),
+            dpop_public_key_thumbprint: None,
+            mtls_thumbprint_sha256: None,
+            runtime_attestation_sha256: None,
+        };
+        (!binding.is_empty()).then_some(binding)
+    }
+}
+
+/// Stable handle to a signed session anchor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionAnchorReference {
+    pub session_anchor_id: String,
+    pub session_anchor_hash: String,
+}
+
+impl SessionAnchorReference {
+    #[must_use]
+    pub fn new(
+        session_anchor_id: impl Into<String>,
+        session_anchor_hash: impl Into<String>,
+    ) -> Self {
+        Self {
+            session_anchor_id: session_anchor_id.into(),
+            session_anchor_hash: session_anchor_hash.into(),
+        }
+    }
+}
+
+/// Signable session-continuity anchor bound to a normalized auth context.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionAnchorBody {
+    pub schema: String,
+    pub id: String,
+    pub session_id: SessionId,
+    pub agent_id: AgentId,
+    pub auth_context: SessionAuthContext,
+    pub auth_context_hash: String,
+    pub auth_method_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_binding: Option<SessionProofBinding>,
+    pub auth_epoch: u64,
+    pub issued_at: u64,
+    pub kernel_key: PublicKey,
+}
+
+impl SessionAnchorBody {
+    pub fn new(
+        id: impl Into<String>,
+        session_id: SessionId,
+        agent_id: AgentId,
+        auth_context: SessionAuthContext,
+        proof_binding: Option<SessionProofBinding>,
+        auth_epoch: u64,
+        issued_at: u64,
+        kernel_key: PublicKey,
+    ) -> Result<Self> {
+        Ok(Self {
+            schema: ARC_SESSION_ANCHOR_SCHEMA.to_string(),
+            id: id.into(),
+            session_id,
+            agent_id,
+            auth_context_hash: auth_context.canonical_hash()?,
+            auth_method_hash: auth_context.auth_method_hash()?,
+            auth_context,
+            proof_binding: proof_binding.filter(|binding| !binding.is_empty()),
+            auth_epoch,
+            issued_at,
+            kernel_key,
+        })
+    }
+}
+
+/// Signed session anchor that captures authenticated session continuity.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionAnchor {
+    pub schema: String,
+    pub id: String,
+    pub session_id: SessionId,
+    pub agent_id: AgentId,
+    pub auth_context: SessionAuthContext,
+    pub auth_context_hash: String,
+    pub auth_method_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_binding: Option<SessionProofBinding>,
+    pub auth_epoch: u64,
+    pub issued_at: u64,
+    pub kernel_key: PublicKey,
+    pub signature: Signature,
+}
+
+impl SessionAnchor {
+    pub fn sign(body: SessionAnchorBody, keypair: &Keypair) -> Result<Self> {
+        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        Ok(Self {
+            schema: body.schema,
+            id: body.id,
+            session_id: body.session_id,
+            agent_id: body.agent_id,
+            auth_context: body.auth_context,
+            auth_context_hash: body.auth_context_hash,
+            auth_method_hash: body.auth_method_hash,
+            proof_binding: body.proof_binding,
+            auth_epoch: body.auth_epoch,
+            issued_at: body.issued_at,
+            kernel_key: body.kernel_key,
+            signature,
+        })
+    }
+
+    #[must_use]
+    pub fn body(&self) -> SessionAnchorBody {
+        SessionAnchorBody {
+            schema: self.schema.clone(),
+            id: self.id.clone(),
+            session_id: self.session_id.clone(),
+            agent_id: self.agent_id.clone(),
+            auth_context: self.auth_context.clone(),
+            auth_context_hash: self.auth_context_hash.clone(),
+            auth_method_hash: self.auth_method_hash.clone(),
+            proof_binding: self.proof_binding.clone(),
+            auth_epoch: self.auth_epoch,
+            issued_at: self.issued_at,
+            kernel_key: self.kernel_key.clone(),
+        }
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        let body = self.body();
+        self.kernel_key.verify_canonical(&body, &self.signature)
+    }
+
+    pub fn anchor_hash(&self) -> Result<String> {
+        let canonical = canonical_json_bytes(&self.body())?;
+        Ok(sha256_hex(&canonical))
+    }
+
+    pub fn reference(&self) -> Result<SessionAnchorReference> {
+        Ok(SessionAnchorReference::new(
+            self.id.clone(),
+            self.anchor_hash()?,
+        ))
+    }
+
+    pub fn matches_context(
+        &self,
+        auth_context: &SessionAuthContext,
+        proof_binding: Option<&SessionProofBinding>,
+    ) -> Result<bool> {
+        let expected_context_hash = auth_context.canonical_hash()?;
+        let expected_method_hash = auth_context.auth_method_hash()?;
+        let normalized_binding = proof_binding.filter(|binding| !binding.is_empty());
+
+        Ok(self.auth_context == *auth_context
+            && self.auth_context_hash == expected_context_hash
+            && self.auth_method_hash == expected_method_hash
+            && self.proof_binding.as_ref() == normalized_binding)
+    }
+}
+
+/// Runtime lineage mode for a request node inside ARC's provenance graph.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RequestLineageMode {
+    Root,
+    LocalChild,
+    Continued,
+}
+
+/// Persisted kernel record for one request node in the provenance DAG.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestLineageRecord {
+    pub schema: String,
+    pub request_id: RequestId,
+    pub session_anchor: SessionAnchorReference,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_request_id: Option<RequestId>,
+    pub operation_kind: OperationKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_hash: Option<String>,
+    pub lineage_mode: RequestLineageMode,
+    pub evidence_class: ProvenanceEvidenceClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation_token_id: Option<String>,
+    pub started_at: u64,
+}
+
+impl RequestLineageRecord {
+    #[must_use]
+    pub fn new(
+        request_id: RequestId,
+        session_anchor: SessionAnchorReference,
+        operation_kind: OperationKind,
+        lineage_mode: RequestLineageMode,
+        started_at: u64,
+    ) -> Self {
+        let evidence_class = match lineage_mode {
+            RequestLineageMode::Root | RequestLineageMode::LocalChild => {
+                ProvenanceEvidenceClass::Observed
+            }
+            RequestLineageMode::Continued => ProvenanceEvidenceClass::Verified,
+        };
+
+        Self {
+            schema: ARC_REQUEST_LINEAGE_RECORD_SCHEMA.to_string(),
+            request_id,
+            session_anchor,
+            parent_request_id: None,
+            operation_kind,
+            capability_id: None,
+            subject_key: None,
+            issuer_key: None,
+            intent_hash: None,
+            lineage_mode,
+            evidence_class,
+            continuation_token_id: None,
+            started_at,
+        }
+    }
+
+    #[must_use]
+    pub fn with_parent_request_id(mut self, parent_request_id: RequestId) -> Self {
+        self.parent_request_id = Some(parent_request_id);
+        self
+    }
+
+    #[must_use]
+    pub fn with_capability_attribution(
+        mut self,
+        capability_id: impl Into<String>,
+        subject_key: impl Into<String>,
+        issuer_key: impl Into<String>,
+    ) -> Self {
+        self.capability_id = Some(capability_id.into());
+        self.subject_key = Some(subject_key.into());
+        self.issuer_key = Some(issuer_key.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_intent_hash(mut self, intent_hash: impl Into<String>) -> Self {
+        self.intent_hash = Some(intent_hash.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_evidence_class(mut self, evidence_class: ProvenanceEvidenceClass) -> Self {
+        self.evidence_class = evidence_class;
+        self
+    }
+
+    #[must_use]
+    pub fn with_continuation_token_id(mut self, continuation_token_id: impl Into<String>) -> Self {
+        self.continuation_token_id = Some(continuation_token_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn is_root(&self) -> bool {
+        matches!(self.lineage_mode, RequestLineageMode::Root)
+    }
+
+    #[must_use]
+    pub fn is_local_child(&self) -> bool {
+        matches!(self.lineage_mode, RequestLineageMode::LocalChild)
+    }
+
+    #[must_use]
+    pub fn is_continued(&self) -> bool {
+        matches!(self.lineage_mode, RequestLineageMode::Continued)
     }
 }
 
@@ -717,7 +1059,7 @@ impl ResourceUriClassification {
     }
 }
 
-fn normalize_local_file_uri_path(parsed: &Url) -> Result<String, &'static str> {
+fn normalize_local_file_uri_path(parsed: &Url) -> std::result::Result<String, &'static str> {
     match parsed.host_str() {
         None => {}
         Some(host) if host.eq_ignore_ascii_case("localhost") => {}
@@ -1648,6 +1990,117 @@ mod tests {
         let encoded = serde_json::to_string(&auth).unwrap();
         let decoded: SessionAuthContext = serde_json::from_str(&encoded).unwrap();
         assert_eq!(decoded, auth);
+    }
+
+    #[test]
+    fn session_anchor_signing_binds_auth_context_and_reference() {
+        let kp = Keypair::generate();
+        let auth = SessionAuthContext::streamable_http_static_bearer(
+            "static-bearer:abcd1234",
+            "cafebabe",
+            Some("https://app.example".to_string()),
+        );
+        let proof_binding = SessionProofBinding {
+            token_fingerprint: Some("cafebabe".to_string()),
+            dpop_public_key_thumbprint: Some("dpop-thumbprint".to_string()),
+            mtls_thumbprint_sha256: None,
+            runtime_attestation_sha256: None,
+        };
+
+        let body = SessionAnchorBody::new(
+            "anchor-1",
+            SessionId::new("sess-001"),
+            "agent-123".to_string(),
+            auth.clone(),
+            Some(proof_binding.clone()),
+            4,
+            1_710_000_000,
+            kp.public_key(),
+        )
+        .unwrap();
+        let anchor = SessionAnchor::sign(body, &kp).unwrap();
+        let reference = anchor.reference().unwrap();
+
+        assert!(anchor.verify_signature().unwrap());
+        assert!(anchor.matches_context(&auth, Some(&proof_binding)).unwrap());
+        assert_eq!(reference.session_anchor_id, "anchor-1");
+        assert!(!reference.session_anchor_hash.is_empty());
+        assert_eq!(anchor.auth_context_hash, auth.canonical_hash().unwrap());
+        assert_eq!(anchor.auth_method_hash, auth.auth_method_hash().unwrap());
+    }
+
+    #[test]
+    fn session_anchor_detects_material_auth_context_drift() {
+        let kp = Keypair::generate();
+        let auth = SessionAuthContext::streamable_http_oauth_bearer(
+            Some("oidc:https://issuer.example#sub:user-123".to_string()),
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("arc-mcp".to_string()),
+            vec!["mcp:invoke".to_string()],
+            Some("cafebabe".to_string()),
+            Some("https://app.example".to_string()),
+        );
+        let body = SessionAnchorBody::new(
+            "anchor-2",
+            SessionId::new("sess-002"),
+            "agent-456".to_string(),
+            auth.clone(),
+            SessionProofBinding::from_auth_context(&auth),
+            1,
+            1_710_000_010,
+            kp.public_key(),
+        )
+        .unwrap();
+        let anchor = SessionAnchor::sign(body, &kp).unwrap();
+        let changed_auth = SessionAuthContext::streamable_http_oauth_bearer(
+            Some("oidc:https://issuer.example#sub:user-123".to_string()),
+            Some("https://issuer.example".to_string()),
+            Some("user-123".to_string()),
+            Some("arc-mcp".to_string()),
+            vec!["mcp:invoke".to_string(), "mcp:admin".to_string()],
+            Some("cafebabe".to_string()),
+            Some("https://app.example".to_string()),
+        );
+        let changed_binding = SessionProofBinding::from_auth_context(&changed_auth);
+
+        assert!(!anchor
+            .matches_context(&changed_auth, changed_binding.as_ref())
+            .unwrap());
+    }
+
+    #[test]
+    fn request_lineage_record_tracks_continuation_and_capability_binding() {
+        let record = RequestLineageRecord::new(
+            RequestId::new("req-child-1"),
+            SessionAnchorReference::new("anchor-1", "anchor-hash-1"),
+            OperationKind::ToolCall,
+            RequestLineageMode::Continued,
+            1_710_000_020,
+        )
+        .with_parent_request_id(RequestId::new("req-parent-1"))
+        .with_capability_attribution("cap-1", "subject-key-1", "issuer-key-1")
+        .with_intent_hash("intent-hash-1")
+        .with_continuation_token_id("continuation-1");
+
+        let encoded = serde_json::to_string(&record).unwrap();
+        let decoded: RequestLineageRecord = serde_json::from_str(&encoded).unwrap();
+
+        assert!(decoded.is_continued());
+        assert!(!decoded.is_root());
+        assert_eq!(
+            decoded.evidence_class,
+            crate::capability::ProvenanceEvidenceClass::Verified
+        );
+        assert_eq!(
+            decoded.parent_request_id,
+            Some(RequestId::new("req-parent-1"))
+        );
+        assert_eq!(decoded.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(
+            decoded.continuation_token_id.as_deref(),
+            Some("continuation-1")
+        );
     }
 
     #[test]

@@ -1,0 +1,15 @@
+hushspec: "0.1.0"
+name: incident-network-observability
+description: >
+  Guards for the customer observability MCP server. Read-only tools for
+  incident investigation -- no write operations, no egress.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - get_incident_summary
+      - query_spans
+      - get_deploy_timeline
+      - get_slo_status

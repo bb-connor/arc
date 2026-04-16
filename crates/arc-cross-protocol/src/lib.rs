@@ -85,8 +85,8 @@ impl<'a> TargetProtocolRegistry<'a> {
         &self,
         tool: &ToolDefinition,
     ) -> Result<DiscoveryProtocol, String> {
-        let target = schema_string_extension(&tool.input_schema, "x-arc-target-protocol")
-            .or_else(|| {
+        let target =
+            schema_string_extension(&tool.input_schema, "x-arc-target-protocol").or_else(|| {
                 tool.output_schema
                     .as_ref()
                     .and_then(|schema| schema_string_extension(schema, "x-arc-target-protocol"))
@@ -342,12 +342,11 @@ pub fn plan_authoritative_route(
         })
         .collect::<Vec<_>>();
 
-    let available_candidate =
-        |protocol: DiscoveryProtocol| -> Option<&RouteCandidateEvidence> {
-            candidates
-                .iter()
-                .find(|candidate| candidate.target_protocol == protocol && candidate.available)
-        };
+    let available_candidate = |protocol: DiscoveryProtocol| -> Option<&RouteCandidateEvidence> {
+        candidates
+            .iter()
+            .find(|candidate| candidate.target_protocol == protocol && candidate.available)
+    };
 
     let decision = if hints.disallow_projected_protocols
         && requested_target_protocol != DiscoveryProtocol::Native
@@ -468,9 +467,7 @@ pub fn plan_authoritative_route(
 }
 
 /// Build receipt metadata wrapper for signed route-selection evidence.
-pub fn route_selection_metadata(
-    evidence: &RouteSelectionEvidence,
-) -> Result<Value, BridgeError> {
+pub fn route_selection_metadata(evidence: &RouteSelectionEvidence) -> Result<Value, BridgeError> {
     Ok(json!({
         "route_selection": serde_json::to_value(evidence)
             .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
@@ -777,15 +774,15 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
             .kernel
             .evaluate_tool_call_blocking_with_metadata(
                 &ToolCallRequest {
-                request_id: request.execution.kernel_request_id.clone(),
-                capability: request.execution.capability.clone(),
-                tool_name: request.execution.target_tool_name.clone(),
-                server_id: request.execution.target_server_id.clone(),
-                agent_id: request.execution.agent_id.clone(),
-                arguments: request.execution.arguments.clone(),
-                dpop_proof: request.execution.dpop_proof.clone(),
-                governed_intent: request.execution.governed_intent.clone(),
-                approval_token: request.execution.approval_token.clone(),
+                    request_id: request.execution.kernel_request_id.clone(),
+                    capability: request.execution.capability.clone(),
+                    tool_name: request.execution.target_tool_name.clone(),
+                    server_id: request.execution.target_server_id.clone(),
+                    agent_id: request.execution.agent_id.clone(),
+                    arguments: request.execution.arguments.clone(),
+                    dpop_proof: request.execution.dpop_proof.clone(),
+                    governed_intent: request.execution.governed_intent.clone(),
+                    approval_token: request.execution.approval_token.clone(),
                 },
                 Some(route_metadata),
             )
@@ -963,8 +960,11 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                     Some(route_selection_metadata(&planning.evidence)?),
                 )
                 .map_err(BridgeError::Kernel)?;
-            let deny_route_hops =
-                route_hops_from_planning(&planning.evidence, &request.kernel_request_id, &response.receipt.id);
+            let deny_route_hops = route_hops_from_planning(
+                &planning.evidence,
+                &request.kernel_request_id,
+                &response.receipt.id,
+            );
             let route = build_route_evidence(source_protocol, &deny_route_hops)?;
             let trace = build_trace_context(
                 &request,
@@ -990,9 +990,11 @@ impl<'a> CrossProtocolOrchestrator<'a> {
             });
         }
 
-        let selected_target_protocol = planning
-            .selected_target_protocol
-            .ok_or_else(|| BridgeError::InvalidRequest("route planner returned no selected target protocol".to_string()))?;
+        let selected_target_protocol = planning.selected_target_protocol.ok_or_else(|| {
+            BridgeError::InvalidRequest(
+                "route planner returned no selected target protocol".to_string(),
+            )
+        })?;
         let mut selected_request = request.clone();
         selected_request.target_protocol = selected_target_protocol;
 
@@ -1047,15 +1049,15 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                 .kernel
                 .evaluate_tool_call_blocking_with_metadata(
                     &ToolCallRequest {
-                    request_id: request.kernel_request_id.clone(),
-                    capability: request.capability.clone(),
-                    tool_name: request.target_tool_name.clone(),
-                    server_id: request.target_server_id.clone(),
-                    agent_id: request.agent_id.clone(),
-                    arguments: request.arguments.clone(),
-                    dpop_proof: request.dpop_proof.clone(),
-                    governed_intent: request.governed_intent.clone(),
-                    approval_token: request.approval_token.clone(),
+                        request_id: request.kernel_request_id.clone(),
+                        capability: request.capability.clone(),
+                        tool_name: request.target_tool_name.clone(),
+                        server_id: request.target_server_id.clone(),
+                        agent_id: request.agent_id.clone(),
+                        arguments: request.arguments.clone(),
+                        dpop_proof: request.dpop_proof.clone(),
+                        governed_intent: request.governed_intent.clone(),
+                        approval_token: request.approval_token.clone(),
                     },
                     Some(route_metadata),
                 )
@@ -1694,7 +1696,10 @@ mod tests {
             }),
             None,
         );
-        assert_eq!(target_protocol_for_tool(&tool).unwrap(), DiscoveryProtocol::Mcp);
+        assert_eq!(
+            target_protocol_for_tool(&tool).unwrap(),
+            DiscoveryProtocol::Mcp
+        );
     }
 
     #[test]
@@ -1990,7 +1995,8 @@ mod tests {
     #[test]
     fn plan_authoritative_route_prefers_registered_protocol_from_governed_intent() {
         let executor = MockMcpExecutor;
-        let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
+        let registry =
+            TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
         let planning = plan_authoritative_route(
             "req-route-preferred",
             DiscoveryProtocol::A2a,
@@ -2004,8 +2010,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(planning.selected_target_protocol, Some(DiscoveryProtocol::Mcp));
-        assert_eq!(planning.evidence.decision, RouteSelectionDecision::Attenuate);
+        assert_eq!(
+            planning.selected_target_protocol,
+            Some(DiscoveryProtocol::Mcp)
+        );
+        assert_eq!(
+            planning.evidence.decision,
+            RouteSelectionDecision::Attenuate
+        );
         assert_eq!(
             planning.evidence.selected_target_protocol,
             Some(DiscoveryProtocol::Mcp)
@@ -2013,14 +2025,16 @@ mod tests {
     }
 
     #[test]
-    fn plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_is_unavailable() {
+    fn plan_authoritative_route_attentuates_to_native_fallback_when_requested_route_is_unavailable()
+    {
         let mut availability = BTreeMap::new();
         availability.insert(
             DiscoveryProtocol::Mcp,
             RouteAvailabilityStatus::unavailable("mcp route unavailable"),
         );
         let executor = MockMcpExecutor;
-        let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
+        let registry =
+            TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
         let planning = plan_authoritative_route(
             "req-route-fallback",
             DiscoveryProtocol::A2a,
@@ -2033,8 +2047,14 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(planning.selected_target_protocol, Some(DiscoveryProtocol::Native));
-        assert_eq!(planning.evidence.decision, RouteSelectionDecision::Attenuate);
+        assert_eq!(
+            planning.selected_target_protocol,
+            Some(DiscoveryProtocol::Native)
+        );
+        assert_eq!(
+            planning.evidence.decision,
+            RouteSelectionDecision::Attenuate
+        );
         assert_eq!(
             planning.evidence.reason.as_deref(),
             Some("requested target protocol unavailable; attenuated to native fallback")
@@ -2044,7 +2064,8 @@ mod tests {
     #[test]
     fn plan_authoritative_route_denies_when_projected_protocols_are_disallowed_without_native() {
         let executor = MockMcpExecutor;
-        let registry = TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
+        let registry =
+            TargetProtocolRegistry::new(DiscoveryProtocol::Native).with_executor(&executor);
         let mut availability = BTreeMap::new();
         availability.insert(
             DiscoveryProtocol::Native,
@@ -2067,7 +2088,9 @@ mod tests {
         assert_eq!(planning.evidence.decision, RouteSelectionDecision::Deny);
         assert_eq!(
             planning.evidence.reason.as_deref(),
-            Some("governed intent disallowed projected protocols and no native route was available")
+            Some(
+                "governed intent disallowed projected protocols and no native route was available"
+            )
         );
     }
 

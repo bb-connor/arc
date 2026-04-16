@@ -16,8 +16,8 @@ CONTRACTS_DIR = Path(__file__).resolve().parents[1] / "contracts"
 PROTOCOL_VERSION = "2025-11-25"
 DEFAULT_APPROVAL_THRESHOLD_MINOR = 100_000
 DEFAULT_BUDGET_MINOR = 150_000
-DEFAULT_BUYER_ID = "acme-platform-security"
-DEFAULT_PROVIDER_ID = "contoso-red-team"
+DEFAULT_BUYER_ID = "lattice-platform-security"
+DEFAULT_PROVIDER_ID = "vanguard-security"
 
 
 def contract_template(name: str) -> dict[str, Any]:
@@ -429,9 +429,9 @@ def build_service(provider: ProviderGateway | None = None) -> ProcurementService
 
 def create_app(provider: ProviderGateway | None = None) -> FastAPI:
     app = FastAPI(
-        title="Acme Procurement API",
+        title="Lattice Procurement API",
         version="0.1.0",
-        description="Tiny buyer-side procurement service for the agent-commerce-network example.",
+        description="Buyer-side procurement service for the agent-commerce-network example.",
     )
     app.state.procurement_service = build_service(provider)
 

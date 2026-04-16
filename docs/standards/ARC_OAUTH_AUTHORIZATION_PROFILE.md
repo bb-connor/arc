@@ -211,7 +211,8 @@ row in `senderConstraint`:
 - `runtimeAssuranceBound`
   - `true` when `transactionContext.runtimeAssurance*` fields are populated
 - `delegatedCallChainBound`
-  - `true` when `transactionContext.callChain` is populated
+  - `true` when `transactionContext.callChain` carries corroborated provenance
+    rather than a bare caller assertion
 
 ARC's sender-binding story is therefore:
 

@@ -12,14 +12,16 @@ impl ArcKernel {
         let session_id = SessionId::new(format!("sess-{}", session_number));
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
-        self.with_sessions_write(|sessions| {
-            sessions.insert(
-                session_id.clone(),
-                Session::new(session_id.clone(), agent_id, issued_capabilities),
-            );
-            Ok(())
-        })
-        .unwrap_or_else(|error| panic!("failed to open session: {error}"));
+        let session_snapshot = self
+            .with_sessions_write(|sessions| {
+                let session = Session::new(session_id.clone(), agent_id, issued_capabilities);
+                let snapshot = session.clone();
+                sessions.insert(session_id.clone(), session);
+                Ok(snapshot)
+            })
+            .unwrap_or_else(|error| panic!("failed to open session: {error}"));
+        self.persist_session_anchor_snapshot(&session_snapshot, None)
+            .unwrap_or_else(|error| panic!("failed to persist initial session anchor: {error}"));
 
         session_id
     }
@@ -39,10 +41,15 @@ impl ArcKernel {
         session_id: &SessionId,
         auth_context: SessionAuthContext,
     ) -> Result<(), KernelError> {
-        self.with_session_mut(session_id, |session| {
-            session.set_auth_context(auth_context);
-            Ok(())
-        })
+        let (session_snapshot, supersedes_anchor_id) =
+            self.with_session_mut(session_id, |session| {
+                let previous_anchor_id = session.session_anchor().id().to_string();
+                session.set_auth_context(auth_context);
+                let supersedes_anchor_id = (session.session_anchor().id() != previous_anchor_id)
+                    .then_some(previous_anchor_id);
+                Ok((session.clone(), supersedes_anchor_id))
+            })?;
+        self.persist_session_anchor_snapshot(&session_snapshot, supersedes_anchor_id.as_deref())
     }
 
     /// Persist peer capabilities negotiated at the edge for a session.
@@ -310,7 +317,11 @@ impl ArcKernel {
     ) -> Result<(), KernelError> {
         self.with_sessions_write(|sessions| {
             begin_session_request_in_sessions(sessions, context, operation_kind, cancellable)
-        })
+        })?;
+        let session_snapshot = self
+            .session(&context.session_id)
+            .ok_or_else(|| KernelError::UnknownSession(context.session_id.clone()))?;
+        self.persist_request_lineage_snapshot(&session_snapshot, &context.request_id)
     }
 
     /// Construct and register a child request under an existing parent request.
@@ -322,7 +333,7 @@ impl ArcKernel {
         progress_token: Option<ProgressToken>,
         cancellable: bool,
     ) -> Result<OperationContext, KernelError> {
-        self.with_sessions_write(|sessions| {
+        let child_context = self.with_sessions_write(|sessions| {
             begin_child_request_in_sessions(
                 sessions,
                 parent_context,
@@ -331,7 +342,12 @@ impl ArcKernel {
                 progress_token,
                 cancellable,
             )
-        })
+        })?;
+        let session_snapshot = self
+            .session(&child_context.session_id)
+            .ok_or_else(|| KernelError::UnknownSession(child_context.session_id.clone()))?;
+        self.persist_request_lineage_snapshot(&session_snapshot, &child_context.request_id)?;
+        Ok(child_context)
     }
 
     /// Complete an in-flight session request.
@@ -362,6 +378,101 @@ impl ArcKernel {
                 terminal_state,
             )
         })
+    }
+
+    pub(crate) fn signed_session_anchor_for_session(
+        &self,
+        session: &Session,
+    ) -> Result<arc_core::session::SessionAnchor, KernelError> {
+        let body = arc_core::session::SessionAnchorBody::new(
+            session.session_anchor().id().to_string(),
+            session.id().clone(),
+            session.agent_id().to_string(),
+            session.auth_context().clone(),
+            arc_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+            session.session_anchor().auth_epoch(),
+            session.session_anchor().issued_at(),
+            self.config.keypair.public_key(),
+        )
+        .map_err(|error| {
+            KernelError::Internal(format!("failed to build session anchor body: {error}"))
+        })?;
+
+        arc_core::session::SessionAnchor::sign(body, &self.config.keypair).map_err(|error| {
+            KernelError::Internal(format!("failed to sign session anchor: {error}"))
+        })
+    }
+
+    fn persist_session_anchor_snapshot(
+        &self,
+        session: &Session,
+        supersedes_anchor_id: Option<&str>,
+    ) -> Result<(), KernelError> {
+        let anchor = self.signed_session_anchor_for_session(session)?;
+        let anchor_json = serde_json::to_value(&anchor).map_err(|error| {
+            KernelError::Internal(format!("failed to serialize session anchor: {error}"))
+        })?;
+        self.with_receipt_store(|store| {
+            Ok(store.record_session_anchor(
+                session.id().as_str(),
+                &anchor.id,
+                &anchor.auth_context_hash,
+                anchor.issued_at,
+                supersedes_anchor_id,
+                &anchor_json,
+            )?)
+        })?;
+        Ok(())
+    }
+
+    fn persist_request_lineage_snapshot(
+        &self,
+        session: &Session,
+        request_id: &RequestId,
+    ) -> Result<(), KernelError> {
+        let Some(local_lineage) = session.request_lineage(request_id) else {
+            return Ok(());
+        };
+
+        let anchor = self.signed_session_anchor_for_session(session)?;
+        let anchor_reference = anchor.reference().map_err(|error| {
+            KernelError::Internal(format!(
+                "failed to derive session anchor reference: {error}"
+            ))
+        })?;
+        let lineage_mode = if local_lineage.parent_request_id.is_some() {
+            arc_core::session::RequestLineageMode::LocalChild
+        } else {
+            arc_core::session::RequestLineageMode::Root
+        };
+        let mut lineage_record = arc_core::session::RequestLineageRecord::new(
+            local_lineage.request_id.clone(),
+            anchor_reference,
+            local_lineage.operation_kind,
+            lineage_mode,
+            local_lineage.started_at,
+        );
+        if let Some(parent_request_id) = local_lineage.parent_request_id.clone() {
+            lineage_record = lineage_record.with_parent_request_id(parent_request_id);
+        }
+        let lineage_json = serde_json::to_value(&lineage_record).map_err(|error| {
+            KernelError::Internal(format!("failed to serialize request lineage: {error}"))
+        })?;
+        self.with_receipt_store(|store| {
+            Ok(store.record_request_lineage(
+                session.id().as_str(),
+                local_lineage.request_id.as_str(),
+                local_lineage
+                    .parent_request_id
+                    .as_ref()
+                    .map(|value| value.as_str()),
+                Some(anchor.id.as_str()),
+                local_lineage.started_at,
+                None,
+                &lineage_json,
+            )?)
+        })?;
+        Ok(())
     }
 
     /// Mark an in-flight session request as cancelled.

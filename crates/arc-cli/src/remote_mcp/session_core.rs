@@ -316,10 +316,90 @@ enum RemoteNotificationDelivery {
     GetSse,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+enum RemoteHostedIsolationMode {
+    #[default]
+    DedicatedPerSession,
+    SharedHostedOwnerCompatibility,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+enum RemoteHostedIdentityProfile {
+    #[default]
+    StrongDedicatedSession,
+    WeakSharedHostedOwnerCompatibility,
+}
+
+impl RemoteHostedIsolationMode {
+    fn identity_profile(self) -> RemoteHostedIdentityProfile {
+        match self {
+            Self::DedicatedPerSession => RemoteHostedIdentityProfile::StrongDedicatedSession,
+            Self::SharedHostedOwnerCompatibility => {
+                RemoteHostedIdentityProfile::WeakSharedHostedOwnerCompatibility
+            }
+        }
+    }
+
+    fn snapshot_auth_context(self, auth_context: SessionAuthContext) -> SessionAuthContext {
+        match (self, auth_context) {
+            (
+                Self::SharedHostedOwnerCompatibility,
+                SessionAuthContext {
+                    transport,
+                    method,
+                    origin,
+                },
+            ) if matches!(
+                transport,
+                arc_core::session::SessionTransport::StreamableHttp
+            ) =>
+            {
+                match method {
+                    SessionAuthMethod::OAuthBearer {
+                        principal,
+                        issuer,
+                        subject,
+                        audience,
+                        scopes,
+                        federated_claims,
+                        enterprise_identity,
+                        ..
+                    } => SessionAuthContext {
+                        transport,
+                        method: SessionAuthMethod::OAuthBearer {
+                            principal,
+                            issuer,
+                            subject,
+                            audience,
+                            scopes,
+                            federated_claims,
+                            enterprise_identity,
+                            token_fingerprint: None,
+                        },
+                        origin,
+                    },
+                    other_method => SessionAuthContext {
+                        transport,
+                        method: other_method,
+                        origin,
+                    },
+                }
+            }
+            (_, auth_context) => auth_context,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RemoteSessionOwnershipSnapshot {
     request_ownership: RequestOwnershipSnapshot,
+    #[serde(default)]
+    hosted_isolation: RemoteHostedIsolationMode,
+    #[serde(default)]
+    hosted_identity_profile: RemoteHostedIdentityProfile,
     request_stream_owner: RemoteRequestStreamOwner,
     notification_stream_owner: RemoteNotificationStreamOwner,
     notification_delivery: RemoteNotificationDelivery,
@@ -331,6 +411,8 @@ impl Default for RemoteSessionOwnershipSnapshot {
     fn default() -> Self {
         Self {
             request_ownership: RequestOwnershipSnapshot::request_owned(),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            hosted_identity_profile: RemoteHostedIdentityProfile::StrongDedicatedSession,
             request_stream_owner: RemoteRequestStreamOwner::ExclusiveRequestStream,
             notification_stream_owner: RemoteNotificationStreamOwner::SessionNotificationStream,
             notification_delivery: RemoteNotificationDelivery::PostResponseFallback,
@@ -345,6 +427,7 @@ struct RemoteSession {
     session_id: String,
     capabilities: Vec<RemoteSessionCapability>,
     auth_context: SessionAuthContext,
+    hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
     lifecycle: StdMutex<RemoteSessionLifecycleSnapshot>,
@@ -360,6 +443,7 @@ struct RemoteSessionInit {
     session_id: String,
     capabilities: Vec<RemoteSessionCapability>,
     auth_context: SessionAuthContext,
+    hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     input_tx: mpsc::Sender<Value>,
     event_tx: broadcast::Sender<RemoteSessionEvent>,
@@ -1620,6 +1704,7 @@ impl RemoteSession {
             session_id: init.session_id,
             capabilities: init.capabilities,
             auth_context: init.auth_context,
+            hosted_isolation: init.hosted_isolation,
             lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(None),
             lifecycle: StdMutex::new(RemoteSessionLifecycleSnapshot {
@@ -1822,6 +1907,8 @@ impl RemoteSession {
     fn ownership_snapshot(&self) -> RemoteSessionOwnershipSnapshot {
         let notification_stream_attached = self.has_active_notification_stream();
         RemoteSessionOwnershipSnapshot {
+            hosted_isolation: self.hosted_isolation,
+            hosted_identity_profile: self.hosted_isolation.identity_profile(),
             notification_delivery: if notification_stream_attached {
                 RemoteNotificationDelivery::GetSse
             } else {
@@ -2033,7 +2120,14 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let agent_kp = derive_session_agent_keypair(&self.config, &auth_context)?;
+        let hosted_isolation = if self.config.shared_hosted_owner {
+            RemoteHostedIsolationMode::SharedHostedOwnerCompatibility
+        } else {
+            RemoteHostedIsolationMode::DedicatedPerSession
+        };
+        let session_auth_context = hosted_isolation.snapshot_auth_context(auth_context);
+
+        let agent_kp = derive_session_agent_keypair(&self.config, &session_auth_context)?;
         let agent_pk = agent_kp.public_key();
         let agent_id = agent_pk.to_hex();
         let capabilities: Vec<CapabilityToken> =
@@ -2065,7 +2159,7 @@ impl RemoteSessionFactory {
             capabilities,
             vec![manifest],
         )?;
-        edge.set_session_auth_context(auth_context.clone());
+        edge.set_session_auth_context(session_auth_context.clone());
         edge.attach_upstream_transport(upstream_notification_source);
 
         let (input_tx, input_rx) = mpsc::channel::<Value>();
@@ -2090,7 +2184,8 @@ impl RemoteSessionFactory {
         Ok(Arc::new(RemoteSession::new(RemoteSessionInit {
             session_id,
             capabilities: session_capabilities,
-            auth_context,
+            auth_context: session_auth_context,
+            hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             input_tx,
             event_tx,

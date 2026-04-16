@@ -1,0 +1,10 @@
+[
+  {
+    "operation_id": "op-a13e7b2620",
+    "service": "inference-gateway",
+    "rule_name": "geo-restrict-v42",
+    "changed": true,
+    "evidence_path": "/Users/connor/Medica/backbay/standalone/arc/examples/internet-of-agents-incident-network/workspaces/provider-lab/operations/evidence/op-a13e7b2620/operation.json",
+    "executed_at": 1776300794
+  }
+]

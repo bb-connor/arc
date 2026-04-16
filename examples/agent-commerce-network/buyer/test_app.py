@@ -64,7 +64,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/quote-requests",
             json={
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "hotfix-review",
                 "release_window": "2026-05-01T16:00:00Z",
             },
@@ -80,7 +80,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/quote-requests",
             json={
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "hotfix-review",
                 "release_window": "2026-05-01T16:00:00Z",
             },
@@ -89,7 +89,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/jobs",
             json={
                 "quote_id": quote["quote"]["quote_id"],
-                "provider_id": "contoso-red-team",
+                "provider_id": "vanguard-security",
                 "service_family": "security-review",
                 "budget_minor": 90_000,
             },
@@ -106,7 +106,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/quote-requests",
             json={
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "release-review",
                 "release_window": "2026-05-01T16:00:00Z",
             },
@@ -115,7 +115,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/jobs",
             json={
                 "quote_id": quote["quote"]["quote_id"],
-                "provider_id": "contoso-red-team",
+                "provider_id": "vanguard-security",
                 "service_family": "security-review",
                 "budget_minor": 150_000,
             },
@@ -127,7 +127,7 @@ class BuyerApiTests(unittest.TestCase):
 
         approve_response = client.post(
             f"/procurement/jobs/{created['job_id']}/approve",
-            json={"approver": "alice@acme.example", "reason": "release risk accepted"},
+            json={"approver": "alice@lattice.example", "reason": "release risk accepted"},
         )
         self.assertEqual(approve_response.status_code, 200)
         approved = approve_response.json()
@@ -140,7 +140,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/quote-requests",
             json={
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "release-review",
                 "release_window": "2026-05-01T16:00:00Z",
             },
@@ -149,7 +149,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/jobs",
             json={
                 "quote_id": quote["quote"]["quote_id"],
-                "provider_id": "contoso-red-team",
+                "provider_id": "vanguard-security",
                 "service_family": "security-review",
                 "budget_minor": 50_000,
             },
@@ -165,7 +165,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/quote-requests",
             json={
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "hotfix-review",
                 "release_window": "2026-05-01T16:00:00Z",
             },
@@ -174,7 +174,7 @@ class BuyerApiTests(unittest.TestCase):
             "/procurement/jobs",
             json={
                 "quote_id": quote["quote"]["quote_id"],
-                "provider_id": "contoso-red-team",
+                "provider_id": "vanguard-security",
                 "service_family": "security-review",
                 "budget_minor": 90_000,
             },
@@ -230,9 +230,9 @@ class BuyerApiTests(unittest.TestCase):
         quote = client.request_quote(
             {
                 "request_id": "quote_req_test_001",
-                "buyer_id": "acme-platform-security",
+                "buyer_id": "lattice-platform-security",
                 "service_family": "security-review",
-                "target": "git://acme.example/payments-api",
+                "target": "git://lattice.example/payments-api",
                 "requested_scope": "release-review",
             }
         )

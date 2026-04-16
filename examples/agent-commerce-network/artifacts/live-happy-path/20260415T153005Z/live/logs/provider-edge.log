@@ -1,3 +1,0 @@
-error [ARC-CLI-POLICY]: failed to parse policy YAML: capabilities: unknown field `quote_generation`, expected `default` at line 6 column 3
-context: {"source":"failed to parse policy YAML: capabilities: unknown field `quote_generation`, expected `default` at line 6 column 3"}
-suggested fix: Fix the policy file contents or path so the requested command can load a valid policy document.

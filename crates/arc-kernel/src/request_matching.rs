@@ -44,6 +44,10 @@ pub(super) fn begin_child_request_in_sessions(
     progress_token: Option<ProgressToken>,
     cancellable: bool,
 ) -> Result<OperationContext, KernelError> {
+    let parent_session = session_from_map(sessions, &parent_context.session_id)?;
+    parent_session.validate_context(parent_context)?;
+    parent_session.validate_parent_request_lineage(&request_id, &parent_context.request_id)?;
+
     let child_context = OperationContext {
         session_id: parent_context.session_id.clone(),
         request_id,
@@ -77,9 +81,11 @@ pub(super) fn validate_sampling_request_in_sessions(
     session.validate_context(context)?;
     session.ensure_operation_allowed(OperationKind::CreateMessage)?;
 
-    if context.parent_request_id.is_none() {
-        return Err(KernelError::InvalidChildRequestParent);
-    }
+    let parent_request_id = context
+        .parent_request_id
+        .as_ref()
+        .ok_or(KernelError::InvalidChildRequestParent)?;
+    session.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
 
     if !allow_sampling {
         return Err(KernelError::SamplingNotAllowedByPolicy);
@@ -125,9 +131,11 @@ pub(super) fn validate_elicitation_request_in_sessions(
     session.validate_context(context)?;
     session.ensure_operation_allowed(OperationKind::CreateElicitation)?;
 
-    if context.parent_request_id.is_none() {
-        return Err(KernelError::InvalidChildRequestParent);
-    }
+    let parent_request_id = context
+        .parent_request_id
+        .as_ref()
+        .ok_or(KernelError::InvalidChildRequestParent)?;
+    session.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
 
     if !allow_elicitation {
         return Err(KernelError::ElicitationNotAllowedByPolicy);

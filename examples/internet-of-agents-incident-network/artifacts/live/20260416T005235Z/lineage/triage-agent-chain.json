@@ -1,0 +1,22 @@
+[
+  {
+    "capability_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+    "subject_key": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+    "issuer_key": "77527a20b865ed8e77f9eed6d2a433c06b15e47ac3425365d8b57066518eed5f",
+    "issued_at": 1776300757,
+    "expires_at": 1776302557,
+    "grants_json": "{\"grants\":[{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_incident_summary\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"query_spans\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_deploy_timeline\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_slo_status\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"search_commits\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_diff\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_file\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_oncall_state\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_escalation_timeline\",\"operations\":[\"invoke\",\"delegate\"]},{\"server_id\":\"acp-broker\",\"tool_name\":\"create_task\",\"operations\":[\"invoke\",\"delegate\"]}]}",
+    "delegation_depth": 0,
+    "parent_capability_id": null
+  },
+  {
+    "capability_id": "inc-meridian-inference-gw-2026-04-15-0317z-triage",
+    "subject_key": "de325149398358f894a782efc7cd67fda9229c8a5add38ec9af22b1f8d82e421",
+    "issuer_key": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+    "issued_at": 1776300757,
+    "expires_at": 1776301657,
+    "grants_json": "{\"grants\":[{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_incident_summary\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"query_spans\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_deploy_timeline\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-observability\",\"tool_name\":\"get_slo_status\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"search_commits\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_diff\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-github\",\"tool_name\":\"get_file\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_oncall_state\",\"operations\":[\"invoke\"]},{\"server_id\":\"mcp-pagerduty\",\"tool_name\":\"get_escalation_timeline\",\"operations\":[\"invoke\"]}]}",
+    "delegation_depth": 1,
+    "parent_capability_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b"
+  }
+]

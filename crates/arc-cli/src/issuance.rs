@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_appraisal::{verify_runtime_attestation_record, VerifiedRuntimeAttestationRecord};
 use arc_core::capability::{
     ArcScope, Constraint, Operation, PromptGrant, ResourceGrant, RuntimeAssuranceTier,
     RuntimeAttestationEvidence, ToolGrant,
@@ -127,7 +128,12 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
         runtime_attestation: Option<RuntimeAttestationEvidence>,
     ) -> Result<arc_core::capability::CapabilityToken, KernelError> {
         let mut scope = scope;
-        validate_runtime_attestation_binding(runtime_attestation.as_ref())?;
+        let now = unix_now();
+        let verified_runtime_attestation = verify_runtime_attestation_for_issuance(
+            runtime_attestation.as_ref(),
+            self.runtime_assurance_policy.as_ref(),
+            now,
+        )?;
 
         if let Some(policy) = &self.issuance_policy {
             enforce_reputation_policy(
@@ -145,7 +151,7 @@ impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
                 &scope,
                 ttl_seconds,
                 policy,
-                runtime_attestation.as_ref(),
+                verified_runtime_attestation.as_ref(),
             )?;
         }
 
@@ -176,6 +182,32 @@ fn validate_runtime_attestation_binding(
             })?;
     }
     Ok(())
+}
+
+fn verify_runtime_attestation_for_issuance(
+    runtime_attestation: Option<&RuntimeAttestationEvidence>,
+    policy: Option<&RuntimeAssuranceIssuancePolicy>,
+    now: u64,
+) -> Result<Option<VerifiedRuntimeAttestationRecord>, KernelError> {
+    let Some(runtime_attestation) = runtime_attestation else {
+        return Ok(None);
+    };
+    let Some(policy) = policy else {
+        validate_runtime_attestation_binding(Some(runtime_attestation))?;
+        return Ok(None);
+    };
+
+    verify_runtime_attestation_record(
+        runtime_attestation,
+        policy.attestation_trust_policy.as_ref(),
+        now,
+    )
+    .map(Some)
+    .map_err(|error| {
+        KernelError::CapabilityIssuanceDenied(format!(
+            "runtime attestation evidence rejected by local verification boundary: {error}"
+        ))
+    })
 }
 
 fn enforce_reputation_policy(
@@ -321,12 +353,15 @@ pub fn build_local_reputation_corpus(
                     .get_usage(&capability.capability_id, grant_index)
                     .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))?
                 {
+                    let committed_cost_units = record.committed_cost_units().map_err(|error| {
+                        KernelError::CapabilityIssuanceFailed(error.to_string())
+                    })?;
                     budget_usage.push(ReputationBudgetUsageRecord {
                         capability_id: record.capability_id,
                         grant_index: record.grant_index,
                         invocation_count: record.invocation_count,
                         updated_at: record.updated_at,
-                        total_cost_charged: record.total_cost_charged,
+                        total_cost_charged: committed_cost_units,
                     });
                 }
             }
@@ -394,21 +429,10 @@ fn enforce_runtime_assurance_policy(
     scope: &ArcScope,
     ttl_seconds: u64,
     policy: &RuntimeAssuranceIssuancePolicy,
-    runtime_attestation: Option<&RuntimeAttestationEvidence>,
+    runtime_attestation: Option<&VerifiedRuntimeAttestationRecord>,
 ) -> Result<ArcScope, KernelError> {
-    let now = unix_now();
     let actual_tier = runtime_attestation
-        .map(|attestation| {
-            attestation
-                .resolve_effective_runtime_assurance(policy.attestation_trust_policy.as_ref(), now)
-                .map(|resolved| resolved.effective_tier)
-                .map_err(|error| {
-                    KernelError::CapabilityIssuanceDenied(format!(
-                        "runtime attestation evidence rejected by trust policy: {error}"
-                    ))
-                })
-        })
-        .transpose()?
+        .map(VerifiedRuntimeAttestationRecord::effective_tier)
         .unwrap_or(RuntimeAssuranceTier::None);
     let tier = resolve_runtime_assurance_tier(policy, actual_tier).ok_or_else(|| {
         KernelError::CapabilityIssuanceDenied(format!(
@@ -768,21 +792,6 @@ mod tests {
         policy
     }
 
-    fn test_runtime_attestation() -> RuntimeAttestationEvidence {
-        let now = unix_now();
-        RuntimeAttestationEvidence {
-            schema: "arc.runtime-attestation.v1".to_string(),
-            verifier: "verifier.arc".to_string(),
-            tier: RuntimeAssuranceTier::Attested,
-            issued_at: now.saturating_sub(5),
-            expires_at: now + 300,
-            evidence_sha256: "attestation-digest".to_string(),
-            runtime_identity: Some("spiffe://arc/runtime/test".to_string()),
-            workload_identity: None,
-            claims: None,
-        }
-    }
-
     fn test_azure_runtime_attestation() -> RuntimeAttestationEvidence {
         let now = unix_now();
         RuntimeAttestationEvidence {
@@ -1103,7 +1112,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_assurance_policy_allows_attested_budget_and_binds_constraint() {
+    fn runtime_assurance_policy_denies_raw_attestation_without_local_trust_boundary() {
         let authority = wrap_capability_authority(
             Box::new(arc_kernel::LocalCapabilityAuthority::new(
                 Keypair::generate(),
@@ -1135,22 +1144,47 @@ mod tests {
             prompt_grants: Vec::new(),
         };
 
-        let capability = authority
+        let error = authority
             .issue_capability_with_attestation(
                 &subject_kp.public_key(),
                 requested_scope,
                 120,
-                Some(test_runtime_attestation()),
+                Some(test_azure_runtime_attestation()),
             )
-            .expect("attested runtime tier should allow the expanded monetary ceiling");
+            .expect_err("raw attestation must not unlock attested scope without local trust");
 
         assert!(
-            capability.scope.grants[0]
-                .constraints
-                .contains(&Constraint::MinimumRuntimeAssurance(
-                    RuntimeAssuranceTier::Attested
-                )),
-            "issued capability should preserve the required runtime assurance tier"
+            error
+                .to_string()
+                .contains("policy tier 'baseline'"),
+            "expected local verification boundary to keep raw attestation on the baseline tier, got {error}"
+        );
+    }
+
+    #[test]
+    fn issuance_verification_returns_canonical_subject_and_provenance() {
+        let policy = test_trusted_runtime_assurance_policy();
+        let verified = verify_runtime_attestation_for_issuance(
+            Some(&test_azure_runtime_attestation()),
+            Some(&policy),
+            unix_now(),
+        )
+        .expect("trusted attestation should verify")
+        .expect("verified record should be returned when runtime policy is present");
+
+        assert!(verified.is_locally_accepted());
+        assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);
+        assert_eq!(
+            verified.provenance.canonical_verifier,
+            "https://maa.contoso.test"
+        );
+        assert_eq!(verified.matched_trust_rule(), Some("azure-contoso"));
+        assert_eq!(
+            verified
+                .workload_identity()
+                .expect("trusted attestation should bind a workload identity")
+                .trust_domain,
+            "arc"
         );
     }
 

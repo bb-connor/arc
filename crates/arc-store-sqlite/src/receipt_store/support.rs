@@ -23,6 +23,1276 @@ pub(crate) fn sqlite_u64(value: i64, field: &str) -> Result<u64, ReceiptStoreErr
     })
 }
 
+pub(crate) fn sqlite_bool(value: bool) -> i64 {
+    if value {
+        1
+    } else {
+        0
+    }
+}
+
+const CHECKPOINT_TRANSPARENCY_GUARDS_SQL: &str = r#"
+CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_reject_update
+BEFORE UPDATE ON kernel_checkpoints
+BEGIN
+    SELECT RAISE(ABORT, 'kernel checkpoints are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_reject_delete
+BEFORE DELETE ON kernel_checkpoints
+BEGIN
+    SELECT RAISE(ABORT, 'kernel checkpoints are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_enforce_append_only
+BEFORE INSERT ON kernel_checkpoints
+BEGIN
+    SELECT CASE
+        WHEN NEW.checkpoint_seq < 1
+            THEN RAISE(ABORT, 'checkpoint_seq must be greater than zero')
+        WHEN NEW.batch_start_seq < 1
+            THEN RAISE(ABORT, 'batch_start_seq must be greater than zero')
+        WHEN NEW.batch_end_seq < NEW.batch_start_seq
+            THEN RAISE(ABORT, 'checkpoint batch_end_seq must be >= batch_start_seq')
+        WHEN NEW.tree_size < 1
+            THEN RAISE(ABORT, 'checkpoint tree_size must be greater than zero')
+        WHEN EXISTS (
+            SELECT 1
+            FROM kernel_checkpoints existing
+            WHERE existing.checkpoint_seq >= NEW.checkpoint_seq
+        )
+            THEN RAISE(
+                ABORT,
+                'kernel checkpoints must be appended in strictly increasing checkpoint_seq order'
+            )
+        WHEN NEW.checkpoint_seq > 1
+            AND NOT EXISTS (
+                SELECT 1
+                FROM kernel_checkpoints predecessor
+                WHERE predecessor.checkpoint_seq = NEW.checkpoint_seq - 1
+                  AND predecessor.batch_end_seq + 1 = NEW.batch_start_seq
+            )
+            THEN RAISE(ABORT, 'kernel checkpoint predecessor continuity violation')
+    END;
+END;
+"#;
+
+#[derive(Debug, Clone)]
+pub(crate) struct PersistedCheckpointRow {
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    tree_size: u64,
+    merkle_root_hex: String,
+    issued_at: u64,
+    statement_json: String,
+    signature_hex: String,
+    kernel_key_hex: String,
+}
+
+pub(crate) fn checkpoint_error_to_receipt_store(
+    error: arc_kernel::checkpoint::CheckpointError,
+) -> ReceiptStoreError {
+    ReceiptStoreError::Conflict(format!("checkpoint integrity failure: {error}"))
+}
+
+pub(crate) fn ensure_checkpoint_transparency_guards(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(CHECKPOINT_TRANSPARENCY_GUARDS_SQL)?;
+    Ok(())
+}
+
+pub(crate) fn load_persisted_checkpoint_row(
+    connection: &Connection,
+    checkpoint_seq: u64,
+) -> Result<Option<PersistedCheckpointRow>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
+                   merkle_root, issued_at, statement_json, signature, kernel_key
+            FROM kernel_checkpoints
+            WHERE checkpoint_seq = ?1
+            "#,
+            params![sqlite_i64(checkpoint_seq, "checkpoint_seq")?],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, String>(8)?,
+                ))
+            },
+        )
+        .optional()?
+        .map(
+            |(
+                checkpoint_seq,
+                batch_start_seq,
+                batch_end_seq,
+                tree_size,
+                merkle_root_hex,
+                issued_at,
+                statement_json,
+                signature_hex,
+                kernel_key_hex,
+            )| {
+                Ok(PersistedCheckpointRow {
+                    checkpoint_seq: sqlite_u64(checkpoint_seq, "checkpoint_seq")?,
+                    batch_start_seq: sqlite_u64(batch_start_seq, "batch_start_seq")?,
+                    batch_end_seq: sqlite_u64(batch_end_seq, "batch_end_seq")?,
+                    tree_size: sqlite_u64(tree_size, "tree_size")?,
+                    merkle_root_hex,
+                    issued_at: sqlite_u64(issued_at, "issued_at")?,
+                    statement_json,
+                    signature_hex,
+                    kernel_key_hex,
+                })
+            },
+        )
+        .transpose()
+}
+
+pub(crate) fn load_latest_persisted_checkpoint_row(
+    connection: &Connection,
+) -> Result<Option<PersistedCheckpointRow>, ReceiptStoreError> {
+    let latest_seq = connection
+        .query_row(
+            "SELECT checkpoint_seq FROM kernel_checkpoints ORDER BY checkpoint_seq DESC LIMIT 1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .optional()?;
+    latest_seq
+        .map(|value| {
+            load_persisted_checkpoint_row(connection, sqlite_u64(value, "checkpoint_seq")?)
+        })
+        .transpose()
+        .map(|row| row.flatten())
+}
+
+pub(crate) fn load_all_persisted_checkpoint_rows(
+    connection: &Connection,
+) -> Result<Vec<PersistedCheckpointRow>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
+               merkle_root, issued_at, statement_json, signature, kernel_key
+        FROM kernel_checkpoints
+        ORDER BY checkpoint_seq ASC
+        "#,
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, String>(4)?,
+            row.get::<_, i64>(5)?,
+            row.get::<_, String>(6)?,
+            row.get::<_, String>(7)?,
+            row.get::<_, String>(8)?,
+        ))
+    })?;
+
+    rows.map(|row| {
+        let (
+            checkpoint_seq,
+            batch_start_seq,
+            batch_end_seq,
+            tree_size,
+            merkle_root_hex,
+            issued_at,
+            statement_json,
+            signature_hex,
+            kernel_key_hex,
+        ) = row.map_err(ReceiptStoreError::from)?;
+        Ok(PersistedCheckpointRow {
+            checkpoint_seq: sqlite_u64(checkpoint_seq, "checkpoint_seq")?,
+            batch_start_seq: sqlite_u64(batch_start_seq, "batch_start_seq")?,
+            batch_end_seq: sqlite_u64(batch_end_seq, "batch_end_seq")?,
+            tree_size: sqlite_u64(tree_size, "tree_size")?,
+            merkle_root_hex,
+            issued_at: sqlite_u64(issued_at, "issued_at")?,
+            statement_json,
+            signature_hex,
+            kernel_key_hex,
+        })
+    })
+    .collect::<Result<Vec<_>, _>>()
+}
+
+pub(crate) fn parse_persisted_checkpoint_row(
+    row: PersistedCheckpointRow,
+) -> Result<KernelCheckpoint, ReceiptStoreError> {
+    let body: KernelCheckpointBody = serde_json::from_str(&row.statement_json)?;
+    let signature = Signature::from_hex(&row.signature_hex)
+        .map_err(|error| ReceiptStoreError::CryptoDecode(error.to_string()))?;
+    let checkpoint = KernelCheckpoint { body, signature };
+
+    if checkpoint.body.checkpoint_seq != row.checkpoint_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint row seq {} does not match signed checkpoint_seq {}",
+            row.checkpoint_seq, checkpoint.body.checkpoint_seq
+        )));
+    }
+    if checkpoint.body.batch_start_seq != row.batch_start_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} batch_start_seq column {} does not match signed body {}",
+            row.checkpoint_seq, row.batch_start_seq, checkpoint.body.batch_start_seq
+        )));
+    }
+    if checkpoint.body.batch_end_seq != row.batch_end_seq {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} batch_end_seq column {} does not match signed body {}",
+            row.checkpoint_seq, row.batch_end_seq, checkpoint.body.batch_end_seq
+        )));
+    }
+    if checkpoint.body.tree_size as u64 != row.tree_size {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} tree_size column {} does not match signed body {}",
+            row.checkpoint_seq, row.tree_size, checkpoint.body.tree_size
+        )));
+    }
+    if checkpoint.body.merkle_root.to_hex() != row.merkle_root_hex {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} merkle_root column {} does not match signed body {}",
+            row.checkpoint_seq,
+            row.merkle_root_hex,
+            checkpoint.body.merkle_root.to_hex()
+        )));
+    }
+    if checkpoint.body.issued_at != row.issued_at {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} issued_at column {} does not match signed body {}",
+            row.checkpoint_seq, row.issued_at, checkpoint.body.issued_at
+        )));
+    }
+    if checkpoint.signature.to_hex() != row.signature_hex {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} signature column does not match parsed signature",
+            row.checkpoint_seq
+        )));
+    }
+    if checkpoint.body.kernel_key.to_hex() != row.kernel_key_hex {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint {} kernel_key column {} does not match signed body {}",
+            row.checkpoint_seq,
+            row.kernel_key_hex,
+            checkpoint.body.kernel_key.to_hex()
+        )));
+    }
+
+    arc_kernel::checkpoint::validate_checkpoint(&checkpoint)
+        .map_err(checkpoint_error_to_receipt_store)?;
+
+    Ok(checkpoint)
+}
+
+pub(crate) fn verify_latest_checkpoint_integrity(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    if load_latest_persisted_checkpoint_row(connection)?.is_none() {
+        return Ok(());
+    }
+    verify_checkpoint_chain_integrity(connection).map(|_| ())
+}
+
+pub(crate) fn verify_checkpoint_chain_integrity(
+    connection: &Connection,
+) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+    let rows = load_all_persisted_checkpoint_rows(connection)?;
+    let mut latest = None;
+
+    for row in rows {
+        let checkpoint = parse_persisted_checkpoint_row(row)?;
+        if let Some(predecessor) = latest.as_ref() {
+            arc_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
+                .map_err(checkpoint_error_to_receipt_store)?;
+        }
+        latest = Some(checkpoint);
+    }
+
+    Ok(latest)
+}
+
+const TRANSPARENCY_PROJECTION_GUARDS_SQL: &str = r#"
+CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_update
+BEFORE UPDATE ON claim_receipt_log_entries
+BEGIN
+    SELECT RAISE(ABORT, 'claim receipt log entries are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS claim_receipt_log_entries_reject_delete
+BEFORE DELETE ON claim_receipt_log_entries
+BEGIN
+    SELECT RAISE(ABORT, 'claim receipt log entries are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_tree_heads_reject_update
+BEFORE UPDATE ON checkpoint_tree_heads
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint tree heads are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_tree_heads_reject_delete
+BEFORE DELETE ON checkpoint_tree_heads
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint tree heads are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_predecessor_witnesses_reject_update
+BEFORE UPDATE ON checkpoint_predecessor_witnesses
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint predecessor witnesses are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_predecessor_witnesses_reject_delete
+BEFORE DELETE ON checkpoint_predecessor_witnesses
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint predecessor witnesses are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_publication_metadata_reject_update
+BEFORE UPDATE ON checkpoint_publication_metadata
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint publication metadata is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_publication_metadata_reject_delete
+BEFORE DELETE ON checkpoint_publication_metadata
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint publication metadata is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_publication_trust_anchor_bindings_reject_update
+BEFORE UPDATE ON checkpoint_publication_trust_anchor_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint publication trust-anchor bindings are immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS checkpoint_publication_trust_anchor_bindings_reject_delete
+BEFORE DELETE ON checkpoint_publication_trust_anchor_bindings
+BEGIN
+    SELECT RAISE(ABORT, 'checkpoint publication trust-anchor bindings are immutable');
+END;
+"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ClaimReceiptLogProjectionRow {
+    receipt_id: String,
+    receipt_kind: String,
+    source_seq: u64,
+    timestamp: u64,
+    capability_id: Option<String>,
+    session_id: Option<String>,
+    parent_request_id: Option<String>,
+    request_id: Option<String>,
+    subject_key: Option<String>,
+    issuer_key: Option<String>,
+    tool_server: Option<String>,
+    tool_name: Option<String>,
+    raw_json: String,
+}
+
+impl ClaimReceiptLogProjectionRow {
+    fn kind_rank(&self) -> u8 {
+        match self.receipt_kind.as_str() {
+            "tool_receipt" => 0,
+            "child_receipt" => 1,
+            _ => 2,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CheckpointTreeHeadProjectionRow {
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    tree_size: u64,
+    merkle_root: String,
+    issued_at: u64,
+    kernel_key: String,
+    previous_checkpoint_sha256: Option<String>,
+    statement_json: String,
+    signature: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CheckpointPredecessorWitnessProjectionRow {
+    predecessor_checkpoint_seq: u64,
+    witness_checkpoint_seq: u64,
+    previous_checkpoint_sha256: String,
+    witnessed_at: u64,
+    witness_statement_json: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CheckpointPublicationMetadataProjectionRow {
+    checkpoint_seq: u64,
+    publication_schema: String,
+    merkle_root: String,
+    published_at: u64,
+    kernel_key: String,
+    log_tree_size: u64,
+    entry_start_seq: u64,
+    entry_end_seq: u64,
+    previous_checkpoint_sha256: Option<String>,
+}
+
+fn load_tool_claim_receipt_projection_rows(
+    connection: &Connection,
+) -> Result<Vec<ClaimReceiptLogProjectionRow>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT receipt_id, seq, timestamp, capability_id, subject_key, issuer_key,
+               tool_server, tool_name, raw_json
+        FROM arc_tool_receipts
+        ORDER BY timestamp ASC, seq ASC
+        "#,
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, Option<String>>(6)?,
+            row.get::<_, Option<String>>(7)?,
+            row.get::<_, String>(8)?,
+        ))
+    })?;
+    rows.map(|row| {
+        let (
+            receipt_id,
+            source_seq,
+            timestamp,
+            capability_id,
+            subject_key,
+            issuer_key,
+            tool_server,
+            tool_name,
+            raw_json,
+        ) = row.map_err(ReceiptStoreError::from)?;
+        Ok(ClaimReceiptLogProjectionRow {
+            receipt_id,
+            receipt_kind: "tool_receipt".to_string(),
+            source_seq: sqlite_u64(source_seq, "claim tool source_seq")?,
+            timestamp: sqlite_u64(timestamp, "claim tool timestamp")?,
+            capability_id,
+            session_id: None,
+            parent_request_id: None,
+            request_id: None,
+            subject_key,
+            issuer_key,
+            tool_server,
+            tool_name,
+            raw_json,
+        })
+    })
+    .collect::<Result<Vec<_>, _>>()
+}
+
+fn load_child_claim_receipt_projection_rows(
+    connection: &Connection,
+) -> Result<Vec<ClaimReceiptLogProjectionRow>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT receipt_id, seq, timestamp, session_id, parent_request_id,
+               request_id, raw_json
+        FROM arc_child_receipts
+        ORDER BY timestamp ASC, seq ASC
+        "#,
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, Option<String>>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, Option<String>>(5)?,
+            row.get::<_, String>(6)?,
+        ))
+    })?;
+    rows.map(|row| {
+        let (
+            receipt_id,
+            source_seq,
+            timestamp,
+            session_id,
+            parent_request_id,
+            request_id,
+            raw_json,
+        ) = row?;
+        Ok(ClaimReceiptLogProjectionRow {
+            receipt_id,
+            receipt_kind: "child_receipt".to_string(),
+            source_seq: sqlite_u64(source_seq, "claim child source_seq")?,
+            timestamp: sqlite_u64(timestamp, "claim child timestamp")?,
+            capability_id: None,
+            session_id,
+            parent_request_id,
+            request_id,
+            subject_key: None,
+            issuer_key: None,
+            tool_server: None,
+            tool_name: None,
+            raw_json,
+        })
+    })
+    .collect()
+}
+
+fn load_claim_receipt_log_projection_row(
+    connection: &Connection,
+    receipt_id: &str,
+) -> Result<Option<ClaimReceiptLogProjectionRow>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT receipt_id, receipt_kind, source_seq, timestamp, capability_id,
+                   session_id, parent_request_id, request_id, subject_key, issuer_key,
+                   tool_server, tool_name, raw_json
+            FROM claim_receipt_log_entries
+            WHERE receipt_id = ?1
+            "#,
+            params![receipt_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                    row.get::<_, Option<String>>(9)?,
+                    row.get::<_, Option<String>>(10)?,
+                    row.get::<_, Option<String>>(11)?,
+                    row.get::<_, String>(12)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(ReceiptStoreError::from)?
+        .map(
+            |(
+                receipt_id,
+                receipt_kind,
+                source_seq,
+                timestamp,
+                capability_id,
+                session_id,
+                parent_request_id,
+                request_id,
+                subject_key,
+                issuer_key,
+                tool_server,
+                tool_name,
+                raw_json,
+            )| {
+                Ok(ClaimReceiptLogProjectionRow {
+                    receipt_id,
+                    receipt_kind,
+                    source_seq: sqlite_u64(source_seq, "claim log source_seq")?,
+                    timestamp: sqlite_u64(timestamp, "claim log timestamp")?,
+                    capability_id,
+                    session_id,
+                    parent_request_id,
+                    request_id,
+                    subject_key,
+                    issuer_key,
+                    tool_server,
+                    tool_name,
+                    raw_json,
+                })
+            },
+        )
+        .transpose()
+}
+
+fn insert_claim_receipt_log_projection_row(
+    connection: &Connection,
+    row: &ClaimReceiptLogProjectionRow,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute(
+        r#"
+        INSERT INTO claim_receipt_log_entries (
+            receipt_id, receipt_kind, source_seq, timestamp, capability_id,
+            session_id, parent_request_id, request_id, subject_key, issuer_key,
+            tool_server, tool_name, raw_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+        "#,
+        params![
+            row.receipt_id.as_str(),
+            row.receipt_kind.as_str(),
+            sqlite_i64(row.source_seq, "claim log source_seq")?,
+            sqlite_i64(row.timestamp, "claim log timestamp")?,
+            row.capability_id.as_deref(),
+            row.session_id.as_deref(),
+            row.parent_request_id.as_deref(),
+            row.request_id.as_deref(),
+            row.subject_key.as_deref(),
+            row.issuer_key.as_deref(),
+            row.tool_server.as_deref(),
+            row.tool_name.as_deref(),
+            row.raw_json.as_str(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn load_claim_receipt_log_receipt_ids(
+    connection: &Connection,
+) -> Result<BTreeSet<String>, ReceiptStoreError> {
+    let mut statement = connection
+        .prepare("SELECT receipt_id FROM claim_receipt_log_entries ORDER BY entry_seq ASC")?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+    rows.collect::<Result<BTreeSet<_>, _>>()
+        .map_err(ReceiptStoreError::from)
+}
+
+fn canonical_bytes_from_claim_log_row(
+    receipt_kind: &str,
+    raw_json: &str,
+) -> Result<Vec<u8>, ReceiptStoreError> {
+    match receipt_kind {
+        "tool_receipt" => {
+            let receipt: ArcReceipt = serde_json::from_str(raw_json)?;
+            arc_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
+        }
+        "child_receipt" => {
+            let receipt: ChildRequestReceipt = serde_json::from_str(raw_json)?;
+            arc_core::canonical::canonical_json_bytes(&receipt)
+                .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
+        }
+        other => Err(ReceiptStoreError::Conflict(format!(
+            "unsupported claim receipt kind `{other}` in claim tree"
+        ))),
+    }
+}
+
+pub(crate) fn load_claim_tree_canonical_bytes_range(
+    connection: &Connection,
+    start_entry_seq: u64,
+    end_entry_seq: u64,
+) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT entry_seq, receipt_kind, raw_json
+        FROM claim_receipt_log_entries
+        WHERE entry_seq >= ?1 AND entry_seq <= ?2
+        ORDER BY entry_seq ASC
+        "#,
+    )?;
+    let rows = statement.query_map(
+        params![
+            sqlite_i64(start_entry_seq, "claim tree start_entry_seq")?,
+            sqlite_i64(end_entry_seq, "claim tree end_entry_seq")?,
+        ],
+        |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        },
+    )?;
+    let mut result = Vec::new();
+    for row in rows {
+        let (entry_seq, receipt_kind, raw_json) = row?;
+        result.push((
+            sqlite_u64(entry_seq, "claim tree entry_seq")?,
+            canonical_bytes_from_claim_log_row(&receipt_kind, &raw_json)?,
+        ));
+    }
+    Ok(result)
+}
+
+fn load_checkpoint_tree_head_projection_row(
+    connection: &Connection,
+    checkpoint_seq: u64,
+) -> Result<Option<CheckpointTreeHeadProjectionRow>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT checkpoint_seq, batch_start_seq, batch_end_seq, tree_size, merkle_root,
+                   issued_at, kernel_key, previous_checkpoint_sha256, statement_json, signature
+            FROM checkpoint_tree_heads
+            WHERE checkpoint_seq = ?1
+            "#,
+            params![sqlite_i64(checkpoint_seq, "checkpoint_seq")?],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, String>(9)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(ReceiptStoreError::from)?
+        .map(
+            |(
+                checkpoint_seq,
+                batch_start_seq,
+                batch_end_seq,
+                tree_size,
+                merkle_root,
+                issued_at,
+                kernel_key,
+                previous_checkpoint_sha256,
+                statement_json,
+                signature,
+            )| {
+                Ok(CheckpointTreeHeadProjectionRow {
+                    checkpoint_seq: sqlite_u64(checkpoint_seq, "tree head checkpoint_seq")?,
+                    batch_start_seq: sqlite_u64(batch_start_seq, "tree head batch_start_seq")?,
+                    batch_end_seq: sqlite_u64(batch_end_seq, "tree head batch_end_seq")?,
+                    tree_size: sqlite_u64(tree_size, "tree head tree_size")?,
+                    merkle_root,
+                    issued_at: sqlite_u64(issued_at, "tree head issued_at")?,
+                    kernel_key,
+                    previous_checkpoint_sha256,
+                    statement_json,
+                    signature,
+                })
+            },
+        )
+        .transpose()
+}
+
+fn insert_checkpoint_tree_head_projection_row(
+    connection: &Connection,
+    row: &CheckpointTreeHeadProjectionRow,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute(
+        r#"
+        INSERT INTO checkpoint_tree_heads (
+            checkpoint_seq, batch_start_seq, batch_end_seq, tree_size, merkle_root,
+            issued_at, kernel_key, previous_checkpoint_sha256, statement_json, signature
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "#,
+        params![
+            sqlite_i64(row.checkpoint_seq, "checkpoint_seq")?,
+            sqlite_i64(row.batch_start_seq, "batch_start_seq")?,
+            sqlite_i64(row.batch_end_seq, "batch_end_seq")?,
+            sqlite_i64(row.tree_size, "tree_size")?,
+            row.merkle_root.as_str(),
+            sqlite_i64(row.issued_at, "issued_at")?,
+            row.kernel_key.as_str(),
+            row.previous_checkpoint_sha256.as_deref(),
+            row.statement_json.as_str(),
+            row.signature.as_str(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn load_checkpoint_tree_head_projection_ids(
+    connection: &Connection,
+) -> Result<BTreeSet<u64>, ReceiptStoreError> {
+    let mut statement = connection
+        .prepare("SELECT checkpoint_seq FROM checkpoint_tree_heads ORDER BY checkpoint_seq ASC")?;
+    let rows = statement.query_map([], |row| row.get::<_, i64>(0))?;
+    rows.map(|row| {
+        let checkpoint_seq = row.map_err(ReceiptStoreError::from)?;
+        sqlite_u64(checkpoint_seq, "checkpoint_seq")
+    })
+    .collect::<Result<BTreeSet<_>, _>>()
+}
+
+fn load_checkpoint_predecessor_witness_projection_row(
+    connection: &Connection,
+    witness_checkpoint_seq: u64,
+) -> Result<Option<CheckpointPredecessorWitnessProjectionRow>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT predecessor_checkpoint_seq, witness_checkpoint_seq,
+                   previous_checkpoint_sha256, witnessed_at, witness_statement_json
+            FROM checkpoint_predecessor_witnesses
+            WHERE witness_checkpoint_seq = ?1
+            "#,
+            params![sqlite_i64(
+                witness_checkpoint_seq,
+                "witness_checkpoint_seq"
+            )?],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(ReceiptStoreError::from)?
+        .map(
+            |(
+                predecessor_checkpoint_seq,
+                witness_checkpoint_seq,
+                previous_checkpoint_sha256,
+                witnessed_at,
+                witness_statement_json,
+            )| {
+                Ok(CheckpointPredecessorWitnessProjectionRow {
+                    predecessor_checkpoint_seq: sqlite_u64(
+                        predecessor_checkpoint_seq,
+                        "predecessor_checkpoint_seq",
+                    )?,
+                    witness_checkpoint_seq: sqlite_u64(
+                        witness_checkpoint_seq,
+                        "witness_checkpoint_seq",
+                    )?,
+                    previous_checkpoint_sha256,
+                    witnessed_at: sqlite_u64(witnessed_at, "witnessed_at")?,
+                    witness_statement_json,
+                })
+            },
+        )
+        .transpose()
+}
+
+fn insert_checkpoint_predecessor_witness_projection_row(
+    connection: &Connection,
+    row: &CheckpointPredecessorWitnessProjectionRow,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute(
+        r#"
+        INSERT INTO checkpoint_predecessor_witnesses (
+            predecessor_checkpoint_seq, witness_checkpoint_seq,
+            previous_checkpoint_sha256, witnessed_at, witness_statement_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+        params![
+            sqlite_i64(row.predecessor_checkpoint_seq, "predecessor_checkpoint_seq")?,
+            sqlite_i64(row.witness_checkpoint_seq, "witness_checkpoint_seq")?,
+            row.previous_checkpoint_sha256.as_str(),
+            sqlite_i64(row.witnessed_at, "witnessed_at")?,
+            row.witness_statement_json.as_str(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn load_checkpoint_predecessor_witness_projection_ids(
+    connection: &Connection,
+) -> Result<BTreeSet<u64>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT witness_checkpoint_seq FROM checkpoint_predecessor_witnesses ORDER BY witness_checkpoint_seq ASC",
+    )?;
+    let rows = statement.query_map([], |row| row.get::<_, i64>(0))?;
+    rows.map(|row| {
+        let witness_checkpoint_seq = row.map_err(ReceiptStoreError::from)?;
+        sqlite_u64(witness_checkpoint_seq, "witness_checkpoint_seq")
+    })
+    .collect::<Result<BTreeSet<_>, _>>()
+}
+
+fn load_checkpoint_publication_metadata_projection_row(
+    connection: &Connection,
+    checkpoint_seq: u64,
+) -> Result<Option<CheckpointPublicationMetadataProjectionRow>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT checkpoint_seq, publication_schema, merkle_root, published_at,
+                   kernel_key, log_tree_size, entry_start_seq, entry_end_seq,
+                   previous_checkpoint_sha256
+            FROM checkpoint_publication_metadata
+            WHERE checkpoint_seq = ?1
+            "#,
+            params![sqlite_i64(checkpoint_seq, "checkpoint_seq")?],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, i64>(7)?,
+                    row.get::<_, Option<String>>(8)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(ReceiptStoreError::from)?
+        .map(
+            |(
+                checkpoint_seq,
+                publication_schema,
+                merkle_root,
+                published_at,
+                kernel_key,
+                log_tree_size,
+                entry_start_seq,
+                entry_end_seq,
+                previous_checkpoint_sha256,
+            )| {
+                Ok(CheckpointPublicationMetadataProjectionRow {
+                    checkpoint_seq: sqlite_u64(
+                        checkpoint_seq,
+                        "checkpoint publication metadata checkpoint_seq",
+                    )?,
+                    publication_schema,
+                    merkle_root,
+                    published_at: sqlite_u64(
+                        published_at,
+                        "checkpoint publication metadata published_at",
+                    )?,
+                    kernel_key,
+                    log_tree_size: sqlite_u64(
+                        log_tree_size,
+                        "checkpoint publication metadata log_tree_size",
+                    )?,
+                    entry_start_seq: sqlite_u64(
+                        entry_start_seq,
+                        "checkpoint publication metadata entry_start_seq",
+                    )?,
+                    entry_end_seq: sqlite_u64(
+                        entry_end_seq,
+                        "checkpoint publication metadata entry_end_seq",
+                    )?,
+                    previous_checkpoint_sha256,
+                })
+            },
+        )
+        .transpose()
+}
+
+fn insert_checkpoint_publication_metadata_projection_row(
+    connection: &Connection,
+    row: &CheckpointPublicationMetadataProjectionRow,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute(
+        r#"
+        INSERT INTO checkpoint_publication_metadata (
+            checkpoint_seq, publication_schema, merkle_root, published_at, kernel_key,
+            log_tree_size, entry_start_seq, entry_end_seq, previous_checkpoint_sha256
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "#,
+        params![
+            sqlite_i64(row.checkpoint_seq, "checkpoint_seq")?,
+            row.publication_schema.as_str(),
+            row.merkle_root.as_str(),
+            sqlite_i64(row.published_at, "published_at")?,
+            row.kernel_key.as_str(),
+            sqlite_i64(row.log_tree_size, "log_tree_size")?,
+            sqlite_i64(row.entry_start_seq, "entry_start_seq")?,
+            sqlite_i64(row.entry_end_seq, "entry_end_seq")?,
+            row.previous_checkpoint_sha256.as_deref(),
+        ],
+    )?;
+    Ok(())
+}
+
+fn load_checkpoint_publication_metadata_projection_ids(
+    connection: &Connection,
+) -> Result<BTreeSet<u64>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT checkpoint_seq FROM checkpoint_publication_metadata ORDER BY checkpoint_seq ASC",
+    )?;
+    let rows = statement.query_map([], |row| row.get::<_, i64>(0))?;
+    rows.map(|row| {
+        let checkpoint_seq = row.map_err(ReceiptStoreError::from)?;
+        sqlite_u64(
+            checkpoint_seq,
+            "checkpoint publication metadata checkpoint_seq",
+        )
+    })
+    .collect::<Result<BTreeSet<_>, _>>()
+}
+
+pub(crate) fn ensure_transparency_projection_guards(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(TRANSPARENCY_PROJECTION_GUARDS_SQL)?;
+    Ok(())
+}
+
+pub(crate) fn backfill_claim_receipt_log_entries(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let mut expected = load_tool_claim_receipt_projection_rows(connection)?;
+    expected.extend(load_child_claim_receipt_projection_rows(connection)?);
+    expected.sort_by(|left, right| {
+        (
+            left.timestamp,
+            left.kind_rank(),
+            left.source_seq,
+            left.receipt_id.as_str(),
+        )
+            .cmp(&(
+                right.timestamp,
+                right.kind_rank(),
+                right.source_seq,
+                right.receipt_id.as_str(),
+            ))
+    });
+
+    let existing_count = connection.query_row(
+        "SELECT COUNT(*) FROM claim_receipt_log_entries",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    let existing_count = sqlite_u64(existing_count, "claim_receipt_log_entries count")?;
+    let expected_receipt_ids = expected
+        .iter()
+        .map(|row| row.receipt_id.clone())
+        .collect::<BTreeSet<_>>();
+
+    let tx = connection.transaction()?;
+    if existing_count == 0 {
+        for row in &expected {
+            insert_claim_receipt_log_projection_row(&tx, row)?;
+        }
+        tx.commit()?;
+        return Ok(());
+    }
+
+    for row in &expected {
+        let Some(existing) = load_claim_receipt_log_projection_row(&tx, &row.receipt_id)? else {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "claim receipt log entry `{}` is missing for persisted {} source row",
+                row.receipt_id, row.receipt_kind
+            )));
+        };
+        if existing != *row {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "claim receipt log entry `{}` diverges from persisted {} source row",
+                row.receipt_id, row.receipt_kind
+            )));
+        }
+    }
+
+    let existing_receipt_ids = load_claim_receipt_log_receipt_ids(&tx)?;
+    if existing_receipt_ids != expected_receipt_ids {
+        let missing = expected_receipt_ids
+            .difference(&existing_receipt_ids)
+            .next()
+            .cloned();
+        let extra = existing_receipt_ids
+            .difference(&expected_receipt_ids)
+            .next()
+            .cloned();
+        return Err(ReceiptStoreError::Conflict(format!(
+            "claim receipt log entry set drift detected (missing: {}, extra: {})",
+            missing.as_deref().unwrap_or("<none>"),
+            extra.as_deref().unwrap_or("<none>")
+        )));
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
+pub(crate) fn backfill_checkpoint_transparency_projections(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let rows = load_all_persisted_checkpoint_rows(connection)?;
+    let mut parsed_checkpoints = Vec::with_capacity(rows.len());
+    let mut expected_heads = Vec::with_capacity(rows.len());
+    let mut expected_witnesses = Vec::new();
+    let mut expected_publications = Vec::with_capacity(rows.len());
+
+    for row in rows {
+        let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
+        if let Some(predecessor) = parsed_checkpoints.last() {
+            arc_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
+                .map_err(checkpoint_error_to_receipt_store)?;
+        }
+        let publication = arc_kernel::checkpoint::build_checkpoint_publication(&checkpoint)
+            .map_err(checkpoint_error_to_receipt_store)?;
+
+        expected_heads.push(CheckpointTreeHeadProjectionRow {
+            checkpoint_seq: row.checkpoint_seq,
+            batch_start_seq: row.batch_start_seq,
+            batch_end_seq: row.batch_end_seq,
+            tree_size: row.tree_size,
+            merkle_root: row.merkle_root_hex,
+            issued_at: row.issued_at,
+            kernel_key: row.kernel_key_hex,
+            previous_checkpoint_sha256: checkpoint.body.previous_checkpoint_sha256.clone(),
+            statement_json: row.statement_json.clone(),
+            signature: row.signature_hex,
+        });
+        expected_publications.push(CheckpointPublicationMetadataProjectionRow {
+            checkpoint_seq: publication.checkpoint_seq,
+            publication_schema: publication.schema,
+            merkle_root: publication.merkle_root.to_hex(),
+            published_at: publication.published_at,
+            kernel_key: publication.kernel_key.to_hex(),
+            log_tree_size: publication.log_tree_size,
+            entry_start_seq: publication.entry_start_seq,
+            entry_end_seq: publication.entry_end_seq,
+            previous_checkpoint_sha256: publication.previous_checkpoint_sha256,
+        });
+
+        if let Some(previous_checkpoint_sha256) = checkpoint.body.previous_checkpoint_sha256.clone()
+        {
+            if checkpoint.body.checkpoint_seq <= 1 {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} cannot witness a predecessor digest",
+                    checkpoint.body.checkpoint_seq
+                )));
+            }
+            expected_witnesses.push(CheckpointPredecessorWitnessProjectionRow {
+                predecessor_checkpoint_seq: checkpoint.body.checkpoint_seq - 1,
+                witness_checkpoint_seq: checkpoint.body.checkpoint_seq,
+                previous_checkpoint_sha256,
+                witnessed_at: checkpoint.body.issued_at,
+                witness_statement_json: row.statement_json,
+            });
+        }
+
+        parsed_checkpoints.push(checkpoint);
+    }
+
+    let tx = connection.transaction()?;
+    for row in &expected_heads {
+        match load_checkpoint_tree_head_projection_row(&tx, row.checkpoint_seq)? {
+            Some(existing) if existing == *row => {}
+            Some(_) => {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint tree head projection for checkpoint {} diverges from persisted checkpoint row",
+                    row.checkpoint_seq
+                )))
+            }
+            None => insert_checkpoint_tree_head_projection_row(&tx, row)?,
+        }
+    }
+
+    let expected_head_ids = expected_heads
+        .iter()
+        .map(|row| row.checkpoint_seq)
+        .collect::<BTreeSet<_>>();
+    let existing_head_ids = load_checkpoint_tree_head_projection_ids(&tx)?;
+    if existing_head_ids != expected_head_ids {
+        let missing = expected_head_ids
+            .difference(&existing_head_ids)
+            .next()
+            .copied();
+        let extra = existing_head_ids
+            .difference(&expected_head_ids)
+            .next()
+            .copied();
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint tree head projection drift detected (missing: {}, extra: {})",
+            missing
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string()),
+            extra
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string())
+        )));
+    }
+
+    for row in &expected_witnesses {
+        match load_checkpoint_predecessor_witness_projection_row(&tx, row.witness_checkpoint_seq)? {
+            Some(existing) if existing == *row => {}
+            Some(_) => {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint predecessor witness projection for checkpoint {} diverges from persisted checkpoint chain",
+                    row.witness_checkpoint_seq
+                )))
+            }
+            None => insert_checkpoint_predecessor_witness_projection_row(&tx, row)?,
+        }
+    }
+
+    let expected_witness_ids = expected_witnesses
+        .iter()
+        .map(|row| row.witness_checkpoint_seq)
+        .collect::<BTreeSet<_>>();
+    let existing_witness_ids = load_checkpoint_predecessor_witness_projection_ids(&tx)?;
+    if existing_witness_ids != expected_witness_ids {
+        let missing = expected_witness_ids
+            .difference(&existing_witness_ids)
+            .next()
+            .copied();
+        let extra = existing_witness_ids
+            .difference(&expected_witness_ids)
+            .next()
+            .copied();
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint predecessor witness projection drift detected (missing: {}, extra: {})",
+            missing
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string()),
+            extra
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string())
+        )));
+    }
+
+    for row in &expected_publications {
+        match load_checkpoint_publication_metadata_projection_row(&tx, row.checkpoint_seq)? {
+            Some(existing) if existing == *row => {}
+            Some(_) => {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint publication metadata projection for checkpoint {} diverges from persisted checkpoint row",
+                    row.checkpoint_seq
+                )))
+            }
+            None => insert_checkpoint_publication_metadata_projection_row(&tx, row)?,
+        }
+    }
+
+    let expected_publication_ids = expected_publications
+        .iter()
+        .map(|row| row.checkpoint_seq)
+        .collect::<BTreeSet<_>>();
+    let existing_publication_ids = load_checkpoint_publication_metadata_projection_ids(&tx)?;
+    if existing_publication_ids != expected_publication_ids {
+        let missing = expected_publication_ids
+            .difference(&existing_publication_ids)
+            .next()
+            .copied();
+        let extra = existing_publication_ids
+            .difference(&expected_publication_ids)
+            .next()
+            .copied();
+        return Err(ReceiptStoreError::Conflict(format!(
+            "checkpoint publication metadata projection drift detected (missing: {}, extra: {})",
+            missing
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string()),
+            extra
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "<none>".to_string())
+        )));
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 pub(crate) fn settlement_reconciliation_state_text(
     state: SettlementReconciliationState,
 ) -> &'static str {
@@ -311,7 +1581,7 @@ pub(crate) fn load_underwriting_appeal_rows(
             updated_at,
             resolved_by,
             replacement_decision_id,
-        ) = row?;
+        ) = row.map_err(ReceiptStoreError::from)?;
         Ok(UnderwritingAppealRecord {
             schema: arc_kernel::UNDERWRITING_APPEAL_SCHEMA.to_string(),
             appeal_id,
@@ -326,7 +1596,7 @@ pub(crate) fn load_underwriting_appeal_rows(
             replacement_decision_id,
         })
     })
-    .collect()
+    .collect::<Result<Vec<_>, _>>()
 }
 
 pub(crate) fn underwriting_decision_matches_query(
@@ -919,6 +2189,39 @@ pub(crate) fn authorization_transaction_context_from_governed_metadata(
     }
 }
 
+fn delegated_call_chain_is_sender_bound(
+    call_chain: Option<&arc_core::capability::GovernedCallChainProvenance>,
+) -> bool {
+    let Some(call_chain) = call_chain else {
+        return false;
+    };
+    if call_chain.evidence_class == arc_core::capability::GovernedProvenanceEvidenceClass::Asserted
+    {
+        return false;
+    }
+
+    let has_local_lineage_link = call_chain.evidence_sources.iter().any(|source| {
+        matches!(
+            source,
+            arc_core::capability::GovernedCallChainEvidenceSource::SessionParentRequestLineage
+                | arc_core::capability::GovernedCallChainEvidenceSource::LocalParentReceiptLinkage
+                | arc_core::capability::GovernedCallChainEvidenceSource::UpstreamDelegatorProof
+        )
+    });
+    let has_capability_subject_binding = call_chain.evidence_sources.iter().any(|source| {
+        matches!(
+            source,
+            arc_core::capability::GovernedCallChainEvidenceSource::CapabilityDelegatorSubject
+                | arc_core::capability::GovernedCallChainEvidenceSource::CapabilityOriginSubject
+        )
+    });
+
+    has_local_lineage_link
+        || (call_chain.evidence_class
+            == arc_core::capability::GovernedProvenanceEvidenceClass::Verified
+            && has_capability_subject_binding)
+}
+
 pub(crate) fn resolve_sender_constraint_subject_key(
     receipt_id: &str,
     receipt_subject_key: Option<&str>,
@@ -1099,7 +2402,9 @@ pub(crate) fn derive_authorization_sender_constraint(
         proof_type: proof_required.then(|| ARC_OAUTH_SENDER_PROOF_ARC_DPOP.to_string()),
         proof_schema: proof_required.then(|| DPOP_SCHEMA.to_string()),
         runtime_assurance_bound: transaction_context.runtime_assurance_tier.is_some(),
-        delegated_call_chain_bound: transaction_context.call_chain.is_some(),
+        delegated_call_chain_bound: delegated_call_chain_is_sender_bound(
+            transaction_context.call_chain.as_ref(),
+        ),
     })
 }
 
@@ -1313,6 +2618,14 @@ pub(crate) fn validate_arc_oauth_authorization_row(
                 parent_receipt_id,
             )?;
         }
+        if row.sender_constraint.delegated_call_chain_bound
+            && !delegated_call_chain_is_sender_bound(Some(call_chain))
+        {
+            return Err(invalid_arc_oauth_authorization_profile(
+                &row.receipt_id,
+                "senderConstraint.delegatedCallChainBound requires corroborated call-chain provenance",
+            ));
+        }
     }
 
     if row.transaction_context.runtime_assurance_tier.is_some() {
@@ -1484,7 +2797,7 @@ pub(crate) fn compliance_export_scope_note(
             "child receipts are included only as time-window context for this export scope".to_string(),
         ),
         EvidenceChildReceiptScope::OmittedNoJoinPath => notes.push(
-            "child receipts are omitted for this export scope because no truthful capability/agent join exists yet".to_string(),
+            "child receipts are omitted for this export scope because no capability/agent join exists yet".to_string(),
         ),
         EvidenceChildReceiptScope::FullQueryWindow => {}
     }
@@ -1533,6 +2846,40 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
     Ok(())
 }
 
+pub(crate) fn ensure_receipt_lineage_statement_columns(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(receipt_lineage_statements)")?;
+    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = columns.collect::<Result<Vec<_>, _>>()?;
+
+    if !columns.iter().any(|column| column == "statement_id") {
+        connection.execute(
+            "ALTER TABLE receipt_lineage_statements ADD COLUMN statement_id TEXT",
+            [],
+        )?;
+    }
+
+    connection.execute(
+        r#"
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_receipt_lineage_statement_id
+            ON receipt_lineage_statements(statement_id)
+            WHERE statement_id IS NOT NULL
+        "#,
+        [],
+    )?;
+    connection.execute(
+        r#"
+        UPDATE receipt_lineage_statements
+        SET statement_id = json_extract(raw_json, '$.id')
+        WHERE statement_id IS NULL
+          AND json_extract(raw_json, '$.schema') = ?1
+        "#,
+        params![arc_core::receipt::ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA],
+    )?;
+    Ok(())
+}
+
 pub(crate) fn backfill_tool_receipt_attribution_columns(
     connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
@@ -1569,13 +2916,1149 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
     Ok(())
 }
 
+const SESSION_ANCHOR_SOURCE_KIND: &str = "session_anchor";
+const REQUEST_LINEAGE_SOURCE_KIND: &str = "request_lineage_record";
+const RECEIPT_LINEAGE_SOURCE_KIND: &str = "receipt_lineage_statement";
+const CHILD_RECEIPT_BACKFILL_SOURCE_KIND: &str = "child_receipt_backfill";
+const GOVERNED_RECEIPT_BACKFILL_SOURCE_KIND: &str = "governed_receipt_backfill";
+
+fn provenance_json_sha256(value: &serde_json::Value) -> Result<String, ReceiptStoreError> {
+    let canonical = canonical_json_bytes(value)
+        .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))?;
+    Ok(sha256_hex(&canonical))
+}
+
+fn sanitize_required_identifier(
+    record_kind: &str,
+    record_id: &str,
+    field: &str,
+    value: &str,
+) -> Result<String, ReceiptStoreError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "{record_kind} `{record_id}` requires non-empty {field}"
+        )));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn sanitize_optional_identifier(
+    record_kind: &str,
+    record_id: &str,
+    field: &str,
+    value: Option<&str>,
+) -> Result<Option<String>, ReceiptStoreError> {
+    value
+        .map(|value| sanitize_required_identifier(record_kind, record_id, field, value))
+        .transpose()
+}
+
+fn merge_optional_identifier(
+    record_kind: &str,
+    record_id: &str,
+    field: &str,
+    existing: Option<String>,
+    incoming: Option<&str>,
+) -> Result<Option<String>, ReceiptStoreError> {
+    let incoming = sanitize_optional_identifier(record_kind, record_id, field, incoming)?;
+    match (existing, incoming) {
+        (Some(existing), Some(incoming)) if existing != incoming => {
+            Err(ReceiptStoreError::Conflict(format!(
+                "{record_kind} `{record_id}` reuses {field} with conflicting value `{incoming}` (existing `{existing}`)"
+            )))
+        }
+        (Some(existing), _) => Ok(Some(existing)),
+        (None, incoming) => Ok(incoming),
+    }
+}
+
+fn request_lineage_exists_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    request_id: &str,
+) -> Result<bool, ReceiptStoreError> {
+    Ok(tx
+        .query_row(
+            r#"
+            SELECT 1
+            FROM request_lineage
+            WHERE session_id = ?1 AND request_id = ?2
+            LIMIT 1
+            "#,
+            params![session_id, request_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+fn anchored_request_lineage_exists_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    request_id: &str,
+    session_anchor_id: &str,
+) -> Result<bool, ReceiptStoreError> {
+    Ok(tx
+        .query_row(
+            r#"
+            SELECT 1
+            FROM request_lineage
+            WHERE session_id = ?1
+              AND request_id = ?2
+              AND session_anchor_id = ?3
+            LIMIT 1
+            "#,
+            params![session_id, request_id, session_anchor_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+fn session_anchor_exists_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    session_anchor_id: &str,
+) -> Result<bool, ReceiptStoreError> {
+    Ok(tx
+        .query_row(
+            r#"
+            SELECT 1
+            FROM session_anchors
+            WHERE anchor_id = ?1
+              AND session_id = ?2
+            LIMIT 1
+            "#,
+            params![session_anchor_id, session_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+fn receipt_id_exists_tx(
+    tx: &rusqlite::Transaction<'_>,
+    receipt_id: &str,
+) -> Result<bool, ReceiptStoreError> {
+    Ok(tx
+        .query_row(
+            r#"
+            SELECT 1
+            FROM (
+                SELECT receipt_id FROM arc_tool_receipts
+                UNION ALL
+                SELECT receipt_id FROM arc_child_receipts
+            )
+            WHERE receipt_id = ?1
+            LIMIT 1
+            "#,
+            params![receipt_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
+}
+
+fn extract_lineage_evidence_class(statement_json: &serde_json::Value) -> Option<String> {
+    let nested = statement_json
+        .get("callChain")
+        .or_else(|| statement_json.get("call_chain"));
+    [Some(statement_json), nested]
+        .into_iter()
+        .flatten()
+        .find_map(|value| {
+            value
+                .get("evidenceClass")
+                .or_else(|| value.get("evidence_class"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+        })
+}
+
+fn extract_lineage_evidence_sources_json(
+    statement_json: &serde_json::Value,
+) -> Result<Option<String>, ReceiptStoreError> {
+    let nested = statement_json
+        .get("callChain")
+        .or_else(|| statement_json.get("call_chain"));
+    for value in [Some(statement_json), nested].into_iter().flatten() {
+        if let Some(sources) = value
+            .get("evidenceSources")
+            .or_else(|| value.get("evidence_sources"))
+        {
+            return Ok(Some(serde_json::to_string(sources)?));
+        }
+    }
+    Ok(None)
+}
+
+#[derive(Debug, Clone, Default)]
+struct ReceiptLineageStatementIdentifiers {
+    statement_id: Option<String>,
+    child_receipt_id: Option<String>,
+    child_request_id: Option<String>,
+    child_session_anchor_id: Option<String>,
+    parent_request_id: Option<String>,
+    parent_receipt_id: Option<String>,
+}
+
+fn extract_receipt_lineage_statement_identifiers(
+    statement_json: &serde_json::Value,
+) -> ReceiptLineageStatementIdentifiers {
+    let schema = statement_json
+        .get("schema")
+        .and_then(serde_json::Value::as_str);
+    if schema != Some(arc_core::receipt::ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA) {
+        return ReceiptLineageStatementIdentifiers::default();
+    }
+
+    if let Ok(statement) =
+        serde_json::from_value::<arc_core::receipt::ReceiptLineageStatement>(statement_json.clone())
+    {
+        return ReceiptLineageStatementIdentifiers {
+            statement_id: Some(statement.id),
+            child_receipt_id: Some(statement.child_receipt_id),
+            child_request_id: Some(statement.child_request_id.to_string()),
+            child_session_anchor_id: Some(statement.child_session_anchor.session_anchor_id),
+            parent_request_id: Some(statement.parent_request_id.to_string()),
+            parent_receipt_id: Some(statement.parent_receipt_id),
+        };
+    }
+
+    if let Ok(statement) = serde_json::from_value::<arc_core::receipt::ReceiptLineageStatementBody>(
+        statement_json.clone(),
+    ) {
+        return ReceiptLineageStatementIdentifiers {
+            statement_id: Some(statement.id),
+            child_receipt_id: Some(statement.child_receipt_id),
+            child_request_id: Some(statement.child_request_id.to_string()),
+            child_session_anchor_id: Some(statement.child_session_anchor.session_anchor_id),
+            parent_request_id: Some(statement.parent_request_id.to_string()),
+            parent_receipt_id: Some(statement.parent_receipt_id),
+        };
+    }
+
+    ReceiptLineageStatementIdentifiers::default()
+}
+
+fn build_receipt_lineage_verification_tx(
+    tx: &rusqlite::Transaction<'_>,
+    receipt_id: &str,
+    request_id: Option<&str>,
+    session_id: Option<&str>,
+    session_anchor_id: Option<&str>,
+    parent_request_id: Option<&str>,
+    parent_receipt_id: Option<&str>,
+) -> Result<ReceiptLineageVerification, ReceiptStoreError> {
+    let session_anchor_verified = match (session_id, session_anchor_id) {
+        (Some(session_id), Some(session_anchor_id)) => {
+            session_anchor_exists_tx(tx, session_id, session_anchor_id)?
+        }
+        _ => false,
+    };
+    let parent_request_verified = match (session_id, parent_request_id) {
+        (Some(session_id), Some(parent_request_id)) => {
+            request_lineage_exists_tx(tx, session_id, parent_request_id)?
+        }
+        _ => false,
+    };
+    let parent_receipt_verified = match parent_receipt_id {
+        Some(parent_receipt_id) => receipt_id_exists_tx(tx, parent_receipt_id)?,
+        None => false,
+    };
+    let replay_protected = match (session_id, request_id, session_anchor_id) {
+        (Some(session_id), Some(request_id), Some(session_anchor_id))
+            if session_anchor_verified =>
+        {
+            anchored_request_lineage_exists_tx(tx, session_id, request_id, session_anchor_id)?
+        }
+        _ => false,
+    };
+
+    Ok(ReceiptLineageVerification {
+        receipt_id: receipt_id.to_string(),
+        request_id: request_id.map(str::to_string),
+        session_id: session_id.map(str::to_string),
+        session_anchor_id: session_anchor_id.map(str::to_string),
+        session_anchor_verified,
+        parent_request_verified,
+        parent_receipt_verified,
+        replay_protected,
+    })
+}
+
+fn refresh_receipt_lineage_verification_state_tx(
+    tx: &rusqlite::Transaction<'_>,
+    receipt_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    let row = tx
+        .query_row(
+            r#"
+            SELECT request_id, session_id, session_anchor_id, parent_request_id, parent_receipt_id
+            FROM receipt_lineage_statements
+            WHERE receipt_id = ?1
+            "#,
+            params![receipt_id],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((request_id, session_id, session_anchor_id, parent_request_id, parent_receipt_id)) =
+        row
+    else {
+        return Ok(());
+    };
+
+    let verification = build_receipt_lineage_verification_tx(
+        tx,
+        receipt_id,
+        request_id.as_deref(),
+        session_id.as_deref(),
+        session_anchor_id.as_deref(),
+        parent_request_id.as_deref(),
+        parent_receipt_id.as_deref(),
+    )?;
+    tx.execute(
+        r#"
+        UPDATE receipt_lineage_statements
+        SET verified_session_anchor = ?2,
+            verified_parent_request = ?3,
+            verified_parent_receipt = ?4,
+            replay_protected = ?5
+        WHERE receipt_id = ?1
+        "#,
+        params![
+            receipt_id,
+            sqlite_bool(verification.session_anchor_verified),
+            sqlite_bool(verification.parent_request_verified),
+            sqlite_bool(verification.parent_receipt_verified),
+            sqlite_bool(verification.replay_protected),
+        ],
+    )?;
+    Ok(())
+}
+
+fn refresh_receipt_lineage_rows_for_request_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    request_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    let mut statement = tx.prepare(
+        r#"
+        SELECT receipt_id
+        FROM receipt_lineage_statements
+        WHERE session_id = ?1
+          AND (request_id = ?2 OR parent_request_id = ?2)
+        "#,
+    )?;
+    let receipt_ids = statement
+        .query_map(params![session_id, request_id], |row| {
+            row.get::<_, String>(0)
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    for receipt_id in receipt_ids {
+        refresh_receipt_lineage_verification_state_tx(tx, &receipt_id)?;
+    }
+    Ok(())
+}
+
+fn refresh_receipt_lineage_rows_for_anchor_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    session_anchor_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    let mut statement = tx.prepare(
+        r#"
+        SELECT receipt_id
+        FROM receipt_lineage_statements
+        WHERE session_id = ?1
+          AND session_anchor_id = ?2
+        "#,
+    )?;
+    let receipt_ids = statement
+        .query_map(params![session_id, session_anchor_id], |row| {
+            row.get::<_, String>(0)
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    for receipt_id in receipt_ids {
+        refresh_receipt_lineage_verification_state_tx(tx, &receipt_id)?;
+    }
+    Ok(())
+}
+
+fn refresh_receipt_lineage_rows_for_parent_receipt_tx(
+    tx: &rusqlite::Transaction<'_>,
+    parent_receipt_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    let mut statement = tx.prepare(
+        r#"
+        SELECT receipt_id
+        FROM receipt_lineage_statements
+        WHERE parent_receipt_id = ?1
+        "#,
+    )?;
+    let receipt_ids = statement
+        .query_map(params![parent_receipt_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+
+    for receipt_id in receipt_ids {
+        refresh_receipt_lineage_verification_state_tx(tx, &receipt_id)?;
+    }
+    Ok(())
+}
+
+fn persist_session_anchor_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    anchor_id: &str,
+    auth_context_fingerprint: &str,
+    issued_at: u64,
+    supersedes_anchor_id: Option<&str>,
+    source_kind: &str,
+    anchor_json: &serde_json::Value,
+) -> Result<(), ReceiptStoreError> {
+    let session_id =
+        sanitize_required_identifier("session anchor", anchor_id, "session_id", session_id)?;
+    let anchor_id =
+        sanitize_required_identifier("session anchor", anchor_id, "anchor_id", anchor_id)?;
+    let auth_context_fingerprint = sanitize_required_identifier(
+        "session anchor",
+        &anchor_id,
+        "auth_context_fingerprint",
+        auth_context_fingerprint,
+    )?;
+    let supersedes_anchor_id = sanitize_optional_identifier(
+        "session anchor",
+        &anchor_id,
+        "supersedes_anchor_id",
+        supersedes_anchor_id,
+    )?;
+    if supersedes_anchor_id.as_deref() == Some(anchor_id.as_str()) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "session anchor `{anchor_id}` cannot supersede itself"
+        )));
+    }
+
+    if tx
+        .query_row(
+            r#"
+            SELECT anchor_id
+            FROM session_anchors
+            WHERE session_id = ?1
+              AND auth_context_fingerprint = ?2
+              AND anchor_id <> ?3
+            LIMIT 1
+            "#,
+            params![&session_id, &auth_context_fingerprint, &anchor_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .is_some()
+    {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "session anchor replay detected for session `{session_id}` auth_context_fingerprint `{auth_context_fingerprint}`"
+        )));
+    }
+
+    if let Some(existing_session_id) = tx
+        .query_row(
+            "SELECT session_id FROM session_anchors WHERE anchor_id = ?1",
+            params![&anchor_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+    {
+        if existing_session_id != session_id {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "session anchor `{anchor_id}` is already bound to session `{existing_session_id}`"
+            )));
+        }
+    }
+
+    let raw_json = serde_json::to_string(anchor_json)?;
+    let json_sha256 = provenance_json_sha256(anchor_json)?;
+
+    tx.execute(
+        "UPDATE session_anchors SET is_current = 0 WHERE session_id = ?1 AND anchor_id <> ?2",
+        params![&session_id, &anchor_id],
+    )?;
+    tx.execute(
+        r#"
+        INSERT INTO session_anchors (
+            anchor_id,
+            session_id,
+            auth_context_fingerprint,
+            issued_at,
+            supersedes_anchor_id,
+            is_current,
+            source_kind,
+            json_sha256,
+            raw_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8)
+        ON CONFLICT(anchor_id) DO UPDATE SET
+            auth_context_fingerprint = excluded.auth_context_fingerprint,
+            issued_at = excluded.issued_at,
+            supersedes_anchor_id = COALESCE(excluded.supersedes_anchor_id, session_anchors.supersedes_anchor_id),
+            is_current = 1,
+            source_kind = excluded.source_kind,
+            json_sha256 = excluded.json_sha256,
+            raw_json = excluded.raw_json
+        "#,
+        params![
+            &anchor_id,
+            &session_id,
+            &auth_context_fingerprint,
+            sqlite_i64(issued_at, "session anchor issued_at")?,
+            supersedes_anchor_id.as_deref(),
+            source_kind,
+            &json_sha256,
+            &raw_json,
+        ],
+    )?;
+    refresh_receipt_lineage_rows_for_anchor_tx(tx, &session_id, &anchor_id)?;
+    Ok(())
+}
+
+fn persist_request_lineage_tx(
+    tx: &rusqlite::Transaction<'_>,
+    session_id: &str,
+    request_id: &str,
+    parent_request_id: Option<&str>,
+    session_anchor_id: Option<&str>,
+    recorded_at: u64,
+    request_fingerprint: Option<&str>,
+    source_kind: &str,
+    lineage_json: &serde_json::Value,
+) -> Result<(), ReceiptStoreError> {
+    let session_id =
+        sanitize_required_identifier("request lineage", request_id, "session_id", session_id)?;
+    let request_id =
+        sanitize_required_identifier("request lineage", request_id, "request_id", request_id)?;
+    let parent_request_id = sanitize_optional_identifier(
+        "request lineage",
+        &request_id,
+        "parent_request_id",
+        parent_request_id,
+    )?;
+    if parent_request_id.as_deref() == Some(request_id.as_str()) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "request lineage `{request_id}` cannot point at itself as parent_request_id"
+        )));
+    }
+
+    let existing = tx
+        .query_row(
+            r#"
+            SELECT parent_request_id, session_anchor_id, request_fingerprint
+            FROM request_lineage
+            WHERE session_id = ?1 AND request_id = ?2
+            "#,
+            params![&session_id, &request_id],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            },
+        )
+        .optional()?;
+    let (existing_parent_request_id, existing_session_anchor_id, existing_request_fingerprint) =
+        existing.unwrap_or((None, None, None));
+
+    let session_anchor_id = merge_optional_identifier(
+        "request lineage",
+        &request_id,
+        "session_anchor_id",
+        existing_session_anchor_id,
+        session_anchor_id,
+    )?;
+    let parent_request_id = merge_optional_identifier(
+        "request lineage",
+        &request_id,
+        "parent_request_id",
+        existing_parent_request_id,
+        parent_request_id.as_deref(),
+    )?;
+    let request_fingerprint = merge_optional_identifier(
+        "request lineage",
+        &request_id,
+        "request_fingerprint",
+        existing_request_fingerprint,
+        request_fingerprint,
+    )?;
+
+    let raw_json = serde_json::to_string(lineage_json)?;
+    let json_sha256 = provenance_json_sha256(lineage_json)?;
+    tx.execute(
+        r#"
+        INSERT INTO request_lineage (
+            session_id,
+            request_id,
+            parent_request_id,
+            session_anchor_id,
+            recorded_at,
+            request_fingerprint,
+            source_kind,
+            json_sha256,
+            raw_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        ON CONFLICT(session_id, request_id) DO UPDATE SET
+            parent_request_id = excluded.parent_request_id,
+            session_anchor_id = excluded.session_anchor_id,
+            recorded_at = excluded.recorded_at,
+            request_fingerprint = excluded.request_fingerprint,
+            source_kind = excluded.source_kind,
+            json_sha256 = excluded.json_sha256,
+            raw_json = excluded.raw_json
+        "#,
+        params![
+            &session_id,
+            &request_id,
+            parent_request_id.as_deref(),
+            session_anchor_id.as_deref(),
+            sqlite_i64(recorded_at, "request lineage recorded_at")?,
+            request_fingerprint.as_deref(),
+            source_kind,
+            &json_sha256,
+            &raw_json,
+        ],
+    )?;
+    refresh_receipt_lineage_rows_for_request_tx(tx, &session_id, &request_id)?;
+    Ok(())
+}
+
+fn persist_receipt_lineage_statement_tx(
+    tx: &rusqlite::Transaction<'_>,
+    child_receipt_id: &str,
+    request_id: Option<&str>,
+    session_id: Option<&str>,
+    session_anchor_id: Option<&str>,
+    parent_request_id: Option<&str>,
+    parent_receipt_id: Option<&str>,
+    chain_id: Option<&str>,
+    recorded_at: u64,
+    source_kind: &str,
+    statement_json: &serde_json::Value,
+) -> Result<(), ReceiptStoreError> {
+    let child_receipt_id = sanitize_required_identifier(
+        "receipt lineage statement",
+        child_receipt_id,
+        "child_receipt_id",
+        child_receipt_id,
+    )?;
+    let extracted = extract_receipt_lineage_statement_identifiers(statement_json);
+    if let Some(extracted_child_receipt_id) = extracted.child_receipt_id.as_deref() {
+        let extracted_child_receipt_id = sanitize_required_identifier(
+            "receipt lineage statement",
+            &child_receipt_id,
+            "statement.child_receipt_id",
+            extracted_child_receipt_id,
+        )?;
+        if extracted_child_receipt_id != child_receipt_id {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "receipt lineage statement `{child_receipt_id}` conflicts with signed child_receipt_id `{extracted_child_receipt_id}`"
+            )));
+        }
+    }
+
+    let existing = tx
+        .query_row(
+            r#"
+            SELECT statement_id, request_id, session_id, session_anchor_id, parent_request_id, parent_receipt_id, chain_id
+            FROM receipt_lineage_statements
+            WHERE receipt_id = ?1
+            "#,
+            params![&child_receipt_id],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, Option<String>>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                    row.get::<_, Option<String>>(6)?,
+                ))
+            },
+        )
+        .optional()?;
+    let (
+        existing_statement_id,
+        existing_request_id,
+        existing_session_id,
+        existing_session_anchor_id,
+        existing_parent_request_id,
+        existing_parent_receipt_id,
+        existing_chain_id,
+    ) = existing.unwrap_or((None, None, None, None, None, None, None));
+
+    let statement_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "statement_id",
+        existing_statement_id,
+        extracted.statement_id.as_deref(),
+    )?;
+
+    let request_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "request_id",
+        existing_request_id,
+        extracted.child_request_id.as_deref().or(request_id),
+    )?;
+    let session_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "session_id",
+        existing_session_id,
+        session_id,
+    )?;
+    let session_anchor_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "session_anchor_id",
+        existing_session_anchor_id,
+        extracted
+            .child_session_anchor_id
+            .as_deref()
+            .or(session_anchor_id),
+    )?;
+    let parent_request_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "parent_request_id",
+        existing_parent_request_id,
+        extracted.parent_request_id.as_deref().or(parent_request_id),
+    )?;
+    let parent_receipt_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "parent_receipt_id",
+        existing_parent_receipt_id,
+        extracted.parent_receipt_id.as_deref().or(parent_receipt_id),
+    )?;
+    let chain_id = merge_optional_identifier(
+        "receipt lineage statement",
+        &child_receipt_id,
+        "chain_id",
+        existing_chain_id,
+        chain_id,
+    )?;
+
+    if session_anchor_id.is_some() && session_id.is_none() {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "receipt lineage statement `{child_receipt_id}` requires session_id when session_anchor_id is present"
+        )));
+    }
+    if request_id.is_some() && session_id.is_none() {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "receipt lineage statement `{child_receipt_id}` requires session_id when request_id is present"
+        )));
+    }
+    if request_id.is_some() && parent_request_id.is_some() && request_id == parent_request_id {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "receipt lineage statement `{child_receipt_id}` cannot reuse request_id as parent_request_id"
+        )));
+    }
+    if parent_receipt_id.as_deref() == Some(child_receipt_id.as_str()) {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "receipt lineage statement `{child_receipt_id}` cannot point at itself as parent_receipt_id"
+        )));
+    }
+
+    let verification = build_receipt_lineage_verification_tx(
+        tx,
+        &child_receipt_id,
+        request_id.as_deref(),
+        session_id.as_deref(),
+        session_anchor_id.as_deref(),
+        parent_request_id.as_deref(),
+        parent_receipt_id.as_deref(),
+    )?;
+    let evidence_class = extract_lineage_evidence_class(statement_json);
+    let evidence_sources_json = extract_lineage_evidence_sources_json(statement_json)?;
+    let raw_json = serde_json::to_string(statement_json)?;
+    let json_sha256 = provenance_json_sha256(statement_json)?;
+
+    tx.execute(
+        r#"
+        INSERT INTO receipt_lineage_statements (
+            receipt_id,
+            statement_id,
+            request_id,
+            session_id,
+            session_anchor_id,
+            chain_id,
+            parent_request_id,
+            parent_receipt_id,
+            evidence_class,
+            evidence_sources_json,
+            verified_session_anchor,
+            verified_parent_request,
+            verified_parent_receipt,
+            replay_protected,
+            recorded_at,
+            source_kind,
+            json_sha256,
+            raw_json
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+        ON CONFLICT(receipt_id) DO UPDATE SET
+            statement_id = excluded.statement_id,
+            request_id = excluded.request_id,
+            session_id = excluded.session_id,
+            session_anchor_id = excluded.session_anchor_id,
+            chain_id = excluded.chain_id,
+            parent_request_id = excluded.parent_request_id,
+            parent_receipt_id = excluded.parent_receipt_id,
+            evidence_class = excluded.evidence_class,
+            evidence_sources_json = excluded.evidence_sources_json,
+            verified_session_anchor = excluded.verified_session_anchor,
+            verified_parent_request = excluded.verified_parent_request,
+            verified_parent_receipt = excluded.verified_parent_receipt,
+            replay_protected = excluded.replay_protected,
+            recorded_at = excluded.recorded_at,
+            source_kind = excluded.source_kind,
+            json_sha256 = excluded.json_sha256,
+            raw_json = excluded.raw_json
+        "#,
+        params![
+            &child_receipt_id,
+            statement_id.as_deref(),
+            request_id.as_deref(),
+            session_id.as_deref(),
+            session_anchor_id.as_deref(),
+            chain_id.as_deref(),
+            parent_request_id.as_deref(),
+            parent_receipt_id.as_deref(),
+            evidence_class.as_deref(),
+            evidence_sources_json.as_deref(),
+            sqlite_bool(verification.session_anchor_verified),
+            sqlite_bool(verification.parent_request_verified),
+            sqlite_bool(verification.parent_receipt_verified),
+            sqlite_bool(verification.replay_protected),
+            sqlite_i64(recorded_at, "receipt lineage statement recorded_at")?,
+            source_kind,
+            &json_sha256,
+            &raw_json,
+        ],
+    )?;
+    refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, &child_receipt_id)?;
+    Ok(())
+}
+
+fn ensure_receipt_lineage_statement_for_receipt_id_tx(
+    tx: &rusqlite::Transaction<'_>,
+    receipt_id: &str,
+) -> Result<(), ReceiptStoreError> {
+    if tx
+        .query_row(
+            "SELECT 1 FROM receipt_lineage_statements WHERE receipt_id = ?1 LIMIT 1",
+            params![receipt_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some()
+    {
+        refresh_receipt_lineage_verification_state_tx(tx, receipt_id)?;
+        refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
+        return Ok(());
+    }
+
+    let raw_json = tx
+        .query_row(
+            "SELECT raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
+            params![receipt_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    let Some(raw_json) = raw_json else {
+        return Ok(());
+    };
+    let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
+    let Some(governed) = extract_governed_transaction_metadata(&receipt) else {
+        refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
+        return Ok(());
+    };
+    let Some(call_chain) = governed.call_chain.as_ref() else {
+        refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
+        return Ok(());
+    };
+
+    persist_receipt_lineage_statement_tx(
+        tx,
+        &receipt.id,
+        None,
+        None,
+        None,
+        Some(call_chain.parent_request_id.as_str()),
+        call_chain.parent_receipt_id.as_deref(),
+        Some(call_chain.chain_id.as_str()),
+        receipt.timestamp,
+        GOVERNED_RECEIPT_BACKFILL_SOURCE_KIND,
+        &serde_json::to_value(call_chain)?,
+    )?;
+    Ok(())
+}
+
+fn load_receipt_lineage_verification(
+    connection: &Connection,
+    receipt_id: &str,
+) -> Result<Option<ReceiptLineageVerification>, ReceiptStoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT receipt_id, request_id, session_id, session_anchor_id,
+                   verified_session_anchor, verified_parent_request,
+                   verified_parent_receipt, replay_protected
+            FROM receipt_lineage_statements
+            WHERE receipt_id = ?1
+            "#,
+            params![receipt_id],
+            |row| {
+                Ok(ReceiptLineageVerification {
+                    receipt_id: row.get::<_, String>(0)?,
+                    request_id: row.get::<_, Option<String>>(1)?,
+                    session_id: row.get::<_, Option<String>>(2)?,
+                    session_anchor_id: row.get::<_, Option<String>>(3)?,
+                    session_anchor_verified: row.get::<_, i64>(4)? != 0,
+                    parent_request_verified: row.get::<_, i64>(5)? != 0,
+                    parent_receipt_verified: row.get::<_, i64>(6)? != 0,
+                    replay_protected: row.get::<_, i64>(7)? != 0,
+                })
+            },
+        )
+        .optional()
+        .map_err(ReceiptStoreError::from)
+}
+
+fn load_receipt_lineage_statement_links(
+    connection: &Connection,
+    receipt_id: &str,
+) -> Result<Vec<ReceiptLineageStatementLink>, ReceiptStoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT statement_id,
+               receipt_id,
+               request_id,
+               parent_receipt_id,
+               parent_request_id,
+               session_id,
+               session_anchor_id,
+               chain_id,
+               recorded_at
+        FROM receipt_lineage_statements
+        WHERE receipt_id = ?1
+           OR parent_receipt_id = ?1
+        ORDER BY recorded_at ASC, receipt_id ASC
+        "#,
+    )?;
+    let rows = statement
+        .query_map(params![receipt_id], |row| {
+            let recorded_at = row.get::<_, i64>(8)?;
+            let recorded_at = u64::try_from(recorded_at)
+                .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(8, recorded_at))?;
+            Ok(ReceiptLineageStatementLink {
+                statement_id: row.get::<_, Option<String>>(0)?,
+                child_receipt_id: row.get::<_, String>(1)?,
+                child_request_id: row.get::<_, Option<String>>(2)?,
+                parent_receipt_id: row.get::<_, Option<String>>(3)?,
+                parent_request_id: row.get::<_, Option<String>>(4)?,
+                session_id: row.get::<_, Option<String>>(5)?,
+                session_anchor_id: row.get::<_, Option<String>>(6)?,
+                chain_id: row.get::<_, Option<String>>(7)?,
+                recorded_at,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(rows)
+}
+
+pub(crate) fn backfill_provenance_lineage_tables(
+    connection: &mut Connection,
+) -> Result<(), ReceiptStoreError> {
+    let tx = connection.transaction()?;
+
+    let child_rows = {
+        let mut statement =
+            tx.prepare("SELECT raw_json FROM arc_child_receipts ORDER BY timestamp ASC, seq ASC")?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    for raw_json in child_rows {
+        let receipt: ChildRequestReceipt = serde_json::from_str(&raw_json)?;
+        persist_request_lineage_tx(
+            &tx,
+            receipt.session_id.as_str(),
+            receipt.request_id.as_str(),
+            Some(receipt.parent_request_id.as_str()),
+            None,
+            receipt.timestamp,
+            None,
+            CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
+            &serde_json::from_str::<serde_json::Value>(&raw_json)?,
+        )?;
+    }
+
+    let tool_receipt_ids = {
+        let mut statement =
+            tx.prepare("SELECT receipt_id FROM arc_tool_receipts ORDER BY timestamp ASC, seq ASC")?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows
+    };
+    for receipt_id in tool_receipt_ids {
+        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt_id)?;
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
 impl SqliteReceiptStore {
+    #[allow(dead_code)]
+    pub(crate) fn claim_tree_canonical_bytes_range(
+        &self,
+        start_entry_seq: u64,
+        end_entry_seq: u64,
+    ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
+        let connection = self.connection()?;
+        load_claim_tree_canonical_bytes_range(&connection, start_entry_seq, end_entry_seq)
+    }
+
+    pub fn record_session_anchor_record(
+        &self,
+        session_id: &str,
+        anchor_id: &str,
+        auth_context_fingerprint: &str,
+        issued_at: u64,
+        supersedes_anchor_id: Option<&str>,
+        anchor_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        persist_session_anchor_tx(
+            &tx,
+            session_id,
+            anchor_id,
+            auth_context_fingerprint,
+            issued_at,
+            supersedes_anchor_id,
+            SESSION_ANCHOR_SOURCE_KIND,
+            anchor_json,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn record_request_lineage_record(
+        &self,
+        session_id: &str,
+        request_id: &str,
+        parent_request_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        recorded_at: u64,
+        request_fingerprint: Option<&str>,
+        lineage_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        persist_request_lineage_tx(
+            &tx,
+            session_id,
+            request_id,
+            parent_request_id,
+            session_anchor_id,
+            recorded_at,
+            request_fingerprint,
+            REQUEST_LINEAGE_SOURCE_KIND,
+            lineage_json,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn record_receipt_lineage_statement_record(
+        &self,
+        child_receipt_id: &str,
+        request_id: Option<&str>,
+        session_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        parent_request_id: Option<&str>,
+        parent_receipt_id: Option<&str>,
+        chain_id: Option<&str>,
+        recorded_at: u64,
+        statement_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        persist_receipt_lineage_statement_tx(
+            &tx,
+            child_receipt_id,
+            request_id,
+            session_id,
+            session_anchor_id,
+            parent_request_id,
+            parent_receipt_id,
+            chain_id,
+            recorded_at,
+            RECEIPT_LINEAGE_SOURCE_KIND,
+            statement_json,
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn list_receipt_lineage_statement_links(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Vec<ReceiptLineageStatementLink>, ReceiptStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, receipt_id)?;
+        refresh_receipt_lineage_rows_for_parent_receipt_tx(&tx, receipt_id)?;
+        let links = load_receipt_lineage_statement_links(&tx, receipt_id)?;
+        tx.commit()?;
+        Ok(links)
+    }
+
+    pub fn receipt_lineage_verification(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ReceiptLineageVerification>, ReceiptStoreError> {
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, receipt_id)?;
+        let verification = load_receipt_lineage_verification(&tx, receipt_id)?;
+        tx.commit()?;
+        Ok(verification)
+    }
+
     pub fn append_child_receipt_record(
         &self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
-        self.connection()?.execute(
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        tx.execute(
             r#"
             INSERT INTO arc_child_receipts (
                 receipt_id,
@@ -1601,25 +4084,43 @@ impl SqliteReceiptStore {
                 terminal_state_kind(&receipt.terminal_state),
                 receipt.policy_hash,
                 receipt.outcome_hash,
-                raw_json,
+                &raw_json,
             ],
         )?;
+        persist_request_lineage_tx(
+            &tx,
+            receipt.session_id.as_str(),
+            receipt.request_id.as_str(),
+            Some(receipt.parent_request_id.as_str()),
+            None,
+            receipt.timestamp,
+            None,
+            CHILD_RECEIPT_BACKFILL_SOURCE_KIND,
+            &serde_json::from_str::<serde_json::Value>(&raw_json)?,
+        )?;
+        tx.commit()?;
         Ok(())
     }
 }
 
 impl ReceiptStore for SqliteReceiptStore {
     fn append_arc_receipt(&mut self, receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt).map(|_| ())
+        self.append_arc_receipt_returning_seq(receipt).map(|_| ())
     }
 
     fn append_arc_receipt_returning_seq(
         &mut self,
         receipt: &ArcReceipt,
     ) -> Result<Option<u64>, ReceiptStoreError> {
-        Ok(Some(SqliteReceiptStore::append_arc_receipt_returning_seq(
-            self, receipt,
-        )?))
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        verify_latest_checkpoint_integrity(&connection)?;
+        let seq = SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt)?;
+        let mut connection = self.connection()?;
+        let tx = connection.transaction()?;
+        ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
+        tx.commit()?;
+        Ok(Some(seq))
     }
 
     fn receipts_canonical_bytes_range(
@@ -1631,7 +4132,92 @@ impl ReceiptStore for SqliteReceiptStore {
     }
 
     fn store_checkpoint(&mut self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
-        SqliteReceiptStore::store_checkpoint(self, checkpoint)
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+
+        arc_kernel::checkpoint::validate_checkpoint(checkpoint)
+            .map_err(checkpoint_error_to_receipt_store)?;
+        if let Some(existing) =
+            load_persisted_checkpoint_row(&connection, checkpoint.body.checkpoint_seq)?
+        {
+            let existing = parse_persisted_checkpoint_row(existing)?;
+            if existing == *checkpoint {
+                return Ok(());
+            }
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint {} already exists with different content",
+                checkpoint.body.checkpoint_seq
+            )));
+        }
+
+        match verify_checkpoint_chain_integrity(&connection)? {
+            Some(predecessor) => {
+                if checkpoint.body.checkpoint_seq <= predecessor.body.checkpoint_seq {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "checkpoint {} must be appended after existing checkpoint {}",
+                        checkpoint.body.checkpoint_seq, predecessor.body.checkpoint_seq
+                    )));
+                }
+                arc_kernel::checkpoint::validate_checkpoint_predecessor(&predecessor, checkpoint)
+                    .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "checkpoint predecessor continuity violation: {error}"
+                    ))
+                })?;
+            }
+            None if checkpoint.body.checkpoint_seq != 1 => {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} cannot initialize an empty checkpoint log",
+                    checkpoint.body.checkpoint_seq
+                )));
+            }
+            None => {}
+        }
+
+        let statement_json = serde_json::to_string(&checkpoint.body)?;
+        connection.execute(
+            r#"
+            INSERT INTO kernel_checkpoints (
+                checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
+                merkle_root, issued_at, statement_json, signature, kernel_key
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#,
+            params![
+                sqlite_i64(checkpoint.body.checkpoint_seq, "checkpoint_seq")?,
+                sqlite_i64(checkpoint.body.batch_start_seq, "batch_start_seq")?,
+                sqlite_i64(checkpoint.body.batch_end_seq, "batch_end_seq")?,
+                sqlite_i64(checkpoint.body.tree_size as u64, "tree_size")?,
+                checkpoint.body.merkle_root.to_hex(),
+                sqlite_i64(checkpoint.body.issued_at, "issued_at")?,
+                statement_json,
+                checkpoint.signature.to_hex(),
+                checkpoint.body.kernel_key.to_hex(),
+            ],
+        )?;
+
+        let stored = load_persisted_checkpoint_row(&connection, checkpoint.body.checkpoint_seq)?
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} was not visible after persistence",
+                    checkpoint.body.checkpoint_seq
+                ))
+            })?;
+        let stored = parse_persisted_checkpoint_row(stored)?;
+        if stored != *checkpoint {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint {} persisted with conflicting contents",
+                checkpoint.body.checkpoint_seq
+            )));
+        }
+
+        Ok(())
+    }
+
+    fn load_checkpoint_by_seq(
+        &self,
+        checkpoint_seq: u64,
+    ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
+        SqliteReceiptStore::load_checkpoint_by_seq(self, checkpoint_seq)
     }
 
     fn supports_kernel_signed_checkpoints(&self) -> bool {
@@ -1652,6 +4238,107 @@ impl ReceiptStore for SqliteReceiptStore {
                 arc_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
             },
         )
+    }
+
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<arc_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+        SqliteReceiptStore::get_lineage(self, capability_id).map_err(|error| match error {
+            arc_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            arc_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            arc_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
+    }
+
+    fn get_capability_delegation_chain(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<arc_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+        SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| match error {
+            arc_kernel::CapabilityLineageError::ReceiptStore(error) => error,
+            arc_kernel::CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+            arc_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+        })
+    }
+
+    fn record_session_anchor(
+        &mut self,
+        session_id: &str,
+        anchor_id: &str,
+        auth_context_fingerprint: &str,
+        issued_at: u64,
+        supersedes_anchor_id: Option<&str>,
+        anchor_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_session_anchor_record(
+            session_id,
+            anchor_id,
+            auth_context_fingerprint,
+            issued_at,
+            supersedes_anchor_id,
+            anchor_json,
+        )
+    }
+
+    fn record_request_lineage(
+        &mut self,
+        session_id: &str,
+        request_id: &str,
+        parent_request_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        recorded_at: u64,
+        request_fingerprint: Option<&str>,
+        lineage_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_request_lineage_record(
+            session_id,
+            request_id,
+            parent_request_id,
+            session_anchor_id,
+            recorded_at,
+            request_fingerprint,
+            lineage_json,
+        )
+    }
+
+    fn record_receipt_lineage_statement(
+        &mut self,
+        child_receipt_id: &str,
+        request_id: Option<&str>,
+        session_id: Option<&str>,
+        session_anchor_id: Option<&str>,
+        parent_request_id: Option<&str>,
+        parent_receipt_id: Option<&str>,
+        chain_id: Option<&str>,
+        recorded_at: u64,
+        statement_json: &serde_json::Value,
+    ) -> Result<(), ReceiptStoreError> {
+        self.record_receipt_lineage_statement_record(
+            child_receipt_id,
+            request_id,
+            session_id,
+            session_anchor_id,
+            parent_request_id,
+            parent_receipt_id,
+            chain_id,
+            recorded_at,
+            statement_json,
+        )
+    }
+
+    fn get_receipt_lineage_verification(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Option<ReceiptLineageVerification>, ReceiptStoreError> {
+        self.receipt_lineage_verification(receipt_id)
+    }
+
+    fn list_receipt_lineage_statement_links(
+        &self,
+        receipt_id: &str,
+    ) -> Result<Vec<ReceiptLineageStatementLink>, ReceiptStoreError> {
+        SqliteReceiptStore::list_receipt_lineage_statement_links(self, receipt_id)
     }
 
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
@@ -1680,7 +4367,85 @@ impl ReceiptStore for SqliteReceiptStore {
         &mut self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        verify_latest_checkpoint_integrity(&connection)?;
         SqliteReceiptStore::append_child_receipt_record(self, receipt)
+    }
+}
+
+impl SqliteReceiptStore {
+    pub fn record_checkpoint_publication_trust_anchor_binding(
+        &mut self,
+        checkpoint_seq: u64,
+        binding: &arc_core::receipt::CheckpointPublicationTrustAnchorBinding,
+    ) -> Result<(), ReceiptStoreError> {
+        binding
+            .validate()
+            .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
+        let checkpoint = self
+            .load_checkpoint_by_seq(checkpoint_seq)?
+            .ok_or_else(|| {
+                ReceiptStoreError::NotFound(format!(
+                    "checkpoint {} does not exist for publication binding",
+                    checkpoint_seq
+                ))
+            })?;
+        let publication = arc_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+            &checkpoint,
+            binding.clone(),
+        )
+        .map_err(checkpoint_error_to_receipt_store)?;
+        let normalized_binding = publication.trust_anchor_binding.ok_or_else(|| {
+            ReceiptStoreError::Conflict(format!(
+                "checkpoint {} trust-anchor binding was not preserved during validation",
+                checkpoint_seq
+            ))
+        })?;
+
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        ensure_transparency_projection_guards(&connection)?;
+
+        let existing = connection
+            .query_row(
+                r#"
+                SELECT binding_json
+                FROM checkpoint_publication_trust_anchor_bindings
+                WHERE checkpoint_seq = ?1
+                "#,
+                params![sqlite_i64(checkpoint_seq, "checkpoint_seq")?],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        match existing {
+            Some(binding_json) => {
+                let existing_binding: arc_core::receipt::CheckpointPublicationTrustAnchorBinding =
+                    serde_json::from_str(&binding_json)?;
+                if existing_binding == normalized_binding {
+                    return Ok(());
+                }
+                Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} already has a different trust-anchor publication binding",
+                    checkpoint_seq
+                )))
+            }
+            None => {
+                connection.execute(
+                    r#"
+                    INSERT INTO checkpoint_publication_trust_anchor_bindings (
+                        checkpoint_seq,
+                        binding_json
+                    ) VALUES (?1, ?2)
+                    "#,
+                    params![
+                        sqlite_i64(checkpoint_seq, "checkpoint_seq")?,
+                        serde_json::to_string(&normalized_binding)?,
+                    ],
+                )?;
+                Ok(())
+            }
+        }
     }
 }
 

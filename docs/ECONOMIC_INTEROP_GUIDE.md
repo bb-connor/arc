@@ -150,8 +150,10 @@ IAM reviewers:
 - request-time hosted authorization uses the same bounded
   `authorization_details` and `transactionContext` story rather than a second
   looser OAuth payload model.
-- `transactionContext.callChain` shows delegated provenance when the request
-  continued from an upstream governed flow.
+- `transactionContext.callChain` preserves delegated provenance when the
+  request continued from an upstream governed flow, and the accompanying
+  `evidenceClass` shows whether ARC only preserved an assertion or
+  corroborated that lineage locally or cryptographically.
 - `/v1/reports/authorization-profile-metadata` gives the canonical profile id,
   discovery paths, supported field families, and explicit non-goals without
   requiring a reviewer to reconstruct ARC semantics from the raw report alone.

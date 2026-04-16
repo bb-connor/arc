@@ -20,6 +20,14 @@ fn hosted_mcp_sessions_initialize_resume_and_report_ready_state() {
         trust["lifecycle"]["reconnect"]["resumable"].as_bool(),
         Some(true)
     );
+    assert_eq!(
+        trust["ownership"]["hostedIsolation"].as_str(),
+        Some("dedicated_per_session")
+    );
+    assert_eq!(
+        trust["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("strong_dedicated_session")
+    );
 
     let list = server.list_tools(&session);
     let tools = list["result"]["tools"].as_array().expect("tools array");

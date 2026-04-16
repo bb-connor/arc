@@ -1,0 +1,194 @@
+{
+  "schema_version": "3.1.0",
+  "provider": "StratosNetworks",
+  "scope": "global",
+  "description": "Global edge policies applied across all tenants on the Stratos Networks edge platform",
+  "last_modified": "2026-04-14T08:30:00Z",
+  "last_modified_by": "platform-automation@stratos-networks.com",
+  "rules": [
+    {
+      "name": "global-ddos-mitigation-v9",
+      "description": "Layer 7 DDoS mitigation with adaptive rate limiting across all tenant traffic",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 1000,
+      "scope": "all_tenants",
+      "tenant_override_allowed": false,
+      "created_at": "2025-06-15T00:00:00Z",
+      "last_modified": "2026-03-22T14:00:00Z",
+      "owner": "stratos-security-ops",
+      "conditions": {
+        "request_rate_per_ip": {
+          "threshold": 10000,
+          "window_seconds": 60,
+          "adaptive": true,
+          "adaptive_sensitivity": 0.8
+        }
+      },
+      "action": {
+        "type": "rate_limit_then_block",
+        "initial_action": "challenge",
+        "block_after_failures": 3,
+        "block_duration_seconds": 300
+      }
+    },
+    {
+      "name": "global-tls-enforcement-v4",
+      "description": "Enforce minimum TLS 1.2 on all connections, prefer TLS 1.3",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 999,
+      "scope": "all_tenants",
+      "tenant_override_allowed": false,
+      "created_at": "2025-03-01T00:00:00Z",
+      "last_modified": "2025-12-10T09:00:00Z",
+      "owner": "stratos-security-ops",
+      "conditions": {
+        "tls_version_below": "1.2"
+      },
+      "action": {
+        "type": "connection_close",
+        "response_code": 426,
+        "response_header": "Upgrade: TLS/1.2"
+      }
+    },
+    {
+      "name": "global-sanctioned-region-v7",
+      "description": "Master sanctioned region list applied at the edge for all tenants. Tenant-specific rules further restrict based on their compliance requirements.",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 950,
+      "scope": "all_tenants",
+      "tenant_override_allowed": false,
+      "created_at": "2025-04-20T00:00:00Z",
+      "last_modified": "2026-04-13T22:00:00Z",
+      "owner": "stratos-compliance",
+      "conditions": {
+        "geo_match": {
+          "feed": "stratos-sanctioned-regions-v7",
+          "feed_source": "https://threatfeed.stratos-networks.com/sanctioned/v7",
+          "feed_last_updated": "2026-04-13T22:00:00Z",
+          "feed_entries": 847,
+          "classification_mode": "permissive",
+          "include_cloud_provider_ips": false,
+          "note": "Global rule uses permissive mode and excludes cloud provider IPs. Tenant-specific rules may use strict mode at their own discretion."
+        }
+      },
+      "action": {
+        "type": "block",
+        "response_code": 403,
+        "log_level": "warn"
+      }
+    },
+    {
+      "name": "global-header-security-v3",
+      "description": "Inject standard security response headers on all tenant responses",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 500,
+      "scope": "all_tenants",
+      "tenant_override_allowed": true,
+      "created_at": "2025-07-10T00:00:00Z",
+      "last_modified": "2026-02-01T11:00:00Z",
+      "owner": "stratos-platform-eng",
+      "conditions": {
+        "path_match": ["/*"]
+      },
+      "action": {
+        "type": "add_response_headers",
+        "headers": {
+          "X-Content-Type-Options": "nosniff",
+          "X-Frame-Options": "DENY",
+          "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+          "X-XSS-Protection": "0",
+          "Referrer-Policy": "strict-origin-when-cross-origin"
+        }
+      }
+    },
+    {
+      "name": "global-observability-v2",
+      "description": "Inject trace context headers and emit edge telemetry for all tenant traffic",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 400,
+      "scope": "all_tenants",
+      "tenant_override_allowed": false,
+      "created_at": "2025-09-01T00:00:00Z",
+      "last_modified": "2026-01-15T16:30:00Z",
+      "owner": "stratos-platform-eng",
+      "conditions": {
+        "path_match": ["/*"]
+      },
+      "action": {
+        "type": "add_request_headers",
+        "headers": {
+          "X-Stratos-Edge-Pop": "${pop_id}",
+          "X-Stratos-Edge-Request-Id": "${request_id}",
+          "X-Stratos-Edge-Timestamp": "${timestamp_ms}"
+        },
+        "telemetry": {
+          "emit_to": "stratos-otel-collector",
+          "sample_rate": 0.1,
+          "include_response_timing": true
+        }
+      }
+    },
+    {
+      "name": "global-cache-policy-v5",
+      "description": "Default caching behavior for static and semi-static content across tenants",
+      "enabled": true,
+      "mode": "enforcing",
+      "priority": 300,
+      "scope": "all_tenants",
+      "tenant_override_allowed": true,
+      "created_at": "2025-05-12T00:00:00Z",
+      "last_modified": "2026-03-05T13:45:00Z",
+      "owner": "stratos-platform-eng",
+      "conditions": {
+        "path_match": ["*.js", "*.css", "*.woff2", "*.png", "*.jpg", "*.svg"],
+        "method": ["GET", "HEAD"]
+      },
+      "action": {
+        "type": "cache",
+        "ttl_seconds": 86400,
+        "stale_while_revalidate_seconds": 3600,
+        "respect_origin_headers": true,
+        "cache_key_includes": ["path", "query_string", "accept_encoding"]
+      }
+    },
+    {
+      "name": "global-rollback-armed-v2",
+      "description": "Emergency rollback trigger that can instantly disable all tenant-specific edge rules",
+      "enabled": true,
+      "mode": "armed",
+      "priority": 10000,
+      "scope": "all_tenants",
+      "tenant_override_allowed": false,
+      "created_at": "2025-11-20T00:00:00Z",
+      "last_modified": "2026-04-01T08:00:00Z",
+      "owner": "stratos-incident-response",
+      "conditions": {
+        "trigger": "manual",
+        "authorized_roles": ["incident-commander", "platform-oncall-l3"],
+        "confirmation_required": true
+      },
+      "action": {
+        "type": "disable_tenant_rules",
+        "scope": "specified_tenant_or_all",
+        "log_level": "critical",
+        "notification_channels": ["pagerduty", "slack-stratos-incidents"]
+      }
+    }
+  ],
+  "feed_metadata": {
+    "sanctioned_regions_v7": {
+      "source": "https://threatfeed.stratos-networks.com/sanctioned/v7",
+      "last_updated": "2026-04-13T22:00:00Z",
+      "entry_count": 847,
+      "previous_update": "2026-04-06T22:00:00Z",
+      "previous_entry_count": 312,
+      "changelog": "Added cloud provider IP ranges for 14 additional sanctioned sub-regions per OFAC guidance update 2026-Q2. Expanded coverage from direct-allocation IPs only to include cloud provider presence in sanctioned jurisdictions.",
+      "note": "Entry count increase from 312 to 847 reflects expanded cloud provider IP coverage. Tenants using strict classification mode with include_cloud_provider_ips=true will see significantly broader blocking surface."
+    }
+  }
+}

@@ -2,11 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use arc_core::appraisal::AttestationVerifierFamily;
 use arc_core::capability::{
-    GovernedCallChainContext, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
+    GovernedCallChainProvenance, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
 };
 use arc_core::receipt::{
-    ArcReceipt, Decision, GovernedTransactionReceiptMetadata, MeteredUsageEvidenceReceiptMetadata,
-    SettlementStatus, SignedExportEnvelope,
+    ArcReceipt, Decision, FinancialBudgetAuthorityReceiptMetadata,
+    GovernedTransactionReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, SettlementStatus,
+    SignedExportEnvelope,
 };
 use arc_core::session::ArcIdentityAssertion;
 use arc_core::{
@@ -14,7 +15,9 @@ use arc_core::{
 };
 
 use crate::cost_attribution::CostAttributionQuery;
-use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
+use crate::evidence_export::{
+    EvidenceChildReceiptScope, EvidenceExportQuery, EvidenceLineageReferences,
+};
 use crate::receipt_analytics::{AnalyticsTimeBucket, ReceiptAnalyticsResponse};
 use crate::receipt_query::ReceiptQuery;
 use crate::receipt_store::FederatedEvidenceShareSummary;
@@ -474,6 +477,8 @@ pub struct SettlementReconciliationRow {
     pub cost_charged: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_authority: Option<FinancialBudgetAuthorityReceiptMetadata>,
     pub reconciliation_state: SettlementReconciliationState,
     pub action_required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -544,6 +549,8 @@ pub struct MeteredBillingReconciliationRow {
     pub financial_cost_charged: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub financial_currency: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_authority: Option<FinancialBudgetAuthorityReceiptMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<MeteredBillingEvidenceRecord>,
     pub reconciliation_state: MeteredBillingReconciliationState,
@@ -627,9 +634,25 @@ pub struct GovernedAuthorizationTransactionContext {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance_evidence_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub call_chain: Option<GovernedCallChainContext>,
+    pub call_chain: Option<GovernedCallChainProvenance>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity_assertion: Option<ArcIdentityAssertion>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedTransactionDiagnostics {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asserted_call_chain: Option<GovernedCallChainProvenance>,
+    #[serde(default, skip_serializing_if = "EvidenceLineageReferences::is_empty")]
+    pub lineage_references: EvidenceLineageReferences,
+}
+
+impl GovernedTransactionDiagnostics {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.asserted_call_chain.is_none() && self.lineage_references.is_empty()
+    }
 }
 
 fn default_authorization_context_report_schema() -> String {
@@ -824,11 +847,17 @@ pub struct AuthorizationContextSummary {
     pub metered_billing_receipts: u64,
     pub runtime_assurance_receipts: u64,
     pub call_chain_receipts: u64,
+    pub asserted_call_chain_receipts: u64,
+    pub observed_call_chain_receipts: u64,
+    pub verified_call_chain_receipts: u64,
     pub max_amount_receipts: u64,
     pub sender_bound_receipts: u64,
     pub dpop_bound_receipts: u64,
     pub runtime_assurance_bound_receipts: u64,
     pub delegated_sender_bound_receipts: u64,
+    pub session_anchor_receipts: u64,
+    pub request_lineage_receipts: u64,
+    pub receipt_lineage_statement_receipts: u64,
     pub truncated: bool,
 }
 
@@ -864,6 +893,8 @@ pub struct AuthorizationContextRow {
     pub decision: Decision,
     pub authorization_details: Vec<GovernedAuthorizationDetail>,
     pub transaction_context: GovernedAuthorizationTransactionContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_transaction_diagnostics: Option<GovernedTransactionDiagnostics>,
     pub sender_constraint: AuthorizationContextSenderConstraint,
 }
 
@@ -931,6 +962,12 @@ pub struct ArcOAuthAuthorizationReviewPackSummary {
     pub dpop_required_receipts: u64,
     pub runtime_assurance_receipts: u64,
     pub delegated_call_chain_receipts: u64,
+    pub asserted_call_chain_receipts: u64,
+    pub observed_call_chain_receipts: u64,
+    pub verified_call_chain_receipts: u64,
+    pub session_anchor_receipts: u64,
+    pub request_lineage_receipts: u64,
+    pub receipt_lineage_statement_receipts: u64,
     pub truncated: bool,
 }
 
@@ -941,6 +978,8 @@ pub struct ArcOAuthAuthorizationReviewPackRecord {
     pub capability_id: String,
     pub authorization_context: AuthorizationContextRow,
     pub governed_transaction: GovernedTransactionReceiptMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_transaction_diagnostics: Option<GovernedTransactionDiagnostics>,
     pub signed_receipt: ArcReceipt,
 }
 
@@ -1093,7 +1132,11 @@ pub struct BehavioralFeedReceiptRow {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub currency: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_authority: Option<FinancialBudgetAuthorityReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub governed: Option<GovernedTransactionReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_transaction_diagnostics: Option<GovernedTransactionDiagnostics>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metered_reconciliation: Option<BehavioralFeedMeteredBillingRow>,
 }
@@ -1157,6 +1200,11 @@ pub struct OperatorReport {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use arc_core::capability::{GovernedCallChainContext, GovernedProvenanceEvidenceClass};
+    use arc_core::receipt::{
+        FinancialBudgetAuthorizeReceiptMetadata, FinancialBudgetAuthorityReceiptMetadata,
+        FinancialBudgetHoldAuthorityMetadata, FinancialBudgetTerminalReceiptMetadata,
+    };
 
     #[test]
     fn operator_report_behavioral_feed_query_clamps_limit_and_translates_filters() {
@@ -1225,6 +1273,201 @@ mod tests {
         assert_eq!(
             query.authorization_limit_or_default(),
             MAX_AUTHORIZATION_CONTEXT_LIMIT
+        );
+    }
+
+    #[test]
+    fn governed_transaction_diagnostics_serialization_omits_empty_fields() {
+        let diagnostics = GovernedTransactionDiagnostics::default();
+
+        assert!(diagnostics.is_empty());
+        assert_eq!(
+            serde_json::to_value(diagnostics).unwrap(),
+            serde_json::json!({})
+        );
+    }
+
+    #[test]
+    fn governed_transaction_diagnostics_preserves_asserted_call_chain_and_lineage_references() {
+        let diagnostics = GovernedTransactionDiagnostics {
+            asserted_call_chain: Some(GovernedCallChainProvenance::asserted(
+                GovernedCallChainContext {
+                    chain_id: "chain-1".to_string(),
+                    parent_request_id: "req-parent-1".to_string(),
+                    parent_receipt_id: Some("rcpt-parent-1".to_string()),
+                    origin_subject: "origin".to_string(),
+                    delegator_subject: "delegator".to_string(),
+                },
+            )),
+            lineage_references: EvidenceLineageReferences {
+                session_anchor_id: Some("anchor-1".to_string()),
+                request_lineage_id: Some("req-lineage-1".to_string()),
+                receipt_lineage_statement_id: Some("stmt-1".to_string()),
+            },
+        };
+
+        let value = serde_json::to_value(&diagnostics).unwrap();
+
+        assert_eq!(
+            value["assertedCallChain"]["evidenceClass"],
+            serde_json::json!("asserted")
+        );
+        assert_eq!(value["lineageReferences"]["sessionAnchorId"], "anchor-1");
+        assert_eq!(
+            diagnostics
+                .asserted_call_chain
+                .as_ref()
+                .map(|call_chain| call_chain.evidence_class),
+            Some(GovernedProvenanceEvidenceClass::Asserted)
+        );
+    }
+
+    #[test]
+    fn settlement_reconciliation_row_serialization_preserves_budget_authority_metadata() {
+        let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
+            guarantee_level: "ha_quorum_commit".to_string(),
+            authority_profile: "ha".to_string(),
+            metering_profile: "metered".to_string(),
+            hold_id: "hold-1".to_string(),
+            budget_term: Some("term-7".to_string()),
+            authority: Some(FinancialBudgetHoldAuthorityMetadata {
+                authority_id: "http://leader-a".to_string(),
+                lease_id: "lease-7".to_string(),
+                lease_epoch: 7,
+            }),
+            authorize: FinancialBudgetAuthorizeReceiptMetadata {
+                event_id: Some("hold-1:authorize".to_string()),
+                budget_commit_index: Some(41),
+                exposure_units: 120,
+                committed_cost_units_after: 120,
+            },
+            terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+                disposition: "reconciled".to_string(),
+                event_id: Some("hold-1:reconcile".to_string()),
+                budget_commit_index: Some(42),
+                exposure_units: 120,
+                realized_spend_units: 75,
+                committed_cost_units_after: 75,
+            }),
+        };
+        let row = SettlementReconciliationRow {
+            receipt_id: "rcpt-1".to_string(),
+            timestamp: 42,
+            capability_id: "cap-1".to_string(),
+            subject_key: Some("subject-1".to_string()),
+            tool_server: "payments".to_string(),
+            tool_name: "charge".to_string(),
+            payment_reference: Some("payref-1".to_string()),
+            settlement_status: SettlementStatus::Pending,
+            cost_charged: Some(75),
+            currency: Some("usd".to_string()),
+            budget_authority: Some(budget_authority.clone()),
+            reconciliation_state: SettlementReconciliationState::Open,
+            action_required: true,
+            note: None,
+            updated_at: None,
+        };
+
+        let value = serde_json::to_value(&row).unwrap();
+
+        assert_eq!(
+            value["budgetAuthority"]["guarantee_level"],
+            serde_json::json!("ha_quorum_commit")
+        );
+        assert_eq!(
+            value["budgetAuthority"]["hold_id"],
+            serde_json::json!("hold-1")
+        );
+        assert_eq!(
+            value["budgetAuthority"]["authority"]["authority_id"],
+            serde_json::json!("http://leader-a")
+        );
+    }
+
+    #[test]
+    fn metered_and_behavioral_rows_serialize_budget_authority_metadata() {
+        let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
+            guarantee_level: "ha_quorum_commit".to_string(),
+            authority_profile: "ha".to_string(),
+            metering_profile: "metered".to_string(),
+            hold_id: "hold-2".to_string(),
+            budget_term: Some("term-8".to_string()),
+            authority: Some(FinancialBudgetHoldAuthorityMetadata {
+                authority_id: "http://leader-b".to_string(),
+                lease_id: "lease-8".to_string(),
+                lease_epoch: 8,
+            }),
+            authorize: FinancialBudgetAuthorizeReceiptMetadata {
+                event_id: Some("hold-2:authorize".to_string()),
+                budget_commit_index: Some(51),
+                exposure_units: 150,
+                committed_cost_units_after: 150,
+            },
+            terminal: None,
+        };
+
+        let metered = MeteredBillingReconciliationRow {
+            receipt_id: "rcpt-2".to_string(),
+            timestamp: 99,
+            capability_id: "cap-2".to_string(),
+            subject_key: None,
+            tool_server: "meter".to_string(),
+            tool_name: "bill".to_string(),
+            settlement_mode: MeteredSettlementMode::AllowThenSettle,
+            provider: "provider-1".to_string(),
+            quote_id: "quote-1".to_string(),
+            billing_unit: "tokens".to_string(),
+            quoted_units: 10,
+            quoted_cost: MonetaryAmount {
+                units: 50,
+                currency: "USD".to_string(),
+            },
+            max_billed_units: Some(10),
+            financial_cost_charged: Some(50),
+            financial_currency: Some("USD".to_string()),
+            budget_authority: Some(budget_authority.clone()),
+            evidence: None,
+            reconciliation_state: MeteredBillingReconciliationState::Open,
+            action_required: true,
+            evidence_missing: true,
+            exceeds_quoted_units: false,
+            exceeds_max_billed_units: false,
+            exceeds_quoted_cost: false,
+            financial_mismatch: false,
+            note: None,
+            updated_at: None,
+        };
+        let behavioral = BehavioralFeedReceiptRow {
+            receipt_id: "rcpt-3".to_string(),
+            timestamp: 100,
+            capability_id: "cap-3".to_string(),
+            subject_key: None,
+            issuer_key: None,
+            tool_server: "meter".to_string(),
+            tool_name: "bill".to_string(),
+            decision: Decision::Allow,
+            settlement_status: SettlementStatus::Settled,
+            reconciliation_state: SettlementReconciliationState::Reconciled,
+            action_required: false,
+            cost_charged: Some(50),
+            attempted_cost: Some(60),
+            currency: Some("USD".to_string()),
+            budget_authority: Some(budget_authority),
+            governed: None,
+            governed_transaction_diagnostics: None,
+            metered_reconciliation: None,
+        };
+
+        let metered_value = serde_json::to_value(&metered).unwrap();
+        let behavioral_value = serde_json::to_value(&behavioral).unwrap();
+
+        assert_eq!(
+            metered_value["budgetAuthority"]["guarantee_level"],
+            serde_json::json!("ha_quorum_commit")
+        );
+        assert_eq!(
+            behavioral_value["budgetAuthority"]["hold_id"],
+            serde_json::json!("hold-2")
         );
     }
 }

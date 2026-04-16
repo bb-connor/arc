@@ -1,0 +1,26 @@
+{
+  "id": "cap-019d93af-aa1e-7743-a08a-a4f4dc36cbec",
+  "issuer": "38397ea5cbbc26c600df6cc80336e2ff41137c128f84ace59903bc77e305a9eb",
+  "subject": "0000000000000000000000000000000000000000000000000000000000000000",
+  "scope": {
+    "grants": [
+      {
+        "server_id": "http-sidecar-client",
+        "tool_name": "procurement_quote_read",
+        "operations": [
+          "invoke"
+        ]
+      },
+      {
+        "server_id": "http-sidecar-client",
+        "tool_name": "procurement_job_write",
+        "operations": [
+          "invoke"
+        ]
+      }
+    ]
+  },
+  "issued_at": 1776299256,
+  "expires_at": 1776302856,
+  "signature": "54e9abe31ffe165fef2c53e8e2095e8a27020fc278390f5a45ad1d1b5df32cd0265e1787c0d21c2ed63539615eca013fe3761666b7f561406e9a3bf97fc49608"
+}

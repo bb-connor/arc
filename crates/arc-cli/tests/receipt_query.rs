@@ -25,8 +25,8 @@ use arc_core::appraisal::{
 };
 use arc_core::capability::{
     ArcScope, CapabilityToken, CapabilityTokenBody, GovernedAutonomyTier, GovernedCallChainContext,
-    MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, Operation, RuntimeAssuranceTier,
-    RuntimeAttestationEvidence, ToolGrant, WorkloadIdentity,
+    GovernedCallChainProvenance, MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount,
+    Operation, RuntimeAssuranceTier, RuntimeAttestationEvidence, ToolGrant, WorkloadIdentity,
 };
 use arc_core::credit::{
     CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode, CapitalBookSourceKind,
@@ -39,7 +39,9 @@ use arc_core::credit::{
 };
 use arc_core::crypto::Keypair;
 use arc_core::receipt::{
-    ArcReceipt, ArcReceiptBody, Decision, FinancialReceiptMetadata,
+    ArcReceipt, ArcReceiptBody, Decision, FinancialBudgetAuthorityReceiptMetadata,
+    FinancialBudgetAuthorizeReceiptMetadata, FinancialBudgetHoldAuthorityMetadata,
+    FinancialBudgetTerminalReceiptMetadata, FinancialReceiptMetadata,
     GovernedApprovalReceiptMetadata, GovernedCommerceReceiptMetadata,
     GovernedTransactionReceiptMetadata, MeteredBillingReceiptMetadata, ReceiptAttributionMetadata,
     RuntimeAssuranceReceiptMetadata, SettlementStatus, ToolCallAction,
@@ -613,6 +615,36 @@ fn make_financial_receipt(
     delegation_depth: u32,
 ) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
+        guarantee_level: "ha_quorum_commit".to_string(),
+        authority_profile: "authoritative_hold_event".to_string(),
+        metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
+        hold_id: format!("budget-hold:{id}:capability:0"),
+        budget_term: Some("http://leader-a:7".to_string()),
+        authority: Some(FinancialBudgetHoldAuthorityMetadata {
+            authority_id: "http://leader-a".to_string(),
+            lease_id: "http://leader-a#term-7".to_string(),
+            lease_epoch: 7,
+        }),
+        authorize: FinancialBudgetAuthorizeReceiptMetadata {
+            event_id: Some(format!("budget-hold:{id}:capability:0:authorize")),
+            budget_commit_index: Some(41),
+            exposure_units: cost_charged.max(attempted_cost.unwrap_or(0)),
+            committed_cost_units_after: cost_charged.max(attempted_cost.unwrap_or(0)),
+        },
+        terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+            disposition: if cost_charged == 0 {
+                "released".to_string()
+            } else {
+                "reconciled".to_string()
+            },
+            event_id: Some(format!("budget-hold:{id}:capability:0:terminal")),
+            budget_commit_index: Some(42),
+            exposure_units: cost_charged.max(attempted_cost.unwrap_or(0)),
+            realized_spend_units: cost_charged,
+            committed_cost_units_after: cost_charged,
+        }),
+    };
     let metadata = serde_json::json!({
         "attribution": subject_key.map(|subject_key| ReceiptAttributionMetadata {
             subject_key: subject_key.to_string(),
@@ -637,7 +669,8 @@ fn make_financial_receipt(
             cost_breakdown: None,
             oracle_evidence: None,
             attempted_cost,
-        }
+        },
+        "budget_authority": budget_authority,
     });
     ArcReceipt::sign(
         ArcReceiptBody {
@@ -662,6 +695,83 @@ fn make_financial_receipt(
     .unwrap()
 }
 
+fn make_financial_receipt_with_budget_authority(
+    id: &str,
+    capability_id: &str,
+    tool_server: &str,
+    tool_name: &str,
+    timestamp: u64,
+) -> ArcReceipt {
+    let keypair = Keypair::generate();
+    let metadata = serde_json::json!({
+        "financial": FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged: 75,
+            currency: "USD".to_string(),
+            budget_remaining: 925u64,
+            budget_total: 1000u64,
+            delegation_depth: 0,
+            root_budget_holder: "root-budget-holder".to_string(),
+            payment_reference: Some("pi-budget-lineage-1".to_string()),
+            settlement_status: SettlementStatus::Settled,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        },
+        "budget_authority": FinancialBudgetAuthorityReceiptMetadata {
+            guarantee_level: "ha_quorum_commit".to_string(),
+            authority_profile: "authoritative_hold_event".to_string(),
+            metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
+            hold_id: "budget-hold:req-query-1:cap-budget-lineage:0".to_string(),
+            budget_term: Some("http://leader-a:7".to_string()),
+            authority: Some(FinancialBudgetHoldAuthorityMetadata {
+                authority_id: "http://leader-a".to_string(),
+                lease_id: "http://leader-a#term-7".to_string(),
+                lease_epoch: 7,
+            }),
+            authorize: FinancialBudgetAuthorizeReceiptMetadata {
+                event_id: Some(
+                    "budget-hold:req-query-1:cap-budget-lineage:0:authorize".to_string(),
+                ),
+                budget_commit_index: Some(41),
+                exposure_units: 120,
+                committed_cost_units_after: 120,
+            },
+            terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+                disposition: "reconciled".to_string(),
+                event_id: Some(
+                    "budget-hold:req-query-1:cap-budget-lineage:0:reconcile".to_string(),
+                ),
+                budget_commit_index: Some(42),
+                exposure_units: 120,
+                realized_spend_units: 75,
+                committed_cost_units_after: 75,
+            }),
+        }
+    });
+    ArcReceipt::sign(
+        ArcReceiptBody {
+            id: id.to_string(),
+            timestamp,
+            capability_id: capability_id.to_string(),
+            tool_server: tool_server.to_string(),
+            tool_name: tool_name.to_string(),
+            action: ToolCallAction {
+                parameters: serde_json::json!({ "sku": "budget-lineage" }),
+                parameter_hash: format!("param-{id}"),
+            },
+            decision: Decision::Allow,
+            content_hash: format!("content-{id}"),
+            policy_hash: "policy-hash".to_string(),
+            evidence: Vec::new(),
+            metadata: Some(metadata),
+            kernel_key: keypair.public_key(),
+        },
+        &keypair,
+    )
+    .unwrap()
+}
+
 fn make_financial_receipt_with_settlement_status(
     id: &str,
     capability_id: &str,
@@ -673,6 +783,43 @@ fn make_financial_receipt_with_settlement_status(
     payment_reference: Option<&str>,
 ) -> ArcReceipt {
     let keypair = Keypair::generate();
+    let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
+        guarantee_level: "ha_quorum_commit".to_string(),
+        authority_profile: "authoritative_hold_event".to_string(),
+        metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
+        hold_id: format!("budget-hold:{id}:capability:0"),
+        budget_term: Some("http://leader-a:7".to_string()),
+        authority: Some(FinancialBudgetHoldAuthorityMetadata {
+            authority_id: "http://leader-a".to_string(),
+            lease_id: "http://leader-a#term-7".to_string(),
+            lease_epoch: 7,
+        }),
+        authorize: FinancialBudgetAuthorizeReceiptMetadata {
+            event_id: Some(format!("budget-hold:{id}:capability:0:authorize")),
+            budget_commit_index: Some(41),
+            exposure_units: cost_charged,
+            committed_cost_units_after: cost_charged,
+        },
+        terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+            disposition: match settlement_status {
+                SettlementStatus::Failed => "released".to_string(),
+                _ => "reconciled".to_string(),
+            },
+            event_id: Some(format!("budget-hold:{id}:capability:0:terminal")),
+            budget_commit_index: Some(42),
+            exposure_units: cost_charged,
+            realized_spend_units: if matches!(settlement_status, SettlementStatus::Failed) {
+                0
+            } else {
+                cost_charged
+            },
+            committed_cost_units_after: if matches!(settlement_status, SettlementStatus::Failed) {
+                0
+            } else {
+                cost_charged
+            },
+        }),
+    };
     let metadata = serde_json::json!({
         "financial": FinancialReceiptMetadata {
             grant_index: 0,
@@ -687,7 +834,8 @@ fn make_financial_receipt_with_settlement_status(
             cost_breakdown: None,
             oracle_evidence: None,
             attempted_cost: None,
-        }
+        },
+        "budget_authority": budget_authority
     });
     ArcReceipt::sign(
         ArcReceiptBody {
@@ -1001,13 +1149,15 @@ fn make_governed_authorization_receipt_with_runtime_profile(
                 evidence_sha256: runtime_evidence_sha256.to_string(),
                 workload_identity: None,
             }),
-            call_chain: include_call_chain.then_some(GovernedCallChainContext {
-                chain_id: "chain-ext-1".to_string(),
-                parent_request_id: "req-upstream-1".to_string(),
-                parent_receipt_id: Some("rcpt-upstream-1".to_string()),
-                origin_subject: "subject-root".to_string(),
-                delegator_subject: "subject-delegator".to_string(),
-            }),
+            call_chain: include_call_chain.then_some(GovernedCallChainProvenance::asserted(
+                GovernedCallChainContext {
+                    chain_id: "chain-ext-1".to_string(),
+                    parent_request_id: "req-upstream-1".to_string(),
+                    parent_receipt_id: Some("rcpt-upstream-1".to_string()),
+                    origin_subject: "subject-root".to_string(),
+                    delegator_subject: "subject-delegator".to_string(),
+                },
+            )),
             autonomy: None,
         }
     });
@@ -1936,6 +2086,112 @@ fn test_receipt_query_surfaces_acp_payment_metadata() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn receipt_query_surfaces_financial_hold_lineage_and_guarantee_level() {
+    let dir = unique_dir("arc-rq-budget-lineage");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        store
+            .append_arc_receipt(&make_financial_receipt_with_budget_authority(
+                "r-budget-lineage-1",
+                "cap-budget-lineage-1",
+                "payments",
+                "charge",
+                2_250,
+            ))
+            .unwrap();
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "test-budget-lineage-secret-token".to_string();
+    let mut service = spawn_trust_service(
+        listen,
+        &service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service_result(&client, &base_url, &mut service)
+        .expect("wait for trust service");
+
+    let response = client
+        .get(format!("{base_url}/v1/receipts/query"))
+        .query(&[("capabilityId", "cap-budget-lineage-1")])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+    let body: serde_json::Value = response.json().expect("parse json");
+    let receipts = body["receipts"].as_array().expect("receipts is array");
+    assert_eq!(receipts.len(), 1, "expected one financial receipt");
+
+    let financial = &receipts[0]["metadata"]["financial"];
+    assert_eq!(financial["cost_charged"].as_u64(), Some(75));
+    assert_eq!(financial["settlement_status"].as_str(), Some("settled"));
+
+    let budget_authority = &receipts[0]["metadata"]["budget_authority"];
+    assert_eq!(
+        budget_authority["guarantee_level"].as_str(),
+        Some("ha_quorum_commit")
+    );
+    assert_eq!(
+        budget_authority["hold_id"].as_str(),
+        Some("budget-hold:req-query-1:cap-budget-lineage:0")
+    );
+    assert_eq!(
+        budget_authority["budget_term"].as_str(),
+        Some("http://leader-a:7")
+    );
+    assert_eq!(
+        budget_authority["authority"]["authority_id"].as_str(),
+        Some("http://leader-a")
+    );
+    assert_eq!(
+        budget_authority["authority"]["lease_id"].as_str(),
+        Some("http://leader-a#term-7")
+    );
+    assert_eq!(
+        budget_authority["authority"]["lease_epoch"].as_u64(),
+        Some(7)
+    );
+    assert_eq!(
+        budget_authority["authorize"]["event_id"].as_str(),
+        Some("budget-hold:req-query-1:cap-budget-lineage:0:authorize")
+    );
+    assert_eq!(
+        budget_authority["authorize"]["budget_commit_index"].as_u64(),
+        Some(41)
+    );
+    assert_eq!(
+        budget_authority["terminal"]["disposition"].as_str(),
+        Some("reconciled")
+    );
+    assert_eq!(
+        budget_authority["terminal"]["event_id"].as_str(),
+        Some("budget-hold:req-query-1:cap-budget-lineage:0:reconcile")
+    );
+    assert_eq!(
+        budget_authority["terminal"]["budget_commit_index"].as_u64(),
+        Some(42)
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Two requests with cursor yield non-overlapping sequential results.
 #[test]
 fn test_receipt_query_cursor_pagination() {
@@ -2070,7 +2326,7 @@ fn make_capability_token(
 
 /// Pre-populate the capability_lineage table before the service starts.
 fn prepopulate_lineage(db_path: &PathBuf, entries: &[(&CapabilityToken, Option<&str>)]) {
-    let mut store = SqliteReceiptStore::open(db_path).expect("open receipt store for lineage");
+    let store = SqliteReceiptStore::open(db_path).expect("open receipt store for lineage");
     for (token, parent_id) in entries {
         store
             .record_capability_snapshot(token, *parent_id)
@@ -2803,7 +3059,8 @@ fn test_operator_report_endpoint() {
                 invocation_count: 2,
                 updated_at: 3_100,
                 seq: 1,
-                total_cost_charged: 850,
+                total_cost_exposed: 850,
+                total_cost_realized_spend: 0,
             })
             .expect("upsert budget usage");
     }
@@ -2918,6 +3175,20 @@ fn test_operator_report_endpoint() {
     assert_eq!(
         body["settlementReconciliation"]["summary"]["matchingReceipts"].as_u64(),
         Some(0)
+    );
+    let attribution_row = body["costAttribution"]["receipts"]
+        .as_array()
+        .expect("cost attribution receipts")
+        .iter()
+        .find(|row| row["receiptId"] == "rc-op-1")
+        .expect("operator attribution row");
+    assert_eq!(
+        attribution_row["budgetAuthority"]["guarantee_level"].as_str(),
+        Some("ha_quorum_commit")
+    );
+    assert_eq!(
+        attribution_row["budgetAuthority"]["hold_id"].as_str(),
+        Some("budget-hold:rc-op-1:capability:0")
     );
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -3068,6 +3339,14 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
         .expect("pending receipt should still be present");
     assert_eq!(reconciled_row["reconciliationState"], "reconciled");
     assert_eq!(reconciled_row["note"], "confirmed externally");
+    assert_eq!(
+        reconciled_row["budgetAuthority"]["guarantee_level"].as_str(),
+        Some("ha_quorum_commit")
+    );
+    assert_eq!(
+        reconciled_row["budgetAuthority"]["hold_id"].as_str(),
+        Some("budget-hold:rc-settle-pending:capability:0")
+    );
 
     let operator = client
         .get(format!("{base_url}/v1/reports/operator"))
@@ -3170,9 +3449,15 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
         )
         .send()
         .expect("send metered billing report request");
-
-    assert_eq!(initial.status(), reqwest::StatusCode::OK);
-    let initial_body: serde_json::Value = initial.json().expect("parse initial metered report");
+    let initial_status = initial.status();
+    let initial_text = initial.text().expect("read initial metered report body");
+    assert_eq!(
+        initial_status,
+        reqwest::StatusCode::OK,
+        "metered billing report body: {initial_text}"
+    );
+    let initial_body: serde_json::Value =
+        serde_json::from_str(&initial_text).expect("parse initial metered report");
     assert_eq!(
         initial_body["summary"]["matchingReceipts"].as_u64(),
         Some(2)
@@ -3552,7 +3837,7 @@ fn test_authorization_context_report_and_cli() {
     );
     assert_eq!(
         body["summary"]["delegatedSenderBoundReceipts"].as_u64(),
-        Some(1)
+        Some(0)
     );
 
     let auth_row = body["receipts"]
@@ -3595,6 +3880,10 @@ fn test_authorization_context_report_and_cli() {
         Some("rcpt-upstream-1")
     );
     assert_eq!(
+        auth_row["transactionContext"]["callChain"]["evidenceClass"].as_str(),
+        Some("asserted")
+    );
+    assert_eq!(
         auth_row["senderConstraint"]["subjectKey"].as_str(),
         Some(subject_hex.as_str())
     );
@@ -3632,7 +3921,7 @@ fn test_authorization_context_report_and_cli() {
     );
     assert_eq!(
         auth_row["senderConstraint"]["delegatedCallChainBound"].as_bool(),
-        Some(true)
+        Some(false)
     );
 
     let operator = client
@@ -3731,6 +4020,96 @@ fn test_authorization_context_report_and_cli() {
     assert_eq!(
         cli_row.sender_constraint.issuer_key_source.as_str(),
         "receipt_attribution"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_bound() {
+    let dir = unique_dir("arc-authorization-context-asserted-call-chain");
+    std::fs::create_dir_all(&dir).expect("create temp dir");
+    let receipt_db_path = dir.join("receipts.sqlite3");
+    let revocation_db_path = dir.join("revocations.sqlite3");
+    let authority_db_path = dir.join("authority.sqlite3");
+    let budget_db_path = dir.join("budgets.sqlite3");
+
+    let subject_kp = Keypair::generate();
+    let issuer_kp = Keypair::generate();
+    let subject_hex = subject_kp.public_key().to_hex();
+    let issuer_hex = issuer_kp.public_key().to_hex();
+
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        record_test_capability_snapshot(
+            &mut store,
+            "cap-auth-asserted",
+            &issuer_kp,
+            &subject_kp,
+            "shell",
+            "bash",
+            Some(true),
+        );
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt(
+                "rc-auth-asserted",
+                "cap-auth-asserted",
+                &subject_hex,
+                &issuer_hex,
+                "shell",
+                "bash",
+                7_050,
+            ))
+            .expect("append asserted authorization receipt");
+    }
+
+    let listen = reserve_listen_addr();
+    let service_token = "authorization-context-asserted-token";
+    let _service = spawn_trust_service(
+        listen,
+        service_token,
+        &receipt_db_path,
+        &revocation_db_path,
+        &authority_db_path,
+        &budget_db_path,
+    );
+    let client = Client::builder().build().expect("build client");
+    let base_url = format!("http://{listen}");
+    wait_for_trust_service(&client, &base_url);
+
+    let response = client
+        .get(format!("{base_url}/v1/reports/authorization-context"))
+        .query(&[
+            ("capabilityId", "cap-auth-asserted"),
+            ("authorizationLimit", "10"),
+        ])
+        .header(
+            reqwest::header::AUTHORIZATION,
+            format!("Bearer {service_token}"),
+        )
+        .send()
+        .expect("send authorization context request");
+
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let body: serde_json::Value = response.json().expect("parse authorization context report");
+    assert_eq!(body["summary"]["matchingReceipts"].as_u64(), Some(1));
+    assert_eq!(
+        body["summary"]["delegatedSenderBoundReceipts"].as_u64(),
+        Some(0)
+    );
+    let auth_row = body["receipts"]
+        .as_array()
+        .expect("authorization receipts array")
+        .iter()
+        .find(|row| row["receiptId"] == "rc-auth-asserted")
+        .expect("asserted authorization receipt row");
+    assert_eq!(
+        auth_row["transactionContext"]["callChain"]["evidenceClass"].as_str(),
+        Some("asserted")
+    );
+    assert_eq!(
+        auth_row["senderConstraint"]["delegatedCallChainBound"].as_bool(),
+        Some(false)
     );
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -4506,13 +4885,15 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                             approved: true,
                         }),
                         runtime_assurance: None,
-                        call_chain: Some(GovernedCallChainContext {
-                            chain_id: "chain-invalid-1".to_string(),
-                            parent_request_id: "parent-invalid-1".to_string(),
-                            parent_receipt_id: Some("rcpt-parent-invalid-1".to_string()),
-                            origin_subject: "".to_string(),
-                            delegator_subject: "upstream-delegator".to_string(),
-                        }),
+                        call_chain: Some(GovernedCallChainProvenance::asserted(
+                            GovernedCallChainContext {
+                                chain_id: "chain-invalid-1".to_string(),
+                                parent_request_id: "parent-invalid-1".to_string(),
+                                parent_receipt_id: Some("rcpt-parent-invalid-1".to_string()),
+                                origin_subject: "".to_string(),
+                                delegator_subject: "upstream-delegator".to_string(),
+                            },
+                        )),
                         autonomy: None,
                     }
                 })),
@@ -4768,7 +5149,8 @@ fn test_shared_evidence_reporting_surfaces() {
                 invocation_count: 2,
                 updated_at: 1_800,
                 seq: 1,
-                total_cost_charged: 450,
+                total_cost_exposed: 450,
+                total_cost_realized_spend: 0,
             })
             .expect("upsert budget usage");
     }
@@ -5005,7 +5387,8 @@ fn test_behavioral_feed_export_surfaces() {
                 invocation_count: 2,
                 updated_at: 5_100,
                 seq: 1,
-                total_cost_charged: 950,
+                total_cost_exposed: 950,
+                total_cost_realized_spend: 0,
             })
             .expect("upsert budget usage");
     }
@@ -5038,8 +5421,15 @@ fn test_behavioral_feed_export_surfaces() {
         )
         .send()
         .expect("send behavioral feed request");
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
-    let feed: SignedBehavioralFeed = response.json().expect("parse behavioral feed");
+    let response_status = response.status();
+    let response_text = response.text().expect("read behavioral feed body");
+    assert_eq!(
+        response_status,
+        reqwest::StatusCode::OK,
+        "behavioral feed body: {response_text}"
+    );
+    let feed: SignedBehavioralFeed =
+        serde_json::from_str(&response_text).expect("parse behavioral feed");
     assert!(feed
         .verify_signature()
         .expect("verify behavioral feed signature"));
@@ -5059,6 +5449,28 @@ fn test_behavioral_feed_export_surfaces() {
             .expect("reputation summary")
             .subject_key,
         leaf_hex
+    );
+    let budget_authority_row = feed
+        .body
+        .receipts
+        .iter()
+        .find(|row| row.receipt_id == "rc-risk-2")
+        .expect("budget authority feed row");
+    assert_eq!(
+        budget_authority_row
+            .budget_authority
+            .as_ref()
+            .expect("budget authority")
+            .guarantee_level,
+        "ha_quorum_commit"
+    );
+    assert_eq!(
+        budget_authority_row
+            .budget_authority
+            .as_ref()
+            .expect("budget authority")
+            .hold_id,
+        "budget-hold:rc-risk-2:capability:0"
     );
 
     let cli_output = Command::new(env!("CARGO_BIN_EXE_arc"))

@@ -16,6 +16,7 @@ use crate::runtime_attestation::{
     derive_runtime_attestation_trust_material, AttestationVerifierFamily,
     RuntimeAttestationTrustMaterial,
 };
+use crate::session::SessionAnchorReference;
 
 /// A ARC capability token. Ed25519-signed, scoped, time-bounded.
 ///
@@ -275,7 +276,9 @@ pub enum WorkloadIdentityError {
     #[error("SPIFFE workload identity path '{0}' is invalid")]
     InvalidPath(String),
 
-    #[error("explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'")]
+    #[error(
+        "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+    )]
     Conflict {
         field: &'static str,
         expected: String,
@@ -619,14 +622,18 @@ pub enum AttestationTrustError {
     #[error("runtime attestation workload identity is invalid: {0}")]
     InvalidWorkloadIdentity(String),
 
-    #[error("runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})")]
+    #[error(
+        "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+    )]
     StaleEvidence {
         now: u64,
         issued_at: u64,
         expires_at: u64,
     },
 
-    #[error("attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)")]
+    #[error(
+        "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+    )]
     EvidenceTooOld {
         rule: String,
         max_age_seconds: u64,
@@ -639,13 +646,17 @@ pub enum AttestationTrustError {
     #[error("attestation trust rule `{rule}` rejected attestation type `{actual}`")]
     DisallowedAttestationType { rule: String, actual: String },
 
-    #[error("runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary")]
+    #[error(
+        "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+    )]
     UnsupportedEvidence { schema: String },
 
     #[error("attestation trust rule `{rule}` requires normalized assertion `{assertion}`")]
     MissingAssertion { rule: String, assertion: String },
 
-    #[error("attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`")]
+    #[error(
+        "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+    )]
     AssertionMismatch {
         rule: String,
         assertion: String,
@@ -653,7 +664,9 @@ pub enum AttestationTrustError {
         actual: String,
     },
 
-    #[error("runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule")]
+    #[error(
+        "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+    )]
     UntrustedEvidence { verifier: String, schema: String },
 }
 
@@ -748,6 +761,546 @@ pub struct GovernedCallChainContext {
     pub delegator_subject: String,
 }
 
+/// Reserved key inside `GovernedTransactionIntent.context` for legacy upstream call-chain proofs.
+pub const GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: &str = "callChainUpstreamProof";
+
+/// Signable upstream proof for delegated governed call-chain provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedUpstreamCallChainProofBody {
+    /// Public key that authenticated the upstream delegated handoff.
+    pub signer: PublicKey,
+    /// Capability subject key this handoff was issued to.
+    pub subject: PublicKey,
+    /// Stable identifier for the delegated transaction or call chain.
+    pub chain_id: String,
+    /// Upstream parent request identifier inside the trusted domain.
+    pub parent_request_id: String,
+    /// Optional upstream parent receipt identifier when already available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_id: Option<String>,
+    /// Root or originating subject for the governed chain.
+    pub origin_subject: String,
+    /// Immediate delegator subject that handed control to the current subject.
+    pub delegator_subject: String,
+    /// Unix timestamp (seconds) when this proof was issued.
+    pub issued_at: u64,
+    /// Unix timestamp (seconds) when this proof expires.
+    pub expires_at: u64,
+}
+
+/// Signed upstream proof ARC can validate and promote to verified provenance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedUpstreamCallChainProof {
+    pub signer: PublicKey,
+    pub subject: PublicKey,
+    pub chain_id: String,
+    pub parent_request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_id: Option<String>,
+    pub origin_subject: String,
+    pub delegator_subject: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub signature: Signature,
+}
+
+impl GovernedUpstreamCallChainProof {
+    #[must_use]
+    pub fn body(&self) -> GovernedUpstreamCallChainProofBody {
+        GovernedUpstreamCallChainProofBody {
+            signer: self.signer.clone(),
+            subject: self.subject.clone(),
+            chain_id: self.chain_id.clone(),
+            parent_request_id: self.parent_request_id.clone(),
+            parent_receipt_id: self.parent_receipt_id.clone(),
+            origin_subject: self.origin_subject.clone(),
+            delegator_subject: self.delegator_subject.clone(),
+            issued_at: self.issued_at,
+            expires_at: self.expires_at,
+        }
+    }
+
+    pub fn sign(body: GovernedUpstreamCallChainProofBody, keypair: &Keypair) -> Result<Self> {
+        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        Ok(Self {
+            signer: body.signer,
+            subject: body.subject,
+            chain_id: body.chain_id,
+            parent_request_id: body.parent_request_id,
+            parent_receipt_id: body.parent_receipt_id,
+            origin_subject: body.origin_subject,
+            delegator_subject: body.delegator_subject,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            signature,
+        })
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        let body = self.body();
+        self.signer.verify_canonical(&body, &self.signature)
+    }
+
+    #[must_use]
+    pub fn is_valid_at(&self, now: u64) -> bool {
+        now >= self.issued_at && now < self.expires_at
+    }
+
+    pub fn validate_time(&self, now: u64) -> Result<()> {
+        if now < self.issued_at {
+            return Err(Error::CapabilityNotYetValid {
+                not_before: self.issued_at,
+            });
+        }
+        if now >= self.expires_at {
+            return Err(Error::CapabilityExpired {
+                expires_at: self.expires_at,
+            });
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn matches_context(&self, context: &GovernedCallChainContext) -> bool {
+        self.chain_id == context.chain_id
+            && self.parent_request_id == context.parent_request_id
+            && self.parent_receipt_id == context.parent_receipt_id
+            && self.origin_subject == context.origin_subject
+            && self.delegator_subject == context.delegator_subject
+    }
+}
+
+/// Reserved key inside `GovernedTransactionIntent.context` for continuation tokens.
+pub const GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY: &str = "callChainContinuation";
+/// Versioned schema identifier for continuation tokens.
+pub const ARC_CALL_CHAIN_CONTINUATION_SCHEMA: &str = "arc.call_chain_continuation.v1";
+
+/// Audience binding for a continuation token.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallChainContinuationAudience {
+    pub server_id: String,
+    pub tool_name: String,
+}
+
+/// Stronger cross-kernel continuation artifact for governed provenance transfer.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallChainContinuationTokenBody {
+    pub schema: String,
+    pub token_id: String,
+    pub signer: PublicKey,
+    pub subject: PublicKey,
+    pub chain_id: String,
+    pub parent_request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_anchor: Option<SessionAnchorReference>,
+    pub current_subject: String,
+    pub delegator_subject: String,
+    pub origin_subject: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delegation_link_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_intent_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<CallChainContinuationAudience>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+}
+
+/// Signed continuation token used to move governed provenance across kernels.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CallChainContinuationToken {
+    pub schema: String,
+    pub token_id: String,
+    pub signer: PublicKey,
+    pub subject: PublicKey,
+    pub chain_id: String,
+    pub parent_request_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_receipt_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_session_anchor: Option<SessionAnchorReference>,
+    pub current_subject: String,
+    pub delegator_subject: String,
+    pub origin_subject: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delegation_link_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_intent_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub audience: Option<CallChainContinuationAudience>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_upstream_proof: Option<GovernedUpstreamCallChainProof>,
+    pub signature: Signature,
+}
+
+impl CallChainContinuationToken {
+    #[must_use]
+    pub fn body(&self) -> CallChainContinuationTokenBody {
+        CallChainContinuationTokenBody {
+            schema: self.schema.clone(),
+            token_id: self.token_id.clone(),
+            signer: self.signer.clone(),
+            subject: self.subject.clone(),
+            chain_id: self.chain_id.clone(),
+            parent_request_id: self.parent_request_id.clone(),
+            parent_receipt_id: self.parent_receipt_id.clone(),
+            parent_receipt_hash: self.parent_receipt_hash.clone(),
+            parent_session_anchor: self.parent_session_anchor.clone(),
+            current_subject: self.current_subject.clone(),
+            delegator_subject: self.delegator_subject.clone(),
+            origin_subject: self.origin_subject.clone(),
+            parent_capability_id: self.parent_capability_id.clone(),
+            delegation_link_hash: self.delegation_link_hash.clone(),
+            governed_intent_hash: self.governed_intent_hash.clone(),
+            audience: self.audience.clone(),
+            nonce: self.nonce.clone(),
+            issued_at: self.issued_at,
+            expires_at: self.expires_at,
+        }
+    }
+
+    pub fn sign(body: CallChainContinuationTokenBody, keypair: &Keypair) -> Result<Self> {
+        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        Ok(Self {
+            schema: body.schema,
+            token_id: body.token_id,
+            signer: body.signer,
+            subject: body.subject,
+            chain_id: body.chain_id,
+            parent_request_id: body.parent_request_id,
+            parent_receipt_id: body.parent_receipt_id,
+            parent_receipt_hash: body.parent_receipt_hash,
+            parent_session_anchor: body.parent_session_anchor,
+            current_subject: body.current_subject,
+            delegator_subject: body.delegator_subject,
+            origin_subject: body.origin_subject,
+            parent_capability_id: body.parent_capability_id,
+            delegation_link_hash: body.delegation_link_hash,
+            governed_intent_hash: body.governed_intent_hash,
+            audience: body.audience,
+            nonce: body.nonce,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            legacy_upstream_proof: None,
+            signature,
+        })
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        if let Some(legacy_upstream_proof) = &self.legacy_upstream_proof {
+            return Ok(legacy_upstream_proof.verify_signature()?
+                && legacy_upstream_proof.chain_id == self.chain_id
+                && legacy_upstream_proof.parent_request_id == self.parent_request_id
+                && legacy_upstream_proof.parent_receipt_id == self.parent_receipt_id
+                && legacy_upstream_proof.origin_subject == self.origin_subject
+                && legacy_upstream_proof.delegator_subject == self.delegator_subject
+                && legacy_upstream_proof.signer == self.signer
+                && legacy_upstream_proof.subject == self.subject
+                && legacy_upstream_proof.issued_at == self.issued_at
+                && legacy_upstream_proof.expires_at == self.expires_at);
+        }
+        let body = self.body();
+        self.signer.verify_canonical(&body, &self.signature)
+    }
+
+    #[must_use]
+    pub fn is_valid_at(&self, now: u64) -> bool {
+        now >= self.issued_at && now < self.expires_at
+    }
+
+    pub fn validate_time(&self, now: u64) -> Result<()> {
+        if now < self.issued_at {
+            return Err(Error::CapabilityNotYetValid {
+                not_before: self.issued_at,
+            });
+        }
+        if now >= self.expires_at {
+            return Err(Error::CapabilityExpired {
+                expires_at: self.expires_at,
+            });
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn matches_context(&self, context: &GovernedCallChainContext) -> bool {
+        self.chain_id == context.chain_id
+            && self.parent_request_id == context.parent_request_id
+            && self.parent_receipt_id == context.parent_receipt_id
+            && self.origin_subject == context.origin_subject
+            && self.delegator_subject == context.delegator_subject
+    }
+
+    #[must_use]
+    pub fn matches_session_anchor(&self, session_anchor: &SessionAnchorReference) -> bool {
+        self.parent_session_anchor.as_ref() == Some(session_anchor)
+    }
+
+    #[must_use]
+    pub fn matches_target(&self, server_id: &str, tool_name: &str) -> bool {
+        self.audience.as_ref().is_some_and(|audience| {
+            audience.server_id == server_id && audience.tool_name == tool_name
+        })
+    }
+
+    #[must_use]
+    pub fn matches_intent_hash(&self, intent_hash: &str) -> bool {
+        self.governed_intent_hash.as_deref() == Some(intent_hash)
+    }
+
+    #[must_use]
+    pub fn matches_subject(&self, subject: &PublicKey) -> bool {
+        &self.subject == subject
+    }
+
+    pub fn from_legacy_upstream_proof(proof: &GovernedUpstreamCallChainProof) -> Result<Self> {
+        let proof_body = proof.body();
+        let canonical = canonical_json_bytes(&proof_body)?;
+        Ok(Self {
+            schema: ARC_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
+            token_id: format!("legacy:{}", sha256_hex(&canonical)),
+            signer: proof.signer.clone(),
+            subject: proof.subject.clone(),
+            chain_id: proof.chain_id.clone(),
+            parent_request_id: proof.parent_request_id.clone(),
+            parent_receipt_id: proof.parent_receipt_id.clone(),
+            parent_receipt_hash: None,
+            parent_session_anchor: None,
+            current_subject: proof.subject.to_hex(),
+            delegator_subject: proof.delegator_subject.clone(),
+            origin_subject: proof.origin_subject.clone(),
+            parent_capability_id: None,
+            delegation_link_hash: None,
+            governed_intent_hash: None,
+            audience: None,
+            nonce: None,
+            issued_at: proof.issued_at,
+            expires_at: proof.expires_at,
+            legacy_upstream_proof: Some(proof.clone()),
+            signature: proof.signature.clone(),
+        })
+    }
+}
+
+/// Evidence class describing how ARC learned or validated provenance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernedProvenanceEvidenceClass {
+    /// Caller-asserted provenance bound into the request, but not independently checked yet.
+    #[default]
+    Asserted,
+    /// Provenance observed by ARC or a trusted subsystem, but not fully verified end-to-end.
+    Observed,
+    /// Provenance verified against authoritative evidence such as receipt linkage or signatures.
+    Verified,
+}
+
+/// Generic evidence class used across ARC provenance artifacts.
+pub type ProvenanceEvidenceClass = GovernedProvenanceEvidenceClass;
+
+/// Authoritative local evidence ARC used to corroborate governed call-chain metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GovernedCallChainEvidenceSource {
+    /// The call-chain parent request matched an authenticated parent request in the live session.
+    SessionParentRequestLineage,
+    /// The optional parent receipt identifier matched a receipt ARC already recorded locally.
+    LocalParentReceiptLinkage,
+    /// The asserted delegator subject matched the validated capability delegation source.
+    CapabilityDelegatorSubject,
+    /// The asserted origin subject matched the root delegator visible in capability lineage.
+    CapabilityOriginSubject,
+    /// ARC validated a signed upstream handoff against the capability's delegator key.
+    UpstreamDelegatorProof,
+}
+
+/// Typed provenance envelope for delegated governed call-chain metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedCallChainProvenance {
+    /// Evidence class describing how strongly ARC should treat this provenance.
+    #[serde(default)]
+    pub evidence_class: GovernedProvenanceEvidenceClass,
+    /// Specific authoritative local evidence ARC used when it upgraded the caller assertion.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence_sources: Vec<GovernedCallChainEvidenceSource>,
+    /// Optional signed upstream proof ARC validated before upgrading to verified provenance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream_proof: Option<GovernedUpstreamCallChainProof>,
+    /// Optional preserved caller assertion when ARC upgraded or rewrote the effective context.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asserted_context: Option<GovernedCallChainContext>,
+    /// Optional continuation token identifier that backed a verified upgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation_token_id: Option<String>,
+    /// Optional session-anchor identifier that scoped the verified lineage edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_anchor_id: Option<String>,
+    /// Optional receipt-lineage statement identifier that authenticated the receipt edge.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_lineage_statement_id: Option<String>,
+    /// The delegated call-chain details carried with the governed request or receipt.
+    #[serde(flatten)]
+    pub context: GovernedCallChainContext,
+}
+
+impl GovernedCallChainProvenance {
+    #[must_use]
+    pub fn new(
+        context: GovernedCallChainContext,
+        evidence_class: GovernedProvenanceEvidenceClass,
+    ) -> Self {
+        Self {
+            evidence_class,
+            evidence_sources: Vec::new(),
+            upstream_proof: None,
+            asserted_context: None,
+            continuation_token_id: None,
+            session_anchor_id: None,
+            receipt_lineage_statement_id: None,
+            context,
+        }
+    }
+
+    #[must_use]
+    pub fn with_evidence_sources(
+        mut self,
+        evidence_sources: impl IntoIterator<Item = GovernedCallChainEvidenceSource>,
+    ) -> Self {
+        self.evidence_sources = evidence_sources.into_iter().collect();
+        self
+    }
+
+    #[must_use]
+    pub fn with_upstream_proof(mut self, upstream_proof: GovernedUpstreamCallChainProof) -> Self {
+        self.upstream_proof = Some(upstream_proof);
+        self
+    }
+
+    #[must_use]
+    pub fn with_asserted_context(mut self, asserted_context: GovernedCallChainContext) -> Self {
+        self.asserted_context = Some(asserted_context);
+        self
+    }
+
+    #[must_use]
+    pub fn with_continuation_token_id(mut self, continuation_token_id: impl Into<String>) -> Self {
+        self.continuation_token_id = Some(continuation_token_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_session_anchor_id(mut self, session_anchor_id: impl Into<String>) -> Self {
+        self.session_anchor_id = Some(session_anchor_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_receipt_lineage_statement_id(
+        mut self,
+        receipt_lineage_statement_id: impl Into<String>,
+    ) -> Self {
+        self.receipt_lineage_statement_id = Some(receipt_lineage_statement_id.into());
+        self
+    }
+
+    #[must_use]
+    pub fn asserted(context: GovernedCallChainContext) -> Self {
+        Self::new(context, GovernedProvenanceEvidenceClass::Asserted)
+    }
+
+    #[must_use]
+    pub fn observed(context: GovernedCallChainContext) -> Self {
+        Self::new(context, GovernedProvenanceEvidenceClass::Observed)
+    }
+
+    #[must_use]
+    pub fn verified(context: GovernedCallChainContext) -> Self {
+        Self::new(context, GovernedProvenanceEvidenceClass::Verified)
+    }
+
+    #[must_use]
+    pub fn is_asserted(&self) -> bool {
+        matches!(
+            self.evidence_class,
+            GovernedProvenanceEvidenceClass::Asserted
+        )
+    }
+
+    #[must_use]
+    pub fn is_observed(&self) -> bool {
+        matches!(
+            self.evidence_class,
+            GovernedProvenanceEvidenceClass::Observed
+        )
+    }
+
+    #[must_use]
+    pub fn is_verified(&self) -> bool {
+        matches!(
+            self.evidence_class,
+            GovernedProvenanceEvidenceClass::Verified
+        )
+    }
+
+    #[must_use]
+    pub fn as_context(&self) -> &GovernedCallChainContext {
+        &self.context
+    }
+
+    #[must_use]
+    pub fn asserted_context(&self) -> Option<&GovernedCallChainContext> {
+        self.asserted_context
+            .as_ref()
+            .or_else(|| self.is_asserted().then_some(&self.context))
+    }
+
+    #[must_use]
+    pub fn verified_context(&self) -> Option<&GovernedCallChainContext> {
+        self.is_verified().then_some(&self.context)
+    }
+
+    #[must_use]
+    pub fn into_inner(self) -> GovernedCallChainContext {
+        self.context
+    }
+}
+
+impl From<GovernedCallChainContext> for GovernedCallChainProvenance {
+    fn from(context: GovernedCallChainContext) -> Self {
+        Self::asserted(context)
+    }
+}
+
+impl std::ops::Deref for GovernedCallChainProvenance {
+    type Target = GovernedCallChainContext;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_context()
+    }
+}
+
 /// Explicit autonomy and delegation-bond context attached to a governed request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -798,6 +1351,55 @@ impl GovernedTransactionIntent {
     pub fn binding_hash(&self) -> Result<String> {
         let canonical = canonical_json_bytes(self)?;
         Ok(sha256_hex(&canonical))
+    }
+
+    /// Extract the reserved upstream call-chain proof from the optional context object.
+    pub fn upstream_call_chain_proof(&self) -> Result<Option<GovernedUpstreamCallChainProof>> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(None);
+        };
+        let Some(object) = context.as_object() else {
+            return Ok(None);
+        };
+        let Some(value) = object.get(GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY) else {
+            return Ok(None);
+        };
+        if value.is_null() {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_value(value.clone())?))
+    }
+
+    /// Extract an explicitly attached continuation token without legacy fallback.
+    pub fn explicit_continuation_token(&self) -> Result<Option<CallChainContinuationToken>> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(None);
+        };
+        let Some(object) = context.as_object() else {
+            return Ok(None);
+        };
+
+        let Some(value) = object.get(GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY) else {
+            return Ok(None);
+        };
+        if value.is_null() {
+            return Ok(None);
+        }
+
+        Ok(Some(serde_json::from_value(value.clone())?))
+    }
+
+    /// Extract the stronger continuation token, falling back to the legacy upstream proof key.
+    pub fn continuation_token(&self) -> Result<Option<CallChainContinuationToken>> {
+        if let Some(token) = self.explicit_continuation_token()? {
+            return Ok(Some(token));
+        }
+
+        self.upstream_call_chain_proof()?
+            .as_ref()
+            .map(CallChainContinuationToken::from_legacy_upstream_proof)
+            .transpose()
     }
 }
 
@@ -1778,6 +2380,214 @@ mod tests {
         assert!(token.is_valid_at(1500));
         assert!(!token.is_valid_at(2000));
         assert_eq!(token.subject, subject.public_key());
+    }
+
+    #[test]
+    fn governed_upstream_call_chain_proof_roundtrip_and_context_extraction() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let proof = GovernedUpstreamCallChainProof::sign(
+            GovernedUpstreamCallChainProofBody {
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: "chain-proof-1".to_string(),
+                parent_request_id: "req-parent-proof-1".to_string(),
+                parent_receipt_id: Some("rc-parent-proof-1".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+                issued_at: 1000,
+                expires_at: 2000,
+            },
+            &signer,
+        )
+        .unwrap();
+        let intent = GovernedTransactionIntent {
+            id: "intent-proof-1".to_string(),
+            server_id: "srv-pay".to_string(),
+            tool_name: "charge".to_string(),
+            purpose: "pay supplier".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: Some(GovernedCallChainContext {
+                chain_id: "chain-proof-1".to_string(),
+                parent_request_id: "req-parent-proof-1".to_string(),
+                parent_receipt_id: Some("rc-parent-proof-1".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+            }),
+            autonomy: None,
+            context: Some(serde_json::json!({
+                GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: proof.clone(),
+                "note": "preserve-other-context"
+            })),
+        };
+
+        assert!(proof.verify_signature().unwrap());
+        assert!(proof.is_valid_at(1500));
+        assert!(!proof.is_valid_at(2000));
+        assert!(proof.matches_context(intent.call_chain.as_ref().unwrap()));
+        assert_eq!(intent.upstream_call_chain_proof().unwrap(), Some(proof));
+    }
+
+    #[test]
+    fn call_chain_continuation_token_roundtrip_and_matching_helpers() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let session_anchor = SessionAnchorReference::new("anchor-1", "anchor-hash-1");
+        let call_chain = GovernedCallChainContext {
+            chain_id: "chain-cont-1".to_string(),
+            parent_request_id: "req-parent-cont-1".to_string(),
+            parent_receipt_id: Some("rc-parent-cont-1".to_string()),
+            origin_subject: "origin-subject".to_string(),
+            delegator_subject: "delegator-subject".to_string(),
+        };
+        let token = CallChainContinuationToken::sign(
+            CallChainContinuationTokenBody {
+                schema: ARC_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
+                token_id: "continuation-1".to_string(),
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: call_chain.chain_id.clone(),
+                parent_request_id: call_chain.parent_request_id.clone(),
+                parent_receipt_id: call_chain.parent_receipt_id.clone(),
+                parent_receipt_hash: Some("receipt-hash-1".to_string()),
+                parent_session_anchor: Some(session_anchor.clone()),
+                current_subject: subject.public_key().to_hex(),
+                delegator_subject: call_chain.delegator_subject.clone(),
+                origin_subject: call_chain.origin_subject.clone(),
+                parent_capability_id: Some("cap-parent-1".to_string()),
+                delegation_link_hash: Some("delegation-link-hash-1".to_string()),
+                governed_intent_hash: Some("intent-hash-1".to_string()),
+                audience: Some(CallChainContinuationAudience {
+                    server_id: "srv-pay".to_string(),
+                    tool_name: "charge".to_string(),
+                }),
+                nonce: Some("nonce-1".to_string()),
+                issued_at: 1000,
+                expires_at: 2000,
+            },
+            &signer,
+        )
+        .unwrap();
+        let intent = GovernedTransactionIntent {
+            id: "intent-cont-1".to_string(),
+            server_id: "srv-pay".to_string(),
+            tool_name: "charge".to_string(),
+            purpose: "pay supplier".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: Some(call_chain.clone()),
+            autonomy: None,
+            context: Some(serde_json::json!({
+                GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY: token.clone()
+            })),
+        };
+
+        assert!(token.verify_signature().unwrap());
+        assert!(token.matches_context(&call_chain));
+        assert!(token.matches_session_anchor(&session_anchor));
+        assert!(token.matches_target("srv-pay", "charge"));
+        assert!(token.matches_intent_hash("intent-hash-1"));
+        assert!(token.matches_subject(&subject.public_key()));
+        assert_eq!(
+            intent.explicit_continuation_token().unwrap(),
+            Some(token.clone())
+        );
+        assert_eq!(intent.continuation_token().unwrap(), Some(token));
+    }
+
+    #[test]
+    fn continuation_token_falls_back_to_legacy_upstream_proof() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let proof = GovernedUpstreamCallChainProof::sign(
+            GovernedUpstreamCallChainProofBody {
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: "chain-legacy-1".to_string(),
+                parent_request_id: "req-parent-legacy-1".to_string(),
+                parent_receipt_id: Some("rc-parent-legacy-1".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+                issued_at: 1000,
+                expires_at: 2000,
+            },
+            &signer,
+        )
+        .unwrap();
+        let intent = GovernedTransactionIntent {
+            id: "intent-legacy-1".to_string(),
+            server_id: "srv-pay".to_string(),
+            tool_name: "charge".to_string(),
+            purpose: "pay supplier".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            runtime_attestation: None,
+            call_chain: Some(GovernedCallChainContext {
+                chain_id: "chain-legacy-1".to_string(),
+                parent_request_id: "req-parent-legacy-1".to_string(),
+                parent_receipt_id: Some("rc-parent-legacy-1".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+            }),
+            autonomy: None,
+            context: Some(serde_json::json!({
+                GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: proof
+            })),
+        };
+
+        let token = intent.continuation_token().unwrap().unwrap();
+
+        assert!(token.verify_signature().unwrap());
+        assert!(token.token_id.starts_with("legacy:"));
+        assert_eq!(intent.explicit_continuation_token().unwrap(), None);
+        assert_eq!(token.parent_request_id, "req-parent-legacy-1");
+        assert_eq!(
+            token.parent_receipt_id.as_deref(),
+            Some("rc-parent-legacy-1")
+        );
+    }
+
+    #[test]
+    fn governed_call_chain_provenance_separates_asserted_and_verified_views() {
+        let asserted_context = GovernedCallChainContext {
+            chain_id: "chain-prov-1".to_string(),
+            parent_request_id: "req-parent-prov-1".to_string(),
+            parent_receipt_id: Some("rc-parent-prov-1".to_string()),
+            origin_subject: "origin-asserted".to_string(),
+            delegator_subject: "delegator-asserted".to_string(),
+        };
+        let verified_context = GovernedCallChainContext {
+            chain_id: "chain-prov-1".to_string(),
+            parent_request_id: "req-parent-prov-1".to_string(),
+            parent_receipt_id: Some("rc-parent-prov-1".to_string()),
+            origin_subject: "origin-verified".to_string(),
+            delegator_subject: "delegator-verified".to_string(),
+        };
+        let provenance = GovernedCallChainProvenance::verified(verified_context.clone())
+            .with_asserted_context(asserted_context.clone())
+            .with_continuation_token_id("continuation-1")
+            .with_session_anchor_id("anchor-1")
+            .with_receipt_lineage_statement_id("statement-1");
+
+        let encoded = serde_json::to_value(&provenance).unwrap();
+
+        assert!(provenance.is_verified());
+        assert_eq!(provenance.asserted_context(), Some(&asserted_context));
+        assert_eq!(provenance.verified_context(), Some(&verified_context));
+        assert_eq!(encoded["continuationTokenId"], "continuation-1");
+        assert_eq!(encoded["sessionAnchorId"], "anchor-1");
+        assert_eq!(encoded["receiptLineageStatementId"], "statement-1");
+        assert_eq!(
+            encoded["assertedContext"]["originSubject"],
+            "origin-asserted"
+        );
+        assert_eq!(encoded["originSubject"], "origin-verified");
     }
 
     #[test]

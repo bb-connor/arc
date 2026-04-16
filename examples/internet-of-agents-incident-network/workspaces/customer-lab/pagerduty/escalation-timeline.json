@@ -1,0 +1,292 @@
+{
+  "incident_id": "inc-meridian-inference-gw-2026-04-15-0317z",
+  "pagerduty_incident_id": "PD-Q7X9K2M4",
+  "escalation_policy_id": "PESC-7F3A",
+  "events": [
+    {
+      "sequence": 1,
+      "timestamp": "2026-04-15T03:19:14Z",
+      "event_type": "alert.triggered",
+      "actor": {
+        "type": "integration",
+        "name": "Datadog Integration",
+        "id": "PINT-DD-4A"
+      },
+      "action": "PagerDuty alert triggered via Datadog monitor 'inference-gateway-slo-burn-rate-critical'",
+      "details": {
+        "monitor_id": "mon-78291034",
+        "monitor_name": "Inference Gateway SLO Burn Rate Critical",
+        "trigger_value": "23.4x burn rate",
+        "trigger_threshold": "14.4x",
+        "evaluation_window": "5m"
+      }
+    },
+    {
+      "sequence": 2,
+      "timestamp": "2026-04-15T03:19:14Z",
+      "event_type": "incident.created",
+      "actor": {
+        "type": "system",
+        "name": "PagerDuty"
+      },
+      "action": "Sev-1 incident created and assigned to L1 on-call: Marcus Adeyemi",
+      "details": {
+        "assigned_to": "Marcus Adeyemi",
+        "escalation_level": 1,
+        "notification_channels": ["push", "sms", "phone"]
+      }
+    },
+    {
+      "sequence": 3,
+      "timestamp": "2026-04-15T03:19:15Z",
+      "event_type": "notification.sent",
+      "actor": {
+        "type": "system",
+        "name": "PagerDuty"
+      },
+      "action": "Push notification sent to Marcus Adeyemi",
+      "details": {
+        "channel": "push",
+        "device": "iPhone 16 Pro"
+      }
+    },
+    {
+      "sequence": 4,
+      "timestamp": "2026-04-15T03:19:18Z",
+      "event_type": "notification.sent",
+      "actor": {
+        "type": "system",
+        "name": "PagerDuty"
+      },
+      "action": "SMS sent to Marcus Adeyemi at +1-XXX-XXX-7744",
+      "details": {
+        "channel": "sms"
+      }
+    },
+    {
+      "sequence": 5,
+      "timestamp": "2026-04-15T03:20:14Z",
+      "event_type": "notification.sent",
+      "actor": {
+        "type": "system",
+        "name": "PagerDuty"
+      },
+      "action": "Phone call placed to Marcus Adeyemi",
+      "details": {
+        "channel": "phone",
+        "call_result": "answered"
+      }
+    },
+    {
+      "sequence": 6,
+      "timestamp": "2026-04-15T03:22:18Z",
+      "event_type": "incident.acknowledged",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Incident acknowledged",
+      "details": {
+        "response_time_seconds": 184,
+        "acknowledged_via": "mobile_app"
+      }
+    },
+    {
+      "sequence": 7,
+      "timestamp": "2026-04-15T03:22:31Z",
+      "event_type": "channel.created",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Created Slack incident channel #inc-inference-gw-20260415",
+      "details": {
+        "channel": "#inc-inference-gw-20260415",
+        "auto_invited": ["inference-platform-oncall", "sre-leads"]
+      }
+    },
+    {
+      "sequence": 8,
+      "timestamp": "2026-04-15T03:24:41Z",
+      "event_type": "note.added",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Added investigation note",
+      "details": {
+        "note": "Confirmed 403 spike in Grafana. Error messages reference geo-restrict-v42. Checking recent deploys."
+      }
+    },
+    {
+      "sequence": 9,
+      "timestamp": "2026-04-15T03:25:00Z",
+      "event_type": "status_page.updated",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Status page updated to 'Investigating'",
+      "details": {
+        "component": "Inference API",
+        "previous_status": "operational",
+        "new_status": "major_outage",
+        "public_message": "We are investigating elevated error rates on the Inference API affecting some regions."
+      }
+    },
+    {
+      "sequence": 10,
+      "timestamp": "2026-04-15T03:26:33Z",
+      "event_type": "note.added",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Added investigation note",
+      "details": {
+        "note": "Found deploy at 03:12Z (deploy-9f8e7d6c5b4a). Changed edge.geo_restrict_v42.mode from dry-run to blocking. This is the most recent change and timing correlates exactly with symptom onset."
+      }
+    },
+    {
+      "sequence": 11,
+      "timestamp": "2026-04-15T03:28:14Z",
+      "event_type": "incident.escalated",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Manually escalated to L2",
+      "details": {
+        "reason": "Edge policy issue requires edge platform expertise. Need change author and edge team lead.",
+        "escalation_level": 2
+      }
+    },
+    {
+      "sequence": 12,
+      "timestamp": "2026-04-15T03:28:44Z",
+      "event_type": "responder.joined",
+      "actor": {
+        "type": "user",
+        "name": "Elena Vasquez",
+        "id": "PUSR-9E7B"
+      },
+      "action": "Joined incident as L2 secondary on-call",
+      "details": {
+        "role": "secondary_oncall",
+        "team": "Inference Platform"
+      }
+    },
+    {
+      "sequence": 13,
+      "timestamp": "2026-04-15T03:31:02Z",
+      "event_type": "responder.added",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Paged James Okonkwo as inference-gateway code owner",
+      "details": {
+        "added_user": "James Okonkwo",
+        "reason": "Code owner for inference-gateway, deep knowledge of routing layer"
+      }
+    },
+    {
+      "sequence": 14,
+      "timestamp": "2026-04-15T03:33:15Z",
+      "event_type": "responder.added",
+      "actor": {
+        "type": "user",
+        "name": "Elena Vasquez",
+        "id": "PUSR-9E7B"
+      },
+      "action": "Paged Priya Narayanan as author of the offending change",
+      "details": {
+        "added_user": "Priya Narayanan",
+        "reason": "Author of PR #4821 that promoted geo-restrict-v42 to blocking mode"
+      }
+    },
+    {
+      "sequence": 15,
+      "timestamp": "2026-04-15T03:35:00Z",
+      "event_type": "status_page.updated",
+      "actor": {
+        "type": "user",
+        "name": "Elena Vasquez",
+        "id": "PUSR-9E7B"
+      },
+      "action": "Status page updated to 'Identified'",
+      "details": {
+        "component": "Inference API",
+        "previous_status": "major_outage",
+        "new_status": "major_outage",
+        "public_message": "We have identified the cause as an edge policy misconfiguration affecting traffic from EU, APAC, and South America regions. We are working on a remediation."
+      }
+    },
+    {
+      "sequence": 16,
+      "timestamp": "2026-04-15T03:35:22Z",
+      "event_type": "note.added",
+      "actor": {
+        "type": "user",
+        "name": "Priya Narayanan",
+        "id": "PUSR-6H8J"
+      },
+      "action": "Added root cause analysis note",
+      "details": {
+        "note": "The rule uses sanctioned-list-v7 with include_cloud_provider_ips=true and classification_mode=strict. Dry-run showed 0 false positives but I suspect the issue is that cloud provider IPs in non-sanctioned regions are being classified against their physical region mapping. The rule config resolves cloud IPs to physical data center locations, but many legitimate customers run inference from cloud VMs in eu-west, ap-southeast, etc."
+      }
+    },
+    {
+      "sequence": 17,
+      "timestamp": "2026-04-15T03:38:47Z",
+      "event_type": "note.added",
+      "actor": {
+        "type": "user",
+        "name": "Elena Vasquez",
+        "id": "PUSR-9E7B"
+      },
+      "action": "Added contributing factor note",
+      "details": {
+        "note": "Confirmed: the dry-run validation missed this because the sanctioned-list-v7 feed was updated on April 13 to include broader cloud provider IP ranges. The dry-run observation period started April 11 with the old feed. The feed update happened mid-observation but the dry-run stats were not reset."
+      }
+    },
+    {
+      "sequence": 18,
+      "timestamp": "2026-04-15T03:39:30Z",
+      "event_type": "note.added",
+      "actor": {
+        "type": "user",
+        "name": "James Okonkwo",
+        "id": "PUSR-3D5F"
+      },
+      "action": "Added remediation proposal",
+      "details": {
+        "note": "Proposed remediation: revert geo-restrict-v42 mode from blocking to dry-run. This requires a config change on the Stratos Networks side since we manage edge rules through their platform. We cannot self-serve this change."
+      }
+    },
+    {
+      "sequence": 19,
+      "timestamp": "2026-04-15T03:40:01Z",
+      "event_type": "external_escalation.initiated",
+      "actor": {
+        "type": "user",
+        "name": "Marcus Adeyemi",
+        "id": "PUSR-4A2C"
+      },
+      "action": "Initiated cross-organization escalation to Stratos Networks",
+      "details": {
+        "provider_org": "StratosNetworks",
+        "escalation_method": "ARC cross-org capability request",
+        "requested_action": "Revert geo-restrict-v42 from blocking to dry-run for tenant MeridianLabs on service inference-gateway",
+        "justification": "Edge rule blocking legitimate inference traffic from eu-west, ap-southeast, and sa-east regions. Sev-1 outage with 38.7% error rate and SLO budget near exhaustion."
+      }
+    }
+  ]
+}

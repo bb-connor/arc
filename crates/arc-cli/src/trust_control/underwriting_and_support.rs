@@ -2016,7 +2016,7 @@ fn build_budget_utilization_report(
     let mut rows = Vec::new();
     let mut matching_grants = 0_u64;
     let mut total_invocations = 0_u64;
-    let mut total_cost_charged = 0_u64;
+    let mut total_committed_cost_units = 0_u64;
     let mut near_limit_count = 0_u64;
     let mut exhausted_count = 0_u64;
     let mut rows_missing_scope = 0_u64;
@@ -2065,31 +2065,37 @@ fn build_budget_utilization_report(
             }
         }
 
+        let committed_cost_units = usage
+            .committed_cost_units()
+            .map_err(|error| {
+                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            })?;
         let invocation_utilization_rate = resolved
             .max_invocations
             .and_then(|max| ratio_option(usage.invocation_count as u64, max as u64));
         let cost_utilization_rate = resolved
             .max_total_cost_units
-            .and_then(|max| ratio_option(usage.total_cost_charged, max));
+            .and_then(|max| ratio_option(committed_cost_units, max));
         let remaining_invocations = resolved
             .max_invocations
             .map(|max| max.saturating_sub(usage.invocation_count));
         let remaining_cost_units = resolved
             .max_total_cost_units
-            .map(|max| max.saturating_sub(usage.total_cost_charged));
+            .map(|max| max.saturating_sub(committed_cost_units));
         let exhausted = resolved
             .max_invocations
             .is_some_and(|max| usage.invocation_count >= max)
             || resolved
                 .max_total_cost_units
-                .is_some_and(|max| usage.total_cost_charged >= max);
+                .is_some_and(|max| committed_cost_units >= max);
         let near_limit = exhausted
             || invocation_utilization_rate.is_some_and(|rate| rate >= 0.8)
             || cost_utilization_rate.is_some_and(|rate| rate >= 0.8);
 
         matching_grants = matching_grants.saturating_add(1);
         total_invocations = total_invocations.saturating_add(usage.invocation_count as u64);
-        total_cost_charged = total_cost_charged.saturating_add(usage.total_cost_charged);
+        total_committed_cost_units =
+            total_committed_cost_units.saturating_add(committed_cost_units);
         distinct_capabilities.insert(usage.capability_id.clone());
         if let Some(subject_key) = subject_key.clone() {
             distinct_subjects.insert(subject_key);
@@ -2116,7 +2122,7 @@ fn build_budget_utilization_report(
                 tool_name: resolved.tool_name,
                 invocation_count: usage.invocation_count,
                 max_invocations: resolved.max_invocations,
-                total_cost_charged: usage.total_cost_charged,
+                total_cost_charged: committed_cost_units,
                 currency: resolved.currency,
                 max_total_cost_units: resolved.max_total_cost_units,
                 remaining_cost_units,
@@ -2142,11 +2148,11 @@ fn build_budget_utilization_report(
                         }
                     }),
                     money: resolved.max_total_cost_units.map(|max| {
-                        let exhausted = usage.total_cost_charged >= max;
+                        let exhausted = committed_cost_units >= max;
                         let near_limit =
                             exhausted || cost_utilization_rate.is_some_and(|rate| rate >= 0.8);
                         BudgetDimensionUsage {
-                            used: usage.total_cost_charged,
+                            used: committed_cost_units,
                             limit: max,
                             remaining: remaining_cost_units.unwrap_or(0),
                             utilization_rate: cost_utilization_rate,
@@ -2166,7 +2172,7 @@ fn build_budget_utilization_report(
             distinct_capabilities: distinct_capabilities.len() as u64,
             distinct_subjects: distinct_subjects.len() as u64,
             total_invocations,
-            total_cost_charged,
+            total_cost_charged: total_committed_cost_units,
             near_limit_count,
             exhausted_count,
             rows_missing_scope,

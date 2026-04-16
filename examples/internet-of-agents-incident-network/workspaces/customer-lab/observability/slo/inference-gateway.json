@@ -1,0 +1,85 @@
+{
+  "service": "inference-gateway",
+  "environment": "production",
+  "reporting_time": "2026-04-15T03:42:00Z",
+  "slos": [
+    {
+      "name": "availability",
+      "description": "Percentage of non-5xx responses for inference and embedding endpoints",
+      "target_pct": 99.95,
+      "current_pct": 99.71,
+      "status": "BREACHED",
+      "window": "30d-rolling",
+      "window_start": "2026-03-16T00:00:00Z",
+      "window_end": "2026-04-15T03:42:00Z",
+      "error_budget": {
+        "total_minutes": 21.6,
+        "consumed_minutes": 18.9,
+        "remaining_minutes": 2.7,
+        "remaining_pct": 12.5,
+        "burn_rate": {
+          "current_1h": 23.4,
+          "current_6h": 4.1,
+          "current_24h": 1.2,
+          "threshold_critical": 14.4,
+          "threshold_warning": 6.0
+        },
+        "projected_exhaustion": "2026-04-15T03:54:00Z",
+        "alerts_firing": [
+          "slo-availability-budget-burn-critical",
+          "slo-availability-budget-low"
+        ]
+      },
+      "breakdown_by_region": {
+        "us-east-1": { "current_pct": 99.98, "status": "OK" },
+        "us-west-2": { "current_pct": 99.97, "status": "OK" },
+        "eu-west-1": { "current_pct": 96.14, "status": "BREACHED" },
+        "eu-west-2": { "current_pct": 96.88, "status": "BREACHED" },
+        "ap-southeast-1": { "current_pct": 97.21, "status": "BREACHED" },
+        "ap-southeast-2": { "current_pct": 97.54, "status": "BREACHED" },
+        "sa-east-1": { "current_pct": 95.82, "status": "BREACHED" }
+      }
+    },
+    {
+      "name": "latency",
+      "description": "p99 latency for inference completions under 2000ms",
+      "target_ms": 2000,
+      "current_p99_ms": 12400,
+      "status": "BREACHED",
+      "window": "30d-rolling",
+      "window_start": "2026-03-16T00:00:00Z",
+      "window_end": "2026-04-15T03:42:00Z",
+      "error_budget": {
+        "total_minutes": 43.2,
+        "consumed_minutes": 34.1,
+        "remaining_minutes": 9.1,
+        "remaining_pct": 21.1,
+        "burn_rate": {
+          "current_1h": 18.7,
+          "current_6h": 3.3,
+          "current_24h": 0.9,
+          "threshold_critical": 14.4,
+          "threshold_warning": 6.0
+        },
+        "projected_exhaustion": "2026-04-15T04:11:00Z",
+        "alerts_firing": [
+          "slo-latency-budget-burn-critical"
+        ]
+      },
+      "note": "Latency breach is secondary effect of retry storms from 403 rejections, not a primary latency regression"
+    },
+    {
+      "name": "throughput",
+      "description": "Successful inference requests per second should not drop below 80% of trailing 7d average",
+      "target_rps_floor_pct": 80,
+      "trailing_7d_avg_rps": 24700,
+      "current_rps": 15120,
+      "current_pct_of_baseline": 61.2,
+      "status": "BREACHED",
+      "window": "1h-rolling",
+      "alerts_firing": [
+        "slo-throughput-degraded"
+      ]
+    }
+  ]
+}

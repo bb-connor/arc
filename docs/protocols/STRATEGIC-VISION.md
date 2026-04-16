@@ -243,7 +243,7 @@ shipping surface.
 |------|-----------|-------|--------|
 | ACP kernel integration | Promote arc-acp-proxy from unsigned audit entries to full signed receipts via injected kernel service | `arc-acp-proxy` | [Shipped] |
 | MCP proxy DX polish | The repo already ships `arc mcp serve` and `arc mcp serve-http`; Tier 1 work is simplifying naming, defaults, and docs further, potentially including an `arc proxy` alias | `arc-cli` | |
-| Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` | [Shipped] |
+| Unified runtime config | Single `arc.yaml` that configures MCP, A2A, and ACP edges with shared policy | `arc-cli` | [Partial -- flat schema shipped, nested schema proposed. See spec/CONFIGURATION.md] |
 | Symlink fix | Workspace symlink resolution for monorepo consumers | `arc-cli` | |
 
 **Why Tier 1 first:** ACP live-path cryptographic enforcement is now landed, so

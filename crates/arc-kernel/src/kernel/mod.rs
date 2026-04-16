@@ -1,7 +1,14 @@
 use std::sync::atomic::AtomicU64;
 use std::sync::{Mutex, RwLock};
 
+use arc_appraisal::VerifiedRuntimeAttestationRecord;
+
 use self::responses::FinalizeToolOutputCostContext;
+use crate::budget_store::{
+    BudgetAuthorizeHoldDecision, BudgetAuthorizeHoldRequest, BudgetCommitMetadata,
+    BudgetEventAuthority, BudgetHoldMutationDecision, BudgetReconcileHoldDecision,
+    BudgetReconcileHoldRequest, BudgetReverseHoldDecision, BudgetReverseHoldRequest,
+};
 use crate::*;
 
 pub type AgentId = String;
@@ -16,6 +23,92 @@ pub type ServerId = String;
 pub(crate) struct ReceiptContent {
     pub(crate) content_hash: String,
     pub(crate) metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ValidatedGovernedCallChainProof {
+    upstream_proof: Option<arc_core::capability::GovernedUpstreamCallChainProof>,
+    continuation_token_id: Option<String>,
+    session_anchor_id: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+enum LocalReceiptArtifact {
+    Tool(arc_core::receipt::ArcReceipt),
+    Child(arc_core::receipt::ChildRequestReceipt),
+}
+
+impl LocalReceiptArtifact {
+    fn verify_signature(&self) -> Result<bool, KernelError> {
+        match self {
+            Self::Tool(receipt) => receipt.verify_signature().map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain parent receipt failed signature verification: {error}"
+                ))
+            }),
+            Self::Child(receipt) => receipt.verify_signature().map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain parent receipt failed signature verification: {error}"
+                ))
+            }),
+        }
+    }
+
+    fn artifact_hash(&self) -> Result<String, KernelError> {
+        let canonical = match self {
+            Self::Tool(receipt) => canonical_json_bytes(receipt),
+            Self::Child(receipt) => canonical_json_bytes(receipt),
+        }
+        .map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "failed to hash governed call_chain parent receipt: {error}"
+            ))
+        })?;
+        Ok(sha256_hex(&canonical))
+    }
+
+    fn session_anchor_reference(&self) -> Option<arc_core::session::SessionAnchorReference> {
+        let metadata = match self {
+            Self::Tool(receipt) => receipt.metadata.as_ref(),
+            Self::Child(receipt) => receipt.metadata.as_ref(),
+        };
+        extract_session_anchor_reference_from_metadata(metadata)
+    }
+}
+
+fn extract_session_anchor_reference_from_metadata(
+    metadata: Option<&serde_json::Value>,
+) -> Option<arc_core::session::SessionAnchorReference> {
+    let metadata = metadata?;
+    let candidates = [
+        metadata
+            .get("governed_transaction")
+            .and_then(|value| value.get("call_chain")),
+        metadata.get("lineageReferences"),
+    ];
+
+    for candidate in candidates.into_iter().flatten() {
+        let Some(session_anchor_id) = candidate
+            .get("sessionAnchorId")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        else {
+            continue;
+        };
+        let Some(session_anchor_hash) = candidate
+            .get("sessionAnchorHash")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+        else {
+            continue;
+        };
+        return Some(arc_core::session::SessionAnchorReference::new(
+            session_anchor_id,
+            session_anchor_hash,
+        ));
+    }
+
+    None
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
@@ -89,6 +182,9 @@ pub enum KernelError {
 
     #[error("delegation chain revoked at ancestor {0}")]
     DelegationChainRevoked(CapabilityId),
+
+    #[error("delegation admission failed: {0}")]
+    DelegationInvalid(String),
 
     #[error("invalid capability constraint: {0}")]
     InvalidConstraint(String),
@@ -278,6 +374,11 @@ impl KernelError {
                 "ARC-KERNEL-DELEGATION-CHAIN-REVOKED",
                 serde_json::json!({ "capability_id": capability_id }),
                 "Inspect the capability lineage and reissue the chain from a non-revoked ancestor.",
+            ),
+            Self::DelegationInvalid(reason) => self.report_with_context(
+                "ARC-KERNEL-DELEGATION-INVALID",
+                serde_json::json!({ "reason": reason }),
+                "Reissue the delegated capability with a valid ancestor snapshot chain, delegator binding, attenuation proof, and delegated scope ceiling.",
             ),
             Self::InvalidConstraint(reason) => self.report_with_context(
                 "ARC-KERNEL-INVALID-CONSTRAINT",
@@ -681,6 +782,10 @@ pub struct ArcKernel {
     dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     dpop_config: Option<dpop::DpopConfig>,
+    /// Replay store for governed approval tokens. Prevents a signed approval
+    /// from being consumed more than once. Uses the same LRU + TTL pattern as
+    /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
+    approval_replay_store: Option<dpop::DpopNonceStore>,
 }
 
 #[derive(Clone, Copy)]
@@ -698,8 +803,20 @@ pub(crate) struct BudgetChargeResult {
     cost_charged: u64,
     currency: String,
     budget_total: u64,
-    /// Running total cost after this charge (used to compute budget_remaining).
-    new_total_cost_charged: u64,
+    /// Running committed cost after this charge (used to compute budget_remaining).
+    new_committed_cost_units: u64,
+    budget_hold_id: String,
+    authorize_metadata: BudgetCommitMetadata,
+}
+
+impl BudgetChargeResult {
+    fn reverse_event_id(&self) -> String {
+        format!("{}:reverse", self.budget_hold_id)
+    }
+
+    fn reconcile_event_id(&self) -> String {
+        format!("{}:reconcile", self.budget_hold_id)
+    }
 }
 
 struct SessionNestedFlowBridge<'a, C> {
@@ -1016,6 +1133,10 @@ impl ArcKernel {
             last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
+            approval_replay_store: Some(dpop::DpopNonceStore::new(
+                8192,
+                std::time::Duration::from_secs(3600),
+            )),
         }
     }
 
@@ -1128,6 +1249,7 @@ impl ArcKernel {
             .map_err(|_| KernelError::InvalidSignature)?;
         check_time_bounds(capability, current_unix_timestamp())?;
         self.check_revocation(capability)?;
+        self.validate_delegation_admission(capability)?;
         check_subject_binding(capability, agent_id)?;
         Ok(())
     }
@@ -1239,6 +1361,18 @@ impl ArcKernel {
             );
         }
 
+        if let Err(e) = self.validate_delegation_admission(cap) {
+            let msg = e.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
+            return self.build_deny_response_with_metadata(
+                request,
+                &msg,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
@@ -1331,7 +1465,7 @@ impl ArcKernel {
         }
 
         let (matched_grant_index, charge_result) =
-            match self.check_and_increment_budget(cap, &matching_grants) {
+            match self.check_and_increment_budget(&request.request_id, cap, &matching_grants) {
                 Ok(result) => result,
                 Err(e) => {
                     let msg = e.to_string();
@@ -1343,7 +1477,10 @@ impl ArcKernel {
                         now,
                         &matching_grants,
                         cap,
-                        extra_metadata.clone(),
+                        self.merge_budget_receipt_metadata(
+                            extra_metadata.clone(),
+                            self.budget_backend_receipt_metadata()?,
+                        ),
                     );
                 }
             };
@@ -1358,36 +1495,52 @@ impl ArcKernel {
                 ))
             })?;
 
-        if let Err(error) = self.validate_governed_transaction(
+        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
             charge_result.as_ref(),
+            None,
             now,
         ) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
-            if let Some(ref charge) = charge_result {
-                let total_cost_charged_after_release =
-                    self.reverse_budget_charge(&cap.id, charge)?;
-                return self.build_pre_execution_monetary_deny_response_with_metadata(
+            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
+                if let Some(ref charge) = charge_result {
+                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                    return self.build_pre_execution_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        charge,
+                        reverse.committed_cost_units_after,
+                        cap,
+                        self.merge_budget_receipt_metadata(
+                            extra_metadata.clone(),
+                            self.budget_execution_receipt_metadata(
+                                charge,
+                                Some(("reversed", &reverse)),
+                            ),
+                        ),
+                    );
+                }
+                return self.build_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
-                    charge,
-                    total_cost_charged_after_release,
-                    cap,
+                    Some(matched_grant_index),
                     extra_metadata.clone(),
                 );
             }
-            return self.build_deny_response_with_metadata(
+        };
+        let _governed_call_chain_receipt_evidence_scope =
+            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
                 request,
-                &msg,
-                now,
-                Some(matched_grant_index),
-                extra_metadata.clone(),
-            );
-        }
+                cap,
+                None,
+                validated_upstream_call_chain_proof,
+            ));
 
         if let Err(e) = self.run_guards(
             request,
@@ -1398,16 +1551,21 @@ impl ArcKernel {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
             if let Some(ref charge) = charge_result {
-                let total_cost_charged_after_release =
-                    self.reverse_budget_charge(&cap.id, charge)?;
+                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
                 return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
                     charge,
-                    total_cost_charged_after_release,
+                    reverse.committed_cost_units_after,
                     cap,
-                    extra_metadata.clone(),
+                    self.merge_budget_receipt_metadata(
+                        extra_metadata.clone(),
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", &reverse)),
+                        ),
+                    ),
                 );
             }
             return self.build_deny_response_with_metadata(
@@ -1426,16 +1584,21 @@ impl ArcKernel {
                     let msg = format!("payment authorization failed: {error}");
                     warn!(request_id = %request.request_id, reason = %msg, "payment denied");
                     if let Some(ref charge) = charge_result {
-                        let total_cost_charged_after_release =
-                            self.reverse_budget_charge(&cap.id, charge)?;
+                        let reverse = self.reverse_budget_charge(&cap.id, charge)?;
                         return self.build_pre_execution_monetary_deny_response_with_metadata(
                             request,
                             &msg,
                             now,
                             charge,
-                            total_cost_charged_after_release,
+                            reverse.committed_cost_units_after,
                             cap,
-                            extra_metadata.clone(),
+                            self.merge_budget_receipt_metadata(
+                                extra_metadata.clone(),
+                                self.budget_execution_receipt_metadata(
+                                    charge,
+                                    Some(("reversed", &reverse)),
+                                ),
+                            ),
                         );
                     }
                     return self.build_deny_response_with_metadata(
@@ -1454,7 +1617,7 @@ impl ArcKernel {
             match self.dispatch_tool_call_with_cost(request, has_monetary) {
                 Ok(result) => result,
                 Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                    self.unwind_aborted_monetary_invocation(
+                    let _ = self.unwind_aborted_monetary_invocation(
                         request,
                         cap,
                         charge_result.as_ref(),
@@ -1468,7 +1631,7 @@ impl ArcKernel {
                     return Err(error);
                 }
                 Err(KernelError::RequestCancelled { reason, .. }) => {
-                    self.unwind_aborted_monetary_invocation(
+                    let unwind = self.unwind_aborted_monetary_invocation(
                         request,
                         cap,
                         charge_result.as_ref(),
@@ -1484,11 +1647,20 @@ impl ArcKernel {
                         &reason,
                         now,
                         Some(matched_grant_index),
-                        extra_metadata.clone(),
+                        match (charge_result.as_ref(), unwind.as_ref()) {
+                            (Some(charge), Some(reverse)) => self.merge_budget_receipt_metadata(
+                                extra_metadata.clone(),
+                                self.budget_execution_receipt_metadata(
+                                    charge,
+                                    Some(("reversed", reverse)),
+                                ),
+                            ),
+                            _ => extra_metadata.clone(),
+                        },
                     );
                 }
                 Err(KernelError::RequestIncomplete(reason)) => {
-                    self.unwind_aborted_monetary_invocation(
+                    let unwind = self.unwind_aborted_monetary_invocation(
                         request,
                         cap,
                         charge_result.as_ref(),
@@ -1505,11 +1677,20 @@ impl ArcKernel {
                         &reason,
                         now,
                         Some(matched_grant_index),
-                        extra_metadata.clone(),
+                        match (charge_result.as_ref(), unwind.as_ref()) {
+                            (Some(charge), Some(reverse)) => self.merge_budget_receipt_metadata(
+                                extra_metadata.clone(),
+                                self.budget_execution_receipt_metadata(
+                                    charge,
+                                    Some(("reversed", reverse)),
+                                ),
+                            ),
+                            _ => extra_metadata.clone(),
+                        },
                     );
                 }
                 Err(e) => {
-                    self.unwind_aborted_monetary_invocation(
+                    let unwind = self.unwind_aborted_monetary_invocation(
                         request,
                         cap,
                         charge_result.as_ref(),
@@ -1522,11 +1703,20 @@ impl ArcKernel {
                         &msg,
                         now,
                         Some(matched_grant_index),
-                        extra_metadata.clone(),
+                        match (charge_result.as_ref(), unwind.as_ref()) {
+                            (Some(charge), Some(reverse)) => self.merge_budget_receipt_metadata(
+                                extra_metadata.clone(),
+                                self.budget_execution_receipt_metadata(
+                                    charge,
+                                    Some(("reversed", reverse)),
+                                ),
+                            ),
+                            _ => extra_metadata.clone(),
+                        },
                     );
                 }
             };
-        self.finalize_tool_output_with_cost_and_metadata(
+        self.finalize_budgeted_tool_output_with_cost_and_metadata(
             request,
             tool_output,
             tool_started_at.elapsed(),
@@ -1578,6 +1768,12 @@ impl ArcKernel {
             return self.build_deny_response(request, &msg, now, None);
         }
 
+        if let Err(e) = self.validate_delegation_admission(cap) {
+            let msg = e.to_string();
+            warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
+            return self.build_deny_response(request, &msg, now, None);
+        }
+
         if let Err(e) = check_subject_binding(cap, &request.agent_id) {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
@@ -1634,17 +1830,18 @@ impl ArcKernel {
         }
 
         let (matched_grant_index, charge_result) =
-            match self.check_and_increment_budget(cap, &matching_grants) {
+            match self.check_and_increment_budget(&request.request_id, cap, &matching_grants) {
                 Ok(result) => result,
                 Err(e) => {
                     let msg = e.to_string();
                     warn!(request_id = %request.request_id, reason = %msg, "capability rejected");
-                    return self.build_monetary_deny_response(
+                    return self.build_monetary_deny_response_with_metadata(
                         request,
                         &msg,
                         now,
                         &matching_grants,
                         cap,
+                        Some(self.budget_backend_receipt_metadata()?),
                     );
                 }
             };
@@ -1659,29 +1856,43 @@ impl ArcKernel {
                 ))
             })?;
 
-        if let Err(error) = self.validate_governed_transaction(
+        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
             charge_result.as_ref(),
+            Some(parent_context),
             now,
         ) {
-            let msg = error.to_string();
-            warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
-            if let Some(ref charge) = charge_result {
-                let total_cost_charged_after_release =
-                    self.reverse_budget_charge(&cap.id, charge)?;
-                return self.build_pre_execution_monetary_deny_response(
-                    request,
-                    &msg,
-                    now,
-                    charge,
-                    total_cost_charged_after_release,
-                    cap,
-                );
+            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Err(error) => {
+                let msg = error.to_string();
+                warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
+                if let Some(ref charge) = charge_result {
+                    let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                    return self.build_pre_execution_monetary_deny_response_with_metadata(
+                        request,
+                        &msg,
+                        now,
+                        charge,
+                        reverse.committed_cost_units_after,
+                        cap,
+                        Some(self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", &reverse)),
+                        )),
+                    );
+                }
+                return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
             }
-            return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
-        }
+        };
+        let _governed_call_chain_receipt_evidence_scope =
+            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
+                request,
+                cap,
+                Some(parent_context),
+                validated_upstream_call_chain_proof,
+            ));
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
@@ -1695,15 +1906,20 @@ impl ArcKernel {
             let msg = e.to_string();
             warn!(request_id = %request.request_id, reason = %msg, "guard denied");
             if let Some(ref charge) = charge_result {
-                let total_cost_charged_after_release =
-                    self.reverse_budget_charge(&cap.id, charge)?;
-                return self.build_pre_execution_monetary_deny_response(
+                let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                return self.build_pre_execution_monetary_deny_response_with_metadata(
                     request,
                     &msg,
                     now,
                     charge,
-                    total_cost_charged_after_release,
+                    reverse.committed_cost_units_after,
                     cap,
+                    Some(
+                        self.budget_execution_receipt_metadata(
+                            charge,
+                            Some(("reversed", &reverse)),
+                        ),
+                    ),
                 );
             }
             return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
@@ -1716,15 +1932,18 @@ impl ArcKernel {
                     let msg = format!("payment authorization failed: {error}");
                     warn!(request_id = %request.request_id, reason = %msg, "payment denied");
                     if let Some(ref charge) = charge_result {
-                        let total_cost_charged_after_release =
-                            self.reverse_budget_charge(&cap.id, charge)?;
-                        return self.build_pre_execution_monetary_deny_response(
+                        let reverse = self.reverse_budget_charge(&cap.id, charge)?;
+                        return self.build_pre_execution_monetary_deny_response_with_metadata(
                             request,
                             &msg,
                             now,
                             charge,
-                            total_cost_charged_after_release,
+                            reverse.committed_cost_units_after,
                             cap,
+                            Some(self.budget_execution_receipt_metadata(
+                                charge,
+                                Some(("reversed", &reverse)),
+                            )),
                         );
                     }
                     return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
@@ -1777,7 +1996,7 @@ impl ArcKernel {
         let tool_output = match tool_output_result {
             Ok(output) => output,
             Err(error @ KernelError::UrlElicitationsRequired { .. }) => {
-                self.unwind_aborted_monetary_invocation(
+                let _ = self.unwind_aborted_monetary_invocation(
                     request,
                     cap,
                     charge_result.as_ref(),
@@ -1791,7 +2010,7 @@ impl ArcKernel {
                 return Err(error);
             }
             Err(KernelError::RequestCancelled { request_id, reason }) => {
-                self.unwind_aborted_monetary_invocation(
+                let unwind = self.unwind_aborted_monetary_invocation(
                     request,
                     cap,
                     charge_result.as_ref(),
@@ -1808,15 +2027,24 @@ impl ArcKernel {
                     reason = %reason,
                     "tool call cancelled"
                 );
-                return self.build_cancelled_response(
+                return self.build_cancelled_response_with_metadata(
                     request,
                     &reason,
                     now,
                     Some(matched_grant_index),
+                    match (charge_result.as_ref(), unwind.as_ref()) {
+                        (Some(charge), Some(reverse)) => {
+                            Some(self.budget_execution_receipt_metadata(
+                                charge,
+                                Some(("reversed", reverse)),
+                            ))
+                        }
+                        _ => None,
+                    },
                 );
             }
             Err(KernelError::RequestIncomplete(reason)) => {
-                self.unwind_aborted_monetary_invocation(
+                let unwind = self.unwind_aborted_monetary_invocation(
                     request,
                     cap,
                     charge_result.as_ref(),
@@ -1827,15 +2055,25 @@ impl ArcKernel {
                     reason = %reason,
                     "tool call incomplete"
                 );
-                return self.build_incomplete_response(
+                return self.build_incomplete_response_with_output_and_metadata(
                     request,
+                    None,
                     &reason,
                     now,
                     Some(matched_grant_index),
+                    match (charge_result.as_ref(), unwind.as_ref()) {
+                        (Some(charge), Some(reverse)) => {
+                            Some(self.budget_execution_receipt_metadata(
+                                charge,
+                                Some(("reversed", reverse)),
+                            ))
+                        }
+                        _ => None,
+                    },
                 );
             }
             Err(error) => {
-                self.unwind_aborted_monetary_invocation(
+                let unwind = self.unwind_aborted_monetary_invocation(
                     request,
                     cap,
                     charge_result.as_ref(),
@@ -1843,10 +2081,24 @@ impl ArcKernel {
                 )?;
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "tool server error");
-                return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
+                return self.build_deny_response_with_metadata(
+                    request,
+                    &msg,
+                    now,
+                    Some(matched_grant_index),
+                    match (charge_result.as_ref(), unwind.as_ref()) {
+                        (Some(charge), Some(reverse)) => {
+                            Some(self.budget_execution_receipt_metadata(
+                                charge,
+                                Some(("reversed", reverse)),
+                            ))
+                        }
+                        _ => None,
+                    },
+                );
             }
         };
-        self.finalize_tool_output_with_cost(
+        self.finalize_budgeted_tool_output_with_cost_and_metadata(
             request,
             tool_output,
             tool_started_at.elapsed(),
@@ -1858,6 +2110,7 @@ impl ArcKernel {
                 payment_authorization,
                 cap,
             },
+            None,
         )
     }
 
@@ -2060,12 +2313,293 @@ impl ArcKernel {
         Ok(())
     }
 
+    fn validate_delegation_admission(&self, cap: &CapabilityToken) -> Result<(), KernelError> {
+        if cap.delegation_chain.is_empty() {
+            return Ok(());
+        }
+
+        arc_core::capability::validate_delegation_chain(
+            &cap.delegation_chain,
+            Some(self.config.max_delegation_depth),
+        )
+        .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?;
+
+        let last_link = cap
+            .delegation_chain
+            .last()
+            .expect("delegation chain checked as non-empty");
+        if last_link.delegatee != cap.subject {
+            return Err(KernelError::DelegationInvalid(format!(
+                "leaf capability subject {} does not match final delegation delegatee {}",
+                cap.subject.to_hex(),
+                last_link.delegatee.to_hex()
+            )));
+        }
+
+        let mut ancestor_snapshots = Vec::with_capacity(cap.delegation_chain.len());
+        for (index, link) in cap.delegation_chain.iter().enumerate() {
+            let snapshot = self
+                .with_receipt_store(
+                    |store| Ok(store.get_capability_snapshot(&link.capability_id)?),
+                )?
+                .flatten()
+                .ok_or_else(|| {
+                    KernelError::DelegationInvalid(format!(
+                        "missing capability snapshot for delegation ancestor {} at link index {}",
+                        link.capability_id, index
+                    ))
+                })?;
+            let expected_depth = index as u64;
+            if snapshot.delegation_depth != expected_depth {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "delegation ancestor {} at link index {} has stored depth {}, expected {}",
+                    snapshot.capability_id, index, snapshot.delegation_depth, expected_depth
+                )));
+            }
+
+            let expected_parent_capability_id = index
+                .checked_sub(1)
+                .map(|parent_index| cap.delegation_chain[parent_index].capability_id.as_str());
+            if snapshot.parent_capability_id.as_deref() != expected_parent_capability_id {
+                let observed_parent = snapshot.parent_capability_id.as_deref().unwrap_or("<root>");
+                let expected_parent = expected_parent_capability_id.unwrap_or("<root>");
+                return Err(KernelError::DelegationInvalid(format!(
+                    "delegation ancestor {} at link index {} is lineage-linked to {}, expected {}",
+                    snapshot.capability_id, index, observed_parent, expected_parent
+                )));
+            }
+
+            ancestor_snapshots.push(snapshot);
+        }
+
+        for (index, link) in cap.delegation_chain.iter().enumerate() {
+            let parent_snapshot = &ancestor_snapshots[index];
+            let parent_scope = scope_from_capability_snapshot(parent_snapshot)?;
+
+            if parent_snapshot.subject_key != link.delegator.to_hex() {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "delegation link {} delegator {} does not match parent capability subject {}",
+                    index,
+                    link.delegator.to_hex(),
+                    parent_snapshot.subject_key
+                )));
+            }
+            if link.timestamp < parent_snapshot.issued_at
+                || link.timestamp >= parent_snapshot.expires_at
+            {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "delegation link {} timestamp {} is outside parent capability {} validity window [{} , {})",
+                    index,
+                    link.timestamp,
+                    parent_snapshot.capability_id,
+                    parent_snapshot.issued_at,
+                    parent_snapshot.expires_at
+                )));
+            }
+
+            let (
+                child_capability_id,
+                child_subject_key,
+                child_scope,
+                child_issued_at,
+                child_expires_at,
+                child_parent_capability_id,
+            ) = if let Some(next_snapshot) = ancestor_snapshots.get(index + 1) {
+                (
+                    next_snapshot.capability_id.clone(),
+                    next_snapshot.subject_key.clone(),
+                    scope_from_capability_snapshot(next_snapshot)?,
+                    next_snapshot.issued_at,
+                    next_snapshot.expires_at,
+                    next_snapshot.parent_capability_id.clone(),
+                )
+            } else {
+                (
+                    cap.id.clone(),
+                    cap.subject.to_hex(),
+                    cap.scope.clone(),
+                    cap.issued_at,
+                    cap.expires_at,
+                    Some(link.capability_id.clone()),
+                )
+            };
+
+            if child_subject_key != link.delegatee.to_hex() {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "delegation link {} delegatee {} does not match child capability subject {}",
+                    index,
+                    link.delegatee.to_hex(),
+                    child_subject_key
+                )));
+            }
+            if child_parent_capability_id.as_deref() != Some(link.capability_id.as_str()) {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "child capability {} is not lineage-linked to parent capability {}",
+                    child_capability_id, link.capability_id
+                )));
+            }
+            if child_issued_at < link.timestamp {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "child capability {} was issued before delegation link {} timestamp",
+                    child_capability_id, index
+                )));
+            }
+            if child_issued_at < parent_snapshot.issued_at {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "child capability {} predates parent capability {} issuance",
+                    child_capability_id, parent_snapshot.capability_id
+                )));
+            }
+            if child_expires_at > parent_snapshot.expires_at {
+                return Err(KernelError::DelegationInvalid(format!(
+                    "child capability {} expires after parent capability {}",
+                    child_capability_id, parent_snapshot.capability_id
+                )));
+            }
+
+            validate_delegation_scope_step(
+                &parent_snapshot.capability_id,
+                &child_capability_id,
+                &parent_scope,
+                &child_scope,
+                child_expires_at,
+                link,
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn local_budget_event_authority(&self) -> BudgetEventAuthority {
+        BudgetEventAuthority {
+            authority_id: format!("kernel:{}", self.config.keypair.public_key().to_hex()),
+            lease_id: "single-node".to_string(),
+            lease_epoch: 0,
+        }
+    }
+
+    fn budget_backend_receipt_metadata(&self) -> Result<serde_json::Value, KernelError> {
+        let (guarantee_level, authority_profile, metering_profile) =
+            self.with_budget_store(|store| {
+                Ok((
+                    store.budget_guarantee_level().as_str().to_string(),
+                    store.budget_authority_profile().as_str().to_string(),
+                    store.budget_metering_profile().as_str().to_string(),
+                ))
+            })?;
+        Ok(serde_json::json!({
+            "budget_authority": {
+                "guarantee_level": guarantee_level,
+                "authority_profile": authority_profile,
+                "metering_profile": metering_profile,
+            }
+        }))
+    }
+
+    fn budget_execution_receipt_metadata(
+        &self,
+        charge: &BudgetChargeResult,
+        terminal_event: Option<(&str, &BudgetHoldMutationDecision)>,
+    ) -> serde_json::Value {
+        let mut budget_authority = serde_json::Map::new();
+        budget_authority.insert(
+            "guarantee_level".to_string(),
+            serde_json::json!(charge.authorize_metadata.guarantee_level.as_str()),
+        );
+        budget_authority.insert(
+            "authority_profile".to_string(),
+            serde_json::json!(charge.authorize_metadata.budget_profile.as_str()),
+        );
+        budget_authority.insert(
+            "metering_profile".to_string(),
+            serde_json::json!(charge.authorize_metadata.metering_profile.as_str()),
+        );
+        budget_authority.insert(
+            "hold_id".to_string(),
+            serde_json::json!(&charge.budget_hold_id),
+        );
+        if let Some(budget_term) = charge.authorize_metadata.budget_term() {
+            budget_authority.insert("budget_term".to_string(), serde_json::json!(budget_term));
+        }
+        if let Some(authority) = charge.authorize_metadata.authority.as_ref() {
+            budget_authority.insert(
+                "authority".to_string(),
+                serde_json::json!({
+                    "authority_id": &authority.authority_id,
+                    "lease_id": &authority.lease_id,
+                    "lease_epoch": authority.lease_epoch,
+                }),
+            );
+        }
+
+        let mut authorize = serde_json::Map::new();
+        if let Some(event_id) = charge.authorize_metadata.event_id.as_ref() {
+            authorize.insert("event_id".to_string(), serde_json::json!(event_id));
+        }
+        if let Some(commit_index) = charge.authorize_metadata.budget_commit_index {
+            authorize.insert(
+                "budget_commit_index".to_string(),
+                serde_json::json!(commit_index),
+            );
+        }
+        authorize.insert(
+            "exposure_units".to_string(),
+            serde_json::json!(charge.cost_charged),
+        );
+        authorize.insert(
+            "committed_cost_units_after".to_string(),
+            serde_json::json!(charge.new_committed_cost_units),
+        );
+        budget_authority.insert(
+            "authorize".to_string(),
+            serde_json::Value::Object(authorize),
+        );
+
+        if let Some((disposition, terminal_event)) = terminal_event {
+            let mut terminal = serde_json::Map::new();
+            terminal.insert("disposition".to_string(), serde_json::json!(disposition));
+            if let Some(event_id) = terminal_event.metadata.event_id.as_ref() {
+                terminal.insert("event_id".to_string(), serde_json::json!(event_id));
+            }
+            if let Some(commit_index) = terminal_event.metadata.budget_commit_index {
+                terminal.insert(
+                    "budget_commit_index".to_string(),
+                    serde_json::json!(commit_index),
+                );
+            }
+            terminal.insert(
+                "exposure_units".to_string(),
+                serde_json::json!(terminal_event.exposure_units),
+            );
+            terminal.insert(
+                "realized_spend_units".to_string(),
+                serde_json::json!(terminal_event.realized_spend_units),
+            );
+            terminal.insert(
+                "committed_cost_units_after".to_string(),
+                serde_json::json!(terminal_event.committed_cost_units_after),
+            );
+            budget_authority.insert("terminal".to_string(), serde_json::Value::Object(terminal));
+        }
+
+        serde_json::json!({ "budget_authority": budget_authority })
+    }
+
+    fn merge_budget_receipt_metadata(
+        &self,
+        extra_metadata: Option<serde_json::Value>,
+        budget_metadata: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        merge_metadata_objects(extra_metadata, Some(budget_metadata))
+    }
+
     /// Check and decrement the invocation budget for a capability.
     ///
     /// Returns `(matched_grant_index, Option<BudgetChargeResult>)`.
     /// The charge result is populated only for monetary grants.
     fn check_and_increment_budget(
         &self,
+        request_id: &str,
         cap: &CapabilityToken,
         matching_grants: &[MatchingGrant<'_>],
     ) -> Result<(usize, Option<BudgetChargeResult>), KernelError> {
@@ -2092,34 +2626,43 @@ impl ArcKernel {
                 let max_total = grant.max_total_cost.as_ref().map(|m| m.units);
                 let max_per = grant.max_cost_per_invocation.as_ref().map(|m| m.units);
                 let budget_total = max_total.unwrap_or(u64::MAX);
+                let budget_hold_id =
+                    format!("budget-hold:{}:{}:{}", request_id, cap.id, matching.index);
+                let authorize_event_id = format!("{budget_hold_id}:authorize");
+                let authority = self.local_budget_event_authority();
 
-                let ok = self.with_budget_store(|store| {
-                    Ok(store.try_charge_cost(
-                        &cap.id,
-                        matching.index,
-                        grant.max_invocations,
-                        cost_units,
-                        max_per,
-                        max_total,
-                    )?)
-                })?;
-                if ok {
-                    // Read the new running total from the store so budget_remaining
-                    // is computed against cumulative spend, not just this invocation.
-                    let new_total_cost_charged = self
-                        .with_budget_store(|store| Ok(store.get_usage(&cap.id, matching.index)?))?
-                        .map(|record| record.total_cost_charged)
-                        .unwrap_or(cost_units);
-                    let charge = BudgetChargeResult {
+                let decision = self.with_budget_store(|store| {
+                    Ok(store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+                        capability_id: cap.id.clone(),
                         grant_index: matching.index,
-                        cost_charged: cost_units,
-                        currency,
-                        budget_total,
-                        new_total_cost_charged,
-                    };
-                    return Ok((matching.index, Some(charge)));
+                        max_invocations: grant.max_invocations,
+                        requested_exposure_units: cost_units,
+                        max_cost_per_invocation: max_per,
+                        max_total_cost_units: max_total,
+                        hold_id: Some(budget_hold_id.clone()),
+                        event_id: Some(authorize_event_id),
+                        authority: Some(authority.clone()),
+                    })?)
+                })?;
+                match decision {
+                    BudgetAuthorizeHoldDecision::Authorized(authorized) => {
+                        let charge = BudgetChargeResult {
+                            grant_index: matching.index,
+                            cost_charged: cost_units,
+                            currency,
+                            budget_total,
+                            new_committed_cost_units: authorized.committed_cost_units_after,
+                            budget_hold_id: authorized
+                                .hold_id
+                                .unwrap_or_else(|| budget_hold_id.clone()),
+                            authorize_metadata: authorized.metadata,
+                        };
+                        return Ok((matching.index, Some(charge)));
+                    }
+                    BudgetAuthorizeHoldDecision::Denied(_) => {
+                        saw_exhausted_budget = true;
+                    }
                 }
-                saw_exhausted_budget = true;
             } else {
                 // Non-monetary path: use try_increment as before.
                 if self.with_budget_store(|store| {
@@ -2144,43 +2687,302 @@ impl ArcKernel {
         &self,
         capability_id: &str,
         charge: &BudgetChargeResult,
-    ) -> Result<u64, KernelError> {
+    ) -> Result<BudgetReverseHoldDecision, KernelError> {
+        let authority = charge.authorize_metadata.authority.clone();
         self.with_budget_store(|store| {
-            Ok(
-                store.reverse_charge_cost(
-                    capability_id,
-                    charge.grant_index,
-                    charge.cost_charged,
-                )?,
-            )
-        })?;
-        Ok(self
-            .with_budget_store(|store| Ok(store.get_usage(capability_id, charge.grant_index)?))?
-            .map(|record| record.total_cost_charged)
-            .unwrap_or(0))
+            Ok(store.reverse_budget_hold(BudgetReverseHoldRequest {
+                capability_id: capability_id.to_string(),
+                grant_index: charge.grant_index,
+                reversed_exposure_units: charge.cost_charged,
+                hold_id: Some(charge.budget_hold_id.clone()),
+                event_id: Some(charge.reverse_event_id()),
+                authority,
+            })?)
+        })
     }
 
+    fn reconcile_budget_charge(
+        &self,
+        capability_id: &str,
+        charge: &BudgetChargeResult,
+        realized_cost_units: u64,
+    ) -> Result<BudgetReconcileHoldDecision, KernelError> {
+        let authority = charge.authorize_metadata.authority.clone();
+        self.with_budget_store(|store| {
+            Ok(store.reconcile_budget_hold(BudgetReconcileHoldRequest {
+                capability_id: capability_id.to_string(),
+                grant_index: charge.grant_index,
+                exposed_cost_units: charge.cost_charged,
+                realized_spend_units: realized_cost_units.min(charge.cost_charged),
+                hold_id: Some(charge.budget_hold_id.clone()),
+                event_id: Some(charge.reconcile_event_id()),
+                authority,
+            })?)
+        })
+    }
+
+    #[allow(dead_code)]
     fn reduce_budget_charge_to_actual(
         &self,
         capability_id: &str,
         charge: &BudgetChargeResult,
         actual_cost_units: u64,
     ) -> Result<u64, KernelError> {
-        if actual_cost_units >= charge.cost_charged {
-            return Ok(charge.new_total_cost_charged);
+        Ok(self
+            .reconcile_budget_charge(
+                capability_id,
+                charge,
+                actual_cost_units.min(charge.cost_charged),
+            )?
+            .committed_cost_units_after)
+    }
+
+    fn finalize_budgeted_tool_output_with_cost_and_metadata(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        elapsed: Duration,
+        timestamp: u64,
+        matched_grant_index: usize,
+        cost_context: FinalizeToolOutputCostContext<'_>,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        let FinalizeToolOutputCostContext {
+            charge_result,
+            reported_cost,
+            payment_authorization,
+            cap,
+        } = cost_context;
+        let Some(charge) = charge_result else {
+            return self.finalize_tool_output_with_metadata(
+                request,
+                output,
+                elapsed,
+                timestamp,
+                matched_grant_index,
+                extra_metadata,
+            );
+        };
+
+        let reported_cost_ref = reported_cost.as_ref();
+        let mut oracle_evidence = None;
+        let mut cross_currency_note = None;
+        let (actual_cost, cross_currency_failed) = if let Some(cost) =
+            reported_cost_ref.filter(|cost| cost.currency != charge.currency)
+        {
+            match self.resolve_cross_currency_cost(cost, &charge.currency, timestamp) {
+                Ok((converted_units, evidence)) => {
+                    oracle_evidence = Some(evidence);
+                    cross_currency_note = Some(serde_json::json!({
+                        "oracle_conversion": {
+                            "status": "applied",
+                            "reported_currency": cost.currency,
+                            "grant_currency": charge.currency,
+                            "reported_units": cost.units,
+                            "converted_units": converted_units
+                        }
+                    }));
+                    (converted_units, false)
+                }
+                Err(error) => {
+                    warn!(
+                        request_id = %request.request_id,
+                        reported_currency = %cost.currency,
+                        charged_currency = %charge.currency,
+                        reason = %error,
+                        "cross-currency reconciliation failed; closing hold at authorized exposure"
+                    );
+                    cross_currency_note = Some(serde_json::json!({
+                        "oracle_conversion": {
+                            "status": "failed",
+                            "reported_currency": cost.currency,
+                            "grant_currency": charge.currency,
+                            "reported_units": cost.units,
+                            "provisional_units": charge.cost_charged,
+                            "reason": error.to_string()
+                        }
+                    }));
+                    (charge.cost_charged, true)
+                }
+            }
+        } else {
+            (
+                reported_cost_ref
+                    .map(|cost| cost.units)
+                    .unwrap_or(charge.cost_charged),
+                false,
+            )
+        };
+
+        let payment_already_settled = payment_authorization
+            .as_ref()
+            .is_some_and(|authorization| authorization.settled);
+        let cost_overrun =
+            !cross_currency_failed && actual_cost > charge.cost_charged && charge.cost_charged > 0;
+
+        if cost_overrun {
+            warn!(
+                request_id = %request.request_id,
+                reported = actual_cost,
+                charged = charge.cost_charged,
+                "tool server reported cost exceeds max_cost_per_invocation; settlement_status=failed"
+            );
         }
 
-        self.with_budget_store(|store| {
-            Ok(store.reduce_charge_cost(
-                capability_id,
-                charge.grant_index,
-                charge.cost_charged - actual_cost_units,
-            )?)
-        })?;
-        Ok(self
-            .with_budget_store(|store| Ok(store.get_usage(capability_id, charge.grant_index)?))?
-            .map(|record| record.total_cost_charged)
-            .unwrap_or(actual_cost_units))
+        let realized_budget_units =
+            if cross_currency_failed || payment_already_settled || cost_overrun {
+                charge.cost_charged
+            } else {
+                actual_cost.min(charge.cost_charged)
+            };
+        let reconcile = self.reconcile_budget_charge(&cap.id, &charge, realized_budget_units)?;
+        let running_committed_cost_units = reconcile.committed_cost_units_after;
+
+        let payment_result = if let Some(authorization) = payment_authorization.as_ref() {
+            if authorization.settled || cross_currency_failed || cost_overrun {
+                None
+            } else {
+                let adapter = self.payment_adapter.as_ref().ok_or_else(|| {
+                    KernelError::Internal(
+                        "payment authorization present without configured adapter".to_string(),
+                    )
+                })?;
+                Some(if actual_cost == 0 {
+                    adapter.release(&authorization.authorization_id, &request.request_id)
+                } else {
+                    adapter.capture(
+                        &authorization.authorization_id,
+                        actual_cost,
+                        &charge.currency,
+                        &request.request_id,
+                    )
+                })
+            }
+        } else {
+            None
+        };
+
+        let settlement = if cross_currency_failed || cost_overrun {
+            ReceiptSettlement {
+                payment_reference: payment_authorization
+                    .as_ref()
+                    .map(|authorization| authorization.authorization_id.clone()),
+                settlement_status: SettlementStatus::Failed,
+            }
+        } else if let Some(authorization) = payment_authorization.as_ref() {
+            if authorization.settled {
+                ReceiptSettlement::from_authorization(authorization)
+            } else if let Some(payment_result) = payment_result.as_ref() {
+                match payment_result {
+                    Ok(result) => ReceiptSettlement::from_payment_result(result),
+                    Err(error) => {
+                        warn!(
+                            request_id = %request.request_id,
+                            reason = %error,
+                            "post-execution payment settlement failed"
+                        );
+                        ReceiptSettlement {
+                            payment_reference: Some(authorization.authorization_id.clone()),
+                            settlement_status: SettlementStatus::Failed,
+                        }
+                    }
+                }
+            } else {
+                warn!(
+                    request_id = %request.request_id,
+                    authorization_id = %authorization.authorization_id,
+                    "unsettled authorization completed without a payment result"
+                );
+                ReceiptSettlement {
+                    payment_reference: Some(authorization.authorization_id.clone()),
+                    settlement_status: SettlementStatus::Failed,
+                }
+            }
+        } else {
+            ReceiptSettlement::settled()
+        };
+        let recorded_cost = if payment_already_settled && !cross_currency_failed && !cost_overrun {
+            charge.cost_charged
+        } else {
+            actual_cost
+        };
+
+        let budget_remaining = charge
+            .budget_total
+            .saturating_sub(running_committed_cost_units);
+        let delegation_depth = cap.delegation_chain.len() as u32;
+        let root_budget_holder = cap.issuer.to_hex();
+        let (payment_reference, settlement_status) = settlement.into_receipt_parts();
+        let payment_breakdown = payment_authorization.as_ref().map(|authorization| {
+            serde_json::json!({
+                "payment": {
+                    "authorization_id": authorization.authorization_id,
+                    "adapter_metadata": authorization.metadata,
+                    "preauthorized_units": charge.cost_charged,
+                    "recorded_units": recorded_cost
+                }
+            })
+        });
+
+        let financial_meta = FinancialReceiptMetadata {
+            grant_index: charge.grant_index as u32,
+            cost_charged: recorded_cost,
+            currency: charge.currency.clone(),
+            budget_remaining,
+            budget_total: charge.budget_total,
+            delegation_depth,
+            root_budget_holder,
+            payment_reference,
+            settlement_status,
+            cost_breakdown: merge_metadata_objects(
+                merge_metadata_objects(
+                    reported_cost_ref.and_then(|cost| cost.breakdown.clone()),
+                    payment_breakdown,
+                ),
+                cross_currency_note,
+            ),
+            oracle_evidence,
+            attempted_cost: None,
+        };
+
+        let limited_output = self.apply_stream_limits(output, elapsed)?;
+        let tool_call_output = match &limited_output {
+            ToolServerOutput::Value(value) => ToolCallOutput::Value(value.clone()),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, .. }) => {
+                ToolCallOutput::Stream(stream.clone())
+            }
+        };
+
+        let budget_metadata =
+            self.budget_execution_receipt_metadata(&charge, Some(("reconciled", &reconcile)));
+        let merged_extra_metadata =
+            self.merge_budget_receipt_metadata(extra_metadata, budget_metadata);
+        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
+        let merged_extra_metadata = merge_metadata_objects(financial_json, merged_extra_metadata);
+
+        match limited_output {
+            ToolServerOutput::Value(_)
+            | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
+                .build_allow_response_with_metadata(
+                    request,
+                    tool_call_output,
+                    timestamp,
+                    Some(charge.grant_index),
+                    merged_extra_metadata.clone(),
+                ),
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
+                .build_incomplete_response_with_output_and_metadata(
+                    request,
+                    Some(tool_call_output),
+                    &reason,
+                    timestamp,
+                    Some(charge.grant_index),
+                    merged_extra_metadata,
+                ),
+        }
     }
 
     fn block_on_price_oracle<T>(
@@ -2404,41 +3206,59 @@ impl ArcKernel {
         Err("approval signer public key not found among trusted authorities".to_string())
     }
 
-    fn resolve_runtime_assurance(
+    fn verify_governed_runtime_attestation(
         &self,
         attestation: &arc_core::capability::RuntimeAttestationEvidence,
         now: u64,
-    ) -> Result<arc_core::capability::ResolvedRuntimeAssurance, KernelError> {
-        attestation
-            .resolve_effective_runtime_assurance(self.attestation_trust_policy.as_ref(), now)
-            .map_err(|error| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "runtime attestation evidence rejected by trust policy: {error}"
-                ))
-            })
+    ) -> Result<VerifiedRuntimeAttestationRecord, KernelError> {
+        verify_governed_runtime_attestation_record(
+            attestation,
+            self.attestation_trust_policy.as_ref(),
+            now,
+        )
     }
 
-    fn validate_runtime_assurance(
+    fn verify_governed_request_runtime_attestation(
         &self,
         request: &ToolCallRequest,
-        required_tier: RuntimeAssuranceTier,
         now: u64,
-    ) -> Result<(), KernelError> {
-        let attestation = request
+    ) -> Result<Option<VerifiedRuntimeAttestationRecord>, KernelError> {
+        request
             .governed_intent
             .as_ref()
             .and_then(|intent| intent.runtime_attestation.as_ref())
-            .ok_or_else(|| {
-                KernelError::GovernedTransactionDenied(format!(
-                    "runtime attestation tier '{required_tier:?}' required by grant"
-                ))
-            })?;
-        let resolved = self.resolve_runtime_assurance(attestation, now)?;
+            .map(|attestation| self.verify_governed_runtime_attestation(attestation, now))
+            .transpose()
+    }
 
-        if resolved.effective_tier < required_tier {
+    fn validate_runtime_assurance(
+        verified_runtime_attestation: Option<&VerifiedRuntimeAttestationRecord>,
+        required_tier: RuntimeAssuranceTier,
+        requirement_source: &str,
+    ) -> Result<(), KernelError> {
+        let Some(verified_runtime_attestation) = verified_runtime_attestation else {
             return Err(KernelError::GovernedTransactionDenied(format!(
-                "runtime attestation tier '{:?}' is below required '{required_tier:?}'",
-                resolved.effective_tier
+                "runtime attestation tier '{required_tier:?}' required by {requirement_source}"
+            )));
+        };
+
+        if !verified_runtime_attestation.is_locally_accepted() {
+            let reason = verified_runtime_attestation
+                .policy_outcome
+                .reason
+                .as_deref()
+                .unwrap_or(
+                    "runtime attestation evidence did not cross a local verified trust boundary",
+                );
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "runtime attestation tier '{required_tier:?}' required by {requirement_source}; {reason}"
+            )));
+        }
+
+        let effective_tier = verified_runtime_attestation.effective_tier();
+        if effective_tier < required_tier {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "runtime attestation tier '{effective_tier:?}' is below required '{required_tier:?}' for {requirement_source}"
             )));
         }
 
@@ -2486,7 +3306,43 @@ impl ArcKernel {
                 KernelError::GovernedTransactionDenied(format!(
                     "approval token verification failed: {reason}"
                 ))
-            })
+            })?;
+
+        // Step 7: Cap approval token lifetime. Tokens with expires_at more
+        // than MAX_APPROVAL_TTL_SECS beyond issued_at are rejected to prevent
+        // long-lived tokens from outliving the replay store's eviction window.
+        const MAX_APPROVAL_TTL_SECS: u64 = 3600; // 1 hour max
+        let token_lifetime = approval_token
+            .expires_at
+            .saturating_sub(approval_token.issued_at);
+        if token_lifetime > MAX_APPROVAL_TTL_SECS {
+            return Err(KernelError::GovernedTransactionDenied(format!(
+                "approval token lifetime ({token_lifetime}s) exceeds maximum ({MAX_APPROVAL_TTL_SECS}s)"
+            )));
+        }
+
+        // Step 8: Single-use replay check. An approval token must not be
+        // consumed more than once. The replay store TTL is set to
+        // MAX_APPROVAL_TTL_SECS, which is >= any valid token's lifetime
+        // (enforced by step 7). This guarantees a token can never be replayed
+        // after cache eviction because the token itself will have expired
+        // before eviction occurs.
+        if let Some(ref replay_store) = self.approval_replay_store {
+            let is_fresh = replay_store
+                .check_and_insert(&approval_token.request_id, intent_hash)
+                .map_err(|_| {
+                    KernelError::GovernedTransactionDenied(
+                        "approval replay store unavailable; denying as fail-closed".to_string(),
+                    )
+                })?;
+            if !is_fresh {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "approval token has already been consumed (replay detected)".to_string(),
+                ));
+            }
+        }
+
+        Ok(())
     }
 
     fn validate_metered_billing_context(
@@ -2567,11 +3423,15 @@ impl ArcKernel {
     }
 
     fn validate_governed_call_chain_context(
+        &self,
         request: &ToolCallRequest,
+        cap: &CapabilityToken,
         intent: &arc_core::capability::GovernedTransactionIntent,
-    ) -> Result<(), KernelError> {
+        parent_context: Option<&OperationContext>,
+        now: u64,
+    ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
         let Some(call_chain) = intent.call_chain.as_ref() else {
-            return Ok(());
+            return Ok(None);
         };
 
         if call_chain.chain_id.trim().is_empty() {
@@ -2589,6 +3449,15 @@ impl ArcKernel {
                 "governed call_chain.parent_request_id must not equal the current request_id"
                     .to_string(),
             ));
+        }
+        if let Some(parent_context) = parent_context {
+            let local_parent_request_id = parent_context.request_id.to_string();
+            if call_chain.parent_request_id != local_parent_request_id {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain.parent_request_id does not match the locally authenticated parent request".to_string(),
+                ));
+            }
+            self.validate_parent_request_continuation(request, parent_context)?;
         }
         if call_chain.origin_subject.trim().is_empty() {
             return Err(KernelError::GovernedTransactionDenied(
@@ -2609,8 +3478,330 @@ impl ArcKernel {
                 "governed call_chain.parent_receipt_id must not be empty when present".to_string(),
             ));
         }
+        if let Some(capability_delegator_subject) = cap
+            .delegation_chain
+            .last()
+            .map(|link| link.delegator.to_hex())
+        {
+            if call_chain.delegator_subject != capability_delegator_subject {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain.delegator_subject does not match the validated capability delegation source".to_string(),
+                ));
+            }
+        }
+        if let Some(capability_origin_subject) = cap
+            .delegation_chain
+            .first()
+            .map(|link| link.delegator.to_hex())
+        {
+            if call_chain.origin_subject != capability_origin_subject {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain.origin_subject does not match the validated capability lineage origin".to_string(),
+                ));
+            }
+        }
 
-        Ok(())
+        self.validate_governed_call_chain_upstream_proof(
+            request,
+            cap,
+            intent,
+            call_chain,
+            parent_context,
+            now,
+        )
+    }
+
+    fn validate_governed_call_chain_upstream_proof(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        intent: &arc_core::capability::GovernedTransactionIntent,
+        call_chain: &arc_core::capability::GovernedCallChainContext,
+        parent_context: Option<&OperationContext>,
+        now: u64,
+    ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
+        if let Some(continuation_token) = intent.explicit_continuation_token().map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "governed call_chain continuation token is malformed: {error}"
+            ))
+        })? {
+            let signature_valid = continuation_token.verify_signature().map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain continuation token failed signature verification: {error}"
+                ))
+            })?;
+            if !signature_valid {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token failed signature verification"
+                        .to_string(),
+                ));
+            }
+            continuation_token.validate_time(now).map_err(|error| {
+                KernelError::GovernedTransactionDenied(format!(
+                    "governed call_chain continuation token rejected by time bounds: {error}"
+                ))
+            })?;
+            if continuation_token.subject != cap.subject {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token subject does not match the capability subject"
+                        .to_string(),
+                ));
+            }
+            if continuation_token.current_subject != cap.subject.to_hex() {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token current_subject does not match the capability subject"
+                        .to_string(),
+                ));
+            }
+
+            let signer_matches_capability_lineage = cap
+                .delegation_chain
+                .last()
+                .is_some_and(|link| link.delegator == continuation_token.signer);
+            if !self.is_trusted_governed_continuation_signer(&continuation_token.signer)
+                && !signer_matches_capability_lineage
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token signer is not trusted".to_string(),
+                ));
+            }
+            if continuation_token.chain_id != call_chain.chain_id {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token chain_id does not match the asserted call_chain".to_string(),
+                ));
+            }
+            if continuation_token.parent_request_id != call_chain.parent_request_id {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token parent_request_id does not match the asserted call_chain".to_string(),
+                ));
+            }
+            if continuation_token.parent_receipt_id != call_chain.parent_receipt_id {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token parent_receipt_id does not match the asserted call_chain".to_string(),
+                ));
+            }
+            if continuation_token.origin_subject != call_chain.origin_subject {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token origin_subject does not match the asserted call_chain".to_string(),
+                ));
+            }
+            if continuation_token.delegator_subject != call_chain.delegator_subject {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token delegator_subject does not match the asserted call_chain".to_string(),
+                ));
+            }
+            if continuation_token.audience.is_some()
+                && !continuation_token.matches_target(&request.server_id, &request.tool_name)
+            {
+                return Err(KernelError::GovernedTransactionDenied(
+                    "governed call_chain continuation token target does not match the tool call"
+                        .to_string(),
+                ));
+            }
+            if let Some(expected_intent_hash) = continuation_token.governed_intent_hash.as_deref() {
+                let intent_hash = intent.binding_hash().map_err(|error| {
+                    KernelError::GovernedTransactionDenied(format!(
+                        "failed to hash governed transaction intent for continuation validation: {error}"
+                    ))
+                })?;
+                if expected_intent_hash != intent_hash {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token intent_hash does not match the governed intent".to_string(),
+                    ));
+                }
+            }
+            if let Some(parent_capability_id) = continuation_token.parent_capability_id.as_deref() {
+                let Some(expected_parent_capability_id) = cap
+                    .delegation_chain
+                    .last()
+                    .map(|link| link.capability_id.as_str())
+                else {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_capability_id requires a delegated capability lineage".to_string(),
+                    ));
+                };
+                if parent_capability_id != expected_parent_capability_id {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_capability_id does not match the capability lineage".to_string(),
+                    ));
+                }
+            }
+            if let Some(expected_link_hash) = continuation_token.delegation_link_hash.as_deref() {
+                let Some(last_link) = cap.delegation_chain.last() else {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token delegation_link_hash requires a delegated capability lineage".to_string(),
+                    ));
+                };
+                let actual_link_hash =
+                    canonical_json_bytes(&last_link.body()).map_err(|error| {
+                        KernelError::GovernedTransactionDenied(format!(
+                            "failed to hash capability delegation lineage for continuation validation: {error}"
+                        ))
+                    })?;
+                if sha256_hex(&actual_link_hash) != expected_link_hash {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token delegation_link_hash does not match the capability lineage".to_string(),
+                    ));
+                }
+            }
+
+            let local_parent_receipt = if let Some(parent_receipt_id) =
+                continuation_token.parent_receipt_id.as_deref()
+            {
+                match self.local_receipt_artifact(parent_receipt_id) {
+                    Some(parent_receipt) => {
+                        let signature_valid = parent_receipt.verify_signature()?;
+                        if !signature_valid {
+                            return Err(KernelError::GovernedTransactionDenied(
+                                "governed call_chain parent receipt failed signature verification"
+                                    .to_string(),
+                            ));
+                        }
+                        Some(parent_receipt)
+                    }
+                    None => {
+                        if continuation_token.parent_receipt_hash.is_some()
+                            || continuation_token.parent_session_anchor.is_some()
+                        {
+                            return Err(KernelError::GovernedTransactionDenied(
+                                "governed call_chain continuation token parent_receipt_id does not resolve to a locally persisted receipt".to_string(),
+                            ));
+                        }
+                        None
+                    }
+                }
+            } else {
+                if continuation_token.parent_receipt_hash.is_some() {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_receipt_hash requires parent_receipt_id".to_string(),
+                    ));
+                }
+                None
+            };
+
+            if let Some(expected_parent_receipt_hash) =
+                continuation_token.parent_receipt_hash.as_deref()
+            {
+                let Some(parent_receipt) = local_parent_receipt.as_ref() else {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_receipt_hash requires a locally persisted parent receipt".to_string(),
+                    ));
+                };
+                if parent_receipt.artifact_hash()? != expected_parent_receipt_hash {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_receipt_hash does not match the authoritative parent receipt".to_string(),
+                    ));
+                }
+            }
+
+            let validated_session_anchor_id = if let Some(parent_session_anchor) =
+                continuation_token.parent_session_anchor.as_ref()
+            {
+                let authoritative_parent_anchor = if let Some(parent_context) = parent_context {
+                    Some(self.with_session(&parent_context.session_id, |session| {
+                        session.validate_context(parent_context)?;
+                        Ok(session.session_anchor().reference())
+                    })?)
+                } else {
+                    local_parent_receipt
+                        .as_ref()
+                        .and_then(LocalReceiptArtifact::session_anchor_reference)
+                };
+                let Some(authoritative_parent_anchor) = authoritative_parent_anchor else {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage".to_string(),
+                    ));
+                };
+                if authoritative_parent_anchor != *parent_session_anchor {
+                    return Err(KernelError::GovernedTransactionDenied(
+                        "governed call_chain continuation token session anchor does not match the authoritative parent lineage".to_string(),
+                    ));
+                }
+                Some(parent_session_anchor.session_anchor_id.clone())
+            } else {
+                None
+            };
+
+            return Ok(Some(ValidatedGovernedCallChainProof {
+                upstream_proof: None,
+                continuation_token_id: Some(continuation_token.token_id.clone()),
+                session_anchor_id: validated_session_anchor_id,
+            }));
+        }
+
+        let Some(upstream_proof) = intent.upstream_call_chain_proof().map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "governed call_chain upstream proof is malformed: {error}"
+            ))
+        })?
+        else {
+            return Ok(None);
+        };
+
+        let signature_valid = upstream_proof.verify_signature().map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "governed call_chain upstream proof failed signature verification: {error}"
+            ))
+        })?;
+        if !signature_valid {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof failed signature verification".to_string(),
+            ));
+        }
+        upstream_proof.validate_time(now).map_err(|error| {
+            KernelError::GovernedTransactionDenied(format!(
+                "governed call_chain upstream proof rejected by time bounds: {error}"
+            ))
+        })?;
+        if upstream_proof.subject != cap.subject {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof subject does not match the capability subject"
+                    .to_string(),
+            ));
+        }
+
+        let Some(expected_signer) = cap.delegation_chain.last().map(|link| &link.delegator) else {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof requires a delegated capability lineage"
+                    .to_string(),
+            ));
+        };
+        if upstream_proof.signer != *expected_signer {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof signer does not match the validated capability delegation source".to_string(),
+            ));
+        }
+        if upstream_proof.chain_id != call_chain.chain_id {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof chain_id does not match the asserted call_chain".to_string(),
+            ));
+        }
+        if upstream_proof.parent_request_id != call_chain.parent_request_id {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof parent_request_id does not match the asserted call_chain".to_string(),
+            ));
+        }
+        if upstream_proof.parent_receipt_id != call_chain.parent_receipt_id {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof parent_receipt_id does not match the asserted call_chain".to_string(),
+            ));
+        }
+        if upstream_proof.origin_subject != call_chain.origin_subject {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof origin_subject does not match the asserted call_chain".to_string(),
+            ));
+        }
+        if upstream_proof.delegator_subject != call_chain.delegator_subject {
+            return Err(KernelError::GovernedTransactionDenied(
+                "governed call_chain upstream proof delegator_subject does not match the asserted call_chain".to_string(),
+            ));
+        }
+
+        Ok(Some(ValidatedGovernedCallChainProof {
+            upstream_proof: Some(upstream_proof),
+            continuation_token_id: None,
+            session_anchor_id: None,
+        }))
     }
 
     fn validate_governed_autonomy_bond(
@@ -2747,6 +3938,7 @@ impl ArcKernel {
         cap: &CapabilityToken,
         intent: &arc_core::capability::GovernedTransactionIntent,
         minimum_autonomy_tier: Option<GovernedAutonomyTier>,
+        verified_runtime_attestation: Option<&VerifiedRuntimeAttestationRecord>,
         now: u64,
     ) -> Result<(), KernelError> {
         let autonomy = match (intent.autonomy.as_ref(), minimum_autonomy_tier) {
@@ -2791,7 +3983,12 @@ impl ArcKernel {
         }
 
         let required_runtime_assurance = autonomy.tier.minimum_runtime_assurance();
-        self.validate_runtime_assurance(request, required_runtime_assurance, now)?;
+        let requirement_source = format!("governed autonomy tier '{:?}'", autonomy.tier);
+        Self::validate_runtime_assurance(
+            verified_runtime_attestation,
+            required_runtime_assurance,
+            &requirement_source,
+        )?;
 
         let bond_id = bond_id.ok_or_else(|| {
             KernelError::GovernedTransactionDenied(format!(
@@ -2808,8 +4005,9 @@ impl ArcKernel {
         cap: &CapabilityToken,
         grant: &ToolGrant,
         charge_result: Option<&BudgetChargeResult>,
+        parent_context: Option<&OperationContext>,
         now: u64,
-    ) -> Result<(), KernelError> {
+    ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
         let (
             intent_required,
             approval_threshold_units,
@@ -2827,7 +4025,7 @@ impl ArcKernel {
             && minimum_autonomy_tier.is_none()
             && !governed_request_present
         {
-            return Ok(());
+            return Ok(None);
         }
 
         let intent = request.governed_intent.as_ref().ok_or_else(|| {
@@ -2842,11 +4040,11 @@ impl ArcKernel {
             ));
         }
 
-        if let Some(attestation) = intent.runtime_attestation.as_ref() {
-            self.resolve_runtime_assurance(attestation, now)?;
-        }
+        let verified_runtime_attestation =
+            self.verify_governed_request_runtime_attestation(request, now)?;
 
-        Self::validate_governed_call_chain_context(request, intent)?;
+        let validated_upstream_call_chain_proof =
+            self.validate_governed_call_chain_context(request, cap, intent, parent_context, now)?;
 
         let intent_hash = intent.binding_hash().map_err(|error| {
             KernelError::GovernedTransactionDenied(format!(
@@ -2888,9 +4086,20 @@ impl ArcKernel {
         }
 
         if let Some(required_tier) = minimum_runtime_assurance {
-            self.validate_runtime_assurance(request, required_tier, now)?;
+            Self::validate_runtime_assurance(
+                verified_runtime_attestation.as_ref(),
+                required_tier,
+                "grant",
+            )?;
         }
-        self.validate_governed_autonomy(request, cap, intent, minimum_autonomy_tier, now)?;
+        self.validate_governed_autonomy(
+            request,
+            cap,
+            intent,
+            minimum_autonomy_tier,
+            verified_runtime_attestation.as_ref(),
+            now,
+        )?;
 
         Self::validate_metered_billing_context(intent, charge_result, now)?;
 
@@ -2925,7 +4134,136 @@ impl ArcKernel {
             )));
         }
 
-        Ok(())
+        Ok(validated_upstream_call_chain_proof)
+    }
+
+    fn governed_call_chain_receipt_evidence(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        parent_context: Option<&OperationContext>,
+        validated_proof: Option<ValidatedGovernedCallChainProof>,
+    ) -> Option<GovernedCallChainReceiptEvidence> {
+        let call_chain = request.governed_intent.as_ref()?.call_chain.as_ref()?;
+        let continuation_token_id = validated_proof
+            .as_ref()
+            .and_then(|proof| proof.continuation_token_id.clone());
+        let session_anchor_id = validated_proof
+            .as_ref()
+            .and_then(|proof| proof.session_anchor_id.clone());
+        let upstream_proof = validated_proof.and_then(|proof| proof.upstream_proof);
+        let local_parent_request_id = parent_context
+            .map(|context| context.request_id.to_string())
+            .filter(|_| {
+                parent_context.is_some_and(|context| {
+                    self.validate_parent_request_continuation(request, context)
+                        .is_ok()
+                })
+            });
+        let local_parent_receipt_id = call_chain
+            .parent_receipt_id
+            .as_ref()
+            .filter(|receipt_id| self.has_local_receipt_id(receipt_id))
+            .cloned();
+        let capability_delegator_subject = cap
+            .delegation_chain
+            .last()
+            .map(|link| link.delegator.to_hex());
+        let capability_origin_subject = cap
+            .delegation_chain
+            .first()
+            .map(|link| link.delegator.to_hex());
+
+        if local_parent_request_id.is_none()
+            && local_parent_receipt_id.is_none()
+            && capability_delegator_subject.is_none()
+            && capability_origin_subject.is_none()
+            && continuation_token_id.is_none()
+            && session_anchor_id.is_none()
+            && upstream_proof.is_none()
+        {
+            return None;
+        }
+
+        Some(GovernedCallChainReceiptEvidence {
+            local_parent_request_id,
+            local_parent_receipt_id,
+            capability_delegator_subject,
+            capability_origin_subject,
+            upstream_proof,
+            continuation_token_id,
+            session_anchor_id,
+        })
+    }
+
+    fn validate_parent_request_continuation(
+        &self,
+        request: &ToolCallRequest,
+        parent_context: &OperationContext,
+    ) -> Result<(), KernelError> {
+        let child_request_id = RequestId::new(request.request_id.clone());
+        self.with_session(&parent_context.session_id, |session| {
+            session.validate_context(parent_context)?;
+            session
+                .validate_parent_request_lineage(&child_request_id, &parent_context.request_id)?;
+            Ok(())
+        })
+    }
+
+    fn has_local_receipt_id(&self, receipt_id: &str) -> bool {
+        let arc_receipt_match = self.receipt_log.lock().ok().is_some_and(|log| {
+            log.receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id)
+        });
+        if arc_receipt_match {
+            return true;
+        }
+
+        self.child_receipt_log.lock().ok().is_some_and(|log| {
+            log.receipts()
+                .iter()
+                .any(|receipt| receipt.id == receipt_id)
+        })
+    }
+
+    fn is_trusted_governed_continuation_signer(&self, signer: &arc_core::PublicKey) -> bool {
+        if *signer == self.config.keypair.public_key() {
+            return true;
+        }
+        if self
+            .config
+            .ca_public_keys
+            .iter()
+            .any(|candidate| candidate == signer)
+        {
+            return true;
+        }
+        self.capability_authority
+            .trusted_public_keys()
+            .into_iter()
+            .any(|candidate| candidate == *signer)
+    }
+
+    fn local_receipt_artifact(&self, receipt_id: &str) -> Option<LocalReceiptArtifact> {
+        let tool_match = self.receipt_log.lock().ok().and_then(|log| {
+            log.receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Tool)
+        });
+        if tool_match.is_some() {
+            return tool_match;
+        }
+
+        self.child_receipt_log.lock().ok().and_then(|log| {
+            log.receipts()
+                .iter()
+                .find(|receipt| receipt.id == receipt_id)
+                .cloned()
+                .map(LocalReceiptArtifact::Child)
+        })
     }
 
     fn unwind_aborted_monetary_invocation(
@@ -2934,9 +4272,9 @@ impl ArcKernel {
         cap: &CapabilityToken,
         charge_result: Option<&BudgetChargeResult>,
         payment_authorization: Option<&PaymentAuthorization>,
-    ) -> Result<(), KernelError> {
+    ) -> Result<Option<BudgetReverseHoldDecision>, KernelError> {
         let Some(charge) = charge_result else {
-            return Ok(());
+            return Ok(None);
         };
 
         if let Some(authorization) = payment_authorization {
@@ -2962,8 +4300,7 @@ impl ArcKernel {
             }
         }
 
-        self.reverse_budget_charge(&cap.id, charge)?;
-        Ok(())
+        Ok(Some(self.reverse_budget_charge(&cap.id, charge)?))
     }
 
     fn record_observed_capability_snapshot(
@@ -3113,6 +4450,211 @@ impl ArcKernel {
     }
 }
 
+fn scope_from_capability_snapshot(
+    snapshot: &crate::capability_lineage::CapabilitySnapshot,
+) -> Result<ArcScope, KernelError> {
+    serde_json::from_str(&snapshot.grants_json).map_err(|error| {
+        KernelError::Internal(format!(
+            "invalid capability snapshot scope for {}: {error}",
+            snapshot.capability_id
+        ))
+    })
+}
+
+fn validate_delegation_scope_step(
+    parent_capability_id: &str,
+    child_capability_id: &str,
+    parent_scope: &ArcScope,
+    child_scope: &ArcScope,
+    child_expires_at: u64,
+    link: &arc_core::capability::DelegationLink,
+) -> Result<(), KernelError> {
+    validate_delegatable_subset(
+        parent_capability_id,
+        child_capability_id,
+        parent_scope,
+        child_scope,
+    )?;
+    validate_declared_attenuations(child_capability_id, child_scope, child_expires_at, link)?;
+    Ok(())
+}
+
+fn validate_delegatable_subset(
+    parent_capability_id: &str,
+    child_capability_id: &str,
+    parent_scope: &ArcScope,
+    child_scope: &ArcScope,
+) -> Result<(), KernelError> {
+    for child_grant in &child_scope.grants {
+        let allowed = parent_scope.grants.iter().any(|parent_grant| {
+            parent_grant.operations.contains(&Operation::Delegate)
+                && child_grant.is_subset_of(parent_grant)
+        });
+        if !allowed {
+            return Err(KernelError::DelegationInvalid(format!(
+                "parent capability {} does not authorize delegated tool grant {}/{} on child capability {}",
+                parent_capability_id,
+                child_grant.server_id,
+                child_grant.tool_name,
+                child_capability_id
+            )));
+        }
+    }
+
+    for child_grant in &child_scope.resource_grants {
+        let allowed = parent_scope.resource_grants.iter().any(|parent_grant| {
+            parent_grant.operations.contains(&Operation::Delegate)
+                && child_grant.is_subset_of(parent_grant)
+        });
+        if !allowed {
+            return Err(KernelError::DelegationInvalid(format!(
+                "parent capability {} does not authorize delegated resource grant {} on child capability {}",
+                parent_capability_id, child_grant.uri_pattern, child_capability_id
+            )));
+        }
+    }
+
+    for child_grant in &child_scope.prompt_grants {
+        let allowed = parent_scope.prompt_grants.iter().any(|parent_grant| {
+            parent_grant.operations.contains(&Operation::Delegate)
+                && child_grant.is_subset_of(parent_grant)
+        });
+        if !allowed {
+            return Err(KernelError::DelegationInvalid(format!(
+                "parent capability {} does not authorize delegated prompt grant {} on child capability {}",
+                parent_capability_id, child_grant.prompt_name, child_capability_id
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_declared_attenuations(
+    child_capability_id: &str,
+    child_scope: &ArcScope,
+    child_expires_at: u64,
+    link: &arc_core::capability::DelegationLink,
+) -> Result<(), KernelError> {
+    for attenuation in &link.attenuations {
+        match attenuation {
+            arc_core::capability::Attenuation::RemoveTool {
+                server_id,
+                tool_name,
+            } => {
+                if child_scope
+                    .grants
+                    .iter()
+                    .any(|grant| tool_grant_covers_target(grant, server_id, tool_name))
+                {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} still grants removed tool {}/{}",
+                        child_capability_id, server_id, tool_name
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::RemoveOperation {
+                server_id,
+                tool_name,
+                operation,
+            } => {
+                if child_scope.grants.iter().any(|grant| {
+                    tool_grant_covers_target(grant, server_id, tool_name)
+                        && grant.operations.contains(operation)
+                }) {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} still grants removed operation {:?} on {}/{}",
+                        child_capability_id, operation, server_id, tool_name
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::AddConstraint {
+                server_id,
+                tool_name,
+                constraint,
+            } => {
+                if child_scope.grants.iter().any(|grant| {
+                    tool_grant_covers_target(grant, server_id, tool_name)
+                        && !grant.constraints.contains(constraint)
+                }) {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} is missing declared constraint on {}/{}",
+                        child_capability_id, server_id, tool_name
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::ReduceBudget {
+                server_id,
+                tool_name,
+                max_invocations,
+            } => {
+                if child_scope.grants.iter().any(|grant| {
+                    tool_grant_covers_target(grant, server_id, tool_name)
+                        && grant
+                            .max_invocations
+                            .is_none_or(|value| value > *max_invocations)
+                }) {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} exceeds declared invocation budget on {}/{}",
+                        child_capability_id, server_id, tool_name
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::ShortenExpiry { new_expires_at } => {
+                if child_expires_at > *new_expires_at {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} expires after declared shortened expiry {}",
+                        child_capability_id, new_expires_at
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::ReduceCostPerInvocation {
+                server_id,
+                tool_name,
+                max_cost_per_invocation,
+            } => {
+                if child_scope.grants.iter().any(|grant| {
+                    tool_grant_covers_target(grant, server_id, tool_name)
+                        && grant.max_cost_per_invocation.as_ref().is_none_or(|value| {
+                            value.currency != max_cost_per_invocation.currency
+                                || value.units > max_cost_per_invocation.units
+                        })
+                }) {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} exceeds declared per-invocation cost ceiling on {}/{}",
+                        child_capability_id, server_id, tool_name
+                    )));
+                }
+            }
+            arc_core::capability::Attenuation::ReduceTotalCost {
+                server_id,
+                tool_name,
+                max_total_cost,
+            } => {
+                if child_scope.grants.iter().any(|grant| {
+                    tool_grant_covers_target(grant, server_id, tool_name)
+                        && grant.max_total_cost.as_ref().is_none_or(|value| {
+                            value.currency != max_total_cost.currency
+                                || value.units > max_total_cost.units
+                        })
+                }) {
+                    return Err(KernelError::DelegationInvalid(format!(
+                        "child capability {} exceeds declared total-cost ceiling on {}/{}",
+                        child_capability_id, server_id, tool_name
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn tool_grant_covers_target(grant: &ToolGrant, server_id: &str, tool_name: &str) -> bool {
+    (grant.server_id == "*" || grant.server_id == server_id)
+        && (grant.tool_name == "*" || grant.tool_name == tool_name)
+}
+
 /// Parameters for building a receipt.
 pub(crate) struct ReceiptParams<'a> {
     capability_id: &'a str,
@@ -3132,6 +4674,7 @@ pub(crate) fn current_unix_timestamp() -> u64 {
         .unwrap_or(0)
 }
 
+#[allow(dead_code)]
 #[path = "responses.rs"]
 mod responses;
 #[path = "session_ops.rs"]

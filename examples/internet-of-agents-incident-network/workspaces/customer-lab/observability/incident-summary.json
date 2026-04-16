@@ -1,0 +1,156 @@
+{
+  "incident_id": "inc-meridian-inference-gw-2026-04-15-0317z",
+  "status": "critical",
+  "service": "inference-gateway",
+  "cluster": "prod-inference-us-east-1",
+  "symptom": "Sustained 403 spike at edge layer following geo-restrict-v42 promotion to blocking mode",
+  "suspected_rule": "geo-restrict-v42",
+  "correlation_confidence": 0.97,
+  "error_rates": {
+    "baseline_error_rate_pct": 0.04,
+    "current_error_rate_pct": 38.72,
+    "peak_error_rate_pct": 41.3,
+    "peak_time": "2026-04-15T03:21:44Z",
+    "error_breakdown": {
+      "http_403": 0.891,
+      "http_504": 0.062,
+      "http_502": 0.031,
+      "http_500": 0.016
+    }
+  },
+  "latency": {
+    "p50_baseline_ms": 142,
+    "p50_current_ms": 310,
+    "p99_baseline_ms": 890,
+    "p99_current_ms": 12400,
+    "p999_current_ms": 28700,
+    "latency_spike_cause": "Client SDK retry storms amplifying load on remaining healthy paths"
+  },
+  "affected_endpoints": [
+    {
+      "path": "/v1/inference/completions",
+      "method": "POST",
+      "error_rate_pct": 42.1,
+      "requests_per_second": 3840
+    },
+    {
+      "path": "/v1/inference/chat",
+      "method": "POST",
+      "error_rate_pct": 39.8,
+      "requests_per_second": 7210
+    },
+    {
+      "path": "/v1/embeddings/encode",
+      "method": "POST",
+      "error_rate_pct": 36.4,
+      "requests_per_second": 12600
+    },
+    {
+      "path": "/v1/models/list",
+      "method": "GET",
+      "error_rate_pct": 0.03,
+      "requests_per_second": 420
+    },
+    {
+      "path": "/v1/inference/batch",
+      "method": "POST",
+      "error_rate_pct": 44.7,
+      "requests_per_second": 890
+    }
+  ],
+  "error_budget": {
+    "slo_target_availability_pct": 99.95,
+    "monthly_budget_minutes": 21.6,
+    "budget_consumed_minutes": 18.9,
+    "budget_remaining_minutes": 2.7,
+    "burn_rate_multiplier": 23.4,
+    "projected_budget_exhaustion": "2026-04-15T03:54:00Z",
+    "window": "30d-rolling"
+  },
+  "sample_errors": [
+    {
+      "timestamp": "2026-04-15T03:14:02.331Z",
+      "trace_id": "7a3f9c2e1b4d5a6f8e0c3b7d9a1f4e2c",
+      "request_id": "req-9f8e7d6c-5b4a-3c2d-1e0f-a9b8c7d6e5f4",
+      "status_code": 403,
+      "error_message": "Access denied: request blocked by edge rule geo-restrict-v42",
+      "client_ip_geo": "eu-west-1",
+      "user_agent": "meridian-sdk-python/2.14.0",
+      "path": "/v1/inference/completions"
+    },
+    {
+      "timestamp": "2026-04-15T03:14:02.887Z",
+      "trace_id": "2c4e6a8b0d1f3e5c7a9b2d4f6e8c0a1b",
+      "request_id": "req-1a2b3c4d-5e6f-7a8b-9c0d-e1f2a3b4c5d6",
+      "status_code": 403,
+      "error_message": "Access denied: request blocked by edge rule geo-restrict-v42",
+      "client_ip_geo": "ap-southeast-1",
+      "user_agent": "meridian-sdk-node/3.7.1",
+      "path": "/v1/embeddings/encode"
+    },
+    {
+      "timestamp": "2026-04-15T03:14:04.114Z",
+      "trace_id": "5f7a9c1e3b2d4f6a8c0e2b4d6f8a1c3e",
+      "request_id": "req-b2c3d4e5-f6a7-b8c9-d0e1-f2a3b4c5d6e7",
+      "status_code": 403,
+      "error_message": "Access denied: request blocked by edge rule geo-restrict-v42",
+      "client_ip_geo": "sa-east-1",
+      "user_agent": "meridian-sdk-python/2.14.0",
+      "path": "/v1/inference/chat"
+    },
+    {
+      "timestamp": "2026-04-15T03:14:19.442Z",
+      "trace_id": "8d0f2a4c6e8b1d3f5a7c9e2b4d6f8a0c",
+      "request_id": "req-c3d4e5f6-a7b8-c9d0-e1f2-a3b4c5d6e7f8",
+      "status_code": 504,
+      "error_message": "Gateway timeout: upstream inference-router did not respond within 30000ms",
+      "client_ip_geo": "us-east-1",
+      "user_agent": "meridian-sdk-go/1.9.3",
+      "path": "/v1/inference/completions"
+    }
+  ],
+  "timeline": [
+    {
+      "time": "2026-04-15T03:12:01Z",
+      "event": "Deploy pipeline promoted geo-restrict-v42 from dry-run to blocking",
+      "source": "deploy-controller"
+    },
+    {
+      "time": "2026-04-15T03:12:44Z",
+      "event": "Edge rule propagation completed across 23 PoPs",
+      "source": "stratos-edge-sync"
+    },
+    {
+      "time": "2026-04-15T03:14:02Z",
+      "event": "First 403 responses observed in eu-west-1",
+      "source": "inference-gateway-metrics"
+    },
+    {
+      "time": "2026-04-15T03:14:18Z",
+      "event": "403 rate exceeds 5% threshold in ap-southeast-1",
+      "source": "inference-gateway-metrics"
+    },
+    {
+      "time": "2026-04-15T03:15:30Z",
+      "event": "Client SDK retry storms detected, p99 latency climbing",
+      "source": "load-balancer-metrics"
+    },
+    {
+      "time": "2026-04-15T03:17:01Z",
+      "event": "Error budget burn rate exceeded 10x, SLO violation imminent",
+      "source": "slo-monitor"
+    },
+    {
+      "time": "2026-04-15T03:19:14Z",
+      "event": "PagerDuty alert triggered: inference-gateway availability SLO breached",
+      "source": "pagerduty"
+    },
+    {
+      "time": "2026-04-15T03:21:44Z",
+      "event": "Peak error rate 41.3% reached across all affected regions",
+      "source": "inference-gateway-metrics"
+    }
+  ],
+  "customer_repo_path": "git/files/inference-gateway",
+  "customer_policy_path": "git/files/inference-gateway/config/edge-policy.json"
+}

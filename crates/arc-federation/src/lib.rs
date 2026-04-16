@@ -267,6 +267,8 @@ pub struct FederatedReputationInputReference {
     pub artifact_ref: FederationArtifactReference,
     pub subject_key: String,
     pub issuer_operator_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer_independence_group_id: Option<String>,
     pub weight_bps: u32,
     pub blocking: bool,
     pub published_at: u64,
@@ -300,6 +302,14 @@ impl Default for FederatedSybilControl {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FederatedReputationClearingContinuity {
+    pub continuity_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_clearing_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct FederatedReputationClearingArtifact {
     pub schema: String,
     pub clearing_id: String,
@@ -314,6 +324,8 @@ pub struct FederatedReputationClearingArtifact {
     pub accepted_input_ids: Vec<String>,
     pub rejected_input_ids: Vec<String>,
     pub effective_admission_class: GenericTrustAdmissionClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuity: Option<FederatedReputationClearingContinuity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
 }
@@ -732,19 +744,27 @@ pub fn validate_federated_reputation_clearing(
         "federated_clearing.participating_operator_ids",
     )?;
     validate_sybil_control(&clearing.sybil_control)?;
+    if let Some(continuity) = clearing.continuity.as_ref() {
+        validate_reputation_clearing_continuity(continuity, &clearing.clearing_id)?;
+    }
     if clearing.inputs.is_empty() {
         return Err(FederationContractError::MissingField(
             "federated_clearing.inputs",
         ));
     }
 
+    let participating_operators = clearing
+        .participating_operator_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
     let mut input_ids = HashSet::new();
     let mut accepted_ids = HashSet::new();
     let mut rejected_ids = HashSet::new();
     let mut issuer_counts = std::collections::BTreeMap::<String, u32>::new();
     let mut accepted_summary_issuers = HashSet::new();
-    let mut accepted_issuers = HashSet::new();
-    let mut accepted_negative_event_issuers = HashSet::new();
+    let mut accepted_independence_groups = HashSet::new();
+    let mut accepted_negative_event_groups = HashSet::new();
 
     for id in &clearing.accepted_input_ids {
         ensure_non_empty(id, "federated_clearing.accepted_input_ids")?;
@@ -766,6 +786,16 @@ pub fn validate_federated_reputation_clearing(
 
     for input in &clearing.inputs {
         validate_reputation_input_reference(input, clearing.generated_at, &clearing.subject_key)?;
+        if input.artifact_ref.operator_id != input.issuer_operator_id {
+            return Err(FederationContractError::InvalidClearing(
+                "input artifact_ref operator_id must match issuer_operator_id".to_string(),
+            ));
+        }
+        if !participating_operators.contains(input.issuer_operator_id.as_str()) {
+            return Err(FederationContractError::InvalidClearing(
+                "input issuer_operator_id must appear in participating_operator_ids".to_string(),
+            ));
+        }
         let input_id = input.artifact_ref.artifact_id.as_str();
         if !input_ids.insert(input_id) {
             return Err(FederationContractError::DuplicateValue(
@@ -788,7 +818,11 @@ pub fn validate_federated_reputation_clearing(
             ));
         }
         if accepted_ids.contains(input_id) {
-            accepted_issuers.insert(input.issuer_operator_id.as_str());
+            let independence_group = input
+                .issuer_independence_group_id
+                .as_deref()
+                .unwrap_or(input.issuer_operator_id.as_str());
+            accepted_independence_groups.insert(independence_group);
             match input.kind {
                 FederatedReputationInputKind::ReputationSummary => {
                     if !accepted_summary_issuers.insert(input.issuer_operator_id.as_str()) {
@@ -800,7 +834,7 @@ pub fn validate_federated_reputation_clearing(
                 }
                 FederatedReputationInputKind::NegativeEvent => {
                     if input.blocking {
-                        accepted_negative_event_issuers.insert(input.issuer_operator_id.as_str());
+                        accepted_negative_event_groups.insert(independence_group);
                     }
                 }
             }
@@ -812,13 +846,15 @@ pub fn validate_federated_reputation_clearing(
             "each input must be classified as accepted or rejected".to_string(),
         ));
     }
-    if accepted_issuers.len() < clearing.sybil_control.minimum_independent_issuers as usize {
+    if accepted_independence_groups.len()
+        < clearing.sybil_control.minimum_independent_issuers as usize
+    {
         return Err(FederationContractError::InvalidClearing(
             "accepted inputs must meet the minimum_independent_issuers threshold".to_string(),
         ));
     }
     if clearing.sybil_control.negative_event_corroboration_required
-        && accepted_negative_event_issuers.len() == 1
+        && accepted_negative_event_groups.len() == 1
     {
         return Err(FederationContractError::InvalidClearing(
             "blocking negative events require corroboration from independent issuers".to_string(),
@@ -1074,6 +1110,12 @@ fn validate_reputation_input_reference(
         &input.issuer_operator_id,
         "federated_clearing.inputs.issuer_operator_id",
     )?;
+    if let Some(group_id) = input.issuer_independence_group_id.as_deref() {
+        ensure_non_empty(
+            group_id,
+            "federated_clearing.inputs.issuer_independence_group_id",
+        )?;
+    }
     if input.subject_key != subject_key {
         return Err(FederationContractError::InvalidClearing(
             "reputation clearing inputs must target the same subject_key".to_string(),
@@ -1094,6 +1136,11 @@ fn validate_reputation_input_reference(
             return Err(FederationContractError::InvalidClearing(
                 "reputation clearing input expires_at must be greater than published_at"
                     .to_string(),
+            ));
+        }
+        if expires_at <= generated_at {
+            return Err(FederationContractError::InvalidClearing(
+                "reputation clearing inputs cannot be expired at generated_at".to_string(),
             ));
         }
     }
@@ -1117,6 +1164,28 @@ fn validate_reputation_input_reference(
                     "negative event inputs must reference portable negative events".to_string(),
                 ));
             }
+        }
+    }
+    Ok(())
+}
+
+fn validate_reputation_clearing_continuity(
+    continuity: &FederatedReputationClearingContinuity,
+    clearing_id: &str,
+) -> Result<(), FederationContractError> {
+    ensure_non_empty(
+        &continuity.continuity_id,
+        "federated_clearing.continuity.continuity_id",
+    )?;
+    if let Some(previous_clearing_id) = continuity.previous_clearing_id.as_deref() {
+        ensure_non_empty(
+            previous_clearing_id,
+            "federated_clearing.continuity.previous_clearing_id",
+        )?;
+        if previous_clearing_id == clearing_id {
+            return Err(FederationContractError::InvalidClearing(
+                "continuity previous_clearing_id must differ from clearing_id".to_string(),
+            ));
         }
     }
     Ok(())
@@ -1479,6 +1548,7 @@ mod tests {
                     ),
                     subject_key: "subject-1".to_string(),
                     issuer_operator_id: "origin-operator".to_string(),
+                    issuer_independence_group_id: Some("operator-group-origin".to_string()),
                     weight_bps: 3_000,
                     blocking: false,
                     published_at: 1_743_552_000,
@@ -1496,6 +1566,7 @@ mod tests {
                     ),
                     subject_key: "subject-1".to_string(),
                     issuer_operator_id: "mirror-operator-a".to_string(),
+                    issuer_independence_group_id: Some("operator-group-mirror".to_string()),
                     weight_bps: 2_500,
                     blocking: false,
                     published_at: 1_743_552_010,
@@ -1513,6 +1584,7 @@ mod tests {
                     ),
                     subject_key: "subject-1".to_string(),
                     issuer_operator_id: "indexer-operator-a".to_string(),
+                    issuer_independence_group_id: Some("operator-group-indexer".to_string()),
                     weight_bps: 2_000,
                     blocking: true,
                     published_at: 1_743_552_020,
@@ -1531,6 +1603,7 @@ mod tests {
                     ),
                     subject_key: "subject-1".to_string(),
                     issuer_operator_id: "origin-operator".to_string(),
+                    issuer_independence_group_id: Some("operator-group-origin".to_string()),
                     weight_bps: 1_500,
                     blocking: true,
                     published_at: 1_743_552_025,
@@ -1548,6 +1621,10 @@ mod tests {
             ],
             rejected_input_ids: vec![],
             effective_admission_class: GenericTrustAdmissionClass::Reviewable,
+            continuity: Some(FederatedReputationClearingContinuity {
+                continuity_id: "registry.arc.example/liability:subject-1".to_string(),
+                previous_clearing_id: None,
+            }),
             note: Some("Shared reputation clearing preserves local weighting and requires corroborated negative-event inputs."
                 .to_string()),
         }
@@ -2241,6 +2318,28 @@ mod tests {
         ));
 
         let mut input = clearing.inputs[0].clone();
+        input.expires_at = Some(clearing.generated_at);
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
+        input.issuer_independence_group_id = Some("   ".to_string());
+        assert!(matches!(
+            validate_reputation_input_reference(
+                &input,
+                clearing.generated_at,
+                &clearing.subject_key
+            ),
+            Err(FederationContractError::MissingField(_))
+        ));
+
+        let mut input = clearing.inputs[0].clone();
         input.blocking = true;
         assert!(matches!(
             validate_reputation_input_reference(
@@ -2379,6 +2478,21 @@ mod tests {
         ));
 
         let mut clearing = sample_reputation_clearing();
+        clearing.inputs[0].artifact_ref.operator_id = "other-operator".to_string();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.inputs[0].issuer_operator_id = "other-operator".to_string();
+        clearing.inputs[0].artifact_ref.operator_id = "other-operator".to_string();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
         clearing.inputs[0].weight_bps = 4_001;
         assert!(matches!(
             validate_federated_reputation_clearing(&clearing),
@@ -2412,12 +2526,29 @@ mod tests {
         ));
 
         let mut clearing = sample_reputation_clearing();
+        clearing.sybil_control.minimum_independent_issuers = 3;
+        clearing.inputs[1].issuer_independence_group_id =
+            clearing.inputs[0].issuer_independence_group_id.clone();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
         clearing.accepted_input_ids.clear();
         clearing.rejected_input_ids = clearing
             .inputs
             .iter()
             .map(|input| input.artifact_ref.artifact_id.clone())
             .collect();
+        assert!(matches!(
+            validate_federated_reputation_clearing(&clearing),
+            Err(FederationContractError::InvalidClearing(_))
+        ));
+
+        let mut clearing = sample_reputation_clearing();
+        clearing.continuity.as_mut().unwrap().previous_clearing_id =
+            Some(clearing.clearing_id.clone());
         assert!(matches!(
             validate_federated_reputation_clearing(&clearing),
             Err(FederationContractError::InvalidClearing(_))

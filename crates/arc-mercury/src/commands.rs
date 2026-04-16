@@ -28,8 +28,9 @@ use arc_mercury_core::{
     MercuryEmbeddedOemProfile, MercuryEmbeddedPartnerSurface, MercuryEmbeddedSdkSurface,
     MercuryGovernanceChangeClass, MercuryGovernanceControlState, MercuryGovernanceDecisionPackage,
     MercuryGovernanceGateState, MercuryGovernanceReviewAudience, MercuryGovernanceReviewPackage,
-    MercuryGovernanceWorkflowPath, MercuryInquiryPackage, MercuryPackageKind, MercuryPilotScenario,
-    MercuryPilotStep, MercuryPortfolioProgramArtifact, MercuryPortfolioProgramArtifactKind,
+    MercuryGovernanceWorkflowPath, MercuryInquiryPackage, MercuryPackageKind,
+    MercuryPilotScenario, MercuryPilotStep,
+    MercuryPortfolioProgramArtifact, MercuryPortfolioProgramArtifactKind,
     MercuryPortfolioProgramMotion, MercuryPortfolioProgramPackage, MercuryPortfolioProgramProfile,
     MercuryPortfolioProgramSurface, MercuryPortfolioRevenueBoundaryArtifact,
     MercuryPortfolioRevenueBoundaryArtifactKind, MercuryPortfolioRevenueBoundaryMotion,
@@ -86,6 +87,7 @@ use arc_mercury_core::{
     MERCURY_THIRD_PROGRAM_PROFILE_SCHEMA, MERCURY_TRUST_NETWORK_PACKAGE_SCHEMA,
     MERCURY_TRUST_NETWORK_PROFILE_SCHEMA,
 };
+use arc_mercury_core::proof_package::MercuryInquiryPackageArgs;
 use arc_store_sqlite::SqliteReceiptStore;
 use chrono::Utc;
 use serde::Serialize;

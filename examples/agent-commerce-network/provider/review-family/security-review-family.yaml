@@ -1,5 +1,5 @@
 family_id: security-review
-provider_id: contoso-red-team
+provider_id: vanguard-security
 summary: >
   One priced service family for release-bound security review across code,
   infrastructure, and deployment artifacts.

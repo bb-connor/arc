@@ -1,0 +1,173 @@
+{
+  "incident_id": "inc-meridian-inference-gw-2026-04-15-0317z",
+  "pagerduty_incident_id": "PD-Q7X9K2M4",
+  "severity": "sev-1",
+  "status": "acknowledged",
+  "urgency": "high",
+  "service": {
+    "id": "P8Y2N4R6",
+    "name": "Inference Gateway - Production",
+    "team": "Inference Platform"
+  },
+  "escalation_policy": {
+    "id": "PESC-7F3A",
+    "name": "Inference Platform - Sev1",
+    "levels": [
+      {
+        "level": 1,
+        "targets": ["inference-platform-oncall-primary"],
+        "escalation_delay_minutes": 5
+      },
+      {
+        "level": 2,
+        "targets": ["inference-platform-oncall-secondary", "sre-lead-oncall"],
+        "escalation_delay_minutes": 10
+      },
+      {
+        "level": 3,
+        "targets": ["vp-infrastructure", "cto-office"],
+        "escalation_delay_minutes": 15
+      }
+    ]
+  },
+  "responders": [
+    {
+      "user": {
+        "id": "PUSR-4A2C",
+        "name": "Marcus Adeyemi",
+        "email": "marcus.adeyemi@meridian-labs.ai"
+      },
+      "role": "primary_oncall",
+      "team": "Inference Platform",
+      "acknowledged_at": "2026-04-15T03:22:18Z",
+      "response_time_seconds": 184
+    },
+    {
+      "user": {
+        "id": "PUSR-9E7B",
+        "name": "Elena Vasquez",
+        "email": "elena.vasquez@meridian-labs.ai"
+      },
+      "role": "secondary_oncall",
+      "team": "Inference Platform",
+      "acknowledged_at": "2026-04-15T03:28:44Z",
+      "response_time_seconds": null,
+      "note": "Joined after L2 escalation"
+    },
+    {
+      "user": {
+        "id": "PUSR-3D5F",
+        "name": "James Okonkwo",
+        "email": "james.okonkwo@meridian-labs.ai"
+      },
+      "role": "subject_matter_expert",
+      "team": "Inference Platform",
+      "acknowledged_at": "2026-04-15T03:31:02Z",
+      "response_time_seconds": null,
+      "note": "Paged as inference-gateway code owner"
+    },
+    {
+      "user": {
+        "id": "PUSR-6H8J",
+        "name": "Priya Narayanan",
+        "email": "priya.narayanan@meridian-labs.ai"
+      },
+      "role": "change_author",
+      "team": "Edge Platform",
+      "acknowledged_at": "2026-04-15T03:33:15Z",
+      "response_time_seconds": null,
+      "note": "Author of the geo-restrict-v42 promotion, paged for context"
+    }
+  ],
+  "timeline_events": [
+    {
+      "type": "triggered",
+      "timestamp": "2026-04-15T03:19:14Z",
+      "actor": "monitoring-integration",
+      "details": "Alert triggered: inference-gateway availability SLO burn rate 23.4x (threshold: 14.4x)"
+    },
+    {
+      "type": "acknowledged",
+      "timestamp": "2026-04-15T03:22:18Z",
+      "actor": "Marcus Adeyemi",
+      "details": null
+    },
+    {
+      "type": "note_added",
+      "timestamp": "2026-04-15T03:24:41Z",
+      "actor": "Marcus Adeyemi",
+      "details": "Confirmed 403 spike in Grafana. Error messages reference geo-restrict-v42. Checking recent deploys."
+    },
+    {
+      "type": "escalated",
+      "timestamp": "2026-04-15T03:28:14Z",
+      "actor": "Marcus Adeyemi",
+      "details": "Escalating to L2. This is an edge policy issue, need edge platform expertise. Recent deploy at 03:12Z promoted geo-restrict-v42 from dry-run to blocking."
+    },
+    {
+      "type": "responder_added",
+      "timestamp": "2026-04-15T03:28:44Z",
+      "actor": "escalation-policy",
+      "details": "Elena Vasquez added via L2 escalation"
+    },
+    {
+      "type": "responder_added",
+      "timestamp": "2026-04-15T03:31:02Z",
+      "actor": "Marcus Adeyemi",
+      "details": "James Okonkwo added as inference-gateway code owner"
+    },
+    {
+      "type": "responder_added",
+      "timestamp": "2026-04-15T03:33:15Z",
+      "actor": "Elena Vasquez",
+      "details": "Priya Narayanan added as author of the geo-restrict-v42 change"
+    },
+    {
+      "type": "note_added",
+      "timestamp": "2026-04-15T03:35:22Z",
+      "actor": "Priya Narayanan",
+      "details": "The rule uses sanctioned-list-v7 with include_cloud_provider_ips=true and classification_mode=strict. Dry-run showed 0 false positives but I suspect the issue is that cloud provider IPs in non-sanctioned regions are being classified against their physical region mapping. The rule config resolves cloud IPs to physical data center locations, but many legitimate customers run inference from cloud VMs in eu-west, ap-southeast, etc."
+    },
+    {
+      "type": "note_added",
+      "timestamp": "2026-04-15T03:38:47Z",
+      "actor": "Elena Vasquez",
+      "details": "Confirmed: the dry-run validation missed this because the sanctioned-list-v7 feed was updated on April 13 to include broader cloud provider IP ranges. The dry-run observation period started April 11 with the old feed. The feed update happened mid-observation but the dry-run stats were not reset."
+    },
+    {
+      "type": "external_escalation",
+      "timestamp": "2026-04-15T03:40:01Z",
+      "actor": "Marcus Adeyemi",
+      "details": "Initiating cross-org escalation to Stratos Networks for edge rule remediation. Meridian does not have direct access to modify edge rules in production."
+    }
+  ],
+  "runbook": {
+    "id": "RB-INF-012",
+    "name": "Inference Gateway Edge Policy Incident",
+    "url": "https://runbooks.meridian-labs.ai/inference-platform/edge-policy-incident",
+    "last_updated": "2026-03-20T10:00:00Z"
+  },
+  "status_page": {
+    "component_id": "comp-inference-api",
+    "component_name": "Inference API",
+    "current_status": "major_outage",
+    "status_page_url": "https://status.meridian-labs.ai",
+    "updates": [
+      {
+        "timestamp": "2026-04-15T03:25:00Z",
+        "status": "investigating",
+        "message": "We are investigating elevated error rates on the Inference API affecting some regions."
+      },
+      {
+        "timestamp": "2026-04-15T03:35:00Z",
+        "status": "identified",
+        "message": "We have identified the cause as an edge policy misconfiguration affecting traffic from EU, APAC, and South America regions. We are working on a remediation."
+      }
+    ]
+  },
+  "communication_channel": {
+    "type": "slack",
+    "channel": "#inc-inference-gw-20260415",
+    "bridge_link": "https://meridian-labs.zoom.us/j/98765432100"
+  }
+}

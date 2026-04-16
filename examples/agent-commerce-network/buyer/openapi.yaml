@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Acme Procurement API
+  title: Lattice Procurement API
   version: 0.1.0
   description: >
     Buyer-side procurement workflow for the agent-commerce-network example.

@@ -113,6 +113,7 @@ fn build_proof_package(
         verified.exported_at,
         unix_now(),
         MercuryPublicationProfile::pilot_default(),
+        verified.transparency,
         bundle_manifests,
     )
     .map_err(|error| CliError::Other(error.to_string()))
@@ -150,13 +151,15 @@ fn build_inquiry_package(
     });
     MercuryInquiryPackage::build(
         proof_package,
-        unix_now(),
-        audience,
-        redaction_profile.map(ToOwned::to_owned),
-        rendered_export,
-        latest.disclosure,
-        latest.approval_state,
-        verifier_equivalent,
+        MercuryInquiryPackageArgs {
+            created_at: unix_now(),
+            audience: audience.to_string(),
+            redaction_profile: redaction_profile.map(ToOwned::to_owned),
+            rendered_export,
+            disclosure: latest.disclosure,
+            approval_state: latest.approval_state,
+            verifier_equivalent,
+        },
     )
     .map_err(|error| CliError::Other(error.to_string()))
 }

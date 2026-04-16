@@ -39,13 +39,16 @@ pub use bitcoin::{
     ParsedOtsProof, PreparedOtsSubmission,
 };
 pub use bundle::{
-    verify_proof_bundle, AnchorLaneKind, AnchorProofBundle, AnchorVerificationLane,
-    AnchorVerificationReport, ARC_ANCHOR_PROOF_BUNDLE_SCHEMA,
+    verify_checkpoint_publication_records, verify_proof_bundle, AnchorLaneKind, AnchorProofBundle,
+    AnchorVerificationLane, AnchorVerificationReport, ARC_ANCHOR_PROOF_BUNDLE_SCHEMA,
 };
 pub use discovery::{
-    build_anchor_discovery_artifact, AnchorDiscoveryArtifact, AnchorDiscoveryChain,
-    AnchorDiscoveryService, AnchorDiscoveryServiceEndpoint, RootPublicationOwnership,
-    ARC_ANCHOR_DISCOVERY_SCHEMA, ARC_ANCHOR_SERVICE_TYPE,
+    build_anchor_discovery_artifact, build_anchor_discovery_artifact_with_runtime,
+    verify_proof_bundle_with_discovery, AnchorDiscoveryArtifact, AnchorDiscoveryChain,
+    AnchorDiscoveryChainRuntimeState, AnchorDiscoveryFreshnessState,
+    AnchorDiscoveryFreshnessStatus, AnchorDiscoveryPublicationPolicy, AnchorDiscoveryService,
+    AnchorDiscoveryServiceEndpoint, RootPublicationOwnership, ARC_ANCHOR_DISCOVERY_SCHEMA,
+    ARC_ANCHOR_SERVICE_TYPE,
 };
 pub use evm::{
     build_chain_anchor_record, confirm_root_publication, ensure_publication_ready,
@@ -109,6 +112,7 @@ pub fn checkpoint_statement_from_kernel(checkpoint: &KernelCheckpoint) -> Web3Ch
         tree_size: checkpoint.body.tree_size as u64,
         merkle_root: checkpoint.body.merkle_root,
         issued_at: checkpoint.body.issued_at,
+        previous_checkpoint_sha256: checkpoint.body.previous_checkpoint_sha256.clone(),
         kernel_key: checkpoint.body.kernel_key.clone(),
         signature: checkpoint.signature.clone(),
     }
@@ -124,6 +128,7 @@ pub fn kernel_checkpoint_from_statement(statement: &Web3CheckpointStatement) -> 
             tree_size: statement.tree_size as usize,
             merkle_root: statement.merkle_root,
             issued_at: statement.issued_at,
+            previous_checkpoint_sha256: statement.previous_checkpoint_sha256.clone(),
             kernel_key: statement.kernel_key.clone(),
         },
         signature: statement.signature.clone(),
@@ -258,7 +263,17 @@ fn exactly_one_checkpoint<'a>(
 
 #[cfg(test)]
 mod tests {
+    use arc_core::crypto::Keypair;
+    use arc_core::receipt::{
+        CheckpointPublicationIdentity, CheckpointPublicationIdentityKind,
+        CheckpointPublicationTrustAnchorBinding, CheckpointTrustAnchorIdentity,
+        CheckpointTrustAnchorIdentityKind,
+    };
     use arc_core::web3::AnchorInclusionProof;
+    use arc_kernel::checkpoint::{
+        build_checkpoint, build_checkpoint_transparency,
+        build_trust_anchored_checkpoint_publication, CheckpointTransparencySummary,
+    };
     use arc_kernel::evidence_export::{
         EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
         EvidenceRetentionMetadata, EvidenceToolReceiptRecord, EvidenceUncheckpointedReceipt,
@@ -270,12 +285,16 @@ mod tests {
     use opentimestamps::timestamp::{Step, StepData, Timestamp};
 
     use super::{
-        attach_bitcoin_anchor, build_anchor_discovery_artifact, build_anchor_inclusion_proof,
+        attach_bitcoin_anchor, build_anchor_discovery_artifact,
+        build_anchor_discovery_artifact_with_runtime, build_anchor_inclusion_proof,
         build_anchor_inclusion_proof_from_evidence_bundle, inspect_ots_proof,
         kernel_checkpoint_from_statement, prepare_ots_submission, prepare_root_publication,
         prepare_solana_memo_publication, verify_bitcoin_anchor_for_proof,
-        verify_ots_proof_for_submission, verify_proof_bundle, AnchorLaneKind, AnchorProofBundle,
-        AnchorServiceConfig, EvmAnchorTarget, SolanaMemoAnchorRecord,
+        verify_checkpoint_publication_records, verify_ots_proof_for_submission,
+        verify_proof_bundle, verify_proof_bundle_with_discovery, AnchorEmergencyControls,
+        AnchorEmergencyMode, AnchorLaneHealthStatus, AnchorLaneKind, AnchorLaneRuntimeStatus,
+        AnchorProofBundle, AnchorRuntimeReport, AnchorServiceConfig, EvmAnchorTarget,
+        SolanaMemoAnchorRecord, ARC_ANCHOR_RUNTIME_REPORT_SCHEMA,
     };
 
     fn sample_primary_proof() -> AnchorInclusionProof {
@@ -331,6 +350,84 @@ mod tests {
                 live_db_size_bytes: 0,
                 oldest_live_receipt_timestamp: None,
             },
+        }
+    }
+
+    fn sample_bitcoin_bundle() -> AnchorProofBundle {
+        let proof = sample_primary_proof();
+        let checkpoint = kernel_checkpoint_from_statement(&proof.checkpoint_statement);
+        let submission = prepare_ots_submission(
+            std::slice::from_ref(&checkpoint),
+            &[String::from(
+                "https://alice.btc.calendar.opentimestamps.org",
+            )],
+        )
+        .unwrap();
+        let ots_proof = synthetic_ots_proof(submission.document_digest.as_bytes(), 900_000);
+        let upgraded = attach_bitcoin_anchor(
+            &proof,
+            &submission,
+            900_000,
+            "0000000000000000000abc".to_string(),
+            ots_proof,
+        )
+        .unwrap();
+
+        AnchorProofBundle {
+            schema: super::ARC_ANCHOR_PROOF_BUNDLE_SCHEMA.to_string(),
+            primary_proof: upgraded,
+            secondary_lanes: vec![AnchorLaneKind::BitcoinOts],
+            solana_anchor: None,
+            note: None,
+        }
+    }
+
+    fn sample_discovery_config(
+        operator_address: String,
+        include_solana_lane: bool,
+    ) -> AnchorServiceConfig {
+        AnchorServiceConfig {
+            evm_targets: vec![EvmAnchorTarget {
+                chain_id: "eip155:8453".to_string(),
+                rpc_url: "http://127.0.0.1:8545".to_string(),
+                contract_address: "0x1000000000000000000000000000000000000001".to_string(),
+                operator_address,
+                publisher_address: "0x2000000000000000000000000000000000000002".to_string(),
+            }],
+            ots_calendars: vec![String::from(
+                "https://alice.btc.calendar.opentimestamps.org",
+            )],
+            solana_cluster: include_solana_lane.then(|| "solana:mainnet-beta".to_string()),
+        }
+    }
+
+    fn sample_runtime_report(
+        mode: AnchorEmergencyMode,
+        status: AnchorLaneHealthStatus,
+        indexed_checkpoint_seq: u64,
+        last_published_at: Option<u64>,
+    ) -> AnchorRuntimeReport {
+        AnchorRuntimeReport {
+            schema: ARC_ANCHOR_RUNTIME_REPORT_SCHEMA.to_string(),
+            generated_at: 1_775_137_800,
+            controls: AnchorEmergencyControls {
+                mode,
+                changed_at: 1_775_137_700,
+                reason: None,
+            },
+            lanes: vec![AnchorLaneRuntimeStatus {
+                lane: AnchorLaneKind::EvmPrimary,
+                chain_id: Some("eip155:8453".to_string()),
+                status,
+                latest_checkpoint_seq: 42,
+                indexed_checkpoint_seq,
+                reorg_depth: 0,
+                last_published_at,
+                next_action: Some("publish checkpoint 42".to_string()),
+                note: None,
+            }],
+            indexers: Vec::new(),
+            incidents: Vec::new(),
         }
     }
 
@@ -576,6 +673,65 @@ mod tests {
     }
 
     #[test]
+    fn discovery_aware_bundle_verification_rejects_paused_freshness_state() {
+        let bundle = sample_bitcoin_bundle();
+        let discovery = build_anchor_discovery_artifact_with_runtime(
+            &sample_discovery_config(
+                bundle
+                    .primary_proof
+                    .key_binding_certificate
+                    .certificate
+                    .settlement_address
+                    .clone(),
+                false,
+            ),
+            &bundle.primary_proof.key_binding_certificate,
+            &sample_runtime_report(
+                AnchorEmergencyMode::PublishPaused,
+                AnchorLaneHealthStatus::Healthy,
+                42,
+                Some(1_775_137_760),
+            ),
+            120,
+        )
+        .unwrap();
+
+        let error = verify_proof_bundle_with_discovery(&bundle, &discovery).unwrap_err();
+
+        assert!(error.to_string().contains("freshness state paused"));
+    }
+
+    #[test]
+    fn discovery_aware_bundle_verification_rejects_secondary_lane_mismatch() {
+        let bundle = sample_bitcoin_bundle();
+        let discovery = build_anchor_discovery_artifact_with_runtime(
+            &sample_discovery_config(
+                bundle
+                    .primary_proof
+                    .key_binding_certificate
+                    .certificate
+                    .settlement_address
+                    .clone(),
+                true,
+            ),
+            &bundle.primary_proof.key_binding_certificate,
+            &sample_runtime_report(
+                AnchorEmergencyMode::Normal,
+                AnchorLaneHealthStatus::Healthy,
+                42,
+                Some(1_775_137_760),
+            ),
+            120,
+        )
+        .unwrap();
+
+        let error = verify_proof_bundle_with_discovery(&bundle, &discovery).unwrap_err();
+
+        assert!(error.to_string().contains("secondary lanes"));
+        assert!(error.to_string().contains("solana_memo"));
+    }
+
+    #[test]
     fn evidence_bundle_projects_back_into_anchor_inclusion() {
         let proof = sample_primary_proof();
         let bundle = sample_evidence_bundle();
@@ -676,5 +832,78 @@ mod tests {
             Some("opentimestamps")
         );
         assert!(discovery.root_publication_ownership[1].delegate_publication_allowed);
+    }
+
+    #[test]
+    fn publication_record_requires_witness_or_immutable_anchor_reference() {
+        let keypair = Keypair::generate();
+        let checkpoint = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
+            .expect("checkpoint");
+        let transparency =
+            build_checkpoint_transparency(&[checkpoint]).expect("transparency summary");
+
+        let error = verify_checkpoint_publication_records(&transparency).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("requires a trust-anchor binding or successor witness"));
+    }
+
+    #[test]
+    fn checkpoint_verifier_requires_trust_anchor_and_signer_chain() {
+        let keypair = Keypair::generate();
+        let checkpoint = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
+            .expect("checkpoint");
+        let mut publication = build_trust_anchored_checkpoint_publication(
+            &checkpoint,
+            CheckpointPublicationTrustAnchorBinding {
+                publication_identity: CheckpointPublicationIdentity::new(
+                    CheckpointPublicationIdentityKind::TransparencyService,
+                    "transparency.example/checkpoints/1",
+                ),
+                trust_anchor_identity: CheckpointTrustAnchorIdentity::new(
+                    CheckpointTrustAnchorIdentityKind::Did,
+                    "did:arc:operator-root",
+                ),
+                trust_anchor_ref: "arc_checkpoint_witness_chain".to_string(),
+                signer_cert_ref: "did:web:arc.example#checkpoint-signer".to_string(),
+                publication_profile_version: "phase4-preview.v1".to_string(),
+            },
+        )
+        .expect("trust-anchored publication");
+        publication
+            .trust_anchor_binding
+            .as_mut()
+            .expect("binding")
+            .signer_cert_ref
+            .clear();
+        let transparency = CheckpointTransparencySummary {
+            publications: vec![publication],
+            witnesses: Vec::new(),
+            consistency_proofs: Vec::new(),
+            equivocations: Vec::new(),
+        };
+
+        let error = verify_checkpoint_publication_records(&transparency).unwrap_err();
+
+        assert!(error.to_string().contains("signer_cert_ref"));
+    }
+
+    #[test]
+    fn witness_rejects_conflicting_checkpoint_same_log_and_tree_size() {
+        let keypair = Keypair::generate();
+        let first = build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"two".to_vec()], &keypair)
+            .expect("first checkpoint");
+        let conflicting =
+            build_checkpoint(2, 1, 2, &[b"one".to_vec(), b"changed".to_vec()], &keypair)
+                .expect("conflicting checkpoint");
+        let transparency =
+            build_checkpoint_transparency(&[first, conflicting]).expect("transparency summary");
+
+        let error = verify_checkpoint_publication_records(&transparency).unwrap_err();
+
+        assert!(error
+            .to_string()
+            .contains("conflicting checkpoints at cumulative tree size"));
     }
 }

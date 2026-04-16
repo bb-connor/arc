@@ -1,0 +1,23 @@
+{
+  "id": "inc-meridian-inference-gw-2026-04-15-0317z-change",
+  "issuer": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+  "subject": "7f1d21c15907cc010abcf937b9b1eca646e164a8e7434842ba6813e2aa45360a",
+  "scope": {
+    "grants": [],
+    "resource_grants": [],
+    "prompt_grants": []
+  },
+  "issued_at": 1776300757,
+  "expires_at": 1776301657,
+  "delegation_chain": [
+    {
+      "capability_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+      "delegator": "130014d225711198837ad7d0a8326d162a1fcb569c2b2949a14d16b326bfa5ba",
+      "delegatee": "7f1d21c15907cc010abcf937b9b1eca646e164a8e7434842ba6813e2aa45360a",
+      "attenuations": [],
+      "timestamp": 1776300757,
+      "signature": "be7adfad051208a5a75ccc9505b89ce665d3e7734134568e3f19939c47a1d5bbb3ebef754091361c7a6de26218c0df103925053c6f7662694c3ee949e1c7540c"
+    }
+  ],
+  "signature": "7f52a9333904923e870c148f0505c492e4281797bfebcdbea0737f4c0c032ee0e423e3e9dfdc6f215c116eb601ff87c960db2eec84498c5ae38ab41c53901404"
+}

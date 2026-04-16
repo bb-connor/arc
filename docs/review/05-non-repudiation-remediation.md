@@ -32,9 +32,21 @@ into a real transparency system.
 ARC already has several useful building blocks:
 
 - `ArcReceipt` and `ChildRequestReceipt` are signed over canonical JSON.
-- Tool receipts are persisted with monotonic local `seq` values in SQLite.
+- Tool receipts are persisted with monotonic local `seq` values in SQLite, and
+  tool plus child receipts are projected into a unified local claim-log surface.
 - `KernelCheckpoint` signs a Merkle root over a contiguous batch of tool
-  receipts.
+  receipts, and checkpoint persistence is now locally immutable and append-only.
+- ARC derives local `log_id`, `log_tree_size`, predecessor-witness, consistency
+  proof, and same-size fork-detection summaries from persisted checkpoints.
+- Evidence export and Mercury proof packages now distinguish `audit` from
+  `transparency_preview` claims and reject `append_only` claims without a
+  declared trust anchor.
+- Checkpoint publication records can now carry typed trust-anchor bindings, and
+  `arc-anchor` verifies that a publication is backed by either a declared
+  trust-anchor path or a successor witness chain.
+- `arc-anchor` discovery now projects publication policy, current freshness,
+  per-chain runtime state, and active conflict visibility for the bounded
+  publication lanes.
 - Inclusion proofs exist for receipts inside a checkpointed batch.
 - Evidence export can bundle receipts, checkpoints, and inclusion proofs.
 - Archive flows preserve tool-receipt checkpoints when the covered batch is
@@ -45,11 +57,12 @@ The implementation also already exposes the main limitations:
 - receipt verification trusts the embedded `kernel_key` instead of an external
   trust anchor
 - checkpoint verification does the same
-- checkpoints are independent batch commitments, not signed tree heads over one
-  append-only global log
-- child receipts are stored separately and are not included in checkpoint
-  commitments
-- checkpoint persistence is mutable (`ON CONFLICT DO UPDATE`)
+- checkpoint leaves and inclusion proofs still derive from tool receipts only;
+  child receipts are projected into the claim log but are not yet sequenced
+  into the checkpoint tree
+- checkpoints now provide local prefix-growth continuity over checkpointed
+  tool-receipt batches, not one externally anchored append-only log over the
+  full claimed receipt family
 - the distributed control plane is not a linearizable global sequencer
 - the standards profile explicitly excludes witness networks and multi-region
   consensus
@@ -90,15 +103,17 @@ Inclusion is necessary. It is not sufficient.
 
 ### 3. Batch checkpoints are not a global transparency log
 
-A sequence of independent per-batch Merkle roots is not the same thing as an
-append-only log with signed tree heads and consistency proofs. Without
-continuity proofs over a single prefix-growing tree, ARC cannot honestly claim
+ARC now derives local tree-head identity, tree-size, and consistency proofs
+across checkpoint progression, but that is still not the same thing as a public
+append-only log over the full claim tree. Without a single externally anchored,
+claim-complete prefix-growing tree, ARC cannot honestly claim
 Certificate-Transparency-like semantics.
 
 ### 4. No anti-equivocation story means no portable public truth
 
-Today ARC can sign a checkpoint, but it does not yet publish checkpoints in a
-way that lets external parties detect:
+Today ARC can sign immutable local checkpoints and derive same-size fork and
+continuity summaries, but it still does not publish checkpoints in a way that
+lets external parties detect:
 
 - same-size different-root forks
 - conflicting successor chains
@@ -251,12 +266,12 @@ and checkpointed, every such decision must become a log entry with:
 
 ### 5. Make checkpoint persistence immutable
 
-Current checkpoint storage allows mutation on conflict. That is unacceptable for
-transparency semantics.
+Checkpoint storage is now locally immutable and fail closed on conflicting reuse
+of `checkpoint_seq`. That closes one prerequisite for stronger claim language,
+but immutability alone is still insufficient for transparency semantics.
 
-Required change:
+Required floor:
 
-- `ON CONFLICT DO UPDATE` becomes fail-closed immutability
 - inserting a different object for an existing `checkpoint_seq` is an integrity
   violation
 - any replay or restore flow must use explicit recovery procedures and preserve
@@ -550,6 +565,29 @@ bundle.
 - Ship the standalone verifier and machine-readable fixtures.
 - Formalize inclusion/consistency/key-chain semantics.
 - Gate strong public claims on passing the transparency qualification suite.
+
+Current repo state:
+
+- `M1` is partially real: the claim-log projection, immutable checkpoint
+  storage, and local `log_id` / `tree_size` semantics exist, but the checkpoint
+  tree is still driven by tool-receipt sequences rather than one unified
+  claim-entry stream.
+- `M2` is partially real: derived publications, predecessor witnesses,
+  consistency proofs, and proof/export contract updates ship, but they still
+  describe a local checkpoint chain over tool-receipt batches rather than a
+  claim-complete public log.
+- `M3` is only boundary-real: proof packages refuse `append_only` claims
+  without a trust anchor, but ARC still verifies receipts and checkpoints with
+  embedded keys and does not yet ship signer chains, rotation, or revocation
+  material.
+- `M4` is partially real: `audit` versus `transparency_preview` claims now
+  exist, trust-anchor-bound publication records ship, and the bounded
+  `arc-anchor` path now exposes publication policy, freshness, and witness or
+  immutable-anchor requirements for the shipped lanes.
+- `M5` is partially real: local same-log same-tree-size fork detection exists,
+  and the bounded `arc-anchor` verifier now rejects conflicting publication
+  chains for the same local log/tree-size view, but no broader externally
+  reviewable anti-equivocation or HA sequencing story ships.
 
 ## Acceptance Criteria
 

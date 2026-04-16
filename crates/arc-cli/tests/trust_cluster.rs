@@ -17,6 +17,8 @@ use arc_core::receipt::{
     ToolCallAction,
 };
 use arc_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+use arc_kernel::BudgetStore;
+use arc_store_sqlite::SqliteBudgetStore;
 use reqwest::blocking::Client;
 use reqwest::header::AUTHORIZATION;
 use serde_json::{json, Value};
@@ -389,10 +391,14 @@ fn post_json(client: &Client, url: &str, token: &str, body: &Value) -> Value {
             .json(body)
             .send()
         {
-            Ok(response) => match response.error_for_status() {
-                Ok(response) => return response.json().expect("decode json"),
-                Err(error) => last_error = Some(error.to_string()),
-            },
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    return response.json().expect("decode json");
+                }
+                let response_body = response.text().unwrap_or_default();
+                last_error = Some(format!("{status} body={response_body}"));
+            }
             Err(error) => last_error = Some(error.to_string()),
         }
         thread::sleep(Duration::from_millis(250));
@@ -501,6 +507,68 @@ fn assert_expected_write_visibility_metadata(response: &Value, leader_url: &str)
     assert_eq!(assert_write_visibility_metadata(response), leader_url);
 }
 
+fn assert_budget_commit_metadata(
+    response: &Value,
+    expected_authority_id: &str,
+    quorum_size: u64,
+    committed_nodes: u64,
+    expected_witnesses: &[&str],
+) {
+    let commit = &response["budgetCommit"];
+    assert_eq!(commit["authorityId"].as_str(), Some(expected_authority_id));
+    assert_eq!(commit["budgetTerm"], commit["leaseEpoch"]);
+    assert_eq!(commit["quorumCommitted"].as_bool(), Some(true));
+    assert_eq!(commit["quorumSize"].as_u64(), Some(quorum_size));
+    assert_eq!(commit["committedNodes"].as_u64(), Some(committed_nodes));
+    assert!(
+        commit["budgetSeq"].as_u64().unwrap_or(0) > 0,
+        "expected positive budget seq in commit metadata: {commit}"
+    );
+    assert_eq!(commit["commitIndex"], commit["budgetSeq"]);
+    let witnesses = commit["witnessUrls"]
+        .as_array()
+        .expect("budget commit witnesses array")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>();
+    assert_eq!(witnesses.len(), expected_witnesses.len());
+    for witness in expected_witnesses {
+        assert!(
+            witnesses.contains(witness),
+            "missing witness `{witness}` in budget commit metadata: {commit}"
+        );
+    }
+}
+
+fn assert_budget_authority_metadata(
+    response: &Value,
+    expected_authority_id: &str,
+    expected_guarantee_level: &str,
+) {
+    let authority = &response["budgetAuthority"];
+    assert_eq!(
+        authority["authorityId"].as_str(),
+        Some(expected_authority_id)
+    );
+    assert_eq!(authority["leaderUrl"].as_str(), Some(expected_authority_id));
+    assert_eq!(
+        authority["guaranteeLevel"].as_str(),
+        Some(expected_guarantee_level)
+    );
+    assert!(
+        authority["budgetTerm"].as_u64().unwrap_or(0) > 0,
+        "expected positive budget term in authority metadata: {authority}"
+    );
+    assert_eq!(authority["leaseEpoch"], authority["budgetTerm"]);
+    assert!(
+        authority["leaseId"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(expected_authority_id),
+        "expected lease id to include authority id: {authority}"
+    );
+}
+
 fn assert_authority_generation(client: &Client, base_url: &str, token: &str, expected: u64) {
     let authority = get_json(client, &format!("{base_url}/v1/authority"), token);
     assert_eq!(authority["generation"].as_u64(), Some(expected));
@@ -582,6 +650,50 @@ fn assert_budget_invocation_count(
         .find(|usage| usage["grantIndex"].as_u64() == Some(grant_index))
         .expect("matching budget usage");
     assert_eq!(usage["invocationCount"].as_u64(), Some(expected));
+}
+
+fn assert_budget_totals(
+    client: &Client,
+    base_url: &str,
+    token: &str,
+    capability_id: &str,
+    grant_index: u64,
+    expected_exposure: u64,
+    expected_realized_spend: u64,
+) {
+    let budgets = get_json(
+        client,
+        &format!("{base_url}/v1/budgets?capabilityId={capability_id}&limit=10"),
+        token,
+    );
+    let usage = budgets["usages"]
+        .as_array()
+        .expect("budgets array")
+        .iter()
+        .find(|usage| usage["grantIndex"].as_u64() == Some(grant_index))
+        .expect("matching budget usage");
+    assert_eq!(
+        usage["totalExposureCharged"].as_u64(),
+        Some(expected_exposure)
+    );
+    assert_eq!(
+        usage["totalRealizedSpend"].as_u64(),
+        Some(expected_realized_spend)
+    );
+}
+
+#[cfg(unix)]
+fn send_signal(child: &Child, signal: &str) {
+    let status = Command::new("kill")
+        .arg(format!("-{signal}"))
+        .arg(child.id().to_string())
+        .status()
+        .expect("send signal to child");
+    assert!(
+        status.success(),
+        "signal {signal} should succeed for child {}",
+        child.id()
+    );
 }
 
 fn assert_lineage_visible(client: &Client, base_url: &str, token: &str, capability_id: &str) {
@@ -961,6 +1073,38 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     );
     assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 3);
     assert_budget_invocation_count(&client, &follower_url, service_token, "cap-shared", 0, 3);
+    assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 0, 0);
+
+    let authorized_budget = post_json(
+        &client,
+        &format!("{follower_url}/v1/budgets/authorize-exposure"),
+        service_token,
+        &json!({
+            "capabilityId": "cap-shared",
+            "grantIndex": 0,
+            "maxInvocations": 4,
+            "exposureUnits": 75,
+            "maxExposurePerInvocation": 100,
+            "maxTotalExposureUnits": 400,
+            "holdId": "cap-shared-hold-1",
+            "eventId": "cap-shared-hold-1:authorize"
+        }),
+    );
+    assert_eq!(authorized_budget["allowed"].as_bool(), Some(true));
+    assert_eq!(authorized_budget["invocationCount"].as_u64(), Some(4));
+    assert_eq!(authorized_budget["totalExposureCharged"].as_u64(), Some(75));
+    assert_eq!(authorized_budget["totalRealizedSpend"].as_u64(), Some(0));
+    assert_expected_write_visibility_metadata(&authorized_budget, &leader_url);
+    assert_budget_authority_metadata(&authorized_budget, &leader_url, "ha_quorum_commit");
+    assert_budget_commit_metadata(
+        &authorized_budget,
+        &leader_url,
+        2,
+        2,
+        &[leader_url.as_str(), follower_url.as_str()],
+    );
+    assert_budget_invocation_count(&client, &leader_url, service_token, "cap-shared", 0, 4);
+    assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 75, 0);
 
     let survivor_url = if leader_url == url_a {
         drop(server_a.take());
@@ -1005,7 +1149,11 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
         service_token,
     );
     assert_eq!(budgets["count"].as_u64(), Some(1));
-    assert_eq!(budgets["usages"][0]["invocationCount"].as_u64(), Some(3));
+    assert_eq!(budgets["usages"][0]["invocationCount"].as_u64(), Some(4));
+    assert_eq!(
+        budgets["usages"][0]["totalExposureCharged"].as_u64(),
+        Some(75)
+    );
 }
 
 #[test]
@@ -1374,6 +1522,113 @@ fn trust_control_cluster_requires_quorum_and_heals_after_partition() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn trust_control_cluster_failed_quorum_does_not_leave_orphaned_exposure() {
+    let dir = unique_test_dir().join("budget-quorum-commit-timeout");
+    fs::create_dir_all(&dir).expect("create test dir");
+
+    let addr_a = reserve_listen_addr();
+    let addr_b = reserve_listen_addr();
+    let url_a = format!("http://{addr_a}");
+    let url_b = format!("http://{addr_b}");
+    let expected_leader_url = std::cmp::min(url_a.clone(), url_b.clone());
+    let service_token = "budget-quorum-commit-timeout-token";
+
+    let server_a = spawn_trust_service(
+        addr_a,
+        service_token,
+        &dir.join("receipts-a.sqlite3"),
+        &dir.join("revocations-a.sqlite3"),
+        &dir.join("authority-a.sqlite3"),
+        &dir.join("budgets-a.sqlite3"),
+        None,
+        &url_a,
+        std::slice::from_ref(&url_b),
+    );
+    let server_b = spawn_trust_service(
+        addr_b,
+        service_token,
+        &dir.join("receipts-b.sqlite3"),
+        &dir.join("revocations-b.sqlite3"),
+        &dir.join("authority-b.sqlite3"),
+        &dir.join("budgets-b.sqlite3"),
+        None,
+        &url_b,
+        std::slice::from_ref(&url_a),
+    );
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .expect("build client");
+
+    wait_until(
+        "budget quorum timeout cluster health reachable",
+        Duration::from_secs(20),
+        || try_get_json(&client, &format!("{url_a}/health"), service_token).is_some(),
+    );
+    wait_until(
+        "budget quorum timeout peer health reachable",
+        Duration::from_secs(20),
+        || try_get_json(&client, &format!("{url_b}/health"), service_token).is_some(),
+    );
+    wait_for_leader_convergence(&client, service_token, &url_a, &url_b, &expected_leader_url);
+
+    let stopped_peer = if expected_leader_url == url_a {
+        &server_b.child
+    } else {
+        &server_a.child
+    };
+    send_signal(stopped_peer, "STOP");
+
+    let (status, body) = post_json_status(
+        &client,
+        &format!("{expected_leader_url}/v1/budgets/authorize-exposure"),
+        service_token,
+        &json!({
+            "capabilityId": "cap-stalled-commit",
+            "grantIndex": 0,
+            "maxInvocations": 5,
+            "exposureUnits": 60,
+            "maxExposurePerInvocation": 100,
+            "maxTotalExposureUnits": 400,
+            "holdId": "cap-stalled-commit-hold-1",
+            "eventId": "cap-stalled-commit-hold-1:authorize"
+        }),
+    );
+    assert_eq!(status, 503);
+    assert!(
+        body.contains("leader-visible") || body.contains("quorum commit"),
+        "expected explicit quorum-commit failure body, got: {body}"
+    );
+    wait_until(
+        "failed quorum authorize rollback removes orphaned exposure",
+        Duration::from_secs(10),
+        || {
+            let Some(budgets) = try_get_json(
+                &client,
+                &format!(
+                    "{expected_leader_url}/v1/budgets?capabilityId=cap-stalled-commit&limit=10"
+                ),
+                service_token,
+            ) else {
+                return false;
+            };
+            let Some(usage) = budgets["usages"].as_array().and_then(|usages| {
+                usages
+                    .iter()
+                    .find(|usage| usage["grantIndex"].as_u64() == Some(0))
+            }) else {
+                return false;
+            };
+            usage["invocationCount"].as_u64() == Some(0)
+                && usage["totalExposureCharged"].as_u64() == Some(0)
+                && usage["totalRealizedSpend"].as_u64() == Some(0)
+        },
+    );
+}
+
 #[test]
 fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
     let dir = unique_test_dir().join("late-joiner");
@@ -1541,6 +1796,239 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
                     })
         },
         || cluster_status_diagnostics(&client, &all_urls, service_token),
+    );
+}
+
+#[test]
+fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
+    let dir = unique_test_dir().join("snapshot-budget-holds");
+    fs::create_dir_all(&dir).expect("create test dir");
+
+    let nodes = reserve_cluster_nodes(3);
+    let (addr_late, late_url) = nodes[0].clone();
+    let (addr_a, url_a) = nodes[1].clone();
+    let (addr_b, url_b) = nodes[2].clone();
+    let warm_urls = vec![url_a.clone(), url_b.clone()];
+    let all_urls = vec![late_url.clone(), url_a.clone(), url_b.clone()];
+    let service_token = "cluster-snapshot-budget-token";
+    let warm_leader_url = url_a.clone();
+    let late_budget_db = dir.join("budgets-late.sqlite3");
+
+    let _server_a = spawn_trust_service(
+        addr_a,
+        service_token,
+        &dir.join("receipts-a.sqlite3"),
+        &dir.join("revocations-a.sqlite3"),
+        &dir.join("authority-a.sqlite3"),
+        &dir.join("budgets-a.sqlite3"),
+        None,
+        &url_a,
+        &[late_url.clone(), url_b.clone()],
+    );
+    let _server_b = spawn_trust_service(
+        addr_b,
+        service_token,
+        &dir.join("receipts-b.sqlite3"),
+        &dir.join("revocations-b.sqlite3"),
+        &dir.join("authority-b.sqlite3"),
+        &dir.join("budgets-b.sqlite3"),
+        None,
+        &url_b,
+        &[late_url.clone(), url_a.clone()],
+    );
+
+    let client = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .expect("build client");
+
+    for base_url in &warm_urls {
+        wait_until(
+            "warm budget node health reachable",
+            Duration::from_secs(20),
+            || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
+        );
+    }
+
+    wait_until_with_diagnostics(
+        "warm budget cluster converges without late joiner",
+        Duration::from_secs(90),
+        || {
+            warm_urls.iter().all(|base_url| {
+                let Some(status) = try_internal_cluster_status(&client, base_url, service_token)
+                else {
+                    return false;
+                };
+                status["leaderUrl"].as_str() == Some(warm_leader_url.as_str())
+                    && status["hasQuorum"].as_bool() == Some(true)
+                    && status["reachableNodes"].as_u64() == Some(2)
+            })
+        },
+        || cluster_status_diagnostics(&client, &warm_urls, service_token),
+    );
+
+    let authorize = post_json(
+        &client,
+        &format!("{url_b}/v1/budgets/authorize-exposure"),
+        service_token,
+        &json!({
+            "capabilityId": "cap-snapshot-hold",
+            "grantIndex": 0,
+            "maxInvocations": 5,
+            "exposureUnits": 90,
+            "maxExposurePerInvocation": 100,
+            "maxTotalExposureUnits": 400,
+            "holdId": "cap-snapshot-hold-1",
+            "eventId": "cap-snapshot-hold-1:authorize"
+        }),
+    );
+    assert_eq!(authorize["allowed"].as_bool(), Some(true));
+    assert_expected_write_visibility_metadata(&authorize, &warm_leader_url);
+
+    let release = post_json(
+        &client,
+        &format!("{url_a}/v1/budgets/reconcile-spend"),
+        service_token,
+        &json!({
+            "capabilityId": "cap-snapshot-hold",
+            "grantIndex": 0,
+            "reductionUnits": 30,
+            "holdId": "cap-snapshot-hold-1",
+            "eventId": "cap-snapshot-hold-1:release"
+        }),
+    );
+    assert_eq!(release["releasedExposureUnits"].as_u64(), Some(30));
+    assert_expected_write_visibility_metadata(&release, &warm_leader_url);
+    assert_budget_invocation_count(
+        &client,
+        &warm_leader_url,
+        service_token,
+        "cap-snapshot-hold",
+        0,
+        1,
+    );
+    assert_budget_totals(
+        &client,
+        &warm_leader_url,
+        service_token,
+        "cap-snapshot-hold",
+        0,
+        60,
+        0,
+    );
+
+    let _late_server = spawn_trust_service(
+        addr_late,
+        service_token,
+        &dir.join("receipts-late.sqlite3"),
+        &dir.join("revocations-late.sqlite3"),
+        &dir.join("authority-late.sqlite3"),
+        &late_budget_db,
+        None,
+        &late_url,
+        &[url_a.clone(), url_b.clone()],
+    );
+
+    wait_until(
+        "late budget node health reachable",
+        Duration::from_secs(20),
+        || try_get_json(&client, &format!("{late_url}/health"), service_token).is_some(),
+    );
+
+    wait_until_with_diagnostics(
+        "late joiner snapshots budget hold history",
+        Duration::from_secs(90),
+        || {
+            let Some(status) = try_internal_cluster_status(&client, &late_url, service_token)
+            else {
+                return false;
+            };
+            let Some(budgets) = try_get_json(
+                &client,
+                &format!("{late_url}/v1/budgets?capabilityId=cap-snapshot-hold&limit=10"),
+                service_token,
+            ) else {
+                return false;
+            };
+            status["leaderUrl"].as_str() == Some(late_url.as_str())
+                && status["hasQuorum"].as_bool() == Some(true)
+                && budgets["count"].as_u64() == Some(1)
+                && budgets["usages"][0]["invocationCount"].as_u64() == Some(1)
+                && budgets["usages"][0]["totalExposureCharged"].as_u64() == Some(60)
+                && budgets["usages"][0]["totalRealizedSpend"].as_u64() == Some(0)
+                && status["peers"]
+                    .as_array()
+                    .expect("peer status array")
+                    .iter()
+                    .any(|peer| peer["snapshotAppliedCount"].as_u64().unwrap_or(0) >= 1)
+        },
+        || cluster_status_diagnostics(&client, &all_urls, service_token),
+    );
+
+    let late_store = SqliteBudgetStore::open(&late_budget_db).expect("open late budget db");
+    let pre_reconcile_events = late_store
+        .list_mutation_events(10, Some("cap-snapshot-hold"), Some(0))
+        .expect("list replayed mutation events");
+    let pre_reconcile_event_ids = pre_reconcile_events
+        .iter()
+        .map(|event| event.event_id.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pre_reconcile_event_ids,
+        vec![
+            "cap-snapshot-hold-1:authorize",
+            "cap-snapshot-hold-1:release",
+        ]
+    );
+    drop(late_store);
+
+    let reconcile = post_json(
+        &client,
+        &format!("{late_url}/v1/budgets/reconcile-spend"),
+        service_token,
+        &json!({
+            "capabilityId": "cap-snapshot-hold",
+            "grantIndex": 0,
+            "authorizedExposureUnits": 60,
+            "realizedSpendUnits": 45,
+            "holdId": "cap-snapshot-hold-1",
+            "eventId": "cap-snapshot-hold-1:reconcile"
+        }),
+    );
+    assert_eq!(reconcile["releasedExposureUnits"].as_u64(), Some(15));
+    assert_expected_write_visibility_metadata(&reconcile, &late_url);
+    assert_budget_totals(
+        &client,
+        &late_url,
+        service_token,
+        "cap-snapshot-hold",
+        0,
+        0,
+        45,
+    );
+
+    let late_store = SqliteBudgetStore::open(&late_budget_db).expect("reopen late budget db");
+    let usage = late_store
+        .get_usage("cap-snapshot-hold", 0)
+        .expect("get replayed budget usage")
+        .expect("late usage row");
+    assert_eq!(usage.invocation_count, 1);
+    assert_eq!(usage.total_cost_exposed, 0);
+    assert_eq!(usage.total_cost_realized_spend, 45);
+
+    let post_reconcile_event_ids = late_store
+        .list_mutation_events(10, Some("cap-snapshot-hold"), Some(0))
+        .expect("list late mutation events after reconcile")
+        .into_iter()
+        .map(|event| event.event_id)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        post_reconcile_event_ids,
+        vec![
+            "cap-snapshot-hold-1:authorize".to_string(),
+            "cap-snapshot-hold-1:release".to_string(),
+            "cap-snapshot-hold-1:reconcile".to_string(),
+        ]
     );
 }
 

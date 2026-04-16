@@ -1,13 +1,25 @@
 # Unified Configuration
 
-Status: **Shipped**
+Status: **Partially shipped -- see caveats below**
 Authors: ARC core team
 Normative spec: `spec/CONFIGURATION.md`
 
-> **Status note**: This document describes the design rationale and migration
-> guide for the unified `arc.yaml` configuration system. The normative schema
-> and validation rules are defined in `spec/CONFIGURATION.md`. This document
-> is retained as a non-normative companion for context and history.
+> **Status note (amended April 2026)**: This document was originally written
+> as the design rationale for a unified `arc.yaml` configuration system.
+> **Parts of this document are aspirational and do not match the current
+> implementation.** Specifically:
+>
+> - The nested `adapters.mcp/a2a/acp` schema described here is NOT the
+>   shipped schema. The current loader uses flat Vec sections. See
+>   `crates/arc-config/src/schema.rs` for the actual schema.
+> - `kernel.keypair` is NOT shipped. The current field is `kernel.signing_key`.
+> - `arc start --config arc.yaml` does NOT exist. The CLI uses per-command
+>   `--config` flags on individual subcommands.
+>
+> For the current, normative config contract, read `spec/CONFIGURATION.md`.
+> This document is retained as a non-normative companion for design context
+> and migration history. Do not copy-paste examples from this doc without
+> checking them against the normative spec.
 
 ## 1. Problem Statement
 

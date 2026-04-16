@@ -36,6 +36,7 @@ async fn handle_internal_cluster_status(
                 health: peer_state.health.label().to_string(),
                 partitioned: peer_state.partitioned,
                 last_error: peer_state.last_error.clone(),
+                last_contact_at: peer_state.last_contact_at,
                 tool_seq: peer_state.tool_seq,
                 child_seq: peer_state.child_seq,
                 lineage_seq: peer_state.lineage_seq,
@@ -59,6 +60,7 @@ async fn handle_internal_cluster_status(
                 health: peer_state.health.label().to_string(),
                 partitioned: peer_state.partitioned,
                 last_error: peer_state.last_error.clone(),
+                last_contact_at: peer_state.last_contact_at,
                 tool_seq: peer_state.tool_seq,
                 child_seq: peer_state.child_seq,
                 lineage_seq: peer_state.lineage_seq,
@@ -83,6 +85,7 @@ async fn handle_internal_cluster_status(
         quorum_size: consensus.quorum_size,
         reachable_nodes: consensus.reachable_nodes,
         election_term: consensus.election_term,
+        authority_lease: cluster_authority_lease_view(&state),
         replication,
         peers,
     })
@@ -192,6 +195,7 @@ async fn handle_internal_cluster_partition(
         reachable_nodes: consensus.reachable_nodes,
         quorum_size: consensus.quorum_size,
         election_term: consensus.election_term,
+        authority_lease: cluster_authority_lease_view(&state),
     })
     .into_response()
 }
@@ -335,6 +339,19 @@ async fn handle_internal_budgets_delta(
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
         }
     };
+    let after_seq = query.after_seq.unwrap_or(0);
+    let max_seq_in_batch = records.iter().map(|usage| usage.seq).max();
+    let mutation_events = if let Some(max_seq_in_batch) = max_seq_in_batch {
+        match collect_budget_mutation_event_views_for_seq_range(&store, after_seq, max_seq_in_batch)
+        {
+            Ok(events) => events,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            }
+        }
+    } else {
+        Vec::new()
+    };
     Json(BudgetDeltaResponse {
         records: records
             .into_iter()
@@ -342,11 +359,13 @@ async fn handle_internal_budgets_delta(
                 capability_id: usage.capability_id,
                 grant_index: usage.grant_index,
                 invocation_count: usage.invocation_count,
-                total_cost_charged: usage.total_cost_charged,
+                total_cost_exposed: usage.total_cost_exposed,
+                total_cost_realized_spend: usage.total_cost_realized_spend,
                 updated_at: usage.updated_at,
                 seq: Some(usage.seq),
             })
             .collect(),
+        mutation_events,
     })
     .into_response()
 }
@@ -599,6 +618,9 @@ fn sync_peer_budgets(
         if response.records.is_empty() {
             break;
         }
+        for event in &response.mutation_events {
+            replay_budget_mutation_event(&mut store, event)?;
+        }
         let mut last_cursor = None;
         for record in response.records {
             let seq = record.seq.ok_or_else(|| {
@@ -612,7 +634,8 @@ fn sync_peer_budgets(
                 invocation_count: record.invocation_count,
                 updated_at: record.updated_at,
                 seq,
-                total_cost_charged: record.total_cost_charged,
+                total_cost_exposed: record.total_cost_exposed,
+                total_cost_realized_spend: record.total_cost_realized_spend,
             })?;
             applied = applied.saturating_add(1);
             last_cursor = Some(BudgetCursor {
@@ -697,6 +720,9 @@ fn build_cluster_state(
         peers,
         election_term: 0,
         last_leader_url: None,
+        term_started_at: None,
+        lease_expires_at: None,
+        lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
     }))))
 }
 
@@ -710,6 +736,175 @@ fn cluster_self_url(state: &TrustServiceState) -> Option<String> {
 
 fn current_leader_url(state: &TrustServiceState) -> Option<String> {
     cluster_consensus_view(state).and_then(|view| view.leader_url)
+}
+
+fn authority_lease_ttl(sync_interval: Duration) -> Duration {
+    let scaled = sync_interval
+        .checked_mul(3)
+        .unwrap_or_else(|| Duration::from_secs(5));
+    scaled
+        .max(Duration::from_millis(500))
+        .min(Duration::from_secs(5))
+}
+
+fn cluster_authority_lease_view_locked(
+    cluster: &mut ClusterRuntimeState,
+    consensus: &ClusterConsensusView,
+) -> Option<ClusterAuthorityLeaseView> {
+    let leader_url = consensus.leader_url.clone()?;
+    let lease_epoch = consensus.election_term;
+    let lease_id = format!("{leader_url}#term-{lease_epoch}");
+    Some(ClusterAuthorityLeaseView {
+        authority_id: leader_url.clone(),
+        leader_url,
+        term: consensus.election_term,
+        lease_id,
+        lease_epoch,
+        term_started_at: cluster.term_started_at,
+        lease_expires_at: cluster.lease_expires_at?,
+        lease_ttl_ms: cluster.lease_ttl_ms,
+        lease_valid: consensus.has_quorum
+            && cluster
+                .lease_expires_at
+                .is_some_and(|expires_at| expires_at >= unix_timestamp_now()),
+    })
+}
+
+fn cluster_authority_lease_view(state: &TrustServiceState) -> Option<ClusterAuthorityLeaseView> {
+    let cluster = state.cluster.as_ref()?;
+    Some(match cluster.lock() {
+        Ok(mut guard) => {
+            let consensus = compute_cluster_consensus_locked(&mut guard);
+            cluster_authority_lease_view_locked(&mut guard, &consensus)
+        }
+        Err(poisoned) => {
+            let mut guard = poisoned.into_inner();
+            let consensus = compute_cluster_consensus_locked(&mut guard);
+            cluster_authority_lease_view_locked(&mut guard, &consensus)
+        }
+    }?)
+}
+
+fn current_budget_event_authority(
+    state: &TrustServiceState,
+) -> Result<Option<BudgetEventAuthority>, Response> {
+    if state.cluster.is_none() {
+        return Ok(None);
+    }
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease is unavailable for budget writes",
+        ));
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before budget write could start",
+        ));
+    }
+    Ok(Some(BudgetEventAuthority {
+        authority_id: authority_lease.authority_id,
+        lease_id: authority_lease.lease_id,
+        lease_epoch: authority_lease.lease_epoch,
+    }))
+}
+
+fn budget_authority_metadata_view(
+    state: &TrustServiceState,
+    budget_commit_index: Option<u64>,
+    guarantee_level: &'static str,
+) -> Option<BudgetAuthorityMetadataView> {
+    let authority_lease = cluster_authority_lease_view(state)?;
+    Some(BudgetAuthorityMetadataView {
+        authority_id: authority_lease.authority_id,
+        leader_url: authority_lease.leader_url,
+        budget_term: authority_lease.term,
+        lease_id: authority_lease.lease_id,
+        lease_epoch: authority_lease.lease_epoch,
+        lease_expires_at: authority_lease.lease_expires_at,
+        lease_ttl_ms: authority_lease.lease_ttl_ms,
+        guarantee_level: guarantee_level.to_string(),
+        budget_commit_index,
+    })
+}
+
+fn budget_authority_guarantee_level(
+    state: &TrustServiceState,
+    budget_commit_index: Option<u64>,
+) -> &'static str {
+    if state.cluster.is_some() {
+        if budget_commit_index.is_some() {
+            "ha_quorum_commit"
+        } else {
+            "ha_leader_visible"
+        }
+    } else {
+        "single_node_atomic"
+    }
+}
+
+fn budget_authorize_compensation_event_id(
+    payload: &TryChargeCostRequest,
+    budget_seq: u64,
+) -> String {
+    if let Some(event_id) = payload.event_id.as_deref() {
+        return format!("{event_id}:rollback");
+    }
+    if let Some(hold_id) = payload.hold_id.as_deref() {
+        return format!("{hold_id}:rollback");
+    }
+    format!(
+        "rollback:{}:{}:{}",
+        payload.capability_id, payload.grant_index, budget_seq
+    )
+}
+
+fn rollback_budget_authorize_exposure(
+    state: &TrustServiceState,
+    payload: &TryChargeCostRequest,
+    authority: Option<&BudgetEventAuthority>,
+) -> Result<(), BudgetStoreError> {
+    let mut store = open_budget_store(&state.config).map_err(|response| {
+        BudgetStoreError::Invariant(format!(
+            "failed to reopen budget store for compensation: {}",
+            response.status()
+        ))
+    })?;
+    let usage = store.get_usage(&payload.capability_id, payload.grant_index)?;
+    let Some(usage) = usage else {
+        return Ok(());
+    };
+    if usage.total_cost_exposed == 0 {
+        return Ok(());
+    }
+    let rollback_event_id = budget_authorize_compensation_event_id(payload, usage.seq);
+    store.reverse_charge_cost_with_ids_and_authority(
+        &payload.capability_id,
+        payload.grant_index,
+        payload.cost_units,
+        payload.hold_id.as_deref(),
+        Some(&rollback_event_id),
+        authority,
+    )
+}
+
+async fn respond_after_budget_write_quorum_commit<T>(
+    state: &TrustServiceState,
+    failure_message: &'static str,
+    payload: Option<(T, u64)>,
+) -> Response
+where
+    T: Serialize,
+{
+    let Some((payload, budget_seq)) = payload else {
+        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, failure_message);
+    };
+    let budget_commit = match wait_for_budget_write_quorum_commit(state, budget_seq).await {
+        Ok(commit) => commit,
+        Err(response) => return response,
+    };
+    json_response_with_leader_visibility_and_budget_commit(state, payload, budget_commit)
 }
 
 fn respond_after_leader_visible_write<T, F>(
@@ -734,6 +929,14 @@ fn json_response_with_leader_visibility<T: Serialize>(
     state: &TrustServiceState,
     payload: T,
 ) -> Response {
+    json_response_with_leader_visibility_and_budget_commit(state, payload, None)
+}
+
+fn json_response_with_leader_visibility_and_budget_commit<T: Serialize>(
+    state: &TrustServiceState,
+    payload: T,
+    budget_commit: Option<BudgetWriteCommitView>,
+) -> Response {
     let mut value = match serde_json::to_value(payload) {
         Ok(value) => value,
         Err(error) => {
@@ -754,16 +957,143 @@ fn json_response_with_leader_visibility<T: Serialize>(
         map.insert("handledBy".to_string(), Value::String(self_url));
         map.insert("leaderUrl".to_string(), Value::String(leader_url));
         map.insert("visibleAtLeader".to_string(), Value::Bool(true));
+        if let Some(authority_lease) = cluster_authority_lease_view(state) {
+            let authority_lease = match serde_json::to_value(authority_lease) {
+                Ok(value) => value,
+                Err(error) => {
+                    return plain_http_error(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &format!("failed to serialize cluster authority lease metadata: {error}"),
+                    )
+                }
+            };
+            map.insert("clusterAuthority".to_string(), authority_lease);
+        }
+    }
+    if let Some(budget_commit) = budget_commit {
+        let budget_commit = match serde_json::to_value(budget_commit) {
+            Ok(value) => value,
+            Err(error) => {
+                return plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    &format!("failed to serialize budget quorum commit metadata: {error}"),
+                )
+            }
+        };
+        map.insert("budgetCommit".to_string(), budget_commit);
     }
     Json(value).into_response()
 }
 
+fn budget_write_quorum_commit_view(
+    state: &TrustServiceState,
+    budget_seq: u64,
+) -> Option<BudgetWriteCommitView> {
+    let cluster = state.cluster.as_ref()?;
+    Some(match cluster.lock() {
+        Ok(mut guard) => budget_write_quorum_commit_view_locked(&mut guard, budget_seq),
+        Err(poisoned) => {
+            let mut guard = poisoned.into_inner();
+            budget_write_quorum_commit_view_locked(&mut guard, budget_seq)
+        }
+    })
+}
+
+fn budget_write_quorum_commit_view_locked(
+    cluster: &mut ClusterRuntimeState,
+    budget_seq: u64,
+) -> BudgetWriteCommitView {
+    let consensus = compute_cluster_consensus_locked(cluster);
+    let mut witness_urls = BTreeSet::from([cluster.self_url.clone()]);
+    for (peer_url, peer_state) in &cluster.peers {
+        let committed = peer_state
+            .budget_cursor
+            .as_ref()
+            .map(|cursor| cursor.seq >= budget_seq)
+            .unwrap_or(false);
+        if peer_state.health.is_reachable() && !peer_state.partitioned && committed {
+            witness_urls.insert(peer_url.clone());
+        }
+    }
+    let committed_nodes = witness_urls.len();
+    let authority_id = consensus
+        .leader_url
+        .clone()
+        .unwrap_or_else(|| cluster.self_url.clone());
+    let budget_term = consensus.election_term;
+    let lease_epoch = budget_term;
+    let lease_id = format!("{authority_id}#term-{lease_epoch}");
+    BudgetWriteCommitView {
+        budget_seq,
+        commit_index: budget_seq,
+        quorum_committed: committed_nodes >= consensus.quorum_size,
+        quorum_size: consensus.quorum_size,
+        committed_nodes,
+        witness_urls: witness_urls.into_iter().collect(),
+        authority_id,
+        budget_term,
+        lease_id,
+        lease_epoch,
+    }
+}
+
+fn budget_write_quorum_commit_timeout(sync_interval: Duration) -> Duration {
+    let scaled = sync_interval
+        .checked_mul(8)
+        .unwrap_or_else(|| Duration::from_secs(10));
+    scaled
+        .max(Duration::from_secs(2))
+        .min(Duration::from_secs(10))
+}
+
+async fn wait_for_budget_write_quorum_commit(
+    state: &TrustServiceState,
+    budget_seq: u64,
+) -> Result<Option<BudgetWriteCommitView>, Response> {
+    if state.cluster.is_none() {
+        return Ok(None);
+    }
+
+    let timeout = budget_write_quorum_commit_timeout(state.config.cluster_sync_interval);
+    let poll_interval = Duration::from_millis(50);
+    let deadline = Instant::now() + timeout;
+    loop {
+        let Some(commit_view) = budget_write_quorum_commit_view(state, budget_seq) else {
+            return Ok(None);
+        };
+        if commit_view.quorum_committed {
+            return Ok(Some(commit_view));
+        }
+        if !cluster_consensus_view(state).is_some_and(|consensus| consensus.has_quorum) {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &format!(
+                    "budget write became leader-visible at commit index {budget_seq} for authority term {} but cluster quorum disappeared before commit",
+                    commit_view.budget_term,
+                ),
+            ));
+        }
+        if Instant::now() >= deadline {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &format!(
+                    "budget write became leader-visible at commit index {budget_seq} for authority term {} but only {}/{} quorum witnesses observed before timeout",
+                    commit_view.budget_term, commit_view.committed_nodes, commit_view.quorum_size
+                ),
+            ));
+        }
+        tokio::time::sleep(poll_interval).await;
+    }
+}
+
 fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
     if let Some(cluster) = state.cluster.as_ref() {
+        let now = unix_timestamp_now();
         match cluster.lock() {
             Ok(mut guard) => {
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Healthy;
+                    peer.last_contact_at = Some(now);
                     if !peer.partitioned {
                         peer.last_error = None;
                     }
@@ -774,6 +1104,7 @@ fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
                 let mut guard = poisoned.into_inner();
                 if let Some(peer) = guard.peers.get_mut(peer_url) {
                     peer.health = PeerHealth::Healthy;
+                    peer.last_contact_at = Some(now);
                     if !peer.partitioned {
                         peer.last_error = None;
                     }
@@ -785,8 +1116,10 @@ fn update_peer_success(state: &TrustServiceState, peer_url: &str) {
 }
 
 fn update_peer_reachable(state: &TrustServiceState, peer_url: &str) {
+    let now = unix_timestamp_now();
     update_peer_state(state, peer_url, |peer| {
         peer.health = PeerHealth::Healthy;
+        peer.last_contact_at = Some(now);
     });
 }
 
@@ -1071,10 +1404,15 @@ fn cluster_consensus_view(state: &TrustServiceState) -> Option<ClusterConsensusV
 }
 
 fn compute_cluster_consensus_locked(cluster: &mut ClusterRuntimeState) -> ClusterConsensusView {
+    let now = unix_timestamp_now();
+    let lease_ttl_secs = Duration::from_millis(cluster.lease_ttl_ms).as_secs().max(1);
     let quorum_size = cluster.peers.len().div_ceil(2) + 1;
     let mut candidates = vec![cluster.self_url.clone()];
     for (peer_url, peer_state) in &cluster.peers {
-        if peer_state.health.is_reachable() && !peer_state.partitioned {
+        let contact_is_fresh = peer_state
+            .last_contact_at
+            .is_some_and(|last_contact_at| now <= last_contact_at.saturating_add(lease_ttl_secs));
+        if peer_state.health.is_reachable() && !peer_state.partitioned && contact_is_fresh {
             candidates.push(peer_url.clone());
         }
     }
@@ -1089,6 +1427,15 @@ fn compute_cluster_consensus_locked(cluster: &mut ClusterRuntimeState) -> Cluste
     if cluster.last_leader_url != leader_url {
         cluster.election_term = cluster.election_term.saturating_add(1);
         cluster.last_leader_url = leader_url.clone();
+        cluster.term_started_at = leader_url.as_ref().map(|_| now);
+    }
+    cluster.lease_expires_at = if has_quorum {
+        Some(now.saturating_add(lease_ttl_secs))
+    } else {
+        None
+    };
+    if !has_quorum {
+        cluster.term_started_at = None;
     }
     let role = if !has_quorum {
         "candidate"
@@ -1118,6 +1465,8 @@ fn cluster_replication_heads(
 fn build_cluster_state_snapshot(
     state: &TrustServiceState,
 ) -> Result<ClusterStateSnapshotResponse, CliError> {
+    let consensus = cluster_consensus_view(state);
+    let authority_lease = cluster_authority_lease_view(state);
     let authority = if let Some(path) = state.config.authority_db_path.as_deref() {
         let authority = SqliteCapabilityAuthority::open(path)?;
         Some(authority_snapshot_view(authority.snapshot()?))
@@ -1150,6 +1499,12 @@ fn build_cluster_state_snapshot(
     } else {
         Vec::new()
     };
+    let budget_mutation_events = if let Some(path) = state.config.budget_db_path.as_deref() {
+        let store = SqliteBudgetStore::open(path)?;
+        collect_budget_mutation_event_views(&store)?
+    } else {
+        Vec::new()
+    };
 
     let replication = ClusterReplicationHeadsView {
         tool_seq: tool_receipts.last().map(|record| record.seq).unwrap_or(0),
@@ -1168,13 +1523,19 @@ fn build_cluster_state_snapshot(
 
     Ok(ClusterStateSnapshotResponse {
         generated_at: unix_timestamp_now(),
+        election_term: consensus
+            .as_ref()
+            .map(|view| view.election_term)
+            .unwrap_or(0),
         replication,
+        authority_lease,
         authority,
         revocations,
         tool_receipts,
         child_receipts,
         lineage,
         budgets,
+        budget_mutation_events,
     })
 }
 
@@ -1185,13 +1546,16 @@ fn apply_cluster_snapshot(
 ) -> Result<(), CliError> {
     let ClusterStateSnapshotResponse {
         generated_at,
+        election_term,
         replication,
+        authority_lease,
         authority,
         revocations,
         tool_receipts,
         child_receipts,
         lineage,
         budgets,
+        budget_mutation_events,
     } = snapshot;
 
     if let (Some(path), Some(authority_view)) =
@@ -1231,6 +1595,9 @@ fn apply_cluster_snapshot(
     let mut budget_cursor = None;
     if let Some(path) = state.config.budget_db_path.as_deref() {
         let mut store = SqliteBudgetStore::open(path)?;
+        for event in &budget_mutation_events {
+            replay_budget_mutation_event(&mut store, event)?;
+        }
         for usage in &budgets {
             let seq = usage.seq.unwrap_or(0);
             store.upsert_usage(&BudgetUsageRecord {
@@ -1239,7 +1606,8 @@ fn apply_cluster_snapshot(
                 invocation_count: usage.invocation_count,
                 updated_at: usage.updated_at,
                 seq,
-                total_cost_charged: usage.total_cost_charged,
+                total_cost_exposed: usage.total_cost_exposed,
+                total_cost_realized_spend: usage.total_cost_realized_spend,
             })?;
             let should_replace = budget_cursor
                 .as_ref()
@@ -1255,6 +1623,8 @@ fn apply_cluster_snapshot(
             }
         }
     }
+
+    seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref());
 
     update_peer_state(state, peer_url, |peer| {
         peer.tool_seq = replication.tool_seq;
@@ -1274,6 +1644,49 @@ fn apply_cluster_snapshot(
     });
 
     Ok(())
+}
+
+fn seed_cluster_authority_from_snapshot(
+    state: &TrustServiceState,
+    snapshot_election_term: u64,
+    authority_lease: Option<&ClusterAuthorityLeaseView>,
+) {
+    let Some(cluster) = state.cluster.as_ref() else {
+        return;
+    };
+
+    let snapshot_term = authority_lease
+        .map(|lease| lease.term)
+        .unwrap_or(snapshot_election_term);
+    if snapshot_term == 0 {
+        return;
+    }
+
+    let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
+    let should_seed = |guard: &ClusterRuntimeState| {
+        snapshot_term > guard.election_term
+            || (snapshot_term == guard.election_term && snapshot_leader != guard.last_leader_url)
+    };
+
+    match cluster.lock() {
+        Ok(mut guard) => {
+            if should_seed(&guard) {
+                guard.election_term = snapshot_term;
+                guard.last_leader_url = snapshot_leader.clone();
+                guard.term_started_at = authority_lease.and_then(|lease| lease.term_started_at);
+                guard.lease_expires_at = authority_lease.map(|lease| lease.lease_expires_at);
+            }
+        }
+        Err(poisoned) => {
+            let mut guard = poisoned.into_inner();
+            if should_seed(&guard) {
+                guard.election_term = snapshot_term;
+                guard.last_leader_url = snapshot_leader;
+                guard.term_started_at = authority_lease.and_then(|lease| lease.term_started_at);
+                guard.lease_expires_at = authority_lease.map(|lease| lease.lease_expires_at);
+            }
+        }
+    }
 }
 
 fn collect_revocation_views(
@@ -1371,12 +1784,226 @@ fn collect_budget_views(store: &SqliteBudgetStore) -> Result<Vec<BudgetUsageView
             capability_id: usage.capability_id,
             grant_index: usage.grant_index,
             invocation_count: usage.invocation_count,
-            total_cost_charged: usage.total_cost_charged,
+            total_cost_exposed: usage.total_cost_exposed,
+            total_cost_realized_spend: usage.total_cost_realized_spend,
             updated_at: usage.updated_at,
             seq: Some(usage.seq),
         }));
     }
     Ok(records)
+}
+
+fn collect_budget_mutation_event_views(
+    store: &SqliteBudgetStore,
+) -> Result<Vec<BudgetMutationEventView>, CliError> {
+    Ok(store
+        .list_mutation_events(i64::MAX as usize, None, None)?
+        .into_iter()
+        .map(budget_mutation_event_view)
+        .collect())
+}
+
+fn collect_budget_mutation_event_views_for_seq_range(
+    store: &SqliteBudgetStore,
+    after_seq: u64,
+    max_seq_in_batch: u64,
+) -> Result<Vec<BudgetMutationEventView>, CliError> {
+    Ok(store
+        .list_mutation_events(i64::MAX as usize, None, None)?
+        .into_iter()
+        .filter(|record| {
+            record
+                .usage_seq
+                .is_some_and(|usage_seq| usage_seq > after_seq && usage_seq <= max_seq_in_batch)
+        })
+        .map(budget_mutation_event_view)
+        .collect())
+}
+
+fn budget_mutation_event_view(record: BudgetMutationRecord) -> BudgetMutationEventView {
+    BudgetMutationEventView {
+        event_id: record.event_id,
+        hold_id: record.hold_id,
+        capability_id: record.capability_id,
+        grant_index: record.grant_index,
+        kind: record.kind.as_str().to_string(),
+        allowed: record.allowed,
+        recorded_at: record.recorded_at,
+        usage_seq: record.usage_seq,
+        exposure_units: record.exposure_units,
+        realized_spend_units: record.realized_spend_units,
+        max_invocations: record.max_invocations,
+        max_cost_per_invocation: record.max_cost_per_invocation,
+        max_total_cost_units: record.max_total_cost_units,
+        invocation_count_after: record.invocation_count_after,
+        total_cost_exposed_after: record.total_cost_exposed_after,
+        total_cost_realized_spend_after: record.total_cost_realized_spend_after,
+        authority: record
+            .authority
+            .map(|authority| BudgetMutationAuthorityView {
+                authority_id: authority.authority_id,
+                lease_id: authority.lease_id,
+                lease_epoch: authority.lease_epoch,
+            }),
+    }
+}
+
+fn budget_event_authority_from_view(
+    authority: &BudgetMutationAuthorityView,
+) -> BudgetEventAuthority {
+    BudgetEventAuthority {
+        authority_id: authority.authority_id.clone(),
+        lease_id: authority.lease_id.clone(),
+        lease_epoch: authority.lease_epoch,
+    }
+}
+
+fn replay_budget_mutation_event(
+    store: &mut SqliteBudgetStore,
+    event: &BudgetMutationEventView,
+) -> Result<(), CliError> {
+    let authority = event
+        .authority
+        .as_ref()
+        .map(budget_event_authority_from_view);
+    let grant_index = event.grant_index as usize;
+    let kind = BudgetMutationKind::parse(&event.kind).ok_or_else(|| {
+        CliError::Other(format!(
+            "unknown budget mutation kind `{}` in cluster snapshot",
+            event.kind
+        ))
+    })?;
+
+    match kind {
+        BudgetMutationKind::AuthorizeExposure => {
+            let allowed = event.allowed.ok_or_else(|| {
+                CliError::Other(format!(
+                    "missing `allowed` value for budget authorize event `{}`",
+                    event.event_id
+                ))
+            })?;
+            let replayed = if allowed {
+                store.try_charge_cost_with_ids_and_authority(
+                    &event.capability_id,
+                    grant_index,
+                    event.max_invocations,
+                    event.exposure_units,
+                    event.max_cost_per_invocation,
+                    event.max_total_cost_units,
+                    event.hold_id.as_deref(),
+                    Some(event.event_id.as_str()),
+                    authority.as_ref(),
+                )?
+            } else {
+                store.try_charge_cost_with_ids_and_authority(
+                    &event.capability_id,
+                    grant_index,
+                    event.max_invocations.or(Some(event.invocation_count_after)),
+                    event.exposure_units,
+                    event.max_cost_per_invocation,
+                    event.max_total_cost_units.or(Some(
+                        event
+                            .total_cost_exposed_after
+                            .saturating_add(event.total_cost_realized_spend_after),
+                    )),
+                    event.hold_id.as_deref(),
+                    Some(event.event_id.as_str()),
+                    authority.as_ref(),
+                )?
+            };
+            if replayed != allowed {
+                return Err(CliError::Other(format!(
+                    "budget authorize event `{}` replayed with allowed={replayed} instead of {allowed}",
+                    event.event_id
+                )));
+            }
+        }
+        BudgetMutationKind::ReverseExposure => {
+            store.reverse_charge_cost_with_ids_and_authority(
+                &event.capability_id,
+                grant_index,
+                event.exposure_units,
+                event.hold_id.as_deref(),
+                Some(event.event_id.as_str()),
+                authority.as_ref(),
+            )?;
+        }
+        BudgetMutationKind::ReleaseExposure => {
+            store.reduce_charge_cost_with_ids_and_authority(
+                &event.capability_id,
+                grant_index,
+                event.exposure_units,
+                event.hold_id.as_deref(),
+                Some(event.event_id.as_str()),
+                authority.as_ref(),
+            )?;
+        }
+        BudgetMutationKind::ReconcileSpend => {
+            store.settle_charge_cost_with_ids_and_authority(
+                &event.capability_id,
+                grant_index,
+                event.exposure_units,
+                event.realized_spend_units,
+                event.hold_id.as_deref(),
+                Some(event.event_id.as_str()),
+                authority.as_ref(),
+            )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn forwarded_control_response(response: ureq::Response) -> Result<Response, CliError> {
+    let status = StatusCode::from_u16(response.status()).map_err(|error| {
+        CliError::Other(format!(
+            "failed to map forwarded trust-control response status: {error}"
+        ))
+    })?;
+    let content_type = response.header(CONTENT_TYPE.as_str()).map(str::to_owned);
+    let body = response.into_string().map_err(|error| {
+        CliError::Other(format!(
+            "failed to decode forwarded trust-control response body: {error}"
+        ))
+    })?;
+
+    let mut builder = Response::builder().status(status);
+    if let Some(content_type) = content_type {
+        builder = builder.header(CONTENT_TYPE, content_type);
+    }
+    builder.body(axum::body::Body::from(body)).map_err(|error| {
+        CliError::Other(format!(
+            "failed to build forwarded trust-control response: {error}"
+        ))
+    })
+}
+
+fn post_json_to_control_service<B: Serialize>(
+    client: &TrustControlClient,
+    path: &str,
+    body: &B,
+) -> Result<Response, CliError> {
+    let json = serde_json::to_value(body).map_err(|error| {
+        CliError::Other(format!(
+            "failed to serialize forwarded trust control request: {error}"
+        ))
+    })?;
+    let endpoint = client.endpoints.first().ok_or_else(|| {
+        CliError::Other("trust control client requires at least one endpoint".to_string())
+    })?;
+    let url = format!("{endpoint}{path}");
+    match client
+        .http
+        .post(&url)
+        .set(AUTHORIZATION.as_str(), &format!("Bearer {}", client.token))
+        .send_json(json)
+    {
+        Ok(response) => forwarded_control_response(response),
+        Err(ureq::Error::Status(_, response)) => forwarded_control_response(response),
+        Err(ureq::Error::Transport(error)) => Err(CliError::Other(format!(
+            "trust control service transport failed: {error}"
+        ))),
+    }
 }
 
 async fn forward_post_to_leader<B: Serialize>(
@@ -1396,6 +2023,18 @@ async fn forward_post_to_leader<B: Serialize>(
             "cluster quorum is unavailable for trust-control writes",
         ));
     }
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease is unavailable for trust-control writes",
+        ));
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before trust-control write forwarding",
+        ));
+    }
     let Some(mut leader_url) = consensus.leader_url else {
         return Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
@@ -1410,8 +2049,8 @@ async fn forward_post_to_leader<B: Serialize>(
         let client = build_client(&leader_url, &state.config.service_token).map_err(|error| {
             plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
         })?;
-        match client.post_json::<_, Value>(path, body) {
-            Ok(value) => return Ok(Some(Json(value).into_response())),
+        match post_json_to_control_service(&client, path, body) {
+            Ok(response) => return Ok(Some(response)),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
                 let Some(next_consensus) = cluster_consensus_view(state) else {
@@ -1421,6 +2060,18 @@ async fn forward_post_to_leader<B: Serialize>(
                     return Err(plain_http_error(
                         StatusCode::SERVICE_UNAVAILABLE,
                         "cluster quorum is unavailable for trust-control writes",
+                    ));
+                }
+                let Some(next_authority_lease) = cluster_authority_lease_view(state) else {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster authority lease is unavailable for trust-control writes",
+                    ));
+                };
+                if !next_authority_lease.lease_valid {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster authority lease expired before trust-control write forwarding",
                     ));
                 }
                 let Some(next_leader) = next_consensus.leader_url else {
@@ -2820,6 +3471,9 @@ mod cluster_and_reports_tests {
             ]),
             election_term: 0,
             last_leader_url: None,
+            term_started_at: None,
+            lease_expires_at: None,
+            lease_ttl_ms: authority_lease_ttl(Duration::from_millis(25)).as_millis() as u64,
         };
 
         let initial = compute_cluster_consensus_locked(&mut cluster);
@@ -2828,16 +3482,32 @@ mod cluster_and_reports_tests {
         assert_eq!(initial.quorum_size, 2);
         assert_eq!(initial.reachable_nodes, 1);
         assert_eq!(initial.election_term, 0);
+        assert!(cluster_authority_lease_view_locked(&mut cluster, &initial).is_none());
 
         cluster.peers.get_mut("http://node-b").unwrap().health = PeerHealth::Healthy;
+        cluster
+            .peers
+            .get_mut("http://node-b")
+            .unwrap()
+            .last_contact_at = Some(unix_timestamp_now());
         let with_quorum = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(with_quorum.role, "leader");
         assert!(with_quorum.has_quorum);
         assert_eq!(with_quorum.leader_url.as_deref(), Some("http://node-a"));
         assert_eq!(with_quorum.reachable_nodes, 2);
         assert_eq!(with_quorum.election_term, 1);
+        let with_quorum_lease = cluster_authority_lease_view_locked(&mut cluster, &with_quorum)
+            .expect("authority lease");
+        assert_eq!(with_quorum_lease.lease_epoch, 1);
+        assert!(with_quorum_lease.lease_id.contains("http://node-a"));
+        assert!(with_quorum_lease.lease_expires_at >= unix_timestamp_now());
 
         cluster.peers.get_mut("http://node-c").unwrap().health = PeerHealth::Healthy;
+        cluster
+            .peers
+            .get_mut("http://node-c")
+            .unwrap()
+            .last_contact_at = Some(unix_timestamp_now());
         let stable = compute_cluster_consensus_locked(&mut cluster);
         assert_eq!(stable.role, "leader");
         assert_eq!(stable.election_term, 1);
@@ -2849,6 +3519,32 @@ mod cluster_and_reports_tests {
         assert_eq!(lost_quorum.role, "candidate");
         assert!(!lost_quorum.has_quorum);
         assert_eq!(lost_quorum.election_term, 2);
+        assert!(cluster_authority_lease_view_locked(&mut cluster, &lost_quorum).is_none());
+    }
+
+    #[test]
+    fn compute_cluster_consensus_drops_stale_peers_after_authority_lease_timeout() {
+        let mut cluster = ClusterRuntimeState {
+            self_url: "http://node-a".to_string(),
+            peers: HashMap::from([(
+                "http://node-b".to_string(),
+                PeerSyncState {
+                    health: PeerHealth::Healthy,
+                    last_contact_at: Some(unix_timestamp_now().saturating_sub(5)),
+                    ..PeerSyncState::default()
+                },
+            )]),
+            election_term: 0,
+            last_leader_url: None,
+            term_started_at: None,
+            lease_expires_at: None,
+            lease_ttl_ms: authority_lease_ttl(Duration::from_millis(25)).as_millis() as u64,
+        };
+
+        let consensus = compute_cluster_consensus_locked(&mut cluster);
+        assert!(!consensus.has_quorum);
+        assert_eq!(consensus.reachable_nodes, 1);
+        assert!(cluster_authority_lease_view_locked(&mut cluster, &consensus).is_none());
     }
 
     #[tokio::test]
@@ -2872,6 +3568,12 @@ mod cluster_and_reports_tests {
             Value::String("http://node-a".to_string())
         );
         assert_eq!(body["visibleAtLeader"], Value::Bool(true));
+        assert_eq!(
+            body["clusterAuthority"]["authorityId"],
+            Value::String("http://node-a".to_string())
+        );
+        assert_eq!(body["clusterAuthority"]["term"], Value::from(1));
+        assert_eq!(body["clusterAuthority"]["leaseValid"], Value::Bool(true));
 
         let scalar = json_response_with_leader_visibility(&state, "not-an-object");
         assert_eq!(scalar.status(), StatusCode::INTERNAL_SERVER_ERROR);
@@ -2880,6 +3582,71 @@ mod cluster_and_reports_tests {
             .expect("read scalar error body");
         let text = String::from_utf8(body.to_vec()).expect("decode error body");
         assert!(text.contains("success responses must be JSON objects"));
+    }
+
+    #[tokio::test]
+    async fn budget_quorum_commit_metadata_tracks_quorum_witnesses() {
+        let state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b", "http://node-c"],
+            None,
+            None,
+            None,
+        );
+        update_peer_reachable(&state, "http://node-b");
+        update_peer_reachable(&state, "http://node-c");
+        update_peer_budget_cursor(
+            &state,
+            "http://node-b",
+            BudgetCursor {
+                seq: 9,
+                updated_at: 14,
+                capability_id: "cap-1".to_string(),
+                grant_index: 0,
+            },
+        );
+        update_peer_budget_cursor(
+            &state,
+            "http://node-c",
+            BudgetCursor {
+                seq: 7,
+                updated_at: 12,
+                capability_id: "cap-1".to_string(),
+                grant_index: 0,
+            },
+        );
+
+        let commit = budget_write_quorum_commit_view(&state, 8).expect("budget quorum commit");
+        assert!(commit.quorum_committed);
+        assert_eq!(commit.quorum_size, 2);
+        assert_eq!(commit.committed_nodes, 2);
+        assert_eq!(
+            commit.witness_urls,
+            vec!["http://node-a".to_string(), "http://node-b".to_string()]
+        );
+
+        let response = json_response_with_leader_visibility_and_budget_commit(
+            &state,
+            json!({ "allowed": true }),
+            Some(commit),
+        );
+        let body = to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read quorum commit response body");
+        let body: Value = serde_json::from_slice(&body).expect("decode quorum commit body");
+        assert_eq!(body["budgetCommit"]["budgetSeq"], Value::from(8));
+        assert_eq!(body["budgetCommit"]["commitIndex"], Value::from(8));
+        assert_eq!(body["budgetCommit"]["quorumCommitted"], Value::Bool(true));
+        assert_eq!(body["budgetCommit"]["committedNodes"], Value::from(2));
+        assert_eq!(
+            body["budgetCommit"]["authorityId"],
+            Value::String("http://node-a".to_string())
+        );
+        assert_eq!(body["budgetCommit"]["budgetTerm"], Value::from(1));
+        assert_eq!(
+            body["budgetCommit"]["witnessUrls"],
+            json!(["http://node-a", "http://node-b"])
+        );
     }
 
     #[test]
@@ -3091,15 +3858,20 @@ mod cluster_and_reports_tests {
             let mut budget_store =
                 SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
             budget_store
-                .upsert_usage(&BudgetUsageRecord {
-                    capability_id: "cap-1".to_string(),
-                    grant_index: 0,
-                    invocation_count: 2,
-                    updated_at: 31,
-                    seq: 1,
-                    total_cost_charged: 9,
-                })
-                .expect("write budget usage");
+                .try_charge_cost_with_ids(
+                    "cap-1",
+                    0,
+                    Some(4),
+                    9,
+                    Some(9),
+                    Some(32),
+                    Some("hold-1"),
+                    Some("hold-1:authorize"),
+                )
+                .expect("authorize budget exposure");
+            budget_store
+                .reduce_charge_cost_with_ids("cap-1", 0, 4, Some("hold-1"), Some("hold-1:release"))
+                .expect("release budget exposure");
         }
 
         let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
@@ -3107,6 +3879,15 @@ mod cluster_and_reports_tests {
         assert_eq!(snapshot.replication.child_seq, 1);
         assert_eq!(snapshot.replication.lineage_seq, 1);
         assert_eq!(snapshot.replication.budget_seq, 1);
+        assert_eq!(snapshot.budget_mutation_events.len(), 2);
+        assert_eq!(
+            snapshot
+                .budget_mutation_events
+                .iter()
+                .map(|event| event.event_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["hold-1:authorize", "hold-1:release"]
+        );
         assert_eq!(
             snapshot
                 .replication
@@ -3157,8 +3938,20 @@ mod cluster_and_reports_tests {
             .list_usages_after(MAX_LIST_LIMIT, None)
             .expect("list replicated budgets");
         assert_eq!(budgets.len(), 1);
-        assert_eq!(budgets[0].invocation_count, 2);
-        assert_eq!(budgets[0].total_cost_charged, 9);
+        assert_eq!(budgets[0].invocation_count, 1);
+        assert_eq!(budgets[0].total_cost_exposed, 5);
+        assert_eq!(budgets[0].total_cost_realized_spend, 0);
+        let mutation_events = SqliteBudgetStore::open(&target_budget_db)
+            .expect("open target budget db")
+            .list_mutation_events(10, Some("cap-1"), Some(0))
+            .expect("list replicated mutation events");
+        assert_eq!(
+            mutation_events
+                .iter()
+                .map(|event| event.event_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["hold-1:authorize", "hold-1:release"]
+        );
 
         assert_eq!(peer_tool_seq(&target_state, "http://node-a"), 1);
         assert_eq!(peer_child_seq(&target_state, "http://node-a"), 1);
@@ -3185,5 +3978,60 @@ mod cluster_and_reports_tests {
             Some(Some(generated_at))
         );
         assert!(!peer_should_force_snapshot(&target_state, "http://node-a"));
+    }
+
+    #[test]
+    fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
+        let source_state =
+            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let target_state = state_with_cluster(
+            "http://node-0",
+            &["http://node-a", "http://node-b"],
+            None,
+            None,
+            None,
+        );
+
+        for state in [&source_state, &target_state] {
+            let cluster = state.cluster.as_ref().expect("cluster state");
+            let mut guard = cluster.lock().expect("cluster guard");
+            for peer in guard.peers.values_mut() {
+                peer.health = PeerHealth::Healthy;
+                peer.last_contact_at = Some(unix_timestamp_now());
+            }
+        }
+
+        let initial_target_consensus =
+            cluster_consensus_view(&target_state).expect("initial target consensus");
+        assert_eq!(
+            initial_target_consensus.leader_url.as_deref(),
+            Some("http://node-0")
+        );
+        assert_eq!(initial_target_consensus.election_term, 1);
+
+        let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
+        assert_eq!(snapshot.election_term, 1);
+        assert_eq!(
+            snapshot
+                .authority_lease
+                .as_ref()
+                .expect("snapshot authority lease")
+                .leader_url,
+            "http://node-a"
+        );
+
+        apply_cluster_snapshot(&target_state, "http://node-a", snapshot)
+            .expect("apply cluster snapshot");
+
+        let seeded_consensus =
+            cluster_consensus_view(&target_state).expect("seeded target consensus");
+        assert_eq!(
+            seeded_consensus.leader_url.as_deref(),
+            Some("http://node-0")
+        );
+        assert_eq!(seeded_consensus.election_term, 2);
+        let seeded_lease = cluster_authority_lease_view(&target_state).expect("seeded lease");
+        assert_eq!(seeded_lease.authority_id, "http://node-0");
+        assert_eq!(seeded_lease.lease_epoch, 2);
     }
 }

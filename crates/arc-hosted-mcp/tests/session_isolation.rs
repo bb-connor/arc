@@ -9,6 +9,15 @@ use serde_json::{json, Value};
 
 use support::{sign_jwt, start_jwt_http_server, unix_now};
 
+#[derive(Clone, Copy)]
+struct JwtSessionClaims<'a> {
+    subject: &'a str,
+    client_id: &'a str,
+    tenant_id: &'a str,
+    scopes: &'a str,
+    groups: &'a [&'a str],
+}
+
 fn jwt_for(
     signing_key: &Keypair,
     issuer: &str,
@@ -18,15 +27,38 @@ fn jwt_for(
     tenant_id: &str,
     exp_offset_secs: u64,
 ) -> String {
+    jwt_for_claims(
+        signing_key,
+        issuer,
+        audience,
+        JwtSessionClaims {
+            subject,
+            client_id,
+            tenant_id,
+            scopes: "mcp:invoke tools.read",
+            groups: &[],
+        },
+        exp_offset_secs,
+    )
+}
+
+fn jwt_for_claims(
+    signing_key: &Keypair,
+    issuer: &str,
+    audience: &str,
+    claims: JwtSessionClaims<'_>,
+    exp_offset_secs: u64,
+) -> String {
     sign_jwt(
         signing_key,
         &json!({
             "iss": issuer,
-            "sub": subject,
+            "sub": claims.subject,
             "aud": audience,
-            "scope": "mcp:invoke tools.read",
-            "client_id": client_id,
-            "tid": tenant_id,
+            "scope": claims.scopes,
+            "client_id": claims.client_id,
+            "tid": claims.tenant_id,
+            "groups": claims.groups,
             "exp": unix_now() + exp_offset_secs,
         }),
     )
@@ -82,7 +114,7 @@ fn hosted_mcp_rejects_cross_tenant_session_reuse() {
     assert!(cross_a
         .text()
         .expect("cross-session body")
-        .contains("authenticated principal does not match session"));
+        .contains("authenticated authorization context does not match session"));
 
     let cross_b = server.post_json_with_token(
         &token_a,
@@ -99,7 +131,7 @@ fn hosted_mcp_rejects_cross_tenant_session_reuse() {
     assert!(cross_b
         .text()
         .expect("cross-session body")
-        .contains("authenticated principal does not match session"));
+        .contains("authenticated authorization context does not match session"));
 
     let tools_a = server.list_tools_with_token(&token_a, &session_a);
     assert_eq!(
@@ -203,4 +235,146 @@ fn hosted_mcp_isolates_receipt_and_trust_attribution_by_session() {
 
     assert_eq!(subject_counts.get(&subject_a), Some(&1));
     assert_eq!(subject_counts.get(&subject_b), Some(&1));
+}
+
+#[test]
+fn hosted_mcp_rejects_session_reuse_when_authorization_context_drifts() {
+    let issuer = "https://issuer.example";
+    let audience = "arc-mcp";
+    let admin_token = "admin-secret";
+    let signing_key = Keypair::generate();
+    let server = start_jwt_http_server(
+        &signing_key.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+    );
+
+    let baseline_groups = ["eng", "ops"];
+    let reduced_groups = ["eng"];
+    let baseline = JwtSessionClaims {
+        subject: "user-123",
+        client_id: "client-a",
+        tenant_id: "tenant-a",
+        scopes: "mcp:invoke tools.read",
+        groups: &baseline_groups,
+    };
+    let session_token = jwt_for_claims(&signing_key, issuer, audience, baseline, 300);
+    let session = server.initialize_session_with_token(&session_token);
+
+    let scenarios = [
+        (
+            "privilege shrink",
+            JwtSessionClaims {
+                scopes: "mcp:invoke",
+                ..baseline
+            },
+        ),
+        (
+            "client context drift",
+            JwtSessionClaims {
+                client_id: "client-b",
+                ..baseline
+            },
+        ),
+        (
+            "tenant drift",
+            JwtSessionClaims {
+                tenant_id: "tenant-b",
+                ..baseline
+            },
+        ),
+        (
+            "group drift",
+            JwtSessionClaims {
+                groups: &reduced_groups,
+                ..baseline
+            },
+        ),
+    ];
+
+    for (index, (label, claims)) in scenarios.iter().enumerate() {
+        let token = jwt_for_claims(&signing_key, issuer, audience, *claims, 600 + index as u64);
+        let response = server.post_json_with_token(
+            &token,
+            Some(&session.id),
+            Some(&session.protocol_version),
+            &json!({
+                "jsonrpc": "2.0",
+                "id": 20 + index as i64,
+                "method": "tools/list",
+                "params": {}
+            }),
+        );
+        assert_eq!(
+            response.status(),
+            reqwest::StatusCode::FORBIDDEN,
+            "{label} should block session reuse"
+        );
+        let body = response.text().expect("drift response body");
+        assert!(
+            body.contains("authenticated authorization context does not match session"),
+            "{label} returned unexpected body: {body}"
+        );
+    }
+
+    let tools = server.list_tools_with_token(&session_token, &session);
+    assert_eq!(
+        tools["result"]["tools"][0]["name"].as_str(),
+        Some("echo_json")
+    );
+}
+
+#[test]
+fn hosted_mcp_dedicated_sessions_require_exact_oauth_bearer_continuity() {
+    let issuer = "https://issuer.example";
+    let audience = "arc-mcp";
+    let admin_token = "admin-secret";
+    let signing_key = Keypair::generate();
+    let server = start_jwt_http_server(
+        &signing_key.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+    );
+
+    let claims = JwtSessionClaims {
+        subject: "user-123",
+        client_id: "client-a",
+        tenant_id: "tenant-a",
+        scopes: "mcp:invoke tools.read",
+        groups: &[],
+    };
+    let session_token = jwt_for_claims(&signing_key, issuer, audience, claims, 300);
+    let session = server.initialize_session_with_token(&session_token);
+    let trust: Value = server
+        .get_admin_session_trust(&session.id)
+        .json()
+        .expect("session trust json");
+    assert_eq!(
+        trust["ownership"]["hostedIsolation"].as_str(),
+        Some("dedicated_per_session")
+    );
+    assert_eq!(
+        trust["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("strong_dedicated_session")
+    );
+
+    let refreshed_token = jwt_for_claims(&signing_key, issuer, audience, claims, 600);
+    let response = server.post_json_with_token(
+        &refreshed_token,
+        Some(&session.id),
+        Some(&session.protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 99,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(response.status(), reqwest::StatusCode::FORBIDDEN);
+    assert!(response
+        .text()
+        .expect("refreshed token body")
+        .contains("authenticated authorization context does not match session"));
 }

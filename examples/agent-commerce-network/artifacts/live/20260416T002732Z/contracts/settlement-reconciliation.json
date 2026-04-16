@@ -1,0 +1,11 @@
+{
+  "settlement_id": "settlement_2301fbdda3",
+  "job_id": "job_983cd14eb1",
+  "quoted_amount_minor": 45000,
+  "approved_amount_minor": 45000,
+  "settled_amount_minor": 45000,
+  "currency": "USD",
+  "status": "reconciled",
+  "buyer_position": "accepted",
+  "provider_position": "accepted"
+}

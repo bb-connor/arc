@@ -1,0 +1,469 @@
+{
+  "service": "inference-gateway",
+  "collection_window": {
+    "start": "2026-04-15T03:13:00Z",
+    "end": "2026-04-15T03:18:00Z"
+  },
+  "total_traces_collected": 24710,
+  "error_traces_sampled": 5,
+  "latency_distribution": {
+    "p50_ms": 287,
+    "p75_ms": 1240,
+    "p90_ms": 4800,
+    "p95_ms": 8900,
+    "p99_ms": 12400,
+    "p999_ms": 28700
+  },
+  "status_code_distribution": {
+    "200": 0.613,
+    "403": 0.341,
+    "504": 0.028,
+    "502": 0.012,
+    "500": 0.006
+  },
+  "traces": [
+    {
+      "trace_id": "7a3f9c2e1b4d5a6f8e0c3b7d9a1f4e2c",
+      "root_service": "inference-gateway",
+      "root_operation": "POST /v1/inference/completions",
+      "start_time": "2026-04-15T03:14:02.114Z",
+      "duration_ms": 4.2,
+      "status": "ERROR",
+      "http_status_code": 403,
+      "client_region": "eu-west-1",
+      "spans": [
+        {
+          "span_id": "a1b2c3d4e5f60001",
+          "parent_span_id": null,
+          "operation_name": "ingress.receive",
+          "service_name": "inference-gateway",
+          "start_time": "2026-04-15T03:14:02.114Z",
+          "duration_ms": 4.2,
+          "status": "ERROR",
+          "attributes": {
+            "http.method": "POST",
+            "http.url": "/v1/inference/completions",
+            "http.status_code": 403,
+            "http.user_agent": "meridian-sdk-python/2.14.0",
+            "net.peer.ip": "52.214.97.33",
+            "client.geo.country": "IE",
+            "client.geo.region": "eu-west-1",
+            "meridian.org_id": "org-9f3e1a7c",
+            "meridian.model": "meridian-72b-instruct",
+            "meridian.api_key_prefix": "mk-prod-7f3a"
+          }
+        },
+        {
+          "span_id": "a1b2c3d4e5f60002",
+          "parent_span_id": "a1b2c3d4e5f60001",
+          "operation_name": "edge.rule_evaluation",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.115Z",
+          "duration_ms": 1.8,
+          "status": "OK",
+          "attributes": {
+            "edge.pop": "DUB-01",
+            "edge.rule_chain_length": 7,
+            "edge.rules_evaluated": 4,
+            "edge.terminating_rule": "geo-restrict-v42",
+            "edge.terminating_action": "block",
+            "edge.rule_version": "v42-2026-04-15-031201"
+          }
+        },
+        {
+          "span_id": "a1b2c3d4e5f60003",
+          "parent_span_id": "a1b2c3d4e5f60002",
+          "operation_name": "edge.geo_classify",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.115Z",
+          "duration_ms": 0.4,
+          "status": "OK",
+          "attributes": {
+            "geo.source_ip": "52.214.97.33",
+            "geo.resolved_country": "IE",
+            "geo.resolved_region": "eu-west",
+            "geo.asn": 16509,
+            "geo.asn_org": "Amazon.com Inc.",
+            "geo.classification": "cloud_provider",
+            "geo.confidence": 0.99
+          }
+        },
+        {
+          "span_id": "a1b2c3d4e5f60004",
+          "parent_span_id": "a1b2c3d4e5f60002",
+          "operation_name": "edge.enforce_decision",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.116Z",
+          "duration_ms": 0.3,
+          "status": "OK",
+          "attributes": {
+            "edge.decision": "DENY",
+            "edge.rule_id": "geo-restrict-v42",
+            "edge.rule_mode": "blocking",
+            "edge.response_code": 403,
+            "edge.deny_reason": "geo_classification_mismatch: source classified as cloud_provider in restricted region eu-west"
+          }
+        }
+      ]
+    },
+    {
+      "trace_id": "2c4e6a8b0d1f3e5c7a9b2d4f6e8c0a1b",
+      "root_service": "inference-gateway",
+      "root_operation": "POST /v1/embeddings/encode",
+      "start_time": "2026-04-15T03:14:02.887Z",
+      "duration_ms": 3.1,
+      "status": "ERROR",
+      "http_status_code": 403,
+      "client_region": "ap-southeast-1",
+      "spans": [
+        {
+          "span_id": "b2c3d4e5f6a70001",
+          "parent_span_id": null,
+          "operation_name": "ingress.receive",
+          "service_name": "inference-gateway",
+          "start_time": "2026-04-15T03:14:02.887Z",
+          "duration_ms": 3.1,
+          "status": "ERROR",
+          "attributes": {
+            "http.method": "POST",
+            "http.url": "/v1/embeddings/encode",
+            "http.status_code": 403,
+            "http.user_agent": "meridian-sdk-node/3.7.1",
+            "net.peer.ip": "13.212.44.102",
+            "client.geo.country": "SG",
+            "client.geo.region": "ap-southeast-1",
+            "meridian.org_id": "org-2b8d4f1e",
+            "meridian.model": "meridian-embed-v3",
+            "meridian.api_key_prefix": "mk-prod-2c9f"
+          }
+        },
+        {
+          "span_id": "b2c3d4e5f6a70002",
+          "parent_span_id": "b2c3d4e5f6a70001",
+          "operation_name": "edge.rule_evaluation",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.888Z",
+          "duration_ms": 1.4,
+          "status": "OK",
+          "attributes": {
+            "edge.pop": "SIN-02",
+            "edge.rule_chain_length": 7,
+            "edge.rules_evaluated": 4,
+            "edge.terminating_rule": "geo-restrict-v42",
+            "edge.terminating_action": "block",
+            "edge.rule_version": "v42-2026-04-15-031201"
+          }
+        },
+        {
+          "span_id": "b2c3d4e5f6a70003",
+          "parent_span_id": "b2c3d4e5f6a70002",
+          "operation_name": "edge.geo_classify",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.888Z",
+          "duration_ms": 0.3,
+          "status": "OK",
+          "attributes": {
+            "geo.source_ip": "13.212.44.102",
+            "geo.resolved_country": "SG",
+            "geo.resolved_region": "ap-southeast",
+            "geo.asn": 16509,
+            "geo.asn_org": "Amazon.com Inc.",
+            "geo.classification": "cloud_provider",
+            "geo.confidence": 0.99
+          }
+        },
+        {
+          "span_id": "b2c3d4e5f6a70004",
+          "parent_span_id": "b2c3d4e5f6a70002",
+          "operation_name": "edge.enforce_decision",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:02.889Z",
+          "duration_ms": 0.2,
+          "status": "OK",
+          "attributes": {
+            "edge.decision": "DENY",
+            "edge.rule_id": "geo-restrict-v42",
+            "edge.rule_mode": "blocking",
+            "edge.response_code": 403,
+            "edge.deny_reason": "geo_classification_mismatch: source classified as cloud_provider in restricted region ap-southeast"
+          }
+        }
+      ]
+    },
+    {
+      "trace_id": "5f7a9c1e3b2d4f6a8c0e2b4d6f8a1c3e",
+      "root_service": "inference-gateway",
+      "root_operation": "POST /v1/inference/chat",
+      "start_time": "2026-04-15T03:14:04.114Z",
+      "duration_ms": 5.7,
+      "status": "ERROR",
+      "http_status_code": 403,
+      "client_region": "sa-east-1",
+      "spans": [
+        {
+          "span_id": "c3d4e5f6a7b80001",
+          "parent_span_id": null,
+          "operation_name": "ingress.receive",
+          "service_name": "inference-gateway",
+          "start_time": "2026-04-15T03:14:04.114Z",
+          "duration_ms": 5.7,
+          "status": "ERROR",
+          "attributes": {
+            "http.method": "POST",
+            "http.url": "/v1/inference/chat",
+            "http.status_code": 403,
+            "http.user_agent": "meridian-sdk-python/2.14.0",
+            "net.peer.ip": "54.232.187.14",
+            "client.geo.country": "BR",
+            "client.geo.region": "sa-east-1",
+            "meridian.org_id": "org-7e2c9a4b",
+            "meridian.model": "meridian-72b-instruct",
+            "meridian.api_key_prefix": "mk-prod-8d1e"
+          }
+        },
+        {
+          "span_id": "c3d4e5f6a7b80002",
+          "parent_span_id": "c3d4e5f6a7b80001",
+          "operation_name": "edge.rule_evaluation",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:04.115Z",
+          "duration_ms": 2.1,
+          "status": "OK",
+          "attributes": {
+            "edge.pop": "GRU-01",
+            "edge.rule_chain_length": 7,
+            "edge.rules_evaluated": 4,
+            "edge.terminating_rule": "geo-restrict-v42",
+            "edge.terminating_action": "block",
+            "edge.rule_version": "v42-2026-04-15-031201"
+          }
+        },
+        {
+          "span_id": "c3d4e5f6a7b80003",
+          "parent_span_id": "c3d4e5f6a7b80002",
+          "operation_name": "edge.geo_classify",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:04.115Z",
+          "duration_ms": 0.6,
+          "status": "OK",
+          "attributes": {
+            "geo.source_ip": "54.232.187.14",
+            "geo.resolved_country": "BR",
+            "geo.resolved_region": "sa-east",
+            "geo.asn": 16509,
+            "geo.asn_org": "Amazon.com Inc.",
+            "geo.classification": "cloud_provider",
+            "geo.confidence": 0.98
+          }
+        },
+        {
+          "span_id": "c3d4e5f6a7b80004",
+          "parent_span_id": "c3d4e5f6a7b80002",
+          "operation_name": "edge.enforce_decision",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:14:04.116Z",
+          "duration_ms": 0.3,
+          "status": "OK",
+          "attributes": {
+            "edge.decision": "DENY",
+            "edge.rule_id": "geo-restrict-v42",
+            "edge.rule_mode": "blocking",
+            "edge.response_code": 403,
+            "edge.deny_reason": "geo_classification_mismatch: source classified as cloud_provider in restricted region sa-east"
+          }
+        }
+      ]
+    },
+    {
+      "trace_id": "d4e5f6a7b8c90d1e2f3a4b5c6d7e8f9a",
+      "root_service": "inference-gateway",
+      "root_operation": "POST /v1/inference/completions",
+      "start_time": "2026-04-15T03:15:31.228Z",
+      "duration_ms": 14200,
+      "status": "ERROR",
+      "http_status_code": 403,
+      "client_region": "eu-west-2",
+      "spans": [
+        {
+          "span_id": "d4e5f6a7b8c90001",
+          "parent_span_id": null,
+          "operation_name": "ingress.receive",
+          "service_name": "inference-gateway",
+          "start_time": "2026-04-15T03:15:31.228Z",
+          "duration_ms": 14200,
+          "status": "ERROR",
+          "attributes": {
+            "http.method": "POST",
+            "http.url": "/v1/inference/completions",
+            "http.status_code": 403,
+            "http.user_agent": "meridian-sdk-python/2.14.0",
+            "net.peer.ip": "18.130.72.199",
+            "client.geo.country": "GB",
+            "client.geo.region": "eu-west-2",
+            "meridian.org_id": "org-3f6a8c1d",
+            "meridian.model": "meridian-8b-code",
+            "meridian.api_key_prefix": "mk-prod-4b7c",
+            "retry.attempt": 3,
+            "retry.max_attempts": 3,
+            "retry.backoff_ms": 4000
+          }
+        },
+        {
+          "span_id": "d4e5f6a7b8c90002",
+          "parent_span_id": "d4e5f6a7b8c90001",
+          "operation_name": "edge.rule_evaluation",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:15:31.229Z",
+          "duration_ms": 1.6,
+          "status": "OK",
+          "attributes": {
+            "edge.pop": "LHR-03",
+            "edge.rule_chain_length": 7,
+            "edge.rules_evaluated": 4,
+            "edge.terminating_rule": "geo-restrict-v42",
+            "edge.terminating_action": "block",
+            "edge.rule_version": "v42-2026-04-15-031201"
+          }
+        },
+        {
+          "span_id": "d4e5f6a7b8c90003",
+          "parent_span_id": "d4e5f6a7b8c90002",
+          "operation_name": "edge.geo_classify",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:15:31.229Z",
+          "duration_ms": 0.5,
+          "status": "OK",
+          "attributes": {
+            "geo.source_ip": "18.130.72.199",
+            "geo.resolved_country": "GB",
+            "geo.resolved_region": "eu-west",
+            "geo.asn": 16509,
+            "geo.asn_org": "Amazon.com Inc.",
+            "geo.classification": "cloud_provider",
+            "geo.confidence": 0.99
+          }
+        },
+        {
+          "span_id": "d4e5f6a7b8c90004",
+          "parent_span_id": "d4e5f6a7b8c90002",
+          "operation_name": "edge.enforce_decision",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:15:31.230Z",
+          "duration_ms": 0.2,
+          "status": "OK",
+          "attributes": {
+            "edge.decision": "DENY",
+            "edge.rule_id": "geo-restrict-v42",
+            "edge.rule_mode": "blocking",
+            "edge.response_code": 403,
+            "edge.deny_reason": "geo_classification_mismatch: source classified as cloud_provider in restricted region eu-west"
+          }
+        },
+        {
+          "span_id": "d4e5f6a7b8c90005",
+          "parent_span_id": "d4e5f6a7b8c90001",
+          "operation_name": "sdk.retry_delay",
+          "service_name": "client-sdk",
+          "start_time": "2026-04-15T03:15:31.232Z",
+          "duration_ms": 14100,
+          "status": "ERROR",
+          "attributes": {
+            "retry.strategy": "exponential_backoff",
+            "retry.attempt_1_delay_ms": 1000,
+            "retry.attempt_2_delay_ms": 2000,
+            "retry.attempt_3_delay_ms": 4000,
+            "retry.all_attempts_failed": true,
+            "retry.final_status_code": 403
+          }
+        }
+      ]
+    },
+    {
+      "trace_id": "e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+      "root_service": "inference-gateway",
+      "root_operation": "POST /v1/inference/batch",
+      "start_time": "2026-04-15T03:16:12.773Z",
+      "duration_ms": 3.4,
+      "status": "ERROR",
+      "http_status_code": 403,
+      "client_region": "ap-southeast-2",
+      "spans": [
+        {
+          "span_id": "e5f6a7b8c9d00001",
+          "parent_span_id": null,
+          "operation_name": "ingress.receive",
+          "service_name": "inference-gateway",
+          "start_time": "2026-04-15T03:16:12.773Z",
+          "duration_ms": 3.4,
+          "status": "ERROR",
+          "attributes": {
+            "http.method": "POST",
+            "http.url": "/v1/inference/batch",
+            "http.status_code": 403,
+            "http.user_agent": "meridian-batch-worker/1.2.0",
+            "net.peer.ip": "3.105.22.178",
+            "client.geo.country": "AU",
+            "client.geo.region": "ap-southeast-2",
+            "meridian.org_id": "org-9f3e1a7c",
+            "meridian.model": "meridian-72b-instruct",
+            "meridian.api_key_prefix": "mk-batch-1a3f",
+            "batch.job_id": "batch-7c9e2a4f-1b3d-5e7a-9c0b-2d4f6e8a0c1b",
+            "batch.items_total": 2400,
+            "batch.items_processed": 0
+          }
+        },
+        {
+          "span_id": "e5f6a7b8c9d00002",
+          "parent_span_id": "e5f6a7b8c9d00001",
+          "operation_name": "edge.rule_evaluation",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:16:12.774Z",
+          "duration_ms": 1.2,
+          "status": "OK",
+          "attributes": {
+            "edge.pop": "SYD-01",
+            "edge.rule_chain_length": 7,
+            "edge.rules_evaluated": 4,
+            "edge.terminating_rule": "geo-restrict-v42",
+            "edge.terminating_action": "block",
+            "edge.rule_version": "v42-2026-04-15-031201"
+          }
+        },
+        {
+          "span_id": "e5f6a7b8c9d00003",
+          "parent_span_id": "e5f6a7b8c9d00002",
+          "operation_name": "edge.geo_classify",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:16:12.774Z",
+          "duration_ms": 0.3,
+          "status": "OK",
+          "attributes": {
+            "geo.source_ip": "3.105.22.178",
+            "geo.resolved_country": "AU",
+            "geo.resolved_region": "ap-southeast",
+            "geo.asn": 16509,
+            "geo.asn_org": "Amazon.com Inc.",
+            "geo.classification": "cloud_provider",
+            "geo.confidence": 0.99
+          }
+        },
+        {
+          "span_id": "e5f6a7b8c9d00004",
+          "parent_span_id": "e5f6a7b8c9d00002",
+          "operation_name": "edge.enforce_decision",
+          "service_name": "stratos-edge-worker",
+          "start_time": "2026-04-15T03:16:12.775Z",
+          "duration_ms": 0.2,
+          "status": "OK",
+          "attributes": {
+            "edge.decision": "DENY",
+            "edge.rule_id": "geo-restrict-v42",
+            "edge.rule_mode": "blocking",
+            "edge.response_code": 403,
+            "edge.deny_reason": "geo_classification_mismatch: source classified as cloud_provider in restricted region ap-southeast"
+          }
+        }
+      ]
+    }
+  ]
+}

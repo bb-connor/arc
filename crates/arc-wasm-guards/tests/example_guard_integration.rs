@@ -84,7 +84,10 @@ fn tool_gate_allows_safe_tool() {
     backend.load_module(&wasm_bytes, 1_000_000).unwrap();
 
     let verdict = backend.evaluate(&make_request("read_file")).unwrap();
-    assert!(verdict.is_allow(), "expected Allow for safe tool, got {verdict:?}");
+    assert!(
+        verdict.is_allow(),
+        "expected Allow for safe tool, got {verdict:?}"
+    );
 }
 
 #[test]
@@ -95,7 +98,10 @@ fn tool_gate_denies_dangerous_tool() {
     backend.load_module(&wasm_bytes, 1_000_000).unwrap();
 
     let verdict = backend.evaluate(&make_request("dangerous_tool")).unwrap();
-    assert!(verdict.is_deny(), "expected Deny for dangerous_tool, got {verdict:?}");
+    assert!(
+        verdict.is_deny(),
+        "expected Deny for dangerous_tool, got {verdict:?}"
+    );
     match verdict {
         GuardVerdict::Deny { reason: Some(r) } => {
             assert!(
@@ -115,7 +121,10 @@ fn tool_gate_denies_rm_rf() {
     backend.load_module(&wasm_bytes, 1_000_000).unwrap();
 
     let verdict = backend.evaluate(&make_request("rm_rf")).unwrap();
-    assert!(verdict.is_deny(), "expected Deny for rm_rf, got {verdict:?}");
+    assert!(
+        verdict.is_deny(),
+        "expected Deny for rm_rf, got {verdict:?}"
+    );
 }
 
 #[test]
@@ -126,7 +135,10 @@ fn tool_gate_denies_drop_database() {
     backend.load_module(&wasm_bytes, 1_000_000).unwrap();
 
     let verdict = backend.evaluate(&make_request("drop_database")).unwrap();
-    assert!(verdict.is_deny(), "expected Deny for drop_database, got {verdict:?}");
+    assert!(
+        verdict.is_deny(),
+        "expected Deny for drop_database, got {verdict:?}"
+    );
 }
 
 // ---------------------------------------------------------------------------

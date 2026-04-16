@@ -1,7 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use arc_core::{canonical_json_bytes, sha256_hex};
-use arc_kernel::evidence_export::EvidenceExportBundle;
+use arc_kernel::checkpoint::{
+    validate_checkpoint_transparency, verify_checkpoint_transparency_records,
+    CheckpointTransparencySummary,
+};
+use arc_kernel::evidence_export::{
+    build_evidence_transparency_claims, EvidenceExportBundle, EvidenceTransparencyClaims,
+};
 use arc_kernel::{is_supported_checkpoint_schema, verify_checkpoint_signature};
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +19,9 @@ use crate::receipt_metadata::{
 pub const MERCURY_PUBLICATION_PROFILE_SCHEMA: &str = "arc.mercury.publication_profile.v1";
 pub const MERCURY_PROOF_PACKAGE_SCHEMA: &str = "arc.mercury.proof_package.v1";
 pub const MERCURY_INQUIRY_PACKAGE_SCHEMA: &str = "arc.mercury.inquiry_package.v1";
+const CHECKPOINT_CONTINUITY_AUDIT_ONLY: &str = "audit_only";
+const CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW: &str = "transparency_preview";
+const CHECKPOINT_CONTINUITY_APPEND_ONLY: &str = "append_only";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -39,7 +48,7 @@ impl MercuryPublicationProfile {
     pub fn pilot_default() -> Self {
         Self {
             schema: MERCURY_PUBLICATION_PROFILE_SCHEMA.to_string(),
-            checkpoint_continuity: "append_only".to_string(),
+            checkpoint_continuity: CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW.to_string(),
             inclusion_proofs_required: true,
             checkpoint_signatures_required: true,
             witness_record: None,
@@ -62,6 +71,38 @@ impl MercuryPublicationProfile {
             "publication_profile.checkpoint_continuity",
             &self.checkpoint_continuity,
         )?;
+        match self.checkpoint_continuity.as_str() {
+            CHECKPOINT_CONTINUITY_AUDIT_ONLY | CHECKPOINT_CONTINUITY_TRANSPARENCY_PREVIEW => {
+                if self
+                    .trust_anchor
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|anchor| !anchor.is_empty())
+                    .is_some()
+                {
+                    return Err(MercuryContractError::Validation(
+                        "publication_profile.trust_anchor is only valid when publication_profile.checkpoint_continuity=append_only".to_string(),
+                    ));
+                }
+            }
+            CHECKPOINT_CONTINUITY_APPEND_ONLY => {
+                if self
+                    .trust_anchor
+                    .as_deref()
+                    .map(|anchor| anchor.trim().is_empty())
+                    .unwrap_or(true)
+                {
+                    return Err(MercuryContractError::Validation(
+                        "publication_profile.checkpoint_continuity=append_only requires publication_profile.trust_anchor".to_string(),
+                    ));
+                }
+            }
+            other => {
+                return Err(MercuryContractError::Validation(format!(
+                    "unsupported publication_profile.checkpoint_continuity: {other}"
+                )));
+            }
+        }
         ensure_non_empty(
             "publication_profile.completeness_mode",
             &self.completeness_mode,
@@ -100,6 +141,10 @@ pub struct MercuryProofPackage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub strategy_id: Option<String>,
     pub publication_profile: MercuryPublicationProfile,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_claim_boundary: Option<EvidenceTransparencyClaims>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint_transparency: Option<CheckpointTransparencySummary>,
     pub receipt_records: Vec<MercuryProofReceiptRecord>,
     pub bundle_manifests: Vec<MercuryBundleManifest>,
     pub arc_bundle: EvidenceExportBundle,
@@ -113,6 +158,7 @@ impl MercuryProofPackage {
         evidence_exported_at: u64,
         created_at: u64,
         publication_profile: MercuryPublicationProfile,
+        checkpoint_transparency: Option<CheckpointTransparencySummary>,
         bundle_manifests: Vec<MercuryBundleManifest>,
     ) -> Result<Self, MercuryContractError> {
         if arc_bundle.tool_receipts.is_empty() {
@@ -168,6 +214,19 @@ impl MercuryProofPackage {
                 "receiptIds": receipt_records.iter().map(|record| record.receipt_id.clone()).collect::<Vec<_>>(),
             }),
         )?;
+        if publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY
+            && checkpoint_transparency.is_none()
+        {
+            return Err(MercuryContractError::Validation(
+                "append_only proof packages must carry checkpoint_transparency publication records".to_string(),
+            ));
+        }
+        let (checkpoint_transparency, publication_claim_boundary) =
+            derive_publication_materials_with_summary(
+                &arc_bundle,
+                &publication_profile,
+                checkpoint_transparency.as_ref(),
+            )?;
 
         let package = Self {
             schema: MERCURY_PROOF_PACKAGE_SCHEMA.to_string(),
@@ -193,6 +252,8 @@ impl MercuryProofPackage {
                     .map(|record| record.metadata.business_ids.strategy_id.as_deref()),
             ),
             publication_profile,
+            publication_claim_boundary: Some(publication_claim_boundary),
+            checkpoint_transparency,
             receipt_records,
             bundle_manifests,
             arc_bundle,
@@ -216,6 +277,41 @@ impl MercuryProofPackage {
         )?;
         ensure_non_empty("evidence_export_schema", &self.evidence_export_schema)?;
         self.publication_profile.validate()?;
+        let (derived_checkpoint_transparency, derived_publication_claim_boundary) =
+            derive_publication_materials_with_summary(
+                &self.arc_bundle,
+                &self.publication_profile,
+                self.checkpoint_transparency.as_ref(),
+            )?;
+        if self.publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY
+            && self.checkpoint_transparency.is_none()
+        {
+            return Err(MercuryContractError::Validation(
+                "append_only proof packages must carry checkpoint_transparency publication records".to_string(),
+            ));
+        }
+        if let Some(publication_claim_boundary) = self.publication_claim_boundary.as_ref() {
+            publication_claim_boundary
+                .validate()
+                .map_err(MercuryContractError::Validation)?;
+            if publication_claim_boundary != &derived_publication_claim_boundary {
+                return Err(MercuryContractError::Validation(
+                    "publication_claim_boundary does not match the ARC bundle and publication_profile".to_string(),
+                ));
+            }
+        } else if self.publication_profile.checkpoint_continuity
+            == CHECKPOINT_CONTINUITY_APPEND_ONLY
+        {
+            return Err(MercuryContractError::Validation(
+                "append_only proof packages must carry publication_claim_boundary".to_string(),
+            ));
+        }
+        if self.checkpoint_transparency.as_ref() != derived_checkpoint_transparency.as_ref() {
+            return Err(MercuryContractError::Validation(
+                "checkpoint_transparency does not match the ARC bundle and publication_profile"
+                    .to_string(),
+            ));
+        }
         if self.receipt_records.is_empty() {
             return Err(MercuryContractError::MissingField("receipt_records"));
         }
@@ -268,7 +364,11 @@ impl MercuryProofPackage {
         verified_at: u64,
     ) -> Result<MercuryVerificationReport, MercuryContractError> {
         self.validate()?;
-        verify_arc_bundle(&self.arc_bundle, &self.publication_profile)?;
+        verify_arc_bundle(
+            &self.arc_bundle,
+            &self.publication_profile,
+            self.checkpoint_transparency.as_ref(),
+        )?;
         Ok(MercuryVerificationReport {
             schema: self.schema.clone(),
             package_kind: MercuryPackageKind::Proof,
@@ -443,6 +543,7 @@ pub struct MercuryVerificationReport {
 fn verify_arc_bundle(
     bundle: &EvidenceExportBundle,
     publication_profile: &MercuryPublicationProfile,
+    checkpoint_transparency: Option<&CheckpointTransparencySummary>,
 ) -> Result<(), MercuryContractError> {
     let mut tool_receipts_by_seq = BTreeMap::new();
     for record in &bundle.tool_receipts {
@@ -525,6 +626,11 @@ fn verify_arc_bundle(
             )));
         }
     }
+    let _ = derive_publication_materials_with_summary(
+        bundle,
+        publication_profile,
+        checkpoint_transparency,
+    )?;
 
     let mut lineage_ids = BTreeSet::new();
     for snapshot in &bundle.capability_lineage {
@@ -626,6 +732,72 @@ fn shared_optional_value<'a>(values: impl Iterator<Item = Option<&'a str>>) -> O
     first.flatten().map(ToOwned::to_owned)
 }
 
+fn publication_claim_trust_anchor<'a>(
+    publication_profile: &'a MercuryPublicationProfile,
+) -> Result<Option<&'a str>, MercuryContractError> {
+    publication_profile.validate()?;
+    Ok(
+        if publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY {
+            publication_profile
+                .trust_anchor
+                .as_deref()
+                .map(str::trim)
+                .filter(|anchor| !anchor.is_empty())
+        } else {
+            None
+        },
+    )
+}
+
+fn derive_publication_materials_with_summary(
+    bundle: &EvidenceExportBundle,
+    publication_profile: &MercuryPublicationProfile,
+    checkpoint_transparency: Option<&CheckpointTransparencySummary>,
+) -> Result<
+    (
+        Option<CheckpointTransparencySummary>,
+        EvidenceTransparencyClaims,
+    ),
+    MercuryContractError,
+> {
+    let normalized_transparency = match checkpoint_transparency {
+        Some(summary) => Some(
+            verify_checkpoint_transparency_records(&bundle.checkpoints, summary).map_err(
+                |error| {
+                    MercuryContractError::Validation(format!(
+                        "checkpoint transparency verification failed: {error}"
+                    ))
+                },
+            )?,
+        ),
+        None => None,
+    };
+    let transparency = match normalized_transparency.as_ref() {
+        Some(summary) => summary.clone(),
+        None => validate_checkpoint_transparency(&bundle.checkpoints).map_err(|error| {
+            MercuryContractError::Validation(format!(
+                "checkpoint transparency verification failed: {error}"
+            ))
+        })?,
+    };
+    let claim_boundary = build_evidence_transparency_claims(
+        bundle,
+        &transparency,
+        publication_claim_trust_anchor(publication_profile)?,
+    );
+    claim_boundary
+        .validate()
+        .map_err(MercuryContractError::Validation)?;
+    if publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY
+        && !claim_boundary.is_trust_anchored()
+    {
+        return Err(MercuryContractError::Validation(
+            "append_only publication claims require a trust anchor; the ARC bundle still contains only transparency-preview log claims".to_string(),
+        ));
+    }
+    Ok((normalized_transparency, claim_boundary))
+}
+
 fn build_hash_id(prefix: &str, value: &serde_json::Value) -> Result<String, MercuryContractError> {
     Ok(format!(
         "{prefix}-{}",
@@ -654,8 +826,17 @@ fn ensure_non_empty(field: &'static str, value: &str) -> Result<(), MercuryContr
 mod tests {
     use arc_core::crypto::Keypair;
     use arc_core::merkle::MerkleTree;
-    use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
-    use arc_kernel::checkpoint::{build_checkpoint, build_inclusion_proof};
+    use arc_core::receipt::{
+        ArcReceipt, ArcReceiptBody, CheckpointPublicationIdentity,
+        CheckpointPublicationIdentityKind, CheckpointPublicationTrustAnchorBinding,
+        CheckpointTrustAnchorIdentity, CheckpointTrustAnchorIdentityKind, Decision,
+        ToolCallAction,
+    };
+    use arc_kernel::checkpoint::{
+        build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
+        build_trust_anchored_checkpoint_publication, validate_checkpoint_transparency,
+        CheckpointTransparencySummary,
+    };
     use arc_kernel::evidence_export::{
         EvidenceChildReceiptScope, EvidenceExportQuery, EvidenceRetentionMetadata,
         EvidenceToolReceiptRecord,
@@ -665,25 +846,25 @@ mod tests {
 
     use super::*;
 
-    fn sample_receipt() -> ArcReceipt {
+    fn sample_receipt(sequence: u64) -> ArcReceipt {
         let keypair = Keypair::generate();
         let metadata = sample_mercury_receipt_metadata()
             .into_receipt_metadata_value()
             .expect("metadata value");
         ArcReceipt::sign(
             ArcReceiptBody {
-                id: "receipt-proof-1".to_string(),
-                timestamp: 1_775_137_626,
-                capability_id: "cap-proof-1".to_string(),
+                id: format!("receipt-proof-{sequence}"),
+                timestamp: 1_775_137_625 + sequence,
+                capability_id: format!("cap-proof-{sequence}"),
                 tool_server: "mercury".to_string(),
                 tool_name: "release_control".to_string(),
                 action: ToolCallAction::from_parameters(
-                    serde_json::json!({"release":"candidate-1"}),
+                    serde_json::json!({"release": format!("candidate-{sequence}")}),
                 )
                 .expect("action"),
                 decision: Decision::Allow,
-                content_hash: "content-proof-1".to_string(),
-                policy_hash: "policy-proof-1".to_string(),
+                content_hash: format!("content-proof-{sequence}"),
+                policy_hash: format!("policy-proof-{sequence}"),
                 evidence: Vec::new(),
                 metadata: Some(metadata),
                 kernel_key: keypair.public_key(),
@@ -694,7 +875,7 @@ mod tests {
     }
 
     fn sample_bundle() -> EvidenceExportBundle {
-        let receipt = sample_receipt();
+        let receipt = sample_receipt(1);
         let canonical = canonical_json_bytes(&receipt).expect("canonical receipt");
         let checkpoint_keypair = Keypair::generate();
         let checkpoint = build_checkpoint(1, 1, 1, &[canonical.clone()], &checkpoint_keypair)
@@ -718,6 +899,82 @@ mod tests {
         }
     }
 
+    fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, CheckpointTransparencySummary) {
+        let first_receipt = sample_receipt(1);
+        let second_receipt = sample_receipt(2);
+        let first_canonical = canonical_json_bytes(&first_receipt).expect("first canonical");
+        let second_canonical = canonical_json_bytes(&second_receipt).expect("second canonical");
+        let checkpoint_keypair = Keypair::generate();
+        let first_checkpoint =
+            build_checkpoint(1, 1, 1, std::slice::from_ref(&first_canonical), &checkpoint_keypair)
+                .expect("first checkpoint");
+        let second_checkpoint = build_checkpoint_with_previous(
+            2,
+            2,
+            2,
+            std::slice::from_ref(&second_canonical),
+            &checkpoint_keypair,
+            Some(&first_checkpoint),
+        )
+        .expect("second checkpoint");
+        let first_tree =
+            MerkleTree::from_leaves(std::slice::from_ref(&first_canonical)).expect("first tree");
+        let second_tree =
+            MerkleTree::from_leaves(std::slice::from_ref(&second_canonical)).expect("second tree");
+        let first_proof =
+            build_inclusion_proof(&first_tree, 0, first_checkpoint.body.checkpoint_seq, 1)
+                .expect("first proof");
+        let second_proof =
+            build_inclusion_proof(&second_tree, 0, second_checkpoint.body.checkpoint_seq, 2)
+                .expect("second proof");
+        let bundle = EvidenceExportBundle {
+            query: EvidenceExportQuery::default(),
+            tool_receipts: vec![
+                EvidenceToolReceiptRecord {
+                    seq: 1,
+                    receipt: first_receipt,
+                },
+                EvidenceToolReceiptRecord {
+                    seq: 2,
+                    receipt: second_receipt,
+                },
+            ],
+            child_receipts: Vec::new(),
+            child_receipt_scope: EvidenceChildReceiptScope::OmittedNoJoinPath,
+            checkpoints: vec![first_checkpoint.clone(), second_checkpoint.clone()],
+            capability_lineage: Vec::new(),
+            inclusion_proofs: vec![first_proof, second_proof],
+            uncheckpointed_receipts: Vec::new(),
+            retention: EvidenceRetentionMetadata {
+                live_db_size_bytes: 2_048,
+                oldest_live_receipt_timestamp: Some(1_775_137_626),
+            },
+        };
+        let mut transparency =
+            validate_checkpoint_transparency(&[first_checkpoint.clone(), second_checkpoint.clone()])
+                .expect("transparency");
+        let binding = CheckpointPublicationTrustAnchorBinding {
+            publication_identity: CheckpointPublicationIdentity::new(
+                CheckpointPublicationIdentityKind::LocalLog,
+                transparency.publications[0].log_id.clone(),
+            ),
+            trust_anchor_identity: CheckpointTrustAnchorIdentity::new(
+                CheckpointTrustAnchorIdentityKind::TransparencyRoot,
+                "root-set-1",
+            ),
+            trust_anchor_ref: "anchor-root-1".to_string(),
+            signer_cert_ref: "cert-chain-1".to_string(),
+            publication_profile_version: "phase4-pilot".to_string(),
+        };
+        transparency.publications = vec![
+            build_trust_anchored_checkpoint_publication(&first_checkpoint, binding.clone())
+                .expect("first anchored publication"),
+            build_trust_anchored_checkpoint_publication(&second_checkpoint, binding)
+                .expect("second anchored publication"),
+        ];
+        (bundle, transparency)
+    }
+
     #[test]
     fn proof_package_build_and_verify_passes() {
         let package = MercuryProofPackage::build(
@@ -727,14 +984,138 @@ mod tests {
             1_775_137_700,
             1_775_137_800,
             MercuryPublicationProfile::pilot_default(),
+            None,
             vec![sample_mercury_bundle_manifest()],
         )
         .expect("proof package");
+        let claim_boundary = package
+            .publication_claim_boundary
+            .as_ref()
+            .expect("publication claim boundary");
+        assert_eq!(
+            claim_boundary.publication_state.as_str(),
+            "transparency_preview"
+        );
+        assert!(claim_boundary.trust_anchor.is_none());
 
         let report = package.verify(1_775_137_900).expect("verification report");
         assert_eq!(report.package_kind, MercuryPackageKind::Proof);
         assert_eq!(report.workflow_id, "workflow-release-control");
         assert_eq!(report.receipt_count, 1);
+    }
+
+    #[test]
+    fn mercury_proof_package_requires_trust_anchor_for_append_only_claim() {
+        let mut profile = MercuryPublicationProfile::pilot_default();
+        profile.checkpoint_continuity = "append_only".to_string();
+
+        let error = MercuryProofPackage::build(
+            sample_bundle(),
+            "manifest-sha256-proof",
+            "arc.evidence_export_manifest.v1",
+            1_775_137_700,
+            1_775_137_800,
+            profile,
+            None,
+            vec![sample_mercury_bundle_manifest()],
+        )
+        .expect_err("append_only profile without trust anchor should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("requires publication_profile.trust_anchor"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn mercury_preview_profile_rejects_trust_anchor_material() {
+        let mut profile = MercuryPublicationProfile::pilot_default();
+        profile.trust_anchor = Some("anchor-root-1".to_string());
+
+        let error = profile
+            .validate()
+            .expect_err("preview profiles should not carry trust anchors");
+
+        assert!(
+            error
+                .to_string()
+                .contains("only valid when publication_profile.checkpoint_continuity=append_only"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn append_only_proof_package_fails_closed_without_publication_records() {
+        let mut profile = MercuryPublicationProfile::pilot_default();
+        profile.checkpoint_continuity = "append_only".to_string();
+        profile.trust_anchor = Some("anchor-root-1".to_string());
+
+        let error = MercuryProofPackage::build(
+            sample_bundle(),
+            "manifest-sha256-proof",
+            "arc.evidence_export_manifest.v1",
+            1_775_137_700,
+            1_775_137_800,
+            profile,
+            None,
+            vec![sample_mercury_bundle_manifest()],
+        )
+        .expect_err("append_only proof package without packaged publication records should fail");
+
+        assert!(
+            error
+                .to_string()
+                .contains("must carry checkpoint_transparency publication records"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn proof_package_carries_publication_record_and_optional_consistency_chain() {
+        let (bundle, transparency) = sample_bundle_with_publication_records();
+        let mut profile = MercuryPublicationProfile::pilot_default();
+        profile.checkpoint_continuity = "append_only".to_string();
+        profile.trust_anchor = Some("anchor-root-1".to_string());
+
+        let package = MercuryProofPackage::build(
+            bundle,
+            "manifest-sha256-proof",
+            "arc.evidence_export_manifest.v1",
+            1_775_137_700,
+            1_775_137_800,
+            profile,
+            Some(transparency),
+            vec![sample_mercury_bundle_manifest()],
+        )
+        .expect("proof package with publication records");
+
+        let packaged = package
+            .checkpoint_transparency
+            .as_ref()
+            .expect("checkpoint transparency");
+        assert_eq!(packaged.publications.len(), 2);
+        assert_eq!(packaged.consistency_proofs.len(), 1);
+        assert_eq!(
+            packaged.publications[0]
+                .trust_anchor_binding
+                .as_ref()
+                .expect("binding")
+                .trust_anchor_ref,
+            "anchor-root-1"
+        );
+        assert_eq!(
+            package
+                .publication_claim_boundary
+                .as_ref()
+                .expect("claim boundary")
+                .trust_anchor
+                .as_deref(),
+            Some("anchor-root-1")
+        );
+
+        package.verify(1_775_137_900).expect("verification report");
     }
 
     #[test]
@@ -746,6 +1127,7 @@ mod tests {
             1_775_137_700,
             1_775_137_800,
             MercuryPublicationProfile::pilot_default(),
+            None,
             vec![sample_mercury_bundle_manifest()],
         )
         .expect("proof package");

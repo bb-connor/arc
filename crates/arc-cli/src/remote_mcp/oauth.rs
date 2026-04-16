@@ -854,6 +854,10 @@ fn validate_session_auth_context(
                 issuer: request_issuer,
                 subject: request_subject,
                 audience: request_audience,
+                scopes: request_scopes,
+                federated_claims: request_federated_claims,
+                enterprise_identity: request_enterprise_identity,
+                token_fingerprint: request_fingerprint,
                 ..
             },
             SessionAuthMethod::OAuthBearer {
@@ -861,6 +865,10 @@ fn validate_session_auth_context(
                 issuer: session_issuer,
                 subject: session_subject,
                 audience: session_audience,
+                scopes: session_scopes,
+                federated_claims: session_federated_claims,
+                enterprise_identity: session_enterprise_identity,
+                token_fingerprint: session_fingerprint,
                 ..
             },
         ) => {
@@ -868,6 +876,14 @@ fn validate_session_auth_context(
                 && request_issuer == session_issuer
                 && request_subject == session_subject
                 && request_audience == session_audience
+                && request_scopes == session_scopes
+                && request_federated_claims == session_federated_claims
+                && request_enterprise_identity == session_enterprise_identity
+                && session_fingerprint
+                    .as_ref()
+                    .is_none_or(|session_fingerprint| {
+                        request_fingerprint.as_ref() == Some(session_fingerprint)
+                    })
         }
         (SessionAuthMethod::Anonymous, SessionAuthMethod::Anonymous) => true,
         _ => false,
@@ -878,7 +894,7 @@ fn validate_session_auth_context(
     } else {
         Err(plain_http_error(
             StatusCode::FORBIDDEN,
-            "authenticated principal does not match session",
+            "authenticated authorization context does not match session",
         ))
     }
 }

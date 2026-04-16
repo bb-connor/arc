@@ -775,6 +775,62 @@ fn spawn_http_server_with_jwt_auth(
     )
 }
 
+fn spawn_http_server_with_shared_owner_and_jwt_auth(
+    dir: &Path,
+    listen: SocketAddr,
+    jwt_public_key_hex: &str,
+    issuer: &str,
+    audience: &str,
+    admin_token: &str,
+) -> ServerGuard {
+    let policy_path = write_policy(dir);
+    let script_path = write_mock_server_script(dir);
+    let receipt_db_path = dir.join("remote-receipts.sqlite3");
+    let revocation_db_path = dir.join("remote-revocations.sqlite3");
+    let authority_seed_path = dir.join("remote-authority.seed");
+
+    let child = Command::new(env!("CARGO_BIN_EXE_arc"))
+        .args([
+            "--receipt-db",
+            receipt_db_path.to_str().expect("receipt db path"),
+            "--revocation-db",
+            revocation_db_path.to_str().expect("revocation db path"),
+            "--authority-seed-file",
+            authority_seed_path.to_str().expect("authority seed path"),
+            "mcp",
+            "serve-http",
+            "--policy",
+            policy_path.to_str().expect("policy path"),
+            "--server-id",
+            "wrapped-http-mock",
+            "--server-name",
+            "Wrapped HTTP Mock",
+            "--listen",
+            &listen.to_string(),
+            "--auth-jwt-public-key",
+            jwt_public_key_hex,
+            "--auth-jwt-issuer",
+            issuer,
+            "--auth-jwt-audience",
+            audience,
+            "--auth-scope",
+            "mcp:invoke",
+            "--admin-token",
+            admin_token,
+            "--shared-hosted-owner",
+            "--",
+            "python3",
+            script_path.to_str().expect("script path"),
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn arc mcp serve-http with shared-owner jwt auth");
+
+    ServerGuard { child }
+}
+
 fn spawn_http_server_with_jwt_auth_and_identity_federation(
     dir: &Path,
     listen: SocketAddr,
@@ -2160,6 +2216,14 @@ fn mcp_serve_http_session_trust_reports_lifecycle_and_reconnect_contract() {
         Some("post_response_fallback")
     );
     assert_eq!(
+        trust_status["ownership"]["hostedIsolation"].as_str(),
+        Some("dedicated_per_session")
+    );
+    assert_eq!(
+        trust_status["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("strong_dedicated_session")
+    );
+    assert_eq!(
         trust_status["ownership"]["requestStreamActive"].as_bool(),
         Some(false)
     );
@@ -3208,6 +3272,17 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
     let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+    let trust_a: Value = get_admin_session_trust(&client, &base_url, token, &session_a)
+        .json()
+        .expect("session A trust json");
+    assert_eq!(
+        trust_a["ownership"]["hostedIsolation"].as_str(),
+        Some("shared_hosted_owner_compatibility")
+    );
+    assert_eq!(
+        trust_a["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("weak_shared_hosted_owner_compatibility")
+    );
 
     let startup_markers =
         fs::read_to_string(&startup_marker_path).expect("read shared owner startup markers");
@@ -4233,7 +4308,8 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
 }
 
 #[test]
-fn mcp_serve_http_supports_jwt_bearer_admission_and_separate_admin_token() {
+fn mcp_serve_http_dedicated_jwt_sessions_require_exact_bearer_continuity_and_separate_admin_token()
+{
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
     let listen = reserve_listen_addr();
@@ -4272,6 +4348,115 @@ fn mcp_serve_http_supports_jwt_bearer_admission_and_separate_admin_token() {
         }),
     );
     let (session_id, protocol_version) = initialize_session(&client, &base_url, &token_a);
+    let trust = get_admin_session_trust(&client, &base_url, admin_token, &session_id);
+    assert_eq!(trust.status(), reqwest::StatusCode::OK);
+    let trust: Value = trust.json().expect("session trust json");
+    assert_eq!(
+        trust["ownership"]["hostedIsolation"].as_str(),
+        Some("dedicated_per_session")
+    );
+    assert_eq!(
+        trust["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("strong_dedicated_session")
+    );
+
+    let token_b = sign_jwt(
+        &jwt_signing_key,
+        &json!({
+            "iss": issuer,
+            "sub": "user-123",
+            "aud": audience,
+            "scope": "mcp:invoke tools.read",
+            "client_id": "client-abc",
+            "exp": SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("time after epoch")
+                .as_secs()
+                + 600,
+        }),
+    );
+    let tools_list = post_json(
+        &client,
+        &base_url,
+        &token_b,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(tools_list.status(), reqwest::StatusCode::FORBIDDEN);
+    assert!(tools_list
+        .text()
+        .expect("dedicated continuity body")
+        .contains("authenticated authorization context does not match session"));
+
+    let admin_unauthorized = get_admin_authority(&client, &base_url, &token_b);
+    assert_eq!(
+        admin_unauthorized.status(),
+        reqwest::StatusCode::UNAUTHORIZED
+    );
+
+    let admin_authorized = get_admin_authority(&client, &base_url, admin_token);
+    assert_eq!(admin_authorized.status(), reqwest::StatusCode::OK);
+    let admin_authorized: Value = admin_authorized.json().expect("authority json");
+    assert_eq!(admin_authorized["configured"], true);
+}
+
+#[test]
+fn mcp_serve_http_shared_owner_jwt_sessions_keep_weak_compatibility_continuity() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let issuer = "https://issuer.example";
+    let audience = "arc-mcp";
+    let admin_token = "admin-secret";
+    let jwt_signing_key = Keypair::generate();
+    let _server = spawn_http_server_with_shared_owner_and_jwt_auth(
+        &dir,
+        listen,
+        &jwt_signing_key.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let token_a = sign_jwt(
+        &jwt_signing_key,
+        &json!({
+            "iss": issuer,
+            "sub": "user-123",
+            "aud": audience,
+            "scope": "mcp:invoke tools.read",
+            "client_id": "client-abc",
+            "exp": SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("time after epoch")
+                .as_secs()
+                + 300,
+        }),
+    );
+    let (session_id, protocol_version) = initialize_session(&client, &base_url, &token_a);
+    let trust = get_admin_session_trust(&client, &base_url, admin_token, &session_id);
+    assert_eq!(trust.status(), reqwest::StatusCode::OK);
+    let trust: Value = trust.json().expect("session trust json");
+    assert_eq!(
+        trust["ownership"]["hostedIsolation"].as_str(),
+        Some("shared_hosted_owner_compatibility")
+    );
+    assert_eq!(
+        trust["ownership"]["hostedIdentityProfile"].as_str(),
+        Some("weak_shared_hosted_owner_compatibility")
+    );
 
     let token_b = sign_jwt(
         &jwt_signing_key,
@@ -4311,17 +4496,6 @@ fn mcp_serve_http_supports_jwt_bearer_admission_and_separate_admin_token() {
             .len()
             >= 1
     );
-
-    let admin_unauthorized = get_admin_authority(&client, &base_url, &token_b);
-    assert_eq!(
-        admin_unauthorized.status(),
-        reqwest::StatusCode::UNAUTHORIZED
-    );
-
-    let admin_authorized = get_admin_authority(&client, &base_url, admin_token);
-    assert_eq!(admin_authorized.status(), reqwest::StatusCode::OK);
-    let admin_authorized: Value = admin_authorized.json().expect("authority json");
-    assert_eq!(admin_authorized["configured"], true);
 }
 
 #[test]

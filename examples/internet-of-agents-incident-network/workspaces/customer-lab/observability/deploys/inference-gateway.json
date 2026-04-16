@@ -1,0 +1,169 @@
+{
+  "service": "inference-gateway",
+  "environment": "production",
+  "cluster": "prod-inference-us-east-1",
+  "deploy_pipeline": "meridian-deploy-v3",
+  "deployments": [
+    {
+      "deploy_id": "deploy-9f8e7d6c5b4a",
+      "timestamp": "2026-04-15T03:12:01Z",
+      "status": "completed",
+      "commit_sha": "a4c7e2f91b3d8a5c6e0f4b7d9a1c3e5f7b2d4a6c",
+      "commit_message": "feat(edge): promote geo-restrict-v42 to blocking mode for inference-gateway",
+      "author": "priya.narayanan@meridian-labs.ai",
+      "deployer": "deploy-bot",
+      "image_tag": "inference-gateway:v2.41.0-rc3-edge-promote",
+      "previous_image_tag": "inference-gateway:v2.41.0-rc2",
+      "rollout_strategy": "immediate",
+      "rollout_percentage": 100,
+      "canary": {
+        "enabled": false,
+        "reason": "Config-only change, canary bypassed per edge-team policy"
+      },
+      "feature_flags_changed": [
+        {
+          "flag": "edge.geo_restrict_v42.mode",
+          "old_value": "dry-run",
+          "new_value": "blocking"
+        }
+      ],
+      "change_type": "edge-policy-promotion",
+      "pr_number": 4821,
+      "review_approved": true,
+      "ci_status": "passed",
+      "notes": "Promoting after 14-day dry-run observation period. 0 false positives in dry-run logs."
+    },
+    {
+      "deploy_id": "deploy-8e7d6c5b4a39",
+      "timestamp": "2026-04-14T18:44:12Z",
+      "status": "completed",
+      "commit_sha": "b5d8f3a02c4e9b6d1f7a3c5e8b0d2f4a6c8e0b2d",
+      "commit_message": "fix(routing): correct weighted routing for meridian-8b-code replica set 3",
+      "author": "james.okonkwo@meridian-labs.ai",
+      "deployer": "james.okonkwo@meridian-labs.ai",
+      "image_tag": "inference-gateway:v2.41.0-rc2",
+      "previous_image_tag": "inference-gateway:v2.41.0-rc1",
+      "rollout_strategy": "canary",
+      "rollout_percentage": 100,
+      "canary": {
+        "enabled": true,
+        "canary_percentage": 5,
+        "canary_duration_minutes": 30,
+        "canary_passed": true,
+        "canary_metrics": {
+          "error_rate_delta": -0.002,
+          "latency_p99_delta_ms": -12
+        }
+      },
+      "feature_flags_changed": [],
+      "change_type": "application-code",
+      "pr_number": 4819,
+      "review_approved": true,
+      "ci_status": "passed",
+      "notes": null
+    },
+    {
+      "deploy_id": "deploy-7d6c5b4a3928",
+      "timestamp": "2026-04-13T09:17:33Z",
+      "status": "completed",
+      "commit_sha": "c6e9f4b13d5a0c7e2f8b4d6a9c1e3f5b7d0a2c4e",
+      "commit_message": "feat(models): add meridian-8b-code to inference routing table",
+      "author": "sarah.kimura@meridian-labs.ai",
+      "deployer": "sarah.kimura@meridian-labs.ai",
+      "image_tag": "inference-gateway:v2.41.0-rc1",
+      "previous_image_tag": "inference-gateway:v2.40.3",
+      "rollout_strategy": "canary",
+      "rollout_percentage": 100,
+      "canary": {
+        "enabled": true,
+        "canary_percentage": 2,
+        "canary_duration_minutes": 60,
+        "canary_passed": true,
+        "canary_metrics": {
+          "error_rate_delta": 0.001,
+          "latency_p99_delta_ms": 34
+        }
+      },
+      "feature_flags_changed": [
+        {
+          "flag": "models.meridian_8b_code.enabled",
+          "old_value": "false",
+          "new_value": "true"
+        },
+        {
+          "flag": "models.meridian_8b_code.max_batch_size",
+          "old_value": null,
+          "new_value": "64"
+        }
+      ],
+      "change_type": "application-code",
+      "pr_number": 4807,
+      "review_approved": true,
+      "ci_status": "passed",
+      "notes": null
+    },
+    {
+      "deploy_id": "deploy-6c5b4a392817",
+      "timestamp": "2026-04-11T14:02:08Z",
+      "status": "completed",
+      "commit_sha": "d7f0a5c24e6b1d8f3a9c5e7b0d2f4a6c8e1b3d5a",
+      "commit_message": "feat(edge): add geo-restrict-v42 rule in dry-run mode",
+      "author": "priya.narayanan@meridian-labs.ai",
+      "deployer": "deploy-bot",
+      "image_tag": "inference-gateway:v2.40.3",
+      "previous_image_tag": "inference-gateway:v2.40.2",
+      "rollout_strategy": "immediate",
+      "rollout_percentage": 100,
+      "canary": {
+        "enabled": false,
+        "reason": "Config-only change, dry-run mode, no traffic impact"
+      },
+      "feature_flags_changed": [
+        {
+          "flag": "edge.geo_restrict_v42.enabled",
+          "old_value": "false",
+          "new_value": "true"
+        },
+        {
+          "flag": "edge.geo_restrict_v42.mode",
+          "old_value": null,
+          "new_value": "dry-run"
+        }
+      ],
+      "change_type": "edge-policy-addition",
+      "pr_number": 4793,
+      "review_approved": true,
+      "ci_status": "passed",
+      "notes": "New geo-restriction rule targeting sanctioned regions. Deployed in dry-run for 14-day observation."
+    },
+    {
+      "deploy_id": "deploy-5b4a39281706",
+      "timestamp": "2026-04-09T22:31:55Z",
+      "status": "completed",
+      "commit_sha": "e8a1b6d35f7c2e9a4b0d6f8c1e3a5b7d9f2c4e6a",
+      "commit_message": "perf(gateway): reduce connection pool overhead for embedding requests",
+      "author": "james.okonkwo@meridian-labs.ai",
+      "deployer": "james.okonkwo@meridian-labs.ai",
+      "image_tag": "inference-gateway:v2.40.2",
+      "previous_image_tag": "inference-gateway:v2.40.1",
+      "rollout_strategy": "canary",
+      "rollout_percentage": 100,
+      "canary": {
+        "enabled": true,
+        "canary_percentage": 10,
+        "canary_duration_minutes": 45,
+        "canary_passed": true,
+        "canary_metrics": {
+          "error_rate_delta": 0.0,
+          "latency_p99_delta_ms": -87
+        }
+      },
+      "feature_flags_changed": [],
+      "change_type": "application-code",
+      "pr_number": 4781,
+      "review_approved": true,
+      "ci_status": "passed",
+      "notes": null
+    }
+  ]
+}

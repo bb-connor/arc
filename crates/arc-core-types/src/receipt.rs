@@ -6,14 +6,17 @@
 use serde::{Deserialize, Serialize};
 
 use crate::capability::{
-    GovernedAutonomyTier, GovernedCallChainContext, MeteredBillingQuote, MeteredSettlementMode,
-    MonetaryAmount, RuntimeAssuranceTier, WorkloadIdentity,
+    GovernedAutonomyTier, GovernedCallChainContext, GovernedCallChainProvenance,
+    MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, ProvenanceEvidenceClass,
+    RuntimeAssuranceTier, WorkloadIdentity,
 };
 use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::oracle::OracleConversionEvidence;
 use crate::runtime_attestation::AttestationVerifierFamily;
-use crate::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
+use crate::session::{
+    OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
+};
 
 /// A ARC receipt. Signed proof that a tool call was evaluated by the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -171,6 +174,31 @@ impl ArcReceipt {
     pub fn is_incomplete(&self) -> bool {
         matches!(self.decision, Decision::Incomplete { .. })
     }
+
+    fn typed_metadata<T>(&self, key: &str) -> Option<T>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        self.metadata
+            .as_ref()
+            .and_then(|metadata| metadata.get(key))
+            .cloned()
+            .and_then(|value| serde_json::from_value(value).ok())
+    }
+
+    /// Extract typed financial receipt metadata when present.
+    #[must_use]
+    pub fn financial_metadata(&self) -> Option<FinancialReceiptMetadata> {
+        self.typed_metadata("financial")
+    }
+
+    /// Extract typed budget-authority lineage for monetary receipts when present.
+    #[must_use]
+    pub fn financial_budget_authority_metadata(
+        &self,
+    ) -> Option<FinancialBudgetAuthorityReceiptMetadata> {
+        self.typed_metadata("budget_authority")
+    }
 }
 
 impl ChildRequestReceipt {
@@ -215,6 +243,158 @@ impl ChildRequestReceipt {
     }
 }
 
+/// Versioned schema identifier for signed receipt-lineage statements.
+pub const ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA: &str = "arc.receipt_lineage_statement.v1";
+
+fn default_receipt_lineage_evidence_class() -> ProvenanceEvidenceClass {
+    ProvenanceEvidenceClass::Verified
+}
+
+/// Relation type carried by a receipt-lineage statement.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReceiptLineageRelationKind {
+    LocalChild,
+    Continued,
+}
+
+/// Signable receipt-lineage statement body.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptLineageStatementBody {
+    pub schema: String,
+    pub id: String,
+    pub parent_receipt_id: String,
+    pub child_receipt_id: String,
+    pub parent_request_id: RequestId,
+    pub child_request_id: RequestId,
+    pub parent_session_anchor: SessionAnchorReference,
+    pub child_session_anchor: SessionAnchorReference,
+    pub relation_kind: ReceiptLineageRelationKind,
+    #[serde(default = "default_receipt_lineage_evidence_class")]
+    pub evidence_class: ProvenanceEvidenceClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation_token_id: Option<String>,
+    pub issued_at: u64,
+    pub kernel_key: PublicKey,
+}
+
+impl ReceiptLineageStatementBody {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        parent_receipt_id: impl Into<String>,
+        child_receipt_id: impl Into<String>,
+        parent_request_id: RequestId,
+        child_request_id: RequestId,
+        parent_session_anchor: SessionAnchorReference,
+        child_session_anchor: SessionAnchorReference,
+        relation_kind: ReceiptLineageRelationKind,
+        issued_at: u64,
+        kernel_key: PublicKey,
+    ) -> Self {
+        Self {
+            schema: ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA.to_string(),
+            id: id.into(),
+            parent_receipt_id: parent_receipt_id.into(),
+            child_receipt_id: child_receipt_id.into(),
+            parent_request_id,
+            child_request_id,
+            parent_session_anchor,
+            child_session_anchor,
+            relation_kind,
+            evidence_class: default_receipt_lineage_evidence_class(),
+            continuation_token_id: None,
+            issued_at,
+            kernel_key,
+        }
+    }
+
+    #[must_use]
+    pub fn with_evidence_class(mut self, evidence_class: ProvenanceEvidenceClass) -> Self {
+        self.evidence_class = evidence_class;
+        self
+    }
+
+    #[must_use]
+    pub fn with_continuation_token_id(mut self, continuation_token_id: impl Into<String>) -> Self {
+        self.continuation_token_id = Some(continuation_token_id.into());
+        self
+    }
+}
+
+/// Signed linkage statement connecting parent and child receipts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptLineageStatement {
+    pub schema: String,
+    pub id: String,
+    pub parent_receipt_id: String,
+    pub child_receipt_id: String,
+    pub parent_request_id: RequestId,
+    pub child_request_id: RequestId,
+    pub parent_session_anchor: SessionAnchorReference,
+    pub child_session_anchor: SessionAnchorReference,
+    pub relation_kind: ReceiptLineageRelationKind,
+    pub evidence_class: ProvenanceEvidenceClass,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuation_token_id: Option<String>,
+    pub issued_at: u64,
+    pub kernel_key: PublicKey,
+    pub signature: Signature,
+}
+
+impl ReceiptLineageStatement {
+    pub fn sign(body: ReceiptLineageStatementBody, keypair: &Keypair) -> Result<Self> {
+        let (signature, _bytes) = keypair.sign_canonical(&body)?;
+        Ok(Self {
+            schema: body.schema,
+            id: body.id,
+            parent_receipt_id: body.parent_receipt_id,
+            child_receipt_id: body.child_receipt_id,
+            parent_request_id: body.parent_request_id,
+            child_request_id: body.child_request_id,
+            parent_session_anchor: body.parent_session_anchor,
+            child_session_anchor: body.child_session_anchor,
+            relation_kind: body.relation_kind,
+            evidence_class: body.evidence_class,
+            continuation_token_id: body.continuation_token_id,
+            issued_at: body.issued_at,
+            kernel_key: body.kernel_key,
+            signature,
+        })
+    }
+
+    #[must_use]
+    pub fn body(&self) -> ReceiptLineageStatementBody {
+        ReceiptLineageStatementBody {
+            schema: self.schema.clone(),
+            id: self.id.clone(),
+            parent_receipt_id: self.parent_receipt_id.clone(),
+            child_receipt_id: self.child_receipt_id.clone(),
+            parent_request_id: self.parent_request_id.clone(),
+            child_request_id: self.child_request_id.clone(),
+            parent_session_anchor: self.parent_session_anchor.clone(),
+            child_session_anchor: self.child_session_anchor.clone(),
+            relation_kind: self.relation_kind,
+            evidence_class: self.evidence_class,
+            continuation_token_id: self.continuation_token_id.clone(),
+            issued_at: self.issued_at,
+            kernel_key: self.kernel_key.clone(),
+        }
+    }
+
+    pub fn verify_signature(&self) -> Result<bool> {
+        let body = self.body();
+        self.kernel_key.verify_canonical(&body, &self.signature)
+    }
+
+    #[must_use]
+    pub fn is_verified(&self) -> bool {
+        self.evidence_class == ProvenanceEvidenceClass::Verified
+    }
+}
+
 /// Signed envelope for stable export/report artifacts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -245,6 +425,56 @@ where
     pub fn verify_signature(&self) -> Result<bool> {
         self.signer_key
             .verify_canonical(&self.body, &self.signature)
+    }
+}
+
+/// Declared verifier material required to treat a checkpoint publication as
+/// trust-anchored rather than local-preview only.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckpointPublicationTrustAnchorBinding {
+    /// Typed publication surface identity declared for this publication path.
+    pub publication_identity: CheckpointPublicationIdentity,
+    /// Typed trust-anchor identity declared for this publication path.
+    pub trust_anchor_identity: CheckpointTrustAnchorIdentity,
+    /// Stable identifier for the trust anchor that vouches for the publication path.
+    pub trust_anchor_ref: String,
+    /// Stable identifier for the signer certificate or chain entry used by the publisher.
+    pub signer_cert_ref: String,
+    /// Versioned publication profile that defines the verifier policy for this path.
+    pub publication_profile_version: String,
+}
+
+impl CheckpointPublicationTrustAnchorBinding {
+    pub fn validate(&self) -> Result<()> {
+        fn require_non_empty(value: &str, field: &str) -> Result<()> {
+            if value.trim().is_empty() {
+                return Err(Error::CanonicalJson(format!(
+                    "{field} must not be empty for trust-anchored checkpoint publication"
+                )));
+            }
+            Ok(())
+        }
+
+        if !self.publication_identity.has_identity() {
+            return Err(Error::CanonicalJson(
+                "publication_identity.identity must not be empty for trust-anchored checkpoint publication"
+                    .to_string(),
+            ));
+        }
+        if !self.trust_anchor_identity.has_identity() {
+            return Err(Error::CanonicalJson(
+                "trust_anchor_identity.identity must not be empty for trust-anchored checkpoint publication"
+                    .to_string(),
+            ));
+        }
+        require_non_empty(&self.trust_anchor_ref, "trust_anchor_ref")?;
+        require_non_empty(&self.signer_cert_ref, "signer_cert_ref")?;
+        require_non_empty(
+            &self.publication_profile_version,
+            "publication_profile_version",
+        )?;
+        Ok(())
     }
 }
 
@@ -367,6 +597,54 @@ pub struct FinancialReceiptMetadata {
     /// Cost that was attempted but denied (populated only on denial receipts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attempted_cost: Option<u64>,
+}
+
+/// Authority identity bound to a budget hold lineage record.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinancialBudgetHoldAuthorityMetadata {
+    pub authority_id: String,
+    pub lease_id: String,
+    pub lease_epoch: u64,
+}
+
+/// Authorize event lineage preserved on a financial receipt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinancialBudgetAuthorizeReceiptMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_commit_index: Option<u64>,
+    pub exposure_units: u64,
+    pub committed_cost_units_after: u64,
+}
+
+/// Terminal hold mutation lineage preserved on a financial receipt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinancialBudgetTerminalReceiptMetadata {
+    pub disposition: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_commit_index: Option<u64>,
+    pub exposure_units: u64,
+    pub realized_spend_units: u64,
+    pub committed_cost_units_after: u64,
+}
+
+/// Explicit budget hold lineage and guarantee data attached to a financial receipt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinancialBudgetAuthorityReceiptMetadata {
+    pub guarantee_level: String,
+    pub authority_profile: String,
+    pub metering_profile: String,
+    pub hold_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_term: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authority: Option<FinancialBudgetHoldAuthorityMetadata>,
+    pub authorize: FinancialBudgetAuthorizeReceiptMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal: Option<FinancialBudgetTerminalReceiptMetadata>,
 }
 
 /// Canonical settlement states for receipt-side financial metadata.
@@ -493,12 +771,93 @@ pub struct GovernedTransactionReceiptMetadata {
     /// Optional runtime assurance evidence that accompanied the request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_assurance: Option<RuntimeAssuranceReceiptMetadata>,
-    /// Optional delegated call-chain context bound through the governed intent hash.
+    /// Optional delegated call-chain provenance bound through the governed intent hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub call_chain: Option<GovernedCallChainContext>,
+    pub call_chain: Option<GovernedCallChainProvenance>,
     /// Optional autonomy tier and delegation-bond attachment bound through the governed intent hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autonomy: Option<GovernedAutonomyReceiptMetadata>,
+}
+
+impl GovernedTransactionReceiptMetadata {
+    #[must_use]
+    pub fn asserted_call_chain(&self) -> Option<&GovernedCallChainContext> {
+        self.call_chain
+            .as_ref()
+            .and_then(GovernedCallChainProvenance::asserted_context)
+    }
+
+    #[must_use]
+    pub fn verified_call_chain(&self) -> Option<&GovernedCallChainContext> {
+        self.call_chain
+            .as_ref()
+            .and_then(GovernedCallChainProvenance::verified_context)
+    }
+}
+
+/// Declared publication surface family for a checkpoint publication record.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckpointPublicationIdentityKind {
+    LocalLog,
+    TransparencyService,
+    ImmutableRecord,
+    ChainAnchor,
+}
+
+/// Optional typed publication identity carried alongside a checkpoint record.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckpointPublicationIdentity {
+    pub kind: CheckpointPublicationIdentityKind,
+    pub identity: String,
+}
+
+impl CheckpointPublicationIdentity {
+    #[must_use]
+    pub fn new(kind: CheckpointPublicationIdentityKind, identity: impl Into<String>) -> Self {
+        Self {
+            kind,
+            identity: identity.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_identity(&self) -> bool {
+        !self.identity.trim().is_empty()
+    }
+}
+
+/// Declared trust-anchor family for a checkpoint publication record.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckpointTrustAnchorIdentityKind {
+    OperatorRoot,
+    Did,
+    X509Root,
+    TransparencyRoot,
+    ChainRoot,
+}
+
+/// Optional typed trust-anchor identity carried alongside a checkpoint record.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckpointTrustAnchorIdentity {
+    pub kind: CheckpointTrustAnchorIdentityKind,
+    pub identity: String,
+}
+
+impl CheckpointTrustAnchorIdentity {
+    #[must_use]
+    pub fn new(kind: CheckpointTrustAnchorIdentityKind, identity: impl Into<String>) -> Self {
+        Self {
+            kind,
+            identity: identity.into(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_identity(&self) -> bool {
+        !self.identity.trim().is_empty()
+    }
 }
 
 /// Universal receipt-side attribution for capability context.
@@ -850,6 +1209,162 @@ mod tests {
     }
 
     #[test]
+    fn financial_budget_authority_metadata_serde_roundtrip() {
+        let metadata = FinancialBudgetAuthorityReceiptMetadata {
+            guarantee_level: "ha_quorum_commit".to_string(),
+            authority_profile: "authoritative_hold_event".to_string(),
+            metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
+            hold_id: "budget-hold:req-1:cap-1:0".to_string(),
+            budget_term: Some("http://leader-a:7".to_string()),
+            authority: Some(FinancialBudgetHoldAuthorityMetadata {
+                authority_id: "http://leader-a".to_string(),
+                lease_id: "http://leader-a#term-7".to_string(),
+                lease_epoch: 7,
+            }),
+            authorize: FinancialBudgetAuthorizeReceiptMetadata {
+                event_id: Some("budget-hold:req-1:cap-1:0:authorize".to_string()),
+                budget_commit_index: Some(41),
+                exposure_units: 120,
+                committed_cost_units_after: 120,
+            },
+            terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+                disposition: "reconciled".to_string(),
+                event_id: Some("budget-hold:req-1:cap-1:0:reconcile".to_string()),
+                budget_commit_index: Some(42),
+                exposure_units: 120,
+                realized_spend_units: 75,
+                committed_cost_units_after: 75,
+            }),
+        };
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        let restored: FinancialBudgetAuthorityReceiptMetadata =
+            serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn checkpoint_publication_trust_anchor_binding_serde_and_validation() {
+        let binding = CheckpointPublicationTrustAnchorBinding {
+            publication_identity: CheckpointPublicationIdentity::new(
+                CheckpointPublicationIdentityKind::TransparencyService,
+                "transparency.example/checkpoints/7",
+            ),
+            trust_anchor_identity: CheckpointTrustAnchorIdentity::new(
+                CheckpointTrustAnchorIdentityKind::Did,
+                "did:arc:operator-root",
+            ),
+            trust_anchor_ref: "arc_checkpoint_witness_chain".to_string(),
+            signer_cert_ref: "did:web:arc.example#checkpoint-signer".to_string(),
+            publication_profile_version: "phase4-preview.v1".to_string(),
+        };
+
+        let json = serde_json::to_string(&binding).unwrap();
+        let restored: CheckpointPublicationTrustAnchorBinding =
+            serde_json::from_str(&json).unwrap();
+
+        restored.validate().unwrap();
+        assert_eq!(restored, binding);
+    }
+
+    #[test]
+    fn checkpoint_publication_trust_anchor_binding_rejects_blank_fields() {
+        let error = CheckpointPublicationTrustAnchorBinding {
+            publication_identity: CheckpointPublicationIdentity::new(
+                CheckpointPublicationIdentityKind::TransparencyService,
+                "",
+            ),
+            trust_anchor_identity: CheckpointTrustAnchorIdentity::new(
+                CheckpointTrustAnchorIdentityKind::Did,
+                "did:arc:operator-root",
+            ),
+            trust_anchor_ref: " ".to_string(),
+            signer_cert_ref: "did:web:arc.example#checkpoint-signer".to_string(),
+            publication_profile_version: "phase4-preview.v1".to_string(),
+        }
+        .validate()
+        .expect_err("blank trust anchor must be rejected");
+        assert!(error.to_string().contains("publication_identity.identity"));
+    }
+
+    #[test]
+    fn arc_receipt_extracts_typed_financial_and_budget_authority_metadata() {
+        let kp = Keypair::generate();
+        let financial = FinancialReceiptMetadata {
+            grant_index: 0,
+            cost_charged: 75,
+            currency: "USD".to_string(),
+            budget_remaining: 925,
+            budget_total: 1000,
+            delegation_depth: 1,
+            root_budget_holder: "agent-root-001".to_string(),
+            payment_reference: None,
+            settlement_status: SettlementStatus::Settled,
+            cost_breakdown: None,
+            oracle_evidence: None,
+            attempted_cost: None,
+        };
+        let budget_authority = FinancialBudgetAuthorityReceiptMetadata {
+            guarantee_level: "ha_quorum_commit".to_string(),
+            authority_profile: "authoritative_hold_event".to_string(),
+            metering_profile: "max_cost_preauthorize_then_reconcile_actual".to_string(),
+            hold_id: "budget-hold:req-1:cap-1:0".to_string(),
+            budget_term: Some("http://leader-a:7".to_string()),
+            authority: Some(FinancialBudgetHoldAuthorityMetadata {
+                authority_id: "http://leader-a".to_string(),
+                lease_id: "http://leader-a#term-7".to_string(),
+                lease_epoch: 7,
+            }),
+            authorize: FinancialBudgetAuthorizeReceiptMetadata {
+                event_id: Some("budget-hold:req-1:cap-1:0:authorize".to_string()),
+                budget_commit_index: Some(41),
+                exposure_units: 120,
+                committed_cost_units_after: 120,
+            },
+            terminal: Some(FinancialBudgetTerminalReceiptMetadata {
+                disposition: "reconciled".to_string(),
+                event_id: Some("budget-hold:req-1:cap-1:0:reconcile".to_string()),
+                budget_commit_index: Some(42),
+                exposure_units: 120,
+                realized_spend_units: 75,
+                committed_cost_units_after: 75,
+            }),
+        };
+        let receipt = ArcReceipt::sign(
+            ArcReceiptBody {
+                metadata: Some(serde_json::json!({
+                    "financial": financial.clone(),
+                    "budget_authority": budget_authority.clone(),
+                })),
+                ..make_receipt_body(&kp)
+            },
+            &kp,
+        )
+        .unwrap();
+
+        let extracted_financial = receipt
+            .financial_metadata()
+            .expect("extract financial metadata");
+        assert_eq!(extracted_financial.grant_index, financial.grant_index);
+        assert_eq!(extracted_financial.cost_charged, financial.cost_charged);
+        assert_eq!(extracted_financial.currency, financial.currency);
+        assert_eq!(
+            extracted_financial.budget_remaining,
+            financial.budget_remaining
+        );
+        assert_eq!(extracted_financial.budget_total, financial.budget_total);
+        assert_eq!(
+            extracted_financial.root_budget_holder,
+            financial.root_budget_holder
+        );
+        assert_eq!(
+            receipt.financial_budget_authority_metadata(),
+            Some(budget_authority)
+        );
+    }
+
+    #[test]
     fn settlement_status_serde_roundtrip() {
         let status = SettlementStatus::Failed;
         let json = serde_json::to_string(&status).unwrap();
@@ -860,6 +1375,8 @@ mod tests {
 
     #[test]
     fn governed_transaction_receipt_metadata_serde_roundtrip() {
+        let proof_signer = Keypair::generate();
+        let proof_subject = Keypair::generate();
         let metadata = GovernedTransactionReceiptMetadata {
             intent_id: "intent-1".to_string(),
             intent_hash: "intent-hash".to_string(),
@@ -909,13 +1426,39 @@ mod tests {
                 evidence_sha256: "attestation-digest".to_string(),
                 workload_identity: None,
             }),
-            call_chain: Some(GovernedCallChainContext {
-                chain_id: "chain-1".to_string(),
-                parent_request_id: "req-parent-1".to_string(),
-                parent_receipt_id: Some("rc-parent-1".to_string()),
-                origin_subject: "origin-subject".to_string(),
-                delegator_subject: "delegator-subject".to_string(),
-            }),
+            call_chain: Some(
+                GovernedCallChainProvenance::observed(
+                    crate::capability::GovernedCallChainContext {
+                        chain_id: "chain-1".to_string(),
+                        parent_request_id: "req-parent-1".to_string(),
+                        parent_receipt_id: Some("rc-parent-1".to_string()),
+                        origin_subject: "origin-subject".to_string(),
+                        delegator_subject: "delegator-subject".to_string(),
+                    },
+                )
+                .with_upstream_proof(
+                    crate::capability::GovernedUpstreamCallChainProof::sign(
+                        crate::capability::GovernedUpstreamCallChainProofBody {
+                            signer: proof_signer.public_key(),
+                            subject: proof_subject.public_key(),
+                            chain_id: "chain-1".to_string(),
+                            parent_request_id: "req-parent-1".to_string(),
+                            parent_receipt_id: Some("rc-parent-1".to_string()),
+                            origin_subject: "origin-subject".to_string(),
+                            delegator_subject: "delegator-subject".to_string(),
+                            issued_at: 1000,
+                            expires_at: 1600,
+                        },
+                        &proof_signer,
+                    )
+                    .unwrap(),
+                )
+                .with_evidence_sources([
+                    crate::capability::GovernedCallChainEvidenceSource::SessionParentRequestLineage,
+                    crate::capability::GovernedCallChainEvidenceSource::LocalParentReceiptLinkage,
+                    crate::capability::GovernedCallChainEvidenceSource::UpstreamDelegatorProof,
+                ]),
+            ),
             autonomy: Some(GovernedAutonomyReceiptMetadata {
                 tier: GovernedAutonomyTier::Delegated,
                 delegation_bond_id: Some("bond-1".to_string()),
@@ -933,6 +1476,74 @@ mod tests {
     }
 
     #[test]
+    fn receipt_lineage_statement_sign_and_verify() {
+        let kp = Keypair::generate();
+        let body = ReceiptLineageStatementBody::new(
+            "statement-1",
+            "receipt-parent-1",
+            "receipt-child-1",
+            RequestId::new("req-parent-1"),
+            RequestId::new("req-child-1"),
+            SessionAnchorReference::new("anchor-parent-1", "anchor-parent-hash-1"),
+            SessionAnchorReference::new("anchor-child-1", "anchor-child-hash-1"),
+            ReceiptLineageRelationKind::Continued,
+            1_710_000_000,
+            kp.public_key(),
+        )
+        .with_continuation_token_id("continuation-1");
+        let statement = ReceiptLineageStatement::sign(body, &kp).unwrap();
+        let encoded = serde_json::to_string(&statement).unwrap();
+        let decoded: ReceiptLineageStatement = serde_json::from_str(&encoded).unwrap();
+
+        assert!(decoded.verify_signature().unwrap());
+        assert!(decoded.is_verified());
+        assert_eq!(decoded.parent_receipt_id, "receipt-parent-1");
+        assert_eq!(decoded.child_receipt_id, "receipt-child-1");
+        assert_eq!(
+            decoded.continuation_token_id.as_deref(),
+            Some("continuation-1")
+        );
+    }
+
+    #[test]
+    fn governed_transaction_receipt_metadata_helpers_split_asserted_and_verified_call_chain() {
+        let asserted_context = crate::capability::GovernedCallChainContext {
+            chain_id: "chain-1".to_string(),
+            parent_request_id: "req-parent-1".to_string(),
+            parent_receipt_id: Some("rc-parent-1".to_string()),
+            origin_subject: "origin-asserted".to_string(),
+            delegator_subject: "delegator-asserted".to_string(),
+        };
+        let verified_context = crate::capability::GovernedCallChainContext {
+            chain_id: "chain-1".to_string(),
+            parent_request_id: "req-parent-1".to_string(),
+            parent_receipt_id: Some("rc-parent-1".to_string()),
+            origin_subject: "origin-verified".to_string(),
+            delegator_subject: "delegator-verified".to_string(),
+        };
+        let metadata = GovernedTransactionReceiptMetadata {
+            intent_id: "intent-1".to_string(),
+            intent_hash: "intent-hash".to_string(),
+            purpose: "pay supplier".to_string(),
+            server_id: "payments".to_string(),
+            tool_name: "charge".to_string(),
+            max_amount: None,
+            commerce: None,
+            metered_billing: None,
+            approval: None,
+            runtime_assurance: None,
+            call_chain: Some(
+                crate::capability::GovernedCallChainProvenance::verified(verified_context.clone())
+                    .with_asserted_context(asserted_context.clone()),
+            ),
+            autonomy: None,
+        };
+
+        assert_eq!(metadata.asserted_call_chain(), Some(&asserted_context));
+        assert_eq!(metadata.verified_call_chain(), Some(&verified_context));
+    }
+
+    #[test]
     fn receipt_attribution_metadata_serde_roundtrip() {
         let metadata = ReceiptAttributionMetadata {
             subject_key: "subject-key".to_string(),
@@ -944,6 +1555,35 @@ mod tests {
         let json = serde_json::to_string(&metadata).unwrap();
         let restored: ReceiptAttributionMetadata = serde_json::from_str(&json).unwrap();
         assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn checkpoint_publication_and_trust_anchor_identities_roundtrip() {
+        let publication_identity = CheckpointPublicationIdentity::new(
+            CheckpointPublicationIdentityKind::TransparencyService,
+            "transparency.example/checkpoints/7",
+        );
+        let trust_anchor_identity = CheckpointTrustAnchorIdentity::new(
+            CheckpointTrustAnchorIdentityKind::Did,
+            "did:arc:operator-root",
+        );
+
+        assert!(publication_identity.has_identity());
+        assert!(trust_anchor_identity.has_identity());
+
+        let encoded = serde_json::to_string(&serde_json::json!({
+            "publication_identity": publication_identity.clone(),
+            "trust_anchor_identity": trust_anchor_identity.clone(),
+        }))
+        .unwrap();
+        let decoded: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+        let restored_publication: CheckpointPublicationIdentity =
+            serde_json::from_value(decoded["publication_identity"].clone()).unwrap();
+        let restored_trust_anchor: CheckpointTrustAnchorIdentity =
+            serde_json::from_value(decoded["trust_anchor_identity"].clone()).unwrap();
+
+        assert_eq!(restored_publication, publication_identity);
+        assert_eq!(restored_trust_anchor, trust_anchor_identity);
     }
 
     #[test]

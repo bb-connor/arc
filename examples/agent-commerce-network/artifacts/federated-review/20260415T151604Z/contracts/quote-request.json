@@ -1,9 +1,0 @@
-{
-  "quote_id": "quote_req_acme_001",
-  "buyer_id": "acme-platform-security",
-  "provider_id": "contoso-red-team",
-  "service_family": "security-review",
-  "requested_scope": "release-review",
-  "target": "git://acme.example/payments-api",
-  "release_window": "2026-05-01T16:00:00Z"
-}

@@ -6,7 +6,7 @@
 //! corresponding to `capability.subject` on every invocation.
 //!
 //! Proof fields:
-//! - `schema`:        constant `"arc.dpop_proof.v1"` (legacy `arc.*` accepted)
+//! - `schema`:        constant `"arc.dpop_proof.v1"`
 //! - `capability_id`: token ID of the capability being invoked
 //! - `tool_server`:   server_id of the target tool server
 //! - `tool_name`:     name of the tool being called
@@ -38,12 +38,10 @@ use crate::KernelError;
 
 /// Schema identifier for ARC DPoP proofs.
 pub const DPOP_SCHEMA: &str = "arc.dpop_proof.v1";
-/// Legacy ARC schema identifier accepted for compatibility.
-pub const LEGACY_DPOP_SCHEMA: &str = "arc.dpop_proof.v1";
 
 #[must_use]
 pub fn is_supported_dpop_schema(schema: &str) -> bool {
-    schema == DPOP_SCHEMA || schema == LEGACY_DPOP_SCHEMA
+    schema == DPOP_SCHEMA
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +219,7 @@ pub fn verify_dpop_proof(
     // Step 1: Schema check.
     if !is_supported_dpop_schema(&proof.body.schema) {
         return Err(KernelError::DpopVerificationFailed(format!(
-            "unknown DPoP schema: expected {DPOP_SCHEMA} or {LEGACY_DPOP_SCHEMA}, got {}",
+            "unknown DPoP schema: expected {DPOP_SCHEMA}, got {}",
             proof.body.schema
         )));
     }

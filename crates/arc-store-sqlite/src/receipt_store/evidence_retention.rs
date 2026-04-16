@@ -1,3 +1,8 @@
+use super::support::{
+    checkpoint_error_to_receipt_store, ensure_checkpoint_transparency_guards,
+    load_claim_tree_canonical_bytes_range, load_persisted_checkpoint_row,
+    parse_persisted_checkpoint_row, verify_checkpoint_chain_integrity,
+};
 use super::*;
 
 impl SqliteReceiptStore {
@@ -9,6 +14,30 @@ impl SqliteReceiptStore {
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
         let tx = connection.transaction()?;
+        let mut subject_key = attribution.subject_key;
+        let mut issuer_key = attribution.issuer_key;
+        if subject_key.is_none() || issuer_key.is_none() {
+            if let Some((lineage_subject_key, lineage_issuer_key)) = tx
+                .query_row(
+                    "SELECT subject_key, issuer_key FROM capability_lineage WHERE capability_id = ?1",
+                    params![receipt.capability_id.as_str()],
+                    |row| {
+                        Ok((
+                            row.get::<_, Option<String>>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                        ))
+                    },
+                )
+                .optional()?
+            {
+                if subject_key.is_none() {
+                    subject_key = lineage_subject_key;
+                }
+                if issuer_key.is_none() {
+                    issuer_key = lineage_issuer_key;
+                }
+            }
+        }
         let inserted = tx.execute(
             r#"
             INSERT INTO arc_tool_receipts (
@@ -31,8 +60,8 @@ impl SqliteReceiptStore {
                 receipt.id,
                 sqlite_i64(receipt.timestamp, "receipt timestamp")?,
                 receipt.capability_id,
-                attribution.subject_key,
-                attribution.issuer_key,
+                subject_key,
+                issuer_key,
                 attribution.grant_index.map(i64::from),
                 receipt.tool_server,
                 receipt.tool_name,
@@ -53,8 +82,50 @@ impl SqliteReceiptStore {
 
     /// Store a signed KernelCheckpoint in the kernel_checkpoints table.
     pub fn store_checkpoint(&self, checkpoint: &KernelCheckpoint) -> Result<(), ReceiptStoreError> {
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+
+        arc_kernel::checkpoint::validate_checkpoint(checkpoint)
+            .map_err(checkpoint_error_to_receipt_store)?;
+        if let Some(existing) =
+            load_persisted_checkpoint_row(&connection, checkpoint.body.checkpoint_seq)?
+        {
+            let existing = parse_persisted_checkpoint_row(existing)?;
+            if existing == *checkpoint {
+                return Ok(());
+            }
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint {} already exists with different content",
+                checkpoint.body.checkpoint_seq
+            )));
+        }
+
+        match verify_checkpoint_chain_integrity(&connection)? {
+            Some(predecessor) => {
+                if checkpoint.body.checkpoint_seq <= predecessor.body.checkpoint_seq {
+                    return Err(ReceiptStoreError::Conflict(format!(
+                        "checkpoint {} must be appended after existing checkpoint {}",
+                        checkpoint.body.checkpoint_seq, predecessor.body.checkpoint_seq
+                    )));
+                }
+                arc_kernel::checkpoint::validate_checkpoint_predecessor(&predecessor, checkpoint)
+                    .map_err(|error| {
+                    ReceiptStoreError::Conflict(format!(
+                        "checkpoint predecessor continuity violation: {error}"
+                    ))
+                })?;
+            }
+            None if checkpoint.body.checkpoint_seq != 1 => {
+                return Err(ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} cannot initialize an empty checkpoint log",
+                    checkpoint.body.checkpoint_seq
+                )));
+            }
+            None => {}
+        }
+
         let statement_json = serde_json::to_string(&checkpoint.body)?;
-        self.connection()?.execute(
+        connection.execute(
             r#"
             INSERT INTO kernel_checkpoints (
                 checkpoint_seq, batch_start_seq, batch_end_seq, tree_size,
@@ -62,17 +133,32 @@ impl SqliteReceiptStore {
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
             params![
-                checkpoint.body.checkpoint_seq as i64,
-                checkpoint.body.batch_start_seq as i64,
-                checkpoint.body.batch_end_seq as i64,
-                checkpoint.body.tree_size as i64,
+                sqlite_i64(checkpoint.body.checkpoint_seq, "checkpoint_seq")?,
+                sqlite_i64(checkpoint.body.batch_start_seq, "batch_start_seq")?,
+                sqlite_i64(checkpoint.body.batch_end_seq, "batch_end_seq")?,
+                sqlite_i64(checkpoint.body.tree_size as u64, "tree_size")?,
                 checkpoint.body.merkle_root.to_hex(),
-                checkpoint.body.issued_at as i64,
+                sqlite_i64(checkpoint.body.issued_at, "issued_at")?,
                 statement_json,
                 checkpoint.signature.to_hex(),
                 checkpoint.body.kernel_key.to_hex(),
             ],
         )?;
+
+        let stored = load_persisted_checkpoint_row(&connection, checkpoint.body.checkpoint_seq)?
+            .ok_or_else(|| {
+                ReceiptStoreError::Conflict(format!(
+                    "checkpoint {} was not visible after persistence",
+                    checkpoint.body.checkpoint_seq
+                ))
+            })?;
+        let stored = parse_persisted_checkpoint_row(stored)?;
+        if stored != *checkpoint {
+            return Err(ReceiptStoreError::Conflict(format!(
+                "checkpoint {} persisted with conflicting contents",
+                checkpoint.body.checkpoint_seq
+            )));
+        }
         Ok(())
     }
 
@@ -81,28 +167,11 @@ impl SqliteReceiptStore {
         &self,
         checkpoint_seq: u64,
     ) -> Result<Option<KernelCheckpoint>, ReceiptStoreError> {
-        let row = self
-            .connection()?
-            .query_row(
-                r#"
-                SELECT statement_json, signature
-                FROM kernel_checkpoints
-                WHERE checkpoint_seq = ?1
-                "#,
-                params![checkpoint_seq as i64],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?;
-
-        match row {
-            None => Ok(None),
-            Some((statement_json, signature_hex)) => {
-                let body: KernelCheckpointBody = serde_json::from_str(&statement_json)?;
-                let signature = Signature::from_hex(&signature_hex)
-                    .map_err(|e| ReceiptStoreError::CryptoDecode(e.to_string()))?;
-                Ok(Some(KernelCheckpoint { body, signature }))
-            }
-        }
+        let connection = self.connection()?;
+        ensure_checkpoint_transparency_guards(&connection)?;
+        load_persisted_checkpoint_row(&connection, checkpoint_seq)?
+            .map(parse_persisted_checkpoint_row)
+            .transpose()
     }
 
     /// Return canonical JSON bytes for receipts with seq in [start_seq, end_seq], ordered by seq.
@@ -114,26 +183,7 @@ impl SqliteReceiptStore {
         end_seq: u64,
     ) -> Result<Vec<(u64, Vec<u8>)>, ReceiptStoreError> {
         let connection = self.connection()?;
-        let mut statement = connection.prepare(
-            r#"
-            SELECT seq, raw_json
-            FROM arc_tool_receipts
-            WHERE seq >= ?1 AND seq <= ?2
-            ORDER BY seq ASC
-            "#,
-        )?;
-        let rows = statement.query_map(params![start_seq as i64, end_seq as i64], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
-        })?;
-        let mut result = Vec::new();
-        for row in rows {
-            let (seq, raw_json) = row?;
-            let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
-            let canonical = canonical_json_bytes(&receipt)
-                .map_err(|e| ReceiptStoreError::Canonical(e.to_string()))?;
-            result.push((seq.max(0) as u64, canonical));
-        }
-        Ok(result)
+        load_claim_tree_canonical_bytes_range(&connection, start_seq, end_seq)
     }
 
     /// Return the current on-disk size of the database in bytes.

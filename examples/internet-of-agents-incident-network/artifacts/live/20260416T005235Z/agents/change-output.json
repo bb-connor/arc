@@ -1,0 +1,11 @@
+{
+  "rollback_option": "Revert geo-restrict-v42 edge rule from blocking back to dry-run mode in production (restore previous config commit d7f0a5c2)",
+  "rollback_risk": "Minimal risk; reverting to dry-run disables active blocking but preserves observability and alerting. Legitimate traffic is immediately unblocked, but sanctioned region blocking is not enforced until the rule is corrected and dry-run retested. If revert is delayed, error budget may be exhausted, and customer impact persists.",
+  "broader_option": "Fully remove/deactivate geo-restrict-v42 and all related geo-restriction logic from the edge policy config (remove rule, not just mode change), pending postmortem and model retrain of geo-classification with updated IPs.",
+  "broader_option_requires_approval": true,
+  "reason": "Full deactivation of all geo-restriction protections introduces regulatory, compliance, and abuse risks. This could re-expose the system to sanctioned region traffic and potential policy violations. Needs executive or cross-functional security/Legal review.",
+  "recommendation": "Proceed immediately with narrowest rollback: revert geo-restrict-v42 to dry-run mode. This directly resolves the observed false positives and restores legitimate customer traffic with minimal risk, addressing the error spike and latency. After traffic returns to baseline, coordinate feed handling and reset dry-run statistics, then retest before considering promotion again.",
+  "role": "change-agent",
+  "mode": "openai_agents_sdk",
+  "tool_calls": []
+}

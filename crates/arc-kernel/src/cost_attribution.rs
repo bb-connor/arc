@@ -1,4 +1,4 @@
-use arc_core::receipt::SettlementStatus;
+use arc_core::receipt::{FinancialBudgetAuthorityReceiptMetadata, SettlementStatus};
 use serde::{Deserialize, Serialize};
 
 /// Maximum number of detailed attribution rows returned in a single report.
@@ -114,6 +114,8 @@ pub struct CostAttributionReceiptRow {
     pub settlement_status: Option<SettlementStatus>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub payment_reference: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_authority: Option<FinancialBudgetAuthorityReceiptMetadata>,
     pub lineage_complete: bool,
     pub chain: Vec<CostAttributionChainHop>,
 }

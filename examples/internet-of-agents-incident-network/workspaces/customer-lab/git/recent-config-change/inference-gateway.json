@@ -1,0 +1,87 @@
+{
+  "service": "inference-gateway",
+  "repository": "meridian-labs/inference-gateway",
+  "branch": "main",
+  "commit": {
+    "sha": "a4c7e2f91b3d8a5c6e0f4b7d9a1c3e5f7b2d4a6c",
+    "short_sha": "a4c7e2f",
+    "message": "feat(edge): promote geo-restrict-v42 to blocking mode for inference-gateway\n\nThe geo-restrict-v42 rule has been in dry-run mode since 2026-04-11\nwith zero false positives observed over the 14-day observation window.\nPromoting to blocking mode per the standard edge policy lifecycle.\n\nDry-run metrics:\n- Total requests evaluated: 48,291,004\n- Would-have-blocked: 312 (all confirmed sanctioned-region origins)\n- False positive rate: 0.000%\n\nApproved by edge-platform team lead.\n\nRefs: EDGE-1847",
+    "author": {
+      "name": "Priya Narayanan",
+      "email": "priya.narayanan@meridian-labs.ai",
+      "timestamp": "2026-04-15T02:58:14Z"
+    },
+    "committer": {
+      "name": "Meridian Deploy Bot",
+      "email": "deploy-bot@meridian-labs.ai",
+      "timestamp": "2026-04-15T03:11:47Z"
+    },
+    "parent_shas": [
+      "b5d8f3a02c4e9b6d1f7a3c5e8b0d2f4a6c8e0b2d"
+    ]
+  },
+  "pull_request": {
+    "number": 4821,
+    "title": "Promote geo-restrict-v42 from dry-run to blocking",
+    "url": "https://github.com/meridian-labs/inference-gateway/pull/4821",
+    "author": "priya.narayanan",
+    "reviewers": [
+      {
+        "login": "carlos.restrepo",
+        "state": "APPROVED",
+        "submitted_at": "2026-04-15T03:04:22Z",
+        "review_comment": "Dry-run numbers look clean. Approved for promotion."
+      }
+    ],
+    "labels": [
+      "edge-policy",
+      "auto-deploy",
+      "config-change"
+    ],
+    "ci_checks": [
+      { "name": "edge-policy-lint", "status": "passed" },
+      { "name": "edge-policy-dry-run-validation", "status": "passed" },
+      { "name": "integration-tests", "status": "passed" },
+      { "name": "security-scan", "status": "passed" }
+    ],
+    "merged_at": "2026-04-15T03:11:47Z",
+    "merge_commit_sha": "a4c7e2f91b3d8a5c6e0f4b7d9a1c3e5f7b2d4a6c"
+  },
+  "changed_files": [
+    {
+      "path": "config/edge-policy.json",
+      "additions": 3,
+      "deletions": 3,
+      "status": "modified"
+    }
+  ],
+  "diff": {
+    "file": "config/edge-policy.json",
+    "hunks": [
+      {
+        "header": "@@ -14,9 +14,9 @@",
+        "lines": [
+          "     {",
+          "       \"name\": \"geo-restrict-v42\",",
+          "       \"description\": \"Block inference requests from sanctioned regions\",",
+          "-      \"enabled\": true,",
+          "-      \"mode\": \"dry-run\",",
+          "-      \"dry_run_expires\": \"2026-04-25T00:00:00Z\",",
+          "+      \"enabled\": true,",
+          "+      \"mode\": \"blocking\",",
+          "+      \"promoted_from_dry_run\": \"2026-04-15T03:11:47Z\",",
+          "       \"conditions\": {",
+          "         \"geo_match\": {",
+          "           \"regions\": [\"sanctioned-list-v7\"],"
+        ]
+      }
+    ]
+  },
+  "analysis": {
+    "change_category": "edge-policy-promotion",
+    "risk_assessment": "low",
+    "risk_rationale": "Config-only change promoting a rule that showed zero false positives in 14-day dry-run. No application code modified.",
+    "blast_radius": "inference-gateway edge layer",
+    "rollback_procedure": "Revert config/edge-policy.json to set mode back to dry-run"
+  }
+}

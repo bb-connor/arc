@@ -45,7 +45,6 @@ pub(crate) use std::collections::HashMap;
 pub(crate) use std::future::Future;
 pub(crate) use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-pub(crate) use arc_core::appraisal::verifier_family_for_attestation_schema;
 pub(crate) use arc_core::canonical::canonical_json_bytes;
 pub(crate) use arc_core::capability::{
     ArcScope, AttestationTrustPolicy, CapabilityToken, Constraint, GovernedApprovalDecision,
@@ -257,9 +256,10 @@ pub use capability_lineage::{
     CapabilityLineageError, CapabilitySnapshot, StoredCapabilitySnapshot,
 };
 pub use checkpoint::{
-    build_checkpoint, build_inclusion_proof, is_supported_checkpoint_schema,
+    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
+    checkpoint_body_sha256, is_supported_checkpoint_schema, verify_checkpoint_continuity,
     verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
-    ReceiptInclusionProof, CHECKPOINT_SCHEMA, LEGACY_CHECKPOINT_SCHEMA,
+    ReceiptInclusionProof, CHECKPOINT_SCHEMA,
 };
 pub use cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
@@ -268,7 +268,7 @@ pub use cost_attribution::{
 };
 pub use dpop::{
     is_supported_dpop_schema, verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof,
-    DpopProofBody, DPOP_SCHEMA, LEGACY_DPOP_SCHEMA,
+    DpopProofBody, DPOP_SCHEMA,
 };
 pub use evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,

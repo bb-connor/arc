@@ -1,7 +1,7 @@
 {
-  "approval_id": "approval_acme_001",
-  "job_id": "job_acme_001",
-  "quote_id": "quote_contoso_001",
+  "approval_id": "approval_lattice_001",
+  "job_id": "job_lattice_001",
+  "quote_id": "quote_vanguard_001",
   "approver": "vp-engineering",
   "reason": "critical release requires external review before deploy",
   "approved_budget_minor": 125000,

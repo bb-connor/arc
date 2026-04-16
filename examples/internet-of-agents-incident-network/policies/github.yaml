@@ -1,0 +1,14 @@
+hushspec: "0.1.0"
+name: incident-network-github
+description: >
+  Guards for the customer GitHub MCP server. Read-only access to
+  repository metadata, commits, and diffs.
+
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - search_commits
+      - get_diff
+      - get_file

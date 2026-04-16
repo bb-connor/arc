@@ -350,5 +350,8 @@ operator can see which provider, organization, group, or role inputs failed.
 - It now exposes imported cross-org reputation signals through local and
   trust-control reputation views, but those signals remain evidence-backed,
   issuer-scoped, attenuated, and separate from native local score history.
-- This phase does not ship reusable verifier artifact distribution or
-  multi-issuer passport composition; those land in later phases.
+- Multi-issuer passport composition and evaluation support now ships
+  (see `arc-credentials/src/cross_issuer.rs` for `CrossIssuerPortfolio`
+  and `CrossIssuerEvaluator`). Automatic local bundle authoring (where
+  the system assembles multi-issuer bundles without operator input)
+  remains future work.

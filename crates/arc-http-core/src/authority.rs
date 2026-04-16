@@ -5,8 +5,7 @@ use arc_core_types::capability::{ArcScope, CapabilityToken, Operation, ToolGrant
 use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
 use arc_cross_protocol::{
-    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol,
-    TargetProtocolRegistry,
+    plan_authoritative_route, route_selection_metadata, DiscoveryProtocol, TargetProtocolRegistry,
 };
 use arc_kernel::{
     ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallRequest,
@@ -384,7 +383,11 @@ impl HttpAuthority {
     ) -> Result<arc_kernel::ToolCallResponse, HttpAuthorityError> {
         let capability = self
             .kernel
-            .issue_capability(&self.kernel_subject, kernel_scope(), HTTP_AUTHORITY_TTL_SECS)
+            .issue_capability(
+                &self.kernel_subject,
+                kernel_scope(),
+                HTTP_AUTHORITY_TTL_SECS,
+            )
             .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
 
         let projected = HttpKernelAuthorizationRequest {
@@ -589,7 +592,10 @@ fn validate_capability_token(raw: &str) -> Result<CapabilityToken, String> {
     Ok(token)
 }
 
-fn decision_metadata(kernel_receipt_id: Option<&str>, route_selection: Option<&Value>) -> Option<Value> {
+fn decision_metadata(
+    kernel_receipt_id: Option<&str>,
+    route_selection: Option<&Value>,
+) -> Option<Value> {
     let mut metadata = http_status_metadata_decision();
     insert_metadata_string(&mut metadata, ARC_KERNEL_RECEIPT_ID_KEY, kernel_receipt_id);
     insert_metadata_value(&mut metadata, "route_selection", route_selection);
@@ -641,7 +647,9 @@ fn metadata_string<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a str
 }
 
 fn metadata_value<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a Value> {
-    metadata.and_then(Value::as_object).and_then(|map| map.get(key))
+    metadata
+        .and_then(Value::as_object)
+        .and_then(|map| map.get(key))
 }
 
 #[cfg(test)]
@@ -846,9 +854,10 @@ mod tests {
             })
             .unwrap()
             .receipt;
-        let kernel_receipt_id = metadata_string(decision.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY)
-            .map(ToOwned::to_owned)
-            .unwrap();
+        let kernel_receipt_id =
+            metadata_string(decision.metadata.as_ref(), ARC_KERNEL_RECEIPT_ID_KEY)
+                .map(ToOwned::to_owned)
+                .unwrap();
         let final_receipt = shared.finalize_decision_receipt(&decision, 204).unwrap();
 
         assert_ne!(final_receipt.id, decision.id);

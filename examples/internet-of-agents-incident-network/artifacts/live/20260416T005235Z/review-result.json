@@ -1,0 +1,86 @@
+{
+  "bundle": "/Users/connor/Medica/backbay/standalone/arc/examples/internet-of-agents-incident-network/artifacts/live/20260416T005235Z",
+  "ok": true,
+  "manifest": {
+    "verified_files": [
+      "incident.json",
+      "identities/public-identities.json",
+      "capabilities/root-commander.json",
+      "capabilities/triage-agent.json",
+      "capabilities/change-agent.json",
+      "capabilities/vendor-liaison-agent.json",
+      "capabilities/provider-coordinator.json",
+      "capabilities/provider-executor.json",
+      "agents/triage-output.json",
+      "agents/change-output.json",
+      "agents/commander-output.json",
+      "agents/vendor-liaison-output.json",
+      "acp/task-created.json",
+      "acp/task-final.json",
+      "provider/process-task-response.json",
+      "lineage/root-commander-chain.json",
+      "lineage/triage-agent-chain.json",
+      "lineage/change-agent-chain.json",
+      "lineage/vendor-liaison-agent-chain.json",
+      "lineage/provider-coordinator-chain.json",
+      "lineage/provider-executor-chain.json",
+      "summary.json",
+      "financial/budget-usage.json",
+      "financial/exposure-ledger.json",
+      "financial/credit-scorecard.json",
+      "financial/settlement-report.json"
+    ],
+    "manifest_entries": 26
+  },
+  "capabilities": {
+    "signatures": {
+      "root-commander": true,
+      "triage-agent": true,
+      "change-agent": true,
+      "vendor-liaison-agent": true,
+      "provider-coordinator": true,
+      "provider-executor": true
+    },
+    "chains": {
+      "root-commander": {
+        "depth": 0,
+        "lineage_ok": true
+      },
+      "triage-agent": {
+        "depth": 1,
+        "parent_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+        "link_signatures_ok": true,
+        "lineage_ok": true
+      },
+      "change-agent": {
+        "depth": 1,
+        "parent_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+        "link_signatures_ok": true,
+        "lineage_ok": true
+      },
+      "vendor-liaison-agent": {
+        "depth": 1,
+        "parent_id": "cap-019d93c6-924d-70b0-be41-4f9c3c7f5a0b",
+        "link_signatures_ok": true,
+        "lineage_ok": true
+      },
+      "provider-coordinator": {
+        "depth": 2,
+        "parent_id": "inc-meridian-inference-gw-2026-04-15-0317z-vendor",
+        "link_signatures_ok": true,
+        "lineage_ok": true
+      },
+      "provider-executor": {
+        "depth": 3,
+        "parent_id": "acp-task-ac4fc0fed5d7-provider-coordinator",
+        "link_signatures_ok": true,
+        "lineage_ok": true
+      }
+    }
+  },
+  "operational": {
+    "scenario_mode": "happy-path",
+    "task_status": "completed"
+  },
+  "errors": []
+}

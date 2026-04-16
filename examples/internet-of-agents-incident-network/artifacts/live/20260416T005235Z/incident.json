@@ -1,0 +1,41 @@
+{
+  "incident_id": "inc-meridian-inference-gw-2026-04-15-0317z",
+  "service": "inference-gateway",
+  "severity": "sev-1",
+  "title": "Inference gateway returning 403 to legitimate traffic after edge rule rollout",
+  "description": "Starting at 03:14 UTC, the inference-gateway service began returning HTTP 403 responses to inference requests originating from EU-West, AP-Southeast, and SA-East regions. The failure correlates with the promotion of edge rule geo-restrict-v42 from dry-run to blocking mode at 03:12 UTC. Affected traffic includes production model inference for GPT-class and embedding endpoints. Customer-reported impact includes failed batch inference jobs and real-time serving degradation across three availability zones.",
+  "customer_org": "MeridianLabs",
+  "provider_org": "StratosNetworks",
+  "opened_at": 1776404220,
+  "symptoms": [
+    "HTTP 403 responses on /v1/inference/* and /v1/embeddings/* endpoints",
+    "Error rate jumped from 0.04% baseline to 38.7% within 90 seconds",
+    "p99 latency spike to 12400ms due to retry storms from client SDKs",
+    "Downstream batch pipeline failures in Meridian's training data collection",
+    "Customer support ticket volume 14x normal rate"
+  ],
+  "affected_regions": [
+    "eu-west-1",
+    "eu-west-2",
+    "ap-southeast-1",
+    "ap-southeast-2",
+    "sa-east-1"
+  ],
+  "impact": {
+    "affected_customers": 2847,
+    "failed_requests_total": 1293400,
+    "revenue_impact_estimate_usd": 184000,
+    "affected_models": [
+      "meridian-72b-instruct",
+      "meridian-embed-v3",
+      "meridian-8b-code"
+    ],
+    "affected_pipelines": [
+      "batch-inference-prod",
+      "realtime-serving-tier1",
+      "embedding-indexer-nightly"
+    ]
+  },
+  "workspace_repo": "inference-gateway",
+  "workspace_config_path": "git/files/inference-gateway/config/edge-policy.json"
+}

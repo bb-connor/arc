@@ -7,29 +7,35 @@ use std::sync::mpsc;
 use std::thread;
 
 use arc_core::capability::{
-    ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody,
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
-    GovernedAutonomyContext, GovernedAutonomyTier, GovernedTransactionIntent, MonetaryAmount,
-    Operation, PromptGrant, ResourceGrant, ToolGrant,
+    ArcScope, CallChainContinuationAudience, CallChainContinuationToken,
+    CallChainContinuationTokenBody, CapabilityToken, CapabilityTokenBody, Constraint,
+    DelegationLink, DelegationLinkBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+    GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY, GovernedApprovalDecision,
+    GovernedApprovalToken, GovernedApprovalTokenBody, GovernedAutonomyContext,
+    GovernedAutonomyTier, GovernedCallChainContext, GovernedTransactionIntent,
+    GovernedUpstreamCallChainProof, GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation,
+    PromptGrant, ResourceGrant, ToolGrant,
 };
 use arc_core::credit::{
-    CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
-    CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CreditBondArtifact,
+    CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites, CreditBondReport,
+    CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
     CreditScorecardSummary, ExposureLedgerQuery, ExposureLedgerSummary, SignedCreditBond,
-    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
 };
 use arc_core::crypto::{Keypair, PublicKey};
+use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
 use arc_core::session::{
     CompleteOperation, CompletionArgument, CompletionReference, CreateMessageOperation,
     GetPromptOperation, OperationContext, RequestId, SamplingMessage, SamplingTool,
-    SamplingToolChoice, SessionId, SessionOperation, ToolCallOperation,
+    SamplingToolChoice, SessionAnchorReference, SessionAuthContext, SessionId, SessionOperation,
+    ToolCallOperation,
 };
 use arc_core::{
     PromptArgument, PromptDefinition, PromptMessage, PromptResult, ReadResourceOperation,
     ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
 };
 use arc_link::{ExchangeRate, PriceOracle, PriceOracleError};
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, params};
 
 struct SqliteReceiptStore {
     connection: Connection,
@@ -163,6 +169,43 @@ impl SqliteReceiptStore {
 
         chain.reverse();
         Ok(chain)
+    }
+
+    fn get_lineage(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, CapabilityLineageError> {
+        self.connection
+            .query_row(
+                r#"
+                    SELECT
+                        capability_id,
+                        subject_key,
+                        issuer_key,
+                        issued_at,
+                        expires_at,
+                        grants_json,
+                        delegation_depth,
+                        parent_capability_id
+                    FROM capability_lineage
+                    WHERE capability_id = ?1
+                "#,
+                params![capability_id],
+                |row| {
+                    Ok(CapabilitySnapshot {
+                        capability_id: row.get::<_, String>(0)?,
+                        subject_key: row.get::<_, String>(1)?,
+                        issuer_key: row.get::<_, String>(2)?,
+                        issued_at: row.get::<_, i64>(3)?.max(0) as u64,
+                        expires_at: row.get::<_, i64>(4)?.max(0) as u64,
+                        grants_json: row.get::<_, String>(5)?,
+                        delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
+                        parent_capability_id: row.get::<_, Option<String>>(7)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
     }
 
     fn record_credit_bond(
@@ -328,7 +371,7 @@ impl ReceiptStore for SqliteReceiptStore {
                     other => {
                         return Err(ReceiptStoreError::Conflict(format!(
                             "unknown credit bond lifecycle state `{other}`"
-                        )))
+                        )));
                     }
                 };
                 Ok(CreditBondRow {
@@ -387,6 +430,30 @@ impl ReceiptStore for SqliteReceiptStore {
             ],
         )?;
         Ok(())
+    }
+
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, ReceiptStoreError> {
+        self.get_lineage(capability_id)
+            .map_err(|error| match error {
+                CapabilityLineageError::ReceiptStore(error) => error,
+                CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+                CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+            })
+    }
+
+    fn get_capability_delegation_chain(
+        &self,
+        capability_id: &str,
+    ) -> Result<Vec<CapabilitySnapshot>, ReceiptStoreError> {
+        self.get_delegation_chain(capability_id)
+            .map_err(|error| match error {
+                CapabilityLineageError::ReceiptStore(error) => error,
+                CapabilityLineageError::Sqlite(error) => ReceiptStoreError::Sqlite(error),
+                CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
+            })
     }
 }
 
@@ -1547,11 +1614,13 @@ fn path_prefix_constraint_is_enforced() {
     );
     let denied_response = kernel.evaluate_tool_call_blocking(&denied).unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
-    assert!(denied_response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("not in capability scope"));
+    assert!(
+        denied_response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("not in capability scope")
+    );
 }
 
 #[test]
@@ -1855,15 +1924,25 @@ fn wildcard_server_grant_allows_real_server() {
 
 #[test]
 fn revoked_ancestor_capability_denies_descendant() {
+    let path = unique_receipt_db_path("arc-kernel-revoked-ancestor-lineage");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
     let mut kernel = ArcKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
 
     let parent_kp = make_keypair();
     let child_kp = make_keypair();
-    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let mut parent_grant = make_grant("srv-a", "read_file");
+    parent_grant.operations.push(Operation::Delegate);
+    let scope = make_scope(vec![parent_grant]);
     let parent = make_capability(&kernel, &parent_kp, scope.clone(), 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
-    let link = make_delegation_link(&parent.id, &kernel.config.keypair, &child_kp, 100);
+    let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-child".to_string(),
@@ -1883,11 +1962,15 @@ fn revoked_ancestor_capability_denies_descendant() {
     let request = make_request("req-1", &child, "read_file", "srv-a");
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains(&parent.id));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains(&parent.id)
+    );
+
+    let _ = std::fs::remove_file(path);
 }
 
 #[test]
@@ -1900,8 +1983,11 @@ fn delegated_tool_call_records_observed_capability_lineage() {
 
     let parent_kp = make_keypair();
     let child_kp = make_keypair();
-    let scope = make_scope(vec![make_grant("srv-a", "read_file")]);
-    let parent = make_capability(&kernel, &parent_kp, scope.clone(), 300);
+    let mut parent_grant = make_grant("srv-a", "read_file");
+    parent_grant.operations.push(Operation::Delegate);
+    let parent_scope = make_scope(vec![parent_grant]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope, 300);
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     seed_store
         .record_capability_snapshot(&parent, None)
         .unwrap();
@@ -1909,13 +1995,13 @@ fn delegated_tool_call_records_observed_capability_lineage() {
 
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
-    let link = make_delegation_link(&parent.id, &kernel.config.keypair, &child_kp, 100);
+    let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
     let child = CapabilityToken::sign(
         CapabilityTokenBody {
             id: "cap-observed-child".to_string(),
             issuer: kernel.config.keypair.public_key(),
             subject: child_kp.public_key(),
-            scope,
+            scope: child_scope,
             issued_at: current_unix_timestamp(),
             expires_at: current_unix_timestamp() + 300,
             delegation_chain: vec![link],
@@ -1940,6 +2026,391 @@ fn delegated_tool_call_records_observed_capability_lineage() {
         Some(parent.id.as_str())
     );
     assert_eq!(chain[1].delegation_depth, 1);
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_without_parent_snapshot_denies() {
+    let path = unique_receipt_db_path("arc-kernel-missing-parent-lineage");
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+
+    let mut parent_grant = make_grant("srv-a", "read_file");
+    parent_grant.operations.push(Operation::Delegate);
+    let parent_scope = make_scope(vec![parent_grant]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-missing-parent".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![link],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-missing-parent",
+            &child,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("missing capability snapshot")
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_without_delegate_operation_denies() {
+    let path = unique_receipt_db_path("arc-kernel-missing-delegate-op");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+
+    let parent_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope, 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-missing-delegate".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![link],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-missing-delegate",
+            &child,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("does not authorize delegated tool grant")
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_with_scope_escalation_denies() {
+    let path = unique_receipt_db_path("arc-kernel-scope-escalation");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+    let parent_scope = ArcScope {
+        grants: vec![ToolGrant {
+            server_id: "srv-a".to_string(),
+            tool_name: "read_file".to_string(),
+            operations: vec![Operation::Invoke, Operation::Delegate],
+            constraints: vec![Constraint::PathPrefix("/workspace/safe".to_string())],
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }],
+        ..ArcScope::default()
+    };
+    let parent = make_capability(&kernel, &parent_kp, parent_scope, 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-escalated-child".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![link],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-escalated-child",
+            &child,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("does not authorize delegated tool grant")
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
+    let path = unique_receipt_db_path("arc-kernel-delegatee-mismatch");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+    let other_child_kp = make_keypair();
+    let mut parent_grant = make_grant("srv-a", "read_file");
+    parent_grant.operations.push(Operation::Delegate);
+    let parent_scope = make_scope(vec![parent_grant]);
+    let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+    seed_store
+        .record_capability_snapshot(&parent, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let link = make_delegation_link(
+        &parent.id,
+        &parent_kp,
+        &other_child_kp,
+        current_unix_timestamp(),
+    );
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-delegatee-mismatch".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![link],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-delegatee-mismatch",
+            &child,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("delegatee")
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_exceeding_configured_max_depth_denies() {
+    let path = unique_receipt_db_path("arc-kernel-max-delegation-depth");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+    let mut config = make_config();
+    config.max_delegation_depth = 1;
+    let mut kernel = ArcKernel::new(config);
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let root_kp = make_keypair();
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+
+    let mut delegable_grant = make_grant("srv-a", "read_file");
+    delegable_grant.operations.push(Operation::Delegate);
+    let delegable_scope = make_scope(vec![delegable_grant.clone()]);
+    let root = make_capability(&kernel, &root_kp, delegable_scope.clone(), 300);
+    seed_store.record_capability_snapshot(&root, None).unwrap();
+
+    let root_to_parent =
+        make_delegation_link(&root.id, &root_kp, &parent_kp, current_unix_timestamp());
+    let parent = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-max-depth-parent".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: parent_kp.public_key(),
+            scope: delegable_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![root_to_parent.clone()],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+    seed_store
+        .record_capability_snapshot(&parent, Some(root.id.as_str()))
+        .unwrap();
+    drop(seed_store);
+
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let parent_to_child =
+        make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-max-depth-child".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![root_to_parent, parent_to_child],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request("req-max-depth", &child, "read_file", "srv-a"))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("delegation depth 2 exceeds maximum 1")
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
+    let path = unique_receipt_db_path("arc-kernel-truncated-lineage");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+
+    let mut kernel = ArcKernel::new(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
+
+    let root_kp = make_keypair();
+    let parent_kp = make_keypair();
+    let child_kp = make_keypair();
+
+    let mut delegable_grant = make_grant("srv-a", "read_file");
+    delegable_grant.operations.push(Operation::Delegate);
+    let delegable_scope = make_scope(vec![delegable_grant.clone()]);
+    let root = make_capability(&kernel, &root_kp, delegable_scope.clone(), 300);
+    seed_store.record_capability_snapshot(&root, None).unwrap();
+
+    let root_to_parent =
+        make_delegation_link(&root.id, &root_kp, &parent_kp, current_unix_timestamp());
+    let parent = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-truncated-parent".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: parent_kp.public_key(),
+            scope: delegable_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![root_to_parent],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+    seed_store
+        .record_capability_snapshot(&parent, Some(root.id.as_str()))
+        .unwrap();
+    drop(seed_store);
+
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
+    let parent_to_child =
+        make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
+    let child = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-truncated-child".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: child_scope,
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![parent_to_child],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&make_request(
+            "req-truncated-lineage",
+            &child,
+            "read_file",
+            "srv-a",
+        ))
+        .unwrap();
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("stored depth")
+    );
 
     let _ = std::fs::remove_file(path);
 }
@@ -2063,9 +2534,11 @@ fn web3_evidence_required_activation_rejects_append_only_receipt_store() {
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
-    assert!(error
-        .to_string()
-        .contains("append-only remote receipt mirrors are unsupported"));
+    assert!(
+        error
+            .to_string()
+            .contains("append-only remote receipt mirrors are unsupported")
+    );
 }
 
 #[test]
@@ -3212,11 +3685,13 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
         response.terminal_state,
         OperationTerminalState::Incomplete { .. }
     ));
-    assert!(response
-        .reason
-        .as_deref()
-        .unwrap_or("")
-        .contains("max total bytes"));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("max total bytes")
+    );
 
     let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
     assert_eq!(output_stream.chunk_count(), 1);
@@ -3592,9 +4067,11 @@ fn subscribe_session_resource_requires_subscribe_operation() {
         )
         .unwrap();
 
-    assert!(kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-        .unwrap());
+    assert!(
+        kernel
+            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+            .unwrap()
+    );
 }
 
 #[test]
@@ -3630,9 +4107,11 @@ fn unsubscribe_session_resource_is_idempotent() {
         .unsubscribe_session_resource(&session_id, "repo://docs/roadmap")
         .unwrap();
 
-    assert!(!kernel
-        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-        .unwrap());
+    assert!(
+        !kernel
+            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+            .unwrap()
+    );
 }
 
 #[test]
@@ -4037,11 +4516,11 @@ fn spawn_payment_test_server(
             .send(String::from_utf8_lossy(&request).into_owned())
             .expect("request should be sent to test");
         let response = format!(
-                "HTTP/1.1 {status_code} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                http_status_text(status_code),
-                body_text.len(),
-                body_text
-            );
+            "HTTP/1.1 {status_code} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+            http_status_text(status_code),
+            body_text.len(),
+            body_text
+        );
         stream
             .write_all(response.as_bytes())
             .expect("server should write response");
@@ -4208,15 +4687,25 @@ fn make_runtime_attestation(
 ) -> arc_core::capability::RuntimeAttestationEvidence {
     let now = current_unix_timestamp();
     arc_core::capability::RuntimeAttestationEvidence {
-        schema: "arc.runtime-attestation.v1".to_string(),
-        verifier: "verifier.arc".to_string(),
+        schema: "arc.runtime-attestation.enterprise-verifier.json.v1".to_string(),
+        verifier: "https://attest.arc.example".to_string(),
         tier,
         issued_at: now.saturating_sub(1),
         expires_at: now + 300,
         evidence_sha256: format!("digest-{tier:?}"),
         runtime_identity: Some("spiffe://arc/runtime/test".to_string()),
-        workload_identity: None,
-        claims: None,
+        workload_identity: Some(
+            arc_core::capability::WorkloadIdentity::parse_spiffe_uri("spiffe://arc/runtime/test")
+                .expect("parse runtime workload identity"),
+        ),
+        claims: Some(serde_json::json!({
+            "enterpriseVerifier": {
+                "attestationType": "enterprise_confidential_vm",
+                "hardwareModel": "AMD_SEV_SNP",
+                "secureBoot": "enabled",
+                "digest": format!("sha384:digest-{tier:?}")
+            }
+        })),
     }
 }
 
@@ -4294,6 +4783,21 @@ fn make_attestation_trust_policy() -> arc_core::capability::AttestationTrustPoli
     }
 }
 
+fn make_attested_attestation_trust_policy() -> arc_core::capability::AttestationTrustPolicy {
+    arc_core::capability::AttestationTrustPolicy {
+        rules: vec![arc_core::capability::AttestationTrustRule {
+            name: "azure-contoso-attested".to_string(),
+            schema: "arc.runtime-attestation.azure-maa.jwt.v1".to_string(),
+            verifier: "https://maa.contoso.test".to_string(),
+            effective_tier: RuntimeAssuranceTier::Attested,
+            verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AzureMaa),
+            max_evidence_age_seconds: Some(120),
+            allowed_attestation_types: vec!["sgx".to_string()],
+            required_assertions: std::collections::BTreeMap::new(),
+        }],
+    }
+}
+
 fn make_metered_billing_context(
     quote_id: &str,
     provider: &str,
@@ -4322,14 +4826,112 @@ fn make_metered_billing_context(
 fn make_governed_call_chain_context(
     chain_id: &str,
     parent_request_id: &str,
-) -> arc_core::capability::GovernedCallChainContext {
-    arc_core::capability::GovernedCallChainContext {
+) -> GovernedCallChainContext {
+    GovernedCallChainContext {
         chain_id: chain_id.to_string(),
         parent_request_id: parent_request_id.to_string(),
         parent_receipt_id: Some("rc-upstream-1".to_string()),
         origin_subject: "subject-origin".to_string(),
         delegator_subject: "subject-delegator".to_string(),
     }
+}
+
+fn make_governed_upstream_call_chain_proof(
+    signer: &Keypair,
+    subject: &PublicKey,
+    call_chain: &GovernedCallChainContext,
+) -> GovernedUpstreamCallChainProof {
+    let now = current_unix_timestamp();
+    GovernedUpstreamCallChainProof::sign(
+        GovernedUpstreamCallChainProofBody {
+            signer: signer.public_key(),
+            subject: subject.clone(),
+            chain_id: call_chain.chain_id.clone(),
+            parent_request_id: call_chain.parent_request_id.clone(),
+            parent_receipt_id: call_chain.parent_receipt_id.clone(),
+            origin_subject: call_chain.origin_subject.clone(),
+            delegator_subject: call_chain.delegator_subject.clone(),
+            issued_at: now.saturating_sub(5),
+            expires_at: now + 300,
+        },
+        signer,
+    )
+    .unwrap()
+}
+
+fn attach_governed_upstream_call_chain_proof(
+    intent: &mut GovernedTransactionIntent,
+    proof: &GovernedUpstreamCallChainProof,
+) {
+    let mut context = match intent.context.take() {
+        Some(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    context.insert(
+        GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY.to_string(),
+        serde_json::to_value(proof).unwrap(),
+    );
+    intent.context = Some(serde_json::Value::Object(context));
+}
+
+fn make_governed_call_chain_continuation_token(
+    signer: &Keypair,
+    subject: &PublicKey,
+    call_chain: &GovernedCallChainContext,
+    parent_session_anchor: SessionAnchorReference,
+    parent_receipt_hash: &str,
+    server_id: &str,
+    tool_name: &str,
+    governed_intent_hash: Option<&str>,
+) -> CallChainContinuationToken {
+    let now = current_unix_timestamp();
+    let legacy_upstream_proof =
+        make_governed_upstream_call_chain_proof(signer, subject, call_chain);
+    let mut token = CallChainContinuationToken::sign(
+        CallChainContinuationTokenBody {
+            schema: arc_core::capability::ARC_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
+            token_id: "continuation-token-1".to_string(),
+            signer: signer.public_key(),
+            subject: subject.clone(),
+            chain_id: call_chain.chain_id.clone(),
+            parent_request_id: call_chain.parent_request_id.clone(),
+            parent_receipt_id: call_chain.parent_receipt_id.clone(),
+            parent_receipt_hash: Some(parent_receipt_hash.to_string()),
+            parent_session_anchor: Some(parent_session_anchor),
+            current_subject: subject.to_hex(),
+            delegator_subject: call_chain.delegator_subject.clone(),
+            origin_subject: call_chain.origin_subject.clone(),
+            parent_capability_id: None,
+            delegation_link_hash: None,
+            governed_intent_hash: governed_intent_hash.map(str::to_string),
+            audience: Some(CallChainContinuationAudience {
+                server_id: server_id.to_string(),
+                tool_name: tool_name.to_string(),
+            }),
+            nonce: Some("nonce-continuation-1".to_string()),
+            issued_at: now.saturating_sub(5),
+            expires_at: now + 300,
+        },
+        signer,
+    )
+    .unwrap();
+    token.legacy_upstream_proof = Some(legacy_upstream_proof);
+    token
+}
+
+fn attach_governed_call_chain_continuation_token(
+    intent: &mut GovernedTransactionIntent,
+    token: &CallChainContinuationToken,
+) {
+    let mut context = match intent.context.take() {
+        Some(serde_json::Value::Object(map)) => map,
+        _ => serde_json::Map::new(),
+    };
+    context.insert(
+        GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY.to_string(),
+        serde_json::to_value(token).unwrap(),
+    );
+    intent.context = Some(serde_json::Value::Object(context));
 }
 
 fn make_governed_autonomy_context(
@@ -4707,7 +5309,7 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
@@ -4754,7 +5356,7 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
-    assert_eq!(usage.total_cost_charged, 100);
+    assert_eq!(usage.committed_cost_units().unwrap(), 100);
 }
 
 #[test]
@@ -4811,7 +5413,57 @@ fn monetary_allow_receipt_contains_financial_metadata() {
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 1);
-    assert_eq!(usage.total_cost_charged, 75);
+    assert_eq!(usage.committed_cost_units().unwrap(), 75);
+}
+
+#[test]
+fn monetary_allow_records_budget_hold_and_append_only_events() {
+    let mut kernel = ArcKernel::new(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = make_monetary_grant("cost-srv", "compute", 100, 1000, "USD");
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request_id = "req-budget-event-log";
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap.clone(),
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+
+    let hold_id = format!("budget-hold:{request_id}:{}:0", cap.id);
+    let authorize_event_id = format!("{hold_id}:authorize");
+    let reconcile_event_id = format!("{hold_id}:reconcile");
+    let events = kernel
+        .budget_store
+        .lock()
+        .unwrap()
+        .list_mutation_events(10, Some(&cap.id), Some(0))
+        .unwrap();
+
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].event_id, authorize_event_id);
+    assert_eq!(events[0].hold_id.as_deref(), Some(hold_id.as_str()));
+    assert_eq!(events[0].allowed, Some(true));
+    assert_eq!(events[0].exposure_units, 100);
+    assert_eq!(events[1].event_id, reconcile_event_id);
+    assert_eq!(events[1].hold_id.as_deref(), Some(hold_id.as_str()));
+    assert_eq!(events[1].realized_spend_units, 75);
+    assert_eq!(events[1].total_cost_exposed_after, 0);
+    assert_eq!(events[1].total_cost_realized_spend_after, 75);
 }
 
 #[test]
@@ -5000,10 +5652,12 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("metered billing provider must not be empty"))
+    );
 
     let usage = kernel
         .budget_store
@@ -5013,7 +5667,7 @@ fn governed_request_rejects_empty_metered_billing_provider() {
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
@@ -5078,6 +5732,872 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
     assert_eq!(
         governed["intent_hash"],
         serde_json::Value::String(intent.binding_hash().unwrap())
+    );
+}
+
+#[test]
+fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
+    let mut kernel = ArcKernel::new(make_config());
+    let agent_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let capability = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-echo", "delegate")]),
+        300,
+    );
+    let prior_response = kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "req-local-parent-receipt",
+            &capability,
+            "delegate",
+            "srv-echo",
+            serde_json::json!({ "stage": "parent" }),
+        ))
+        .unwrap();
+
+    let request_id = "req-governed-local-parent-receipt";
+    let intent = GovernedTransactionIntent {
+        id: "intent-local-parent-receipt".to_string(),
+        server_id: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        purpose: "continue delegated workflow".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(arc_core::capability::GovernedCallChainContext {
+            chain_id: "chain-local-parent-receipt".to_string(),
+            parent_request_id: "req-upstream-local".to_string(),
+            parent_receipt_id: Some(prior_response.receipt.id.clone()),
+            origin_subject: "origin-subject".to_string(),
+            delegator_subject: "delegator-subject".to_string(),
+        }),
+        autonomy: None,
+        context: None,
+    };
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "child" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: None,
+        })
+        .unwrap();
+
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["call_chain"]["evidenceClass"], "observed");
+    assert_eq!(
+        governed["call_chain"]["evidenceSources"],
+        serde_json::json!(["local_parent_receipt_linkage"])
+    );
+}
+
+#[test]
+fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
+    let path = unique_receipt_db_path("arc-kernel-call-chain-capability-lineage");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = ArcKernel::new(make_config());
+    let root_kp = make_keypair();
+    let child_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let mut root_grant = make_grant("srv-echo", "delegate");
+    root_grant.operations.push(Operation::Delegate);
+    let root_scope = make_scope(vec![root_grant.clone()]);
+    let root_capability = make_capability(&kernel, &root_kp, root_scope.clone(), 300);
+    seed_store
+        .record_capability_snapshot(&root_capability, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let delegated_capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-governed-child".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: make_scope(vec![make_grant("srv-echo", "delegate")]),
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![make_delegation_link(
+                &root_capability.id,
+                &root_kp,
+                &child_kp,
+                current_unix_timestamp(),
+            )],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let request_id = "req-governed-capability-lineage";
+    let root_subject = root_kp.public_key().to_hex();
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "delegated" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-capability-lineage".to_string(),
+                server_id: "srv-echo".to_string(),
+                tool_name: "delegate".to_string(),
+                purpose: "continue delegated workflow".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(arc_core::capability::GovernedCallChainContext {
+                    chain_id: "chain-capability-lineage".to_string(),
+                    parent_request_id: "req-upstream-capability".to_string(),
+                    parent_receipt_id: None,
+                    origin_subject: root_subject.clone(),
+                    delegator_subject: root_subject,
+                }),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        })
+        .unwrap();
+
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["call_chain"]["evidenceClass"], "observed");
+    assert_eq!(
+        governed["call_chain"]["evidenceSources"],
+        serde_json::json!(["capability_delegator_subject", "capability_origin_subject"])
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
+    let path = unique_receipt_db_path("arc-kernel-call-chain-upstream-proof");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = ArcKernel::new(make_config());
+    let root_kp = make_keypair();
+    let child_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let mut root_grant = make_grant("srv-echo", "delegate");
+    root_grant.operations.push(Operation::Delegate);
+    let root_capability = make_capability(&kernel, &root_kp, make_scope(vec![root_grant]), 300);
+    seed_store
+        .record_capability_snapshot(&root_capability, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let delegated_capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-governed-upstream-proof".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: make_scope(vec![make_grant("srv-echo", "delegate")]),
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![make_delegation_link(
+                &root_capability.id,
+                &root_kp,
+                &child_kp,
+                current_unix_timestamp(),
+            )],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let root_subject = root_kp.public_key().to_hex();
+    let call_chain = GovernedCallChainContext {
+        chain_id: "chain-upstream-proof".to_string(),
+        parent_request_id: "req-upstream-proof-parent".to_string(),
+        parent_receipt_id: Some("rc-upstream-proof-parent".to_string()),
+        origin_subject: root_subject.clone(),
+        delegator_subject: root_subject,
+    };
+    let mut intent = GovernedTransactionIntent {
+        id: "intent-upstream-proof".to_string(),
+        server_id: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        purpose: "continue delegated workflow with signed upstream provenance".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(call_chain.clone()),
+        autonomy: None,
+        context: Some(serde_json::json!({ "workflow": "delegated-proof" })),
+    };
+    let upstream_proof =
+        make_governed_upstream_call_chain_proof(&root_kp, &child_kp.public_key(), &call_chain);
+    attach_governed_upstream_call_chain_proof(&mut intent, &upstream_proof);
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-upstream-proof".to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "delegated" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: None,
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["call_chain"]["evidenceClass"], "verified");
+    assert_eq!(
+        governed["call_chain"]["evidenceSources"],
+        serde_json::json!([
+            "capability_delegator_subject",
+            "capability_origin_subject",
+            "upstream_delegator_proof"
+        ])
+    );
+    assert_eq!(
+        governed["call_chain"]["upstreamProof"]["signer"],
+        serde_json::Value::String(root_kp.public_key().to_hex())
+    );
+    assert_eq!(
+        governed["call_chain"]["upstreamProof"]["subject"],
+        serde_json::Value::String(child_kp.public_key().to_hex())
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_order() {
+    let mut asserted_kernel = ArcKernel::new(make_config());
+    let asserted_agent_kp = make_keypair();
+    asserted_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+    let asserted_capability = make_capability(
+        &asserted_kernel,
+        &asserted_agent_kp,
+        make_scope(vec![make_grant("srv-echo", "delegate")]),
+        300,
+    );
+    let asserted_response = asserted_kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-asserted-order".to_string(),
+            capability: asserted_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: asserted_agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "asserted" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-asserted-order".to_string(),
+                server_id: "srv-echo".to_string(),
+                tool_name: "delegate".to_string(),
+                purpose: "preserve caller-supplied delegated context".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(make_governed_call_chain_context(
+                    "chain-asserted-order",
+                    "req-upstream-asserted-order",
+                )),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        })
+        .unwrap();
+    let asserted_governed = asserted_response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("asserted receipt should carry governed transaction metadata");
+    assert_eq!(asserted_governed["call_chain"]["evidenceClass"], "asserted");
+    assert_eq!(
+        asserted_governed["call_chain"]["evidenceSources"],
+        serde_json::json!([])
+    );
+    assert!(asserted_governed["call_chain"]["upstreamProof"].is_null());
+
+    let mut observed_kernel = ArcKernel::new(make_config());
+    let observed_agent_kp = make_keypair();
+    observed_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+    let observed_capability = make_capability(
+        &observed_kernel,
+        &observed_agent_kp,
+        make_scope(vec![make_grant("srv-echo", "delegate")]),
+        300,
+    );
+    let parent_response = observed_kernel
+        .evaluate_tool_call_blocking(&make_request_with_arguments(
+            "req-observed-parent-order",
+            &observed_capability,
+            "delegate",
+            "srv-echo",
+            serde_json::json!({ "stage": "parent" }),
+        ))
+        .unwrap();
+    let observed_response = observed_kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-observed-order".to_string(),
+            capability: observed_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: observed_agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "observed" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-observed-order".to_string(),
+                server_id: "srv-echo".to_string(),
+                tool_name: "delegate".to_string(),
+                purpose: "upgrade local delegated context from receipt linkage".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(GovernedCallChainContext {
+                    chain_id: "chain-observed-order".to_string(),
+                    parent_request_id: "req-upstream-observed-order".to_string(),
+                    parent_receipt_id: Some(parent_response.receipt.id.clone()),
+                    origin_subject: "subject-origin".to_string(),
+                    delegator_subject: "subject-delegator".to_string(),
+                }),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        })
+        .unwrap();
+    let observed_governed = observed_response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("observed receipt should carry governed transaction metadata");
+    assert_eq!(observed_governed["call_chain"]["evidenceClass"], "observed");
+    assert_eq!(
+        observed_governed["call_chain"]["evidenceSources"],
+        serde_json::json!(["local_parent_receipt_linkage"])
+    );
+    assert!(observed_governed["call_chain"]["upstreamProof"].is_null());
+
+    let path = unique_receipt_db_path("arc-kernel-call-chain-execution-order");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut verified_kernel = ArcKernel::new(make_config());
+    let root_kp = make_keypair();
+    let child_kp = make_keypair();
+    verified_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let mut root_grant = make_grant("srv-echo", "delegate");
+    root_grant.operations.push(Operation::Delegate);
+    let root_capability = make_capability(
+        &verified_kernel,
+        &root_kp,
+        make_scope(vec![root_grant]),
+        300,
+    );
+    seed_store
+        .record_capability_snapshot(&root_capability, None)
+        .unwrap();
+    drop(seed_store);
+    verified_kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let delegated_capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-governed-execution-order".to_string(),
+            issuer: verified_kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: make_scope(vec![make_grant("srv-echo", "delegate")]),
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![make_delegation_link(
+                &root_capability.id,
+                &root_kp,
+                &child_kp,
+                current_unix_timestamp(),
+            )],
+        },
+        &verified_kernel.config.keypair,
+    )
+    .unwrap();
+
+    let root_subject = root_kp.public_key().to_hex();
+    let call_chain = GovernedCallChainContext {
+        chain_id: "chain-verified-order".to_string(),
+        parent_request_id: "req-upstream-verified-order".to_string(),
+        parent_receipt_id: Some("rc-upstream-verified-order".to_string()),
+        origin_subject: root_subject.clone(),
+        delegator_subject: root_subject,
+    };
+    let mut verified_intent = GovernedTransactionIntent {
+        id: "intent-verified-order".to_string(),
+        server_id: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        purpose: "upgrade delegated context with signed upstream provenance".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(call_chain.clone()),
+        autonomy: None,
+        context: None,
+    };
+    let upstream_proof =
+        make_governed_upstream_call_chain_proof(&root_kp, &child_kp.public_key(), &call_chain);
+    attach_governed_upstream_call_chain_proof(&mut verified_intent, &upstream_proof);
+
+    let verified_response = verified_kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-verified-order".to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "verified" }),
+            dpop_proof: None,
+            governed_intent: Some(verified_intent),
+            approval_token: None,
+        })
+        .unwrap();
+    let verified_governed = verified_response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("verified receipt should carry governed transaction metadata");
+    assert_eq!(verified_governed["call_chain"]["evidenceClass"], "verified");
+    assert_eq!(
+        verified_governed["call_chain"]["evidenceSources"],
+        serde_json::json!([
+            "capability_delegator_subject",
+            "capability_origin_subject",
+            "upstream_delegator_proof"
+        ])
+    );
+    assert_eq!(
+        verified_governed["call_chain"]["upstreamProof"]["signer"],
+        serde_json::Value::String(root_kp.public_key().to_hex())
+    );
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
+    let path = unique_receipt_db_path("arc-kernel-call-chain-upstream-proof-subject-mismatch");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = ArcKernel::new(make_config());
+    let root_kp = make_keypair();
+    let child_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let mut root_grant = make_grant("srv-echo", "delegate");
+    root_grant.operations.push(Operation::Delegate);
+    let root_capability = make_capability(&kernel, &root_kp, make_scope(vec![root_grant]), 300);
+    seed_store
+        .record_capability_snapshot(&root_capability, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let delegated_capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-governed-upstream-proof-subject-mismatch".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: make_scope(vec![make_grant("srv-echo", "delegate")]),
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![make_delegation_link(
+                &root_capability.id,
+                &root_kp,
+                &child_kp,
+                current_unix_timestamp(),
+            )],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let root_subject = root_kp.public_key().to_hex();
+    let call_chain = GovernedCallChainContext {
+        chain_id: "chain-upstream-proof-subject-mismatch".to_string(),
+        parent_request_id: "req-upstream-proof-subject-parent".to_string(),
+        parent_receipt_id: Some("rc-upstream-proof-subject-parent".to_string()),
+        origin_subject: root_subject.clone(),
+        delegator_subject: root_subject,
+    };
+    let wrong_subject = make_keypair();
+    let mut intent = GovernedTransactionIntent {
+        id: "intent-upstream-proof-subject-mismatch".to_string(),
+        server_id: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        purpose: "continue delegated workflow with mismatched proof subject".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(call_chain.clone()),
+        autonomy: None,
+        context: Some(serde_json::json!({ "workflow": "delegated-proof" })),
+    };
+    let upstream_proof =
+        make_governed_upstream_call_chain_proof(&root_kp, &wrong_subject.public_key(), &call_chain);
+    attach_governed_upstream_call_chain_proof(&mut intent, &upstream_proof);
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-upstream-proof-subject-mismatch".to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "delegated" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: None,
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("call_chain upstream proof subject")
+            && reason.contains("capability subject")
+    }));
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_capability_lineage() {
+    let path = unique_receipt_db_path("arc-kernel-call-chain-delegator-mismatch");
+    let mut seed_store = SqliteReceiptStore::open(&path).unwrap();
+    let mut kernel = ArcKernel::new(make_config());
+    let root_kp = make_keypair();
+    let child_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let mut root_grant = make_grant("srv-echo", "delegate");
+    root_grant.operations.push(Operation::Delegate);
+    let root_capability = make_capability(&kernel, &root_kp, make_scope(vec![root_grant]), 300);
+    seed_store
+        .record_capability_snapshot(&root_capability, None)
+        .unwrap();
+    drop(seed_store);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
+
+    let delegated_capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-governed-child-mismatch".to_string(),
+            issuer: kernel.config.keypair.public_key(),
+            subject: child_kp.public_key(),
+            scope: make_scope(vec![make_grant("srv-echo", "delegate")]),
+            issued_at: current_unix_timestamp(),
+            expires_at: current_unix_timestamp() + 300,
+            delegation_chain: vec![make_delegation_link(
+                &root_capability.id,
+                &root_kp,
+                &child_kp,
+                current_unix_timestamp(),
+            )],
+        },
+        &kernel.config.keypair,
+    )
+    .unwrap();
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-governed-capability-lineage-deny".to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "delegated" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-capability-lineage-deny".to_string(),
+                server_id: "srv-echo".to_string(),
+                tool_name: "delegate".to_string(),
+                purpose: "continue delegated workflow".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: Some(arc_core::capability::GovernedCallChainContext {
+                    chain_id: "chain-capability-lineage-deny".to_string(),
+                    parent_request_id: "req-upstream-capability-deny".to_string(),
+                    parent_receipt_id: None,
+                    origin_subject: root_kp.public_key().to_hex(),
+                    delegator_subject: "subject-wrong".to_string(),
+                }),
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(response.reason.as_deref().is_some_and(|reason| {
+        reason.contains("call_chain.delegator_subject")
+            && reason.contains("validated capability delegation source")
+    }));
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
+    let mut kernel = ArcKernel::new(make_config());
+    let agent_kp = make_keypair();
+    kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let capability = make_capability(
+        &kernel,
+        &agent_kp,
+        make_scope(vec![make_grant("srv-echo", "delegate")]),
+        300,
+    );
+    let session_id = kernel.open_session(agent_kp.public_key().to_hex(), vec![capability.clone()]);
+    kernel.activate_session(&session_id).unwrap();
+
+    let parent_context = make_operation_context(
+        &session_id,
+        "req-parent-session-lineage",
+        &agent_kp.public_key().to_hex(),
+    );
+    kernel
+        .begin_session_request(&parent_context, OperationKind::ToolCall, true)
+        .unwrap();
+
+    let mut client = MockNestedFlowClient {
+        roots: Vec::new(),
+        sampled_message: CreateMessageResult {
+            role: "assistant".to_string(),
+            content: serde_json::json!({ "type": "text", "text": "unused" }),
+            model: "unused".to_string(),
+            stop_reason: None,
+        },
+        elicited_content: make_elicited_content(),
+        cancel_parent_on_create_message: false,
+        cancel_child_on_create_message: false,
+        completed_elicitation_ids: Vec::new(),
+        resource_updates: Vec::new(),
+        resources_list_changed_count: 0,
+    };
+    let response = kernel
+        .evaluate_tool_call_with_nested_flow_client(
+            &parent_context,
+            &ToolCallRequest {
+                request_id: "req-child-session-lineage".to_string(),
+                capability,
+                tool_name: "delegate".to_string(),
+                server_id: "srv-echo".to_string(),
+                agent_id: agent_kp.public_key().to_hex(),
+                arguments: serde_json::json!({ "stage": "child" }),
+                dpop_proof: None,
+                governed_intent: Some(GovernedTransactionIntent {
+                    id: "intent-session-lineage".to_string(),
+                    server_id: "srv-echo".to_string(),
+                    tool_name: "delegate".to_string(),
+                    purpose: "continue nested delegated workflow".to_string(),
+                    max_amount: None,
+                    commerce: None,
+                    metered_billing: None,
+                    runtime_attestation: None,
+                    call_chain: Some(arc_core::capability::GovernedCallChainContext {
+                        chain_id: "chain-session-lineage".to_string(),
+                        parent_request_id: parent_context.request_id.to_string(),
+                        parent_receipt_id: None,
+                        origin_subject: "origin-subject".to_string(),
+                        delegator_subject: "delegator-subject".to_string(),
+                    }),
+                    autonomy: None,
+                    context: None,
+                }),
+                approval_token: None,
+            },
+            &mut client,
+        )
+        .unwrap();
+
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["call_chain"]["evidenceClass"], "observed");
+    assert_eq!(
+        governed["call_chain"]["evidenceSources"],
+        serde_json::json!(["session_parent_request_lineage"])
+    );
+}
+
+#[test]
+fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anchor() {
+    let parent_kernel = ArcKernel::new(make_config());
+    let mut child_config = make_config();
+    child_config.ca_public_keys.push(parent_kernel.public_key());
+    let mut child_kernel = ArcKernel::new(child_config);
+    let child_kp = make_keypair();
+    child_kernel.register_tool_server(Box::new(EchoServer::new("srv-echo", vec!["delegate"])));
+
+    let delegated_capability = make_capability(
+        &child_kernel,
+        &child_kp,
+        make_scope(vec![make_grant("srv-echo", "delegate")]),
+        300,
+    );
+
+    let parent_session_id = parent_kernel.open_session(child_kp.public_key().to_hex(), Vec::new());
+    parent_kernel.activate_session(&parent_session_id).unwrap();
+    parent_kernel
+        .with_session_mut(&parent_session_id, |session| {
+            assert!(
+                session.set_auth_context(SessionAuthContext::streamable_http_static_bearer(
+                    "static-bearer:parent",
+                    "token-parent",
+                    Some("https://parent.example".to_string()),
+                ))
+            );
+            Ok(())
+        })
+        .unwrap();
+    let parent_anchor = parent_kernel
+        .with_session(&parent_session_id, |session| {
+            Ok(session.session_anchor().reference())
+        })
+        .unwrap();
+
+    let parent_receipt = ArcReceipt::sign(
+        ArcReceiptBody {
+            id: "rc-parent-continuation".to_string(),
+            timestamp: current_unix_timestamp(),
+            capability_id: "cap-parent-continuation".to_string(),
+            tool_server: "srv-echo".to_string(),
+            tool_name: "delegate".to_string(),
+            action: ToolCallAction::from_parameters(serde_json::json!({ "stage": "parent" }))
+                .unwrap(),
+            decision: Decision::Allow,
+            content_hash: arc_core::crypto::sha256_hex(br#"{"ok":true}"#),
+            policy_hash: "policy-parent-continuation".to_string(),
+            evidence: Vec::new(),
+            metadata: Some(serde_json::json!({
+                "lineageReferences": {
+                    "sessionAnchorId": parent_anchor.session_anchor_id.clone(),
+                    "sessionAnchorHash": parent_anchor.session_anchor_hash.clone(),
+                }
+            })),
+            kernel_key: parent_kernel.public_key(),
+        },
+        &parent_kernel.config.keypair,
+    )
+    .unwrap();
+    let parent_receipt_hash = arc_core::crypto::sha256_hex(
+        &arc_core::canonical::canonical_json_bytes(&parent_receipt).unwrap(),
+    );
+    child_kernel.record_arc_receipt(&parent_receipt).unwrap();
+
+    let call_chain = GovernedCallChainContext {
+        chain_id: "chain-cross-kernel-continuation".to_string(),
+        parent_request_id: "req-parent-continuation".to_string(),
+        parent_receipt_id: Some(parent_receipt.id.clone()),
+        origin_subject: "subject-origin".to_string(),
+        delegator_subject: "subject-delegator".to_string(),
+    };
+    let mut intent = GovernedTransactionIntent {
+        id: "intent-continuation".to_string(),
+        server_id: "srv-echo".to_string(),
+        tool_name: "delegate".to_string(),
+        purpose: "continue delegated workflow with continuation token".to_string(),
+        max_amount: None,
+        commerce: None,
+        metered_billing: None,
+        runtime_attestation: None,
+        call_chain: Some(call_chain.clone()),
+        autonomy: None,
+        context: None,
+    };
+    let continuation_token = make_governed_call_chain_continuation_token(
+        &parent_kernel.config.keypair,
+        &child_kp.public_key(),
+        &call_chain,
+        parent_anchor.clone(),
+        &parent_receipt_hash,
+        "srv-echo",
+        "delegate",
+        None,
+    );
+    attach_governed_call_chain_continuation_token(&mut intent, &continuation_token);
+
+    let response = child_kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: "req-child-continuation".to_string(),
+            capability: delegated_capability,
+            tool_name: "delegate".to_string(),
+            server_id: "srv-echo".to_string(),
+            agent_id: child_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "stage": "child" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: None,
+        })
+        .unwrap();
+
+    assert_eq!(
+        response.verdict,
+        Verdict::Allow,
+        "cross-kernel continuation token should allow; reason: {:?}",
+        response.reason
+    );
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["call_chain"]["evidenceClass"], "observed");
+    assert_eq!(
+        governed["call_chain"]["continuationTokenId"],
+        serde_json::json!("continuation-token-1")
+    );
+    assert_eq!(
+        governed["call_chain"]["sessionAnchorId"],
+        serde_json::json!(parent_anchor.session_anchor_id.clone())
+    );
+    assert_eq!(
+        governed["call_chain"]["evidenceSources"],
+        serde_json::json!(["local_parent_receipt_linkage"])
     );
 }
 
@@ -5174,10 +6694,12 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_ref()
-        .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty")));
+    assert!(
+        response
+            .reason
+            .as_ref()
+            .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty"))
+    );
 }
 
 #[test]
@@ -5246,11 +6768,11 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
         .get_usage(&cap.id, 0)
         .unwrap()
         .unwrap();
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
-fn governed_monetary_allow_records_runtime_assurance_metadata() {
+fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_required() {
     let mut kernel = ArcKernel::new(make_monetary_config());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
@@ -5294,6 +6816,58 @@ fn governed_monetary_allow_records_runtime_assurance_metadata() {
         })
         .unwrap();
 
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert!(
+        response.reason.as_deref().is_some_and(|reason| {
+            reason.contains("runtime attestation tier 'Attested' required by grant")
+                && reason.contains("did not cross a local verified trust boundary")
+        }),
+        "denial should explain that raw attestation did not satisfy the local verified boundary"
+    );
+}
+
+#[test]
+fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_optional() {
+    let mut kernel = ArcKernel::new(make_monetary_config());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50);
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request_id = "req-governed-assurance-optional";
+    let mut intent = make_governed_intent(
+        "intent-governed-assurance-optional",
+        "cost-srv",
+        "compute",
+        "execute governed payout",
+        100,
+        "USD",
+    );
+    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap,
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "invoice_id": "inv-1001" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: Some(approval_token),
+        })
+        .unwrap();
+
     assert_eq!(response.verdict, Verdict::Allow);
     let governed = response
         .receipt
@@ -5302,18 +6876,9 @@ fn governed_monetary_allow_records_runtime_assurance_metadata() {
         .and_then(|metadata| metadata.get("governed_transaction"))
         .expect("allow receipt should carry governed transaction metadata");
     assert_eq!(
-        governed["runtime_assurance"]["schema"],
-        "arc.runtime-attestation.v1"
-    );
-    assert_eq!(governed["runtime_assurance"]["tier"], "attested");
-    assert_eq!(governed["runtime_assurance"]["verifier"], "verifier.arc");
-    assert_eq!(
-        governed["runtime_assurance"]["workloadIdentity"]["trustDomain"],
-        "arc"
-    );
-    assert_eq!(
-        governed["runtime_assurance"]["workloadIdentity"]["path"],
-        "/runtime/test"
+        governed.get("runtime_assurance"),
+        None,
+        "optional raw attestation should not be emitted as verified runtime authority"
     );
 }
 
@@ -5338,8 +6903,8 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
         "USD",
     );
     intent.runtime_attestation = Some(arc_core::capability::RuntimeAttestationEvidence {
-        schema: "arc.runtime-attestation.v1".to_string(),
-        verifier: "verifier.arc".to_string(),
+        schema: "arc.runtime-attestation.enterprise-verifier.json.v1".to_string(),
+        verifier: "https://attest.arc.example".to_string(),
         tier: RuntimeAssuranceTier::Attested,
         issued_at: current_unix_timestamp().saturating_sub(1),
         expires_at: current_unix_timestamp() + 300,
@@ -5352,7 +6917,14 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             trust_domain: "other".to_string(),
             path: "/runtime/test".to_string(),
         }),
-        claims: None,
+        claims: Some(serde_json::json!({
+            "enterpriseVerifier": {
+                "attestationType": "enterprise_confidential_vm",
+                "hardwareModel": "AMD_SEV_SNP",
+                "secureBoot": "enabled",
+                "digest": "sha384:digest-invalid-workload"
+            }
+        })),
     });
     let approval_token = make_governed_approval_token(
         &kernel.config.keypair,
@@ -5441,6 +7013,10 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
     assert_eq!(governed["runtime_assurance"]["tier"], "verified");
     assert_eq!(governed["runtime_assurance"]["verifierFamily"], "azure_maa");
     assert_eq!(
+        governed["runtime_assurance"]["verifier"],
+        "https://maa.contoso.test"
+    );
+    assert_eq!(
         governed["runtime_assurance"]["workloadIdentity"]["trustDomain"],
         "arc"
     );
@@ -5494,10 +7070,10 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(
         response.reason.as_deref().is_some_and(|reason| {
-            reason.contains("rejected by trust policy")
+            reason.contains("rejected by local verification boundary")
                 && reason.contains("did not match any trusted verifier rule")
         }),
-        "denial should explain the trust-policy mismatch"
+        "denial should explain the local verification-boundary mismatch"
     );
 }
 
@@ -5564,6 +7140,7 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
 #[test]
 fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
     let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -5584,7 +7161,7 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
     intent.call_chain = Some(make_governed_call_chain_context(
         "chain-bond-1",
         "req-parent-1",
@@ -5615,15 +7192,18 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") }));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") })
+    );
 }
 
 #[test]
 fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
     let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attested_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
 
@@ -5644,7 +7224,7 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
     intent.call_chain = Some(make_governed_call_chain_context(
         "chain-bond-2",
         "req-parent-2",
@@ -5676,13 +7256,15 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
 
     assert_eq!(response.verdict, Verdict::Deny);
     assert!(response.reason.as_deref().is_some_and(|reason| {
-        reason.contains("runtime attestation tier") && reason.contains("Verified")
+        reason.contains("runtime attestation tier 'Attested'")
+            && reason.contains("below required 'Verified'")
     }));
 }
 
 #[test]
 fn governed_request_denies_delegated_autonomy_with_expired_bond() {
     let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let path = unique_receipt_db_path("kernel-bond-expired");
@@ -5720,7 +7302,7 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
     intent.call_chain = Some(make_governed_call_chain_context(
         "chain-bond-3",
         "req-parent-3",
@@ -5751,15 +7333,18 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response
-        .reason
-        .as_deref()
-        .is_some_and(|reason| reason.contains("is expired")));
+    assert!(
+        response
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason.contains("is expired"))
+    );
 }
 
 #[test]
 fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metadata() {
     let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
     let agent_kp = Keypair::generate();
     kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
     let path = unique_receipt_db_path("kernel-bond-active");
@@ -5797,7 +7382,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
         100,
         "USD",
     );
-    intent.runtime_attestation = Some(make_runtime_attestation(RuntimeAssuranceTier::Attested));
+    intent.runtime_attestation = Some(make_trusted_azure_runtime_attestation());
     intent.call_chain = Some(make_governed_call_chain_context(
         "chain-bond-4",
         "req-parent-4",
@@ -5836,6 +7421,7 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
         .expect("allow receipt should carry governed transaction metadata");
     assert_eq!(governed["autonomy"]["tier"], "delegated");
     assert_eq!(governed["autonomy"]["delegationBondId"], bond_id);
+    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
 }
 
 #[test]
@@ -5908,7 +7494,7 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
@@ -6204,7 +7790,7 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 
     handle.join().expect("server thread should exit cleanly");
 }
@@ -6431,7 +8017,7 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
@@ -6548,7 +8134,7 @@ fn monetary_tool_server_error_releases_precharged_budget() {
         .unwrap()
         .unwrap();
     assert_eq!(usage.invocation_count, 0);
-    assert_eq!(usage.total_cost_charged, 0);
+    assert_eq!(usage.committed_cost_units().unwrap(), 0);
 }
 
 #[test]
@@ -7396,9 +8982,11 @@ fn kernel_error_report_includes_out_of_scope_context() {
     assert_eq!(report.code, "ARC-KERNEL-OUT-OF-SCOPE-TOOL");
     assert_eq!(report.context["tool"], "read_file");
     assert_eq!(report.context["server"], "fs");
-    assert!(report
-        .suggested_fix
-        .contains("Issue a capability that grants this tool"));
+    assert!(
+        report
+            .suggested_fix
+            .contains("Issue a capability that grants this tool")
+    );
 }
 
 #[test]

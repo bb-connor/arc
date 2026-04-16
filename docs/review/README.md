@@ -17,6 +17,9 @@ Each document covers one hole:
 
 - [13-ship-blocker-ladder.md](./13-ship-blocker-ladder.md): release-triage ladder splitting bounded-ARC blockers, stronger-security blockers, and comptroller-thesis blockers into P0/P1/P2
 - [14-bounded-arc-pre-ship-checklist.md](./14-bounded-arc-pre-ship-checklist.md): authoritative pre-ship checklist for the bounded ARC release boundary, mapped to `v3.18`
+- [15-vision-gap-map.md](./15-vision-gap-map.md): strongest ARC vision claims mapped to current evidence and the exact work required to make each stronger claim literally true
+- [16-vision-closure-execution-board.md](./16-vision-closure-execution-board.md): phased execution board turning the vision-gap debate into waves, owners, gates, and merge order
+- [17-post-closure-execution-board.md](./17-post-closure-execution-board.md): hard-gated follow-on board sequencing Wave 0 reporting truth closure before trust-anchored transparency publication and the budget-authority protocol
 - [01-formal-verification-remediation.md](./01-formal-verification-remediation.md): formal model scope, refinement to Rust, and proof-gated claim discipline
 - [02-delegation-enforcement-remediation.md](./02-delegation-enforcement-remediation.md): runtime delegation-chain validation, attenuation enforcement, and lineage completeness
 - [03-runtime-attestation-remediation.md](./03-runtime-attestation-remediation.md): verifier-backed runtime assurance from raw evidence to kernel admission
@@ -37,6 +40,13 @@ shipping?" then go to the underlying remediations:
 
 - [13-ship-blocker-ladder.md](./13-ship-blocker-ladder.md)
 - [14-bounded-arc-pre-ship-checklist.md](./14-bounded-arc-pre-ship-checklist.md)
+
+Start with the vision map if the immediate question is "which parts of the full
+ARC thesis are already true, and what exact work remains?":
+
+- [15-vision-gap-map.md](./15-vision-gap-map.md)
+- [16-vision-closure-execution-board.md](./16-vision-closure-execution-board.md)
+- [17-post-closure-execution-board.md](./17-post-closure-execution-board.md)
 
 Start with the foundation docs first:
 
