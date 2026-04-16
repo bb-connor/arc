@@ -18,6 +18,52 @@ use crate::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
 
+/// Trust level of a receipt's authorization, recording HOW the Kernel
+/// participated in the evaluation. Captured per-receipt so downstream
+/// consumers (audit, regulatory, dashboards) can reason about the strength
+/// of mediation that produced each authorization.
+///
+/// See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` and roadmap Phase 1.2.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustLevel {
+    /// Tool invocation was synchronously mediated by the kernel (the
+    /// strongest form: kernel observed the call inline and authorized it).
+    /// This is the default and the safest baseline.
+    Mediated,
+    /// Authorization happened inline in the agent process (e.g. a
+    /// long-running orchestrator embedded the kernel via FFI). The kernel
+    /// observed the call but did not synchronously mediate it through a
+    /// separate trust boundary.
+    Verified,
+    /// Authorization was advisory only -- the kernel evaluated but the
+    /// caller may have proceeded regardless. Used for shadow-mode
+    /// integrations and observability-only deployments.
+    Advisory,
+}
+
+impl Default for TrustLevel {
+    fn default() -> Self {
+        Self::Mediated
+    }
+}
+
+impl TrustLevel {
+    /// Return the canonical snake_case string for this trust level.
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Mediated => "mediated",
+            Self::Verified => "verified",
+            Self::Advisory => "advisory",
+        }
+    }
+}
+
+fn is_default_trust_level(level: &TrustLevel) -> bool {
+    matches!(level, TrustLevel::Mediated)
+}
+
 /// A ARC receipt. Signed proof that a tool call was evaluated by the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArcReceipt {
@@ -45,6 +91,11 @@ pub struct ArcReceipt {
     /// Optional receipt metadata for stream/accounting details.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    /// Strength of kernel mediation that produced this receipt. Defaults
+    /// to `Mediated`. Older receipts that omit this field deserialize
+    /// to `Mediated` for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_trust_level")]
+    pub trust_level: TrustLevel,
     /// The Kernel's public key (for verification without out-of-band lookup).
     pub kernel_key: PublicKey,
     /// Ed25519 signature over canonical JSON of all fields above.
@@ -67,6 +118,8 @@ pub struct ArcReceiptBody {
     pub evidence: Vec<GuardEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "is_default_trust_level")]
+    pub trust_level: TrustLevel,
     pub kernel_key: PublicKey,
 }
 
@@ -121,6 +174,7 @@ impl ArcReceipt {
             policy_hash: body.policy_hash,
             evidence: body.evidence,
             metadata: body.metadata,
+            trust_level: body.trust_level,
             kernel_key: body.kernel_key,
             signature,
         })
@@ -141,6 +195,7 @@ impl ArcReceipt {
             policy_hash: self.policy_hash.clone(),
             evidence: self.evidence.clone(),
             metadata: self.metadata.clone(),
+            trust_level: self.trust_level,
             kernel_key: self.kernel_key.clone(),
         }
     }
@@ -919,6 +974,7 @@ mod tests {
                     "enforced": true
                 }
             })),
+            trust_level: TrustLevel::default(),
             kernel_key: kp.public_key(),
         }
     }

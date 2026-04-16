@@ -177,6 +177,7 @@ impl ReceiptSigner for KernelReceiptSigner {
                     "enforcementMode": entry.enforcement_mode,
                 }
             })),
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: self.keypair.public_key(),
         };
 

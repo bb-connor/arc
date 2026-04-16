@@ -84,6 +84,7 @@ fn receipt(
         policy_hash: policy_hash.to_string(),
         evidence: vec![],
         metadata: Some(metadata),
+        trust_level: arc_core::TrustLevel::default(),
         kernel_key: kernel.public_key(),
     };
     ArcReceipt::sign(body, kernel).unwrap()

@@ -1762,6 +1762,7 @@ mod tests {
                 policy_hash: "policy-export-1".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
+                trust_level: arc_core::TrustLevel::default(),
                 kernel_key: keypair.public_key(),
             },
             &keypair,

@@ -394,6 +394,7 @@ fn sample_receipt(
             policy_hash: sha256_hex(b"policy:web3"),
             evidence: Vec::new(),
             metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: keypair.public_key(),
         },
         keypair,

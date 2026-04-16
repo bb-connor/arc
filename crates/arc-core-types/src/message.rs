@@ -176,6 +176,7 @@ mod tests {
                 details: None,
             }],
             metadata: None,
+            trust_level: crate::receipt::TrustLevel::default(),
             kernel_key: kp.public_key(),
         };
         ArcReceipt::sign(body, kp).unwrap()

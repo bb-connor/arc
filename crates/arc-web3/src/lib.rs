@@ -1610,6 +1610,7 @@ mod tests {
                     "oracle_evidence": sample_oracle_evidence()
                 }
             })),
+            trust_level: arc_core_types::receipt::TrustLevel::default(),
             kernel_key: operator.public_key(),
         };
         ArcReceipt::sign(body, &operator).unwrap()

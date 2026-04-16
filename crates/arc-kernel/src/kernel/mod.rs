@@ -4665,6 +4665,10 @@ pub(crate) struct ReceiptParams<'a> {
     content_hash: String,
     metadata: Option<serde_json::Value>,
     timestamp: u64,
+    /// Strength of kernel mediation for this evaluation. Defaults to
+    /// `Mediated` (the safest baseline) when integration adapters do not
+    /// override it.
+    trust_level: arc_core::TrustLevel,
 }
 
 pub(crate) fn current_unix_timestamp() -> u64 {

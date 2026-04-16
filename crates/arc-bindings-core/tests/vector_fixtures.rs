@@ -140,6 +140,7 @@ fn base_receipt_body(
             "surface": "bindings-vectors",
             "version": 1
         })),
+        trust_level: arc_core::TrustLevel::default(),
         kernel_key: keypair.public_key(),
     }
 }

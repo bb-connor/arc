@@ -85,6 +85,7 @@ mod tests {
             metadata: Some(serde_json::json!({
                 "surface": "bindings-test"
             })),
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: keypair.public_key(),
         };
         ArcReceipt::sign(body, &keypair).unwrap()

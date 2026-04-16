@@ -226,6 +226,7 @@ fn financial_receipt_carries_hold_lineage_and_guarantee_level() {
                 "financial": financial.clone(),
                 "budget_authority": budget_authority.clone(),
             })),
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: keypair.public_key(),
         },
         &keypair,

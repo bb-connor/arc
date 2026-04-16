@@ -114,6 +114,7 @@ impl ArcKernel {
                 content_hash: receipt_content.content_hash,
                 metadata,
                 timestamp,
+            trust_level: arc_core::TrustLevel::default(),
             })?;
 
             self.record_arc_receipt(&receipt)?;
@@ -215,6 +216,7 @@ impl ArcKernel {
                 )?,
             ),
             timestamp,
+        trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -660,6 +662,7 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+        trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -730,6 +733,7 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+        trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -822,6 +826,7 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+        trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -898,6 +903,7 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata,
             timestamp,
+        trust_level: arc_core::TrustLevel::default(),
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -936,6 +942,7 @@ impl ArcKernel {
             policy_hash: self.config.policy_hash.clone(),
             evidence: vec![],
             metadata: params.metadata,
+            trust_level: params.trust_level,
             kernel_key: self.config.keypair.public_key(),
         };
 

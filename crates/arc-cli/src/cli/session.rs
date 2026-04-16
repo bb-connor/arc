@@ -284,6 +284,7 @@ fn make_error_receipt(
         policy_hash: "error".to_string(),
         evidence: vec![],
         metadata: None,
+        trust_level: arc_core::TrustLevel::default(),
         kernel_key: kp.public_key(),
     };
 

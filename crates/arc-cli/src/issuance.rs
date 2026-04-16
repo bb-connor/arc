@@ -866,6 +866,7 @@ mod tests {
                         grant_index: Some(0),
                     }
                 })),
+                trust_level: arc_core::TrustLevel::default(),
                 kernel_key: kernel_kp.public_key(),
             },
             &kernel_kp,

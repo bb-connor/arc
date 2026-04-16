@@ -424,6 +424,7 @@ fn receipt_with_ts(id: &str, capability_id: &str, timestamp: u64) -> ArcReceipt 
             policy_hash: "policy-passport".to_string(),
             evidence: Vec::new(),
             metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: keypair.public_key(),
         },
         &keypair,

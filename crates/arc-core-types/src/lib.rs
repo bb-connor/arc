@@ -43,6 +43,7 @@ pub use receipt::{
     GovernedCommerceReceiptMetadata, GovernedTransactionReceiptMetadata, GuardEvidence,
     MeteredBillingReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, ReceiptAttributionMetadata,
     RuntimeAssuranceReceiptMetadata, SettlementStatus, SignedExportEnvelope, ToolCallAction,
+    TrustLevel,
 };
 pub use runtime_attestation::{
     verifier_family_for_attestation_schema, AttestationVerifierFamily,

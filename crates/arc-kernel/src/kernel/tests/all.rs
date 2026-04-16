@@ -6518,6 +6518,7 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
                     "sessionAnchorHash": parent_anchor.session_anchor_hash.clone(),
                 }
             })),
+            trust_level: arc_core::TrustLevel::default(),
             kernel_key: parent_kernel.public_key(),
         },
         &parent_kernel.config.keypair,
