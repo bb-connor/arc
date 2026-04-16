@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**28 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**29 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -44,7 +44,7 @@ roadmap phase.
 | 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
-| 6 (Framework SDKs) | 6.1, 6.4 | 6.2, 6.3 | -- |
+| 6 (Framework SDKs) | 6.1, 6.2, 6.4 | 6.3 | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1 | -- | 9.2 |
@@ -594,7 +594,7 @@ between crews. Published to PyPI.
 **Acceptance**: A CrewAI crew where the researcher agent can search but not
 write, and the writer agent can write but not search.
 
-### 6.2 arc-autogen
+### 6.2 arc-autogen [SHIPPED 1b8f77e]
 
 **What**: Function registration wrapper, group chat governance, nested
 chat delegation.
