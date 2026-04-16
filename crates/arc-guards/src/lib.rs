@@ -54,9 +54,11 @@ pub mod patch_integrity;
 pub mod path_allowlist;
 mod pipeline;
 pub mod post_invocation;
+pub mod prompt_injection;
 pub mod response_sanitization;
 pub mod secret_leak;
 mod shell_command;
+pub mod text_utils;
 pub mod velocity;
 
 pub use advisory::{
@@ -74,6 +76,10 @@ pub use patch_integrity::PatchIntegrityGuard;
 pub use path_allowlist::PathAllowlistGuard;
 pub use pipeline::GuardPipeline;
 pub use post_invocation::{PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict};
+pub use prompt_injection::{
+    Detection as PromptInjectionDetection, PromptInjectionConfig, PromptInjectionGuard,
+    Signal as PromptInjectionSignal,
+};
 pub use response_sanitization::{
     ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivityLevel,
 };
