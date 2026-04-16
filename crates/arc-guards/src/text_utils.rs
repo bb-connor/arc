@@ -189,6 +189,116 @@ pub fn truncate_at_char_boundary(input: &str, max_bytes: usize) -> (&str, bool) 
     (&input[..end], true)
 }
 
+/// Ratio of non-alphanumeric (punctuation / symbol) characters to
+/// non-whitespace characters.  Used by the statistical jailbreak layer to
+/// flag inputs whose visible content is dominated by symbols (a common
+/// adversarial-suffix shape).  Returns `0.0` for empty or all-whitespace
+/// input.
+pub fn punctuation_ratio(s: &str) -> f32 {
+    let mut punct = 0usize;
+    let mut total = 0usize;
+    for c in s.chars() {
+        if c.is_whitespace() {
+            continue;
+        }
+        total += 1;
+        if !c.is_alphanumeric() {
+            punct += 1;
+        }
+    }
+    if total == 0 {
+        0.0
+    } else {
+        punct as f32 / total as f32
+    }
+}
+
+/// Return true if `s` contains a run of `min_run` or more consecutive
+/// non-alphanumeric, non-whitespace characters.  Adversarial suffixes in the
+/// wild typically appear as long unbroken punctuation / symbol sequences.
+pub fn long_run_of_symbols(s: &str, min_run: usize) -> bool {
+    if min_run == 0 {
+        return true;
+    }
+    let mut run = 0usize;
+    for c in s.chars() {
+        if c.is_alphanumeric() || c.is_whitespace() {
+            run = 0;
+            continue;
+        }
+        run += 1;
+        if run >= min_run {
+            return true;
+        }
+    }
+    false
+}
+
+/// Shannon entropy (bits/char) over non-whitespace ASCII bytes of `s`.
+/// Returns `0.0` when the ASCII-non-whitespace subset is empty.  This is a
+/// cheap proxy for character diversity: payloads dominated by a handful of
+/// symbols have low entropy; uniform-random adversarial suffixes have high
+/// entropy.  Non-ASCII characters are ignored (they are already accounted
+/// for by canonicalization folding).
+pub fn shannon_entropy_ascii_nonws(s: &str) -> f32 {
+    let mut counts = [0u32; 128];
+    let mut total = 0u32;
+    for b in s.bytes() {
+        if b >= 128 || b.is_ascii_whitespace() {
+            continue;
+        }
+        counts[b as usize] = counts[b as usize].saturating_add(1);
+        total = total.saturating_add(1);
+    }
+    if total == 0 {
+        return 0.0;
+    }
+    let total_f = total as f64;
+    let mut entropy = 0.0f64;
+    for c in counts {
+        if c == 0 {
+            continue;
+        }
+        let p = (c as f64) / total_f;
+        entropy -= p * p.log2();
+    }
+    entropy as f32
+}
+
+/// Number of zero-width / Unicode formatting codepoints in `s` (using the
+/// [`is_zero_width`] predicate).  Useful for a statistical "obfuscation"
+/// signal that fires even when canonicalization has already stripped the
+/// characters: callers count on the original pre-canonicalization string.
+pub fn zero_width_count(s: &str) -> usize {
+    s.chars().filter(|c| is_zero_width(*c)).count()
+}
+
+/// Ratio of distinct character shingles (sliding n-grams) to total shingles
+/// for `s` after canonicalization.  Lower values indicate heavy repetition
+/// (a hallmark of token-spam / adversarial-suffix attacks).  Returns `1.0`
+/// when `s` has fewer than `n` chars or is empty (nothing to compare).
+///
+/// `n` is clamped to `[1, 16]`; callers typically pick `n = 3` for
+/// character trigrams, which balance sensitivity against random noise.
+pub fn shingle_uniqueness(s: &str, n: usize) -> f32 {
+    let n = n.clamp(1, 16);
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() < n {
+        return 1.0;
+    }
+    let total = chars.len() - n + 1;
+    if total == 0 {
+        return 1.0;
+    }
+    let mut seen: std::collections::HashSet<String> =
+        std::collections::HashSet::with_capacity(total);
+    for window in chars.windows(n) {
+        let key: String = window.iter().collect();
+        seen.insert(key);
+    }
+    (seen.len() as f32) / (total as f32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +344,56 @@ mod tests {
         let (out, truncated) = truncate_at_char_boundary("hi", 100);
         assert!(!truncated);
         assert_eq!(out, "hi");
+    }
+
+    #[test]
+    fn punctuation_ratio_basic() {
+        assert_eq!(punctuation_ratio(""), 0.0);
+        assert_eq!(punctuation_ratio("   \n\t"), 0.0);
+        // All alphanum -> 0.0.
+        assert_eq!(punctuation_ratio("abc123"), 0.0);
+        // All punctuation -> 1.0.
+        assert_eq!(punctuation_ratio("!!!@@@"), 1.0);
+        // Half and half (non-whitespace): 3/6 = 0.5.
+        assert!((punctuation_ratio("ab;c;!") - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn long_run_of_symbols_detects_runs() {
+        assert!(!long_run_of_symbols("hello world", 12));
+        assert!(long_run_of_symbols("hello !!!!!!!!!!!! world", 12));
+        assert!(!long_run_of_symbols("hello !!! world", 12));
+        // min_run 0 is trivially true even for empty input.
+        assert!(long_run_of_symbols("", 0));
+    }
+
+    #[test]
+    fn shannon_entropy_ascii_nonws_bounds() {
+        // All-one-character -> 0 entropy.
+        assert!(shannon_entropy_ascii_nonws("aaaaaa") < 1e-6);
+        // Two equiprobable characters -> 1 bit.
+        let e = shannon_entropy_ascii_nonws("abababab");
+        assert!((e - 1.0).abs() < 0.1);
+        // Empty input -> 0.
+        assert_eq!(shannon_entropy_ascii_nonws(""), 0.0);
+    }
+
+    #[test]
+    fn zero_width_count_matches_inserts() {
+        let s = "a\u{200B}b\u{200C}c\u{FEFF}d";
+        assert_eq!(zero_width_count(s), 3);
+        assert_eq!(zero_width_count("plain"), 0);
+    }
+
+    #[test]
+    fn shingle_uniqueness_detects_repetition() {
+        // Unique input: every trigram distinct.
+        let u = shingle_uniqueness("abcdefg", 3);
+        assert!((u - 1.0).abs() < 1e-6);
+        // Repeated trigrams: "aaa" repeats.
+        let r = shingle_uniqueness("aaaaaaaaa", 3);
+        assert!(r < 0.2, "expected low uniqueness, got {r}");
+        // Too-short input returns 1.0.
+        assert_eq!(shingle_uniqueness("ab", 3), 1.0);
     }
 }

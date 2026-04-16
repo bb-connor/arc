@@ -24,6 +24,7 @@
 //! | [`AdvisoryPipeline`] | **Full** | Non-blocking advisory signals with optional promotion |
 //! | [`AnomalyAdvisoryGuard`] | **Full** | Flags unusual invocation patterns and delegation depth |
 //! | [`DataTransferAdvisoryGuard`] | **Full** | Flags high data transfer volumes |
+//! | [`JailbreakGuard`] | **Full** | Multi-layer jailbreak detection (heuristic + statistical + ML) |
 //!
 //! # Guard pipeline
 //!
@@ -51,6 +52,8 @@ pub mod data_flow;
 mod egress_allowlist;
 mod forbidden_path;
 pub mod internal_network;
+pub mod jailbreak;
+pub mod jailbreak_detector;
 pub mod mcp_tool;
 pub mod patch_integrity;
 pub mod path_allowlist;
@@ -73,6 +76,16 @@ pub use data_flow::{DataFlowConfig, DataFlowGuard};
 pub use egress_allowlist::EgressAllowlistGuard;
 pub use forbidden_path::ForbiddenPathGuard;
 pub use internal_network::InternalNetworkGuard;
+pub use jailbreak::{
+    JailbreakGuard, JailbreakGuardConfig, DEFAULT_FINGERPRINT_CAPACITY as JAILBREAK_DEFAULT_FINGERPRINT_CAPACITY,
+};
+pub use jailbreak_detector::{
+    DetectorConfig as JailbreakDetectorConfig, Detection as JailbreakDetection, JailbreakCategory,
+    JailbreakDetector, LayerScores as JailbreakLayerScores, LayerWeights,
+    LinearModel as JailbreakLinearModel, Signal as JailbreakSignal,
+    StatisticalThresholds as JailbreakStatisticalThresholds,
+    DEFAULT_DENY_THRESHOLD as JAILBREAK_DEFAULT_DENY_THRESHOLD,
+};
 pub use mcp_tool::McpToolGuard;
 pub use patch_integrity::PatchIntegrityGuard;
 pub use path_allowlist::PathAllowlistGuard;
