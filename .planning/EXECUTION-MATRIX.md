@@ -270,29 +270,55 @@
 
 ---
 
-## Next Candidates: Wave 2 (post-1b)
+## Wave 2 Results (2026-04-16)
 
-**Criteria**: Disjoint write sets, no contention on hot files. Phase 2.2 Constraint variants are now shipped, so all data-layer / memory / financial guards downstream are unblocked.
+**All 7 Wave 2 stories SHIPPED.** Commits on `project/full-roadmap`:
 
-### Wave 2: Zero-Contention, Ready Now
-*These can start immediately on parallel branches. No hot-file contention.*
+| # | Story | Commit | Notes |
+|---|-------|--------|-------|
+| 7.2 | VectorDbGuard | `102c805` | arc-data-guards: vector_guard.rs + tests |
+| 7.3 | WarehouseCostGuard | `5a0da48` | + `CostDimension::WarehouseQuery` in arc-metering |
+| 7.4 | QueryResultGuard | `d8e4514` | Shipped as transform + pipeline hook; kernel post-invocation surface pending |
+| 3.1 | PromptInjectionGuard | `3d55e18` | 6-signal detector, lru dedup, sha2 hashing, 225 tests |
+| 17.6 | Cloud Run/ECS/Azure | `8a0b933` | deploy/{cloud-run,ecs,azure}/ + README |
+| 12.1 | SIEM exporters + alerting | `4c8472b` | Datadog + Sumo Logic + webhook + PagerDuty/OpsGenie |
+| 5.6 | WASM policy-driven loading | `c381458` | Placeholders + capability intersection + signed-module verification |
 
-1. **7.2 VectorDbGuard** — `crates/arc-data-guards/src/vector_guard.rs` (new). Depends on shipped 7.1 (re-uses crate scaffolding). No kernel/core-types contention.
-2. **7.3 WarehouseCostGuard** — `crates/arc-data-guards/src/warehouse_cost_guard.rs` (new) + optional `CostDimension::WarehouseQuery` in arc-metering/cost.rs. Self-contained.
-3. **7.4 QueryResultGuard (post-invocation)** — `crates/arc-data-guards/src/result_guard.rs` (new). Consumes shipped MaxRowsReturned / ColumnDenylist constraints.
-4. **12.1 Missing SIEM Exporters** — `crates/arc-siem/src/exporters/{datadog.rs,sumo_logic.rs,webhook.rs,alerting.rs}` (new). Sibling modules; mod.rs write is the only contention.
-5. **0.4 Pre-Built Binary Distribution** — `.github/workflows/release-binaries.yml`, `Dockerfile.sidecar`, Homebrew formula. Pure CI/infra.
-6. **17.6 Cloud Run / ECS Sidecar Reference** — `deploy/{cloud-run,ecs,azure}/*`. Pure manifest/config.
-7. **3.1 PromptInjectionGuard** — `crates/arc-guards/src/prompt_injection.rs` (new). Self-contained content guard; pre-invocation only.
-8. **5.6 Custom Guard Registry: WASM Merge** — `crates/arc-wasm-guards/src/placeholders.rs` (new) + `load_guards_from_policy()`. Depends on shipped 1.3 signing and shipped 2.2 constraints.
+**Post-Wave adjacents:**
 
-### Wave 3: Moderate Contention, Sequence After Wave 2
-*Kernel or core-types writes; do after the above land.*
+- `ed2614f` — **TEE attested checkpoint binding scope** — `arc.nitro.attested_checkpoint_binding.v1` shape doc + kernel scoped verified runtime attestation record + CLI issuance returns verified record without runtime policy.
+- `56af8a9` — **cargo fmt workspace sweep** — 36 files, no behavior change.
 
-9. **2.3 ModelConstraint Implementation** — deepen `arc-kernel/src/kernel/mod.rs` evaluation for already-shipped ModelConstraint variant. Kernel contention.
-10. **2.4 Plan-Level Evaluation** — new `arc-core-types::PlannedToolCall`, kernel `evaluate_plan()`, HTTP route. Large kernel + core-types write.
-11. **15.1 FIPS Crypto Path** — `SigningBackend` trait in arc-core-types/src/crypto.rs; P-256/P-384 backend. Moderate contention.
-12. **3.4 HITL Verdict + 3.5 Persistence + 3.6 Channels** — cluster; all three share `Verdict::PendingApproval` and ApprovalGuard. Serialize within cluster, parallelize across other waves.
+**Integration gate**: `cargo check --workspace --all-targets` clean. Focused test suites across arc-data-guards + arc-siem + arc-guards + arc-metering + arc-core-types: **654/654 passed, 0 failed, 2 ignored**. Kernel+appraisal: **258 passed, 4 failed** (4 = pre-existing failures unchanged by Wave 2).
+
+**Not shipped in Wave 2**: 0.4 Pre-Built Binary Distribution (CI-only; deferred pending GitHub Actions secret config).
+
+---
+
+## Next Candidates: Wave 3
+
+**Criteria**: kernel-contended work now unblocked. Another session previously held parallel work on arc-kernel/mod.rs + arc-appraisal has been quiesced; main is clean. Serialize within the kernel hot-file cluster.
+
+### Wave 3a: Parallelizable Pre-Kernel (no hot-file contention)
+*Can start immediately.*
+
+1. **15.1 FIPS Crypto Path** — `SigningBackend` trait in arc-core-types/src/crypto.rs; P-256/P-384 backend. No kernel write.
+2. **0.4 Pre-Built Binary Distribution** — `.github/workflows/release-binaries.yml`, `Dockerfile.sidecar`, Homebrew formula. Pure CI/infra.
+3. **13.x Observability hardening** — arc-metering dashboards, receipt-query CLI. Stays within arc-metering + arc-cli.
+
+### Wave 3b: Kernel Cluster (serialize)
+*One at a time; each completes before the next spawns.*
+
+4. **2.3 ModelConstraint Implementation** — deepen `arc-kernel/src/kernel/mod.rs` + `request_matching.rs` evaluation for already-shipped ModelConstraint variant.
+5. **2.4 Plan-Level Evaluation** — new `arc-core-types::PlannedToolCall`, kernel `evaluate_plan()`, HTTP route.
+6. **3.4 HITL Verdict + 3.5 Persistence + 3.6 Channels** — cluster; all three share `Verdict::PendingApproval` and ApprovalGuard. Serialize within cluster.
+
+### Wave 3c: Post-Kernel
+*After 3b completes.*
+
+7. **Debug 4 pre-existing arc-kernel test failures** (checkpoint / session / receipt_support / governed_call_chain order).
+8. **14.x WASM kernel** — arc-kernel-core extraction.
+9. **10.3 arc-langgraph** — after 3.4-3.6 HITL shapes stabilize.
 
 ---
 
@@ -343,8 +369,8 @@ PHASE 14 (WASM Kernel, depends on 1,2,3)
 
 ---
 
-**Last Updated**: 2026-04-16 15:55 UTC (post Wave 1b)
-**Next Review**: After Wave 2 parallel cluster lands (phases 7.2-7.4, 12.1, 0.4, 17.6, 3.1, 5.6)
+**Last Updated**: 2026-04-16 21:20 UTC (post Wave 2 + TEE binding scope)
+**Next Review**: After Wave 3a parallel cluster lands (15.1 FIPS, 0.4 binaries, 13.x observability)
 
 ## Known Pre-existing Test Failures (not caused by Wave 1 work)
 
