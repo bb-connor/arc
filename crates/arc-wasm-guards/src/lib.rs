@@ -63,9 +63,15 @@ pub use config::WasmGuardConfig;
 pub use error::WasmGuardError;
 #[cfg(feature = "wasmtime-runtime")]
 pub use host::WasmHostState;
-pub use manifest::{GuardManifest, MANIFEST_FILENAME, SUPPORTED_ABI_VERSIONS};
+pub use manifest::{
+    load_signature_sidecar, signature_sidecar_path, signed_module_message, verify_guard_signature,
+    verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,
+    MANIFEST_FILENAME, SIGNATURE_SUFFIX, SUPPORTED_ABI_VERSIONS,
+};
 #[cfg(feature = "wasmtime-runtime")]
-pub use runtime::wasmtime_backend::{create_backend, detect_wasm_format, WasmFormat};
+pub use runtime::wasmtime_backend::{
+    create_backend, detect_wasm_format, load_signed_guard, WasmFormat,
+};
 pub use runtime::{WasmGuard, WasmGuardRuntime};
 #[cfg(feature = "wasmtime-runtime")]
 pub use wiring::{build_guard_pipeline, load_wasm_guards};

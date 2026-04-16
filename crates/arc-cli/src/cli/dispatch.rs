@@ -2209,6 +2209,10 @@ fn main() {
             GuardCommands::Bench { path, iterations, fuel_limit } => guard::cmd_guard_bench(&path, iterations, fuel_limit),
             GuardCommands::Pack => guard::cmd_guard_pack(),
             GuardCommands::Install { path, target_dir } => guard::cmd_guard_install(&path, &target_dir),
+            GuardCommands::Sign { wasm, key, name, version } => {
+                guards::sign::cmd_guard_sign(&wasm, &key, &name, &version)
+            }
+            GuardCommands::Verify { wasm } => guards::sign::cmd_guard_verify(&wasm),
         },
     };
 

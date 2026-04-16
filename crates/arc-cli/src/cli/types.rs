@@ -265,6 +265,27 @@ enum GuardCommands {
         #[arg(long, default_value = "guards")]
         target_dir: PathBuf,
     },
+
+    /// Sign a .wasm guard binary and write a `.wasm.sig` sidecar (Phase 1.3).
+    Sign {
+        /// Path to the `.wasm` file to sign.
+        wasm: PathBuf,
+        /// Path to a file containing a hex-encoded 32-byte Ed25519 signing seed.
+        #[arg(long)]
+        key: PathBuf,
+        /// Module name to embed in the signed envelope (matches `guard-manifest.yaml`).
+        #[arg(long)]
+        name: String,
+        /// Module version to embed in the signed envelope.
+        #[arg(long)]
+        version: String,
+    },
+
+    /// Verify the `.wasm.sig` sidecar for a .wasm guard binary (exits 0 on success).
+    Verify {
+        /// Path to the `.wasm` file to verify.
+        wasm: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]

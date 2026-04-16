@@ -113,9 +113,11 @@ impl WasmGuard {
             ToolAction::CodeExecution { language, .. } => {
                 (Some("code_execution".into()), None, Some(language.clone()))
             }
-            ToolAction::BrowserAction { verb, target } => {
-                (Some("browser_action".into()), None, target.clone().or_else(|| Some(verb.clone())))
-            }
+            ToolAction::BrowserAction { verb, target } => (
+                Some("browser_action".into()),
+                None,
+                target.clone().or_else(|| Some(verb.clone())),
+            ),
             ToolAction::DatabaseQuery { database, .. } => {
                 (Some("database_query".into()), None, Some(database.clone()))
             }
@@ -443,6 +445,38 @@ pub mod wasmtime_backend {
                 Ok(Box::new(backend))
             }
         }
+    }
+
+    /// Load a WASM guard enforcing the Phase 1.3 signing policy.
+    ///
+    /// Reads `wasm_path` from disk, verifies that the signature sidecar
+    /// (`wasm_path + ".sig"`) is present and valid per
+    /// [`crate::manifest::verify_guard_signature`], then checks the SHA-256
+    /// hash against the manifest declaration before instantiating the
+    /// backend via [`create_backend`].
+    ///
+    /// Errors are fail-closed: any signature, hash, or format problem
+    /// rejects the guard before any guest code runs. Operators may set
+    /// `manifest.allow_unsigned = true` (with `signer_public_key = None`)
+    /// to permit unsigned modules, in which case a WARN is logged.
+    pub fn load_signed_guard(
+        engine: Arc<Engine>,
+        wasm_path: &str,
+        fuel_limit: u64,
+        manifest: &crate::manifest::GuardManifest,
+    ) -> Result<Box<dyn crate::abi::WasmGuardAbi>, WasmGuardError> {
+        let wasm_bytes = std::fs::read(wasm_path).map_err(|e| WasmGuardError::ModuleLoad {
+            path: wasm_path.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        // Signing policy (Phase 1.3) -- fail-closed.
+        crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
+
+        // Hash attestation from the manifest.
+        crate::manifest::verify_wasm_hash(&wasm_bytes, &manifest.wasm_sha256)?;
+
+        create_backend(engine, &wasm_bytes, fuel_limit, manifest.config.clone())
     }
 
     // -------------------------------------------------------------------

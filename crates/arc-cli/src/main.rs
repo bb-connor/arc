@@ -17,6 +17,7 @@ mod admin;
 mod cert;
 mod did;
 mod guard;
+mod guards;
 mod passport;
 mod scaffold;
 

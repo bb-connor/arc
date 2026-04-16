@@ -70,6 +70,11 @@ pub enum WasmGuardError {
     /// The .wasm binary is neither a valid core module nor a Component Model component.
     #[error("unrecognized WASM format: neither core module nor component")]
     UnrecognizedFormat,
+
+    /// Ed25519 signature verification (or the surrounding envelope check)
+    /// failed for a WASM guard module. Emitted by Phase 1.3 signing.
+    #[error("signature verification failed: {0}")]
+    SignatureVerification(String),
 }
 
 #[cfg(test)]

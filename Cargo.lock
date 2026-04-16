@@ -894,11 +894,13 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "clap",
+ "ed25519-dalek",
  "flate2",
  "hex",
  "p256",
  "p384",
  "percent-encoding",
+ "rand_core 0.6.4",
  "reqwest",
  "rsa",
  "rusqlite",
@@ -1070,6 +1072,21 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "arc-data-guards"
+version = "0.1.0"
+dependencies = [
+ "arc-core",
+ "arc-guards",
+ "arc-kernel",
+ "regex",
+ "serde",
+ "serde_json",
+ "sqlparser",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -1587,7 +1604,9 @@ dependencies = [
  "arc-guards",
  "arc-kernel",
  "criterion",
+ "ed25519-dalek",
  "hex",
+ "rand_core 0.6.4",
  "serde",
  "serde_json",
  "serde_yml",
@@ -5117,6 +5136,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "recursive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0786a43debb760f491b1bc0269fe5e84155353c67482b9e60d0cfb596054b43e"
+dependencies = [
+ "recursive-proc-macro-impl",
+ "stacker",
+]
+
+[[package]]
+name = "recursive-proc-macro-impl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76009fbe0614077fc1a2ce255e3a1881a2e3a3527097d5dc6d8212c585e7e38b"
+dependencies = [
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5984,10 +6023,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlparser"
+version = "0.61.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbf5ea8d4d7c808e1af1cbabebca9a2abe603bcefc22294c5b95018d53200cb7"
+dependencies = [
+ "log",
+ "recursive",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "stacker"
+version = "0.1.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08d74a23609d509411d10e2176dc2a4346e3b4aea2e7b1869f19fdedbc71c013"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "libc",
+ "psm",
+ "windows-sys 0.59.0",
+]
 
 [[package]]
 name = "static_assertions"

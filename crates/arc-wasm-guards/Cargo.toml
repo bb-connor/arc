@@ -20,6 +20,7 @@ arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-config = { package = "arc-config", path = "../arc-config" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
+ed25519-dalek = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -32,6 +33,7 @@ wasmtime = { version = "29", optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+rand_core = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 
