@@ -11,6 +11,7 @@ repository.workspace = true
 name = "arc_data_guards"
 
 [dependencies]
+arc-core = { package = "arc-core", path = "../arc-core" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
 serde = { workspace = true }
@@ -21,7 +22,6 @@ regex = "1"
 sqlparser = "0.61"
 
 [dev-dependencies]
-arc-core = { package = "arc-core", path = "../arc-core" }
 serde_json = { workspace = true }
 
 [lints.clippy]
