@@ -1,4 +1,4 @@
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, RwLock};
 
 use arc_appraisal::VerifiedRuntimeAttestationRecord;
@@ -18,6 +18,11 @@ pub type CapabilityId = String;
 
 /// A string-typed server identifier.
 pub type ServerId = String;
+
+/// Deny reason surfaced by every evaluate path when the emergency kill
+/// switch is engaged. Exposed as `pub` so HTTP adapters and SDKs can
+/// pattern-match on the exact string without drifting.
+pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
 
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
@@ -786,6 +791,25 @@ pub struct ArcKernel {
     /// from being consumed more than once. Uses the same LRU + TTL pattern as
     /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
     approval_replay_store: Option<dpop::DpopNonceStore>,
+    /// Emergency kill switch. When `true`, every evaluate entry point returns
+    /// `Verdict::Deny` without performing capability validation or guard
+    /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
+    ///
+    /// Reads use `Ordering::SeqCst` even on the hot path. The emergency check
+    /// is a single atomic load per evaluate call (negligible cost relative to
+    /// the guard pipeline) and `SeqCst` is the safest default for a rarely
+    /// taken control path.
+    emergency_stopped: AtomicBool,
+    /// Unix timestamp (seconds) at which the kill switch was last engaged.
+    /// `0` means "never engaged" or "currently resumed". Written with
+    /// `SeqCst` before `emergency_stopped` is set to `true`, cleared to `0`
+    /// after `emergency_stopped` is set to `false`.
+    emergency_stopped_since: AtomicU64,
+    /// Operator-supplied reason for the most recent emergency stop. Set on
+    /// `emergency_stop`, cleared on `emergency_resume`. Guarded by a mutex
+    /// because the payload is a heap-allocated `String`; callers that only
+    /// need presence information can read `emergency_stopped` instead.
+    emergency_stop_reason: Mutex<Option<String>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1137,6 +1161,9 @@ impl ArcKernel {
                 8192,
                 std::time::Duration::from_secs(3600),
             )),
+            emergency_stopped: AtomicBool::new(false),
+            emergency_stopped_since: AtomicU64::new(0),
+            emergency_stop_reason: Mutex::new(None),
         }
     }
 
@@ -1169,6 +1196,97 @@ impl ArcKernel {
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.budget_store = Mutex::new(budget_store);
+    }
+
+    /// Engage the emergency kill switch.
+    ///
+    /// After this call, every `evaluate_tool_call*` path returns a signed
+    /// deny receipt with reason `"kernel emergency stop active"` before
+    /// touching capability validation or the guard pipeline. The kernel
+    /// remains running so orchestrators and health probes see a live
+    /// process; it is simply inert.
+    ///
+    /// The active capability set is NOT purged from the revocation store:
+    /// the current `RevocationStore` trait has no bulk revoke API and
+    /// capability expiration plus the kill-switch flag together satisfy
+    /// Phase 1.4 acceptance. When a future revision adds `revoke_all`,
+    /// this method should call it; until then, capability revocation is
+    /// delegated to natural expiration.
+    ///
+    /// Fails closed: if the reason mutex is poisoned we still leave the
+    /// kernel in the stopped state (the flag is set before any fallible
+    /// step) and surface the poison to the caller.
+    pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
+        let now = current_unix_timestamp();
+        // Record the timestamp first so any concurrent reader that observes
+        // `emergency_stopped == true` sees a non-zero `since` value.
+        self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        self.emergency_stopped.store(true, Ordering::SeqCst);
+
+        warn!(
+            reason = %reason,
+            timestamp = now,
+            "emergency stop engaged -- all evaluations will be denied"
+        );
+
+        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
+            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
+        })?;
+        *slot = Some(reason.to_string());
+        Ok(())
+    }
+
+    /// Disengage the emergency kill switch and resume normal operation.
+    ///
+    /// Subsequent `evaluate_tool_call*` calls follow the full validation
+    /// pipeline again. Capabilities that naturally expired while the
+    /// kernel was stopped remain expired; the kill switch does not
+    /// retroactively grant anything.
+    pub fn emergency_resume(&self) -> Result<(), KernelError> {
+        self.emergency_stopped.store(false, Ordering::SeqCst);
+        self.emergency_stopped_since.store(0, Ordering::SeqCst);
+
+        warn!("emergency stop disengaged -- evaluations will resume");
+
+        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
+            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
+        })?;
+        *slot = None;
+        Ok(())
+    }
+
+    /// Return `true` when the emergency kill switch is engaged.
+    #[must_use]
+    pub fn is_emergency_stopped(&self) -> bool {
+        self.emergency_stopped.load(Ordering::SeqCst)
+    }
+
+    /// Return the unix timestamp (seconds) at which the kill switch was
+    /// engaged, or `None` when the kernel is currently running normally.
+    #[must_use]
+    pub fn emergency_stopped_since(&self) -> Option<u64> {
+        if !self.is_emergency_stopped() {
+            return None;
+        }
+        let since = self.emergency_stopped_since.load(Ordering::SeqCst);
+        if since == 0 {
+            None
+        } else {
+            Some(since)
+        }
+    }
+
+    /// Return the operator-supplied reason for the current emergency stop,
+    /// or `None` when the kernel is running normally or the mutex is
+    /// poisoned (fail-closed readers should treat `None` as "no reason
+    /// available").
+    #[must_use]
+    pub fn emergency_stop_reason(&self) -> Option<String> {
+        if !self.is_emergency_stopped() {
+            return None;
+        }
+        let guard = self.emergency_stop_reason.lock().ok()?;
+        guard.clone()
     }
 
     /// Install a DPoP nonce replay store and verification config.
@@ -1245,6 +1363,14 @@ impl ArcKernel {
         capability: &CapabilityToken,
         agent_id: &str,
     ) -> Result<(), KernelError> {
+        // Phase 1.4 emergency kill switch: resource/prompt operations that go
+        // through this helper must also deny-fast so the kill switch applies
+        // to every capability-backed surface, not just tool calls.
+        if self.is_emergency_stopped() {
+            return Err(KernelError::GuardDenied(
+                EMERGENCY_STOP_DENY_REASON.to_string(),
+            ));
+        }
         self.verify_capability_signature(capability)
             .map_err(|_| KernelError::InvalidSignature)?;
         check_time_bounds(capability, current_unix_timestamp())?;
@@ -1313,8 +1439,26 @@ impl ArcKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
         let now = current_unix_timestamp();
+
+        // Phase 1.4 emergency kill switch: every evaluate path checks the flag
+        // BEFORE capability validation, guard evaluation, or budget mutation so
+        // a stopped kernel cannot be coerced into doing any work.
+        if self.is_emergency_stopped() {
+            warn!(
+                request_id = %request.request_id,
+                "emergency stop active -- denying evaluate_tool_call"
+            );
+            return self.build_deny_response_with_metadata(
+                request,
+                EMERGENCY_STOP_DENY_REASON,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
+        self.validate_web3_evidence_prerequisites()?;
 
         debug!(
             request_id = %request.request_id,
@@ -1738,8 +1882,20 @@ impl ArcKernel {
         request: &ToolCallRequest,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
         let now = current_unix_timestamp();
+
+        // Phase 1.4 emergency kill switch: the nested-flow path also deny-fast
+        // so sampling/elicitation-bearing tool calls cannot slip past while
+        // the kernel is stopped.
+        if self.is_emergency_stopped() {
+            warn!(
+                request_id = %request.request_id,
+                "emergency stop active -- denying evaluate_tool_call (nested flow)"
+            );
+            return self.build_deny_response(request, EMERGENCY_STOP_DENY_REASON, now, None);
+        }
+
+        self.validate_web3_evidence_prerequisites()?;
 
         debug!(
             request_id = %request.request_id,
