@@ -38,6 +38,9 @@ pub const EMERGENCY_RESUME_PATH: &str = "/emergency-resume";
 /// `GET /emergency-status` -- report current kill-switch state.
 pub const EMERGENCY_STATUS_PATH: &str = "/emergency-status";
 
+/// `POST /evaluate-plan` -- Phase 2.4 plan-level pre-flight evaluation.
+pub const EVALUATE_PLAN_PATH: &str = "/evaluate-plan";
+
 /// Header that carries the operator admin token on every emergency
 /// call. Adapters must not expose these routes without requiring this
 /// header; see [`crate::emergency::EmergencyAdmin::new`].

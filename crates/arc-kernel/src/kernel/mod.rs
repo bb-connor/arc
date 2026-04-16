@@ -1439,6 +1439,267 @@ impl ArcKernel {
         )
     }
 
+    /// Phase 2.4 plan-level evaluation.
+    ///
+    /// Takes an ordered list of planned tool calls under a single
+    /// capability token and evaluates every step INDEPENDENTLY against
+    /// the pre-invocation portion of the evaluation pipeline: capability
+    /// signature / time-bound / revocation / subject binding, the
+    /// request-matching pass (scope + constraints + model constraint),
+    /// and the registered guard pipeline. No tool-server dispatch, no
+    /// budget mutation, no receipt emission, and no cross-step state
+    /// propagation take place: this is a stateless pre-flight check.
+    ///
+    /// Dependencies between planned steps are advisory metadata only in
+    /// v1: the kernel does not topologically sort the graph, refuse on
+    /// cycles, or short-circuit downstream steps when an earlier step
+    /// denies. Callers are expected to make that decision themselves
+    /// once they have the per-step verdict list.
+    ///
+    /// Guards that require post-invocation output (response-shaping,
+    /// streaming sanitizers, etc.) are inherently skipped because no
+    /// tool output exists; in Phase 2.4 every registered guard is
+    /// invoked against the synthesised pre-flight request, matching the
+    /// set of guards that run in `evaluate_tool_call` before dispatch.
+    ///
+    /// Receipt emission is deferred to a future phase. The kernel emits
+    /// structured trace spans for the plan and every per-step verdict
+    /// so operators can correlate plan evaluations with subsequent
+    /// tool-call receipts.
+    pub async fn evaluate_plan(
+        &self,
+        req: arc_core_types::PlanEvaluationRequest,
+    ) -> arc_core_types::PlanEvaluationResponse {
+        self.evaluate_plan_blocking(&req)
+    }
+
+    /// Synchronous variant of [`Self::evaluate_plan`] for substrate
+    /// adapters that do not run on an async runtime.
+    ///
+    /// Plan evaluation never touches the network, so the async method
+    /// is a thin wrapper over this blocking implementation.
+    pub fn evaluate_plan_blocking(
+        &self,
+        req: &arc_core_types::PlanEvaluationRequest,
+    ) -> arc_core_types::PlanEvaluationResponse {
+        use arc_core_types::{
+            PlanEvaluationResponse, PlanVerdict, StepVerdict, StepVerdictKind,
+        };
+
+        debug!(
+            plan_id = %req.plan_id,
+            planner_capability_id = %req.planner_capability_id,
+            step_count = req.steps.len(),
+            "evaluating plan"
+        );
+
+        let mut step_verdicts = Vec::with_capacity(req.steps.len());
+
+        // Reject capability-id mismatches once, up front: every step is
+        // evaluated under the same token so a mismatch is fatal for the
+        // whole plan. Fail-closed: every step is flagged denied.
+        if req.planner_capability.id != req.planner_capability_id {
+            let reason = format!(
+                "planner_capability_id {} does not match embedded token id {}",
+                req.planner_capability_id, req.planner_capability.id
+            );
+            for (index, _) in req.steps.iter().enumerate() {
+                step_verdicts.push(StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(reason.clone()),
+                    guard: None,
+                });
+            }
+            let plan_verdict = if step_verdicts.is_empty() {
+                PlanVerdict::FullyDenied
+            } else {
+                PlanEvaluationResponse::aggregate(&step_verdicts)
+            };
+            return PlanEvaluationResponse {
+                plan_id: req.plan_id.clone(),
+                plan_verdict,
+                step_verdicts,
+            };
+        }
+
+        // Emergency stop applies to plan evaluation too: a stopped kernel
+        // must not leak any information about what the plan might allow.
+        if self.is_emergency_stopped() {
+            warn!(
+                plan_id = %req.plan_id,
+                "emergency stop active -- denying evaluate_plan"
+            );
+            for (index, _) in req.steps.iter().enumerate() {
+                step_verdicts.push(StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(EMERGENCY_STOP_DENY_REASON.to_string()),
+                    guard: None,
+                });
+            }
+            let plan_verdict = if step_verdicts.is_empty() {
+                PlanVerdict::FullyDenied
+            } else {
+                PlanEvaluationResponse::aggregate(&step_verdicts)
+            };
+            return PlanEvaluationResponse {
+                plan_id: req.plan_id.clone(),
+                plan_verdict,
+                step_verdicts,
+            };
+        }
+
+        for (index, step) in req.steps.iter().enumerate() {
+            let verdict = self.evaluate_plan_step(req, step, index);
+            step_verdicts.push(verdict);
+        }
+
+        let plan_verdict = PlanEvaluationResponse::aggregate(&step_verdicts);
+
+        debug!(
+            plan_id = %req.plan_id,
+            plan_verdict = ?plan_verdict,
+            "plan evaluation complete"
+        );
+
+        PlanEvaluationResponse {
+            plan_id: req.plan_id.clone(),
+            plan_verdict,
+            step_verdicts,
+        }
+    }
+
+    fn evaluate_plan_step(
+        &self,
+        req: &arc_core_types::PlanEvaluationRequest,
+        step: &arc_core_types::PlannedToolCall,
+        index: usize,
+    ) -> arc_core_types::StepVerdict {
+        use arc_core_types::{StepVerdict, StepVerdictKind};
+
+        let now = current_unix_timestamp();
+        let cap = &req.planner_capability;
+
+        // Capability-wide checks repeat per-step so a failure here is
+        // still reflected in every step's verdict, keeping the per-step
+        // output self-contained.
+        if let Err(reason) = self.verify_capability_signature(cap) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(format!("signature verification failed: {reason}")),
+                guard: None,
+            };
+        }
+        if let Err(error) = check_time_bounds(cap, now) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+        if let Err(error) = self.check_revocation(cap) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+        if let Err(error) = check_subject_binding(cap, &req.agent_id) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+
+        // Synthesise a ToolCallRequest so the same request-matching and
+        // guard machinery applies to plan steps as to runtime calls. No
+        // DPoP / governed-intent / approval-token shape is carried: plan
+        // evaluation is a pre-flight check and is not a substitute for
+        // those runtime-only proofs.
+        let synthesised = ToolCallRequest {
+            request_id: step.request_id.clone(),
+            capability: cap.clone(),
+            tool_name: step.tool_name.clone(),
+            server_id: step.server_id.clone(),
+            agent_id: req.agent_id.clone(),
+            arguments: step.parameters.clone(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: step.model_metadata.clone(),
+        };
+
+        let matching_grants = match resolve_matching_grants(
+            cap,
+            &synthesised.tool_name,
+            &synthesised.server_id,
+            &synthesised.arguments,
+            synthesised.model_metadata.as_ref(),
+        ) {
+            Ok(grants) if !grants.is_empty() => grants,
+            Ok(_) => {
+                let error = KernelError::OutOfScope {
+                    tool: synthesised.tool_name.clone(),
+                    server: synthesised.server_id.clone(),
+                };
+                return StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(error.to_string()),
+                    guard: None,
+                };
+            }
+            Err(error) => {
+                return StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(error.to_string()),
+                    guard: None,
+                };
+            }
+        };
+
+        let matched_grant_index = matching_grants
+            .first()
+            .map(|matching| matching.index)
+            .unwrap_or(0);
+
+        // run_guards returns Ok(()) on allow and Err(GuardDenied(...))
+        // on deny. Fail-closed: any guard error reads as a denial so the
+        // caller still sees a per-step reason string.
+        if let Err(error) = self.run_guards(
+            &synthesised,
+            &cap.scope,
+            None,
+            Some(matched_grant_index),
+        ) {
+            // Attempt to extract the offending guard name from the
+            // canonical `guard "<name>" denied the request` format
+            // emitted by run_guards.
+            let message = error.to_string();
+            let guard = extract_guard_name(&message);
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(message),
+                guard,
+            };
+        }
+
+        StepVerdict {
+            step_index: index,
+            verdict: StepVerdictKind::Allowed,
+            reason: None,
+            guard: None,
+        }
+    }
+
     fn evaluate_tool_call_sync_with_session_roots(
         &self,
         request: &ToolCallRequest,
@@ -4658,6 +4919,22 @@ impl ArcKernel {
         }
         Ok(())
     }
+}
+
+/// Extract a guard name from a `GuardDenied` error message shaped like
+/// `guard "<name>" denied the request` or `guard "<name>" error ...`.
+///
+/// Plan evaluation surfaces the offending guard in the per-step verdict
+/// so callers can target a specific guard when replanning. Parsing the
+/// name out of the canonical string is sufficient here; the structured
+/// denial payload defined by Phase 0.5 is a tool-call response type and
+/// is not shared with plan evaluation.
+fn extract_guard_name(message: &str) -> Option<String> {
+    let start_marker = "guard \"";
+    let start = message.find(start_marker)? + start_marker.len();
+    let rest = &message[start..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
 }
 
 fn scope_from_capability_snapshot(

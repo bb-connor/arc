@@ -12,6 +12,7 @@ pub mod manifest;
 pub mod merkle;
 pub mod message;
 pub mod oracle;
+pub mod plan;
 pub mod receipt;
 pub mod runtime_attestation;
 pub mod session;
@@ -41,6 +42,10 @@ pub use manifest::{
 };
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
+pub use plan::{
+    PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall,
+    PlannedToolCallId, StepVerdict, StepVerdictKind,
+};
 pub use oracle::{OracleConversionEvidence, ARC_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
 pub use receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,

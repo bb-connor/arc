@@ -1277,6 +1277,7 @@ version = "0.1.0"
 dependencies = [
  "arc-appraisal",
  "arc-core",
+ "arc-core-types",
  "arc-credit",
  "arc-governance",
  "arc-link",

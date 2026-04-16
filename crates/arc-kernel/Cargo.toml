@@ -13,6 +13,7 @@ name = "arc_kernel"
 [dependencies]
 arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core-types = { package = "arc-core-types", path = "../arc-core-types" }
 arc-credit = { package = "arc-credit", path = "../arc-credit" }
 arc-governance = { package = "arc-governance", path = "../arc-governance" }
 arc-link = { package = "arc-link", path = "../arc-link", default-features = false }
