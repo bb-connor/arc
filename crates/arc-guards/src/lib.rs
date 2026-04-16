@@ -42,6 +42,8 @@
 pub mod action;
 mod path_normalization;
 
+pub mod external;
+
 pub mod advisory;
 pub mod agent_velocity;
 pub mod behavioral_sequence;
@@ -88,3 +90,9 @@ pub use shell_command::ShellCommandGuard;
 pub use velocity::VelocityGuard;
 
 pub use action::{extract_action, ToolAction};
+
+pub use external::{
+    AsyncGuardAdapter, AsyncGuardAdapterBuilder, AsyncGuardAdapterConfig, CircuitBreaker,
+    CircuitBreakerConfig, CircuitOpenVerdict, CircuitState, ExternalGuard, ExternalGuardError,
+    GuardCallContext, RateLimitedVerdict, RetryConfig, TokenBucket, TtlCache,
+};
