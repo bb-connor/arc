@@ -1,0 +1,155 @@
+# Demo workload used by test-harness.sh to exercise the allow/deny flow.
+#
+# Deploys a tiny httpbin-style server into the `agent-tools` namespace with
+# the `arc.protocol/secured=true` label so the AuthorizationPolicy from
+# 02-authorization-policy.yaml applies to it. The Service + VirtualService
+# expose two routes that matter:
+#
+#   GET  /tools/hello    -- allowed when `Authorization: Bearer ...` is set
+#                           and ARC's guard pipeline approves. Responses
+#                           carry an `x-arc-receipt-id` header injected by
+#                           the ext_authz adapter.
+#   POST /tools/hello    -- allowed when `x-arc-capability-token: ...` is
+#                           set and the token grants the tool.
+#
+#   GET  /healthz        -- bypasses ARC (ALLOW AuthorizationPolicy) so
+#                           kubelet probes keep working during outages.
+#
+# The namespace opts into Istio sidecar injection; istio-proxy runs next
+# to mccutcheon/go-httpbin and funnels all ingress through the mesh.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-tools
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/part-of: arc-protocol
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-tool
+  namespace: agent-tools
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-tool
+  namespace: agent-tools
+  labels:
+    app.kubernetes.io/name: demo-tool
+    app.kubernetes.io/part-of: arc-protocol
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-tool
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-tool
+        # The opt-in label consumed by every AuthorizationPolicy in
+        # 02-authorization-policy.yaml. Workloads that omit this label
+        # skip ARC evaluation entirely.
+        arc.protocol/secured: "true"
+      annotations:
+        arc.protocol/policy: "demo-tool-policy"
+        arc.protocol/fail-mode: "closed"
+    spec:
+      serviceAccountName: demo-tool
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: httpbin
+          # go-httpbin is an httpbin clone with a pinned, non-root friendly image.
+          image: ghcr.io/mccutchen/go-httpbin:v2.18.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "-port=8080"
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /status/200
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /status/200
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-tool
+  namespace: agent-tools
+  labels:
+    app.kubernetes.io/name: demo-tool
+    app.kubernetes.io/part-of: arc-protocol
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: demo-tool
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+      appProtocol: http
+---
+# VirtualService rewrites external `/hello` into the go-httpbin path
+# `/anything/hello` so the demo can prove ARC's receipt header reaches
+# the client end-to-end, not just the upstream pod.
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: demo-tool
+  namespace: agent-tools
+  labels:
+    app.kubernetes.io/part-of: arc-protocol
+spec:
+  hosts:
+    - demo-tool.agent-tools.svc.cluster.local
+  http:
+    - name: tools-hello
+      match:
+        - uri:
+            prefix: /tools/
+      rewrite:
+        uri: /anything/tools/
+      route:
+        - destination:
+            host: demo-tool.agent-tools.svc.cluster.local
+            port:
+              number: 80
+    - name: healthz
+      match:
+        - uri:
+            exact: /healthz
+      rewrite:
+        uri: /status/200
+      route:
+        - destination:
+            host: demo-tool.agent-tools.svc.cluster.local
+            port:
+              number: 80
