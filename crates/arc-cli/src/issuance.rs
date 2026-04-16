@@ -194,7 +194,13 @@ fn verify_runtime_attestation_for_issuance(
     };
     let Some(policy) = policy else {
         validate_runtime_attestation_binding(Some(runtime_attestation))?;
-        return Ok(None);
+        return verify_runtime_attestation_record(runtime_attestation, None, now)
+            .map(Some)
+            .map_err(|error| {
+                KernelError::CapabilityIssuanceDenied(format!(
+                    "runtime attestation evidence rejected by local verification boundary: {error}"
+                ))
+            });
     };
 
     verify_runtime_attestation_record(
@@ -1187,6 +1193,29 @@ mod tests {
                 .trust_domain,
             "arc"
         );
+    }
+
+    #[test]
+    fn issuance_verification_returns_verified_record_without_runtime_policy() {
+        let evidence = test_azure_runtime_attestation();
+        let verified = verify_runtime_attestation_for_issuance(Some(&evidence), None, unix_now())
+            .expect("attestation should pass local binding validation")
+            .expect("verified record should still be returned without runtime policy");
+
+        assert!(!verified.policy_outcome.trust_policy_configured);
+        assert!(!verified.is_locally_accepted());
+        assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::None);
+        assert_eq!(
+            verified.evidence_schema(),
+            "arc.runtime-attestation.azure-maa.jwt.v1"
+        );
+        assert_eq!(verified.evidence_sha256(), "attestation-digest-azure");
+        assert_eq!(verified.canonical_verifier(), "https://maa.contoso.test");
+        assert_eq!(
+            verified.verifier_family(),
+            arc_core::appraisal::AttestationVerifierFamily::AzureMaa
+        );
+        assert!(verified.matches_evidence(&evidence));
     }
 
     #[test]

@@ -37,6 +37,12 @@ struct ValidatedGovernedCallChainProof {
     session_anchor_id: Option<String>,
 }
 
+#[derive(Debug, Clone, Default)]
+struct ValidatedGovernedAdmission {
+    call_chain_proof: Option<ValidatedGovernedCallChainProof>,
+    verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
+}
+
 #[derive(Debug, Clone)]
 enum LocalReceiptArtifact {
     Tool(arc_core::receipt::ArcReceipt),
@@ -1639,7 +1645,7 @@ impl ArcKernel {
                 ))
             })?;
 
-        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
+        let validated_governed_admission = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
@@ -1647,7 +1653,7 @@ impl ArcKernel {
             None,
             now,
         ) {
-            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Ok(validated_governed_admission) => validated_governed_admission,
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
@@ -1678,13 +1684,23 @@ impl ArcKernel {
                 );
             }
         };
+        let _governed_runtime_attestation_receipt_scope =
+            scope_governed_runtime_attestation_receipt_record(
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
+            );
         let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
-                request,
-                cap,
-                None,
-                validated_upstream_call_chain_proof,
-            ));
+            scope_governed_call_chain_receipt_evidence(
+                self.governed_call_chain_receipt_evidence(
+                    request,
+                    cap,
+                    None,
+                    validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.call_chain_proof.clone()),
+                ),
+            );
 
         if let Err(e) = self.run_guards(
             request,
@@ -2012,7 +2028,7 @@ impl ArcKernel {
                 ))
             })?;
 
-        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
+        let validated_governed_admission = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
@@ -2020,7 +2036,7 @@ impl ArcKernel {
             Some(parent_context),
             now,
         ) {
-            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Ok(validated_governed_admission) => validated_governed_admission,
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
@@ -2042,13 +2058,23 @@ impl ArcKernel {
                 return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
             }
         };
+        let _governed_runtime_attestation_receipt_scope =
+            scope_governed_runtime_attestation_receipt_record(
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
+            );
         let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
-                request,
-                cap,
-                Some(parent_context),
-                validated_upstream_call_chain_proof,
-            ));
+            scope_governed_call_chain_receipt_evidence(
+                self.governed_call_chain_receipt_evidence(
+                    request,
+                    cap,
+                    Some(parent_context),
+                    validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.call_chain_proof.clone()),
+                ),
+            );
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
@@ -4180,7 +4206,7 @@ impl ArcKernel {
         charge_result: Option<&BudgetChargeResult>,
         parent_context: Option<&OperationContext>,
         now: u64,
-    ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
+    ) -> Result<Option<ValidatedGovernedAdmission>, KernelError> {
         let (
             intent_required,
             approval_threshold_units,
@@ -4307,7 +4333,10 @@ impl ArcKernel {
             )));
         }
 
-        Ok(validated_upstream_call_chain_proof)
+        Ok(Some(ValidatedGovernedAdmission {
+            call_chain_proof: validated_upstream_call_chain_proof,
+            verified_runtime_attestation,
+        }))
     }
 
     fn governed_call_chain_receipt_evidence(
