@@ -14,6 +14,7 @@ name = "arc_data_guards"
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-guards = { package = "arc-guards", path = "../arc-guards" }
+arc-metering = { package = "arc-metering", path = "../arc-metering" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
