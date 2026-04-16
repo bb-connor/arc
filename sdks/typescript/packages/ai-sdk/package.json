@@ -1,0 +1,42 @@
+{
+  "name": "@arc-protocol/ai-sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ARC protocol wrapper for the Vercel AI SDK -- streaming-safe arcTool()",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arc-protocol/node-http": "file:../node-http"
+  },
+  "peerDependencies": {
+    "ai": ">=3.4 <6",
+    "zod": ">=3.23 <4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ai": "^5.0.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0",
+    "zod": "^3.23.8"
+  }
+}
