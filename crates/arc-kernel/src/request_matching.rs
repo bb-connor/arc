@@ -359,7 +359,146 @@ fn constraint_matches(
         | Constraint::MinimumRuntimeAssurance(_)
         | Constraint::MinimumAutonomyTier(_) => Ok(true),
         Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
+
+        // Phase 2.2 additions. These constraints either require domain-
+        // specific evaluation (SQL parsing, post-invocation result
+        // inspection, or cross-request HITL state) that lives outside
+        // this argument-matching stage, or they match against
+        // well-known argument keys. Unless a specific check below
+        // rejects the request, the constraint is accepted at this
+        // stage and enforced by a downstream guard.
+        Constraint::TableAllowlist(_)
+        | Constraint::ColumnDenylist(_)
+        | Constraint::MaxRowsReturned(_)
+        | Constraint::OperationClass(_)
+        | Constraint::ContentReviewTier(_)
+        | Constraint::MaxTransactionAmountUsd(_)
+        | Constraint::RequireDualApproval(_)
+        | Constraint::ModelConstraint { .. } => Ok(true),
+
+        Constraint::AudienceAllowlist(allowed) => {
+            Ok(audience_allowlist_matches(arguments, allowed))
+        }
+        Constraint::MemoryStoreAllowlist(allowed) => {
+            Ok(memory_store_allowlist_matches(arguments, allowed))
+        }
+        Constraint::MemoryWriteDenyPatterns(patterns) => {
+            memory_write_deny_patterns_match(arguments, patterns)
+        }
     }
+}
+
+/// Returns true when no recipient-style argument is present, or when
+/// every recipient value the call carries is in the allowlist.
+///
+/// Recognised argument keys: `recipient`, `recipients`, `audience`,
+/// `to`, `channel`, `channels`. Nested objects and arrays are walked.
+fn audience_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
+    let mut observed: Vec<String> = Vec::new();
+    collect_audience_values(arguments, &mut observed);
+    if observed.is_empty() {
+        return true;
+    }
+    observed.iter().all(|value| allowed.iter().any(|a| a == value))
+}
+
+fn collect_audience_values(arguments: &serde_json::Value, out: &mut Vec<String>) {
+    match arguments {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                if is_audience_key(key) {
+                    collect_string_values(value, out);
+                } else {
+                    collect_audience_values(value, out);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_audience_values(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_audience_key(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "recipient" | "recipients" | "audience" | "to" | "channel" | "channels"
+    )
+}
+
+fn collect_string_values(value: &serde_json::Value, out: &mut Vec<String>) {
+    match value {
+        serde_json::Value::String(s) => out.push(s.clone()),
+        serde_json::Value::Array(values) => {
+            for v in values {
+                collect_string_values(v, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Returns true when no `store` argument is present, or when every
+/// `store` value the call carries is in the allowlist.
+fn memory_store_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
+    let mut observed: Vec<String> = Vec::new();
+    collect_memory_store_values(arguments, &mut observed);
+    if observed.is_empty() {
+        return true;
+    }
+    observed.iter().all(|value| allowed.iter().any(|a| a == value))
+}
+
+fn collect_memory_store_values(arguments: &serde_json::Value, out: &mut Vec<String>) {
+    match arguments {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                if is_memory_store_key(key) {
+                    collect_string_values(value, out);
+                } else {
+                    collect_memory_store_values(value, out);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_memory_store_values(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_memory_store_key(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "store" | "memory_store" | "collection" | "namespace"
+    )
+}
+
+/// Returns Ok(false) when any string leaf in the arguments matches any
+/// deny pattern. An invalid regex surfaces as `InvalidConstraint`.
+fn memory_write_deny_patterns_match(
+    arguments: &serde_json::Value,
+    patterns: &[String],
+) -> Result<bool, KernelError> {
+    let leaves = collect_string_leaves(arguments);
+    for pattern in patterns {
+        let regex = Regex::new(pattern).map_err(|error| {
+            KernelError::InvalidConstraint(format!(
+                "memory write deny pattern \"{pattern}\" failed to compile: {error}"
+            ))
+        })?;
+        for leaf in &leaves {
+            if regex.is_match(&leaf.value) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 fn resource_grant_matches_request(grant: &ResourceGrant, uri: &str) -> bool {

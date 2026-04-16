@@ -3321,6 +3321,23 @@ impl ArcKernel {
                             }),
                     );
                 }
+                // Phase 2.2 data-layer, communication, financial,
+                // model-routing, and memory-governance constraints do
+                // not contribute to governed-transaction requirements.
+                // Their enforcement is wired into request_matching.rs
+                // (argument-level checks) and downstream data/content
+                // guards (SQL parsing, result shaping, HITL replay).
+                Constraint::TableAllowlist(_)
+                | Constraint::ColumnDenylist(_)
+                | Constraint::MaxRowsReturned(_)
+                | Constraint::OperationClass(_)
+                | Constraint::AudienceAllowlist(_)
+                | Constraint::ContentReviewTier(_)
+                | Constraint::MaxTransactionAmountUsd(_)
+                | Constraint::RequireDualApproval(_)
+                | Constraint::ModelConstraint { .. }
+                | Constraint::MemoryStoreAllowlist(_)
+                | Constraint::MemoryWriteDenyPatterns(_) => {}
                 _ => {}
             }
         }

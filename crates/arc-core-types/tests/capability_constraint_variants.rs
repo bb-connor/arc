@@ -1,0 +1,198 @@
+//! Serde and construction tests for Phase 2.2 `Constraint` variants.
+//!
+//! These exercise the data-layer, communication, financial,
+//! model-routing, and memory-governance variants added per
+//! `docs/protocols/ADR-TYPE-EVOLUTION.md` section 3. Each variant must
+//! participate in the existing
+//! `#[serde(tag = "type", content = "value", rename_all = "snake_case")]`
+//! envelope and round-trip through serde without information loss.
+
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
+use arc_core_types::capability::{
+    Constraint, ContentReviewTier, ModelSafetyTier, SqlOperationClass,
+};
+use serde_json::{json, Value};
+
+fn to_value(constraint: &Constraint) -> Value {
+    serde_json::to_value(constraint).expect("constraint serializes")
+}
+
+fn roundtrip(constraint: Constraint) -> Constraint {
+    let value = to_value(&constraint);
+    serde_json::from_value(value).expect("constraint deserializes")
+}
+
+#[test]
+fn table_allowlist_serializes_with_expected_tag() {
+    let constraint = Constraint::TableAllowlist(vec!["users".to_string(), "orders".to_string()]);
+    let value = to_value(&constraint);
+    assert_eq!(
+        value,
+        json!({
+            "type": "table_allowlist",
+            "value": ["users", "orders"],
+        })
+    );
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn column_denylist_roundtrips() {
+    let constraint = Constraint::ColumnDenylist(vec![
+        "users.password_hash".to_string(),
+        "users.ssn".to_string(),
+    ]);
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "column_denylist");
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn operation_class_enum_serializes() {
+    let constraint = Constraint::OperationClass(SqlOperationClass::ReadOnly);
+    let value = to_value(&constraint);
+    assert_eq!(
+        value,
+        json!({
+            "type": "operation_class",
+            "value": "read_only",
+        })
+    );
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+
+    let rw = Constraint::OperationClass(SqlOperationClass::ReadWrite);
+    assert_eq!(to_value(&rw)["value"], "read_write");
+
+    let admin = Constraint::OperationClass(SqlOperationClass::Admin);
+    assert_eq!(to_value(&admin)["value"], "admin");
+}
+
+#[test]
+fn max_rows_returned_roundtrips() {
+    let constraint = Constraint::MaxRowsReturned(1000);
+    let value = to_value(&constraint);
+    assert_eq!(
+        value,
+        json!({
+            "type": "max_rows_returned",
+            "value": 1000,
+        })
+    );
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn audience_allowlist_accepts_string_list() {
+    let constraint = Constraint::AudienceAllowlist(vec![
+        "#ops".to_string(),
+        "alerts@example.com".to_string(),
+    ]);
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "audience_allowlist");
+    assert_eq!(value["value"][0], "#ops");
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn content_review_tier_roundtrips() {
+    for tier in [
+        ContentReviewTier::None,
+        ContentReviewTier::Basic,
+        ContentReviewTier::Strict,
+    ] {
+        let constraint = Constraint::ContentReviewTier(tier);
+        let value = to_value(&constraint);
+        assert_eq!(value["type"], "content_review_tier");
+        assert_eq!(roundtrip(constraint.clone()), constraint);
+    }
+}
+
+#[test]
+fn max_transaction_amount_usd_roundtrips() {
+    let constraint = Constraint::MaxTransactionAmountUsd("100.00".to_string());
+    let value = to_value(&constraint);
+    assert_eq!(
+        value,
+        json!({
+            "type": "max_transaction_amount_usd",
+            "value": "100.00",
+        })
+    );
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn require_dual_approval_roundtrips() {
+    let constraint = Constraint::RequireDualApproval(true);
+    let value = to_value(&constraint);
+    assert_eq!(
+        value,
+        json!({
+            "type": "require_dual_approval",
+            "value": true,
+        })
+    );
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn model_constraint_with_both_fields_roundtrips() {
+    let constraint = Constraint::ModelConstraint {
+        allowed_model_ids: vec!["gpt-5".to_string(), "claude-opus-4".to_string()],
+        min_safety_tier: Some(ModelSafetyTier::Standard),
+    };
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "model_constraint");
+    assert_eq!(value["value"]["allowed_model_ids"][0], "gpt-5");
+    assert_eq!(value["value"]["min_safety_tier"], "standard");
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn model_constraint_with_only_allowed_ids() {
+    let constraint = Constraint::ModelConstraint {
+        allowed_model_ids: vec!["claude-haiku-4".to_string()],
+        min_safety_tier: None,
+    };
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "model_constraint");
+    assert_eq!(value["value"]["allowed_model_ids"][0], "claude-haiku-4");
+    assert!(value["value"]["min_safety_tier"].is_null());
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn memory_store_allowlist_roundtrips() {
+    let constraint = Constraint::MemoryStoreAllowlist(vec![
+        "conversation".to_string(),
+        "scratchpad".to_string(),
+    ]);
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "memory_store_allowlist");
+    assert_eq!(value["value"][0], "conversation");
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+#[test]
+fn memory_write_deny_patterns_roundtrips() {
+    let constraint = Constraint::MemoryWriteDenyPatterns(vec![
+        r"\bAKIA[0-9A-Z]{16}\b".to_string(),
+        r"-----BEGIN [A-Z ]+PRIVATE KEY-----".to_string(),
+    ]);
+    let value = to_value(&constraint);
+    assert_eq!(value["type"], "memory_write_deny_patterns");
+    assert_eq!(roundtrip(constraint.clone()), constraint);
+}
+
+/// Existing variants must still decode from their on-wire form after
+/// adding the Phase 2.2 variants, proving additive compatibility.
+#[test]
+fn existing_path_prefix_still_deserializes() {
+    let value = json!({
+        "type": "path_prefix",
+        "value": "/workspace",
+    });
+    let constraint: Constraint = serde_json::from_value(value).expect("decodes");
+    assert_eq!(constraint, Constraint::PathPrefix("/workspace".to_string()));
+}

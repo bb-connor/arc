@@ -1675,6 +1675,53 @@ pub enum Operation {
     Delegate,
 }
 
+/// Operation class for data-layer tool calls (SQL, document DB, etc.).
+///
+/// Used by `Constraint::OperationClass` to restrict a grant to read-only,
+/// read-write, or administrative operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SqlOperationClass {
+    /// SELECT and other read-only statements only.
+    ReadOnly,
+    /// Read and write (INSERT, UPDATE, DELETE) but no schema changes.
+    ReadWrite,
+    /// Schema-altering or privilege-altering operations.
+    Admin,
+}
+
+/// Content review tier for outbound communication constraints.
+///
+/// Used by `Constraint::ContentReviewTier` to indicate the level of
+/// content review that downstream guards should apply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentReviewTier {
+    /// No content review required.
+    None,
+    /// Basic heuristic review (e.g. keyword filters).
+    Basic,
+    /// Strict review (e.g. model-based review or human approval).
+    Strict,
+}
+
+/// Safety tier for model-routing constraints.
+///
+/// Used by `Constraint::ModelConstraint` to express a minimum safety
+/// floor for the model executing a tool-bearing agent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelSafetyTier {
+    /// Low assurance: unfiltered or permissive models.
+    Low,
+    /// Standard assurance: baseline safety filters.
+    Standard,
+    /// High assurance: stricter safety filters and evaluations.
+    High,
+    /// Restricted: only models meeting restricted-use criteria.
+    Restricted,
+}
+
 /// A constraint on tool parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
@@ -1701,6 +1748,56 @@ pub enum Constraint {
     MinimumAutonomyTier(GovernedAutonomyTier),
     /// Extensibility: arbitrary key-value constraint.
     Custom(String, String),
+
+    // ---- Phase 2.2 additions -----------------------------------------
+    //
+    // The variants below were added per docs/protocols/ADR-TYPE-EVOLUTION.md
+    // section 3 to carry data-layer, communication, financial,
+    // model-routing, and memory-governance policy. They participate in
+    // the existing tagged serde envelope
+    // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
+
+    /// Data layer: database tables the grant may reference.
+    ///
+    /// Evaluated against parsed SQL by `arc-data-guards`; the kernel
+    /// records the constraint and leaves enforcement to that guard.
+    TableAllowlist(Vec<String>),
+    /// Data layer: forbidden columns, formatted as `"table.column"`.
+    ///
+    /// Evaluated by `arc-data-guards`; kernel treats it as an advisory
+    /// constraint and does not reject at the request-matching stage.
+    ColumnDenylist(Vec<String>),
+    /// Data layer: maximum number of rows a query may return.
+    ///
+    /// Enforced post-invocation by downstream result-shaping guards.
+    MaxRowsReturned(u64),
+    /// Data layer: operation class the grant authorises.
+    OperationClass(SqlOperationClass),
+    /// Communication: allowed recipient channels or IDs.
+    AudienceAllowlist(Vec<String>),
+    /// Communication: content review tier demanded of downstream guards.
+    ContentReviewTier(ContentReviewTier),
+    /// Financial: maximum transaction amount in USD.
+    ///
+    /// The value is a decimal string (e.g. `"100.00"`) because
+    /// `rust_decimal` is not in the workspace.
+    MaxTransactionAmountUsd(String),
+    /// Financial: whether the grant requires dual approval before execution.
+    RequireDualApproval(bool),
+    /// Model routing: constrain the models this grant may execute under.
+    ModelConstraint {
+        /// Explicit allowlist of model identifiers. Empty means no allowlist.
+        allowed_model_ids: Vec<String>,
+        /// Minimum acceptable model safety tier, if any.
+        min_safety_tier: Option<ModelSafetyTier>,
+    },
+    /// Memory governance: memory stores the grant may write to.
+    MemoryStoreAllowlist(Vec<String>),
+    /// Memory governance: regex patterns that block writes.
+    ///
+    /// Patterns are compiled lazily during kernel evaluation so invalid
+    /// regexes do not break construction or round-trip serialization.
+    MemoryWriteDenyPatterns(Vec<String>),
 }
 
 /// A link in the delegation chain, recording that `delegator` granted a

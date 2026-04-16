@@ -20,13 +20,14 @@ pub use canonical::{canonical_json_bytes, canonical_json_string, canonicalize};
 pub use capability::{
     canonicalize_attestation_verifier, validate_attenuation, validate_delegation_chain, ArcScope,
     Attenuation, AttestationTrustError, AttestationTrustPolicy, AttestationTrustRule,
-    CapabilityToken, CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody,
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    CapabilityToken, CapabilityTokenBody, Constraint, ContentReviewTier, DelegationLink,
+    DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
     GovernedCommerceContext, GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode, MonetaryAmount, Operation, PromptGrant, ResolvedRuntimeAssurance,
-    ResourceGrant, RuntimeAssuranceTier, RuntimeAttestationEvidence, ToolGrant,
-    WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError, WorkloadIdentityScheme,
+    MeteredSettlementMode, ModelSafetyTier, MonetaryAmount, Operation, PromptGrant,
+    ResolvedRuntimeAssurance, ResourceGrant, RuntimeAssuranceTier, RuntimeAttestationEvidence,
+    SqlOperationClass, ToolGrant, WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError,
+    WorkloadIdentityScheme,
 };
 pub use crypto::{sha256_hex, Keypair, PublicKey, Signature};
 pub use error::{Error, Result};
