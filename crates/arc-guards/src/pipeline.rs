@@ -60,9 +60,17 @@ impl Guard for GuardPipeline {
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
+        let mut final_verdict = Verdict::Allow;
         for guard in &self.guards {
             match guard.evaluate(ctx) {
                 Ok(Verdict::Allow) => continue,
+                Ok(Verdict::PendingApproval) => {
+                    // Phase 3.4 introduced `PendingApproval` as a sticky
+                    // escalation state. Keep iterating so another guard can
+                    // still short-circuit to Deny, but propagate the pending
+                    // verdict up the stack if no deny occurs.
+                    final_verdict = Verdict::PendingApproval;
+                }
                 Ok(Verdict::Deny) => {
                     return Err(KernelError::GuardDenied(format!(
                         "guard \"{}\" denied the request",
@@ -78,7 +86,7 @@ impl Guard for GuardPipeline {
                 }
             }
         }
-        Ok(Verdict::Allow)
+        Ok(final_verdict)
     }
 }
 

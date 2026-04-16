@@ -90,13 +90,19 @@ pub use mcp_tool::McpToolGuard;
 pub use patch_integrity::PatchIntegrityGuard;
 pub use path_allowlist::PathAllowlistGuard;
 pub use pipeline::GuardPipeline;
-pub use post_invocation::{PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict};
+pub use post_invocation::{
+    sanitize_json, PipelineOutcome, PostInvocationHook, PostInvocationPipeline,
+    PostInvocationVerdict, SanitizerHook,
+};
 pub use prompt_injection::{
     Detection as PromptInjectionDetection, PromptInjectionConfig, PromptInjectionGuard,
     Signal as PromptInjectionSignal,
 };
 pub use response_sanitization::{
-    ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivityLevel,
+    AllowlistConfig, CategoryConfig, DenylistConfig, EntropyConfig, OutputSanitizer,
+    OutputSanitizerConfig, ProcessingStats, Redaction, RedactionStrategy,
+    ResponseSanitizationGuard, SanitizationAction, SanitizationResult, SanitizedValue,
+    ScanResult, SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span, TokenVault,
 };
 pub use secret_leak::SecretLeakGuard;
 pub use shell_command::ShellCommandGuard;
