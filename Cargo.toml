@@ -16,6 +16,7 @@ members = [
     "crates/arc-credit",
     "crates/arc-credentials",
     "crates/arc-did",
+    "crates/arc-envoy-ext-authz",
     "crates/arc-federation",
     "crates/arc-governance",
     "crates/arc-hosted-mcp",
