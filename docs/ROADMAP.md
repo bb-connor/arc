@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**24 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**25 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -44,7 +44,7 @@ roadmap phase.
 | 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
-| 6 (Framework SDKs) | -- | 6.1 | 6.2, 6.3, 6.4 |
+| 6 (Framework SDKs) | 6.1 | -- | 6.2, 6.3, 6.4 |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1 | -- | 9.2 |
@@ -60,7 +60,7 @@ roadmap phase.
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
 
-**Wave 3a in flight**: 6.1 arc-crewai, 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
+**Wave 3a in flight**: 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
 
 ---
 
@@ -577,7 +577,7 @@ functions the WASM module can call.
 > **Depends on**: Phase 0 (publishing, MockArcClient), Phase 2 (type extensions).
 > **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md`
 
-### 6.1 arc-crewai (Highest Priority)
+### 6.1 arc-crewai (Highest Priority) [SHIPPED dfcb780]
 
 **What**: `BaseTool` wrapper, per-role capability scoping, delegation
 between crews. Published to PyPI.
