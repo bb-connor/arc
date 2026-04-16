@@ -52,6 +52,7 @@ pub mod error;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod host;
 pub mod manifest;
+pub mod placeholders;
 pub mod runtime;
 #[cfg(feature = "wasmtime-runtime")]
 pub mod wiring;
@@ -68,9 +69,15 @@ pub use manifest::{
     verify_signed_module, write_signature_sidecar, GuardManifest, SignedWasmModule,
     MANIFEST_FILENAME, SIGNATURE_SUFFIX, SUPPORTED_ABI_VERSIONS,
 };
+pub use placeholders::{
+    resolve_placeholders, resolve_placeholders_in_json, PlaceholderEnv, PlaceholderError,
+    ProcessEnv,
+};
 #[cfg(feature = "wasmtime-runtime")]
 pub use runtime::wasmtime_backend::{
-    create_backend, detect_wasm_format, load_signed_guard, WasmFormat,
+    create_backend, detect_wasm_format, load_guards_from_policy, load_signed_guard, LoadError,
+    PolicyCustomGuard, PolicyCustomGuards, PolicyModuleSource, WasmFormat, WasmGuardHandle,
+    KNOWN_HOST_FUNCTIONS,
 };
 pub use runtime::{WasmGuard, WasmGuardRuntime};
 #[cfg(feature = "wasmtime-runtime")]

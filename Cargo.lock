@@ -1081,6 +1081,7 @@ dependencies = [
  "arc-core",
  "arc-guards",
  "arc-kernel",
+ "arc-metering",
  "regex",
  "serde",
  "serde_json",
@@ -1201,9 +1202,11 @@ dependencies = [
  "arc-http-session",
  "arc-kernel",
  "glob",
+ "lru",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror 1.0.69",
  "tracing",
 ]
@@ -1633,6 +1636,7 @@ dependencies = [
  "tracing",
  "wasmparser 0.221.3",
  "wasmtime",
+ "wat",
 ]
 
 [[package]]
