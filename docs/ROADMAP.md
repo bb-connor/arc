@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**36 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**37 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -40,7 +40,7 @@ roadmap phase.
 |---|---|---|---|
 | 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
 | 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
-| 2 (Types) | 2.1, 2.2, 2.3 | -- | 2.4 |
+| 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2 | -- | 3.3, 3.4, 3.5, 3.6 |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
@@ -60,7 +60,7 @@ roadmap phase.
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
 
-**Wave 3a + 3b complete**. Wave 3c next: 2.4 Plan-level evaluation, 3.4-3.6 HITL cluster, plus parallelizable 9.2 Istio / 10.x / 11.x / 12.3 / 13.2-13.3 / 17.1-17.5 / 18.x / 19.x. Phases 6 (SDKs) and 15 (compliance) fully shipped.
+**Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
 
 ---
 
@@ -293,7 +293,7 @@ compiles, serializes, and is enforced by the kernel.
 **Acceptance**: A tool call with `model_metadata.model_id = "small-uncensored"`
 is denied when the grant requires `min_safety_tier: Standard`.
 
-### 2.4 Plan-Level Evaluation
+### 2.4 Plan-Level Evaluation [SHIPPED 6e16017]
 
 **What**: New `evaluate_plan()` kernel method and `/evaluate-plan` HTTP
 endpoint. Takes a list of planned tool calls, evaluates all against scope
