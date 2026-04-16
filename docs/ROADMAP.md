@@ -32,13 +32,13 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**23 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**24 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
 | Phase group | Shipped | In flight | Pending |
 |---|---|---|---|
-| 0 (DX) | 0.3, 0.5 | 0.4 | 0.1, 0.2 |
+| 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
 | 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
 | 2 (Types) | 2.1, 2.2 | -- | 2.3, 2.4 |
 | 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
@@ -60,7 +60,7 @@ roadmap phase.
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
 
-**Wave 3a in flight**: 0.4 binary distribution, 6.1 arc-crewai, 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
+**Wave 3a in flight**: 6.1 arc-crewai, 13.1 AsyncGuardAdapter, 15.1 FIPS crypto path.
 
 ---
 
@@ -116,7 +116,7 @@ a running sidecar.
 **Acceptance**: A pytest test using `MockArcClient` passes without any
 sidecar process running.
 
-### 0.4 Pre-Built Binary Distribution
+### 0.4 Pre-Built Binary Distribution [SHIPPED c9650f9]
 
 **What**: Distribute the ARC sidecar as pre-built binaries so developers
 don't need the Rust toolchain.
