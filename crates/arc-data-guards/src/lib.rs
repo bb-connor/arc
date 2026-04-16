@@ -36,6 +36,7 @@
 
 pub mod config;
 pub mod error;
+pub mod result_guard;
 pub mod sql_guard;
 pub mod sql_parser;
 pub mod vector_guard;
@@ -43,6 +44,9 @@ pub mod warehouse_cost_guard;
 
 pub use config::{SqlDialect, SqlGuardConfig, SqlOperation};
 pub use error::SqlGuardDenyReason;
+pub use result_guard::{
+    QueryResultGuard, QueryResultGuardConfig, QueryResultHook, DEFAULT_REDACTION_MARKER,
+};
 pub use sql_guard::SqlQueryGuard;
 pub use sql_parser::SqlAnalysis;
 pub use vector_guard::{
