@@ -110,6 +110,33 @@ impl WasmGuard {
             ToolAction::ShellCommand(_) => (Some("shell_command".into()), None, None),
             ToolAction::McpTool(_, _) => (Some("mcp_tool".into()), None, None),
             ToolAction::Patch(path, _) => (Some("patch".into()), Some(path.clone()), None),
+            ToolAction::CodeExecution { language, .. } => {
+                (Some("code_execution".into()), None, Some(language.clone()))
+            }
+            ToolAction::BrowserAction { verb, target } => {
+                (Some("browser_action".into()), None, target.clone().or_else(|| Some(verb.clone())))
+            }
+            ToolAction::DatabaseQuery { database, .. } => {
+                (Some("database_query".into()), None, Some(database.clone()))
+            }
+            ToolAction::ExternalApiCall { service, endpoint } => (
+                Some("external_api_call".into()),
+                None,
+                Some(format!("{service}:{endpoint}")),
+            ),
+            ToolAction::MemoryWrite { store, key } => (
+                Some("memory_write".into()),
+                None,
+                Some(format!("{store}/{key}")),
+            ),
+            ToolAction::MemoryRead { store, key } => (
+                Some("memory_read".into()),
+                None,
+                Some(match key {
+                    Some(k) => format!("{store}/{k}"),
+                    None => store.clone(),
+                }),
+            ),
             ToolAction::Unknown => (Some("unknown".into()), None, None),
         };
 
