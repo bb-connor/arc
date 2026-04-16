@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**37 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**38 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -50,7 +50,7 @@ roadmap phase.
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
 | 10 (Orchestration) | 10.1, 10.2 | -- | 10.3 |
 | 11 (Content / streaming / IaC) | -- | -- | 11.1, 11.2, 11.3 |
-| 12 (Observability) | 12.1, 12.2 | -- | 12.3 |
+| 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
@@ -933,7 +933,7 @@ on high-severity guard denials.
 **Acceptance**: `OcsfFormatter::format(&receipt)` produces a valid OCSF
 3002 event JSON. Ingested by AWS Security Lake without schema errors.
 
-### 12.3 LangSmith / LangFuse Bridge
+### 12.3 LangSmith / LangFuse Bridge [SHIPPED 5e067c1]
 
 **What**: Push receipts as enriched spans into agent observability platforms.
 
