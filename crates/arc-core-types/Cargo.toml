@@ -21,6 +21,15 @@ ryu = { workspace = true }
 sha2 = { workspace = true }
 percent-encoding = "2"
 url = { workspace = true }
+# FIPS-capable ECDSA (P-256 / P-384) signing via aws-lc-rs. Gated behind the
+# `fips` feature so non-FIPS builds keep their historical dependency set.
+aws-lc-rs = { version = "1.16", default-features = false, features = ["aws-lc-sys"], optional = true }
+
+[features]
+default = []
+# Enables the P-256 and P-384 SigningBackend implementations backed by
+# aws-lc-rs. See `crate::crypto` for details.
+fips = ["dep:aws-lc-rs"]
 
 [dev-dependencies]
 jsonschema = { version = "0.46.0", default-features = false }

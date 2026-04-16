@@ -3381,6 +3381,12 @@ impl ArcKernel {
         &self,
         approval_token: &GovernedApprovalToken,
     ) -> Result<(), String> {
+        // Multi-algorithm dispatch happens inside `approval_token.verify_signature()`:
+        // the `approver` public key and the `signature` field are each algorithm-
+        // tagged (Ed25519 by default; `p256:` / `p384:` under the FIPS crypto
+        // path), so ECDSA approvals are validated through aws-lc-rs when the
+        // `arc-core-types/fips` feature is enabled without any kernel-side
+        // algorithm plumbing.
         let kernel_pk = self.config.keypair.public_key();
         let mut trusted = self.config.ca_public_keys.clone();
         for authority_pk in self.capability_authority.trusted_public_keys() {

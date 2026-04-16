@@ -1021,6 +1021,7 @@ dependencies = [
 name = "arc-core-types"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
  "ed25519-dalek",
  "hex",
  "jsonschema",
@@ -1201,13 +1202,16 @@ dependencies = [
  "arc-core",
  "arc-http-session",
  "arc-kernel",
+ "async-trait",
  "glob",
  "lru",
+ "rand 0.8.5",
  "regex",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
+ "tokio",
  "tracing",
 ]
 

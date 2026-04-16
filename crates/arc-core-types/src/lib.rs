@@ -29,7 +29,11 @@ pub use capability::{
     SqlOperationClass, ToolGrant, WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError,
     WorkloadIdentityScheme,
 };
-pub use crypto::{sha256_hex, Keypair, PublicKey, Signature};
+pub use crypto::{
+    sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
+#[cfg(feature = "fips")]
+pub use crypto::{P256Backend, P384Backend};
 pub use error::{Error, Result};
 pub use hashing::{sha256, Hash};
 pub use manifest::{

@@ -10,7 +10,10 @@ use crate::capability::{
     MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, ProvenanceEvidenceClass,
     RuntimeAssuranceTier, WorkloadIdentity,
 };
-use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
+use crate::crypto::{
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
+    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
 use crate::error::{Error, Result};
 use crate::oracle::OracleConversionEvidence;
 use crate::runtime_attestation::AttestationVerifierFamily;
@@ -98,7 +101,13 @@ pub struct ArcReceipt {
     pub trust_level: TrustLevel,
     /// The Kernel's public key (for verification without out-of-band lookup).
     pub kernel_key: PublicKey,
-    /// Ed25519 signature over canonical JSON of all fields above.
+    /// Signing algorithm used for [`ArcReceipt::signature`]. Absent means
+    /// Ed25519 for backward compatibility with receipts issued prior to the
+    /// introduction of [`SigningAlgorithm`]. Informational only: verification
+    /// dispatches off the self-describing encoding of the signature itself.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
 
@@ -138,6 +147,9 @@ pub struct ChildRequestReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     pub kernel_key: PublicKey,
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -159,7 +171,7 @@ pub struct ChildRequestReceiptBody {
 }
 
 impl ArcReceipt {
-    /// Sign a receipt body with the Kernel's keypair.
+    /// Sign a receipt body with the Kernel's Ed25519 keypair.
     pub fn sign(body: ArcReceiptBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -176,6 +188,31 @@ impl ArcReceipt {
             metadata: body.metadata,
             trust_level: body.trust_level,
             kernel_key: body.kernel_key,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a receipt body with an arbitrary [`SigningBackend`].
+    ///
+    /// The `body.kernel_key` must equal `backend.public_key()`.
+    pub fn sign_with_backend(body: ArcReceiptBody, backend: &dyn SigningBackend) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            timestamp: body.timestamp,
+            capability_id: body.capability_id,
+            tool_server: body.tool_server,
+            tool_name: body.tool_name,
+            action: body.action,
+            decision: body.decision,
+            content_hash: body.content_hash,
+            policy_hash: body.policy_hash,
+            evidence: body.evidence,
+            metadata: body.metadata,
+            trust_level: body.trust_level,
+            kernel_key: body.kernel_key,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -271,6 +308,30 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a child-request receipt body with an arbitrary [`SigningBackend`].
+    pub fn sign_with_backend(
+        body: ChildRequestReceiptBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            timestamp: body.timestamp,
+            session_id: body.session_id,
+            parent_request_id: body.parent_request_id,
+            request_id: body.request_id,
+            operation_kind: body.operation_kind,
+            terminal_state: body.terminal_state,
+            outcome_hash: body.outcome_hash,
+            policy_hash: body.policy_hash,
+            metadata: body.metadata,
+            kernel_key: body.kernel_key,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -1653,6 +1714,57 @@ mod tests {
         assert_eq!(receipt.id, restored.id);
         assert_eq!(receipt.parent_request_id, restored.parent_request_id);
         assert_eq!(receipt.outcome_hash, restored.outcome_hash);
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn ed25519_receipt_is_byte_identical_without_algorithm_field() {
+        // Back-compat: a standard Ed25519 receipt must still serialize
+        // without any `algorithm` envelope field. Persisted receipts from
+        // earlier ARC releases decode cleanly (the `algorithm` field is
+        // `#[serde(default)]`) and verify through the unchanged path.
+        let kp = Keypair::generate();
+        let receipt = ArcReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+        let value = serde_json::to_value(&receipt).unwrap();
+        assert!(
+            value.get("algorithm").is_none(),
+            "Ed25519 receipts must omit the `algorithm` envelope field"
+        );
+        // Simulate an old on-disk receipt by stripping any algorithm field we
+        // might later add and ensure it still verifies.
+        let wire = serde_json::to_string(&receipt).unwrap();
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn legacy_ed25519_receipt_without_algorithm_field_still_verifies() {
+        // Generate an Ed25519 receipt, then assert that parsing its JSON (which
+        // has no `algorithm` key) produces a receipt whose `algorithm` is
+        // `None` and whose signature still verifies.
+        let kp = Keypair::generate();
+        let receipt = ArcReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+        let wire = serde_json::to_string(&receipt).unwrap();
+        assert!(!wire.contains("\"algorithm\""));
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
+        assert!(restored.algorithm.is_none());
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn receipt_signs_and_verifies_under_p256_backend() {
+        use crate::crypto::{P256Backend, SigningAlgorithm, SigningBackend};
+        let backend = P256Backend::generate().expect("p256 backend");
+        let mut body = make_receipt_body(&Keypair::generate());
+        body.kernel_key = backend.public_key();
+        let receipt = ArcReceipt::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
+        assert!(receipt.verify_signature().unwrap());
+        // And through the wire.
+        let wire = serde_json::to_string(&receipt).unwrap();
+        assert!(wire.contains("\"p256:"));
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
         assert!(restored.verify_signature().unwrap());
     }
 }

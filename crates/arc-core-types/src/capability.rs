@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::canonical::canonical_json_bytes;
-use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use crate::crypto::{
+    is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend, Keypair, PublicKey,
+    Signature, SigningAlgorithm, SigningBackend,
+};
 use crate::error::{Error, Result};
 use crate::runtime_attestation::{
     derive_runtime_attestation_trust_material, AttestationVerifierFamily,
@@ -18,11 +21,14 @@ use crate::runtime_attestation::{
 };
 use crate::session::SessionAnchorReference;
 
-/// A ARC capability token. Ed25519-signed, scoped, time-bounded.
+/// A ARC capability token. Scoped, time-bounded, cryptographically signed.
 ///
 /// The `signature` field covers the canonical JSON of all other fields.
 /// Verification re-serializes the token (excluding the signature), computes
-/// the canonical form, and checks the Ed25519 signature against `issuer`.
+/// the canonical form, and checks the signature against `issuer` using the
+/// algorithm declared by the `algorithm` field (defaulting to Ed25519 when
+/// absent, which preserves backward compatibility with tokens issued prior
+/// to the introduction of [`SigningAlgorithm`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityToken {
     /// Unique token ID (UUIDv7 recommended, used for revocation).
@@ -40,12 +46,20 @@ pub struct CapabilityToken {
     /// Ordered list of delegation links from the root CA to this token.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub delegation_chain: Vec<DelegationLink>,
-    /// Ed25519 signature over canonical JSON of all fields above.
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
 
 /// The body of a capability token, containing every field except the signature.
 /// Used as the signing input.
+///
+/// The declared signing algorithm is not included in the body: the `signature`
+/// type itself is self-describing (Ed25519 / P-256 / P-384) via its hex
+/// encoding, and the `issuer` key encodes its own algorithm. This keeps the
+/// pre-`SigningBackend` Ed25519 body serialization byte-identical.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityTokenBody {
     pub id: String,
@@ -73,7 +87,11 @@ impl CapabilityToken {
         }
     }
 
-    /// Sign a capability token body with the given keypair.
+    /// Sign a capability token body with the given Ed25519 keypair.
+    ///
+    /// This is the historical signing entry point and produces a
+    /// byte-identical artifact to pre-`SigningBackend` ARC releases: the
+    /// `algorithm` envelope field is omitted from the serialized output.
     pub fn sign(body: CapabilityTokenBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -84,11 +102,43 @@ impl CapabilityToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a capability token body with an arbitrary [`SigningBackend`].
+    ///
+    /// Use this entry point to produce FIPS-algorithm (P-256 / P-384) tokens
+    /// when operating under the `fips` feature. The `body.issuer` field must
+    /// equal `backend.public_key()`; otherwise verification will fail.
+    ///
+    /// The resulting token's `algorithm` envelope field is populated with the
+    /// backend's algorithm. It is informational only -- verification
+    /// dispatches off the `signature` hex prefix, not this field.
+    pub fn sign_with_backend(
+        body: CapabilityTokenBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            issuer: body.issuer,
+            subject: body.subject,
+            scope: body.scope,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            delegation_chain: body.delegation_chain,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
 
     /// Verify the token's signature against its issuer key.
+    ///
+    /// Dispatches off the algorithm carried by `signature` and `issuer`.
+    /// For FIPS algorithms, the `fips` feature must be enabled at the crate
+    /// level or verification returns `Ok(false)`.
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
         self.issuer.verify_canonical(&body, &self.signature)
@@ -1444,6 +1494,12 @@ pub struct GovernedApprovalToken {
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    ///
+    /// Informational: verification dispatches off the algorithm encoded in
+    /// [`GovernedApprovalToken::signature`] and [`GovernedApprovalToken::approver`].
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -1462,6 +1518,7 @@ impl GovernedApprovalToken {
         }
     }
 
+    /// Sign a governed approval token body with the given Ed25519 keypair.
     pub fn sign(body: GovernedApprovalTokenBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -1473,6 +1530,29 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a governed approval token body with an arbitrary [`SigningBackend`].
+    ///
+    /// `body.approver` must equal `backend.public_key()`.
+    pub fn sign_with_backend(
+        body: GovernedApprovalTokenBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            approver: body.approver,
+            subject: body.subject,
+            governed_intent_hash: body.governed_intent_hash,
+            request_id: body.request_id,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            decision: body.decision,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -3266,5 +3346,138 @@ mod tests {
         let json = serde_json::to_string_pretty(&attenuations).unwrap();
         let restored: Vec<Attenuation> = serde_json::from_str(&json).unwrap();
         assert_eq!(attenuations, restored);
+    }
+
+    #[test]
+    fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
+        // Pre-existing Ed25519 tokens must serialize without any `algorithm`
+        // envelope field, so captured on-disk receipts and capability
+        // artifacts continue to round-trip through the schema validators.
+        let kp = Keypair::generate();
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-compat".to_string(),
+            issuer: kp.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign(body, &kp).unwrap();
+        let json = serde_json::to_value(&token).unwrap();
+        assert!(
+            json.get("algorithm").is_none(),
+            "Ed25519 tokens must omit the `algorithm` envelope field"
+        );
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn capability_token_backend_signing_with_ed25519_verifies() {
+        let backend = crate::crypto::Ed25519Backend::generate();
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-backend".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(
+            token.algorithm,
+            Some(crate::crypto::SigningAlgorithm::Ed25519)
+        );
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p256_round_trip() {
+        // A capability token signed with P-256 verifies when reconstructed
+        // through the exact same API path the kernel uses
+        // (`verify_signature` -> `PublicKey::verify_canonical`).
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-p256".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
+        assert!(token.verify_signature().unwrap());
+
+        // Round-trip through JSON (the wire format the kernel receives).
+        let wire = serde_json::to_string(&token).unwrap();
+        assert!(wire.contains("\"p256:"));
+        assert!(wire.contains("\"algorithm\":\"p256\""));
+        let restored: CapabilityToken = serde_json::from_str(&wire).unwrap();
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p384_round_trip() {
+        let backend = crate::crypto::P384Backend::generate().expect("p384 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-p384".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p256_tampered_body_fails() {
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-tamper".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let mut token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        token.id = "cap-tampered".to_string();
+        assert!(!token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn governed_approval_token_p256_verifies() {
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = GovernedApprovalTokenBody {
+            id: "approval-p256".to_string(),
+            approver: backend.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "hash-xyz".to_string(),
+            request_id: "req-1".to_string(),
+            issued_at: 1000,
+            expires_at: 2000,
+            decision: GovernedApprovalDecision::Approved,
+        };
+        let token = GovernedApprovalToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
+        assert!(token.verify_signature().unwrap());
     }
 }
