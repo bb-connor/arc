@@ -1,8 +1,12 @@
 # ARC Roadmap Execution Matrix
 
 > **Generated**: 2026-04-16
+> **Last Updated**: 2026-04-16 15:50 UTC (post Wave 1 commit)
 > **Methodology**: Cross-referenced roadmap stories against actual codebase (crates/, sdks/, docs/) with git commit history verification
-> **Known completed**: Phase 0.3 (788f69c), Phase 1.2 (27488eb), Phase 2.1 (f5a8a58), Phases 15.2-15.5 (98252dd)
+> **Known completed**:
+>  - Wave 0: 0.3 (788f69c), 1.2 (27488eb), 2.1 (f5a8a58), 15.2-15.5 (98252dd), 16.1 (f7c738f)
+>  - Wave 1a: 0.5 (224a05c), 1.3 (3e258a3), 1.4 (225193d), 7.1 (b3666a9)
+>  - Wave 1b: 2.2 (f6a8820), 9.1 (7f4d0d7), 12.2 (dec8378), 16.2 (8234a4d)
 
 ---
 
@@ -14,7 +18,7 @@
 | 0.2 | Publish TypeScript SDKs to npm | PARTIAL | `sdks/typescript/packages/{elysia,express,fastify,node-http}/package.json` exist with npm metadata; `.github/workflows/publish-typescript.yml` missing | CI/CD pipeline for npm registry publishing |
 | 0.3 | MockArcClient for Testing | SHIPPED | Commit 788f69c: `sdks/python/arc-sdk-python/src/arc_sdk/testing.py` with `MockArcClient`, `allow_all()`, `deny_all()`, `with_policy()` factories; `tests/test_mock_client.py` ✓ | — |
 | 0.4 | Pre-Built Binary Distribution | MISSING | No `.github/workflows/release-binaries.yml`; no `Dockerfile.sidecar`; no Homebrew tap | Cross-platform binary builds, Homebrew formula, Docker image |
-| 0.5 | Error Message Improvements | PARTIAL | `sdks/python/arc-sdk-python/src/arc_sdk/errors.py` exists (60 grep matches); no evidence of enriched Deny variant in `arc-http-core/src/verdict.rs` | Enrich Deny verdict with scope, guard evidence, next-steps |
+| 0.5 | Error Message Improvements | SHIPPED | Commit 224a05c: enriched Deny verdict with structured context (scope, guard evidence, next-steps) | — |
 
 ---
 
@@ -24,8 +28,8 @@
 |-------|-------|--------|----------|-----|
 | 1.1 | Execution Nonces (TOCTOU Fix) | MISSING | No `arc-kernel/src/execution_nonce.rs` found; no grep matches for `ExecutionNonce` type | Implement nonce generation, validation, and store trait |
 | 1.2 | Trust Level Taxonomy | SHIPPED | Commit 27488eb: `crates/arc-core-types/src/receipt.rs` contains `pub enum TrustLevel { Mediated, Verified, Advisory }` with field on `ArcReceipt` and `ChildRequestReceiptBody` ✓ | — |
-| 1.3 | WASM Guard Module Signing | MISSING | No `arc-wasm-guards/src/manifest.rs` with signature field; `arc-cli/src/guards/sign.rs` not found | Ed25519 signing infrastructure, CLI command, verification at load |
-| 1.4 | Emergency Kill Switch | MISSING | No `emergency_stop()` or `emergency_resume()` in kernel; no `/emergency-stop` endpoint | Atomic flag in kernel, HTTP endpoints, full scope revocation on trigger |
+| 1.3 | WASM Guard Module Signing | SHIPPED | Commit 3e258a3: Ed25519 signing for WASM guard modules at load | — |
+| 1.4 | Emergency Kill Switch | SHIPPED | Commit 225193d: emergency_stop/resume on kernel + HTTP endpoints | — |
 | 1.5 | Multi-Tenant Receipt Isolation | MISSING | `tenant_id` appears only in test config (federated_issue.rs, provider_admin.rs); NOT on `ArcReceipt` or `receipt_store` (5 test-only matches in arc-cli) | Add tenant_id field to receipt, modify receipt store SQL, enforce WHERE clause |
 
 ---
@@ -35,7 +39,7 @@
 | Story | Title | Status | Evidence | Gap |
 |-------|-------|--------|----------|-----|
 | 2.1 | New ToolAction Variants | SHIPPED | Commit f5a8a58: `crates/arc-guards/src/action.rs` contains `ToolAction::CodeExecution { language, code }`, `BrowserAction { verb, target }`, `DatabaseQuery { database, query }`, `ExternalApiCall { service, endpoint }`, `MemoryWrite { store, key }`, `MemoryRead { store, key }`; extraction heuristics in `extract_action()` ✓ | — |
-| 2.2 | New Constraint Variants | PARTIAL | `crates/arc-core-types/src/capability.rs:1681` defines `pub enum Constraint` with 10 variants including `GovernedIntentRequired`, `RequireApprovalAbove`, `SellerExact`, `MinimumRuntimeAssurance`, `MinimumAutonomyTier`, `Custom`; no `TableAllowlist`, `ColumnDenylist`, `ModelConstraint` variants found | Add data-layer (TableAllowlist, ColumnDenylist, MaxRowsReturned), model routing, financial constraints; kernel constraint checking |
+| 2.2 | New Constraint Variants | SHIPPED | Commit f6a8820: 11 new Constraint variants (TableAllowlist, ColumnDenylist, MaxRowsReturned, OperationClass, AudienceAllowlist, ContentReviewTier, MaxTransactionAmountUsd, RequireDualApproval, ModelConstraint, MemoryStoreAllowlist, MemoryWriteDenyPatterns) + kernel request_matching enforcement for Audience/Memory variants | — |
 | 2.3 | ModelConstraint Implementation | MISSING | No `ModelMetadata`, `ModelSafetyTier`, or `ModelConstraint` types found in arc-core-types; no kernel evaluation logic | Define types, add constraint evaluator in kernel, test against model_metadata |
 | 2.4 | Plan-Level Evaluation | MISSING | No `PlannedToolCall`, `PlanEvaluationRequest`, `PlanEvaluationResponse` types; no `evaluate_plan()` kernel method; no `/evaluate-plan` endpoint | Plan types in arc-core-types, kernel method, HTTP route, verdict per step |
 
@@ -92,7 +96,7 @@
 
 | Story | Title | Status | Evidence | Gap |
 |-------|-------|--------|----------|-----|
-| 7.1 | SqlQueryGuard | MISSING | No `arc-data-guards` crate found; no `sql_guard.rs` or `sql_parser.rs` | New crate with sqlparser-rs, SQL analysis, operation/predicate checking |
+| 7.1 | SqlQueryGuard | SHIPPED | Commit b3666a9: arc-data-guards crate with SqlQueryGuard | — |
 | 7.2 | VectorDbGuard | MISSING | No `vector_guard.rs` in arc-data-guards | Collection scoping, operation class, top_k limits |
 | 7.3 | WarehouseCostGuard | MISSING | No `warehouse_cost_guard.rs`; no `CostDimension::WarehouseQuery` in arc-metering | Pre-execution cost estimation, MaxBytesScanned/MaxCostPerQuery |
 | 7.4 | QueryResultGuard (Post-Invocation) | MISSING | No `result_guard.rs` | Row count enforcement, column redaction, PII pattern matching |
@@ -112,7 +116,7 @@
 
 | Story | Title | Status | Evidence | Gap |
 |-------|-------|--------|----------|-----|
-| 9.1 | gRPC ext_authz Adapter | MISSING | No `arc-envoy-ext-authz` crate; no grpc_service.rs | New crate, gRPC service impl, Envoy proto vendoring |
+| 9.1 | gRPC ext_authz Adapter | SHIPPED | Commit 7f4d0d7: arc-envoy-ext-authz crate with EnvoyKernel trait, Check RPC, vendored envoy v3 protos | — |
 | 9.2 | Istio Integration Example | MISSING | No `examples/istio-ext-authz/` | Reference AuthorizationPolicy, K8s manifests |
 
 ---
@@ -142,7 +146,7 @@
 | Story | Title | Status | Evidence | Gap |
 |-------|-------|--------|----------|-----|
 | 12.1 | Missing SIEM Exporters | PARTIAL | `crates/arc-siem/src/exporters/` exists with some exporters; no Datadog, Sumo Logic, webhook, or alerting exporters found | Port 4 missing exporters from ClawdStrike |
-| 12.2 | OCSF Receipt Format | MISSING | No `arc-siem/src/ocsf.rs` | OCSF 3002 event mapping |
+| 12.2 | OCSF Receipt Format | SHIPPED | Commit dec8378: arc-siem/src/ocsf.rs with OCSF 3002 mapping + OcsfExporter backend | — |
 | 12.3 | LangSmith / LangFuse Bridge | MISSING | No `sdks/python/arc-observability/` | Receipts as enriched spans in observability platforms |
 
 ---
@@ -183,8 +187,8 @@
 
 | Story | Title | Status | Evidence | Gap |
 |-------|-------|--------|----------|-----|
-| 16.1 | Economic Layer Developer Guide | MISSING | No `docs/guides/ECONOMIC-LAYER.md` | How-to guide for metering, budgets, credit, settlement |
-| 16.2 | Hierarchical Budget Governance | MISSING | No `crates/arc-metering/src/budget_hierarchy.rs` | Tree-structured budget policies (department → team → agent) |
+| 16.1 | Economic Layer Developer Guide | SHIPPED | Commit f7c738f: docs/guides/ECONOMIC-LAYER.md | — |
+| 16.2 | Hierarchical Budget Governance | SHIPPED | Commit 8234a4d: arc_metering::budget_hierarchy BudgetTree with org/dept/team/agent rollups; stateless policy with caller-supplied SpendSnapshot | — |
 
 ---
 
@@ -233,10 +237,10 @@
 
 ## Execution Status Summary
 
-### By Status
-- **SHIPPED**: 9 stories (0.3, 1.2, 2.1, 15.2, 15.3, 15.4, 15.5, + 2 compliance docs counted separately)
-- **PARTIAL**: 9 stories (0.1, 0.2, 0.5, 2.2, 3.3, 5.5, 12.1, 19.2, 20.1, 20.4)
-- **MISSING**: 57 stories
+### By Status (post Wave 1b, 2026-04-16 15:50 UTC)
+- **SHIPPED**: 17 stories (0.3, 0.5, 1.2, 1.3, 1.4, 2.1, 2.2, 7.1, 9.1, 12.2, 15.2, 15.3, 15.4, 15.5, 16.1, 16.2 + 1 external program docs set)
+- **PARTIAL**: 6 stories (0.1, 0.2, 3.3, 5.5, 12.1, 19.2, 20.1, 20.4)
+- **MISSING**: 52 stories
 - **BLOCKED**: 0 stories (no hard external blockers identified; Phase 3/14 dependencies documented)
 
 ### By Phase
@@ -266,55 +270,29 @@
 
 ---
 
-## Next Candidates: 8 Highest-Parallelism Stories
+## Next Candidates: Wave 2 (post-1b)
 
-**Criteria**: Disjoint write sets, no contention on hot files (arc-kernel/kernel/mod.rs, arc-core-types/capability.rs, arc-core-types/receipt.rs, arc-core-types/session.rs, arc-store-sqlite/receipt_store/*, arc-cli/trust_control/*)
+**Criteria**: Disjoint write sets, no contention on hot files. Phase 2.2 Constraint variants are now shipped, so all data-layer / memory / financial guards downstream are unblocked.
 
-### Wave 1: Zero-Contention, Ready to Start Now
-*These can start immediately and have minimal cross-story dependencies*
+### Wave 2: Zero-Contention, Ready Now
+*These can start immediately on parallel branches. No hot-file contention.*
 
-1. **1.3 WASM Guard Module Signing**
-   - Files: `arc-wasm-guards/src/manifest.rs` (new), `arc-cli/src/guards/sign.rs` (new), `arc-wasm-guards/src/runtime.rs` (modify)
-   - No kernel/core-types contention
-   - Blocking: Phase 5.5 guard compilation, Phase 13 threat intel (which use WASM)
+1. **7.2 VectorDbGuard** — `crates/arc-data-guards/src/vector_guard.rs` (new). Depends on shipped 7.1 (re-uses crate scaffolding). No kernel/core-types contention.
+2. **7.3 WarehouseCostGuard** — `crates/arc-data-guards/src/warehouse_cost_guard.rs` (new) + optional `CostDimension::WarehouseQuery` in arc-metering/cost.rs. Self-contained.
+3. **7.4 QueryResultGuard (post-invocation)** — `crates/arc-data-guards/src/result_guard.rs` (new). Consumes shipped MaxRowsReturned / ColumnDenylist constraints.
+4. **12.1 Missing SIEM Exporters** — `crates/arc-siem/src/exporters/{datadog.rs,sumo_logic.rs,webhook.rs,alerting.rs}` (new). Sibling modules; mod.rs write is the only contention.
+5. **0.4 Pre-Built Binary Distribution** — `.github/workflows/release-binaries.yml`, `Dockerfile.sidecar`, Homebrew formula. Pure CI/infra.
+6. **17.6 Cloud Run / ECS Sidecar Reference** — `deploy/{cloud-run,ecs,azure}/*`. Pure manifest/config.
+7. **3.1 PromptInjectionGuard** — `crates/arc-guards/src/prompt_injection.rs` (new). Self-contained content guard; pre-invocation only.
+8. **5.6 Custom Guard Registry: WASM Merge** — `crates/arc-wasm-guards/src/placeholders.rs` (new) + `load_guards_from_policy()`. Depends on shipped 1.3 signing and shipped 2.2 constraints.
 
-2. **7.1 SqlQueryGuard (New Crate)**
-   - Files: New crate `arc-data-guards/` with `sql_guard.rs`, `sql_parser.rs`
-   - No core contention
-   - Blocking: Phase 7.2, 7.3, 7.4
+### Wave 3: Moderate Contention, Sequence After Wave 2
+*Kernel or core-types writes; do after the above land.*
 
-3. **0.4 Pre-Built Binary Distribution**
-   - Files: `.github/workflows/release-binaries.yml`, `Dockerfile.sidecar`, Homebrew config
-   - Pure CI/infrastructure, no code changes
-   - Unblocks: Phase 0 DX delivery
-
-4. **16.1 Economic Layer Developer Guide**
-   - Files: `docs/guides/ECONOMIC-LAYER.md` (new)
-   - Pure documentation
-   - Unblocks: developer understanding before 16.2
-
-5. **17.6 Cloud Run / ECS Sidecar Reference Patterns**
-   - Files: `deploy/{cloud-run,ecs,azure}/` (new manifests)
-   - Pure configuration/examples, no code
-   - Self-contained
-
-### Wave 2: Moderate Contention, After Phase 2 Types
-*Wait for Phase 2.2 (Constraint variants) to land, then safe to parallelize*
-
-6. **2.3 ModelConstraint Implementation**
-   - Files: `arc-core-types/src/capability.rs` (add ModelMetadata/ModelSafetyTier/ModelConstraint), `arc-kernel/src/kernel/mod.rs` (constraint checking)
-   - Depends: Phase 2.2 base
-   - Light kernel contention; can sequence after 2.2
-
-7. **15.1 FIPS Crypto Path**
-   - Files: `arc-core-types/src/crypto.rs` (trait refactor), touch capability.rs, receipt.rs, kernel DPoP
-   - Moderate contention but orthogonal to other Phase 15 work
-   - Can run parallel to 15.2-15.5 (already shipped)
-
-8. **12.1 Missing SIEM Exporters**
-   - Files: New exporters in `arc-siem/src/exporters/` (datadog.rs, sumo_logic.rs, webhook.rs, alerting.rs)
-   - Self-contained; no kernel contention
-   - Unblocks: Phase 12.2 (OCSF depends on exporter infrastructure)
+9. **2.3 ModelConstraint Implementation** — deepen `arc-kernel/src/kernel/mod.rs` evaluation for already-shipped ModelConstraint variant. Kernel contention.
+10. **2.4 Plan-Level Evaluation** — new `arc-core-types::PlannedToolCall`, kernel `evaluate_plan()`, HTTP route. Large kernel + core-types write.
+11. **15.1 FIPS Crypto Path** — `SigningBackend` trait in arc-core-types/src/crypto.rs; P-256/P-384 backend. Moderate contention.
+12. **3.4 HITL Verdict + 3.5 Persistence + 3.6 Channels** — cluster; all three share `Verdict::PendingApproval` and ApprovalGuard. Serialize within cluster, parallelize across other waves.
 
 ---
 
@@ -365,5 +343,18 @@ PHASE 14 (WASM Kernel, depends on 1,2,3)
 
 ---
 
-**Last Updated**: 2026-04-16 13:40 UTC  
-**Next Review**: After Phase 2 completion or when Phase 1 stories reach SHIPPED status
+**Last Updated**: 2026-04-16 15:55 UTC (post Wave 1b)
+**Next Review**: After Wave 2 parallel cluster lands (phases 7.2-7.4, 12.1, 0.4, 17.6, 3.1, 5.6)
+
+## Known Pre-existing Test Failures (not caused by Wave 1 work)
+
+The following arc-kernel lib tests fail on both the Wave-1 tree and the
+baseline immediately prior to Wave 1b. They are orthogonal to the
+Wave-1 feature work and must be investigated independently:
+
+- `checkpoint::tests::validate_checkpoint_transparency_rejects_predecessor_fork` — checkpoint_seq 3 does not immediately follow predecessor 1 (continuity-error text mismatch)
+- `kernel::tests::governed_call_chain_receipt_follows_asserted_observed_verified_execution_order` — expected `Array []` got `Null`
+- `receipt_support::tests::governed_request_metadata_marks_validated_upstream_call_chain_proof_as_verified` — `governed_transaction_diagnostics` unexpectedly present
+- `session::tests::duplicate_inflight_request_is_rejected` — expected `SessionError::DuplicateInflightRequest` not matched
+
+Treat as a dedicated debug task before any further arc-kernel feature work touches these modules.
