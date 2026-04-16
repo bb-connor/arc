@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**34 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**35 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -41,7 +41,7 @@ roadmap phase.
 | 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
 | 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
 | 2 (Types) | 2.1, 2.2, 2.3 | -- | 2.4 |
-| 3 (Content safety / HITL) | 3.1 | -- | 3.2, 3.3, 3.4, 3.5, 3.6 |
+| 3 (Content safety / HITL) | 3.1, 3.2 | -- | 3.3, 3.4, 3.5, 3.6 |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
@@ -334,7 +334,7 @@ sync Guard trait. Includes text canonicalization and fingerprint dedup.
 **Acceptance**: Guard detects "ignore previous instructions" patterns and
 returns Deny. Existing guards unaffected.
 
-### 3.2 JailbreakGuard (Port from ClawdStrike)
+### 3.2 JailbreakGuard (Port from ClawdStrike) [SHIPPED 2da8f19]
 
 **What**: Port the 4-layer jailbreak detector (heuristic, statistical, ML
 scoring, optional LLM judge). LLM judge deferred to host function in v2.
