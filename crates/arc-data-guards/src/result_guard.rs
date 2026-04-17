@@ -319,12 +319,19 @@ fn redact_columns(row: &mut Value, denied: &[String], marker: &str) {
         }
 
         // Nested table shape: "table" with a nested object whose columns
-        // we need to scrub.
+        // we need to scrub. We check both the `table.column` dotted
+        // denylist entries AND the bare column names -- documented
+        // "bare column names apply to any table" behavior, which the
+        // previous code missed for nested objects and leaked e.g.
+        // `{"users": {"email": ...}}` when only `"email"` was denied.
         if let Some(Value::Object(inner)) = map.get_mut(key) {
             let inner_keys: Vec<String> = inner.keys().cloned().collect();
             for col in inner_keys {
-                let dotted = format!("{}.{}", lower, col.to_ascii_lowercase());
-                if denied.iter().any(|d| d == &dotted) {
+                let col_lower = col.to_ascii_lowercase();
+                let dotted = format!("{}.{}", lower, col_lower);
+                let hit = denied.iter().any(|d| d == &dotted)
+                    || bare.iter().any(|b| b.as_ref() == col_lower);
+                if hit {
                     if let Some(v) = inner.get_mut(&col) {
                         *v = Value::String(marker.to_string());
                     }
