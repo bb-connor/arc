@@ -58,6 +58,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # When dispatched with a tag input (e.g. workflow_dispatch to
+          # rebuild v0.1.0 from main), check that tag out — otherwise
+          # the default GITHUB_REF is the triggering branch/ref, which
+          # would publish binaries built from the wrong commit under
+          # the requested tag name.
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
