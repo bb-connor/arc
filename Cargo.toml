@@ -25,6 +25,7 @@ members = [
     "crates/arc-config",
     "crates/arc-api-protect",
     "crates/arc-kernel",
+    "crates/arc-kernel-core",
     "crates/arc-listing",
     "crates/arc-market",
     "crates/arc-mercury",

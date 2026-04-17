@@ -1287,6 +1287,7 @@ dependencies = [
  "arc-core-types",
  "arc-credit",
  "arc-governance",
+ "arc-kernel-core",
  "arc-link",
  "arc-listing",
  "arc-market",
@@ -1304,6 +1305,15 @@ dependencies = [
  "tracing",
  "ureq",
  "uuid",
+]
+
+[[package]]
+name = "arc-kernel-core"
+version = "0.1.0"
+dependencies = [
+ "arc-core-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

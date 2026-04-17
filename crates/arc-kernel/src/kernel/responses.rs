@@ -889,11 +889,14 @@ impl ArcKernel {
         // entry BEFORE the receipt is signed so the provenance evidence
         // rides in the signed metadata. Writes append AFTER signing
         // (see below) because the chain entry needs the receipt id.
-        let memory_action_kind =
-            crate::memory_provenance::classify_memory_action(&request.tool_name, &request.arguments);
+        let memory_action_kind = crate::memory_provenance::classify_memory_action(
+            &request.tool_name,
+            &request.arguments,
+        );
         let memory_read_metadata = match memory_action_kind.as_ref() {
-            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => self
-                .resolve_memory_read_provenance_metadata(store, key),
+            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => {
+                self.resolve_memory_read_provenance_metadata(store, key)
+            }
             _ => None,
         };
 
@@ -1052,9 +1055,9 @@ impl ArcKernel {
                     "chain_digest": chain_digest,
                 }
             })),
-            crate::memory_provenance::ProvenanceVerification::Unverified { reason } => Some(
-                memory_read_unverified_metadata(store, key, reason),
-            ),
+            crate::memory_provenance::ProvenanceVerification::Unverified { reason } => {
+                Some(memory_read_unverified_metadata(store, key, reason))
+            }
         }
     }
 
@@ -1124,8 +1127,21 @@ impl ArcKernel {
             kernel_key: self.config.keypair.public_key(),
         };
 
-        ArcReceipt::sign(body, &self.config.keypair)
-            .map_err(|e| KernelError::ReceiptSigningFailed(e.to_string()))
+        // Phase 14.1: delegate the pure signing step to arc-kernel-core so the
+        // portable TCB stays in one place. The full kernel still owns body
+        // construction (tenant scope resolution, policy_hash injection,
+        // evidence assembly) because those are std/tokio-aware concerns.
+        let backend = arc_core::crypto::Ed25519Backend::new(self.config.keypair.clone());
+        arc_kernel_core::sign_receipt(body, &backend).map_err(|error| {
+            use arc_kernel_core::ReceiptSigningError;
+            let message = match error {
+                ReceiptSigningError::KernelKeyMismatch => {
+                    "kernel signing key does not match receipt body kernel_key".to_string()
+                }
+                ReceiptSigningError::SigningFailed(reason) => reason,
+            };
+            KernelError::ReceiptSigningFailed(message)
+        })
     }
 
     pub(crate) fn record_arc_receipt(&self, receipt: &ArcReceipt) -> Result<(), KernelError> {

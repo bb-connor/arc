@@ -1,0 +1,36 @@
+[package]
+name = "arc-kernel-core"
+description = "Portable (no_std + alloc) ARC kernel core: pure verdict evaluation, capability verification, and receipt signing"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_kernel_core"
+
+# Phase 14.1 portable kernel core extraction.
+#
+# This crate contains the pure-compute subset of ARC kernel evaluation:
+# capability verification, scope matching, guard pipeline evaluation, and
+# receipt signing. It is a `no_std + alloc` crate by source, which means
+# the crate itself never imports from `std`, so later phases (browser
+# adapter, edge adapter, mobile adapter) can consume it without the
+# std runtime once `arc-core-types` is made no-std-ready.
+#
+# Today `arc-core-types` still imports from `std` (BTreeMap aliases,
+# `std::fmt`, `std::cmp::Ordering`) and pulls in `getrandom` without the
+# `js` feature, which blocks `cargo build --target wasm32-unknown-unknown`
+# at the dependency level. This crate is structured so that when
+# `arc-core-types` is modernised (a separate roadmap story), arc-kernel-core
+# will cross-compile to wasm32 with no changes beyond adding the `getrandom`
+# js feature to arc-core-types. See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
+[dependencies]
+arc-core-types = { package = "arc-core-types", path = "../arc-core-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

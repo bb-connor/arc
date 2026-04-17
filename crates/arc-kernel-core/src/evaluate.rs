@@ -1,0 +1,262 @@
+//! Pure-compute verdict evaluation.
+//!
+//! [`evaluate`] walks a `(capability, request, guards)` tuple through the
+//! sync checks that do not require I/O or mutable kernel state:
+//!
+//! 1. Issuer trust + signature + time-bound verification via
+//!    [`crate::capability_verify::verify_capability`].
+//! 2. Subject-binding check (agent_id == capability.subject hex).
+//! 3. Portable scope match via [`crate::scope::resolve_matching_grants`].
+//! 4. Guard pipeline: every registered guard is invoked in order;
+//!    fail-closed on error or `Deny`.
+//!
+//! What it does NOT do (fenced into `arc-kernel` proper):
+//!
+//! - Revocation membership lookup (stateful `RevocationStore`).
+//! - Budget mutation (stateful `BudgetStore`).
+//! - Delegation-chain ancestor inspection against the receipt store.
+//! - DPoP proof verification with nonce replay (LRU-backed).
+//! - Governed-transaction policy evaluation (pulls in arc-governance).
+//! - Payment authorisation (async adapter trait).
+//! - Tool dispatch to wrapped servers (async transport).
+//! - Receipt persistence / Merkle checkpointing (SQL / IO).
+//!
+//! The caller -- today `arc-kernel::ArcKernel::evaluate_tool_call_sync` and
+//! tomorrow `arc-kernel-wasm::BrowserKernel::evaluate` -- wraps this pure
+//! core in the I/O checks it needs.
+
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use arc_core_types::capability::CapabilityToken;
+use arc_core_types::crypto::PublicKey;
+
+use crate::capability_verify::{verify_capability, CapabilityError, VerifiedCapability};
+use crate::clock::Clock;
+use crate::guard::{Guard, GuardContext, PortableToolCallRequest};
+use crate::scope::{resolve_matching_grants, MatchedGrant};
+use crate::Verdict;
+
+/// Inputs to [`evaluate`]. Grouped into a struct so the call site stays
+/// tidy and future fields (e.g. a policy-digest override) can be added
+/// without breaking the public signature.
+pub struct EvaluateInput<'a> {
+    /// Tool call request being evaluated.
+    pub request: &'a PortableToolCallRequest,
+    /// The capability token authorising this call.
+    pub capability: &'a CapabilityToken,
+    /// Trusted issuer public keys (typically CA + kernel + authority).
+    pub trusted_issuers: &'a [PublicKey],
+    /// Clock used for time-bound enforcement.
+    pub clock: &'a dyn Clock,
+    /// Guard pipeline. Evaluated in order, fail-closed on deny or error.
+    pub guards: &'a [&'a dyn Guard],
+    /// Optional filesystem roots from the owning session, passed through to
+    /// guards that enforce root-based resource protection.
+    pub session_filesystem_roots: Option<&'a [String]>,
+}
+
+/// Verdict + context produced by [`evaluate`].
+///
+/// On `Verdict::Allow` the caller is handed the `VerifiedCapability` and
+/// the matched grant index; the full kernel uses those to drive budget
+/// accounting, receipt construction, and tool dispatch.
+#[derive(Debug, Clone)]
+pub struct EvaluationVerdict {
+    /// The three-valued verdict. `PendingApproval` is never produced by
+    /// the core; only Allow / Deny flow out of this module.
+    pub verdict: Verdict,
+    /// Human-readable deny reason when `verdict == Deny`.
+    pub reason: Option<String>,
+    /// Grant index that admitted the request. Populated on Allow.
+    pub matched_grant_index: Option<usize>,
+    /// Verified capability snapshot. Populated when signature + time
+    /// checks succeeded, even if a later guard denied.
+    pub verified: Option<VerifiedCapability>,
+}
+
+impl EvaluationVerdict {
+    /// Is this an allow verdict?
+    #[must_use]
+    pub fn is_allow(&self) -> bool {
+        self.verdict == Verdict::Allow
+    }
+
+    /// Is this a deny verdict?
+    #[must_use]
+    pub fn is_deny(&self) -> bool {
+        self.verdict == Verdict::Deny
+    }
+}
+
+/// Errors the portable core can raise.
+///
+/// These are portable-kernel equivalents of the legacy
+/// `arc_kernel::KernelError` variants that can be produced without any
+/// I/O. The caller in `arc-kernel` maps them back onto its richer
+/// `KernelError` surface for backward compatibility.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KernelCoreError {
+    /// Capability signature or issuer trust failed.
+    InvalidCapability(CapabilityError),
+    /// Subject mismatch: `request.agent_id` != `capability.subject`.
+    SubjectMismatch { expected: String, actual: String },
+    /// No grant in scope covers the requested tool/server.
+    OutOfScope { tool: String, server: String },
+    /// A guard returned a fail-closed error.
+    GuardError { guard: String, reason: String },
+    /// A guard denied the request outright.
+    GuardDenied { guard: String },
+}
+
+impl KernelCoreError {
+    /// Human-readable reason for the deny verdict.
+    #[must_use]
+    pub fn deny_reason(&self) -> String {
+        match self {
+            KernelCoreError::InvalidCapability(error) => match error {
+                CapabilityError::UntrustedIssuer => {
+                    "capability issuer is not a trusted CA".to_string()
+                }
+                CapabilityError::InvalidSignature => "capability signature is invalid".to_string(),
+                CapabilityError::NotYetValid => "capability not yet valid".to_string(),
+                CapabilityError::Expired => "capability has expired".to_string(),
+                CapabilityError::Internal(msg) => {
+                    let mut out = String::from("capability verification failed: ");
+                    out.push_str(msg);
+                    out
+                }
+            },
+            KernelCoreError::SubjectMismatch { expected, actual } => {
+                let mut out = String::from("request agent ");
+                out.push_str(actual);
+                out.push_str(" does not match capability subject ");
+                out.push_str(expected);
+                out
+            }
+            KernelCoreError::OutOfScope { tool, server } => {
+                let mut out = String::from("requested tool ");
+                out.push_str(tool);
+                out.push_str(" on server ");
+                out.push_str(server);
+                out.push_str(" is not in capability scope");
+                out
+            }
+            KernelCoreError::GuardError { guard, reason } => {
+                let mut out = String::from("guard \"");
+                out.push_str(guard);
+                out.push_str("\" error (fail-closed): ");
+                out.push_str(reason);
+                out
+            }
+            KernelCoreError::GuardDenied { guard } => {
+                let mut out = String::from("guard \"");
+                out.push_str(guard);
+                out.push_str("\" denied the request");
+                out
+            }
+        }
+    }
+}
+
+/// Primary entry point for the portable kernel core.
+///
+/// Performs in order:
+///
+/// 1. Capability signature / issuer / time-bound verification.
+/// 2. Subject binding (agent_id match).
+/// 3. Portable scope match.
+/// 4. Guard pipeline (fail-closed).
+///
+/// Returns `Ok(EvaluationVerdict)` for Allow or Deny. An `Err` is only
+/// returned when the underlying `verify_canonical` machinery reports an
+/// internal failure that is not a clean verify-false; semantically this
+/// is still a deny at the caller's level and arc-kernel maps it onto
+/// `KernelError::Internal`.
+pub fn evaluate(input: EvaluateInput<'_>) -> EvaluationVerdict {
+    // Step 1: capability verification.
+    let verified = match verify_capability(input.capability, input.trusted_issuers, input.clock) {
+        Ok(verified) => verified,
+        Err(error) => {
+            let core_err = KernelCoreError::InvalidCapability(error);
+            return deny(core_err, None, None);
+        }
+    };
+
+    // Step 2: subject binding.
+    if verified.subject_hex != input.request.agent_id {
+        let core_err = KernelCoreError::SubjectMismatch {
+            expected: verified.subject_hex.clone(),
+            actual: input.request.agent_id.clone(),
+        };
+        return deny(core_err, None, Some(verified));
+    }
+
+    // Step 3: scope match.
+    let matches: Vec<MatchedGrant<'_>> = resolve_matching_grants(
+        &verified.scope,
+        &input.request.tool_name,
+        &input.request.server_id,
+    );
+    if matches.is_empty() {
+        let core_err = KernelCoreError::OutOfScope {
+            tool: input.request.tool_name.clone(),
+            server: input.request.server_id.clone(),
+        };
+        return deny(core_err, None, Some(verified));
+    }
+    // Safe: guarded above.
+    let matched_grant_index = matches[0].index;
+
+    // Step 4: guard pipeline.
+    let ctx = GuardContext {
+        request: input.request,
+        scope: &verified.scope,
+        agent_id: &input.request.agent_id,
+        server_id: &input.request.server_id,
+        session_filesystem_roots: input.session_filesystem_roots,
+        matched_grant_index: Some(matched_grant_index),
+    };
+
+    for guard in input.guards {
+        match guard.evaluate(&ctx) {
+            Ok(Verdict::Allow) => {}
+            Ok(Verdict::Deny) | Ok(Verdict::PendingApproval) => {
+                // PendingApproval is reserved for the full kernel orchestration
+                // layer (arc-kernel::approval::ApprovalGuard); if a legacy sync
+                // guard surfaces it here we fail closed.
+                let core_err = KernelCoreError::GuardDenied {
+                    guard: guard.name().to_string(),
+                };
+                return deny(core_err, Some(matched_grant_index), Some(verified));
+            }
+            Err(error) => {
+                let core_err = KernelCoreError::GuardError {
+                    guard: guard.name().to_string(),
+                    reason: error.deny_reason(),
+                };
+                return deny(core_err, Some(matched_grant_index), Some(verified));
+            }
+        }
+    }
+
+    EvaluationVerdict {
+        verdict: Verdict::Allow,
+        reason: None,
+        matched_grant_index: Some(matched_grant_index),
+        verified: Some(verified),
+    }
+}
+
+fn deny(
+    error: KernelCoreError,
+    matched_grant_index: Option<usize>,
+    verified: Option<VerifiedCapability>,
+) -> EvaluationVerdict {
+    EvaluationVerdict {
+        verdict: Verdict::Deny,
+        reason: Some(error.deny_reason()),
+        matched_grant_index,
+        verified,
+    }
+}

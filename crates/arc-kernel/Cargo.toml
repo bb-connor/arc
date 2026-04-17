@@ -14,6 +14,7 @@ name = "arc_kernel"
 arc-appraisal = { package = "arc-appraisal", path = "../arc-appraisal" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-core-types = { package = "arc-core-types", path = "../arc-core-types" }
+arc-kernel-core = { package = "arc-kernel-core", path = "../arc-kernel-core" }
 arc-credit = { package = "arc-credit", path = "../arc-credit" }
 arc-governance = { package = "arc-governance", path = "../arc-governance" }
 arc-link = { package = "arc-link", path = "../arc-link", default-features = false }

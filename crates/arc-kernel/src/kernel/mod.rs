@@ -1608,13 +1608,12 @@ impl ArcKernel {
                 "execution nonce required but not presented on tool call".to_string(),
             )
         })?;
-        let parameter_hash = arc_core::receipt::ToolCallAction::from_parameters(
-            request.arguments.clone(),
-        )
-        .map_err(|e| {
-            KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
-        })?
-        .parameter_hash;
+        let parameter_hash =
+            arc_core::receipt::ToolCallAction::from_parameters(request.arguments.clone())
+                .map_err(|e| {
+                    KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
+                })?
+                .parameter_hash;
         let expected = crate::execution_nonce::NonceBinding {
             subject_id: cap.subject.to_hex(),
             capability_id: cap.id.clone(),
@@ -1803,9 +1802,7 @@ impl ArcKernel {
         &self,
         req: &arc_core_types::PlanEvaluationRequest,
     ) -> arc_core_types::PlanEvaluationResponse {
-        use arc_core_types::{
-            PlanEvaluationResponse, PlanVerdict, StepVerdict, StepVerdictKind,
-        };
+        use arc_core_types::{PlanEvaluationResponse, PlanVerdict, StepVerdict, StepVerdictKind};
 
         debug!(
             plan_id = %req.plan_id,
@@ -1994,12 +1991,9 @@ impl ArcKernel {
         // run_guards returns Ok(()) on allow and Err(GuardDenied(...))
         // on deny. Fail-closed: any guard error reads as a denial so the
         // caller still sees a per-step reason string.
-        if let Err(error) = self.run_guards(
-            &synthesised,
-            &cap.scope,
-            None,
-            Some(matched_grant_index),
-        ) {
+        if let Err(error) =
+            self.run_guards(&synthesised, &cap.scope, None, Some(matched_grant_index))
+        {
             // Attempt to extract the offending guard name from the
             // canonical `guard "<name>" denied the request` format
             // emitted by run_guards.
@@ -3072,29 +3066,73 @@ impl ArcKernel {
 
     /// Verify the capability's signature against the trusted CA keys or the
     /// kernel's own key (for locally-issued capabilities).
-    fn verify_capability_signature(&self, cap: &CapabilityToken) -> Result<(), String> {
-        let kernel_pk = self.config.keypair.public_key();
+    /// Resolve the trusted-issuer set for capability verification.
+    ///
+    /// This combines the configured CA public keys, the capability
+    /// authority's trusted keys, and the kernel's own public key. The
+    /// method is also used by the arc-kernel-core delegation path
+    /// so the portable TCB verifier sees the same trust set as the
+    /// legacy inline check.
+    pub(crate) fn trusted_issuer_keys(&self) -> Vec<arc_core::PublicKey> {
         let mut trusted = self.config.ca_public_keys.clone();
         for authority_pk in self.capability_authority.trusted_public_keys() {
             if !trusted.contains(&authority_pk) {
                 trusted.push(authority_pk);
             }
         }
+        let kernel_pk = self.config.keypair.public_key();
         if !trusted.contains(&kernel_pk) {
             trusted.push(kernel_pk);
         }
+        trusted
+    }
 
-        for pk in &trusted {
-            if *pk == cap.issuer {
-                return match cap.verify_signature() {
-                    Ok(true) => Ok(()),
-                    Ok(false) => Err("signature did not verify".to_string()),
-                    Err(e) => Err(e.to_string()),
-                };
-            }
+    fn verify_capability_signature(&self, cap: &CapabilityToken) -> Result<(), String> {
+        let trusted = self.trusted_issuer_keys();
+
+        if !trusted.contains(&cap.issuer) {
+            return Err("signer public key not found among trusted CAs".to_string());
         }
 
-        Err("signer public key not found among trusted CAs".to_string())
+        match cap.verify_signature() {
+            Ok(true) => Ok(()),
+            Ok(false) => Err("signature did not verify".to_string()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Phase 14.1 -- run the portable pure-compute verdict path provided by
+    /// `arc-kernel-core`.
+    ///
+    /// This exposes the same synchronous checks the core kernel performs
+    /// (capability signature, issuer trust, time bounds, subject binding,
+    /// scope match, sync guard pipeline) in isolation from the
+    /// `arc-kernel`-only concerns (budget mutation, revocation lookup,
+    /// governed-transaction evaluation, tool dispatch, receipt
+    /// persistence).
+    ///
+    /// Adapters that run the kernel on constrained platforms (wasm32,
+    /// edge workers, mobile via FFI) should prefer this entry point --
+    /// it does not require a tokio runtime, a sqlite database, or any
+    /// IO adapter. The full `evaluate_tool_call_*` API remains the
+    /// authoritative path for the desktop sidecar.
+    pub fn evaluate_portable_verdict<'a, 'b>(
+        &self,
+        capability: &'a CapabilityToken,
+        request: &'b arc_kernel_core::PortableToolCallRequest,
+        guards: &'a [&'a dyn arc_kernel_core::Guard],
+        clock: &'a dyn arc_kernel_core::Clock,
+        session_filesystem_roots: Option<&'a [String]>,
+    ) -> arc_kernel_core::EvaluationVerdict {
+        let trusted = self.trusted_issuer_keys();
+        arc_kernel_core::evaluate(arc_kernel_core::EvaluateInput {
+            request,
+            capability,
+            trusted_issuers: &trusted,
+            clock,
+            guards,
+            session_filesystem_roots,
+        })
     }
 
     /// Check the revocation store for the capability and its entire
