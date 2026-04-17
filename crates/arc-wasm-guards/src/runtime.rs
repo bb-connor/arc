@@ -1111,9 +1111,12 @@ pub mod wasmtime_backend {
         let mut handles: Vec<WasmGuardHandle> = Vec::with_capacity(policy.modules.len());
 
         // Sort a copy of the entries so lower priority runs first, non-advisory
-        // before advisory at the same priority.
+        // before advisory at the same priority. Priority is the primary key;
+        // advisory is only a tie-breaker. Matches `load_wasm_guards` in
+        // `wiring.rs` so policy-driven and config-driven loading produce the
+        // same evaluation order.
         let mut sorted: Vec<PolicyCustomGuard> = policy.modules.clone();
-        sorted.sort_by_key(|g| (g.advisory as u8, g.priority));
+        sorted.sort_by_key(|g| (g.priority, g.advisory as u8));
 
         for guard_spec in &sorted {
             // 1. Capability intersection (fail closed on any un-allowed capability).
