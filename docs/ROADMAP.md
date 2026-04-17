@@ -1299,7 +1299,7 @@ Enforce `MemoryStoreAllowlist`, `MaxRetentionTtl`, `MaxMemoryEntries`.
 `MemoryStoreAllowlist` is denied. Writes exceeding `MaxMemoryEntries`
 are denied.
 
-### 18.2 Memory Entry Provenance
+### 18.2 Memory Entry Provenance [SHIPPED 0e9ffb5]
 
 **What**: Hash chain of memory writes linked to capability IDs. On read,
 verify the write was authorized.
