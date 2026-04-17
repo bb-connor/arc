@@ -31,10 +31,13 @@ action.
 - `istioctl` 1.22+ (for the MeshConfig install/patch and `proxy-config`
   verification commands).
 - `curl` and `awk` on the workstation running `test-harness.sh`.
-- An ARC sidecar image pushed to a registry your cluster can pull. The
-  example pins `ghcr.io/backbay/arc-sidecar:0.1.0`; iteration is easier
-  against `:latest`, but production-shape manifests MUST pin a version or
-  sha256 digest.
+- A dedicated ARC Envoy ext_authz adapter image pushed to a registry your
+  cluster can pull. The reference manifest uses
+  `ghcr.io/backbay/arc-ext-authz:latest` as a placeholder. Replace it with
+  the adapter image you built and published for your environment. Do not use
+  the generic `ghcr.io/backbay/arc-sidecar` image here; that image is the
+  HTTP sidecar and does not expose Envoy's gRPC `Authorization/Check`
+  service.
 - A capability token issued by an ARC capability authority (or the demo
   token the kernel accepts in shadow mode). Export it as
   `ARC_DEMO_CAPABILITY_TOKEN` before running `test-harness.sh`.
