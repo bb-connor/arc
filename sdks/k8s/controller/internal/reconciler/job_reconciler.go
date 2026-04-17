@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -107,7 +108,12 @@ type JobReconciler struct {
 
 	// attempts tracks receipt submission attempts keyed by Job UID so that
 	// we can enforce MaxAttempts across requeues. It is purely in-memory.
-	attempts map[types.UID]int
+	// attemptsMu guards concurrent access from multiple Reconcile workers
+	// when MaxConcurrentReconciles > 1; without it, concurrent writes on
+	// the plain map trigger Go's fatal "concurrent map writes" panic and
+	// crash the controller under load.
+	attemptsMu sync.Mutex
+	attempts   map[types.UID]int
 }
 
 // NewJobReconciler constructs a JobReconciler with default state.
@@ -361,7 +367,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 		}
 	}
 
-	delete(r.attempts, job.UID)
+	r.forgetAttempts(job.UID)
 	return ctrl.Result{}, nil
 }
 
@@ -394,7 +400,7 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 	if err := r.Update(ctx, job); err != nil {
 		return ctrl.Result{}, fmt.Errorf("remove finalizer on delete: %w", err)
 	}
-	delete(r.attempts, job.UID)
+	r.forgetAttempts(job.UID)
 	return ctrl.Result{}, nil
 }
 
@@ -441,6 +447,8 @@ func (r *JobReconciler) event(obj client.Object, eventType, reason, message stri
 
 // backoffFor returns an exponentially growing delay keyed by Job UID.
 func (r *JobReconciler) backoffFor(uid types.UID) time.Duration {
+	r.attemptsMu.Lock()
+	defer r.attemptsMu.Unlock()
 	r.attempts[uid]++
 	n := r.attempts[uid]
 	if n < 1 {
@@ -457,7 +465,15 @@ func (r *JobReconciler) backoffFor(uid types.UID) time.Duration {
 }
 
 func (r *JobReconciler) attemptExceeded(uid types.UID) bool {
+	r.attemptsMu.Lock()
+	defer r.attemptsMu.Unlock()
 	return r.attempts[uid] >= r.Retry.MaxAttempts
+}
+
+func (r *JobReconciler) forgetAttempts(uid types.UID) {
+	r.attemptsMu.Lock()
+	defer r.attemptsMu.Unlock()
+	delete(r.attempts, uid)
 }
 
 // isGoverned returns true if a Job carries the governed label set to "true".
