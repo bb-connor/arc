@@ -3,6 +3,14 @@ pub use arc_core_types::{capability, crypto, receipt};
 pub use arc_credit as credit;
 pub use arc_underwriting as underwriting;
 
+pub mod insurance_flow;
+pub use insurance_flow::{
+    quote_and_bind, BoundPolicy, ClaimDecision, ClaimDenialReason, ClaimEvidence, ClaimSettlement,
+    ClaimSettlementRequest, ClaimSettlementSink, CoverageLimit, InsuranceFlowError, PolicyStatus,
+    PremiumSource, ReceiptEvidenceSource, ReceiptFingerprint, ResolvedReceiptEvidence,
+    StaticPremiumSource,
+};
+
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
