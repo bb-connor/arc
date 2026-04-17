@@ -19,6 +19,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -98,6 +99,12 @@ type JobReconciler struct {
 	Recorder record.EventRecorder
 	Retry    RetryPolicy
 
+	// MaxConcurrentReconciles bounds how many Reconcile goroutines run in
+	// parallel. Zero (default) means the controller-runtime default of 1.
+	// Wired through to controller.Options.MaxConcurrentReconciles so the
+	// operator's CLI flag actually takes effect.
+	MaxConcurrentReconciles int
+
 	// attempts tracks receipt submission attempts keyed by Job UID so that
 	// we can enforce MaxAttempts across requeues. It is purely in-memory.
 	attempts map[types.UID]int
@@ -117,18 +124,40 @@ func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ArcClient, re
 
 // SetupWithManager wires the reconciler into the controller-runtime manager.
 //
-// Only Jobs carrying the governed label flow into Reconcile. Pods owned by a
-// governed Job are also watched so that receipt annotations trigger
-// reconciliation and receipts are harvested while the Job is still running.
+// Jobs are admitted into the reconcile queue when either (a) they currently
+// carry the governed label, or (b) they still hold our finalizer. The
+// finalizer branch is load-bearing: if the governed label is removed from a
+// previously-governed Job, deletion events still need to reach Reconcile so
+// the ARC finalizer + capability can be cleaned up — otherwise the Job can be
+// stuck terminating forever. Pods owned by a governed Job are watched so
+// receipt annotations trigger reconciliation while the Job is still running.
 func (r *JobReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	governed := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetLabels()[LabelGoverned] == "true"
+	governedOrFinalized := predicate.NewPredicateFuncs(func(o client.Object) bool {
+		if o.GetLabels()[LabelGoverned] == "true" {
+			return true
+		}
+		for _, f := range o.GetFinalizers() {
+			if f == FinalizerName {
+				return true
+			}
+		}
+		return false
 	})
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&batchv1.Job{}, builder.WithPredicates(governed)).
+		For(&batchv1.Job{}, builder.WithPredicates(governedOrFinalized)).
 		Owns(&corev1.Pod{}).
+		WithOptions(r.controllerOptions()).
 		Complete(r)
+}
+
+// controllerOptions exposes a hook so tests and main can tune concurrency.
+// Defaults preserve the controller-runtime default of 1 worker when
+// MaxConcurrentReconciles is zero.
+func (r *JobReconciler) controllerOptions() controller.Options {
+	return controller.Options{
+		MaxConcurrentReconciles: r.MaxConcurrentReconciles,
+	}
 }
 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;update;patch

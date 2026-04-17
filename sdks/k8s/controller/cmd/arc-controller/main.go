@@ -9,6 +9,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
@@ -92,10 +93,16 @@ func run() error {
 		return fmt.Errorf("create manager: %w", err)
 	}
 
-	arcClient := arcapi.NewClient(arcSidecarURL, nil)
+	// Honor the --arc-request-timeout flag instead of falling back to the
+	// client's internal 10s default when nil is passed.
+	httpClient := &http.Client{Timeout: arcRequestTimeout}
+	arcClient := arcapi.NewClient(arcSidecarURL, httpClient)
 	recorder := mgr.GetEventRecorderFor("arc-k8s-controller")
 
 	r := reconciler.NewJobReconciler(mgr.GetClient(), mgr.GetScheme(), arcClient, recorder)
+	// Honor the --max-concurrent-reconciles flag so operator-configured
+	// concurrency is actually applied to the controller options.
+	r.MaxConcurrentReconciles = reconcileConcurrency
 	if err := r.SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("setup reconciler: %w", err)
 	}
