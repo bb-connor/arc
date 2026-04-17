@@ -58,6 +58,7 @@ pub mod capability_verify;
 pub mod clock;
 pub mod evaluate;
 pub mod guard;
+pub mod passport_verify;
 pub mod receipts;
 pub mod rng;
 pub mod scope;
@@ -66,6 +67,10 @@ pub use capability_verify::{verify_capability, CapabilityError, VerifiedCapabili
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{evaluate, EvaluateInput, EvaluationVerdict, KernelCoreError};
 pub use guard::{Guard, GuardContext, PortableToolCallRequest};
+pub use passport_verify::{
+    verify_parsed_passport, verify_passport, PortablePassportBody, PortablePassportEnvelope,
+    VerifiedPassport, VerifyError, PORTABLE_PASSPORT_SCHEMA,
+};
 pub use receipts::{sign_receipt, ReceiptSigningError};
 pub use rng::{NullRng, Rng};
 pub use scope::{MatchedGrant, ScopeMatchError};

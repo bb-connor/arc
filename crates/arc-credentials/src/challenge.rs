@@ -263,6 +263,7 @@ pub fn build_agent_passport(
         enterprise_identity_provenance,
         issued_at: rfc3339_from_unix(issued_at)?,
         valid_until: rfc3339_from_unix(valid_until)?,
+        trust_tier: None,
     })
 }
 

@@ -1765,6 +1765,20 @@ fn main() {
             ),
         },
         Commands::Passport { command } => match command {
+            PassportCommands::Generate {
+                agent,
+                output,
+                compliance_score,
+                behavioral_anomaly,
+                validity_days,
+            } => passport::cmd_passport_generate(
+                &agent,
+                output.as_deref(),
+                compliance_score,
+                behavioral_anomaly,
+                validity_days,
+                json_output,
+            ),
             PassportCommands::Create {
                 subject_public_key,
                 output,
