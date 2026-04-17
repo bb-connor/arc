@@ -160,20 +160,24 @@ impl SqlQueryGuard {
             }
 
             // Computed/opaque projections (`"?"` from the parser, e.g.
-            // `SELECT lower(ssn) FROM users`). Skipping these silently
-            // would let `lower(ssn)` bypass a column allowlist that only
-            // permits non-sensitive columns. Fail closed whenever the
-            // table has a column allowlist configured; there is no way
-            // to prove the computed expression stays inside the allowed
-            // set without evaluating it.
+            // `SELECT lower(ssn) FROM users`) or JOINs where the source
+            // table cannot be resolved (parser emits `table == "?"` too).
+            // A per-table allowlist check is not enough: the computed
+            // expression could read any column from any joined table,
+            // and for JOINs `table == "?"` never matches a real
+            // allowlist entry, letting sensitive columns leak through
+            // expressions like `lower(users.ssn)`.
+            //
+            // We reach this branch only after the early return at the
+            // top of `enforce_columns` proved that SOME column allowlist
+            // is configured, so fail closed uniformly on any `"?"`
+            // projection: the guard cannot prove the expression stays
+            // inside the allowed set without evaluating it.
             if column == "?" {
-                if self.config.table_has_column_allowlist(table) {
-                    return Err(SqlGuardDenyReason::ColumnNotAllowed {
-                        table: table.clone(),
-                        column: "?".to_string(),
-                    });
-                }
-                continue;
+                return Err(SqlGuardDenyReason::ColumnNotAllowed {
+                    table: table.clone(),
+                    column: "?".to_string(),
+                });
             }
 
             // Apply the column allowlist for this table if configured.
