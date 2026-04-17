@@ -1,10 +1,19 @@
-pub use arc_core_types::{crypto, receipt};
+pub use arc_core_types::capability::MonetaryAmount;
+pub use arc_core_types::{canonical_json_bytes, crypto, receipt};
+
+pub mod discovery;
+pub use discovery::{
+    compare, provider_signing_key, resolve_admissible_listing, search, Listing, ListingComparison,
+    ListingComparisonRow, ListingPricingHint, ListingQuery, ListingSearchResponse, ListingSla,
+    SignedListingPricingHint, LISTING_COMPARISON_SCHEMA, LISTING_PRICING_HINT_SCHEMA,
+    LISTING_SEARCH_SCHEMA, MAX_MARKETPLACE_SEARCH_LIMIT,
+};
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::crypto::{canonical_json_bytes, sha256_hex, PublicKey};
+use crate::crypto::{sha256_hex, PublicKey};
 use crate::receipt::SignedExportEnvelope;
 
 pub const GENERIC_NAMESPACE_ARTIFACT_SCHEMA: &str = "arc.registry.namespace.v1";
