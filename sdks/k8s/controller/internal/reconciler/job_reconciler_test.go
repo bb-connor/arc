@@ -211,8 +211,11 @@ func TestReconcile_NewGovernedJob_MintsGrant(t *testing.T) {
 	if got.Annotations[AnnotationCapabilityID] != "cap-abc" {
 		t.Fatalf("expected capability-id annotation, got %q", got.Annotations[AnnotationCapabilityID])
 	}
-	if got.Annotations[AnnotationCapabilityToken] != "token-cap-abc" {
-		t.Fatalf("expected capability-token annotation, got %q", got.Annotations[AnnotationCapabilityToken])
+	if got.Annotations[AnnotationCapabilityToken] != "" {
+		t.Fatalf("expected no top-level capability-token annotation, got %q", got.Annotations[AnnotationCapabilityToken])
+	}
+	if got.Spec.Template.Annotations[AnnotationCapabilityToken] != "token-cap-abc" {
+		t.Fatalf("expected pod-template capability-token annotation, got %q", got.Spec.Template.Annotations[AnnotationCapabilityToken])
 	}
 	if _, err := time.Parse(time.RFC3339, got.Annotations[AnnotationCapabilityExpiresAt]); err != nil {
 		t.Fatalf("invalid expires-at annotation %q: %v", got.Annotations[AnnotationCapabilityExpiresAt], err)
@@ -239,7 +242,7 @@ func TestReconcile_CompletedJob_ReleasesAndEmitsReceipt(t *testing.T) {
 	job := governedJob()
 	// Pre-set: the mint has already happened.
 	job.Annotations[AnnotationCapabilityID] = "cap-ok"
-	job.Annotations[AnnotationCapabilityToken] = "token-cap-ok"
+	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-ok"}
 	job.Annotations[AnnotationCapabilityExpiresAt] = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	job.Finalizers = []string{FinalizerName}
 	// Mark complete.
@@ -300,7 +303,7 @@ func TestReconcile_FailedJob_ReleasesAndEmitsReceipt(t *testing.T) {
 	arc := &stubArcClient{}
 	job := governedJob()
 	job.Annotations[AnnotationCapabilityID] = "cap-fail"
-	job.Annotations[AnnotationCapabilityToken] = "token-cap-fail"
+	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-fail"}
 	job.Annotations[AnnotationCapabilityExpiresAt] = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	job.Finalizers = []string{FinalizerName}
 	job.Status.Conditions = []batchv1.JobCondition{
@@ -402,7 +405,7 @@ func TestReconcile_Idempotent(t *testing.T) {
 	arc := &stubArcClient{}
 	job := completedJob(governedJob())
 	job.Annotations[AnnotationCapabilityID] = "cap-idem"
-	job.Annotations[AnnotationCapabilityToken] = "token-cap-idem"
+	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-idem"}
 	job.Annotations[AnnotationCapabilityExpiresAt] = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
 	job.Finalizers = []string{FinalizerName}
 

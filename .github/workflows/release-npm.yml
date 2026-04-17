@@ -215,17 +215,15 @@ jobs:
             exit 1
           fi
 
-      - name: Install dependencies (workspace root)
+      - name: Install dependencies
+        working-directory: ${{ matrix.package }}
         shell: bash
         run: |
           set -euo pipefail
-          cd sdks/typescript
-          # Prefer reproducible installs; fall back to install if the
-          # lockfile is stale (ci would otherwise fail).
           if [[ -f package-lock.json ]]; then
-            npm ci --workspaces --include-workspace-root
+            npm ci
           else
-            npm install --workspaces --include-workspace-root
+            npm install
           fi
 
       - name: Build

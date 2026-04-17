@@ -8,8 +8,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -24,9 +23,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@arc-protocol/node-http": "file:../node-http"
   },
   "peerDependencies": {
     "ai": ">=3.4 <6",

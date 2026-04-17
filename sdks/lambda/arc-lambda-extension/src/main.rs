@@ -252,6 +252,7 @@ struct EvaluateRequest {
     scope: Option<String>,
     #[serde(default)]
     #[allow(dead_code)]
+    #[serde(alias = "parameters")]
     arguments: Option<serde_json::Value>,
 }
 
@@ -307,9 +308,17 @@ async fn handle(
             status: "ok",
             extension: EXTENSION_NAME,
         }),
-        ("POST", "/v1/evaluate") => match read_body(req).await {
+        ("POST", "/v1/evaluate") => {
+            let (parts, body) = req.into_parts();
+            match read_body(body).await {
             Ok(body) => match serde_json::from_slice::<EvaluateRequest>(&body) {
-                Ok(request) => evaluate(request, state).await,
+                Ok(mut request) => {
+                    if let Err(error) = hydrate_request_from_headers(&parts.headers, &mut request) {
+                        error_json(StatusCode::BAD_REQUEST, "invalid_capability", error)
+                    } else {
+                        evaluate(request, state).await
+                    }
+                }
                 Err(err) => error_json(
                     StatusCode::BAD_REQUEST,
                     "invalid_json",
@@ -321,7 +330,8 @@ async fn handle(
                 "body_read_error",
                 format!("failed to read request body: {err}"),
             ),
-        },
+        }
+        }
         _ => error_json(
             StatusCode::NOT_FOUND,
             "not_found",
@@ -331,9 +341,36 @@ async fn handle(
     Ok(response)
 }
 
-async fn read_body(req: Request<Incoming>) -> Result<Vec<u8>, hyper::Error> {
-    let collected = req.into_body().collect().await?;
+async fn read_body(body: Incoming) -> Result<Vec<u8>, hyper::Error> {
+    let collected = body.collect().await?;
     Ok(collected.to_bytes().to_vec())
+}
+
+fn hydrate_request_from_headers(
+    headers: &hyper::HeaderMap,
+    request: &mut EvaluateRequest,
+) -> Result<(), String> {
+    if request.capability.is_none() {
+        if let Some(raw_capability) = headers.get("x-arc-capability") {
+            let raw_capability = raw_capability
+                .to_str()
+                .map_err(|error| format!("invalid x-arc-capability header: {error}"))?;
+            request.capability = Some(
+                serde_json::from_str(raw_capability)
+                    .map_err(|error| format!("invalid x-arc-capability JSON: {error}"))?,
+            );
+        }
+    }
+
+    if request.capability_id.is_empty() {
+        if let Some(capability) = request.capability.as_ref() {
+            let capability: CapabilityToken = serde_json::from_value(capability.clone())
+                .map_err(|error| format!("invalid capability token: {error}"))?;
+            request.capability_id = capability.id;
+        }
+    }
+
+    Ok(())
 }
 
 async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Full<Bytes>> {
@@ -379,9 +416,6 @@ async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Fu
 }
 
 fn evaluate_request(request: &EvaluateRequest, now: u64) -> (&'static str, Option<String>) {
-    if request.capability_id.is_empty() {
-        return ("deny", Some("missing capability_id".into()));
-    }
     if request.tool_server.is_empty() {
         return ("deny", Some("missing tool_server".into()));
     }
@@ -393,6 +427,9 @@ fn evaluate_request(request: &EvaluateRequest, now: u64) -> (&'static str, Optio
         Ok(capability) => capability,
         Err(reason) => return ("deny", Some(reason)),
     };
+    if request.capability_id.is_empty() {
+        return ("deny", Some("missing capability_id".into()));
+    }
     if capability.id != request.capability_id {
         return (
             "deny",
@@ -533,11 +570,39 @@ mod tests {
             receipt_tx: tx,
             buffer: Mutex::new(ReceiptBuffer::new(rx)),
         });
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap();
         let request = EvaluateRequest {
             capability_id: "".into(),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
-            capability: None,
+            capability: Some(serde_json::to_value(capability).unwrap()),
             trusted_issuers: Vec::new(),
             scope: None,
             arguments: None,
@@ -771,6 +836,53 @@ mod tests {
             .as_str()
             .unwrap_or_default()
             .contains("capability"));
+    }
+
+    #[tokio::test]
+    async fn request_hydration_accepts_header_capability_and_parameters_alias() {
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap();
+        let mut request: EvaluateRequest = serde_json::from_value(serde_json::json!({
+            "tool_server": "srv",
+            "tool_name": "tool",
+            "parameters": { "q": "hello" }
+        }))
+        .unwrap();
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            "x-arc-capability",
+            serde_json::to_string(&capability).unwrap().parse().unwrap(),
+        );
+
+        hydrate_request_from_headers(&headers, &mut request).expect("hydrate request");
+        assert_eq!(request.capability_id, "cap");
+        assert_eq!(request.arguments, Some(serde_json::json!({ "q": "hello" })));
     }
 
     #[tokio::test]

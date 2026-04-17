@@ -12,8 +12,8 @@ use arc_open_market::{
         ListingPricingHint, ListingSla, SignedGenericListing, SignedListingPricingHint,
         GENERIC_LISTING_ARTIFACT_SCHEMA, LISTING_PRICING_HINT_SCHEMA,
     },
-    BidMintContext, BidRequest, BiddingError, RequestedScope, ACCEPTED_BID_SCHEMA,
-    ASK_RESPONSE_SCHEMA, BID_REQUEST_SCHEMA,
+    BidMintContext, BidRequest, BiddingError, RequestedScope, SignedBidRequest,
+    ACCEPTED_BID_SCHEMA, ASK_RESPONSE_SCHEMA, BID_REQUEST_SCHEMA,
 };
 
 fn namespace(keypair: &Keypair) -> GenericNamespaceOwnership {
@@ -172,6 +172,24 @@ fn bid_request(agent_id: &str, max_units: u64, window_seconds: u64, now: u64) ->
     }
 }
 
+fn signed_bid_request(
+    agent_keypair: &Keypair,
+    agent_id: &str,
+    max_units: u64,
+    window_seconds: u64,
+    now: u64,
+) -> SignedBidRequest {
+    SignedBidRequest::sign(
+        bid_request(agent_id, max_units, window_seconds, now),
+        agent_keypair,
+    )
+    .expect("sign bid")
+}
+
+fn resign_bid_request(agent_keypair: &Keypair, request: &BidRequest) -> SignedBidRequest {
+    SignedBidRequest::sign(request.clone(), agent_keypair).expect("re-sign bid")
+}
+
 #[test]
 fn bid_happy_path_mints_token_and_accept_records_settlement() {
     let registry_keypair = Keypair::generate();
@@ -185,7 +203,7 @@ fn bid_happy_path_mints_token_and_accept_records_settlement() {
         100,
         600,
     );
-    let request = bid_request("agent-alpha", 200, 600, 120);
+    let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 600, 120);
     let ask = bid(
         &request,
         BidMintContext {
@@ -226,7 +244,7 @@ fn bid_fails_closed_on_stale_listing_freshness() {
         600,
     );
     listing.freshness.state = GenericListingFreshnessState::Stale;
-    let request = bid_request("agent-alpha", 200, 300, 120);
+    let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
     let error = bid(
         &request,
         BidMintContext {
@@ -254,7 +272,7 @@ fn bid_fails_closed_on_revoked_listing() {
         100,
         600,
     );
-    let request = bid_request("agent-alpha", 200, 300, 120);
+    let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
     let error = bid(
         &request,
         BidMintContext {
@@ -282,8 +300,9 @@ fn bid_refuses_mismatched_listing_id() {
         100,
         600,
     );
-    let mut request = bid_request("agent-alpha", 200, 300, 120);
-    request.listing_id = "listing-999".to_string();
+    let mut request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
+    request.body.listing_id = "listing-999".to_string();
+    request = resign_bid_request(&agent_keypair, &request.body);
 
     let error = bid(
         &request,
@@ -321,9 +340,10 @@ fn bid_allows_deeper_scope_prefix_without_rewriting_tool_name() {
         "tools:search:premium",
     );
 
-    let mut request = bid_request("agent-alpha", 200, 600, 120);
-    request.requested_scope.capability_scope_prefix = "tools:search:premium".to_string();
-    request.requested_scope.tool_name = "search".to_string();
+    let mut request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 600, 120);
+    request.body.requested_scope.capability_scope_prefix = "tools:search:premium".to_string();
+    request.body.requested_scope.tool_name = "search".to_string();
+    request = resign_bid_request(&agent_keypair, &request.body);
 
     let ask = bid(
         &request,
@@ -353,7 +373,7 @@ fn accept_refuses_empty_bid_receipt_id() {
         100,
         600,
     );
-    let request = bid_request("agent-alpha", 200, 300, 120);
+    let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
     let ask = bid(
         &request,
         BidMintContext {

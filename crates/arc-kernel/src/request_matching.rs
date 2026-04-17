@@ -358,6 +358,7 @@ fn constraint_matches(
             Ok(string_leaves.iter().any(|leaf| regex.is_match(&leaf.value)))
         }
         Constraint::MaxLength(max) => Ok(string_leaves.iter().all(|leaf| leaf.value.len() <= *max)),
+        Constraint::MaxArgsSize(max) => Ok(arguments.to_string().len() <= *max),
         Constraint::GovernedIntentRequired
         | Constraint::RequireApprovalAbove { .. }
         | Constraint::SellerExact(_)
@@ -375,10 +376,10 @@ fn constraint_matches(
         Constraint::TableAllowlist(_)
         | Constraint::ColumnDenylist(_)
         | Constraint::MaxRowsReturned(_)
-        | Constraint::OperationClass(_)
-        | Constraint::ContentReviewTier(_)
+        | Constraint::OperationClass(_) => Ok(true),
+        Constraint::ContentReviewTier(_)
         | Constraint::MaxTransactionAmountUsd(_)
-        | Constraint::RequireDualApproval(_) => Ok(true),
+        | Constraint::RequireDualApproval(_) => Ok(false),
 
         // Phase 2.3: evaluate the model-routing constraint against the
         // request-supplied `model_metadata`. A grant is admitted only
@@ -401,6 +402,68 @@ fn constraint_matches(
         }
         Constraint::MemoryWriteDenyPatterns(patterns) => {
             memory_write_deny_patterns_match(arguments, patterns)
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use arc_core::capability::{
+        ArcScope, CapabilityTokenBody, Constraint, ContentReviewTier, Operation, ToolGrant,
+    };
+    use arc_core::crypto::Keypair;
+
+    fn capability_with_constraints(constraints: Vec<Constraint>) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-request-matching".to_string(),
+                issuer: issuer.public_key(),
+                subject: issuer.public_key(),
+                scope: ArcScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv".to_string(),
+                        tool_name: "tool".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints,
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..ArcScope::default()
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("sign capability")
+    }
+
+    #[test]
+    fn governed_only_constraints_fail_closed_without_specialized_enforcement() {
+        let constraints = [
+            Constraint::ContentReviewTier(ContentReviewTier::Strict),
+            Constraint::MaxTransactionAmountUsd("100.00".to_string()),
+            Constraint::RequireDualApproval(true),
+        ];
+
+        for constraint in constraints {
+            let capability = capability_with_constraints(vec![constraint]);
+            assert!(
+                !capability_matches_request(
+                    &capability,
+                    "tool",
+                    "srv",
+                    &serde_json::json!({"amount_usd": "25.00"}),
+                )
+                .expect("evaluate request match"),
+                "governed-only constraint should deny without its dedicated enforcement path"
+            );
         }
     }
 }

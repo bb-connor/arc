@@ -18,13 +18,14 @@ Container images are published for `linux/amd64` and `linux/arm64`.
 ## Install via Homebrew
 
 ```bash
-brew tap backbay/arc https://github.com/backbay/arc
-brew install backbay/arc/arc
+curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+brew install --formula /tmp/arc.rb
 arc --version
 ```
 
-The formula lives at `Homebrew/arc.rb`. See
-[`docs/install/homebrew.md`](./homebrew.md) for tap details.
+The release workflow renders the installable formula from
+`Homebrew/arc.rb.tmpl` and publishes it as the `arc.rb` release asset.
+See [`docs/install/homebrew.md`](./homebrew.md) for details.
 
 ## Install via Docker
 
@@ -114,4 +115,4 @@ docker buildx imagetools inspect ghcr.io/backbay/arc-sidecar:0.1.0
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
 | `ghcr.io/backbay/arc-sidecar` container image  | `.github/workflows/sidecar-image.yml`                 |
-| Homebrew formula (this repo)                   | `Homebrew/arc.rb` (synced to the `backbay/arc` tap)   |
+| Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `arc.rb` |

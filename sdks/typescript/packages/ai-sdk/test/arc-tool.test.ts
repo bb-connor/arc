@@ -21,7 +21,7 @@ interface FetchCall {
  * environment (Node >= 18).
  */
 function fakeFetch(
-  receipts: Array<ArcReceipt | { error: string; status: number }>,
+  receipts: Array<ArcReceipt | Record<string, unknown> | { error: string; status: number }>,
 ): { fetch: typeof fetch; calls: FetchCall[] } {
   const calls: FetchCall[] = [];
   let i = 0;
@@ -62,6 +62,17 @@ function denyReceipt(reason = "no permission", guard = "TestGuard", id = "r-deny
   return {
     id,
     decision: { verdict: "deny", reason, guard },
+  };
+}
+
+function lambdaAllowReceipt(id = "r-allow"): Record<string, unknown> {
+  return {
+    receipt_id: id,
+    decision: "allow",
+    capability_id: "cap-1",
+    tool_server: "math",
+    tool_name: "double",
+    timestamp: 1_700_000_000,
   };
 }
 
@@ -144,7 +155,7 @@ describe("arcTool: allow path invokes underlying execute", () => {
       tool_server: "math",
       tool_name: "double",
       capability_id: "cap-1",
-      parameters: { n: 21 },
+      arguments: { n: 21 },
     });
   });
 
@@ -163,6 +174,24 @@ describe("arcTool: allow path invokes underlying execute", () => {
 
     await wrapped.execute!({});
     expect(calls[0]!.headers["x-arc-capability"]).toBe('{"id":"cap-xyz"}');
+    expect(calls[0]!.body).toMatchObject({
+      capability_id: "cap-xyz",
+      capability: { id: "cap-xyz" },
+      arguments: {},
+    });
+  });
+
+  it("normalizes the Lambda evaluator response contract", async () => {
+    const { fetch } = fakeFetch([lambdaAllowReceipt()]);
+    const wrapped = arcTool({
+      parameters: z.object({ n: z.number() }),
+      execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
+      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      clientOptions: { fetch },
+    });
+
+    const result = await wrapped.execute!({ n: 21 });
+    expect(result).toEqual({ doubled: 42 });
   });
 
   it("forwards ToolExecuteOptions (abortSignal, toolCallId) to underlying execute", async () => {

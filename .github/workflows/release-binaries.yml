@@ -236,7 +236,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.version.outputs.version }}"
-          formula_src="Homebrew/arc.rb"
+          formula_src="Homebrew/arc.rb.tmpl"
           formula_out="release/arc.rb"
           if [[ ! -f "$formula_src" ]]; then
             echo "formula source missing: $formula_src" >&2
@@ -266,14 +266,11 @@ jobs:
           x86_mac=$(derive_sha256 "release/arc-${version}-x86_64-apple-darwin.tar.gz")
           arm_lin=$(derive_sha256 "release/arc-${version}-aarch64-unknown-linux-gnu.tar.gz")
           x86_lin=$(derive_sha256 "release/arc-${version}-x86_64-unknown-linux-gnu.tar.gz")
-          # Replace the four deterministic placeholder strings. Using distinct
-          # placeholders keeps the substitution unambiguous vs. a single shared
-          # placeholder that would be impossible to map back to platforms.
-          sed -e "s|1111111111111111111111111111111111111111111111111111111111111111|${arm_mac}|" \
-              -e "s|2222222222222222222222222222222222222222222222222222222222222222|${x86_mac}|" \
-              -e "s|3333333333333333333333333333333333333333333333333333333333333333|${arm_lin}|" \
-              -e "s|4444444444444444444444444444444444444444444444444444444444444444|${x86_lin}|" \
-              -e "s|version \"0.1.0\"|version \"${version}\"|" \
+          sed -e "s|__ARC_SHA256_DARWIN_ARM64__|${arm_mac}|" \
+              -e "s|__ARC_SHA256_DARWIN_AMD64__|${x86_mac}|" \
+              -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
+              -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
+              -e "s|__ARC_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
           echo "updated formula at ${formula_out}:"
           grep -E "version |sha256 " "$formula_out"
@@ -291,7 +288,8 @@ jobs:
             echo "### Install"
             echo
             echo '```bash'
-            echo "brew install backbay/arc/arc"
+            echo "curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb"
+            echo "brew install --formula /tmp/arc.rb"
             echo "docker pull ghcr.io/backbay/arc-sidecar:${{ steps.version.outputs.version }}"
             echo '```'
             echo

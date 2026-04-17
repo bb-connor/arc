@@ -180,10 +180,10 @@ impl From<HttpAuthorityError> for crate::error::ProtectError {
             HttpAuthorityError::PendingApproval {
                 approval_id,
                 kernel_receipt_id,
-            } => Self::Evaluation(format!(
-                "http authority evaluation requires approval (approval_id={}, kernel_receipt_id={kernel_receipt_id})",
-                approval_id.as_deref().unwrap_or("unknown"),
-            )),
+            } => Self::PendingApproval {
+                approval_id,
+                kernel_receipt_id,
+            },
             HttpAuthorityError::ReceiptSign(message) => Self::ReceiptSign(message),
         }
     }

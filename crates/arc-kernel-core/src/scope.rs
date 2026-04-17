@@ -181,6 +181,7 @@ fn constraint_matches(
                     .all(|domain| wildcard_matches(&pattern, &domain)))
         }
         Constraint::MaxLength(max) => Ok(string_leaves.iter().all(|leaf| leaf.value.len() <= *max)),
+        Constraint::MaxArgsSize(max) => Ok(arguments.to_string().len() <= *max),
         Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
         Constraint::AudienceAllowlist(allowed) => {
             Ok(audience_allowlist_matches(arguments, allowed))
@@ -265,6 +266,7 @@ fn constraint_name(constraint: &Constraint) -> &'static str {
         Constraint::DomainGlob(_) => "domain_glob",
         Constraint::RegexMatch(_) => "regex_match",
         Constraint::MaxLength(_) => "max_length",
+        Constraint::MaxArgsSize(_) => "max_args_size",
         Constraint::GovernedIntentRequired => "governed_intent_required",
         Constraint::RequireApprovalAbove { .. } => "require_approval_above",
         Constraint::SellerExact(_) => "seller_exact",

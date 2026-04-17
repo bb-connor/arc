@@ -118,7 +118,10 @@ fail-closed mode. Fields: `verdict`, `guard`, `reason`, `receiptId`.
 ### `ArcClient`
 
 Minimal HTTP client for `POST /v1/evaluate`. Can be shared across many
-`arcTool()` instances to amortize construction cost.
+`arcTool()` instances to amortize construction cost. The client accepts
+both the Lambda evaluator wire contract (`arguments`, inline capability,
+`receipt_id`) and the older header-based contract, normalizing both into
+the same `ArcReceipt` API.
 
 ## License
 

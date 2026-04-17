@@ -40,8 +40,9 @@ const (
 	// AnnotationCapabilityID records the ID of the minted capability.
 	AnnotationCapabilityID = "arc.protocol/capability-id"
 
-	// AnnotationCapabilityToken stores the serialized capability token.
-	AnnotationCapabilityToken = "arc.protocol/capability-token"
+	// AnnotationCapabilityToken stores the serialized capability token on the
+	// governed pod template so admission can validate the spawned Pods.
+	AnnotationCapabilityToken = "arc.backbay.io/capability-token"
 
 	// AnnotationCapabilityExpiresAt records the capability expiry (RFC3339).
 	AnnotationCapabilityExpiresAt = "arc.protocol/capability-expires-at"
@@ -280,9 +281,13 @@ func (r *JobReconciler) mintGrant(ctx context.Context, logger logr.Logger, job *
 	if job.Annotations == nil {
 		job.Annotations = map[string]string{}
 	}
+	if job.Spec.Template.Annotations == nil {
+		job.Spec.Template.Annotations = map[string]string{}
+	}
 	job.Annotations[AnnotationCapabilityID] = token.ID
-	job.Annotations[AnnotationCapabilityToken] = token.Token
+	delete(job.Annotations, AnnotationCapabilityToken)
 	job.Annotations[AnnotationCapabilityExpiresAt] = token.ExpiresAt.UTC().Format(time.RFC3339)
+	job.Spec.Template.Annotations[AnnotationCapabilityToken] = token.Token
 	if err := r.Patch(ctx, job, patch); err != nil {
 		return ctrl.Result{}, fmt.Errorf("persist capability annotation: %w", err)
 	}

@@ -41,6 +41,8 @@ pub const ACCEPTED_BID_SCHEMA: &str = "arc.marketplace.accepted-bid.v1";
 pub enum BiddingError {
     #[error("bid request invalid: {0}")]
     InvalidRequest(String),
+    #[error("bid request signature is not verifiable")]
+    BidSignatureInvalid,
     #[error("listing signature is not verifiable")]
     ListingSignatureInvalid,
     #[error("listing pricing hint signature is not verifiable")]
@@ -211,10 +213,14 @@ pub struct BidMintContext<'a> {
 /// against the resolved listing, mint a capability token, and return a
 /// signed ask response.
 pub fn bid(
-    request: &BidRequest,
+    request: &SignedBidRequest,
     context: BidMintContext<'_>,
 ) -> Result<SignedAskResponse, BiddingError> {
-    request.validate()?;
+    request.body.validate()?;
+    match request.verify_signature() {
+        Ok(true) => {}
+        _ => return Err(BiddingError::BidSignatureInvalid),
+    }
     let listing = context.listing;
 
     // Fail-closed: verify the underlying artifacts haven't been tampered.
@@ -228,7 +234,7 @@ pub fn bid(
     }
 
     // Identity checks: bid must reference this listing.
-    if listing.listing_id() != request.listing_id {
+    if listing.listing_id() != request.body.listing_id {
         return Err(BiddingError::ListingMismatch);
     }
     if listing.pricing.body.listing_id != listing.listing_id() {
@@ -253,26 +259,27 @@ pub fn bid(
     }
 
     let advertised_price = &listing.pricing.body.price_per_call;
-    if advertised_price.currency != request.max_price_per_call.currency {
+    if advertised_price.currency != request.body.max_price_per_call.currency {
         return Err(BiddingError::CurrencyMismatch);
     }
-    if request.max_price_per_call.units < advertised_price.units {
+    if request.body.max_price_per_call.units < advertised_price.units {
         return Err(BiddingError::BidCeilingTooLow);
     }
     if !request
+        .body
         .requested_scope
         .capability_scope_prefix
         .starts_with(listing.pricing.body.capability_scope.as_str())
     {
         return Err(BiddingError::ScopeOutsideListing);
     }
-    if request.requested_scope.server_id != listing.listing.body.subject.actor_id {
+    if request.body.requested_scope.server_id != listing.listing.body.subject.actor_id {
         return Err(BiddingError::ScopeOutsideListing);
     }
 
     let issued_at = context.now;
     let expires_at = issued_at
-        .checked_add(request.window_seconds)
+        .checked_add(request.body.window_seconds)
         .ok_or(BiddingError::WindowOutOfBounds)?;
 
     // Mint a scoped capability token.
@@ -283,12 +290,12 @@ pub fn bid(
         scope: ArcScope {
             grants: vec![ToolGrant {
                 server_id: listing.listing.body.subject.actor_id.clone(),
-                tool_name: request.requested_scope.tool_name.clone(),
+                tool_name: request.body.requested_scope.tool_name.clone(),
                 operations: vec![Operation::Invoke],
                 constraints: Vec::new(),
-                max_invocations: request.requested_scope.max_invocations,
+                max_invocations: request.body.requested_scope.max_invocations,
                 max_cost_per_invocation: Some(advertised_price.clone()),
-                max_total_cost: request.requested_scope.max_invocations.map(|count| {
+                max_total_cost: request.body.requested_scope.max_invocations.map(|count| {
                     MonetaryAmount {
                         units: advertised_price.units.saturating_mul(u64::from(count)),
                         currency: advertised_price.currency.clone(),
@@ -306,12 +313,12 @@ pub fn bid(
     let token = CapabilityToken::sign(token_body, context.issuer_keypair)
         .map_err(|error| BiddingError::InvalidRequest(error.to_string()))?;
 
-    let bid_digest = canonical_digest(request)?;
+    let bid_digest = canonical_digest(&request.body)?;
 
     let ask = AskResponse {
         schema: ASK_RESPONSE_SCHEMA.to_string(),
         listing_id: listing.listing_id().to_string(),
-        agent_id: request.agent_id.clone(),
+        agent_id: request.body.agent_id.clone(),
         bid_digest,
         quoted_price: advertised_price.clone(),
         token_offer: token,
@@ -522,6 +529,21 @@ mod tests {
         }
     }
 
+    fn signed_bid_request(
+        agent_keypair: &Keypair,
+        agent_id: &str,
+        max_units: u64,
+        window: u64,
+        now: u64,
+    ) -> SignedBidRequest {
+        SignedBidRequest::sign(bid_request(agent_id, max_units, window, now), agent_keypair)
+            .expect("sign bid")
+    }
+
+    fn resign_bid_request(agent_keypair: &Keypair, request: &BidRequest) -> SignedBidRequest {
+        SignedBidRequest::sign(request.clone(), agent_keypair).expect("re-sign bid")
+    }
+
     #[test]
     fn bid_happy_path_mints_scoped_capability_token() {
         let registry_keypair = Keypair::generate();
@@ -536,7 +558,7 @@ mod tests {
             110,
             600,
         );
-        let request = bid_request("agent-alpha", 200, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
 
         let ask = bid(
             &request,
@@ -598,8 +620,9 @@ mod tests {
             110,
             600,
         );
-        let mut request = bid_request("agent-alpha", 200, 300, 120);
-        request.requested_scope.server_id = "other-server".to_string();
+        let mut request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
+        request.body.requested_scope.server_id = "other-server".to_string();
+        request = resign_bid_request(&agent_keypair, &request.body);
 
         let error = bid(
             &request,
@@ -629,7 +652,7 @@ mod tests {
             110,
             600,
         );
-        let request = bid_request("agent-alpha", 200, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
 
         let error = bid(
             &request,
@@ -660,7 +683,7 @@ mod tests {
             110,
             200,
         );
-        let request = bid_request("agent-alpha", 200, 300, 250);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 250);
 
         let error = bid(
             &request,
@@ -692,7 +715,7 @@ mod tests {
         );
         // Tamper the signed listing body.
         listing.listing.body.subject.actor_id = "forged-server".to_string();
-        let request = bid_request("agent-alpha", 200, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
 
         let error = bid(
             &request,
@@ -723,7 +746,7 @@ mod tests {
             600,
         );
         // Ceiling below advertised units (100).
-        let request = bid_request("agent-alpha", 50, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 50, 300, 120);
 
         let error = bid(
             &request,
@@ -753,7 +776,7 @@ mod tests {
             110,
             600,
         );
-        let request = bid_request("agent-alpha", 200, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
         let ask = bid(
             &request,
             BidMintContext {
@@ -789,7 +812,7 @@ mod tests {
             110,
             600,
         );
-        let request = bid_request("agent-alpha", 200, 300, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
         let mut ask = bid(
             &request,
             BidMintContext {
@@ -821,7 +844,7 @@ mod tests {
             110,
             600,
         );
-        let request = bid_request("agent-alpha", 200, 50, 120);
+        let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 50, 120);
         let ask = bid(
             &request,
             BidMintContext {
@@ -836,5 +859,36 @@ mod tests {
         // window_seconds = 50; ask expires at 170.
         let error = accept(&ask, "receipt-42", 200).expect_err("expired ask rejected");
         assert_eq!(error, BiddingError::PricingExpired);
+    }
+
+    #[test]
+    fn bid_rejects_tampered_bid_signature() {
+        let registry_keypair = Keypair::generate();
+        let operator_keypair = Keypair::generate();
+        let issuer_keypair = Keypair::generate();
+        let agent_keypair = Keypair::generate();
+        let listing = listing_entry(
+            &registry_keypair,
+            &operator_keypair,
+            GenericListingStatus::Active,
+            100,
+            110,
+            600,
+        );
+        let mut request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
+        request.body.window_seconds = 999;
+
+        let error = bid(
+            &request,
+            BidMintContext {
+                listing: &listing,
+                issuer_keypair: &issuer_keypair,
+                agent_subject: agent_keypair.public_key(),
+                token_id: "token-1".to_string(),
+                now: 120,
+            },
+        )
+        .expect_err("tampered bid rejected");
+        assert_eq!(error, BiddingError::BidSignatureInvalid);
     }
 }

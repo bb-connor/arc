@@ -30,15 +30,20 @@
 
 use crate::models::{
     DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
+    SecretPatternsRule, Severity, ToolAccessRule,
 };
 
-use arc_core::capability::{ArcScope, Operation, ToolGrant};
+use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
 use arc_guards::{
     agent_velocity::AgentVelocityConfig,
     jailbreak::{DetectorConfig as JailbreakDetectorConfig, JailbreakGuardConfig},
     post_invocation::SanitizerHook,
     prompt_injection::PromptInjectionConfig,
-    response_sanitization::{SanitizationAction, SensitivityLevel},
+    response_sanitization::{
+        build_pattern, OutputSanitizerConfig, SanitizationAction, SensitivePattern,
+        SensitivityLevel,
+    },
+    secret_leak::CustomSecretPattern,
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
     PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard, SecretLeakGuard,
@@ -216,13 +221,17 @@ fn compile_rule_guards(
             let config = arc_guards::secret_leak::SecretLeakConfig {
                 enabled: true,
                 skip_paths: sp.skip_paths.clone(),
+                custom_patterns: compile_custom_secret_patterns(sp),
             };
             builder.add(SecretLeakGuard::with_config(config));
-            builder.add(ResponseSanitizationGuard::new(
+            builder.add(ResponseSanitizationGuard::with_additional_patterns(
+                compile_response_patterns(sp)?,
                 SensitivityLevel::High,
                 SanitizationAction::Redact,
             ));
-            post_invocation.add(Box::new(SanitizerHook::new()));
+            post_invocation.add(Box::new(SanitizerHook::with_config(
+                compile_output_sanitizer_config(sp),
+            )));
         }
     }
 
@@ -401,9 +410,10 @@ fn compile_budget_guards(
 
 /// Build a default ArcScope from the policy's tool_access rules.
 ///
-/// If tool_access has an allow list, each entry becomes a wildcard ToolGrant
-/// with `Invoke` permission. If not specified, returns a permissive wildcard
-/// scope.
+/// If tool_access has an allow list and can be faithfully represented as an
+/// `ArcScope`, each entry becomes a wildcard ToolGrant with `Invoke`
+/// permission. Policies that rely on negative matches or other semantics the
+/// scope model cannot encode fail closed and emit no default grants.
 fn compile_scope(policy: &HushSpec) -> ArcScope {
     let Some(rules) = &policy.rules else {
         return permissive_scope();
@@ -417,12 +427,19 @@ fn compile_scope(policy: &HushSpec) -> ArcScope {
         return permissive_scope();
     }
 
-    if ta.allow.is_empty() && ta.default == DefaultAction::Allow {
-        return permissive_scope();
+    if ta.default == DefaultAction::Allow {
+        if tool_access_can_safely_widen_to_wildcard(ta) {
+            return permissive_scope();
+        }
+        return ArcScope::default();
     }
 
     if ta.allow.is_empty() && ta.default == DefaultAction::Block {
         // Block-by-default with no allowlist: empty scope
+        return ArcScope::default();
+    }
+
+    if ta.require_workload_identity.is_some() || ta.prefer_workload_identity.is_some() {
         return ArcScope::default();
     }
 
@@ -434,7 +451,7 @@ fn compile_scope(policy: &HushSpec) -> ArcScope {
             server_id: "*".to_string(),
             tool_name: tool_pattern.clone(),
             operations: vec![Operation::Invoke],
-            constraints: vec![],
+            constraints: compile_tool_constraints(ta, tool_pattern),
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
@@ -462,6 +479,142 @@ fn permissive_scope() -> ArcScope {
         }],
         ..ArcScope::default()
     }
+}
+
+fn compile_custom_secret_patterns(rule: &SecretPatternsRule) -> Vec<CustomSecretPattern> {
+    rule.patterns
+        .iter()
+        .map(|pattern| CustomSecretPattern {
+            name: pattern.name.clone(),
+            pattern: pattern.pattern.clone(),
+        })
+        .collect()
+}
+
+fn compile_response_patterns(
+    rule: &SecretPatternsRule,
+) -> Result<Vec<SensitivePattern>, CompileError> {
+    rule.patterns
+        .iter()
+        .map(|pattern| {
+            build_pattern(
+                &pattern.name,
+                &pattern.pattern,
+                severity_to_sensitivity(pattern.severity),
+                "[SECRET REDACTED]",
+            )
+            .ok_or_else(|| {
+                CompileError::Invalid(format!(
+                    "secret_patterns.patterns.{} failed to compile as a response sanitizer regex",
+                    pattern.name
+                ))
+            })
+        })
+        .collect()
+}
+
+fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizerConfig {
+    let mut config = OutputSanitizerConfig::default();
+    config.denylist.patterns = rule
+        .patterns
+        .iter()
+        .map(|pattern| pattern.pattern.clone())
+        .collect();
+    config
+}
+
+fn severity_to_sensitivity(severity: Severity) -> SensitivityLevel {
+    match severity {
+        Severity::Critical | Severity::Error => SensitivityLevel::High,
+        Severity::Warn => SensitivityLevel::Medium,
+    }
+}
+
+fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
+    rule.allow.is_empty()
+        && rule.block.is_empty()
+        && rule.require_confirmation.is_empty()
+        && rule.max_args_size.is_none()
+        && rule.require_runtime_assurance_tier.is_none()
+        && rule.prefer_runtime_assurance_tier.is_none()
+        && rule.require_workload_identity.is_none()
+        && rule.prefer_workload_identity.is_none()
+}
+
+fn compile_tool_constraints(rule: &ToolAccessRule, tool_pattern: &str) -> Vec<Constraint> {
+    let mut constraints = Vec::new();
+    if let Some(max_args_size) = rule.max_args_size {
+        constraints.push(Constraint::MaxArgsSize(max_args_size));
+    }
+    if confirmation_overlap(tool_pattern, &rule.require_confirmation) {
+        constraints.push(Constraint::RequireApprovalAbove { threshold_units: 0 });
+    }
+    if let Some(tier) = rule
+        .require_runtime_assurance_tier
+        .or(rule.prefer_runtime_assurance_tier)
+    {
+        constraints.push(Constraint::MinimumRuntimeAssurance(tier));
+    }
+    constraints
+}
+
+fn confirmation_overlap(tool_pattern: &str, confirmation_patterns: &[String]) -> bool {
+    confirmation_patterns
+        .iter()
+        .any(|pattern| tool_patterns_overlap(tool_pattern, pattern))
+}
+
+fn tool_patterns_overlap(left: &str, right: &str) -> bool {
+    if left == "*" || right == "*" {
+        return true;
+    }
+    if !contains_wildcards(left) && !contains_wildcards(right) {
+        return left == right;
+    }
+    if glob_matches(left, right) || glob_matches(right, left) {
+        return true;
+    }
+    let left_prefix = literal_prefix(left);
+    let right_prefix = literal_prefix(right);
+    left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix)
+}
+
+fn contains_wildcards(pattern: &str) -> bool {
+    pattern.contains('*') || pattern.contains('?')
+}
+
+fn literal_prefix(pattern: &str) -> String {
+    pattern
+        .chars()
+        .take_while(|ch| *ch != '*' && *ch != '?')
+        .collect()
+}
+
+fn glob_matches(pattern: &str, target: &str) -> bool {
+    let mut regex = String::from("^");
+    let mut chars = pattern.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '*' => {
+                if matches!(chars.peek(), Some('*')) {
+                    chars.next();
+                    regex.push_str(".*");
+                } else {
+                    regex.push_str("[^/]*");
+                }
+            }
+            '?' => regex.push('.'),
+            '.' | '+' | '(' | ')' | '{' | '}' | '[' | ']' | '^' | '$' | '|' | '\\' => {
+                regex.push('\\');
+                regex.push(ch);
+            }
+            _ => regex.push(ch),
+        }
+    }
+    regex.push('$');
+    regex::Regex::new(&regex)
+        .map(|compiled| compiled.is_match(target))
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -553,6 +706,16 @@ rules:
                 "response-sanitization".to_string()
             ]
         );
+        let outcome = compiled.post_invocation.evaluate_with_evidence(
+            "read_file",
+            &serde_json::json!({
+                "access_key": "AKIA1234567890ABCDEF"
+            }),
+        );
+        assert!(matches!(
+            outcome.verdict,
+            arc_kernel::PostInvocationVerdict::Redact(_)
+        ));
     }
 
     #[test]
@@ -720,6 +883,51 @@ rules:
         assert_eq!(compiled.default_scope.grants[0].tool_name, "read_file");
         assert_eq!(compiled.default_scope.grants[1].tool_name, "write_file");
         assert_eq!(compiled.default_scope.grants[2].tool_name, "shell_exec");
+    }
+
+    #[test]
+    fn compile_tool_access_scope_preserves_representable_security_constraints() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    allow: [write_file]
+    require_confirmation: [write_*]
+    max_args_size: 2048
+    default: block
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+        assert_eq!(compiled.default_scope.grants.len(), 1);
+        assert_eq!(
+            compiled.default_scope.grants[0].constraints,
+            vec![
+                Constraint::MaxArgsSize(2048),
+                Constraint::RequireApprovalAbove { threshold_units: 0 }
+            ]
+        );
+    }
+
+    #[test]
+    fn compile_tool_access_default_allow_with_security_overrides_fails_closed() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    block: [shell_exec]
+    require_confirmation: [git_push]
+    max_args_size: 2048
+    default: allow
+"#,
+        )
+        .unwrap();
+        let compiled = compile_policy(&spec).unwrap();
+        assert!(compiled.default_scope.grants.is_empty());
     }
 
     #[test]

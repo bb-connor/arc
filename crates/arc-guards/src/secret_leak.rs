@@ -18,6 +18,12 @@ pub struct SecretPattern {
     pub pattern: &'static str,
 }
 
+#[derive(Clone, Debug)]
+pub struct CustomSecretPattern {
+    pub name: String,
+    pub pattern: String,
+}
+
 fn default_patterns() -> Vec<SecretPattern> {
     vec![
         SecretPattern {
@@ -146,6 +152,8 @@ pub struct SecretLeakConfig {
     pub enabled: bool,
     /// File path patterns to skip (e.g. test fixtures).
     pub skip_paths: Vec<String>,
+    /// Additional operator-defined secret patterns.
+    pub custom_patterns: Vec<CustomSecretPattern>,
 }
 
 impl Default for SecretLeakConfig {
@@ -158,6 +166,7 @@ impl Default for SecretLeakConfig {
                 "**/*_test.*".to_string(),
                 "**/*.test.*".to_string(),
             ],
+            custom_patterns: Vec::new(),
         }
     }
 }
@@ -175,7 +184,7 @@ impl SecretLeakGuard {
     }
 
     pub fn with_config(config: SecretLeakConfig) -> Self {
-        let patterns = default_patterns()
+        let mut patterns: Vec<CompiledPattern> = default_patterns()
             .into_iter()
             .filter_map(|p| {
                 Regex::new(p.pattern).ok().map(|regex| CompiledPattern {
@@ -184,6 +193,14 @@ impl SecretLeakGuard {
                 })
             })
             .collect();
+        patterns.extend(config.custom_patterns.iter().filter_map(|pattern| {
+            Regex::new(&pattern.pattern)
+                .ok()
+                .map(|regex| CompiledPattern {
+                    name: pattern.name.clone(),
+                    regex,
+                })
+        }));
 
         let skip_paths = config
             .skip_paths

@@ -279,7 +279,7 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
             Ok(r) => r,
             Err(e) => {
                 warn!("evaluation error: {e}");
-                return (StatusCode::INTERNAL_SERVER_ERROR, "evaluation error").into_response();
+                return evaluation_error_response(&e);
             }
         };
 
@@ -434,14 +434,7 @@ async fn sidecar_evaluate_handler(
         Ok(result) => result,
         Err(error) => {
             warn!("sidecar evaluation error: {error}");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({
-                    "error": "arc_evaluation_failed",
-                    "message": error.to_string(),
-                })),
-            )
-                .into_response();
+            return evaluation_error_response(&error);
         }
     };
 
@@ -551,6 +544,35 @@ fn forwarded_query_string(raw_query: Option<&str>) -> Option<String> {
     }
     let query = serializer.finish();
     (!query.is_empty()).then_some(query)
+}
+
+fn evaluation_error_response(error: &ProtectError) -> Response {
+    match error {
+        ProtectError::PendingApproval {
+            approval_id,
+            kernel_receipt_id,
+        } => {
+            let mut body = serde_json::json!({
+                "error": "arc_approval_required",
+                "message": "request requires human approval before it can proceed",
+                "kernel_receipt_id": kernel_receipt_id,
+            });
+            if let Some(approval_id) = approval_id {
+                body["approval_id"] = serde_json::Value::String(approval_id.clone());
+                body["resume_path"] =
+                    serde_json::Value::String(format!("/approvals/{approval_id}/respond"));
+            }
+            (StatusCode::CONFLICT, axum::Json(body)).into_response()
+        }
+        _ => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "error": "arc_evaluation_failed",
+                "message": error.to_string(),
+            })),
+        )
+            .into_response(),
+    }
 }
 
 fn should_forward_request_header(name: &str) -> bool {
@@ -1038,6 +1060,24 @@ paths:
             forwarded_query_string(Some(&query)).as_deref(),
             Some("source=test&mode=full")
         );
+    }
+
+    #[tokio::test]
+    async fn evaluation_error_response_surfaces_pending_approval_state() {
+        let response = evaluation_error_response(&ProtectError::PendingApproval {
+            approval_id: Some("ap-123".to_string()),
+            kernel_receipt_id: "kr-456".to_string(),
+        });
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_approval_required");
+        assert_eq!(json["approval_id"], "ap-123");
+        assert_eq!(json["kernel_receipt_id"], "kr-456");
+        assert_eq!(json["resume_path"], "/approvals/ap-123/respond");
     }
 
     #[tokio::test]

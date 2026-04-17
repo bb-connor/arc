@@ -178,7 +178,7 @@ export function arcTool<PARAMS, RESULT>(
       const request: Parameters<ArcClient["evaluateToolCall"]>[0] = {
         tool_server: scope.toolServer,
         tool_name: scope.toolName,
-        parameters: params,
+        arguments: params,
       };
       if (scope.capabilityId != null) {
         request.capability_id = scope.capabilityId;

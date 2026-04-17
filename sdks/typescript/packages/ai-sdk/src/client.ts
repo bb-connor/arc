@@ -2,11 +2,11 @@
  * Minimal HTTP client for the ARC sidecar's tool-call evaluation endpoint.
  *
  * The sidecar exposes `POST /v1/evaluate` which accepts a JSON envelope
- * describing a single tool call (capability, server, name, parameters) and
- * returns a signed receipt embedding a `decision.verdict` of `allow`, `deny`,
- * `cancel`, or `incomplete`. This client speaks exactly that endpoint and
- * stays deliberately small so the Vercel AI SDK wrapper does not pull in the
- * HTTP-substrate surface of `@arc-protocol/node-http`.
+ * describing a single tool call (capability, server, name, arguments) and
+ * returns either the historical receipt envelope or the Lambda evaluator's
+ * flatter `{ receipt_id, decision }` shape. This client normalizes both wire
+ * formats to a stable `ArcReceipt` API and stays deliberately small so the
+ * Vercel AI SDK wrapper does not pull in the HTTP-substrate surface.
  *
  * Transport uses `globalThis.fetch` (Node >= 20 ships it natively) and
  * supports a pluggable `fetch` override for testing.
@@ -38,7 +38,9 @@ export interface ArcEvaluateToolCallRequest {
   capability_id?: string | undefined;
   tool_server: string;
   tool_name: string;
-  parameters: unknown;
+  arguments?: unknown;
+  parameters?: unknown;
+  capability?: unknown;
   /** Caller-supplied metadata persisted in the receipt for observability. */
   metadata?: Record<string, unknown> | undefined;
 }
@@ -139,21 +141,32 @@ export class ArcClient {
       "content-type": "application/json",
       accept: "application/json",
     };
+    const normalizedBody: ArcEvaluateToolCallRequest = {
+      ...body,
+      arguments: body.arguments ?? body.parameters ?? null,
+    };
     if (options.capabilityToken != null && options.capabilityToken.length > 0) {
       headers["x-arc-capability"] = options.capabilityToken;
+      const capability = parseCapabilityToken(options.capabilityToken);
+      normalizedBody.capability = normalizedBody.capability ?? capability;
+      if ((normalizedBody.capability_id == null || normalizedBody.capability_id.length === 0)
+        && typeof capability.id === "string"
+        && capability.id.length > 0) {
+        normalizedBody.capability_id = capability.id;
+      }
     }
 
     this.debug?.("arc.evaluate.request", {
       url,
-      tool_server: body.tool_server,
-      tool_name: body.tool_name,
+      tool_server: normalizedBody.tool_server,
+      tool_name: normalizedBody.tool_name,
     });
 
     try {
       const response = await this.fetchImpl(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify(normalizedBody),
         signal: controller.signal,
       });
 
@@ -166,7 +179,7 @@ export class ArcClient {
         );
       }
 
-      const receipt = (await response.json()) as ArcReceipt;
+      const receipt = normalizeReceipt(await response.json());
       if (receipt == null || typeof receipt !== "object" || receipt.decision == null) {
         throw new ArcClientError(
           "arc_invalid_receipt",
@@ -197,4 +210,47 @@ export class ArcClient {
       clearTimeout(timer);
     }
   }
+}
+
+function parseCapabilityToken(capabilityToken: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(capabilityToken) as Record<string, unknown>;
+    if (parsed == null || typeof parsed !== "object") {
+      throw new Error("capability token JSON must decode to an object");
+    }
+    return parsed;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new ArcClientError(
+      "arc_invalid_capability",
+      `failed to parse capability token JSON: ${message}`,
+    );
+  }
+}
+
+function normalizeReceipt(raw: unknown): ArcReceipt {
+  if (raw == null || typeof raw !== "object") {
+    throw new ArcClientError(
+      "arc_invalid_receipt",
+      "sidecar response must be a JSON object",
+    );
+  }
+  const record = raw as Record<string, unknown>;
+  if (record.decision != null && typeof record.decision === "object") {
+    return record as ArcReceipt;
+  }
+  if (typeof record.receipt_id === "string" && typeof record.decision === "string") {
+    return {
+      ...record,
+      id: record.receipt_id,
+      decision: {
+        verdict: record.decision as ArcVerdict,
+        reason: typeof record.reason === "string" ? record.reason : undefined,
+      },
+    };
+  }
+  throw new ArcClientError(
+    "arc_invalid_receipt",
+    "sidecar response missing a recognizable receipt decision shape",
+  );
 }

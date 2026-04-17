@@ -160,6 +160,20 @@ impl ResponseSanitizationGuard {
         }
     }
 
+    pub fn with_additional_patterns(
+        additional_patterns: Vec<SensitivePattern>,
+        min_level: SensitivityLevel,
+        action: SanitizationAction,
+    ) -> Self {
+        let mut patterns = default_patterns();
+        patterns.extend(additional_patterns);
+        Self {
+            patterns,
+            min_level,
+            action,
+        }
+    }
+
     pub fn scan(&self, text: &str) -> Vec<(String, String)> {
         let mut findings = Vec::new();
         for pattern in &self.patterns {

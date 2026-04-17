@@ -4205,6 +4205,7 @@ impl ArcKernel {
                 | Constraint::MaxRowsReturned(_)
                 | Constraint::OperationClass(_)
                 | Constraint::AudienceAllowlist(_)
+                | Constraint::MaxArgsSize(_)
                 | Constraint::ContentReviewTier(_)
                 | Constraint::MaxTransactionAmountUsd(_)
                 | Constraint::RequireDualApproval(_)

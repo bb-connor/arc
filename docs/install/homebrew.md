@@ -3,29 +3,27 @@
 ## One-line install
 
 ```bash
-brew tap backbay/arc https://github.com/backbay/arc && brew install backbay/arc/arc
+curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+brew install --formula /tmp/arc.rb
 ```
 
 ## About the tap
 
-The formula lives in this repository at [`Homebrew/arc.rb`](../../Homebrew/arc.rb).
-The release-binaries workflow (`.github/workflows/release-binaries.yml`)
-publishes archives and `sha256` files for each supported target, and the tap
-repository mirrors the formula with concrete SHA-256 values substituted for
-the `0000…` placeholders.
+The release-binaries workflow renders the installable formula from
+[`Homebrew/arc.rb.tmpl`](../../Homebrew/arc.rb.tmpl) and publishes the
+result as the `arc.rb` release asset alongside the platform archives.
 
 ## Upgrading
 
 ```bash
-brew update
-brew upgrade backbay/arc/arc
+curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+brew upgrade --formula /tmp/arc.rb
 ```
 
 ## Uninstalling
 
 ```bash
-brew uninstall backbay/arc/arc
-brew untap backbay/arc
+brew uninstall arc
 ```
 
 ## Verifying the install

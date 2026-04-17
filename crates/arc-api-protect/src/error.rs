@@ -20,6 +20,14 @@ pub enum ProtectError {
     #[error("evaluation failed: {0}")]
     Evaluation(String),
 
+    #[error(
+        "approval required (approval_id={approval_id:?}, kernel_receipt_id={kernel_receipt_id})"
+    )]
+    PendingApproval {
+        approval_id: Option<String>,
+        kernel_receipt_id: String,
+    },
+
     #[error("receipt signing failed: {0}")]
     ReceiptSign(String),
 

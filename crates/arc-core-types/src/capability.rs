@@ -1963,6 +1963,8 @@ pub enum Constraint {
     RegexMatch(String),
     /// String parameter must not exceed this length.
     MaxLength(usize),
+    /// Serialized argument payload must not exceed this many bytes.
+    MaxArgsSize(usize),
     /// Requests must carry a governed transaction intent.
     GovernedIntentRequired,
     /// Requests at or above this threshold require a valid approval token.
