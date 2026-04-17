@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**59 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**63 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -43,7 +43,7 @@ roadmap phase.
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
 | 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
-| 5 (Guard absorption) | 5.5, 5.6 | -- | 5.1, 5.2, 5.3, 5.4 |
+| 5 (Guard absorption) | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 | -- | -- |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
@@ -479,7 +479,7 @@ guide in <5 minutes and have ARC protecting their tool calls.
 > `docs/guards/09-POLICY-ENGINE-ABSORPTION.md`,
 > `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md`
 
-### 5.1 ComputerUseGuard
+### 5.1 ComputerUseGuard [SHIPPED 8593a9b]
 
 **What**: Port action-type allowlisting with Observe/Guardrail/FailClosed modes.
 
@@ -492,7 +492,7 @@ guide in <5 minutes and have ARC protecting their tool calls.
 **Acceptance**: BrowserAction::Navigate to a blocked domain returns Deny.
 Screenshot actions respect rate limits.
 
-### 5.2 InputInjectionCapabilityGuard
+### 5.2 InputInjectionCapabilityGuard [SHIPPED 8593a9b]
 
 **What**: Port input-type restrictions and postcondition probe validation.
 
@@ -505,7 +505,7 @@ Screenshot actions respect rate limits.
 **Acceptance**: Keyboard input injection denied when input type not in
 allowlist. Actions without postcondition probes denied in strict mode.
 
-### 5.3 RemoteDesktopSideChannelGuard
+### 5.3 RemoteDesktopSideChannelGuard [SHIPPED 8593a9b]
 
 **What**: Port per-channel enable/disable with transfer size limits.
 
@@ -519,7 +519,7 @@ allowlist. Actions without postcondition probes denied in strict mode.
 File transfer exceeding size limit denied. Unknown channels denied
 (fail-closed).
 
-### 5.4 SpiderSense Embedding Detector
+### 5.4 SpiderSense Embedding Detector [SHIPPED 8593a9b]
 
 **What**: Port cosine similarity anomaly detection. Sync guard using
 pre-computed pattern database.
