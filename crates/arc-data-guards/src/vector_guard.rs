@@ -64,7 +64,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::warn;
 
-use arc_core::capability::{ArcScope, Constraint, SqlOperationClass};
+use arc_core::capability::{ArcScope, Constraint, SqlOperationClass, ToolGrant};
 use arc_guards::{extract_action, ToolAction};
 use arc_kernel::{GuardContext, KernelError, Verdict};
 use thiserror::Error;
@@ -341,6 +341,15 @@ impl VectorDbGuard {
     ///
     /// Returns `Ok(())` to allow; `Err(VectorGuardDenyReason)` to deny.
     pub fn check(&self, call: &VectorCall, scope: &ArcScope) -> Result<(), VectorGuardDenyReason> {
+        self.check_with_matched_grant(call, scope, None)
+    }
+
+    fn check_with_matched_grant(
+        &self,
+        call: &VectorCall,
+        scope: &ArcScope,
+        matched_grant_index: Option<usize>,
+    ) -> Result<(), VectorGuardDenyReason> {
         if self.config.allow_all {
             return Ok(());
         }
@@ -396,7 +405,7 @@ impl VectorDbGuard {
             }
 
             // Inspect the active grant's operation class.
-            let class = strictest_operation_class(scope);
+            let class = operation_class_for_request(scope, matched_grant_index);
             if let Some(class) = class {
                 let is_mutation = self
                     .config
@@ -419,7 +428,7 @@ impl VectorDbGuard {
                     _ => {}
                 }
             }
-        } else if let Some(class) = strictest_operation_class(scope) {
+        } else if let Some(class) = operation_class_for_request(scope, matched_grant_index) {
             // No explicit operation verb was provided, but the active grant
             // narrows to a specific OperationClass. Fail closed: a ReadOnly
             // scope must not allow a call that could be a write, and any
@@ -438,7 +447,7 @@ impl VectorDbGuard {
         }
 
         // top_k ceiling.
-        if let Some(max) = scope_max_rows(scope) {
+        if let Some(max) = max_rows_for_request(scope, matched_grant_index) {
             match call.top_k {
                 Some(k) if k > max => {
                     return Err(VectorGuardDenyReason::TopKExceedsLimit { requested: k, max });
@@ -534,7 +543,7 @@ impl arc_kernel::Guard for VectorDbGuard {
             return Ok(Verdict::Allow);
         }
 
-        match self.check(&call, ctx.scope) {
+        match self.check_with_matched_grant(&call, ctx.scope, ctx.matched_grant_index) {
             Ok(()) => Ok(Verdict::Allow),
             Err(reason) => {
                 warn!(
@@ -555,41 +564,82 @@ impl arc_kernel::Guard for VectorDbGuard {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Return the strictest [`SqlOperationClass`] present across all grants in
-/// the scope, or `None` when the scope contains no operation-class
-/// constraint at all.  Strictest wins so a multi-grant scope with one
-/// `ReadOnly` grant enforces read-only semantics on every call the guard
-/// inspects.
-fn strictest_operation_class(scope: &ArcScope) -> Option<SqlOperationClass> {
+fn active_grant(scope: &ArcScope, matched_grant_index: Option<usize>) -> Option<&ToolGrant> {
+    matched_grant_index.and_then(|index| scope.grants.get(index))
+}
+
+fn operation_class_for_constraints(constraints: &[Constraint]) -> Option<SqlOperationClass> {
     let mut strongest: Option<SqlOperationClass> = None;
-    for grant in &scope.grants {
-        for c in &grant.constraints {
-            if let Constraint::OperationClass(class) = c {
-                strongest = Some(match (strongest, *class) {
-                    (None, new) => new,
-                    (Some(SqlOperationClass::ReadOnly), _) => SqlOperationClass::ReadOnly,
-                    (_, SqlOperationClass::ReadOnly) => SqlOperationClass::ReadOnly,
-                    (Some(SqlOperationClass::ReadWrite), _) => SqlOperationClass::ReadWrite,
-                    (_, SqlOperationClass::ReadWrite) => SqlOperationClass::ReadWrite,
-                    (Some(SqlOperationClass::Admin), SqlOperationClass::Admin) => {
-                        SqlOperationClass::Admin
-                    }
-                });
-            }
+    for c in constraints {
+        if let Constraint::OperationClass(class) = c {
+            strongest = Some(match (strongest, *class) {
+                (None, new) => new,
+                (Some(SqlOperationClass::ReadOnly), _) => SqlOperationClass::ReadOnly,
+                (_, SqlOperationClass::ReadOnly) => SqlOperationClass::ReadOnly,
+                (Some(SqlOperationClass::ReadWrite), _) => SqlOperationClass::ReadWrite,
+                (_, SqlOperationClass::ReadWrite) => SqlOperationClass::ReadWrite,
+                (Some(SqlOperationClass::Admin), SqlOperationClass::Admin) => {
+                    SqlOperationClass::Admin
+                }
+            });
         }
     }
     strongest
 }
 
-/// Return the lowest `MaxRowsReturned` across all grants, or `None` when
-/// no grant carries that constraint.
-fn scope_max_rows(scope: &ArcScope) -> Option<u64> {
+/// Return the strictest [`SqlOperationClass`] for the matched grant when
+/// available, or across the full scope as a conservative fallback for
+/// direct callers that do not supply grant attribution.
+fn operation_class_for_request(
+    scope: &ArcScope,
+    matched_grant_index: Option<usize>,
+) -> Option<SqlOperationClass> {
+    if let Some(grant) = active_grant(scope, matched_grant_index) {
+        return operation_class_for_constraints(&grant.constraints);
+    }
+
+    let mut strongest: Option<SqlOperationClass> = None;
+    for grant in &scope.grants {
+        strongest = match (
+            strongest,
+            operation_class_for_constraints(&grant.constraints),
+        ) {
+            (Some(SqlOperationClass::ReadOnly), _) => Some(SqlOperationClass::ReadOnly),
+            (_, Some(SqlOperationClass::ReadOnly)) => Some(SqlOperationClass::ReadOnly),
+            (Some(SqlOperationClass::ReadWrite), _) => Some(SqlOperationClass::ReadWrite),
+            (_, Some(SqlOperationClass::ReadWrite)) => Some(SqlOperationClass::ReadWrite),
+            (None, Some(class)) => Some(class),
+            (current, None) => current,
+            (Some(SqlOperationClass::Admin), Some(SqlOperationClass::Admin)) => {
+                Some(SqlOperationClass::Admin)
+            }
+        };
+    }
+    strongest
+}
+
+fn max_rows_for_constraints(constraints: &[Constraint]) -> Option<u64> {
+    let mut min: Option<u64> = None;
+    for c in constraints {
+        if let Constraint::MaxRowsReturned(n) = c {
+            min = Some(min.map_or(*n, |m| m.min(*n)));
+        }
+    }
+    min
+}
+
+/// Return the lowest `MaxRowsReturned` from the matched grant when
+/// available, or across the full scope as a conservative fallback for
+/// direct callers that do not supply grant attribution.
+fn max_rows_for_request(scope: &ArcScope, matched_grant_index: Option<usize>) -> Option<u64> {
+    if let Some(grant) = active_grant(scope, matched_grant_index) {
+        return max_rows_for_constraints(&grant.constraints);
+    }
+
     let mut min: Option<u64> = None;
     for grant in &scope.grants {
-        for c in &grant.constraints {
-            if let Constraint::MaxRowsReturned(n) = c {
-                min = Some(min.map_or(*n, |m| m.min(*n)));
-            }
+        if let Some(grant_min) = max_rows_for_constraints(&grant.constraints) {
+            min = Some(min.map_or(grant_min, |current| current.min(grant_min)));
         }
     }
     min

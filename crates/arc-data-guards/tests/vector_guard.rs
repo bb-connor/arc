@@ -75,6 +75,16 @@ fn evaluate(
     args: serde_json::Value,
     scope: ArcScope,
 ) -> Verdict {
+    evaluate_with_matched_grant(guard, tool, args, scope, None)
+}
+
+fn evaluate_with_matched_grant(
+    guard: &VectorDbGuard,
+    tool: &str,
+    args: serde_json::Value,
+    scope: ArcScope,
+    matched_grant_index: Option<usize>,
+) -> Verdict {
     let (scope, agent_id, server_id, req) = make_request(tool, args, scope);
     let ctx = GuardContext {
         request: &req,
@@ -82,7 +92,7 @@ fn evaluate(
         agent_id: &agent_id,
         server_id: &server_id,
         session_filesystem_roots: None,
-        matched_grant_index: None,
+        matched_grant_index,
     };
     guard.evaluate(&ctx).expect("evaluate should not error")
 }
@@ -256,6 +266,58 @@ fn allow_all_permits_any_vector_call() {
             "top_k": 50_000
         }),
         ArcScope::default(),
+    );
+    assert_eq!(verdict, Verdict::Allow);
+}
+
+#[test]
+fn applies_operation_class_to_the_matched_grant_only() {
+    let scope = ArcScope {
+        grants: vec![
+            grant(vec![Constraint::OperationClass(
+                SqlOperationClass::ReadOnly,
+            )]),
+            grant(vec![Constraint::OperationClass(
+                SqlOperationClass::ReadWrite,
+            )]),
+        ],
+        ..Default::default()
+    };
+    let guard = VectorDbGuard::new(cfg_docs_only());
+    let verdict = evaluate_with_matched_grant(
+        &guard,
+        "weaviate",
+        serde_json::json!({
+            "collection": "docs",
+            "operation": "upsert",
+            "top_k": 1
+        }),
+        scope,
+        Some(1),
+    );
+    assert_eq!(verdict, Verdict::Allow);
+}
+
+#[test]
+fn applies_max_rows_to_the_matched_grant_only() {
+    let scope = ArcScope {
+        grants: vec![
+            grant(vec![Constraint::MaxRowsReturned(10)]),
+            grant(vec![Constraint::MaxRowsReturned(500)]),
+        ],
+        ..Default::default()
+    };
+    let guard = VectorDbGuard::new(cfg_docs_only());
+    let verdict = evaluate_with_matched_grant(
+        &guard,
+        "qdrant",
+        serde_json::json!({
+            "collection": "docs",
+            "operation": "query",
+            "top_k": 100
+        }),
+        scope,
+        Some(1),
     );
     assert_eq!(verdict, Verdict::Allow);
 }
