@@ -152,12 +152,18 @@ fn cmd_api_protect(
         .map_err(|error| CliError::Other(format!("failed to start async runtime: {error}")))?;
 
     runtime.block_on(async move {
+        let sidecar_control_token = std::env::var("ARC_SIDECAR_CONTROL_TOKEN")
+            .ok()
+            .or_else(|| std::env::var("ARC_API_PROTECT_CONTROL_TOKEN").ok())
+            .map(|token| token.trim().to_string())
+            .filter(|token| !token.is_empty());
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
             spec_path: spec_path.map(|path| path.display().to_string()),
             listen_addr: listen_addr.to_string(),
             receipt_db: receipt_store.map(|path| path.display().to_string()),
+            sidecar_control_token,
         };
         ProtectProxy::new(config)
             .run()

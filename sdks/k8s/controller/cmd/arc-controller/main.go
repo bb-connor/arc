@@ -47,13 +47,14 @@ func main() {
 
 func run() error {
 	var (
-		metricsAddr          string
-		probeAddr            string
-		leaderElect          bool
-		leaderNamespace      string
-		arcSidecarURL        string
-		arcRequestTimeout    time.Duration
-		reconcileConcurrency int
+		metricsAddr            string
+		probeAddr              string
+		leaderElect            bool
+		leaderNamespace        string
+		arcSidecarURL          string
+		arcSidecarControlToken string
+		arcRequestTimeout      time.Duration
+		reconcileConcurrency   int
 	)
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080",
@@ -67,6 +68,9 @@ func run() error {
 	flag.StringVar(&arcSidecarURL, "arc-sidecar-url",
 		envDefault("ARC_SIDECAR_URL", "http://arc-sidecar.arc-system.svc.cluster.local:9090"),
 		"Base URL of the ARC sidecar HTTP API.")
+	flag.StringVar(&arcSidecarControlToken, "arc-sidecar-control-token",
+		envDefault("ARC_SIDECAR_CONTROL_TOKEN", ""),
+		"Optional bearer token used for remote ARC sidecar control endpoints.")
 	flag.DurationVar(&arcRequestTimeout, "arc-request-timeout", 10*time.Second,
 		"HTTP timeout for requests to the ARC sidecar.")
 	flag.IntVar(&reconcileConcurrency, "max-concurrent-reconciles", 4,
@@ -96,7 +100,7 @@ func run() error {
 	// Honor the --arc-request-timeout flag instead of falling back to the
 	// client's internal 10s default when nil is passed.
 	httpClient := &http.Client{Timeout: arcRequestTimeout}
-	arcClient := arcapi.NewClient(arcSidecarURL, httpClient)
+	arcClient := arcapi.NewClient(arcSidecarURL, arcSidecarControlToken, httpClient)
 	recorder := mgr.GetEventRecorderFor("arc-k8s-controller")
 
 	r := reconciler.NewJobReconciler(mgr.GetClient(), mgr.GetScheme(), arcClient, recorder)
@@ -116,6 +120,7 @@ func run() error {
 
 	logger.Info("starting arc-controller",
 		"sidecar", arcSidecarURL,
+		"sidecar_control_token_configured", arcSidecarControlToken != "",
 		"leader_elect", leaderElect,
 		"concurrency", reconcileConcurrency,
 	)

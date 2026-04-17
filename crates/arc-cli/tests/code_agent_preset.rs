@@ -198,10 +198,11 @@ fn preset_denies_dotenv_write_via_arc_check() {
         !output.status.success(),
         "expected DENY exit but stdout={stdout}\nstderr={stderr}"
     );
-    // JSON output should include a deny verdict.
-    assert!(
-        stdout.contains("Deny") || stdout.contains("deny"),
-        "expected deny verdict in stdout; got: {stdout}"
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("decode json");
+    assert_eq!(
+        body["verdict"].as_str(),
+        Some("DENY"),
+        "expected DENY verdict in stdout; got: {stdout}"
     );
 }
 
@@ -233,8 +234,10 @@ fn preset_allows_safe_file_read_via_arc_check() {
         output.status.success(),
         "expected ALLOW exit 0 but got stdout={stdout}\nstderr={stderr}"
     );
-    assert!(
-        stdout.contains("Allow") || stdout.contains("allow"),
-        "expected allow verdict in stdout; got: {stdout}"
+    let body: serde_json::Value = serde_json::from_slice(&output.stdout).expect("decode json");
+    assert_eq!(
+        body["verdict"].as_str(),
+        Some("ALLOW"),
+        "expected ALLOW verdict in stdout; got: {stdout}"
     );
 }

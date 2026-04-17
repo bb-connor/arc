@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
-use axum::http::{Request, StatusCode};
+use axum::http::{header::AUTHORIZATION, Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
 use axum::Json;
@@ -50,6 +50,8 @@ pub struct ProtectConfig {
     pub listen_addr: String,
     /// Optional SQLite path for receipt persistence.
     pub receipt_db: Option<String>,
+    /// Optional bearer token that authorizes remote sidecar control requests.
+    pub sidecar_control_token: Option<String>,
 }
 
 /// Stored receipts for inspection and querying.
@@ -152,6 +154,7 @@ struct ProxyState {
     receipt_log: Mutex<ReceiptLog>,
     receipt_store: Option<Mutex<SqliteReceiptStore>>,
     revoked_capability_ids: Mutex<HashSet<String>>,
+    sidecar_control_token: Option<String>,
 }
 
 /// The protect proxy.
@@ -261,6 +264,7 @@ impl ProtectProxy {
             receipt_log: Mutex::new(receipt_log),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            sidecar_control_token: self.config.sidecar_control_token.clone(),
         });
 
         let app = build_app(Arc::clone(&state));
@@ -741,7 +745,9 @@ async fn sidecar_mint_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
-    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
         return response;
     }
     let (_parts, body) = request.into_parts();
@@ -813,7 +819,9 @@ async fn sidecar_release_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
-    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
         return response;
     }
     let (_parts, body) = request.into_parts();
@@ -867,7 +875,9 @@ async fn sidecar_submit_receipt_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
-    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
         return response;
     }
     let (_parts, body) = request.into_parts();
@@ -1005,26 +1015,65 @@ fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Val
 }
 
 #[allow(clippy::result_large_err)]
-fn require_loopback_sidecar_control_request(request: &Request<Body>) -> Result<(), Response> {
-    let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() else {
-        warn!("rejecting sidecar control request without peer address");
-        return Err(sidecar_control_forbidden_response());
-    };
-
-    if !peer.0.ip().is_loopback() {
-        warn!(peer = %peer.0, "rejecting non-loopback sidecar control request");
-        return Err(sidecar_control_forbidden_response());
+fn require_sidecar_control_request(
+    request: &Request<Body>,
+    expected_bearer_token: Option<&str>,
+) -> Result<(), Response> {
+    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        if peer.0.ip().is_loopback() {
+            return Ok(());
+        }
     }
 
-    Ok(())
+    if let Some(expected_bearer_token) = expected_bearer_token {
+        if sidecar_control_bearer_token_matches(request, expected_bearer_token) {
+            return Ok(());
+        }
+        if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+            warn!(
+                peer = %peer.0,
+                "rejecting sidecar control request without valid bearer token"
+            );
+        } else {
+            warn!("rejecting sidecar control request without valid bearer token");
+        }
+        return Err(sidecar_control_forbidden_response(true));
+    }
+
+    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        warn!(
+            peer = %peer.0,
+            "rejecting non-loopback sidecar control request without configured bearer token"
+        );
+    } else {
+        warn!("rejecting sidecar control request without peer address");
+    }
+    Err(sidecar_control_forbidden_response(false))
 }
 
-fn sidecar_control_forbidden_response() -> Response {
+fn sidecar_control_bearer_token_matches(
+    request: &Request<Body>,
+    expected_bearer_token: &str,
+) -> bool {
+    request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .is_some_and(|token| token == expected_bearer_token)
+}
+
+fn sidecar_control_forbidden_response(remote_auth_configured: bool) -> Response {
+    let message = if remote_auth_configured {
+        "sidecar control endpoints require a loopback caller or valid bearer token"
+    } else {
+        "sidecar control endpoints require a loopback caller"
+    };
     (
         StatusCode::FORBIDDEN,
         axum::Json(serde_json::json!({
             "error": "arc_control_forbidden",
-            "message": "sidecar control endpoints require a loopback caller",
+            "message": message,
         })),
     )
         .into_response()
@@ -1827,6 +1876,7 @@ paths:
             receipt_log: Mutex::new(ReceiptLog { receipts }),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            sidecar_control_token: None,
         })
     }
 
@@ -2897,6 +2947,76 @@ paths:
             json["message"],
             "sidecar control endpoints require a loopback caller"
         );
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::OK);
+
+        let release_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::OK);
+
+        let receipt_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "outcome": "succeeded",
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let receipt_response =
+            sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
+        assert_eq!(receipt_response.status(), StatusCode::OK);
     }
 
     #[tokio::test]

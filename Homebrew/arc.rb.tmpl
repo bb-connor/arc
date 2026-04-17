@@ -34,7 +34,7 @@ class Arc < Formula
   end
 
   def install
-    bin.install "arc"
+    bin.install Dir["arc-#{version}-*/arc"].fetch(0)
   end
 
   test do

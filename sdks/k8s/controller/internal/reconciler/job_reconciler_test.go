@@ -463,7 +463,7 @@ func TestArcClient_EndToEndViaHTTPStub(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	client := arcapi.NewClient(srv.URL, srv.Client())
+	client := arcapi.NewClient(srv.URL, "", srv.Client())
 
 	ctx := context.Background()
 	cap, err := client.Mint(ctx, arcapi.MintRequest{Subject: "job/default/demo", Scopes: []string{"tools:search"}, JobUID: "u"})
@@ -495,13 +495,43 @@ func TestArcClient_ServerError_IsUnreachable(t *testing.T) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	client := arcapi.NewClient(srv.URL, srv.Client())
+	client := arcapi.NewClient(srv.URL, "", srv.Client())
 	_, err := client.Mint(context.Background(), arcapi.MintRequest{Subject: "job/x/y", JobUID: "u"})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
 	if !isUnreachable(err) {
 		t.Fatalf("expected ErrSidecarUnreachable, got %v", err)
+	}
+}
+
+func TestArcClient_SendsControlBearerToken(t *testing.T) {
+	var authHeader string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader = r.Header.Get("Authorization")
+		resp := arcapi.MintResponse{Capability: arcapi.CapabilityToken{
+			ID:        "server-cap",
+			Issuer:    "issuer-server",
+			Subject:   "job/default/demo",
+			IssuedAt:  time.Now().UTC(),
+			ExpiresAt: time.Now().Add(time.Hour).UTC(),
+			Signature: "signature-server",
+		}}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	client := arcapi.NewClient(srv.URL, "cluster-control-token", srv.Client())
+	if _, err := client.Mint(
+		context.Background(),
+		arcapi.MintRequest{Subject: "job/default/demo", JobUID: "u"},
+	); err != nil {
+		t.Fatalf("mint: %v", err)
+	}
+	if authHeader != "Bearer cluster-control-token" {
+		t.Fatalf("expected bearer auth header, got %q", authHeader)
 	}
 }
 

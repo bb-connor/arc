@@ -52,6 +52,12 @@ spec:
           env:
             - name: ARC_SIDECAR_URL
               value: "http://arc-sidecar.arc-system.svc.cluster.local:9090"
+            - name: ARC_SIDECAR_CONTROL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: arc-sidecar-control
+                  key: token
+                  optional: true
           ports:
             - name: metrics
               containerPort: 8080

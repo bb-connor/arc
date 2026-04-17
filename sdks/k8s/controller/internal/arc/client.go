@@ -23,18 +23,23 @@ import (
 // backoff policy is driven by the reconciler so that it composes with
 // controller-runtime's requeue semantics and its rate limiter.
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL      string
+	controlToken string
+	httpClient   *http.Client
 }
 
 // NewClient constructs a Client with a sensible default HTTP timeout.
 //
 // A nil httpClient falls back to a new http.Client with a 10-second timeout.
-func NewClient(baseURL string, httpClient *http.Client) *Client {
+func NewClient(baseURL, controlToken string, httpClient *http.Client) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 10 * time.Second}
 	}
-	return &Client{baseURL: baseURL, httpClient: httpClient}
+	return &Client{
+		baseURL:      baseURL,
+		controlToken: controlToken,
+		httpClient:   httpClient,
+	}
 }
 
 // ErrSidecarUnreachable is returned when the client cannot reach the sidecar
@@ -93,6 +98,9 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body, out any)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if c.controlToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.controlToken)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

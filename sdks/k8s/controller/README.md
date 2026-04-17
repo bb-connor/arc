@@ -63,11 +63,18 @@ converges without additional sidecar calls.
 | `--leader-elect`             | `false`                                                   | Enable leader election.             |
 | `--leader-election-namespace`| `arc-system`                                              | Namespace for the leader lease.     |
 | `--arc-sidecar-url`          | `http://arc-sidecar.arc-system.svc.cluster.local:9090`    | ARC sidecar base URL.               |
+| `--arc-sidecar-control-token`| `""`                                                     | Optional bearer token for remote sidecar control APIs. |
 | `--arc-request-timeout`      | `10s`                                                     | HTTP timeout for sidecar calls.     |
 | `--max-concurrent-reconciles`| `4`                                                       | Parallelism.                        |
 
 The sidecar URL can also be provided via the `ARC_SIDECAR_URL` environment
-variable.
+variable. The control token can be provided via
+`ARC_SIDECAR_CONTROL_TOKEN`.
+
+If `ARC_SIDECAR_URL` points at a non-loopback sidecar service, configure the
+same `ARC_SIDECAR_CONTROL_TOKEN` on both the controller and the sidecar. The
+shipped `config/manager/manager.yaml` reads that token from the
+`arc-sidecar-control` Secret when present.
 
 ## Installation
 
