@@ -1,0 +1,62 @@
+[package]
+name = "arc-kernel-browser"
+description = "Browser (wasm-bindgen) bindings over the portable arc-kernel-core surface: evaluate, sign_receipt, and verify_capability exposed to JS/TS with BrowserClock + WebCryptoRng adapters"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+name = "arc_kernel_browser"
+# `cdylib` is required so `wasm-pack build --target web` produces a `.wasm`
+# artifact that the browser can load through the generated JS glue.
+# `rlib` is kept so `cargo test` on the host (native target) still exercises
+# the non-wasm-gated helpers and so `cargo doc` works.
+crate-type = ["cdylib", "rlib"]
+
+# Phase 14.2 browser bindings.
+#
+# This crate is the wasm-bindgen facade over `arc-kernel-core`. It imports
+# every portable surface (`evaluate`, `sign_receipt`, `verify_capability`,
+# `passport_verify::verify_passport`) with `default-features = false` so the
+# core builds against `no_std + alloc` and cross-compiles to
+# `wasm32-unknown-unknown` without dragging the hosted `std` runtime into the
+# bundle.
+#
+# Platform adapters live here:
+#
+# - `BrowserClock` implements `arc_kernel_core::Clock` via `js_sys::Date::now()`.
+# - `WebCryptoRng` implements `arc_kernel_core::Rng` via
+#   `web_sys::Crypto::get_random_values_with_u8_array` for CSPRNG-quality
+#   entropy (receipt signing seeds, DPoP nonces, etc.).
+#
+# The `#[wasm_bindgen]` entry points accept serde-JSON strings so the same
+# canonical `ToolCallRequest` / `Verdict` / `CapabilityToken` / `ArcReceipt`
+# shapes flow across the wasm boundary unchanged.
+[dependencies]
+arc-kernel-core = { path = "../arc-kernel-core", default-features = false }
+arc-core-types = { path = "../arc-core-types", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+# Browser-target dependencies. Gated on `cfg(target_arch = "wasm32")` so
+# `cargo build` / `cargo test` on the host does not pull the wasm-bindgen
+# toolchain on native; the host target only compiles the pure-logic helpers
+# plus the native smoke tests.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde-wasm-bindgen = "0.6"
+web-sys = { version = "0.3", features = [
+    "Crypto",
+    "Window",
+    "Performance",
+] }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

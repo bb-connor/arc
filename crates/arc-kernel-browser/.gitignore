@@ -1,0 +1,6 @@
+# wasm-pack output (generated during `wasm-pack build`).
+/pkg/
+
+# Local cargo build artifacts when the user runs `cargo build` inside the
+# crate rather than from the workspace root.
+/target/
