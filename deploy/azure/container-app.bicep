@@ -124,6 +124,20 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
         {
           name: 'arc-sidecar'
           image: arcSidecarImage
+          // The sidecar image's CMD default is `--help`; override with
+          // a long-running subcommand so the probes succeed and the
+          // app container becomes ready.
+          command: [
+            '/usr/local/bin/arc-sidecar'
+          ]
+          args: [
+            'api'
+            'protect'
+            '--upstream'
+            'http://127.0.0.1:8080'
+            '--listen'
+            '0.0.0.0:9090'
+          ]
           resources: {
             cpu: json('0.25')
             memory: '0.5Gi'

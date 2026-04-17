@@ -73,6 +73,20 @@ spec:
           image: ghcr.io/backbay/arc-sidecar:latest
           ports:
             - containerPort: 9090
+          # The sidecar image's CMD default is `--help`, which exits
+          # immediately. Override with a long-running ARC subcommand so
+          # the container stays up and serves /health. `api protect`
+          # reverse-proxies app traffic through the kernel; swap to
+          # `arc mcp serve-http -- <wrapped server cmd>` when the
+          # sidecar is fronting an MCP tool server instead of an app.
+          command: ["/usr/local/bin/arc-sidecar"]
+          args:
+            - "api"
+            - "protect"
+            - "--upstream"
+            - "http://127.0.0.1:8080"
+            - "--listen"
+            - "0.0.0.0:9090"
           env:
             - name: ARC_LISTEN_ADDR
               value: "0.0.0.0:9090"

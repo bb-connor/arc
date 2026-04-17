@@ -51,6 +51,15 @@
       "portMappings": [
         { "containerPort": 9090, "hostPort": 9090, "protocol": "tcp" }
       ],
+      "entryPoint": ["/usr/local/bin/arc-sidecar"],
+      "command": [
+        "api",
+        "protect",
+        "--upstream",
+        "http://127.0.0.1:8080",
+        "--listen",
+        "0.0.0.0:9090"
+      ],
       "environment": [
         { "name": "ARC_LISTEN_ADDR", "value": "0.0.0.0:9090" },
         { "name": "ARC_HEALTH_PATH", "value": "/health" },
