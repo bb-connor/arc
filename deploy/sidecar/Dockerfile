@@ -37,6 +37,12 @@ WORKDIR /build
 
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
+# `wit/` is consumed by arc-wasm-guards via
+# `wasmtime::component::bindgen!(path = "../../wit/arc-guard.wit")`,
+# which resolves at compile time. arc-cli enables the component backend,
+# so the wit directory MUST be in the build context or `cargo build -p
+# arc-cli --bin arc` fails with a missing-path error.
+COPY wit ./wit
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests
