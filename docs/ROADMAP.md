@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**41 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**44 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -41,7 +41,7 @@ roadmap phase.
 | 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
 | 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
-| 3 (Content safety / HITL) | 3.1, 3.2, 3.3 | 3.4, 3.5, 3.6 | -- |
+| 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
 | 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
@@ -366,7 +366,7 @@ overlap resolution, and full redaction strategy support.
 **Acceptance**: Post-invocation guard redacts SSNs, credit cards (Luhn-validated),
 API keys, and high-entropy strings from tool results.
 
-### 3.4 Human-in-the-Loop: Kernel Verdict Extension
+### 3.4 Human-in-the-Loop: Kernel Verdict Extension [SHIPPED c1ac528]
 
 **What**: Add `Verdict::PendingApproval(ApprovalRequest)` to the kernel.
 Implement the approval guard, approval store, and resume flow.
@@ -383,7 +383,7 @@ Implement the approval guard, approval store, and resume flow.
 waits for human response. Approved call executes; denied call records
 denial receipt. Replay of consumed approval token is rejected.
 
-### 3.5 HITL Persistence Backend
+### 3.5 HITL Persistence Backend [SHIPPED c1ac528]
 
 **What**: Pending approvals must survive kernel restart. Implement
 `ApprovalStore` and `BatchApprovalStore` traits with SQLite backend.
@@ -403,7 +403,7 @@ fail-closed table, and the `ApprovalStore`/`BatchApprovalStore` contracts)
 Restart the kernel. The pending approval is still queryable via
 `GET /approvals/pending`. Responding to it resumes tool execution.
 
-### 3.6 Approval Channels
+### 3.6 Approval Channels [SHIPPED c1ac528]
 
 **What**: Implement `ApprovalChannel` trait and webhook channel. Slack
 and dashboard channels follow.
