@@ -245,7 +245,15 @@ jobs:
         package: ${{ fromJSON(needs.plan.outputs.packages) }}
     environment:
       name: npm
-      url: https://www.npmjs.com/package/${{ steps.meta.outputs.name }}
+      # Deliberately no `url:` -- `environment` is evaluated at job
+      # creation time, before any step has run, so
+      # `steps.meta.outputs.name` resolves to an empty string and
+      # produces a broken `https://www.npmjs.com/package/` link.
+      # Wiring the package name through the `plan` matrix would require
+      # restructuring the matrix to emit `{dir, name}` objects; the
+      # operator can navigate to the published package from the step
+      # output ("Publish to npm") without a preview URL in GitHub's
+      # Environments panel.
     permissions:
       # Required for npm provenance attestations via GitHub OIDC.
       id-token: write
