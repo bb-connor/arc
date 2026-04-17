@@ -1,10 +1,11 @@
 //! Reverse proxy server that evaluates requests and forwards to upstream.
 
 use std::collections::{HashMap, HashSet};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::{Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
@@ -254,7 +255,12 @@ impl ProtectProxy {
             route_count, self.config.upstream, self.config.listen_addr
         );
 
-        axum::serve(listener, app).await.map_err(ProtectError::Io)?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .map_err(ProtectError::Io)?;
 
         Ok(())
     }
@@ -646,6 +652,9 @@ async fn sidecar_mint_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+        return response;
+    }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
         Ok(bytes) => bytes,
@@ -715,6 +724,9 @@ async fn sidecar_release_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+        return response;
+    }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
         Ok(bytes) => bytes,
@@ -766,6 +778,9 @@ async fn sidecar_submit_receipt_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
+    if let Err(response) = require_loopback_sidecar_control_request(&request) {
+        return response;
+    }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
         Ok(bytes) => bytes,
@@ -898,6 +913,31 @@ fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Val
             "message": message,
         })),
     )
+}
+
+fn require_loopback_sidecar_control_request(request: &Request<Body>) -> Result<(), Response> {
+    let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() else {
+        warn!("rejecting sidecar control request without peer address");
+        return Err(sidecar_control_forbidden_response());
+    };
+
+    if !peer.0.ip().is_loopback() {
+        warn!(peer = %peer.0, "rejecting non-loopback sidecar control request");
+        return Err(sidecar_control_forbidden_response());
+    }
+
+    Ok(())
+}
+
+fn sidecar_control_forbidden_response() -> Response {
+    (
+        StatusCode::FORBIDDEN,
+        axum::Json(serde_json::json!({
+            "error": "arc_control_forbidden",
+            "message": "sidecar control endpoints require a loopback caller",
+        })),
+    )
+        .into_response()
 }
 
 fn ttl_seconds_from_wire(ttl_wire: Option<u64>) -> u64 {
@@ -1675,6 +1715,15 @@ paths:
         path.to_string_lossy().to_string()
     }
 
+    fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {
+        request.extensions_mut().insert(ConnectInfo(peer));
+        request
+    }
+
+    fn with_loopback_peer(request: Request<Body>) -> Request<Body> {
+        with_peer_addr(request, SocketAddr::from(([127, 0, 0, 1], 4100)))
+    }
+
     fn read_http_request<R: Read>(stream: &mut R) -> String {
         let mut request = Vec::new();
         let mut chunk = [0_u8; 1024];
@@ -2327,19 +2376,21 @@ paths:
     #[tokio::test]
     async fn sidecar_mint_returns_canonical_capability_tokens() {
         let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-        let request = Request::builder()
-            .method("POST")
-            .uri("/v1/capabilities/mint")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&serde_json::json!({
-                    "subject": "job/default/demo",
-                    "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
-                    "job_uid": "job-uid-1",
-                }))
-                .expect("serialize mint request"),
-            ))
-            .expect("request");
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
 
         let response = sidecar_mint_handler(State(Arc::clone(&state)), request).await;
         assert_eq!(response.status(), StatusCode::OK);
@@ -2363,29 +2414,31 @@ paths:
     #[tokio::test]
     async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
         let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
-        let request = Request::builder()
-            .method("POST")
-            .uri("/v1/receipts")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&serde_json::json!({
-                    "job_name": "demo",
-                    "namespace": "default",
-                    "job_uid": "job-uid-1",
-                    "capability_id": "cap-1",
-                    "outcome": "succeeded",
-                    "started_at": "2026-04-17T10:00:00Z",
-                    "completed_at": "2026-04-17T10:05:00Z",
-                    "steps": [{
-                        "pod_name": "demo-pod",
-                        "phase": "Succeeded",
-                        "payload": "{\"ok\":true}",
-                        "observed_at": "2026-04-17T10:05:00Z"
-                    }]
-                }))
-                .expect("serialize receipt request"),
-            ))
-            .expect("request");
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "capability_id": "cap-1",
+                        "outcome": "succeeded",
+                        "started_at": "2026-04-17T10:00:00Z",
+                        "completed_at": "2026-04-17T10:05:00Z",
+                        "steps": [{
+                            "pod_name": "demo-pod",
+                            "phase": "Succeeded",
+                            "payload": "{\"ok\":true}",
+                            "observed_at": "2026-04-17T10:05:00Z"
+                        }]
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+        );
 
         let response = sidecar_submit_receipt_handler(State(state), request).await;
         assert_eq!(response.status(), StatusCode::OK);
@@ -2428,19 +2481,21 @@ paths:
             Some(&receipt_db),
         );
 
-        let release_request = Request::builder()
-            .method("POST")
-            .uri("/v1/capabilities/release")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&serde_json::json!({
-                    "capability_id": "cap-revoked",
-                    "job_uid": "job-uid-1",
-                    "reason": "completed",
-                }))
-                .expect("serialize release request"),
-            ))
-            .expect("request");
+        let release_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                        "job_uid": "job-uid-1",
+                        "reason": "completed",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+        );
         let release_response =
             sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
         assert_eq!(release_response.status(), StatusCode::OK);
@@ -2484,29 +2539,31 @@ paths:
             "http://127.0.0.1:1".to_string(),
             Some(&receipt_db),
         );
-        let request = Request::builder()
-            .method("POST")
-            .uri("/v1/receipts")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&serde_json::json!({
-                    "job_name": "demo",
-                    "namespace": "default",
-                    "job_uid": "job-uid-1",
-                    "capability_id": "cap-1",
-                    "outcome": "succeeded",
-                    "started_at": "2026-04-17T10:00:00Z",
-                    "completed_at": "2026-04-17T10:05:00Z",
-                    "steps": [{
-                        "pod_name": "demo-pod",
-                        "phase": "Succeeded",
-                        "payload": "{\"ok\":true}",
-                        "observed_at": "2026-04-17T10:05:00Z"
-                    }]
-                }))
-                .expect("serialize receipt request"),
-            ))
-            .expect("request");
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "capability_id": "cap-1",
+                        "outcome": "succeeded",
+                        "started_at": "2026-04-17T10:00:00Z",
+                        "completed_at": "2026-04-17T10:05:00Z",
+                        "steps": [{
+                            "pod_name": "demo-pod",
+                            "phase": "Succeeded",
+                            "payload": "{\"ok\":true}",
+                            "observed_at": "2026-04-17T10:05:00Z"
+                        }]
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+        );
 
         let response = sidecar_submit_receipt_handler(State(Arc::clone(&state)), request).await;
         assert_eq!(response.status(), StatusCode::OK);
@@ -2539,6 +2596,80 @@ paths:
         assert!(stored.verify_signature().expect("receipt signature"));
 
         let _ = std::fs::remove_file(receipt_db);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_reject_non_loopback_callers() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let release_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::FORBIDDEN);
+
+        let receipt_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "outcome": "succeeded",
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let receipt_response =
+            sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
+        assert_eq!(receipt_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(receipt_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
+        assert_eq!(
+            json["message"],
+            "sidecar control endpoints require a loopback caller"
+        );
     }
 
     #[tokio::test]
