@@ -58,6 +58,19 @@ pub struct SqlAnalysis {
 pub fn parse(query: &str, dialect: SqlDialect) -> Result<SqlAnalysis, String> {
     let dialect_obj = dialect_for(dialect);
     let statements = Parser::parse_sql(dialect_obj.as_ref(), query).map_err(|e| e.to_string())?;
+    // Reject multi-statement queries fail-closed. Analyzing only the first
+    // statement would let a payload like `SELECT ...; DROP TABLE ...` sail
+    // past scope checks because the guard classifies the SELECT while the
+    // destructive DROP hides behind it. Drivers like mysql-connector or
+    // postgres that support `multi_statements` would then execute both.
+    // Operators who legitimately need a batch can split and evaluate each
+    // statement independently.
+    if statements.len() > 1 {
+        return Err(format!(
+            "multi-statement SQL not supported by guard (found {} statements); split into separate evaluations",
+            statements.len()
+        ));
+    }
     let Some(statement) = statements.into_iter().next() else {
         return Err("empty statement".to_string());
     };
