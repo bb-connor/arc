@@ -41,6 +41,7 @@ pub struct HttpAuthority {
     kernel_subject: PublicKey,
     kernel_agent_id: String,
     approval_store: Arc<dyn ApprovalStore>,
+    trusted_capability_issuers: Vec<PublicKey>,
 }
 
 impl std::fmt::Debug for HttpAuthority {
@@ -211,6 +212,7 @@ impl HttpAuthority {
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
         let keypair = Arc::new(keypair);
+        let trusted_capability_issuers = vec![keypair.public_key()];
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
 
@@ -238,12 +240,17 @@ impl HttpAuthority {
             kernel_subject,
             kernel_agent_id,
             approval_store,
+            trusted_capability_issuers,
         }
     }
 
     #[must_use]
     pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
         Arc::clone(&self.approval_store)
+    }
+
+    fn trusted_capability_issuers(&self) -> &[PublicKey] {
+        &self.trusted_capability_issuers
     }
 
     pub fn evaluate(
@@ -263,8 +270,11 @@ impl HttpAuthority {
         &self,
         input: HttpAuthorityInput<'_>,
     ) -> Result<PreparedHttpEvaluation, HttpAuthorityError> {
-        let presented_capability =
-            validate_presented_capability(input.capability_id_hint, input.presented_capability);
+        let presented_capability = validate_presented_capability(
+            input.capability_id_hint,
+            input.presented_capability,
+            self.trusted_capability_issuers(),
+        );
         let caller_identity_hash = input
             .caller
             .identity_hash()
@@ -526,6 +536,7 @@ fn decision_status(verdict: &Verdict) -> u16 {
 fn validate_presented_capability(
     capability_id_hint: Option<&str>,
     presented_capability: Option<&str>,
+    trusted_issuers: &[PublicKey],
 ) -> PresentedCapabilityState {
     let Some(raw_capability) = presented_capability else {
         return PresentedCapabilityState {
@@ -534,7 +545,7 @@ fn validate_presented_capability(
         };
     };
 
-    match validate_capability_token(raw_capability) {
+    match validate_capability_token(raw_capability, trusted_issuers) {
         Ok(token) => {
             if let Some(hint) = capability_id_hint {
                 if hint != token.id {
@@ -612,9 +623,15 @@ fn projected_evidence(
     }
 }
 
-fn validate_capability_token(raw: &str) -> Result<CapabilityToken, String> {
+fn validate_capability_token(
+    raw: &str,
+    trusted_issuers: &[PublicKey],
+) -> Result<CapabilityToken, String> {
     let token: CapabilityToken =
         serde_json::from_str(raw).map_err(|e| format!("invalid capability token: {e}"))?;
+    if !trusted_issuers.contains(&token.issuer) {
+        return Err("capability issuer is not trusted".to_string());
+    }
     let signature_valid = token
         .verify_signature()
         .map_err(|e| format!("capability signature verification failed: {e}"))?;
@@ -729,8 +746,7 @@ mod tests {
     };
     use arc_core_types::capability::{ArcScope, CapabilityTokenBody};
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -760,6 +776,14 @@ mod tests {
 
     fn authority() -> HttpAuthority {
         HttpAuthority::new(Keypair::generate(), "policy-hash".to_string())
+    }
+
+    fn authority_with_issuer() -> (HttpAuthority, Keypair) {
+        let issuer = Keypair::generate();
+        (
+            HttpAuthority::new(issuer.clone(), "policy-hash".to_string()),
+            issuer,
+        )
     }
 
     #[test]
@@ -850,8 +874,9 @@ mod tests {
     #[test]
     fn valid_capability_allows_deny_by_default() {
         let query = HashMap::new();
-        let capability = valid_capability_token_json("cap-123");
-        let result = authority()
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-123");
+        let result = authority
             .evaluate(HttpAuthorityInput {
                 request_id: "req-3".to_string(),
                 method: HttpMethod::Patch,
@@ -879,8 +904,9 @@ mod tests {
     #[test]
     fn capability_hint_mismatch_becomes_denial() {
         let query = HashMap::new();
-        let capability = valid_capability_token_json("cap-123");
-        let result = authority()
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-123");
+        let result = authority
             .evaluate(HttpAuthorityInput {
                 request_id: "req-4".to_string(),
                 method: HttpMethod::Put,
@@ -899,6 +925,36 @@ mod tests {
 
         assert!(result.verdict.is_denied());
         assert!(result.receipt.capability_id.is_none());
+    }
+
+    #[test]
+    fn untrusted_capability_denies_deny_by_default() {
+        let query = HashMap::new();
+        let authority = authority();
+        let capability = signed_capability_token_json(&Keypair::generate(), "cap-untrusted");
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-untrusted".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("ghi".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(result.receipt.capability_id, None);
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability issuer is not trusted")
+        );
     }
 
     #[test]

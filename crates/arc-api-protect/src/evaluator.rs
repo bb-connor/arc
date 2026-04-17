@@ -277,8 +277,7 @@ mod tests {
         ARC_HTTP_STATUS_SCOPE_FINAL,
     };
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -329,7 +328,7 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -358,7 +357,7 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -388,12 +387,12 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let mut headers = HashMap::new();
         headers.insert(
             "X-Arc-Capability".to_string(),
-            valid_capability_token_json("cap-123"),
+            signed_capability_token_json(&keypair, "cap-123"),
         );
 
         let result = evaluator

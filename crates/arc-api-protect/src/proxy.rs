@@ -1800,8 +1800,7 @@ paths:
           description: Deleted
 "#;
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -2176,7 +2175,7 @@ paths:
 
     #[test]
     fn forwarded_query_string_strips_arc_capability() {
-        let token = valid_capability_token_json("cap-query");
+        let token = signed_capability_token_json(&Keypair::generate(), "cap-query");
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("source", "test")
             .append_pair("arc_capability", &token)
@@ -2377,7 +2376,10 @@ paths:
             .header("user-agent", "arc-test")
             .header("authorization", "Bearer upstream-token")
             .header("x-request-id", "req-123")
-            .header("x-arc-capability", valid_capability_token_json("cap-proxy"))
+            .header(
+                "x-arc-capability",
+                signed_capability_token_json(&state.signer_keypair, "cap-proxy"),
+            )
             .header("x-custom-app", "secret")
             .header("connection", "keep-alive")
             .body(Body::from(r#"{"name":"fido"}"#))
@@ -2444,7 +2446,7 @@ paths:
             }],
             server.base_url(),
         );
-        let token = valid_capability_token_json("cap-query");
+        let token = signed_capability_token_json(&state.signer_keypair, "cap-query");
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("source", "test")
             .append_pair("arc_capability", &token)
@@ -2622,7 +2624,7 @@ paths:
             }],
             "http://127.0.0.1:1".to_string(),
         );
-        let token = valid_capability_token_json("cap-sidecar");
+        let token = signed_capability_token_json(&state.signer_keypair, "cap-sidecar");
         let mut body = ArcHttpRequest::new(
             "req-sidecar-allow".to_string(),
             HttpMethod::Post,
@@ -2847,7 +2849,7 @@ paths:
             .uri("/pets")
             .header(
                 "x-arc-capability",
-                valid_capability_token_json("cap-revoked"),
+                signed_capability_token_json(&reloaded.signer_keypair, "cap-revoked"),
             )
             .body(Body::from(r#"{"name":"fido"}"#))
             .expect("request");
