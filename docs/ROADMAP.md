@@ -32,13 +32,13 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**64 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**66 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
 | Phase group | Shipped | In flight | Pending |
 |---|---|---|---|
-| 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
+| 0 (DX) | 0.1, 0.2, 0.3, 0.4, 0.5 | -- | -- |
 | 1 (Structural security) | 1.1, 1.2, 1.3, 1.4, 1.5 | -- | -- |
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
@@ -71,7 +71,7 @@ roadmap phase.
 > **Depends on**: Nothing. Unblocks everything.
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md`
 
-### 0.1 Publish Python SDKs to PyPI
+### 0.1 Publish Python SDKs to PyPI [SHIPPED 9eeea0f]
 
 **What**: Publish `arc-sdk-python`, `arc-fastapi`, `arc-asgi`, `arc-django`,
 `arc-langchain` to PyPI. Set up CI to publish on git tag.
@@ -88,7 +88,7 @@ roadmap phase.
 
 **Acceptance**: `pip install arc-sdk-python` works from a clean venv.
 
-### 0.2 Publish TypeScript SDKs to npm
+### 0.2 Publish TypeScript SDKs to npm [SHIPPED 9eeea0f]
 
 **What**: Publish `@arc-protocol/node-http`, `@arc-protocol/express`,
 `@arc-protocol/fastify`, `@arc-protocol/elysia` to npm.
