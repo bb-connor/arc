@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**48 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**49 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -49,7 +49,7 @@ roadmap phase.
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
 | 10 (Orchestration) | 10.1, 10.2 | -- | 10.3 |
-| 11 (Content / streaming / IaC) | 11.2 | -- | 11.1, 11.3 |
+| 11 (Content / streaming / IaC) | 11.2, 11.3 | -- | 11.1 |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
@@ -880,7 +880,7 @@ transactional receipt commit, DLQ governance.
 capabilities before processing events. Denied events routed to DLQ with
 denial receipt. Offset commit and receipt are transactionally atomic.
 
-### 11.3 IaC Governance (arc-iac)
+### 11.3 IaC Governance (arc-iac) [SHIPPED 4177cad]
 
 **What**: Terraform CLI wrapper with plan/apply two-phase capability.
 Pulumi decorators.
