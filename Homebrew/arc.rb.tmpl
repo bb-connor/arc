@@ -34,7 +34,9 @@ class Arc < Formula
   end
 
   def install
-    bin.install Dir["arc-#{version}-*/arc"].fetch(0)
+    candidate = Dir["arc", "arc-#{version}-*/arc"].find { |path| File.file?(path) }
+    odie "ARC archive did not contain an installable binary" unless candidate
+    bin.install candidate
   end
 
   test do
