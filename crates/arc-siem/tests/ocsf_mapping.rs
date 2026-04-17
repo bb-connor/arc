@@ -39,6 +39,7 @@ fn receipt_with(
         evidence,
         metadata,
         trust_level,
+        tenant_id: None,
         kernel_key: keypair.public_key(),
     };
     ArcReceipt::sign(body, &keypair).unwrap()

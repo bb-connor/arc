@@ -395,6 +395,7 @@ mod tests {
             evidence: Vec::new(),
             metadata: None,
             trust_level: TrustLevel::Mediated,
+            tenant_id: None,
             kernel_key: kp.public_key(),
         };
         #[allow(clippy::unwrap_used)]

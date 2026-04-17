@@ -178,6 +178,7 @@ impl ReceiptSigner for KernelReceiptSigner {
                 }
             })),
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: self.keypair.public_key(),
         };
 

@@ -24,6 +24,93 @@ pub type ServerId = String;
 /// pattern-match on the exact string without drifting.
 pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
 
+// ---------------------------------------------------------------------------
+// Phase 1.5 multi-tenant receipt isolation.
+//
+// The kernel must tag every receipt it signs with the tenant that the active
+// session belongs to. The natural place to derive that is the authenticated
+// session's `enterprise_identity.tenant_id`, but the existing response
+// builders accept only a `&ToolCallRequest` (no session handle) across ~40
+// call sites.  Rather than plumb a new parameter through every builder we
+// stash the resolved tenant_id in a thread-local scope for the duration of
+// one evaluate call; `build_and_sign_receipt` consults it when filling in the
+// receipt body.
+//
+// The scope is RAII: the guard resets the previous value on drop, which
+// keeps reentrant evaluations (e.g. a kernel that recursively evaluates a
+// sub-call inside the same thread) isolated.
+//
+// Tenant_id is NEVER extracted from the caller-provided `ToolCallRequest` --
+// allowing caller choice would defeat the isolation the store-level WHERE
+// clause enforces.
+thread_local! {
+    static RECEIPT_TENANT_ID_SCOPE: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Guard returned by [`scope_receipt_tenant_id`]. Restores the previously
+/// active tenant scope when dropped.
+pub(crate) struct ScopedReceiptTenantId {
+    previous: Option<String>,
+}
+
+impl Drop for ScopedReceiptTenantId {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        RECEIPT_TENANT_ID_SCOPE.with(|slot| {
+            *slot.borrow_mut() = previous;
+        });
+    }
+}
+
+/// Install `tenant_id` as the active scope for this thread until the
+/// returned guard is dropped. Passing `None` explicitly clears the scope
+/// (so a child evaluate that lacks a session cannot inherit a parent's
+/// tenant tag by accident).
+pub(crate) fn scope_receipt_tenant_id(tenant_id: Option<String>) -> ScopedReceiptTenantId {
+    let previous = RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.replace(tenant_id));
+    ScopedReceiptTenantId { previous }
+}
+
+/// Read the tenant_id currently in scope on this thread.
+///
+/// Exposed to `build_and_sign_receipt` (in `responses.rs`) so the receipt
+/// body picks up the tag without rewiring every builder signature.
+pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
+    RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
+}
+
+/// Extract tenant_id from a session's authenticated auth context.
+///
+/// Preference order:
+///   1. OAuth bearer `enterprise_identity.tenant_id` (the richer SSO
+///      claim, preferred because IdP integrations that surface full
+///      EnterpriseIdentityContext use this path).
+///   2. OAuth bearer `federated_claims.tenant_id` (the minimal OIDC
+///      claim set; populated when the IdP only emits `tid`).
+///
+/// Anonymous sessions and static-bearer sessions return `None`.
+pub(crate) fn extract_tenant_id_from_auth_context(
+    auth_context: &SessionAuthContext,
+) -> Option<String> {
+    if let arc_core::session::SessionAuthMethod::OAuthBearer {
+        enterprise_identity,
+        federated_claims,
+        ..
+    } = &auth_context.method
+    {
+        if let Some(identity) = enterprise_identity.as_ref() {
+            if let Some(id) = identity.tenant_id.as_ref() {
+                return Some(id.clone());
+            }
+        }
+        if let Some(id) = federated_claims.tenant_id.as_ref() {
+            return Some(id.clone());
+        }
+    }
+    None
+}
+
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
     pub(crate) content_hash: String,
@@ -1108,6 +1195,29 @@ impl ArcKernel {
         })
     }
 
+    /// Phase 1.5: resolve the tenant_id for a given session by walking its
+    /// authenticated auth context into the enterprise identity's tenant
+    /// claim. Returns `None` for single-tenant / anonymous sessions, for
+    /// unknown session IDs, or when the caller did not supply one.
+    ///
+    /// Tenant_id is taken from the OAuth bearer's `enterprise_identity`
+    /// (preferred, richer SSO claims) and falls back to the OAuth
+    /// `federated_claims.tenant_id` when the IdP surfaces only the minimal
+    /// federated claim set. Both sources originate from the authenticated
+    /// session -- never from caller-provided request fields, because
+    /// caller choice would defeat the isolation guarantee.
+    pub(crate) fn resolve_tenant_id_for_session(
+        &self,
+        session_id: Option<&SessionId>,
+    ) -> Option<String> {
+        let id = session_id?;
+        self.with_session(id, |session| {
+            Ok(extract_tenant_id_from_auth_context(session.auth_context()))
+        })
+        .ok()
+        .flatten()
+    }
+
     fn with_session_mut<R>(
         &self,
         session_id: &SessionId,
@@ -1874,6 +1984,35 @@ impl ArcKernel {
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
+        self.evaluate_tool_call_sync_with_session_context(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            None,
+        )
+    }
+
+    /// Evaluate a tool call sync path with access to the owning session,
+    /// so the kernel can tag the resulting receipt with the session's
+    /// tenant_id (Phase 1.5 multi-tenant receipt isolation).
+    ///
+    /// `session_id` is the session that authenticated the caller, used only
+    /// to resolve the tenant from `auth_context().enterprise_identity`. The
+    /// tenant_id is NEVER read from `request` itself -- accepting a caller-
+    /// provided tenant would defeat the isolation guarantee.
+    fn evaluate_tool_call_sync_with_session_context(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        // Resolve tenant_id from the session's enterprise identity context
+        // (if any) and install it for the remainder of this evaluation so
+        // every receipt `build_and_sign_receipt` signs picks up the tag.
+        let tenant_id = self.resolve_tenant_id_for_session(session_id);
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         let now = current_unix_timestamp();
 
         // Phase 1.4 emergency kill switch: every evaluate path checks the flag
@@ -2328,6 +2467,12 @@ impl ArcKernel {
         request: &ToolCallRequest,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
+        // Phase 1.5: install the parent session's tenant_id so every
+        // receipt signed while this nested-flow evaluation is in flight
+        // carries the correct tenant tag.
+        let tenant_id = self.resolve_tenant_id_for_session(Some(&parent_context.session_id));
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         let now = current_unix_timestamp();
 
         // Phase 1.4 emergency kill switch: the nested-flow path also deny-fast
@@ -5335,6 +5480,15 @@ pub(crate) struct ReceiptParams<'a> {
     /// `Mediated` (the safest baseline) when integration adapters do not
     /// override it.
     trust_level: arc_core::TrustLevel,
+    /// Phase 1.5 multi-tenant receipt isolation: explicit tenant tag for
+    /// this receipt. `None` in virtually every call site -- the evaluate
+    /// path plumbs the resolved tenant through
+    /// [`scope_receipt_tenant_id`] so `build_and_sign_receipt` can pick it
+    /// up without adding a parameter to every builder signature.
+    ///
+    /// MUST be derived from session / auth context, not caller-provided
+    /// request fields (see `STRUCTURAL-SECURITY-FIXES.md` section 6).
+    tenant_id: Option<String>,
 }
 
 pub(crate) fn current_unix_timestamp() -> u64 {

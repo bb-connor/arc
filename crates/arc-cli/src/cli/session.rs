@@ -301,6 +301,7 @@ fn make_error_receipt(
         evidence: vec![],
         metadata: None,
         trust_level: arc_core::TrustLevel::default(),
+        tenant_id: None,
         kernel_key: kp.public_key(),
     };
 

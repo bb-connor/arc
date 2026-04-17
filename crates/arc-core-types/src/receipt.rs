@@ -99,6 +99,16 @@ pub struct ArcReceipt {
     /// to `Mediated` for backward compatibility.
     #[serde(default, skip_serializing_if = "is_default_trust_level")]
     pub trust_level: TrustLevel,
+    /// Phase 1.5 multi-tenant receipt isolation: tenant identifier for
+    /// multi-tenant deployments. `None` in single-tenant mode; derived
+    /// from the authenticated session's enterprise identity context and
+    /// MUST NOT be taken from caller-provided request fields (caller
+    /// choice would defeat the isolation intent).
+    ///
+    /// Serialized only when set, so receipts emitted by single-tenant
+    /// deployments remain byte-identical on the wire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
     /// The Kernel's public key (for verification without out-of-band lookup).
     pub kernel_key: PublicKey,
     /// Signing algorithm used for [`ArcReceipt::signature`]. Absent means
@@ -129,6 +139,11 @@ pub struct ArcReceiptBody {
     pub metadata: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "is_default_trust_level")]
     pub trust_level: TrustLevel,
+    /// Phase 1.5: tenant_id on the canonical signing body. Omitted from
+    /// canonical JSON when `None` so single-tenant deployments continue
+    /// to produce byte-identical signatures.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
     pub kernel_key: PublicKey,
 }
 
@@ -187,6 +202,7 @@ impl ArcReceipt {
             evidence: body.evidence,
             metadata: body.metadata,
             trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
             kernel_key: body.kernel_key,
             algorithm: None,
             signature,
@@ -211,6 +227,7 @@ impl ArcReceipt {
             evidence: body.evidence,
             metadata: body.metadata,
             trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
             kernel_key: body.kernel_key,
             algorithm: Some(backend.algorithm()),
             signature,
@@ -233,6 +250,7 @@ impl ArcReceipt {
             evidence: self.evidence.clone(),
             metadata: self.metadata.clone(),
             trust_level: self.trust_level,
+            tenant_id: self.tenant_id.clone(),
             kernel_key: self.kernel_key.clone(),
         }
     }
@@ -1036,6 +1054,7 @@ mod tests {
                 }
             })),
             trust_level: TrustLevel::default(),
+            tenant_id: None,
             kernel_key: kp.public_key(),
         }
     }

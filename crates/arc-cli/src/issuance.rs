@@ -873,6 +873,7 @@ mod tests {
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
                 kernel_key: kernel_kp.public_key(),
             },
             &kernel_kp,

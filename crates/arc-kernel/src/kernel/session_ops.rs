@@ -217,6 +217,7 @@ impl ArcKernel {
             ),
             timestamp: current_unix_timestamp(),
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -580,6 +581,16 @@ impl ArcKernel {
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        // Phase 1.5: install tenant_id scope for the duration of this
+        // session-scoped evaluation so every receipt signed here (tool
+        // call, resource read deny, etc.) is tagged with the session's
+        // tenant. The ToolCall branch also installs a scope via its
+        // sync_with_session_context path; the nested scope is a no-op
+        // because the value matches, but it keeps non-tool-call branches
+        // (e.g. evaluate_resource_read) covered.
+        let tenant_id = self.resolve_tenant_id_for_session(Some(&context.session_id));
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();
         let should_track_inflight = matches!(
@@ -617,10 +628,14 @@ impl ArcKernel {
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
 
-                self.evaluate_tool_call_sync_with_session_roots(
+                // Phase 1.5: pass the session_id so the evaluate path can
+                // resolve tenant_id from session.auth_context for every
+                // receipt signed during this tool call.
+                self.evaluate_tool_call_sync_with_session_context(
                     &request,
                     Some(session_roots.as_slice()),
                     None,
+                    Some(&context.session_id),
                 )
                 .map(SessionOperationResponse::ToolCall)
             }

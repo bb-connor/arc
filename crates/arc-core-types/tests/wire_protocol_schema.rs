@@ -123,6 +123,7 @@ fn make_receipt(kp: &Keypair, decision: Decision) -> ArcReceipt {
                 "version": 1
             })),
             trust_level: arc_core_types::receipt::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: kp.public_key(),
         },
         kp,

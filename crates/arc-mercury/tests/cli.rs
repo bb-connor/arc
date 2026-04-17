@@ -53,6 +53,7 @@ fn mercury_receipt_with_ts(id: &str, capability_id: &str, timestamp: u64) -> Arc
             evidence: Vec::new(),
             metadata: Some(metadata),
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: keypair.public_key(),
         },
         &keypair,

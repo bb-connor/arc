@@ -2835,12 +2835,36 @@ pub(crate) fn ensure_tool_receipt_attribution_columns(
         )?;
     }
 
+    // Phase 1.5 multi-tenant receipt isolation: tenant_id column.
+    //
+    // Pre-multitenant receipts migrate to NULL, which the
+    // tenant-scoped WHERE clause treats as a "public" fallback set (a
+    // tenant A query returns its own rows AND the NULL-tagged legacy
+    // set), so historical data remains visible under query modes that
+    // opt into backward compatibility. Operators that need strict
+    // isolation across the legacy set can enable
+    // [`SqliteReceiptStore::with_strict_tenant_isolation`].
+    //
+    // Migration fails closed: if the column cannot be added we bail
+    // out and the caller treats the store as unreadable, per the
+    // kernel's fail-closed convention.
+    if !columns.iter().any(|column| column == "tenant_id") {
+        connection.execute(
+            "ALTER TABLE arc_tool_receipts ADD COLUMN tenant_id TEXT",
+            [],
+        )?;
+    }
+
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_subject ON arc_tool_receipts(subject_key)",
         [],
     )?;
     connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_grant ON arc_tool_receipts(capability_id, grant_index)",
+        [],
+    )?;
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_arc_tool_receipts_tenant ON arc_tool_receipts(tenant_id)",
         [],
     )?;
     Ok(())
@@ -2911,6 +2935,20 @@ pub(crate) fn backfill_tool_receipt_attribution_columns(
             (SELECT cl.issuer_key FROM capability_lineage cl WHERE cl.capability_id = arc_tool_receipts.capability_id)
         )
         WHERE issuer_key IS NULL;
+
+        -- Phase 1.5 multi-tenant receipt isolation: hydrate tenant_id
+        -- from the canonical receipt body. Legacy receipts (pre-1.5)
+        -- that were stored before the field existed stay NULL, which
+        -- means "public / visible to any tenant under the default
+        -- compat query mode". Operators who want to purge those
+        -- legacy rows can enable strict tenant isolation on queries.
+        --
+        -- The receipt body uses snake_case field names (no rename_all),
+        -- so the JSON key is `tenant_id`, not `tenantId`.
+        UPDATE arc_tool_receipts
+        SET tenant_id = CAST(json_extract(raw_json, '$.tenant_id') AS TEXT)
+        WHERE tenant_id IS NULL
+          AND json_extract(raw_json, '$.tenant_id') IS NOT NULL;
         "#,
     )?;
     Ok(())

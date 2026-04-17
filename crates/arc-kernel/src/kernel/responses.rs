@@ -115,6 +115,7 @@ impl ArcKernel {
                 metadata,
                 timestamp,
                 trust_level: arc_core::TrustLevel::default(),
+                tenant_id: None,
             })?;
 
             self.record_arc_receipt(&receipt)?;
@@ -218,6 +219,7 @@ impl ArcKernel {
             ),
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -665,6 +667,7 @@ impl ArcKernel {
             ),
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -737,6 +740,7 @@ impl ArcKernel {
             ),
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -831,6 +835,7 @@ impl ArcKernel {
             ),
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -909,6 +914,7 @@ impl ArcKernel {
             metadata,
             timestamp,
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -942,6 +948,20 @@ impl ArcKernel {
         &self,
         params: ReceiptParams<'_>,
     ) -> Result<ArcReceipt, KernelError> {
+        // Phase 1.5 multi-tenant receipt isolation: resolve tenant_id for
+        // this receipt. Precedence:
+        //   1. An explicit override on `ReceiptParams` (currently unused).
+        //   2. The active scoped tenant context set by the evaluate path
+        //      from `session.auth_context().enterprise_identity.tenant_id`.
+        //
+        // Tenant_id is never taken from a caller-provided field on the
+        // request: allowing caller choice would defeat the isolation the
+        // store-level WHERE clause enforces.
+        let tenant_id = params
+            .tenant_id
+            .clone()
+            .or_else(current_scoped_receipt_tenant_id);
+
         let body = ArcReceiptBody {
             id: next_receipt_id("rcpt"),
             timestamp: params.timestamp,
@@ -955,6 +975,7 @@ impl ArcKernel {
             evidence: vec![],
             metadata: params.metadata,
             trust_level: params.trust_level,
+            tenant_id,
             kernel_key: self.config.keypair.public_key(),
         };
 

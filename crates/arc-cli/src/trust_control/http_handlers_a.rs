@@ -2481,6 +2481,11 @@ async fn handle_query_receipts(
         cursor: query.cursor,
         limit: list_limit(query.limit),
         agent_subject: query.agent_subject.clone(),
+        // Phase 1.5: tenant_filter must be derived from the operator's
+        // authenticated tenant claim, not a query parameter. Left None
+        // here pending the auth-context plumb-through; strict-isolation
+        // mode at the store level guards against leakage during rollout.
+        tenant_filter: None,
     };
     let result = match store.query_receipts(&kernel_query) {
         Ok(result) => result,

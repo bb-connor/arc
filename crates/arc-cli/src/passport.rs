@@ -587,6 +587,7 @@ fn build_attestation_evidence(
         agent_subject: Some(subject_key.to_string()),
         since,
         until,
+        tenant: None,
     })?;
 
     if bundle.tool_receipts.is_empty() {

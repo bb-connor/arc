@@ -922,7 +922,10 @@ impl SqliteReceiptStore {
             .build(manager)
             .map_err(|error| ReceiptStoreError::Pool(error.to_string()))?;
 
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            strict_tenant_isolation: std::sync::atomic::AtomicBool::new(false),
+        })
     }
 
     pub fn tool_receipt_count(&self) -> Result<u64, ReceiptStoreError> {

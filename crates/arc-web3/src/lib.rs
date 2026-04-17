@@ -1611,6 +1611,7 @@ mod tests {
                 }
             })),
             trust_level: arc_core_types::receipt::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: operator.public_key(),
         };
         ArcReceipt::sign(body, &operator).unwrap()

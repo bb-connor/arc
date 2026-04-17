@@ -32,6 +32,21 @@ pub struct ReceiptQuery {
     /// Filter by agent subject public key (hex-encoded Ed25519). Resolved through
     /// capability_lineage JOIN -- does not replay issuance logs.
     pub agent_subject: Option<String>,
+    /// Phase 1.5 multi-tenant receipt isolation: restrict results to a
+    /// tenant. When `Some(id)`, the store returns receipts whose
+    /// `tenant_id = id` OR whose `tenant_id IS NULL` (the pre-
+    /// multi-tenant "public" set) so legacy receipts remain visible
+    /// during the transition. When `None`, no filter is applied --
+    /// intended for admin / compat query paths only.
+    ///
+    /// For strict isolation that excludes the NULL fallback set, the
+    /// caller must also flip the store's strict-tenant-isolation mode
+    /// via `SqliteReceiptStore::with_strict_tenant_isolation(true)`.
+    ///
+    /// MUST be derived from the caller's authentication context at the
+    /// HTTP edge, not from a query parameter. See
+    /// `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 6.
+    pub tenant_filter: Option<String>,
 }
 
 /// Result of a receipt query, including pagination state.

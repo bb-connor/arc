@@ -522,6 +522,7 @@ pub(crate) fn merge_export_query(
         agent_subject,
         since,
         until,
+        tenant: None,
     })
 }
 
@@ -1504,6 +1505,7 @@ pub fn cmd_evidence_federation_policy_create(
             agent_subject: args.agent_subject.map(ToOwned::to_owned),
             since: args.since,
             until: args.until,
+            tenant: None,
         },
         require_proofs: args.require_proofs,
         purpose: args.purpose.map(ToOwned::to_owned),
@@ -1549,6 +1551,7 @@ pub fn cmd_evidence_export(
             agent_subject: agent_subject.map(ToOwned::to_owned),
             since,
             until,
+            tenant: None,
         },
         require_proofs,
         federation_policy_file
@@ -1763,6 +1766,7 @@ mod tests {
                 evidence: Vec::new(),
                 metadata: None,
                 trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,

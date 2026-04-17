@@ -349,6 +349,7 @@ mod tests {
                 "financial": { "units": 42, "currency": "USD" }
             })),
             trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: keypair.public_key(),
         };
         ArcReceipt::sign(body, &keypair).unwrap()

@@ -160,6 +160,10 @@ impl OperatorReportQuery {
             agent_subject: self.agent_subject.clone(),
             since: self.since,
             until: self.until,
+            // Phase 1.5: operator_report does not scope by tenant today.
+            // When multi-tenant surfaces are introduced the caller
+            // layer must populate this from the authenticated context.
+            tenant: None,
         }
     }
 
@@ -288,6 +292,10 @@ impl BehavioralFeedQuery {
             cursor: None,
             limit: self.receipt_limit_or_default(),
             agent_subject: self.agent_subject.clone(),
+            // Phase 1.5: operator_report does not scope by tenant today.
+            // When multi-tenant surfaces are introduced the caller layer
+            // must populate this from the authenticated context.
+            tenant_filter: None,
         }
     }
 }

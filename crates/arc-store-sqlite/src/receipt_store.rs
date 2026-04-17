@@ -84,6 +84,12 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 pub struct SqliteReceiptStore {
     pub(crate) pool: Pool<SqliteConnectionManager>,
+    /// Phase 1.5 multi-tenant receipt isolation: when true, tenant-
+    /// scoped queries exclude the pre-multitenant NULL-tagged set. When
+    /// false (the default), queries with `tenant_filter = Some(id)`
+    /// return rows where `tenant_id = id OR tenant_id IS NULL`, which
+    /// keeps legacy (pre-1.5) receipts visible during the transition.
+    pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
 }
 
 type FederatedShareSubjectCorpus = (
@@ -118,5 +124,31 @@ impl SqliteReceiptStore {
         self.pool
             .get()
             .map_err(|error| ReceiptStoreError::Pool(error.to_string()))
+    }
+
+    /// Phase 1.5 multi-tenant receipt isolation: toggle strict-isolation
+    /// mode on tenant-scoped queries.
+    ///
+    /// When `strict = true`, a `tenant_filter = Some(id)` query returns
+    /// ONLY rows whose `tenant_id = id`. Legacy pre-1.5 receipts with
+    /// `tenant_id IS NULL` are excluded.
+    ///
+    /// When `strict = false` (the default), the same query also
+    /// includes rows where `tenant_id IS NULL` -- the pre-multitenant
+    /// "public" fallback set -- so legacy receipts remain visible
+    /// during the transition window.
+    ///
+    /// A `tenant_filter = None` admin / compat query always returns
+    /// every row regardless of this setting.
+    pub fn with_strict_tenant_isolation(&self, strict: bool) {
+        self.strict_tenant_isolation
+            .store(strict, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Read the current strict-tenant-isolation setting.
+    #[must_use]
+    pub fn strict_tenant_isolation_enabled(&self) -> bool {
+        self.strict_tenant_isolation
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }

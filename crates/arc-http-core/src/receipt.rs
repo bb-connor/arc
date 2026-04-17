@@ -192,6 +192,7 @@ impl HttpReceipt {
             evidence: self.evidence.clone(),
             metadata: self.metadata.clone(),
             trust_level: arc_core_types::receipt::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: self.kernel_key.clone(),
         }
     }

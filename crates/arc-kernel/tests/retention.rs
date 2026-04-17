@@ -54,6 +54,7 @@ mod retention {
                 evidence: Vec::new(),
                 metadata: None,
                 trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,

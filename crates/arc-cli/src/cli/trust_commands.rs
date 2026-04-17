@@ -2375,6 +2375,11 @@ fn cmd_receipt_list(
             cursor: args.cursor,
             limit: args.limit,
             agent_subject: None,
+            // Phase 1.5: CLI receipt listing does not derive a tenant
+            // claim today; operator-driven listings must flip the
+            // store's strict-tenant-isolation mode to enforce boundaries
+            // (populated by higher-level admin workflows later).
+            tenant_filter: None,
         };
         let result = store.query_receipts(&kernel_query)?;
         for stored in &result.receipts {
