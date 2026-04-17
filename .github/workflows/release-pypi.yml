@@ -185,8 +185,21 @@ jobs:
           SLUG: ${{ steps.meta.outputs.name }}
         run: |
           set -euo pipefail
-          # Extract version after final "v"
-          tag_version="${REF_NAME##*v}"
+          # Extract version with a non-greedy leading strip so
+          # pre-release tags whose suffix contains the letter "v" (e.g.
+          # py/v1.2.3-dev1, py/v1.0.0-preview.1) round-trip correctly.
+          # The previous `${REF_NAME##*v}` stripped up to the LAST `v`
+          # in the string, yielding `1` instead of `1.2.3-dev1` for
+          # `py/v1.2.3-dev1` and breaking legitimate pre-release
+          # publishes. Match release-binaries.yml's `${tag#v}` shape.
+          if [[ "$REF_NAME" =~ ^py/v(.+)$ ]]; then
+            tag_version="${BASH_REMATCH[1]}"
+          elif [[ "$REF_NAME" =~ ^py/.+-v(.+)$ ]]; then
+            tag_version="${BASH_REMATCH[1]}"
+          else
+            echo "Tag $REF_NAME does not match py/v* or py/<slug>-v*" >&2
+            exit 1
+          fi
           if [[ "$tag_version" != "$EXPECTED" ]]; then
             # Only fail if the tag is slug-specific and refers to this package,
             # or if it is the meta tag py/v<ver>. For the meta tag we require
