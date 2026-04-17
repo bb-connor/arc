@@ -21,6 +21,8 @@
 
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
+pub mod approval;
+pub mod approval_channels;
 pub mod authority;
 pub mod budget_store;
 pub mod capability_lineage;
@@ -247,6 +249,14 @@ pub use arc_core::underwriting::{
     UNDERWRITING_POLICY_INPUT_SCHEMA, UNDERWRITING_RISK_TAXONOMY_VERSION,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
+pub use approval::{
+    compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
+    ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore,
+    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
+    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+};
+pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, LocalCapabilityAuthority,

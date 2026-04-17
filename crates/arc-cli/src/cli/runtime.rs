@@ -279,6 +279,7 @@ fn cmd_check(
         let verdict_str = match response.verdict {
             arc_kernel::Verdict::Allow => "ALLOW",
             arc_kernel::Verdict::Deny => "DENY",
+            arc_kernel::Verdict::PendingApproval => "PENDING_APPROVAL",
         };
         println!("verdict:    {verdict_str}");
         println!("tool:       {tool}");
@@ -295,6 +296,12 @@ fn cmd_check(
         arc_kernel::Verdict::Allow => Ok(()),
         arc_kernel::Verdict::Deny => {
             std::process::exit(2);
+        }
+        arc_kernel::Verdict::PendingApproval => {
+            // Treat approval-pending as a soft deny from the CLI
+            // perspective; the orchestrator can resume once the
+            // human has approved out-of-band.
+            std::process::exit(3);
         }
     }
 }

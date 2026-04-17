@@ -1,4 +1,6 @@
+pub mod approval_store;
 pub mod authority;
+pub mod batch_approval_store;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod evidence_export;
@@ -8,7 +10,9 @@ pub mod revocation_store;
 
 pub use arc_kernel::{EvidenceChildReceiptScope, EvidenceExportQuery};
 
+pub use approval_store::SqliteApprovalStore;
 pub use authority::SqliteCapabilityAuthority;
+pub use batch_approval_store::SqliteBatchApprovalStore;
 pub use budget_store::SqliteBudgetStore;
 pub use receipt_store::SqliteReceiptStore;
 pub use revocation_store::SqliteRevocationStore;

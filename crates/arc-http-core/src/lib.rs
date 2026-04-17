@@ -5,6 +5,7 @@
 //! It is the foundation for `arc-openapi`, `arc-config`, `arc api protect`,
 //! and all language-specific middleware crates.
 
+pub mod approvals;
 mod authority;
 pub mod emergency;
 mod evaluation;
@@ -17,6 +18,12 @@ pub mod routes;
 mod session;
 mod verdict;
 
+pub use approvals::{
+    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond,
+    ApprovalAdmin, ApprovalHandlerError, BatchDecisionEntry, BatchRespondRequest,
+    BatchRespondResponse, BatchRespondResult, BatchRespondSummary, GetApprovalResponse,
+    PendingListResponse, PendingQuery, RespondRequest, RespondResponse,
+};
 pub use authority::{
     HttpAuthority, HttpAuthorityError, HttpAuthorityEvaluation, HttpAuthorityInput,
     HttpAuthorityPolicy, PreparedHttpEvaluation,
@@ -37,8 +44,10 @@ pub use receipt::{
 };
 pub use request::ArcHttpRequest;
 pub use routes::{
-    emergency_route_registrations, EmergencyRouteRegistration, EMERGENCY_ADMIN_TOKEN_HEADER,
-    EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH,
+    approval_route_registrations, emergency_route_registrations, EmergencyRouteRegistration,
+    APPROVALS_BATCH_RESPOND_PATH, APPROVALS_GET_PATH, APPROVALS_PENDING_PATH,
+    APPROVALS_RESPOND_PATH, EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH,
+    EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH,
 };
 pub use session::SessionContext;
 pub use verdict::{DenyDetails, Verdict};

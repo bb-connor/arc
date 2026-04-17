@@ -41,6 +41,52 @@ pub const EMERGENCY_STATUS_PATH: &str = "/emergency-status";
 /// `POST /evaluate-plan` -- Phase 2.4 plan-level pre-flight evaluation.
 pub const EVALUATE_PLAN_PATH: &str = "/evaluate-plan";
 
+/// `GET /approvals/pending` -- Phase 3.4-3.6 list of outstanding HITL
+/// approvals, optionally filtered by query parameters.
+pub const APPROVALS_PENDING_PATH: &str = "/approvals/pending";
+
+/// `GET /approvals/{id}` -- fetch one approval (pending or resolved).
+///
+/// The `{id}` placeholder is substituted by the adapter's routing
+/// layer; this constant is the route template string so adapters can
+/// pass it to their router as-is.
+pub const APPROVALS_GET_PATH: &str = "/approvals/{id}";
+
+/// `POST /approvals/{id}/respond` -- submit a decision for a single
+/// pending approval.
+pub const APPROVALS_RESPOND_PATH: &str = "/approvals/{id}/respond";
+
+/// `POST /approvals/batch/respond` -- submit decisions for multiple
+/// pending approvals in one request.
+pub const APPROVALS_BATCH_RESPOND_PATH: &str = "/approvals/batch/respond";
+
+/// Describe every approval route an adapter must expose.
+#[must_use]
+pub const fn approval_route_registrations() -> [EmergencyRouteRegistration; 4] {
+    [
+        EmergencyRouteRegistration {
+            method: HttpMethod::Get,
+            path: APPROVALS_PENDING_PATH,
+            name: "approvals_pending",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Get,
+            path: APPROVALS_GET_PATH,
+            name: "approvals_get",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: APPROVALS_RESPOND_PATH,
+            name: "approvals_respond",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: APPROVALS_BATCH_RESPOND_PATH,
+            name: "approvals_batch_respond",
+        },
+    ]
+}
+
 /// Header that carries the operator admin token on every emergency
 /// call. Adapters must not expose these routes without requiring this
 /// header; see [`crate::emergency::EmergencyAdmin::new`].

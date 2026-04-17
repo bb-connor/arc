@@ -123,6 +123,9 @@ fn concurrent_evaluate_and_emergency_stop_is_race_free() {
                                 "only emergency stop should cause a deny in this test"
                             );
                         }
+                        Verdict::PendingApproval => {
+                            panic!("unexpected pending approval in emergency test");
+                        }
                     },
                     Err(error) => panic!("evaluate_tool_call_blocking errored: {error}"),
                 }

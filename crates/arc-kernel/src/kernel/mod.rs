@@ -297,6 +297,12 @@ pub enum KernelError {
 
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
+
+    /// Phase 3.4: a human-in-the-loop approval token failed to satisfy
+    /// the pending approval contract (bad binding, bad signature,
+    /// expired, or replayed).
+    #[error("approval rejected: {0}")]
+    ApprovalRejected(String),
 }
 
 impl KernelError {
@@ -551,6 +557,11 @@ impl KernelError {
                 "ARC-KERNEL-DPOP-VERIFICATION-FAILED",
                 serde_json::json!({ "reason": reason }),
                 "Attach a valid DPoP proof bound to the current capability, request, server, and tool before retrying.",
+            ),
+            Self::ApprovalRejected(reason) => self.report_with_context(
+                "ARC-KERNEL-APPROVAL-REJECTED",
+                serde_json::json!({ "reason": reason }),
+                "Obtain a fresh approval token bound to this exact request and retry once a human approver has signed it.",
             ),
         }
     }
@@ -4858,6 +4869,17 @@ impl ArcKernel {
                 Ok(Verdict::Deny) => {
                     return Err(KernelError::GuardDenied(format!(
                         "guard \"{}\" denied the request",
+                        guard.name()
+                    )));
+                }
+                Ok(Verdict::PendingApproval) => {
+                    // Phase 3.4: a legacy `Guard` should not return the
+                    // HITL marker. The fully integrated approval flow
+                    // runs via `ApprovalGuard::evaluate` rather than
+                    // the `Guard` trait so this branch is unreachable
+                    // in practice. Fail-closed just in case.
+                    return Err(KernelError::GuardDenied(format!(
+                        "guard \"{}\" requested approval via legacy path",
                         guard.name()
                     )));
                 }

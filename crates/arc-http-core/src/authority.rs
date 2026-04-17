@@ -293,6 +293,16 @@ impl HttpAuthority {
                     .unwrap_or_else(|| "kernel denied an allowed HTTP projection".to_string());
                 return Err(HttpAuthorityError::Kernel(reason));
             }
+            (KernelVerdict::PendingApproval, _) => {
+                // Phase 3.4: HTTP projection of a tool call that ended
+                // in PendingApproval is not representable in this code
+                // path yet. Surface a dedicated kernel error so callers
+                // can pivot to the `/approvals/*` endpoints.
+                return Err(HttpAuthorityError::Kernel(
+                    "kernel returned PendingApproval; resume via /approvals/{id}/respond"
+                        .to_string(),
+                ));
+            }
         }
 
         let evidence = projected_evidence(input.policy, &presented_capability);

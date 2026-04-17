@@ -15,12 +15,24 @@ use crate::{AgentId, KernelError, ServerId};
 /// This is the kernel's own verdict type, distinct from `arc_core::Decision`.
 /// The kernel uses this internally; it maps to `arc_core::Decision` when
 /// building receipts.
+///
+/// Phase 3.4 introduced the `PendingApproval` variant. The variant is a
+/// marker: the payload (`ApprovalRequest`) is returned separately via
+/// [`crate::approval::HitlVerdict`] so existing call sites that pattern-
+/// match on `Verdict` and rely on its `Copy` semantics keep compiling
+/// without change. The public contract therefore remains: `Allow`,
+/// `Deny`, and `PendingApproval` are the three possible outcomes of
+/// guard evaluation, and callers receive the full approval request via
+/// the richer HITL API surface when they need it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
     /// The action is allowed.
     Allow,
     /// The action is denied.
     Deny,
+    /// The action is suspended pending a human decision. Look up the
+    /// associated `ApprovalRequest` via the HITL API.
+    PendingApproval,
 }
 
 /// A tool call request as seen by the kernel.

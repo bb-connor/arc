@@ -278,6 +278,14 @@ impl CapabilityChecker for KernelCapabilityChecker {
                     .reason
                     .unwrap_or_else(|| "kernel denied ACP operation".to_string()),
             }),
+            KernelVerdict::PendingApproval => Ok(AcpVerdict {
+                allowed: false,
+                capability_id,
+                receipt_id,
+                reason: response
+                    .reason
+                    .unwrap_or_else(|| "ACP operation requires approval".to_string()),
+            }),
         }
     }
 }

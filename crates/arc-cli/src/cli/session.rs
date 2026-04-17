@@ -32,6 +32,10 @@ fn handle_agent_message(
             match response.verdict {
                 arc_kernel::Verdict::Allow => stats.allowed += 1,
                 arc_kernel::Verdict::Deny => stats.denied += 1,
+                // Phase 3.4: pending approval is a non-terminal
+                // outcome; from the CLI's accounting perspective we
+                // fold it into denied until the human responds.
+                arc_kernel::Verdict::PendingApproval => stats.denied += 1,
             }
 
             tool_response_messages(context.request_id.to_string(), response)
@@ -183,6 +187,17 @@ fn tool_response_messages(
         },
         (arc_kernel::Verdict::Allow, _, None) => ToolCallResult::Ok {
             value: serde_json::Value::Null,
+        },
+        // Phase 3.4: map PendingApproval to a policy-denied result so
+        // the existing session driver surfaces it to the caller; the
+        // HTTP `/approvals` surface is the mechanism for resume.
+        (arc_kernel::Verdict::PendingApproval, _, _) => ToolCallResult::Err {
+            error: ToolCallError::PolicyDenied {
+                guard: "approval".to_string(),
+                reason: response
+                    .reason
+                    .unwrap_or_else(|| "tool call requires approval".to_string()),
+            },
         },
     };
 
@@ -923,7 +938,6 @@ capabilities:
             server_id: "srv-b".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/app/src/main.rs"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -984,7 +998,6 @@ capabilities:
             server_id: "srv-a".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/app/src/main.rs"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1036,7 +1049,6 @@ capabilities:
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
-            model_metadata: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1045,7 +1057,6 @@ capabilities:
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1126,7 +1137,6 @@ guards:
             server_id: "*".to_string(),
             tool: "read_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
-            model_metadata: None,
         };
 
         let denied = AgentMessage::ToolCallRequest {
@@ -1135,7 +1145,6 @@ guards:
             server_id: "*".to_string(),
             tool: "write_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md", "content": "nope"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1199,7 +1208,6 @@ capabilities:
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1256,7 +1264,6 @@ capabilities:
             server_id: "*".to_string(),
             tool: "stream_file".to_string(),
             params: serde_json::json!({"path": "/workspace/README.md"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
@@ -1311,7 +1318,6 @@ capabilities:
             server_id: "*".to_string(),
             tool: "bash".to_string(),
             params: serde_json::json!({"command": "rm -rf /"}),
-            model_metadata: None,
         };
 
         let mut stats = SessionStats::default();
