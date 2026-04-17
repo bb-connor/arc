@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**49 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**52 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -48,14 +48,14 @@ roadmap phase.
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
-| 10 (Orchestration) | 10.1, 10.2 | -- | 10.3 |
+| 10 (Orchestration) | 10.1, 10.2, 10.3 | -- | -- |
 | 11 (Content / streaming / IaC) | 11.2, 11.3 | -- | 11.1 |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
-| 17 (Workflow orchestrators) | 17.1, 17.2, 17.5, 17.6 | -- | 17.3, 17.4 |
+| 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
 | 18 (Memory) | -- | -- | 18.1, 18.2 |
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
@@ -825,7 +825,7 @@ aggregates step receipts on completion.
 tool calls via the extension's localhost:9090. Receipts flushed to
 DynamoDB on SHUTDOWN lifecycle event.
 
-### 10.3 arc-langgraph (depends on Phases 0 and 3)
+### 10.3 arc-langgraph (depends on Phases 0 and 3) [SHIPPED 7c2df6b]
 
 **What**: `arc_node` wrapper, node-level scoping, delegation, approval nodes.
 Requires HITL (Phase 3) because `arc_approval_node` maps LangGraph
@@ -1225,7 +1225,7 @@ Denied tasks raise `PermissionError`. Receipts emitted as Prefect events.
 **Acceptance**: A Dagster asset materialization governed by ARC. Partition
 key included in capability evaluation context.
 
-### 17.3 arc-airflow
+### 17.3 arc-airflow [SHIPPED e25d73f]
 
 **What**: `ArcOperator` wrapper, TaskFlow `@arc_task` decorator, DAG listener.
 
@@ -1235,7 +1235,7 @@ key included in capability evaluation context.
 **Acceptance**: An Airflow DAG with `ArcOperator`-wrapped tasks. Denied
 tasks fail with `PermissionError`. Receipt IDs pushed to XCom.
 
-### 17.4 arc-ray
+### 17.4 arc-ray [SHIPPED 1e290d2]
 
 **What**: `@arc_remote` decorator, `ArcActor` base class with standing grants.
 
