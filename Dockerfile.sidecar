@@ -22,7 +22,12 @@ ARG ALPINE_VERSION=3.22
 # Stage 1: build the binary
 ############################
 FROM rust:${RUST_VERSION}-alpine${ALPINE_VERSION} AS builder
-RUN apk add --no-cache build-base cmake perl pkgconf musl-dev
+# `protoc` is required because arc-envoy-ext-authz (transitively reachable
+# through the workspace) invokes tonic-build at compile time. CI installs
+# `protobuf-compiler` for the same reason; keep this image consistent so
+# any future dep change that pulls arc-envoy-ext-authz into arc-cli's
+# transitive graph does not silently break the Docker build.
+RUN apk add --no-cache build-base cmake perl pkgconf musl-dev protoc
 WORKDIR /workspace
 
 # Copy the full workspace so path dependencies resolve.
