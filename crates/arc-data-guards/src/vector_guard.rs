@@ -487,8 +487,19 @@ impl arc_kernel::Guard for VectorDbGuard {
             _ => tool.clone(),
         };
 
-        if !self.config.allow_all && !self.config.looks_like_vector(&database, tool) {
-            // Not vector-flavored; let other guards handle it.
+        // Non-vector traffic always short-circuits to Allow regardless of
+        // `allow_all`. The old `!allow_all && !looks_like_vector` gate
+        // inverted the bypass intent: enabling `allow_all` forced every
+        // tool call (including non-vector ones) through `extract_call`,
+        // which then denied any call lacking vector-specific fields.
+        // Split the condition so `allow_all` only governs whether vector
+        // policy is enforced on vector-shaped requests.
+        if !self.config.looks_like_vector(&database, tool) {
+            return Ok(Verdict::Allow);
+        }
+        if self.config.allow_all {
+            // Vector-shaped request in dry-run/debug mode: skip policy
+            // enforcement but remain aware this is a vector call.
             return Ok(Verdict::Allow);
         }
 
