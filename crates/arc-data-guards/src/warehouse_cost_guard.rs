@@ -458,7 +458,7 @@ fn coerce_decimal_string(v: &Value) -> Option<String> {
         if n.is_sign_negative() || !n.is_finite() {
             return None;
         }
-        return Some(format_decimal(n));
+        return Some(format_decimal_full_precision(n));
     }
     None
 }
@@ -487,6 +487,26 @@ fn format_decimal(n: f64) -> String {
     // Two decimal places is the narrowest "monetary" representation
     // likely to round-trip cleanly; trailing zeros are preserved.
     format!("{n:.2}")
+}
+
+/// Render a non-negative `f64` as a decimal string without rounding
+/// away sub-cent precision. `format!("{n:.2}")` would coerce
+/// `0.0049` to `"0.00"` before policy comparison, understating tight
+/// limits on small queries. We instead use Rust's default `Display`
+/// for `f64` which emits the shortest round-trippable representation
+/// (so `0.0049` stays `0.0049`), then normalize integer-ish values
+/// (`100.0`) to `"100"` so `valid_non_negative_decimal` accepts them
+/// and comparisons against operator-supplied limits do not depend on
+/// trailing `.0`.
+fn format_decimal_full_precision(n: f64) -> String {
+    // Rust's `Display` for f64 already emits the shortest
+    // round-trippable decimal. Trim a trailing ".0" when the value is
+    // an integer so limit strings like "100" still compare equal.
+    let s = format!("{n}");
+    if let Some(stripped) = s.strip_suffix(".0") {
+        return stripped.to_string();
+    }
+    s
 }
 
 /// Compare two non-negative decimal strings without allocating a big-
