@@ -73,6 +73,13 @@ pub mod input_injection;
 pub mod remote_desktop;
 pub mod spider_sense;
 
+// Phase 8.1–8.2, 11.1, 18.1: code execution, browser automation,
+// content review, and memory governance guards.
+pub mod browser_automation;
+pub mod code_execution;
+pub mod content_review;
+pub mod memory_governance;
+
 pub use advisory::{
     AdvisoryGuard, AdvisoryPipeline, AdvisorySeverity, AdvisorySignal, AnomalyAdvisoryGuard,
     DataTransferAdvisoryGuard, GuardOutput, PromotionPolicy, PromotionRule,
@@ -148,4 +155,20 @@ pub use spider_sense::{
     cosine_similarity as spider_sense_cosine_similarity, extract_embedding, AmbiguousPolicy,
     PatternDb, PatternEntry, SpiderSenseConfig, SpiderSenseError, SpiderSenseGuard,
     DEFAULT_AMBIGUITY_BAND, DEFAULT_SIMILARITY_THRESHOLD, DEFAULT_TOP_K,
+};
+
+// Phase 8.1–8.2, 11.1, 18.1 re-exports.
+pub use browser_automation::{
+    default_allowed_verbs as browser_automation_default_allowed_verbs, BrowserAutomationConfig,
+    BrowserAutomationError, BrowserAutomationGuard,
+};
+pub use code_execution::{
+    default_dangerous_modules as code_execution_default_dangerous_modules, CodeExecutionConfig,
+    CodeExecutionError, CodeExecutionGuard,
+};
+pub use content_review::{
+    ContentReviewConfig, ContentReviewError, ContentReviewGuard, ContentReviewRules,
+};
+pub use memory_governance::{
+    MemoryGovernanceConfig, MemoryGovernanceError, MemoryGovernanceGuard,
 };
