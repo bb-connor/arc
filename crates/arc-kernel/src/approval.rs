@@ -760,9 +760,26 @@ pub fn resume_with_decision(
     };
     let token_decision = approval_token.verify_against(&pending, now)?;
 
+    // Validate that the HTTP envelope's outcome matches the signed-token
+    // decision BEFORE touching the store. Otherwise a mismatched pair
+    // (token says Denied, body says Approved) would already have flipped
+    // the pending request to `resolved=true` and bumped any approval
+    // counters before we bail out, corrupting approval-threshold state
+    // and replay-protection bookkeeping while still returning an error.
+    let outcome = match (token_decision, &decision.outcome) {
+        (GovernedApprovalDecision::Approved, ApprovalOutcome::Approved) => ApprovalOutcome::Approved,
+        (GovernedApprovalDecision::Denied, ApprovalOutcome::Denied) => ApprovalOutcome::Denied,
+        _ => {
+            return Err(KernelError::ApprovalRejected(
+                "HTTP outcome disagrees with signed token decision".into(),
+            ));
+        }
+    };
+
     // Record consumption inside the same store call so it survives a
     // restart: `resolve` is expected to atomically mark the request
-    // resolved AND record the consumed token id.
+    // resolved AND record the consumed token id. We only reach this
+    // point once the envelope/token consistency check has passed.
     store.resolve(&decision.approval_id, decision).map_err(|e| {
         match e {
             ApprovalStoreError::AlreadyResolved(m) => {
@@ -775,17 +792,6 @@ pub fn resume_with_decision(
         }
     })?;
 
-    // Map the signed decision onto the lightweight outcome enum.
-    let outcome = match (token_decision, &decision.outcome) {
-        (GovernedApprovalDecision::Approved, ApprovalOutcome::Approved) => ApprovalOutcome::Approved,
-        (GovernedApprovalDecision::Denied, ApprovalOutcome::Denied) => ApprovalOutcome::Denied,
-        // Mismatched envelope and token -- reject.
-        _ => {
-            return Err(KernelError::ApprovalRejected(
-                "HTTP outcome disagrees with signed token decision".into(),
-            ));
-        }
-    };
     Ok(outcome)
 }
 
