@@ -1200,19 +1200,25 @@ name = "arc-guards"
 version = "0.1.0"
 dependencies = [
  "arc-core",
+ "arc-core-types",
  "arc-http-session",
  "arc-kernel",
  "async-trait",
+ "base64 0.22.1",
  "glob",
  "lru",
  "rand 0.8.5",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "url",
+ "wiremock",
+ "zeroize",
 ]
 
 [[package]]

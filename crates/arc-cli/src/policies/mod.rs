@@ -109,13 +109,22 @@ impl Drop for PresetDir {
 }
 
 fn tempdir_in_ci_friendly() -> Result<PresetDir, CliError> {
+    // Use a 128-bit random suffix so two rapid invocations from the same
+    // process can never collide, even on coarse-clock CI runners where
+    // SystemTime has millisecond resolution. A PID+timestamp-only nonce
+    // could otherwise reuse an existing directory under concurrent calls
+    // and silently clobber each other's preset files.
+    use rand_core::{OsRng, RngCore};
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nonce = SystemTime::now()
+    let mut rng_bytes = [0u8; 16];
+    OsRng.fill_bytes(&mut rng_bytes);
+    let suffix = hex::encode(rng_bytes);
+    let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let pid = std::process::id();
-    let path = std::env::temp_dir().join(format!("arc-preset-{pid}-{nonce}"));
+    let path = std::env::temp_dir().join(format!("arc-preset-{pid}-{stamp}-{suffix}"));
     fs::create_dir_all(&path)
         .map_err(|e| CliError::Other(format!("failed to create preset temp dir: {e}")))?;
     Ok(PresetDir { path })
