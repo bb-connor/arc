@@ -168,6 +168,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Match the build job: when dispatched with a tag input, check
+          # that tag out so the Homebrew formula template + release notes
+          # come from the same commit the binaries were built from.
+          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Resolve release version
         id: version
