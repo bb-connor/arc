@@ -38,7 +38,10 @@ jobs:
             bin_suffix: ""
             cross: true
           - target: x86_64-apple-darwin
-            runner: macos-15-intel
+            # macos-13 is the only GitHub-hosted Intel Mac runner label.
+            # macos-14/15 are Apple Silicon only; `macos-15-intel` is not a
+            # real label and would queue indefinitely.
+            runner: macos-13
             archive: tar.gz
             bin_suffix: ""
             cross: false
