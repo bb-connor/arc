@@ -34,14 +34,17 @@ WORKDIR /workspace
 # in sync with anything the Rust build reaches at compile time:
 #   - `wit/` is consumed by arc-wasm-guards via `wasmtime::component::bindgen!`
 #     (arc-cli -> arc-wasm-guards path dep).
-#   - `proto/` is consumed by arc-envoy-ext-authz's build.rs via tonic-build
-#     once any future dep change pulls that crate into arc-cli's graph.
 #   - `examples/`, `formal/`, `tests/` are declared as workspace members, so
 #     their absence breaks the workspace Cargo.lock resolution.
+#
+# Note on protobuf: the vendored Envoy protos consumed by
+# arc-envoy-ext-authz's tonic-build live under
+# `crates/arc-envoy-ext-authz/proto` (not a top-level `proto/`), so the
+# `COPY crates ./crates` line below covers them transparently -- no
+# separate top-level `COPY proto` needed.
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY wit ./wit
-COPY proto ./proto
 COPY examples ./examples
 COPY formal ./formal
 COPY tests ./tests
