@@ -32,14 +32,14 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**63 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**64 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
 | Phase group | Shipped | In flight | Pending |
 |---|---|---|---|
 | 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
-| 1 (Structural security) | 1.1, 1.2, 1.3, 1.4 | -- | 1.5 |
+| 1 (Structural security) | 1.1, 1.2, 1.3, 1.4, 1.5 | -- | -- |
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
 | 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
@@ -215,7 +215,7 @@ Exposed via authenticated HTTP API.
 **Acceptance**: After `POST /emergency-stop`, all evaluate() calls return
 Deny. After `POST /emergency-resume`, normal operation resumes.
 
-### 1.5 Multi-Tenant Receipt Isolation
+### 1.5 Multi-Tenant Receipt Isolation [SHIPPED 2ccf02f]
 
 **What**: Add `tenant_id` to receipts. Enforce query isolation at the
 store level. Tenant derived from auth context, not caller choice.
