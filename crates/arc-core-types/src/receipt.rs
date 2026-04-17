@@ -3,6 +3,10 @@
 //! Every tool invocation -- whether allowed or denied -- produces a receipt.
 //! Receipts are the immutable audit trail of the ARC protocol.
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::{

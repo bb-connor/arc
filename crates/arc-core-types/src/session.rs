@@ -4,8 +4,12 @@
 //! JSON-RPC, stdio frames, or another protocol into `SessionOperation`, and the
 //! kernel can evaluate those operations without knowing how they arrived.
 
-use std::collections::BTreeMap;
-use std::fmt;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use core::fmt;
 
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
@@ -314,7 +318,7 @@ pub struct ArcIdentityAssertion {
 }
 
 impl ArcIdentityAssertion {
-    pub fn validate(&self) -> std::result::Result<(), String> {
+    pub fn validate(&self) -> core::result::Result<(), String> {
         if self.verifier_id.trim().is_empty() {
             return Err("identityAssertion.verifierId must not be empty".to_string());
         }
@@ -356,7 +360,7 @@ impl ArcIdentityAssertion {
         Ok(())
     }
 
-    pub fn validate_at(&self, now: u64) -> std::result::Result<(), String> {
+    pub fn validate_at(&self, now: u64) -> core::result::Result<(), String> {
         self.validate()?;
         if now > self.expires_at {
             return Err("identityAssertion is stale".to_string());
@@ -1059,7 +1063,7 @@ impl ResourceUriClassification {
     }
 }
 
-fn normalize_local_file_uri_path(parsed: &Url) -> std::result::Result<String, &'static str> {
+fn normalize_local_file_uri_path(parsed: &Url) -> core::result::Result<String, &'static str> {
     match parsed.host_str() {
         None => {}
         Some(host) if host.eq_ignore_ascii_case("localhost") => {}

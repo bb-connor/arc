@@ -2,6 +2,19 @@
 //!
 //! This crate holds the protocol-wide types that should remain stable while
 //! heavier domain crates split away from the compatibility facade.
+//!
+//! # no_std support
+//!
+//! The crate is `no_std + alloc` by source: under `--no-default-features`
+//! every module compiles against `core` and `alloc` only. This is the
+//! foundation that lets `arc-kernel-core` cross-compile to
+//! `wasm32-unknown-unknown` and other embedded targets. The default `std`
+//! feature re-enables `std`-backed error impls via `thiserror`, along with
+//! the `std` feature on every transitive dependency.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 pub mod canonical;
 pub mod capability;
@@ -77,10 +90,10 @@ pub use session::{
 
 /// Opaque agent identifier. In practice this is a hex-encoded Ed25519 public key
 /// or a SPIFFE URI, but the core treats it as an opaque string.
-pub type AgentId = String;
+pub type AgentId = alloc::string::String;
 
 /// Opaque tool server identifier.
-pub type ServerId = String;
+pub type ServerId = alloc::string::String;
 
 /// UUIDv7 capability identifier (time-ordered).
-pub type CapabilityId = String;
+pub type CapabilityId = alloc::string::String;

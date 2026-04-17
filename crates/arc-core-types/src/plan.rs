@@ -19,6 +19,9 @@
 //! `PlanEvaluationResponse` regardless of the aggregate verdict:
 //! denials are conveyed in the JSON, not as HTTP status codes.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::{CapabilityToken, ModelMetadata};

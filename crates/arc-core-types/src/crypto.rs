@@ -35,6 +35,10 @@
 //!   their own key material.
 //! - No `unsafe` code is introduced by this module.
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
 use ed25519_dalek::{
     Signature as DalekSignature, Signer as DalekSigner, SigningKey, Verifier, VerifyingKey,
 };
@@ -246,7 +250,7 @@ impl PartialEq for PublicKey {
 impl Eq for PublicKey {}
 
 impl Serialize for PublicKey {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -255,7 +259,7 @@ impl Serialize for PublicKey {
 }
 
 impl<'de> Deserialize<'de> for PublicKey {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -470,7 +474,7 @@ impl PartialEq for Signature {
 impl Eq for Signature {}
 
 impl Serialize for Signature {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -479,7 +483,7 @@ impl Serialize for Signature {
 }
 
 impl<'de> Deserialize<'de> for Signature {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {

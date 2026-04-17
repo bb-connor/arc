@@ -27,9 +27,17 @@ name = "arc_kernel_core"
 # will cross-compile to wasm32 with no changes beyond adding the `getrandom`
 # js feature to arc-core-types. See docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md.
 [dependencies]
-arc-core-types = { package = "arc-core-types", path = "../arc-core-types" }
-serde = { workspace = true }
-serde_json = { workspace = true }
+# Depend on `arc-core-types` with `default-features = false` and forward the
+# `std` feature through our own feature flag so downstream consumers can
+# select between the hosted `std` build and the portable `no_std + alloc`
+# build that targets wasm32-unknown-unknown.
+arc-core-types = { package = "arc-core-types", path = "../arc-core-types", default-features = false }
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+
+[features]
+default = ["std"]
+std = ["arc-core-types/std", "serde/std", "serde_json/std"]
 
 [lints.clippy]
 unwrap_used = "deny"

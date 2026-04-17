@@ -71,6 +71,18 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install protoc
+        # arc-envoy-ext-authz's build.rs invokes tonic-build at compile
+        # time. ci.yml installs protoc on every lane; the release build
+        # needs the same tool or every native (non-cross) job will fail
+        # on Linux / macOS / Windows. `cross` images already bundle
+        # protoc, so the step only runs on native rows.
+        if: matrix.cross == false
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "29.x"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Cache cargo registry and build
         uses: Swatinem/rust-cache@v2
         with:

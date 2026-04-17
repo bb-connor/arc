@@ -11,9 +11,14 @@
 //! - Strings: minimal escaping (only required characters)
 //! - No whitespace between tokens
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use core::cmp::Ordering;
+
 use serde::Serialize;
 use serde_json::Value;
-use std::cmp::Ordering;
 
 use crate::error::{Error, Result};
 
@@ -227,7 +232,7 @@ fn render_decimal(digits: &str, sci_exp: i32) -> String {
         // All digits are before the decimal point; pad with trailing zeros.
         let mut out = String::with_capacity(digits.len() + shift as usize);
         out.push_str(digits);
-        out.extend(std::iter::repeat_n('0', shift as usize));
+        out.extend(core::iter::repeat_n('0', shift as usize));
         return out;
     }
 
@@ -243,7 +248,7 @@ fn render_decimal(digits: &str, sci_exp: i32) -> String {
         let zeros = (-pos) as usize;
         let mut out = String::with_capacity(2 + zeros + digits.len());
         out.push_str("0.");
-        out.extend(std::iter::repeat_n('0', zeros));
+        out.extend(core::iter::repeat_n('0', zeros));
         out.push_str(digits);
         trim_decimal(out)
     }

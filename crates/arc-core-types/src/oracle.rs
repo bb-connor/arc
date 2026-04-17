@@ -1,3 +1,5 @@
+use alloc::string::String;
+
 use serde::{Deserialize, Serialize};
 
 pub const ARC_ORACLE_CONVERSION_EVIDENCE_SCHEMA: &str = "arc.oracle-conversion-evidence.v1";

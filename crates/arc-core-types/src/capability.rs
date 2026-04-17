@@ -4,7 +4,10 @@
 //! ambient authority. The Kernel validates the token on every request and denies
 //! access if any check fails.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -300,34 +303,44 @@ pub struct WorkloadIdentity {
     pub path: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkloadIdentityError {
-    #[error("runtime_identity must not be empty when provided")]
+    #[cfg_attr(feature = "std", error("runtime_identity must not be empty when provided"))]
     EmptyRuntimeIdentity,
 
-    #[error("workload identity URI must not be empty")]
+    #[cfg_attr(feature = "std", error("workload identity URI must not be empty"))]
     EmptyUri,
 
-    #[error("unsupported workload identity scheme '{0}'")]
+    #[cfg_attr(feature = "std", error("unsupported workload identity scheme '{0}'"))]
     UnsupportedScheme(String),
 
-    #[error("workload identity URI is malformed: {0}")]
+    #[cfg_attr(feature = "std", error("workload identity URI is malformed: {0}"))]
     MalformedUri(String),
 
-    #[error("SPIFFE workload identity must include a trust domain")]
+    #[cfg_attr(feature = "std", error("SPIFFE workload identity must include a trust domain"))]
     MissingTrustDomain,
 
-    #[error("SPIFFE workload identity must not include userinfo or a port")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must not include userinfo or a port")
+    )]
     InvalidAuthority,
 
-    #[error("SPIFFE workload identity must not include query or fragment")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must not include query or fragment")
+    )]
     InvalidSuffix,
 
-    #[error("SPIFFE workload identity path '{0}' is invalid")]
+    #[cfg_attr(feature = "std", error("SPIFFE workload identity path '{0}' is invalid"))]
     InvalidPath(String),
 
-    #[error(
-        "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+        )
     )]
     Conflict {
         field: &'static str,
@@ -335,21 +348,67 @@ pub enum WorkloadIdentityError {
         actual: String,
     },
 
-    #[error(
-        "runtime_identity '{0}' is opaque and cannot be reconciled with explicit workload_identity"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime_identity '{0}' is opaque and cannot be reconciled with explicit workload_identity"
+        )
     )]
     OpaqueRuntimeIdentityConflict(String),
 }
 
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for WorkloadIdentityError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::EmptyRuntimeIdentity => {
+                write!(f, "runtime_identity must not be empty when provided")
+            }
+            Self::EmptyUri => write!(f, "workload identity URI must not be empty"),
+            Self::UnsupportedScheme(v) => {
+                write!(f, "unsupported workload identity scheme '{v}'")
+            }
+            Self::MalformedUri(v) => write!(f, "workload identity URI is malformed: {v}"),
+            Self::MissingTrustDomain => {
+                write!(f, "SPIFFE workload identity must include a trust domain")
+            }
+            Self::InvalidAuthority => write!(
+                f,
+                "SPIFFE workload identity must not include userinfo or a port"
+            ),
+            Self::InvalidSuffix => write!(
+                f,
+                "SPIFFE workload identity must not include query or fragment"
+            ),
+            Self::InvalidPath(v) => write!(f, "SPIFFE workload identity path '{v}' is invalid"),
+            Self::Conflict {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+            ),
+            Self::OpaqueRuntimeIdentityConflict(v) => write!(
+                f,
+                "runtime_identity '{v}' is opaque and cannot be reconciled with explicit workload_identity"
+            ),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for WorkloadIdentityError {}
+
 impl WorkloadIdentity {
-    pub fn parse_spiffe_uri(uri: &str) -> std::result::Result<Self, WorkloadIdentityError> {
+    pub fn parse_spiffe_uri(uri: &str) -> core::result::Result<Self, WorkloadIdentityError> {
         Self::parse_spiffe_uri_with_kind(uri, WorkloadCredentialKind::Uri)
     }
 
     pub fn parse_spiffe_uri_with_kind(
         uri: &str,
         credential_kind: WorkloadCredentialKind,
-    ) -> std::result::Result<Self, WorkloadIdentityError> {
+    ) -> core::result::Result<Self, WorkloadIdentityError> {
         let trimmed = uri.trim();
         if trimmed.is_empty() {
             return Err(WorkloadIdentityError::EmptyUri);
@@ -386,7 +445,7 @@ impl WorkloadIdentity {
         })
     }
 
-    pub fn validate(&self) -> std::result::Result<(), WorkloadIdentityError> {
+    pub fn validate(&self) -> core::result::Result<(), WorkloadIdentityError> {
         let parsed = match self.scheme {
             WorkloadIdentityScheme::Spiffe => {
                 Self::parse_spiffe_uri_with_kind(&self.uri, self.credential_kind)?
@@ -446,7 +505,7 @@ impl RuntimeAttestationEvidence {
 
     pub fn normalized_workload_identity(
         &self,
-    ) -> std::result::Result<Option<WorkloadIdentity>, WorkloadIdentityError> {
+    ) -> core::result::Result<Option<WorkloadIdentity>, WorkloadIdentityError> {
         let explicit = self
             .workload_identity
             .as_ref()
@@ -506,7 +565,7 @@ impl RuntimeAttestationEvidence {
 
     pub fn validate_workload_identity_binding(
         &self,
-    ) -> std::result::Result<(), WorkloadIdentityError> {
+    ) -> core::result::Result<(), WorkloadIdentityError> {
         self.normalized_workload_identity().map(|_| ())
     }
 
@@ -514,7 +573,7 @@ impl RuntimeAttestationEvidence {
         &self,
         policy: Option<&AttestationTrustPolicy>,
         now: u64,
-    ) -> std::result::Result<ResolvedRuntimeAssurance, AttestationTrustError> {
+    ) -> core::result::Result<ResolvedRuntimeAssurance, AttestationTrustError> {
         self.validate_workload_identity_binding()
             .map_err(|error| AttestationTrustError::InvalidWorkloadIdentity(error.to_string()))?;
         if !self.is_valid_at(now) {
@@ -667,13 +726,20 @@ pub struct ResolvedRuntimeAssurance {
     pub matched_rule: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttestationTrustError {
-    #[error("runtime attestation workload identity is invalid: {0}")]
+    #[cfg_attr(
+        feature = "std",
+        error("runtime attestation workload identity is invalid: {0}")
+    )]
     InvalidWorkloadIdentity(String),
 
-    #[error(
-        "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+        )
     )]
     StaleEvidence {
         now: u64,
@@ -681,8 +747,11 @@ pub enum AttestationTrustError {
         expires_at: u64,
     },
 
-    #[error(
-        "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+        )
     )]
     EvidenceTooOld {
         rule: String,
@@ -690,22 +759,37 @@ pub enum AttestationTrustError {
         actual_age_seconds: u64,
     },
 
-    #[error("attestation trust rule `{rule}` requires an attestationType claim")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` requires an attestationType claim")
+    )]
     MissingAttestationType { rule: String },
 
-    #[error("attestation trust rule `{rule}` rejected attestation type `{actual}`")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` rejected attestation type `{actual}`")
+    )]
     DisallowedAttestationType { rule: String, actual: String },
 
-    #[error(
-        "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+        )
     )]
     UnsupportedEvidence { schema: String },
 
-    #[error("attestation trust rule `{rule}` requires normalized assertion `{assertion}`")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` requires normalized assertion `{assertion}`")
+    )]
     MissingAssertion { rule: String, assertion: String },
 
-    #[error(
-        "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+        )
     )]
     AssertionMismatch {
         rule: String,
@@ -714,11 +798,73 @@ pub enum AttestationTrustError {
         actual: String,
     },
 
-    #[error(
-        "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+        )
     )]
     UntrustedEvidence { verifier: String, schema: String },
 }
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for AttestationTrustError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidWorkloadIdentity(v) => {
+                write!(f, "runtime attestation workload identity is invalid: {v}")
+            }
+            Self::StaleEvidence {
+                now,
+                issued_at,
+                expires_at,
+            } => write!(
+                f,
+                "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+            ),
+            Self::EvidenceTooOld {
+                rule,
+                max_age_seconds,
+                actual_age_seconds,
+            } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+            ),
+            Self::MissingAttestationType { rule } => write!(
+                f,
+                "attestation trust rule `{rule}` requires an attestationType claim"
+            ),
+            Self::DisallowedAttestationType { rule, actual } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected attestation type `{actual}`"
+            ),
+            Self::UnsupportedEvidence { schema } => write!(
+                f,
+                "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+            ),
+            Self::MissingAssertion { rule, assertion } => write!(
+                f,
+                "attestation trust rule `{rule}` requires normalized assertion `{assertion}`"
+            ),
+            Self::AssertionMismatch {
+                rule,
+                assertion,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+            ),
+            Self::UntrustedEvidence { verifier, schema } => write!(
+                f,
+                "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+            ),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for AttestationTrustError {}
 
 fn normalized_assertion_string(value: &serde_json::Value) -> Option<String> {
     match value {
@@ -1343,7 +1489,7 @@ impl From<GovernedCallChainContext> for GovernedCallChainProvenance {
     }
 }
 
-impl std::ops::Deref for GovernedCallChainProvenance {
+impl core::ops::Deref for GovernedCallChainProvenance {
     type Target = GovernedCallChainContext;
 
     fn deref(&self) -> &Self::Target {

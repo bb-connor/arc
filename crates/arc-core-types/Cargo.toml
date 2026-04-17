@@ -11,25 +11,62 @@ repository.workspace = true
 name = "arc_core_types"
 
 [dependencies]
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-ed25519-dalek = { workspace = true }
-rand_core = { workspace = true }
-hex = { workspace = true }
-ryu = { workspace = true }
-sha2 = { workspace = true }
-percent-encoding = "2"
-url = { workspace = true }
+# Pure-alloc dependencies are always enabled with `default-features = false`
+# so that downstream `no_std + alloc` consumers (e.g. arc-kernel-core on
+# wasm32-unknown-unknown) can link this crate. The `std` feature below
+# re-enables each dep's `std` feature for callers building for a hosted
+# environment.
+#
+# These are declared directly (not via `workspace = true`) because the
+# workspace-level dep entries do not pin `default-features`, which would
+# cause `default-features = false` here to be ignored.
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1", default-features = false, features = ["alloc"] }
+ed25519-dalek = { version = "2", default-features = false, features = ["rand_core", "zeroize", "alloc"] }
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+hex = { version = "0.4", default-features = false, features = ["alloc"] }
+ryu = { version = "1", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+percent-encoding = { version = "2", default-features = false, features = ["alloc"] }
+url = { version = "2", default-features = false }
+# thiserror 1.x always generates `impl std::error::Error`, so it is only
+# available on the `std` feature path. Under `no_std`, we provide manual
+# `core::fmt::Display` + `core::error::Error` impls for every error type.
+thiserror = { workspace = true, optional = true }
 # FIPS-capable ECDSA (P-256 / P-384) signing via aws-lc-rs. Gated behind the
 # `fips` feature so non-FIPS builds keep their historical dependency set.
 aws-lc-rs = { version = "1.16", default-features = false, features = ["aws-lc-sys"], optional = true }
 
+# Ensure `getrandom` has the `js` feature enabled whenever the crate is built
+# for a wasm32 target. `rand_core/getrandom` pulls in `getrandom` transitively;
+# on `wasm32-unknown-unknown` that dependency requires the `js` feature to
+# compile (it has no default source of randomness). Declaring `getrandom`
+# directly here with `features = ["js"]` folds into Cargo's feature unification
+# so both the hosted and browser/edge WASM targets link successfully.
+[target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
+version = "0.2"
+features = ["js"]
+
 [features]
-default = []
+default = ["std"]
+# Enables the `std` library and the `thiserror` derive. Turning this feature
+# off produces a `no_std + alloc` build suitable for wasm32-unknown-unknown
+# and other portable targets.
+std = [
+    "serde/std",
+    "serde_json/std",
+    "ed25519-dalek/std",
+    "rand_core/std",
+    "sha2/std",
+    "hex/std",
+    "percent-encoding/std",
+    "url/std",
+    "dep:thiserror",
+]
 # Enables the P-256 and P-384 SigningBackend implementations backed by
-# aws-lc-rs. See `crate::crypto` for details.
-fips = ["dep:aws-lc-rs"]
+# aws-lc-rs. See `crate::crypto` for details. Requires `std` today because
+# `aws-lc-rs` itself is std-only.
+fips = ["dep:aws-lc-rs", "std"]
 
 [dev-dependencies]
 jsonschema = { version = "0.46.0", default-features = false }

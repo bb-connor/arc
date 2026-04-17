@@ -1,4 +1,6 @@
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,11 +27,30 @@ pub enum AttestationVerifierFamily {
     EnterpriseVerifier,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RuntimeAttestationTrustMaterialError {
-    #[error("runtime attestation schema `{schema}` is not supported by the shared trust boundary")]
+    #[cfg_attr(
+        feature = "std",
+        error("runtime attestation schema `{schema}` is not supported by the shared trust boundary")
+    )]
     UnsupportedSchema { schema: String },
 }
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for RuntimeAttestationTrustMaterialError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnsupportedSchema { schema } => write!(
+                f,
+                "runtime attestation schema `{schema}` is not supported by the shared trust boundary"
+            ),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for RuntimeAttestationTrustMaterialError {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct RuntimeAttestationTrustMaterial {

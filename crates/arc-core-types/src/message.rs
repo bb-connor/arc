@@ -4,6 +4,10 @@
 //! The Agent sends `AgentMessage` variants; the Kernel responds with
 //! `KernelMessage` variants.
 
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::CapabilityToken;

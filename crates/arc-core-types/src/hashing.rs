@@ -4,6 +4,9 @@
 //! Ported from hush-core's `hashing` module for use in Merkle trees and
 //! receipt log integrity proofs.
 
+use alloc::format;
+use alloc::string::{String, ToString};
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as Sha2Digest, Sha256};
 
@@ -20,18 +23,18 @@ pub struct Hash {
 mod hash_serde {
     use serde::{Deserialize, Deserializer, Serializer};
 
-    pub fn serialize<S>(bytes: &[u8; 32], s: S) -> std::result::Result<S::Ok, S::Error>
+    pub fn serialize<S>(bytes: &[u8; 32], s: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        s.serialize_str(&format!("0x{}", hex::encode(bytes)))
+        s.serialize_str(&alloc::format!("0x{}", hex::encode(bytes)))
     }
 
-    pub fn deserialize<'de, D>(d: D) -> std::result::Result<[u8; 32], D::Error>
+    pub fn deserialize<'de, D>(d: D) -> core::result::Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,
     {
-        let hex_str = String::deserialize(d)?;
+        let hex_str = alloc::string::String::deserialize(d)?;
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(&hex_str);
         let bytes = hex::decode(hex_str).map_err(serde::de::Error::custom)?;
         bytes
@@ -91,8 +94,8 @@ impl AsRef<[u8]> for Hash {
     }
 }
 
-impl std::fmt::Display for Hash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for Hash {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "0x{}", self.to_hex())
     }
 }

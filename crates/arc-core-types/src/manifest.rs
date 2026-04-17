@@ -3,6 +3,9 @@
 //! Each tool server publishes a signed manifest at startup. The Kernel verifies
 //! the signature before accepting any tools from the server.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::MonetaryAmount;
