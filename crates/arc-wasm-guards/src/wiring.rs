@@ -54,7 +54,11 @@ pub fn load_wasm_guards(
     engine: Arc<Engine>,
 ) -> Result<Vec<WasmGuard>, WasmGuardError> {
     let mut sorted: Vec<WasmGuardEntry> = entries.to_vec();
-    sorted.sort_by_key(|e| (e.advisory as u8, e.priority));
+    // Priority ascending first, advisory flag as tie-breaker so the documented
+    // ordering ("priority ascending, advisory as tie-breaker") holds instead of
+    // partitioning non-advisory guards ahead of all advisory ones regardless
+    // of numeric priority.
+    sorted.sort_by_key(|e| (e.priority, e.advisory as u8));
 
     let mut guards = Vec::with_capacity(sorted.len());
 
