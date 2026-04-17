@@ -67,6 +67,12 @@ mod shell_command;
 pub mod text_utils;
 pub mod velocity;
 
+// Phase 5.1–5.4: Computer Use Agent (CUA) and SpiderSense guards.
+pub mod computer_use;
+pub mod input_injection;
+pub mod remote_desktop;
+pub mod spider_sense;
+
 pub use advisory::{
     AdvisoryGuard, AdvisoryPipeline, AdvisorySeverity, AdvisorySignal, AnomalyAdvisoryGuard,
     DataTransferAdvisoryGuard, GuardOutput, PromotionPolicy, PromotionRule,
@@ -127,4 +133,19 @@ pub use external::{
     BedrockSource, SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity,
     VertexDecisionDetails, VertexProbability, VertexRatingBreakdown, VertexSafetyConfig,
     VertexSafetyGuard, VirusTotalConfig, VirusTotalGuard,
+};
+
+// Phase 5.1–5.4 re-exports.
+pub use computer_use::{
+    default_allowed_action_types as computer_use_default_allowed_action_types, ComputerUseConfig,
+    ComputerUseGuard, EnforcementMode,
+};
+pub use input_injection::{
+    default_allowed_input_types, InputInjectionCapabilityConfig, InputInjectionCapabilityGuard,
+};
+pub use remote_desktop::{RemoteDesktopSideChannelConfig, RemoteDesktopSideChannelGuard};
+pub use spider_sense::{
+    cosine_similarity as spider_sense_cosine_similarity, extract_embedding, AmbiguousPolicy,
+    PatternDb, PatternEntry, SpiderSenseConfig, SpiderSenseError, SpiderSenseGuard,
+    DEFAULT_AMBIGUITY_BAND, DEFAULT_SIMILARITY_THRESHOLD, DEFAULT_TOP_K,
 };
