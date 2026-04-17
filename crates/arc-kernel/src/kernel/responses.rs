@@ -674,79 +674,7 @@ impl ArcKernel {
         &self,
         redacted: serde_json::Value,
     ) -> Result<ToolServerOutput, KernelError> {
-        let envelope = redacted.as_object().ok_or_else(|| {
-            KernelError::Internal(
-                "post-invocation hook returned a non-object output envelope".to_string(),
-            )
-        })?;
-        let kind = envelope
-            .get("kind")
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| {
-                KernelError::Internal(
-                    "post-invocation hook output envelope is missing kind".to_string(),
-                )
-            })?;
-
-        match kind {
-            "value" => Ok(ToolServerOutput::Value(
-                envelope
-                    .get("value")
-                    .cloned()
-                    .unwrap_or(serde_json::Value::Null),
-            )),
-            "stream" => {
-                let stream = envelope
-                    .get("stream")
-                    .and_then(serde_json::Value::as_object)
-                    .ok_or_else(|| {
-                        KernelError::Internal(
-                            "post-invocation hook output envelope is missing stream".to_string(),
-                        )
-                    })?;
-                let chunks = stream
-                    .get("chunks")
-                    .and_then(serde_json::Value::as_array)
-                    .ok_or_else(|| {
-                        KernelError::Internal(
-                            "post-invocation hook stream envelope is missing chunks".to_string(),
-                        )
-                    })?
-                    .iter()
-                    .cloned()
-                    .map(|data| ToolCallChunk { data })
-                    .collect();
-                let tool_stream = ToolCallStream { chunks };
-                let complete = stream
-                    .get("complete")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(true);
-                if complete {
-                    Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(
-                        tool_stream,
-                    )))
-                } else {
-                    let reason = stream
-                        .get("reason")
-                        .and_then(serde_json::Value::as_str)
-                        .ok_or_else(|| {
-                            KernelError::Internal(
-                                "post-invocation hook incomplete stream is missing reason"
-                                    .to_string(),
-                            )
-                        })?;
-                    Ok(ToolServerOutput::Stream(
-                        ToolServerStreamResult::Incomplete {
-                            stream: tool_stream,
-                            reason: reason.to_string(),
-                        },
-                    ))
-                }
-            }
-            other => Err(KernelError::Internal(format!(
-                "post-invocation hook returned unsupported output kind {other}"
-            ))),
-        }
+        parse_redacted_output(redacted)
     }
 
     fn post_invocation_metadata(
@@ -1474,4 +1402,109 @@ fn memory_read_unverified_metadata(
             "reason": reason.as_str(),
         }
     })
+}
+
+fn parse_redacted_output(redacted: serde_json::Value) -> Result<ToolServerOutput, KernelError> {
+    let envelope = redacted.as_object().ok_or_else(|| {
+        KernelError::Internal(
+            "post-invocation hook returned a non-object output envelope".to_string(),
+        )
+    })?;
+    let kind = envelope
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            KernelError::Internal(
+                "post-invocation hook output envelope is missing kind".to_string(),
+            )
+        })?;
+
+    match kind {
+        "value" => Ok(ToolServerOutput::Value(
+            envelope
+                .get("value")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        )),
+        "stream" => {
+            let stream = envelope
+                .get("stream")
+                .and_then(serde_json::Value::as_object)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook output envelope is missing stream".to_string(),
+                    )
+                })?;
+            let chunks = stream
+                .get("chunks")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook stream envelope is missing chunks".to_string(),
+                    )
+                })?
+                .iter()
+                .cloned()
+                .map(|data| ToolCallChunk { data })
+                .collect();
+            let tool_stream = ToolCallStream { chunks };
+            let complete = stream
+                .get("complete")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook stream envelope is missing complete".to_string(),
+                    )
+                })?;
+            if complete {
+                Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(
+                    tool_stream,
+                )))
+            } else {
+                let reason = stream
+                    .get("reason")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "post-invocation hook incomplete stream is missing reason".to_string(),
+                        )
+                    })?;
+                Ok(ToolServerOutput::Stream(
+                    ToolServerStreamResult::Incomplete {
+                        stream: tool_stream,
+                        reason: reason.to_string(),
+                    },
+                ))
+            }
+        }
+        other => Err(KernelError::Internal(format!(
+            "post-invocation hook returned unsupported output kind {other}"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redacted_stream_requires_complete_flag() {
+        let err = parse_redacted_output(serde_json::json!({
+            "kind": "stream",
+            "stream": {
+                "chunks": []
+            }
+        }))
+        .expect_err("missing complete flag should be rejected");
+
+        match err {
+            KernelError::Internal(message) => {
+                assert!(
+                    message.contains("missing complete"),
+                    "unexpected error message: {message}"
+                );
+            }
+            other => panic!("expected KernelError::Internal, got {other:?}"),
+        }
+    }
 }

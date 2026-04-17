@@ -239,13 +239,14 @@ fn normalise_method(method: &str) -> Result<String, TranslateError> {
 fn collect_policy_headers(
     raw: &std::collections::HashMap<String, String>,
 ) -> BTreeMap<String, String> {
-    const ALLOW_PREFIX: &str = "x-arc-";
     const ALLOW_HEADERS: &[&str] = &[
         "content-type",
         "content-length",
         "host",
         "user-agent",
         "x-request-id",
+        "x-arc-session-id",
+        "x-arc-source",
     ];
     const STRIP_HEADERS: &[&str] = &["authorization", "x-arc-capability-token"];
 
@@ -255,7 +256,7 @@ fn collect_policy_headers(
         if STRIP_HEADERS.contains(&lower.as_str()) {
             continue;
         }
-        if lower.starts_with(ALLOW_PREFIX) || ALLOW_HEADERS.contains(&lower.as_str()) {
+        if ALLOW_HEADERS.contains(&lower.as_str()) {
             out.insert(lower, value.clone());
         }
     }
@@ -568,6 +569,37 @@ mod tests {
         );
         let call = check_request_to_tool_call(&check).unwrap();
         assert_eq!(call.session_id.as_deref(), Some("sess-42"));
+    }
+
+    #[test]
+    fn translate_strips_arc_internal_response_headers() {
+        let check = mk_check(
+            "GET",
+            "/ping",
+            &[
+                ("x-arc-session-id", "sess-42"),
+                ("x-arc-source", "istio-mesh"),
+                ("x-arc-receipt-id", "rcpt-123"),
+                ("x-arc-verdict", "allow"),
+                ("x-arc-denial-reason", "nope"),
+                ("x-arc-denial-guard", "ScopeGuard"),
+            ],
+            "",
+            None,
+        );
+        let call = check_request_to_tool_call(&check).unwrap();
+        assert_eq!(
+            call.headers.get("x-arc-session-id").map(String::as_str),
+            Some("sess-42")
+        );
+        assert_eq!(
+            call.headers.get("x-arc-source").map(String::as_str),
+            Some("istio-mesh")
+        );
+        assert!(!call.headers.contains_key("x-arc-receipt-id"));
+        assert!(!call.headers.contains_key("x-arc-verdict"));
+        assert!(!call.headers.contains_key("x-arc-denial-reason"));
+        assert!(!call.headers.contains_key("x-arc-denial-guard"));
     }
 
     #[test]

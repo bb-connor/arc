@@ -7,6 +7,7 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header::AUTHORIZATION, Request, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
 use axum::Json;
@@ -297,10 +298,7 @@ impl ProtectProxy {
 }
 
 fn build_app(state: Arc<ProxyState>) -> Router {
-    Router::new()
-        .route("/arc/evaluate", post(sidecar_evaluate_handler))
-        .route("/arc/verify", post(sidecar_verify_handler))
-        .route("/arc/health", get(sidecar_health_handler))
+    let approval_routes = Router::new()
         .route("/approvals/pending", get(list_pending_approvals_handler))
         .route(
             "/approvals/batch/respond",
@@ -308,6 +306,16 @@ fn build_app(state: Arc<ProxyState>) -> Router {
         )
         .route("/approvals/{id}/respond", post(respond_approval_handler))
         .route("/approvals/{id}", get(get_approval_handler))
+        .route_layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            require_sidecar_control_middleware,
+        ));
+
+    Router::new()
+        .route("/arc/evaluate", post(sidecar_evaluate_handler))
+        .route("/arc/verify", post(sidecar_verify_handler))
+        .route("/arc/health", get(sidecar_health_handler))
+        .merge(approval_routes)
         .route("/v1/capabilities/mint", post(sidecar_mint_handler))
         .route("/v1/capabilities/release", post(sidecar_release_handler))
         .route("/v1/receipts", post(sidecar_submit_receipt_handler))
@@ -375,6 +383,20 @@ async fn batch_respond_approvals_handler(
         Ok(response) => approval_json(StatusCode::OK, response),
         Err(error) => approval_error_response(error),
     }
+}
+
+async fn require_sidecar_control_middleware(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
+        return response;
+    }
+
+    next.run(request).await
 }
 
 /// Axum handler that evaluates the request and proxies to upstream.
@@ -1025,7 +1047,11 @@ fn require_sidecar_control_request(
         }
     }
 
-    if let Some(expected_bearer_token) = expected_bearer_token {
+    if let Some(expected_bearer_token) = expected_bearer_token.map(str::trim) {
+        if expected_bearer_token.is_empty() {
+            warn!("rejecting sidecar control request with blank bearer token configuration");
+            return Err(sidecar_control_forbidden_response(true));
+        }
         if sidecar_control_bearer_token_matches(request, expected_bearer_token) {
             return Ok(());
         }
@@ -2197,20 +2223,22 @@ paths:
             &approver,
             GovernedApprovalDecision::Approved,
         );
-        let request = Request::builder()
-            .method("POST")
-            .uri(format!("/approvals/{}/respond", approval.approval_id))
-            .header("content-type", "application/json")
-            .body(Body::from(
-                serde_json::to_vec(&RespondRequest {
-                    outcome: ApprovalOutcome::Approved,
-                    reason: Some("approved".to_string()),
-                    approver: approver.public_key(),
-                    token,
-                })
-                .expect("serialize approval response"),
-            ))
-            .expect("request");
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/approvals/{}/respond", approval.approval_id))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&RespondRequest {
+                        outcome: ApprovalOutcome::Approved,
+                        reason: Some("approved".to_string()),
+                        approver: approver.public_key(),
+                        token,
+                    })
+                    .expect("serialize approval response"),
+                ))
+                .expect("request"),
+        );
 
         let response = build_app(Arc::clone(&state))
             .oneshot(request)
@@ -2230,6 +2258,33 @@ paths:
             .get_pending("ap-route-1")
             .expect("approval lookup")
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn approval_routes_reject_remote_callers_without_control_access() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let request = with_peer_addr(
+            Request::builder()
+                .method("GET")
+                .uri("/approvals/pending")
+                .body(Body::empty())
+                .expect("request"),
+            remote,
+        );
+
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .expect("approval response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
     }
 
     #[test]
@@ -3017,6 +3072,42 @@ paths:
         let receipt_response =
             sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
         assert_eq!(receipt_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_reject_blank_control_token_configuration() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("   ".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer ")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
     }
 
     #[tokio::test]

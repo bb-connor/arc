@@ -78,7 +78,7 @@
         }
       ],
       "healthCheck": {
-        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
+        "command": ["CMD-SHELL", "wget -q -O - http://localhost:9090/arc/health >/dev/null 2>&1"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,

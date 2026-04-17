@@ -1197,6 +1197,12 @@ impl OutputSanitizer {
                 V::Array(new_items)
             }
             V::Object(map) => {
+                if let Some((finding, redaction)) = detect_service_account_object(map) {
+                    *was_redacted = true;
+                    findings.push(finding);
+                    redactions.push(redaction);
+                    return V::Null;
+                }
                 let mut new_map = serde_json::Map::with_capacity(map.len());
                 for (k, v) in map {
                     let sv = self.sanitize_value_inner(v, findings, redactions, was_redacted);
@@ -1290,6 +1296,34 @@ fn resolve_overlaps(
         merged.push(current);
     }
     merged
+}
+
+fn detect_service_account_object(
+    map: &serde_json::Map<String, serde_json::Value>,
+) -> Option<(SensitiveDataFinding, Redaction)> {
+    let value = map.get("type")?.as_str()?;
+    if !value.eq_ignore_ascii_case("service_account") {
+        return None;
+    }
+
+    let span = Span { start: 0, end: 0 };
+    let finding = SensitiveDataFinding {
+        id: "secret_gcp_service_account".to_string(),
+        category: SensitiveCategory::Secret,
+        data_type: "gcp_service_account_json".to_string(),
+        confidence: 0.97,
+        span,
+        preview: preview_redacted(value),
+        detector: "object".to_string(),
+        recommended_action: RedactionStrategy::Drop,
+    };
+    let redaction = Redaction {
+        finding_id: finding.id.clone(),
+        strategy: RedactionStrategy::Drop,
+        original_span: span,
+        replacement: String::new(),
+    };
+    Some((finding, redaction))
 }
 
 // ===========================================================================

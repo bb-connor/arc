@@ -49,7 +49,16 @@ spec:
       when:
         - key: request.headers[x-arc-capability-token]
           notValues: [""]
-    # Allow-rule #2: route GETs on /tools/* (listings, schema fetches)
+    # Allow-rule #2: route POSTs through ARC when the request authenticates
+    # with a Bearer token instead of a capability header.
+    - to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/tools/*", "/invoke/*"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+    # Allow-rule #3: route GETs on /tools/* (listings, schema fetches)
     # through ARC only when an Authorization header is present. This
     # illustrates header-based routing -- unauthenticated GETs fall
     # through to the deny policy below.

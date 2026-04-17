@@ -215,8 +215,8 @@ func TestReconcile_NewGovernedJob_MintsGrant(t *testing.T) {
 	if got.Annotations[AnnotationCapabilityToken] != "" {
 		t.Fatalf("expected no top-level capability-token annotation, got %q", got.Annotations[AnnotationCapabilityToken])
 	}
-	if got.Spec.Template.Annotations[AnnotationCapabilityToken] != "token-cap-abc" {
-		t.Fatalf("expected pod-template capability-token annotation, got %q", got.Spec.Template.Annotations[AnnotationCapabilityToken])
+	if got.Spec.Template.Annotations["arc.protocol/capability-token"] != "token-cap-abc" {
+		t.Fatalf("expected pod-template capability-token annotation, got %q", got.Spec.Template.Annotations["arc.protocol/capability-token"])
 	}
 	if _, err := time.Parse(time.RFC3339, got.Annotations[AnnotationCapabilityExpiresAt]); err != nil {
 		t.Fatalf("invalid expires-at annotation %q: %v", got.Annotations[AnnotationCapabilityExpiresAt], err)

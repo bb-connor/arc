@@ -243,6 +243,8 @@ struct EvaluateRequest {
     // Wire-compatible, but ignored for trust decisions. Trusted issuers are
     // sourced from deployment configuration only.
     trusted_issuers: Vec<String>,
+    #[serde(default)]
+    metadata: Option<serde_json::Value>,
     // `scope` and `arguments` are accepted by the wire protocol so future
     // policy checks can inspect them. Marked `allow(dead_code)` so their
     // presence in the schema is enforced by serde without triggering a
@@ -261,6 +263,7 @@ struct EvaluateResponse {
     receipt_id: String,
     decision: &'static str,
     reason: Option<String>,
+    metadata: Option<serde_json::Value>,
     capability_id: String,
     tool_server: String,
     tool_name: String,
@@ -386,6 +389,7 @@ async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Fu
         receipt_id: receipt_id.clone(),
         decision,
         reason: reason.clone(),
+        metadata: request.metadata.clone(),
         capability_id: request.capability_id.clone(),
         tool_server: request.tool_server.clone(),
         tool_name: request.tool_name.clone(),
@@ -604,6 +608,7 @@ mod tests {
             tool_name: "tool".into(),
             capability: Some(serde_json::to_value(capability).unwrap()),
             trusted_issuers: Vec::new(),
+            metadata: None,
             scope: None,
             arguments: None,
         };
@@ -628,6 +633,7 @@ mod tests {
             tool_name: "".into(),
             capability: None,
             trusted_issuers: Vec::new(),
+            metadata: None,
             scope: None,
             arguments: None,
         };
@@ -678,6 +684,7 @@ mod tests {
             tool_name: "tool".into(),
             capability: Some(serde_json::to_value(capability).unwrap()),
             trusted_issuers: Vec::new(),
+            metadata: None,
             scope: Some("read".into()),
             arguments: Some(serde_json::json!({"q": "hello"})),
         };
@@ -735,6 +742,7 @@ mod tests {
             tool_name: "tool".into(),
             capability: Some(serde_json::to_value(capability).unwrap()),
             trusted_issuers: Vec::new(),
+            metadata: None,
             scope: None,
             arguments: None,
         };
@@ -792,6 +800,7 @@ mod tests {
             tool_name: "tool".into(),
             capability: Some(serde_json::to_value(capability).unwrap()),
             trusted_issuers: vec![untrusted_issuer.public_key().to_hex()],
+            metadata: None,
             scope: None,
             arguments: None,
         };
@@ -825,6 +834,7 @@ mod tests {
             tool_name: "tool".into(),
             capability: None,
             trusted_issuers: Vec::new(),
+            metadata: None,
             scope: None,
             arguments: None,
         };
@@ -883,6 +893,64 @@ mod tests {
         hydrate_request_from_headers(&headers, &mut request).expect("hydrate request");
         assert_eq!(request.capability_id, "cap");
         assert_eq!(request.arguments, Some(serde_json::json!({ "q": "hello" })));
+    }
+
+    #[tokio::test]
+    async fn evaluate_preserves_metadata_in_receipt() {
+        let (tx, rx) = mpsc::channel(16);
+        let state = Arc::new(AppState {
+            receipt_tx: tx,
+            buffer: Mutex::new(ReceiptBuffer::new(rx)),
+        });
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap();
+        let request = EvaluateRequest {
+            capability_id: "cap".into(),
+            tool_server: "srv".into(),
+            tool_name: "tool".into(),
+            capability: Some(serde_json::to_value(capability).unwrap()),
+            trusted_issuers: Vec::new(),
+            metadata: Some(serde_json::json!({"trace_id": "trace-1"})),
+            scope: None,
+            arguments: None,
+        };
+        let trusted = serde_json::to_string(&vec![issuer.public_key().to_hex()]).unwrap();
+        let response = with_env_var(
+            TRUSTED_ISSUERS_ENV,
+            &trusted,
+            evaluate(request, state.clone()),
+        )
+        .await;
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed["decision"], "allow");
+        assert_eq!(parsed["metadata"]["trace_id"], "trace-1");
     }
 
     #[tokio::test]

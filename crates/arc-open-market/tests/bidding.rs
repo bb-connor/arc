@@ -231,6 +231,40 @@ fn bid_happy_path_mints_token_and_accept_records_settlement() {
 }
 
 #[test]
+fn accept_rejects_timestamp_before_ask_issuance() {
+    let registry_keypair = Keypair::generate();
+    let operator_keypair = Keypair::generate();
+    let issuer_keypair = Keypair::generate();
+    let agent_keypair = Keypair::generate();
+    let listing = listing_entry(
+        &registry_keypair,
+        &operator_keypair,
+        GenericListingStatus::Active,
+        100,
+        600,
+    );
+    let request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 300, 120);
+    let ask = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &issuer_keypair,
+            agent_subject: agent_keypair.public_key(),
+            token_id: "token-abc".to_string(),
+            now: 120,
+        },
+    )
+    .expect("bid succeeds");
+
+    let error = accept(&ask, "receipt-from-settlement", 119)
+        .expect_err("acceptance before issuance rejected");
+    assert_eq!(
+        error,
+        BiddingError::InvalidRequest("accepted_at must not precede ask issued_at".to_string())
+    );
+}
+
+#[test]
 fn bid_fails_closed_on_stale_listing_freshness() {
     let registry_keypair = Keypair::generate();
     let operator_keypair = Keypair::generate();

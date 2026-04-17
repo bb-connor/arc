@@ -352,6 +352,11 @@ pub fn accept(
         Ok(true) => {}
         _ => return Err(BiddingError::PricingSignatureInvalid),
     }
+    if accepted_at < ask.body.issued_at {
+        return Err(BiddingError::InvalidRequest(
+            "accepted_at must not precede ask issued_at".to_string(),
+        ));
+    }
     if accepted_at >= ask.body.expires_at {
         return Err(BiddingError::PricingExpired);
     }

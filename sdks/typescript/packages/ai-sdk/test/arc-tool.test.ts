@@ -199,6 +199,25 @@ describe("arcTool: allow path invokes underlying execute", () => {
     });
   });
 
+  it("forwards scope metadata into the evaluation request", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const wrapped = arcTool({
+      parameters: z.object({}),
+      execute: async () => "ok",
+      scope: {
+        toolServer: "s",
+        toolName: "t",
+        metadata: { trace_id: "trace-1" },
+      },
+      clientOptions: { fetch },
+    });
+
+    await wrapped.execute!({});
+    expect(calls[0]!.body).toMatchObject({
+      metadata: { trace_id: "trace-1" },
+    });
+  });
+
   it("normalizes the Lambda evaluator response contract", async () => {
     const { fetch } = fakeFetch([lambdaAllowReceipt()]);
     const wrapped = arcTool({

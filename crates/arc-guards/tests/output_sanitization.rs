@@ -83,6 +83,34 @@ fn detects_gcp_service_account_json() {
 }
 
 #[test]
+fn detects_gcp_service_account_object_through_pipeline() {
+    let s = OutputSanitizer::new();
+    let mut pipeline = PostInvocationPipeline::new();
+    pipeline.add(Box::new(SanitizerHook::from_sanitizer(s)));
+
+    let response = serde_json::json!({
+        "type": "service_account",
+        "project_id": "my-project",
+        "client_email": "svc@example.com"
+    });
+
+    let outcome = pipeline.evaluate_with_evidence("tool", &response);
+    match outcome.verdict {
+        PostInvocationVerdict::Redact(v) => {
+            assert!(v.is_null());
+        }
+        other => panic!("expected Redact, got {other:?}"),
+    }
+    assert_eq!(outcome.evidence.len(), 1);
+    assert_eq!(outcome.evidence[0].guard_name, "output-sanitizer");
+    assert!(outcome.evidence[0]
+        .details
+        .as_deref()
+        .unwrap_or("")
+        .contains("secret_gcp_service_account"));
+}
+
+#[test]
 fn detects_password_assignment() {
     let s = OutputSanitizer::new();
     let input = "config: password=hunter2hunter2";

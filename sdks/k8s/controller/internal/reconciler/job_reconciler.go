@@ -42,7 +42,7 @@ const (
 
 	// AnnotationCapabilityToken stores the serialized capability token on the
 	// governed pod template so admission can validate the spawned Pods.
-	AnnotationCapabilityToken = "arc.backbay.io/capability-token"
+	AnnotationCapabilityToken = "arc.protocol/capability-token"
 
 	// AnnotationCapabilityExpiresAt records the capability expiry (RFC3339).
 	AnnotationCapabilityExpiresAt = "arc.protocol/capability-expires-at"
