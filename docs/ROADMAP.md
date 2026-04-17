@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**69 of 73 numbered phases shipped** on `project/full-roadmap` (14.1 marked PARTIAL — core extraction done, WASM32 cross-compile blocked on arc-core-types upgrade). Plus adjacent
+**70 of 73 numbered phases shipped** on `project/full-roadmap` (14.1 marked PARTIAL — core extraction done, WASM32 cross-compile blocked on arc-core-types upgrade). Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -58,7 +58,7 @@ roadmap phase.
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
 | 18 (Memory) | 18.1, 18.2 | -- | -- |
 | 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
-| 20 (Capstone) | 20.4 | -- | 20.1, 20.2, 20.3 |
+| 20 (Capstone) | 20.2, 20.4 | -- | 20.1, 20.3 |
 
 **Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
 
@@ -1420,7 +1420,7 @@ browser/mobile agents). It is NOT creating passport support from scratch.
 field computed from compliance score and behavioral profile. A WASM-compiled
 kernel verifies the passport and reads the tier.
 
-### 20.2 Agent Insurance Protocol (depends on Phases 16, 19.1, 19.2)
+### 20.2 Agent Insurance Protocol (depends on Phases 16, 19.1, 19.2) [SHIPPED 657ca6d]
 
 **What**: Connect arc-underwriting risk assessment -> arc-market liability
 placement -> arc-settle claims payout. Premium pricing from receipt history.
