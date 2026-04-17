@@ -11,8 +11,6 @@ use arc_http_core::{
     Verdict,
 };
 use arc_kernel::ApprovalStore;
-#[cfg(test)]
-use arc_kernel::InMemoryApprovalStore;
 use arc_openapi::PolicyDecision;
 
 /// Evaluated result for a single HTTP request.
@@ -38,14 +36,11 @@ pub struct RequestEvaluator {
 }
 
 impl RequestEvaluator {
-    #[cfg(test)]
     pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
-        Self::new_with_approval_store(
+        Self {
             routes,
-            keypair,
-            policy_hash,
-            Arc::new(InMemoryApprovalStore::new()),
-        )
+            authority: HttpAuthority::new(keypair, policy_hash),
+        }
     }
 
     pub fn new_with_approval_store(

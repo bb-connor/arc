@@ -68,7 +68,7 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
-          RUSTFLAGS: "-D warnings -C debuginfo=0 -C link-arg=-Wl,--threads=1"
+          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
         run: cargo build --workspace && cargo test --workspace --exclude arc-conformance
 
   coverage:
