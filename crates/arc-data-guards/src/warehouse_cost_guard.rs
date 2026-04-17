@@ -357,8 +357,21 @@ impl arc_kernel::Guard for WarehouseCostGuard {
             _ => tool.clone(),
         };
 
-        if !self.config.allow_all && !self.config.looks_like_warehouse(&database, tool) {
-            // Not a warehouse-shaped request; pass.
+        // Non-warehouse traffic always short-circuits to Allow regardless of
+        // `allow_all`. The old `!allow_all && !looks_like_warehouse` gating
+        // accidentally inverted the bypass intent: enabling `allow_all`
+        // caused every tool call (including unrelated non-warehouse ones)
+        // to fall through into `extract_estimate`, which then denied any
+        // call without `dry_run` metadata. The fix keeps the "not a
+        // warehouse" branch as the primary short-circuit and reserves
+        // `allow_all` for enforcement-disable semantics on the warehouse
+        // path only.
+        if !self.config.looks_like_warehouse(&database, tool) {
+            return Ok(Verdict::Allow);
+        }
+        if self.config.allow_all {
+            // Warehouse-shaped request in dry-run/debug mode: skip cost
+            // enforcement but remain aware this is a warehouse call.
             return Ok(Verdict::Allow);
         }
 
