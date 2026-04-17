@@ -172,7 +172,30 @@ pub trait ExecutionNonceStore: Send + Sync {
     /// * `Ok(true)`  -- nonce was fresh; it is now marked consumed.
     /// * `Ok(false)` -- nonce has already been consumed (replay detected).
     /// * `Err(_)`    -- the store is unreachable or corrupted; fail-closed.
+    ///
+    /// Prefer [`Self::reserve_until`] when the caller knows the signed
+    /// expiry of the nonce: durable stores need to retain the consumed
+    /// marker at least as long as the signed nonce is valid, otherwise
+    /// the row may be pruned and the nonce can be replayed within its
+    /// remaining validity window.
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError>;
+
+    /// Reserve a nonce while telling the store when the nonce stops
+    /// being cryptographically valid. Durable implementations (SQLite,
+    /// remote KV stores) MUST retain the consumed marker until at least
+    /// `nonce_expires_at` so replay protection covers the nonce's full
+    /// validity window.
+    ///
+    /// The default implementation falls back to [`Self::reserve`] for
+    /// in-memory / best-effort stores that already track retention
+    /// internally. `nonce_expires_at` is wall-clock unix seconds.
+    fn reserve_until(
+        &self,
+        nonce_id: &str,
+        _nonce_expires_at: i64,
+    ) -> Result<bool, KernelError> {
+        self.reserve(nonce_id)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,7 +435,13 @@ pub fn verify_execution_nonce(
         return Err(ExecutionNonceError::InvalidSignature);
     }
 
-    match nonce_store.reserve(&presented.nonce.nonce_id) {
+    // Pass the nonce's signed expiry so durable stores retain the
+    // consumed marker for the full validity window — otherwise the row
+    // can be pruned while the nonce is still cryptographically valid,
+    // allowing replay within the remaining window.
+    match nonce_store
+        .reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at)
+    {
         Ok(true) => Ok(()),
         Ok(false) => {
             warn!(
