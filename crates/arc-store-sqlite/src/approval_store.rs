@@ -1,8 +1,10 @@
 //! Phase 3.5 SQLite-backed HITL approval store.
 //!
 //! Pending requests survive kernel restart because every `store_pending`
-//! call goes through `INSERT OR REPLACE` on a WAL-journaled SQLite
-//! database. Resolved approvals and consumed tokens live in the same
+//! call persists into a WAL-journaled SQLite database. Duplicate ids are
+//! idempotent only when the serialized payload matches exactly; mismatched
+//! retries are rejected so in-flight HITL state cannot be silently
+//! overwritten. Resolved approvals and consumed tokens live in the same
 //! database so the replay registry survives alongside the pending log.
 //!
 //! The store is synchronous; it uses a small r2d2 pool to keep the
@@ -129,27 +131,53 @@ impl ApprovalStore for SqliteApprovalStore {
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO arc_hitl_pending (
+        let inserted = conn
+            .execute(
+                r#"
+            INSERT INTO arc_hitl_pending (
                 approval_id, policy_id, subject_id, tool_server, tool_name,
                 parameter_hash, expires_at, created_at, payload
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            ON CONFLICT(approval_id) DO NOTHING
             "#,
-            params![
-                request.approval_id,
-                request.policy_id,
-                request.subject_id,
-                request.tool_server,
-                request.tool_name,
-                request.parameter_hash,
-                request.expires_at as i64,
-                request.created_at as i64,
-                payload,
-            ],
-        )
-        .map_err(|e| ApprovalStoreError::Backend(format!("insert pending: {e}")))?;
-        Ok(())
+                params![
+                    request.approval_id,
+                    request.policy_id,
+                    request.subject_id,
+                    request.tool_server,
+                    request.tool_name,
+                    request.parameter_hash,
+                    request.expires_at as i64,
+                    request.created_at as i64,
+                    payload,
+                ],
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("insert pending: {e}")))?;
+        if inserted == 0 {
+            let existing: Option<String> = conn
+                .query_row(
+                    "SELECT payload FROM arc_hitl_pending WHERE approval_id = ?1",
+                    params![request.approval_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|e| {
+                    ApprovalStoreError::Backend(format!("select existing pending: {e}"))
+                })?;
+            match existing {
+                Some(existing) if existing == payload => Ok(()),
+                Some(_) => Err(ApprovalStoreError::Backend(format!(
+                    "approval_id {} already exists with different payload",
+                    request.approval_id
+                ))),
+                None => Err(ApprovalStoreError::Backend(format!(
+                    "approval_id {} conflicted but existing row could not be loaded",
+                    request.approval_id
+                ))),
+            }
+        } else {
+            Ok(())
+        }
     }
 
     fn get_pending(&self, id: &str) -> Result<Option<ApprovalRequest>, ApprovalStoreError> {
@@ -473,5 +501,28 @@ mod tests {
         let fetched = store.get_pending("a-1").unwrap().unwrap();
         assert_eq!(fetched.approval_id, "a-1");
         assert_eq!(fetched.parameter_hash, "h-1");
+    }
+
+    #[test]
+    fn duplicate_pending_insert_is_idempotent_only_when_payload_matches() {
+        let store = SqliteApprovalStore::open_in_memory().unwrap();
+        let original = sample_request("dup-1", "hash-a");
+        let identical = original.clone();
+        let mut mismatched = original.clone();
+        mismatched.parameter_hash = "hash-b".into();
+
+        store.store_pending(&original).unwrap();
+        store.store_pending(&identical).unwrap();
+
+        let err = store.store_pending(&mismatched).unwrap_err();
+        match err {
+            ApprovalStoreError::Backend(message) => {
+                assert!(message.contains("already exists with different payload"));
+            }
+            other => panic!("expected Backend mismatch error, got {other:?}"),
+        }
+
+        let fetched = store.get_pending("dup-1").unwrap().unwrap();
+        assert_eq!(fetched.parameter_hash, "hash-a");
     }
 }

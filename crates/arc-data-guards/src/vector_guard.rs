@@ -513,12 +513,6 @@ impl arc_kernel::Guard for VectorDbGuard {
         if !self.config.looks_like_vector(&database, tool) {
             return Ok(Verdict::Allow);
         }
-        if self.config.allow_all {
-            // Vector-shaped request in dry-run/debug mode: skip policy
-            // enforcement but remain aware this is a vector call.
-            return Ok(Verdict::Allow);
-        }
-
         let call = match self.extract_call(args) {
             Ok(c) => c,
             Err(reason) => {
@@ -532,6 +526,13 @@ impl arc_kernel::Guard for VectorDbGuard {
                 return Ok(Verdict::Deny);
             }
         };
+
+        if self.config.allow_all {
+            // Dry-run/debug mode still validates vector call shape so
+            // malformed payloads fail closed, but skips allowlist and
+            // scope enforcement once parsing succeeds.
+            return Ok(Verdict::Allow);
+        }
 
         match self.check(&call, ctx.scope) {
             Ok(()) => Ok(Verdict::Allow),
@@ -641,7 +642,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arc_core::capability::{Operation, ToolGrant};
+    use arc_core::capability::{CapabilityToken, CapabilityTokenBody, Operation, ToolGrant};
+    use arc_core::crypto::Keypair;
+    use arc_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
     fn grant_with_constraints(constraints: Vec<Constraint>) -> ToolGrant {
         ToolGrant {
@@ -662,6 +665,23 @@ mod tests {
             resource_grants: vec![],
             prompt_grants: vec![],
         }
+    }
+
+    fn test_capability() -> CapabilityToken {
+        let kp = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-vector-guard".into(),
+                issuer: kp.public_key(),
+                subject: kp.public_key(),
+                scope: ArcScope::default(),
+                issued_at: 0,
+                expires_at: u64::MAX,
+                delegation_chain: vec![],
+            },
+            &kp,
+        )
+        .unwrap()
     }
 
     fn base_cfg() -> VectorGuardConfig {
@@ -818,6 +838,41 @@ mod tests {
             top_k: Some(10_000),
         };
         g.check(&call, &ArcScope::default()).unwrap();
+    }
+
+    #[test]
+    fn allow_all_still_denies_parse_errors() {
+        let guard = VectorDbGuard::new(VectorGuardConfig {
+            allow_all: true,
+            ..Default::default()
+        });
+        let request = ToolCallRequest {
+            request_id: "req-vector-allow-all-parse".to_string(),
+            capability: test_capability(),
+            tool_name: "pinecone_query".to_string(),
+            server_id: "srv".to_string(),
+            agent_id: "agent".to_string(),
+            arguments: serde_json::json!({"namespace": "tenant-a"}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let scope = ArcScope::default();
+        let agent_id = String::from("agent");
+        let server_id = String::from("srv");
+        let verdict = guard
+            .evaluate(&GuardContext {
+                request: &request,
+                scope: &scope,
+                agent_id: &agent_id,
+                server_id: &server_id,
+                session_filesystem_roots: None,
+                matched_grant_index: None,
+            })
+            .unwrap();
+        assert_eq!(verdict, Verdict::Deny);
     }
 
     #[test]

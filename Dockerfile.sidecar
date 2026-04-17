@@ -75,9 +75,10 @@ RUN cargo build --release --locked --package arc-cli --bin arc \
 ############################
 FROM alpine:${ALPINE_VERSION} AS runtime
 
-# ca-certificates for outbound TLS, tini for correct signal handling,
-# libgcc/libstdc++ for the Rust runtime.
-RUN apk add --no-cache ca-certificates tini libgcc libstdc++ \
+# The `rust:alpine` builder produces a musl-linked `arc` binary, so the
+# runtime image only needs CA roots and tini. No dynamic libgcc/libstdc++
+# packages are required in the final layer.
+RUN apk add --no-cache ca-certificates tini \
  && addgroup -S -g 10001 arc \
  && adduser  -S -u 10001 -G arc -h /home/arc -s /sbin/nologin arc \
  && mkdir -p /var/lib/arc /etc/arc \

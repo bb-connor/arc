@@ -369,12 +369,6 @@ impl arc_kernel::Guard for WarehouseCostGuard {
         if !self.config.looks_like_warehouse(&database, tool) {
             return Ok(Verdict::Allow);
         }
-        if self.config.allow_all {
-            // Warehouse-shaped request in dry-run/debug mode: skip cost
-            // enforcement but remain aware this is a warehouse call.
-            return Ok(Verdict::Allow);
-        }
-
         let estimate = match self.extract_estimate(args) {
             Ok(e) => e,
             Err(reason) => {
@@ -388,6 +382,13 @@ impl arc_kernel::Guard for WarehouseCostGuard {
                 return Ok(Verdict::Deny);
             }
         };
+
+        if self.config.allow_all {
+            // Dry-run/debug mode still validates the dry-run payload so
+            // malformed estimates fail closed, but skips limit checks
+            // once parsing succeeds.
+            return Ok(Verdict::Allow);
+        }
 
         match self.check(&estimate) {
             Ok(()) => Ok(Verdict::Allow),
@@ -567,6 +568,9 @@ fn pad_right(s: &str, len: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arc_core::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
+    use arc_core::crypto::Keypair;
+    use arc_kernel::{Guard, GuardContext, ToolCallRequest, Verdict};
 
     fn cfg_1gb_5usd() -> WarehouseCostGuardConfig {
         WarehouseCostGuardConfig {
@@ -574,6 +578,23 @@ mod tests {
             max_cost_per_query_usd: Some("5.00".into()),
             ..Default::default()
         }
+    }
+
+    fn test_capability() -> CapabilityToken {
+        let kp = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-warehouse-guard".into(),
+                issuer: kp.public_key(),
+                subject: kp.public_key(),
+                scope: ArcScope::default(),
+                issued_at: 0,
+                expires_at: u64::MAX,
+                delegation_chain: vec![],
+            },
+            &kp,
+        )
+        .unwrap()
     }
 
     #[test]
@@ -703,6 +724,41 @@ mod tests {
             estimated_cost_usd: "9999999.99".into(),
         };
         g.check(&estimate).unwrap();
+    }
+
+    #[test]
+    fn allow_all_still_denies_parse_errors() {
+        let guard = WarehouseCostGuard::new(WarehouseCostGuardConfig {
+            allow_all: true,
+            ..Default::default()
+        });
+        let request = ToolCallRequest {
+            request_id: "req-warehouse-allow-all-parse".to_string(),
+            capability: test_capability(),
+            tool_name: "bigquery".to_string(),
+            server_id: "srv".to_string(),
+            agent_id: "agent".to_string(),
+            arguments: serde_json::json!({"query": "SELECT 1"}),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let scope = ArcScope::default();
+        let agent_id = String::from("agent");
+        let server_id = String::from("srv");
+        let verdict = guard
+            .evaluate(&GuardContext {
+                request: &request,
+                scope: &scope,
+                agent_id: &agent_id,
+                server_id: &server_id,
+                session_filesystem_roots: None,
+                matched_grant_index: None,
+            })
+            .unwrap();
+        assert_eq!(verdict, Verdict::Deny);
     }
 
     #[test]

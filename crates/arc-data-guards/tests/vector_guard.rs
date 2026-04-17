@@ -261,6 +261,24 @@ fn allow_all_permits_any_vector_call() {
 }
 
 #[test]
+fn allow_all_still_denies_malformed_vector_call() {
+    let guard = VectorDbGuard::new(VectorGuardConfig {
+        allow_all: true,
+        ..Default::default()
+    });
+    let verdict = evaluate(
+        &guard,
+        "weaviate",
+        serde_json::json!({
+            "operation": "upsert",
+            "top_k": 50_000
+        }),
+        ArcScope::default(),
+    );
+    assert_eq!(verdict, Verdict::Deny);
+}
+
+#[test]
 fn memory_read_action_routed_through_vector_guard() {
     // arc-guards maps `recall` into ToolAction::MemoryRead; the vector
     // guard must still be able to inspect it.

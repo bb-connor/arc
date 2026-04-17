@@ -142,6 +142,16 @@ fn passes_through_non_warehouse_tools() {
 }
 
 #[test]
+fn allow_all_still_denies_missing_dry_run_metadata() {
+    let guard = WarehouseCostGuard::new(WarehouseCostGuardConfig {
+        allow_all: true,
+        ..Default::default()
+    });
+    let verdict = evaluate(&guard, "bigquery", serde_json::json!({"query": "SELECT 1"}));
+    assert_eq!(verdict, Verdict::Deny);
+}
+
+#[test]
 fn record_cost_emits_warehouse_query_dimension() {
     let estimate = DryRunEstimate {
         bytes_scanned: 1024 * 1024,

@@ -852,6 +852,16 @@ impl ApprovalStore for InMemoryApprovalStore {
             .pending
             .write()
             .map_err(|_| ApprovalStoreError::Backend("pending map poisoned".into()))?;
+        match guard.get(&request.approval_id) {
+            Some(existing) if existing == request => return Ok(()),
+            Some(_) => {
+                return Err(ApprovalStoreError::Backend(format!(
+                    "approval_id {} already exists with different payload",
+                    request.approval_id
+                )))
+            }
+            None => {}
+        }
         guard.insert(request.approval_id.clone(), request.clone());
         Ok(())
     }
