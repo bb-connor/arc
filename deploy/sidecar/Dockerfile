@@ -75,8 +75,16 @@ RUN apt-get update \
                   libssh2.so.1 libpsl.so.5 libgssapi_krb5.so.2 \
                   libldap-2.5.so.0 liblber-2.5.so.0 libzstd.so.1 \
                   libbrotlidec.so.1 libbrotlicommon.so.1; do \
-         if [ -f "/usr/lib/${ARCH_DIR}/${dep}" ]; then \
-           cp -a "/usr/lib/${ARCH_DIR}/${dep}" "/out/lib/${dep}"; \
+         src="/usr/lib/${ARCH_DIR}/${dep}"; \
+         if [ -e "$src" ]; then \
+           # `cp -L` dereferences the symlink and writes the actual
+           # shared-library payload to the soname filename. Debian
+           # `libcurl.so.4` and friends are symlinks to versioned
+           # `.so.X.Y.Z` files; `cp -a` would preserve the symlink,
+           # leaving a dangling reference in the distroless runtime
+           # where the versioned target is absent. ld.so resolves
+           # binaries by soname, so the dereferenced copy is enough.
+           cp -L "$src" "/out/lib/${dep}"; \
          fi; \
        done
 
