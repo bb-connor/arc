@@ -1308,20 +1308,11 @@ fn task_response_from_orchestrated(
 ) -> TaskResponse {
     let mut metadata = orchestrated.metadata();
     let response = orchestrated.response;
-    let denied = matches!(response.verdict, KernelVerdict::Deny);
     annotate_authoritative_a2a_metadata(&mut metadata, response.output.as_ref());
     let receipt_metadata = Some(metadata);
 
-    if denied {
-        TaskResponse {
-            id: task_id,
-            status: TaskStatus::Failed,
-            status_message: response.reason,
-            message: None,
-            metadata: receipt_metadata,
-        }
-    } else {
-        TaskResponse {
+    match response.verdict {
+        KernelVerdict::Allow => TaskResponse {
             id: task_id,
             status: TaskStatus::Completed,
             status_message: None,
@@ -1331,7 +1322,14 @@ fn task_response_from_orchestrated(
                 metadata: None,
             }),
             metadata: receipt_metadata,
-        }
+        },
+        KernelVerdict::Deny | KernelVerdict::PendingApproval => TaskResponse {
+            id: task_id,
+            status: TaskStatus::Failed,
+            status_message: response.reason,
+            message: None,
+            metadata: receipt_metadata,
+        },
     }
 }
 
@@ -2187,6 +2185,53 @@ mod tests {
         );
         assert_eq!(metadata["arc"]["decision"].as_str(), Some("deny"));
         assert!(metadata["arc"]["receipt"]["id"].as_str().is_some());
+    }
+
+    #[test]
+    fn pending_approval_is_not_reported_as_completed() {
+        let config = test_kernel_config();
+        let kernel_issuer = config.keypair.clone();
+        let mut kernel = ArcKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let request = text_message("blocked pending approval");
+        let mut orchestrated = execute_orchestrated_a2a_request(
+            &kernel,
+            CrossProtocolExecutionRequest {
+                origin_request_id: "a2a-task-pending".to_string(),
+                kernel_request_id: "a2a-a2a-task-pending".to_string(),
+                target_protocol: DiscoveryProtocol::Native,
+                target_server_id: "test-srv".to_string(),
+                target_tool_name: "echo".to_string(),
+                agent_id: subject.public_key().to_hex(),
+                arguments: extract_arguments_from_message(&request.message),
+                capability: capability_for_tool(&kernel_issuer, &subject, "test-srv", "echo"),
+                source_envelope: build_a2a_source_envelope("echo", &request).unwrap(),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+            },
+        )
+        .unwrap();
+        orchestrated.response.verdict = KernelVerdict::PendingApproval;
+        orchestrated.response.reason = Some("approval required".to_string());
+
+        let response = task_response_from_orchestrated("task-pending".to_string(), orchestrated);
+        let metadata = response
+            .metadata
+            .expect("pending approval should attach metadata");
+
+        assert_eq!(response.status, TaskStatus::Failed);
+        assert_eq!(
+            response.status_message.as_deref(),
+            Some("approval required")
+        );
+        assert!(response.message.is_none());
+        assert_eq!(
+            metadata["arc"]["decision"].as_str(),
+            Some("pending_approval")
+        );
     }
 
     #[test]

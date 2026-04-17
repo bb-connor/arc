@@ -1295,12 +1295,12 @@ fn acp_invocation_result_from_orchestrated(
         .unwrap_or_else(|| kernel_output_to_value(orchestrated.response.output.as_ref()));
     let metadata = Some(orchestrated.metadata());
     let response = orchestrated.response;
-    let denied = matches!(response.verdict, KernelVerdict::Deny);
+    let success = matches!(response.verdict, KernelVerdict::Allow);
 
     AcpInvocationResult {
-        success: !denied,
+        success,
         data,
-        error: if denied { response.reason } else { None },
+        error: if success { None } else { response.reason },
         metadata,
     }
 }
@@ -2166,6 +2166,49 @@ mod tests {
         );
         assert_eq!(metadata["arc"]["decision"].as_str(), Some("deny"));
         assert!(metadata["arc"]["receipt"]["id"].as_str().is_some());
+    }
+
+    #[test]
+    fn pending_approval_is_not_reported_as_success() {
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ArcKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let mut orchestrated = execute_orchestrated_acp_request(
+            &kernel,
+            CrossProtocolExecutionRequest {
+                origin_request_id: "acp-request-pending".to_string(),
+                kernel_request_id: "acp-pending".to_string(),
+                target_protocol: DiscoveryProtocol::Native,
+                target_server_id: "test-srv".to_string(),
+                target_tool_name: "read_file".to_string(),
+                agent_id: subject.public_key().to_hex(),
+                arguments: json!({"path": "/tmp"}),
+                capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+                source_envelope: build_acp_source_envelope("read_file", json!({"path": "/tmp"}))
+                    .unwrap(),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+            },
+        )
+        .unwrap();
+        orchestrated.response.verdict = KernelVerdict::PendingApproval;
+        orchestrated.response.reason = Some("approval required".to_string());
+
+        let result = acp_invocation_result_from_orchestrated(orchestrated);
+        let metadata = result
+            .metadata
+            .expect("pending approval should attach metadata");
+
+        assert!(!result.success);
+        assert_eq!(result.error.as_deref(), Some("approval required"));
+        assert_eq!(
+            metadata["arc"]["decision"].as_str(),
+            Some("pending_approval")
+        );
     }
 
     #[test]

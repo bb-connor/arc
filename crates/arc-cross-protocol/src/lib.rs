@@ -586,7 +586,6 @@ pub struct OrchestratedToolCall {
 impl OrchestratedToolCall {
     #[must_use]
     pub fn metadata(&self) -> Value {
-        let denied = matches!(self.response.verdict, KernelVerdict::Deny);
         json!({
             "arc": {
                 "receiptId": self.response.receipt.id,
@@ -599,7 +598,11 @@ impl OrchestratedToolCall {
                     "sourceProtocol": self.source_protocol,
                     "targetProtocol": self.target_protocol,
                 },
-                "decision": if denied { "deny" } else { "allow" },
+                "decision": match self.response.verdict {
+                    KernelVerdict::Allow => "allow",
+                    KernelVerdict::Deny => "deny",
+                    KernelVerdict::PendingApproval => "pending_approval",
+                },
                 "capabilityId": self.response.receipt.capability_id,
                 "authorityPath": CROSS_PROTOCOL_AUTHORITY_PATH,
                 "authoritative": true,
@@ -1832,6 +1835,48 @@ mod tests {
         assert_eq!(
             result.metadata()["arc"]["routeSelection"]["decision"].as_str(),
             Some("select")
+        );
+    }
+
+    #[test]
+    fn pending_approval_metadata_is_not_labeled_allow() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+
+        let mut result = orchestrator
+            .execute(
+                &MockBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: "a2a-task-pending".to_string(),
+                    kernel_request_id: "a2a-a2a-task-pending".to_string(),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: "test-srv".to_string(),
+                    target_tool_name: "echo".to_string(),
+                    agent_id: subject.public_key().to_hex(),
+                    arguments: json!({"message":"hello"}),
+                    capability: capability_for_tool(&issuer, &subject, "test-srv", "echo"),
+                    source_envelope: json!({
+                        "message": {"role":"user"},
+                        "metadata": { "arc": { "targetSkillId": "echo" } }
+                    }),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                },
+            )
+            .unwrap();
+        result.response.verdict = KernelVerdict::PendingApproval;
+        result.response.reason = Some("approval required".to_string());
+
+        let metadata = result.metadata();
+        assert_eq!(
+            metadata["arc"]["decision"].as_str(),
+            Some("pending_approval")
+        );
+        assert_eq!(
+            metadata["arc"]["reason"].as_str(),
+            Some("approval required")
         );
     }
 
