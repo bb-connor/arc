@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**53 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**55 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -51,7 +51,7 @@ roadmap phase.
 | 10 (Orchestration) | 10.1, 10.2, 10.3 | -- | -- |
 | 11 (Content / streaming / IaC) | 11.2, 11.3 | -- | 11.1 |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
-| 13 (External guards) | 13.1 | -- | 13.2, 13.3 |
+| 13 (External guards) | 13.1, 13.2, 13.3 | -- | -- |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
@@ -973,7 +973,7 @@ with a circuit breaker that opens after 5 failures. When open, the adapter
 returns `circuit_open_verdict` (configurable Allow or Deny) without calling
 the external service. Cache hit returns cached verdict without API call.
 
-### 13.2 Cloud Guardrail Adapters
+### 13.2 Cloud Guardrail Adapters [SHIPPED bf1bc74]
 
 **What**: `BedrockGuardrailGuard`, `AzureContentSafetyGuard`,
 `VertexSafetyGuard` as `ExternalGuard` implementations.
@@ -990,7 +990,7 @@ the external service. Cache hit returns cached verdict without API call.
 denies when any category exceeds severity threshold. Cloud provider
 verdict captured as `GuardEvidence` in receipt.
 
-### 13.3 Threat Intelligence Guards
+### 13.3 Threat Intelligence Guards [SHIPPED bf1bc74]
 
 **What**: VirusTotal, Safe Browsing, Snyk as `ExternalGuard` implementations.
 
