@@ -44,9 +44,14 @@ guards:
       - "(?i)chmod\\s+777"
       - "(?i)curl\\s+[^|]+\\|\\s*(sh|bash|zsh|fish)"
       - "(?i)wget\\s+[^|]+\\|\\s*(sh|bash|zsh|fish)"
-      - "(?i)git\\s+push\\s+.*--force"
+      # `git push --force` and `-f` stay blocked (destructive), but
+      # `--force-with-lease` is the standard-safe rebased-feature-branch
+      # workflow and MUST be allowed. Match `--force` only when followed
+      # by whitespace or end-of-string, which naturally excludes
+      # `--force-with-lease` without relying on negative lookahead (the
+      # `regex` crate does not support `(?!...)`).
+      - "(?i)git\\s+push\\s+.*--force(\\s|$)"
       - "(?i)git\\s+push\\s+.*-f(\\s|$)"
-      - "(?i)git\\s+push\\s+.*--force-with-lease"
       - "(?i)git\\s+reset\\s+--hard\\s+origin"
       - "(?i)sudo\\s+"
       - "(?i)eval\\s*\\("
