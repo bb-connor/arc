@@ -8,9 +8,10 @@ use arc_cross_protocol::{
     plan_authoritative_route, route_selection_metadata, DiscoveryProtocol, TargetProtocolRegistry,
 };
 use arc_kernel::{
-    ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallRequest,
-    ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ApprovalStore, ArcKernel, Guard, GuardContext, InMemoryApprovalStore, KernelConfig,
+    KernelError, ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -39,6 +40,7 @@ pub struct HttpAuthority {
     kernel: Arc<ArcKernel>,
     kernel_subject: PublicKey,
     kernel_agent_id: String,
+    approval_store: Arc<dyn ApprovalStore>,
 }
 
 impl std::fmt::Debug for HttpAuthority {
@@ -199,6 +201,15 @@ impl Guard for HttpProjectionGuard {
 impl HttpAuthority {
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_with_approval_store(keypair, policy_hash, Arc::new(InMemoryApprovalStore::new()))
+    }
+
+    #[must_use]
+    pub fn new_with_approval_store(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+    ) -> Self {
         let keypair = Arc::new(keypair);
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
@@ -226,7 +237,13 @@ impl HttpAuthority {
             kernel: Arc::new(kernel),
             kernel_subject,
             kernel_agent_id,
+            approval_store,
         }
+    }
+
+    #[must_use]
+    pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
+        Arc::clone(&self.approval_store)
     }
 
     pub fn evaluate(

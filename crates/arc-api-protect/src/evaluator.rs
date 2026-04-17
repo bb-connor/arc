@@ -1,6 +1,7 @@
 //! Request evaluator: matches routes, checks capabilities, signs receipts.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::GuardEvidence;
@@ -9,6 +10,7 @@ use arc_http_core::{
     HttpAuthorityEvaluation, HttpAuthorityInput, HttpAuthorityPolicy, HttpMethod, HttpReceipt,
     Verdict,
 };
+use arc_kernel::{ApprovalStore, InMemoryApprovalStore};
 use arc_openapi::PolicyDecision;
 
 /// Evaluated result for a single HTTP request.
@@ -35,10 +37,29 @@ pub struct RequestEvaluator {
 
 impl RequestEvaluator {
     pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_with_approval_store(
+            routes,
+            keypair,
+            policy_hash,
+            Arc::new(InMemoryApprovalStore::new()),
+        )
+    }
+
+    pub fn new_with_approval_store(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+    ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new(keypair, policy_hash),
+            authority: HttpAuthority::new_with_approval_store(keypair, policy_hash, approval_store),
         }
+    }
+
+    #[must_use]
+    pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
+        self.authority.approval_store()
     }
 
     /// Evaluate an incoming HTTP request against the route table.

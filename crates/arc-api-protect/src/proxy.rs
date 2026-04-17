@@ -216,7 +216,21 @@ impl ProtectProxy {
         let keypair = Keypair::generate();
         let policy_hash = arc_core_types::sha256_hex(spec_content.as_bytes());
 
-        let evaluator = RequestEvaluator::new(routes, keypair.clone(), policy_hash);
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
+            Arc::new(
+                SqliteApprovalStore::open(path)
+                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+            )
+        } else {
+            Arc::new(InMemoryApprovalStore::new())
+        };
+
+        let evaluator = RequestEvaluator::new_with_approval_store(
+            routes,
+            keypair.clone(),
+            policy_hash,
+            Arc::clone(&approval_store),
+        );
 
         let (receipt_log, receipt_store, revoked_capability_ids) =
             if let Some(path) = &self.config.receipt_db {
@@ -237,15 +251,6 @@ impl ProtectProxy {
                     HashSet::new(),
                 )
             };
-
-        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
-            Arc::new(
-                SqliteApprovalStore::open(path)
-                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
-            )
-        } else {
-            Arc::new(InMemoryApprovalStore::new())
-        };
 
         let state = Arc::new(ProxyState {
             evaluator,
@@ -1806,8 +1811,14 @@ paths:
         } else {
             (None, Vec::new(), HashSet::new())
         };
+        let evaluator = RequestEvaluator::new_with_approval_store(
+            routes,
+            keypair.clone(),
+            "test-policy".to_string(),
+            Arc::clone(&approval_store),
+        );
         Arc::new(ProxyState {
-            evaluator: RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string()),
+            evaluator,
             signer_keypair: keypair,
             upstream,
             http_client: reqwest::Client::new(),
@@ -2168,6 +2179,14 @@ paths:
             .get_pending("ap-route-1")
             .expect("approval lookup")
             .is_none());
+    }
+
+    #[test]
+    fn evaluator_and_approval_routes_share_the_same_store() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let evaluator_store = state.evaluator.approval_store();
+
+        assert!(Arc::ptr_eq(&evaluator_store, state.approval_admin.store()));
     }
 
     #[tokio::test]
