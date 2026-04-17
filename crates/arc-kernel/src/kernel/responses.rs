@@ -162,6 +162,7 @@ impl ArcKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -333,6 +334,7 @@ impl ArcKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,

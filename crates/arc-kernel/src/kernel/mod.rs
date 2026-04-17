@@ -3306,10 +3306,10 @@ impl ArcKernel {
     /// it does not require a tokio runtime, a sqlite database, or any
     /// IO adapter. The full `evaluate_tool_call_*` API remains the
     /// authoritative path for the desktop sidecar.
-    pub fn evaluate_portable_verdict<'a, 'b>(
+    pub fn evaluate_portable_verdict<'a>(
         &self,
         capability: &'a CapabilityToken,
-        request: &'b arc_kernel_core::PortableToolCallRequest,
+        request: &arc_kernel_core::PortableToolCallRequest,
         guards: &'a [&'a dyn arc_kernel_core::Guard],
         clock: &'a dyn arc_kernel_core::Clock,
         session_filesystem_roots: Option<&'a [String]>,
@@ -3353,10 +3353,11 @@ impl ArcKernel {
         )
         .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?;
 
-        let last_link = cap
-            .delegation_chain
-            .last()
-            .expect("delegation chain checked as non-empty");
+        let Some(last_link) = cap.delegation_chain.last() else {
+            return Err(KernelError::DelegationInvalid(
+                "delegation chain disappeared after validation".to_string(),
+            ));
+        };
         if last_link.delegatee != cap.subject {
             return Err(KernelError::DelegationInvalid(format!(
                 "leaf capability subject {} does not match final delegation delegatee {}",
@@ -3766,6 +3767,7 @@ impl ArcKernel {
             .committed_cost_units_after)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,

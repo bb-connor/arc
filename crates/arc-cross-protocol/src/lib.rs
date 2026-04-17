@@ -1037,6 +1037,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_target(
         &self,
         request: &CrossProtocolExecutionRequest,
@@ -1283,6 +1284,7 @@ fn planned_protocols_for_target(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn planned_outcome(
     request_id: &str,
     decision: RouteSelectionDecision,

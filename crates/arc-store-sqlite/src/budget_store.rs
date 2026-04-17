@@ -442,6 +442,7 @@ impl SqliteBudgetStore {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn existing_event_allowed(
         transaction: &rusqlite::Transaction<'_>,
         event_id: Option<&str>,
@@ -539,6 +540,7 @@ impl SqliteBudgetStore {
         Ok(Some(existing_allowed.map(|value| value > 0)))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn append_mutation_event(
         transaction: &rusqlite::Transaction<'_>,
         event_id: Option<&str>,

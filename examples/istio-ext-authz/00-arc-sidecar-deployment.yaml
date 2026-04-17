@@ -75,6 +75,19 @@ spec:
           # iterating locally (the README calls this out).
           image: ghcr.io/backbay/arc-sidecar:0.1.0
           imagePullPolicy: IfNotPresent
+          # The sidecar image defaults to `--help`, which exits immediately.
+          # Pin an explicit long-running ARC command in the manifest so the
+          # Deployment does not crash-loop on image defaults.
+          command: ["/usr/local/bin/arc-sidecar"]
+          args:
+            - trust
+            - serve
+            - --listen
+            - 0.0.0.0:9090
+            - --service-token
+            - arc-example-service-token
+            - --policy
+            - /etc/arc/policy.yaml
           ports:
             - name: grpc-ext-authz
               containerPort: 9091

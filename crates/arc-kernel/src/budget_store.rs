@@ -292,6 +292,7 @@ pub trait BudgetStore: Send {
         max_total_cost_units: Option<u64>,
     ) -> Result<bool, BudgetStoreError>;
 
+    #[allow(clippy::too_many_arguments)]
     fn try_charge_cost_with_ids(
         &mut self,
         capability_id: &str,
@@ -315,6 +316,7 @@ pub trait BudgetStore: Send {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn try_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
@@ -444,6 +446,7 @@ pub trait BudgetStore: Send {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn settle_charge_cost_with_ids_and_authority(
         &mut self,
         capability_id: &str,
@@ -1158,7 +1161,11 @@ impl BudgetStore for InMemoryBudgetStore {
             seq = entry.seq;
         }
         if let Some(hold_id) = hold_id {
-            let hold = self.holds.get_mut(hold_id).expect("validated hold");
+            let Some(hold) = self.holds.get_mut(hold_id) else {
+                return Err(BudgetStoreError::Invariant(
+                    "validated hold missing during reverse_charge_cost".to_string(),
+                ));
+            };
             hold.remaining_exposure_units = 0;
             hold.disposition = BudgetHoldDisposition::Reversed;
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());
@@ -1274,7 +1281,11 @@ impl BudgetStore for InMemoryBudgetStore {
             seq = entry.seq;
         }
         if let Some(hold_id) = hold_id {
-            let hold = self.holds.get_mut(hold_id).expect("validated hold");
+            let Some(hold) = self.holds.get_mut(hold_id) else {
+                return Err(BudgetStoreError::Invariant(
+                    "validated hold missing during release_charge_cost".to_string(),
+                ));
+            };
             hold.remaining_exposure_units -= cost_units;
             if hold.remaining_exposure_units == 0 {
                 hold.disposition = BudgetHoldDisposition::Released;
@@ -1424,7 +1435,11 @@ impl BudgetStore for InMemoryBudgetStore {
             seq = entry.seq;
         }
         if let Some(hold_id) = hold_id {
-            let hold = self.holds.get_mut(hold_id).expect("validated hold");
+            let Some(hold) = self.holds.get_mut(hold_id) else {
+                return Err(BudgetStoreError::Invariant(
+                    "validated hold missing during settle_charge_cost".to_string(),
+                ));
+            };
             hold.remaining_exposure_units = 0;
             hold.disposition = BudgetHoldDisposition::Reconciled;
             hold.authority = authority.cloned().or_else(|| hold.authority.clone());

@@ -14,8 +14,9 @@ use arc_core::merkle::MerkleTree;
 use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
     FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedTransactionReceiptMetadata,
-    ReceiptAttributionMetadata, ReceiptLineageRelationKind, ReceiptLineageStatement,
-    ReceiptLineageStatementBody, SettlementStatus, SignedExportEnvelope, ToolCallAction,
+    ReceiptAttributionMetadata, ReceiptLineageEndpoints, ReceiptLineageRelationKind,
+    ReceiptLineageStatement, ReceiptLineageStatementBody, SettlementStatus, SignedExportEnvelope,
+    ToolCallAction,
 };
 use arc_core::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
@@ -2343,12 +2344,14 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
     let statement = ReceiptLineageStatement::sign(
         ReceiptLineageStatementBody::new(
             "stmt-lineage-001",
-            parent_receipt.id.clone(),
-            child_receipt.id.clone(),
-            RequestId::new("req-parent-lineage"),
-            RequestId::new("req-child-lineage"),
-            SessionAnchorReference::new("anchor-parent-lineage", "anchor-parent-lineage-hash"),
-            SessionAnchorReference::new("anchor-child-lineage", "anchor-child-lineage-hash"),
+            ReceiptLineageEndpoints::new(
+                parent_receipt.id.clone(),
+                child_receipt.id.clone(),
+                RequestId::new("req-parent-lineage"),
+                RequestId::new("req-child-lineage"),
+                SessionAnchorReference::new("anchor-parent-lineage", "anchor-parent-lineage-hash"),
+                SessionAnchorReference::new("anchor-child-lineage", "anchor-child-lineage-hash"),
+            ),
             ReceiptLineageRelationKind::Continued,
             2_101,
             statement_kp.public_key(),

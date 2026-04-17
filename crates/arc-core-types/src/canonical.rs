@@ -491,7 +491,7 @@ mod tests {
     fn rfc8785_section3_number_examples() {
         // Verify individual number renderings.
         assert_eq!(
-            canonicalize_f64(333333333.33333334).unwrap(),
+            canonicalize_f64(333_333_333.333_333_3).unwrap(),
             "333333333.3333333"
         );
         assert_eq!(canonicalize_f64(1e20).unwrap(), "100000000000000000000");
@@ -504,7 +504,7 @@ mod tests {
     fn rfc8785_mixed_document() {
         // A representative document exercising multiple features.
         let value = serde_json::json!({
-            "numbers": [333333333.33333334, 1e30, 4.5, -0.0, 0, 2e-3, 0.000001],
+            "numbers": [333_333_333.333_333_3, 1e30, 4.5, -0.0, 0, 2e-3, 0.000001],
             "string": "\u{20ac}$\u{000f}\u{000a}A'\u{0008}\\\"\\",
             "literals": [null, true, false],
         });

@@ -31,12 +31,13 @@ use crate::session::{
 /// of mediation that produced each authorization.
 ///
 /// See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` and roadmap Phase 1.2.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TrustLevel {
     /// Tool invocation was synchronously mediated by the kernel (the
     /// strongest form: kernel observed the call inline and authorized it).
     /// This is the default and the safest baseline.
+    #[default]
     Mediated,
     /// Authorization happened inline in the agent process (e.g. a
     /// long-running orchestrator embedded the kernel via FFI). The kernel
@@ -47,12 +48,6 @@ pub enum TrustLevel {
     /// caller may have proceeded regardless. Used for shadow-mode
     /// integrations and observability-only deployments.
     Advisory,
-}
-
-impl Default for TrustLevel {
-    fn default() -> Self {
-        Self::Mediated
-    }
 }
 
 impl TrustLevel {
@@ -417,16 +412,42 @@ pub struct ReceiptLineageStatementBody {
     pub kernel_key: PublicKey,
 }
 
-impl ReceiptLineageStatementBody {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceiptLineageEndpoints {
+    pub parent_receipt_id: String,
+    pub child_receipt_id: String,
+    pub parent_request_id: RequestId,
+    pub child_request_id: RequestId,
+    pub parent_session_anchor: SessionAnchorReference,
+    pub child_session_anchor: SessionAnchorReference,
+}
+
+impl ReceiptLineageEndpoints {
     #[must_use]
     pub fn new(
-        id: impl Into<String>,
         parent_receipt_id: impl Into<String>,
         child_receipt_id: impl Into<String>,
         parent_request_id: RequestId,
         child_request_id: RequestId,
         parent_session_anchor: SessionAnchorReference,
         child_session_anchor: SessionAnchorReference,
+    ) -> Self {
+        Self {
+            parent_receipt_id: parent_receipt_id.into(),
+            child_receipt_id: child_receipt_id.into(),
+            parent_request_id,
+            child_request_id,
+            parent_session_anchor,
+            child_session_anchor,
+        }
+    }
+}
+
+impl ReceiptLineageStatementBody {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        endpoints: ReceiptLineageEndpoints,
         relation_kind: ReceiptLineageRelationKind,
         issued_at: u64,
         kernel_key: PublicKey,
@@ -434,12 +455,12 @@ impl ReceiptLineageStatementBody {
         Self {
             schema: ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA.to_string(),
             id: id.into(),
-            parent_receipt_id: parent_receipt_id.into(),
-            child_receipt_id: child_receipt_id.into(),
-            parent_request_id,
-            child_request_id,
-            parent_session_anchor,
-            child_session_anchor,
+            parent_receipt_id: endpoints.parent_receipt_id,
+            child_receipt_id: endpoints.child_receipt_id,
+            parent_request_id: endpoints.parent_request_id,
+            child_request_id: endpoints.child_request_id,
+            parent_session_anchor: endpoints.parent_session_anchor,
+            child_session_anchor: endpoints.child_session_anchor,
             relation_kind,
             evidence_class: default_receipt_lineage_evidence_class(),
             continuation_token_id: None,
@@ -1620,12 +1641,14 @@ mod tests {
         let kp = Keypair::generate();
         let body = ReceiptLineageStatementBody::new(
             "statement-1",
-            "receipt-parent-1",
-            "receipt-child-1",
-            RequestId::new("req-parent-1"),
-            RequestId::new("req-child-1"),
-            SessionAnchorReference::new("anchor-parent-1", "anchor-parent-hash-1"),
-            SessionAnchorReference::new("anchor-child-1", "anchor-child-hash-1"),
+            ReceiptLineageEndpoints::new(
+                "receipt-parent-1",
+                "receipt-child-1",
+                RequestId::new("req-parent-1"),
+                RequestId::new("req-child-1"),
+                SessionAnchorReference::new("anchor-parent-1", "anchor-parent-hash-1"),
+                SessionAnchorReference::new("anchor-child-1", "anchor-child-hash-1"),
+            ),
             ReceiptLineageRelationKind::Continued,
             1_710_000_000,
             kp.public_key(),

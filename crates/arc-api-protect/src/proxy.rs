@@ -915,6 +915,7 @@ fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Val
     )
 }
 
+#[allow(clippy::result_large_err)]
 fn require_loopback_sidecar_control_request(request: &Request<Body>) -> Result<(), Response> {
     let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() else {
         warn!("rejecting sidecar control request without peer address");
@@ -1169,6 +1170,7 @@ fn manual_receipt_policy_hash(label: &str) -> String {
     arc_core_types::sha256_hex(label.as_bytes())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_manual_receipt(
     state: &Arc<ProxyState>,
     request_id: String,

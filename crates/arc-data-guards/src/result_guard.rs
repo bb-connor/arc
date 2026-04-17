@@ -151,35 +151,28 @@ impl QueryResultGuard {
     ///   redaction marker inside every row.
     /// - If the config has `redact_pii_patterns`, every matched substring
     ///   in every string value is replaced.
-    /// - If the response is not a JSON object or has no recognised rows
-    ///   field, the value is returned unchanged.
+    /// - Constrained responses that do not expose rows under a
+    ///   recognised shape are redacted fail-closed instead of passing
+    ///   through unchanged.
     pub fn redact_result(&self, scope: &ArcScope, value: &mut Value) {
         let max_rows = scope_min_max_rows(scope);
         let denied = scope_column_denylist(scope);
+        let requires_row_shape = max_rows.is_some() || !denied.is_empty();
 
         // Apply the row-level transforms first.
-        if let Some(obj) = value.as_object_mut() {
-            let rows_key = self
-                .config
-                .rows_keys
-                .iter()
-                .find(|k| obj.get(*k).map(|v| v.is_array()).unwrap_or(false))
-                .cloned();
-
-            if let Some(key) = rows_key {
-                if let Some(array) = obj.get_mut(&key).and_then(|v| v.as_array_mut()) {
-                    if let Some(limit) = max_rows {
-                        if array.len() > limit as usize {
-                            array.truncate(limit as usize);
-                        }
-                    }
-                    if !denied.is_empty() {
-                        for row in array.iter_mut() {
-                            redact_columns(row, &denied, &self.config.redaction_marker);
-                        }
-                    }
+        if let Some(array) = locate_rows_array_mut(value, &self.config.rows_keys) {
+            if let Some(limit) = max_rows {
+                if array.len() > limit as usize {
+                    array.truncate(limit as usize);
                 }
             }
+            if !denied.is_empty() {
+                for row in array.iter_mut() {
+                    redact_columns(row, &denied, &self.config.redaction_marker);
+                }
+            }
+        } else if requires_row_shape {
+            redact_unstructured_result(value, &self.config.redaction_marker);
         }
 
         // PII pass runs after structural shaping so denied columns are
@@ -274,6 +267,53 @@ fn scope_column_denylist(scope: &ArcScope) -> Vec<String> {
         }
     }
     out
+}
+
+fn locate_rows_array_mut<'a>(
+    value: &'a mut Value,
+    rows_keys: &[String],
+) -> Option<&'a mut Vec<Value>> {
+    if value.is_array() {
+        return value.as_array_mut();
+    }
+
+    let obj = value.as_object_mut()?;
+    let rows_key = rows_keys
+        .iter()
+        .find(|key| obj.get(*key).map(Value::is_array).unwrap_or(false))?
+        .clone();
+    obj.get_mut(&rows_key).and_then(Value::as_array_mut)
+}
+
+fn redact_unstructured_result(value: &mut Value, marker: &str) {
+    match value {
+        Value::Object(map) => {
+            if let Some(data) = map.get_mut("data") {
+                redact_nested_values(data, marker);
+            } else {
+                for field in map.values_mut() {
+                    redact_nested_values(field, marker);
+                }
+            }
+        }
+        _ => redact_nested_values(value, marker),
+    }
+}
+
+fn redact_nested_values(value: &mut Value, marker: &str) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                redact_nested_values(item, marker);
+            }
+        }
+        Value::Object(map) => {
+            for field in map.values_mut() {
+                redact_nested_values(field, marker);
+            }
+        }
+        _ => *value = Value::String(marker.to_string()),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -530,12 +570,36 @@ mod tests {
     }
 
     #[test]
-    fn non_object_response_is_unchanged() {
+    fn top_level_array_is_treated_as_rows() {
         let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
         let mut value = serde_json::json!([1, 2, 3]);
         guard.redact_result(&scope, &mut value);
-        assert_eq!(value, serde_json::json!([1, 2, 3]));
+        assert_eq!(value, serde_json::json!([1]));
+    }
+
+    #[test]
+    fn constrained_unknown_row_key_is_redacted_fail_closed() {
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
+        let mut value = serde_json::json!({
+            "items": [
+                {"id": 1, "email": "a@b.com"},
+                {"id": 2, "email": "c@d.com"}
+            ],
+            "count": 2
+        });
+        guard.redact_result(&scope, &mut value);
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "items": [
+                    {"id": "[REDACTED]", "email": "[REDACTED]"},
+                    {"id": "[REDACTED]", "email": "[REDACTED]"}
+                ],
+                "count": "[REDACTED]"
+            })
+        );
     }
 
     #[test]

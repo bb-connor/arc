@@ -196,6 +196,17 @@ impl From<HttpAuthorityError> for ArcTowerError {
                 Self::Evaluation(format!("content hash failed: {message}"))
             }
             HttpAuthorityError::Kernel(message) => Self::Evaluation(message),
+            HttpAuthorityError::PendingApproval {
+                approval_id,
+                kernel_receipt_id,
+            } => Self::Evaluation(match approval_id {
+                Some(approval_id) => format!(
+                    "request requires approval; approval_id={approval_id}; kernel_receipt_id={kernel_receipt_id}"
+                ),
+                None => format!(
+                    "request requires approval; kernel_receipt_id={kernel_receipt_id}"
+                ),
+            }),
             HttpAuthorityError::ReceiptSign(message) => {
                 Self::ReceiptSign(format!("signing failed: {message}"))
             }

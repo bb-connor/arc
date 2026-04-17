@@ -3358,6 +3358,7 @@ fn refresh_receipt_lineage_rows_for_parent_receipt_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn persist_session_anchor_tx(
     tx: &rusqlite::Transaction<'_>,
     session_id: &str,
@@ -3470,6 +3471,7 @@ fn persist_session_anchor_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn persist_request_lineage_tx(
     tx: &rusqlite::Transaction<'_>,
     session_id: &str,
@@ -3579,6 +3581,7 @@ fn persist_request_lineage_tx(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn persist_receipt_lineage_statement_tx(
     tx: &rusqlite::Transaction<'_>,
     child_receipt_id: &str,
@@ -4006,6 +4009,7 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn record_request_lineage_record(
         &self,
         session_id: &str,
@@ -4033,6 +4037,7 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn record_receipt_lineage_statement_record(
         &self,
         child_receipt_id: &str,

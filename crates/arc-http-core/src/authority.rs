@@ -384,6 +384,7 @@ impl HttpAuthority {
             .map_err(|e| HttpAuthorityError::ReceiptSign(e.to_string()))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn authorize_via_kernel(
         &self,
         request_id: &str,

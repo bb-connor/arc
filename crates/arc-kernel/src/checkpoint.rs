@@ -284,7 +284,7 @@ pub fn build_checkpoint_publication(
         schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
         checkpoint_seq: checkpoint.body.checkpoint_seq,
         checkpoint_sha256: checkpoint_body_sha256(&checkpoint.body)?,
-        merkle_root: checkpoint.body.merkle_root.clone(),
+        merkle_root: checkpoint.body.merkle_root,
         published_at: checkpoint.body.issued_at,
         kernel_key: checkpoint.body.kernel_key.clone(),
         log_tree_size: checkpoint_log_tree_size(&checkpoint.body),
@@ -397,6 +397,7 @@ pub fn verify_checkpoint_consistency_proof(
     Ok(*proof == build_checkpoint_consistency_proof(previous, current)?)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ordered_equivocation(
     kind: CheckpointEquivocationKind,
     log_id: Option<String>,

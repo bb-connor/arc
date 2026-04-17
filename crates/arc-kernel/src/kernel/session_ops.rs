@@ -388,10 +388,12 @@ impl ArcKernel {
     ) -> Result<arc_core::session::SessionAnchor, KernelError> {
         let body = arc_core::session::SessionAnchorBody::new(
             session.session_anchor().id().to_string(),
-            session.id().clone(),
-            session.agent_id().to_string(),
-            session.auth_context().clone(),
-            arc_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+            arc_core::session::SessionAnchorContext::new(
+                session.id().clone(),
+                session.agent_id().to_string(),
+                session.auth_context().clone(),
+                arc_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+            ),
             session.session_anchor().auth_epoch(),
             session.session_anchor().issued_at(),
             self.config.keypair.public_key(),

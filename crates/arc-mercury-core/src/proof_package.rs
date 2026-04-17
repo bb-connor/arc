@@ -151,6 +151,7 @@ pub struct MercuryProofPackage {
 }
 
 impl MercuryProofPackage {
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         arc_bundle: EvidenceExportBundle,
         evidence_export_manifest_hash: impl Into<String>,
@@ -734,9 +735,9 @@ fn shared_optional_value<'a>(values: impl Iterator<Item = Option<&'a str>>) -> O
     first.flatten().map(ToOwned::to_owned)
 }
 
-fn publication_claim_trust_anchor<'a>(
-    publication_profile: &'a MercuryPublicationProfile,
-) -> Result<Option<&'a str>, MercuryContractError> {
+fn publication_claim_trust_anchor(
+    publication_profile: &MercuryPublicationProfile,
+) -> Result<Option<&str>, MercuryContractError> {
     publication_profile.validate()?;
     Ok(
         if publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY {

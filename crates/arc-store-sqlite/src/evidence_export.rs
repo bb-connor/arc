@@ -325,7 +325,7 @@ fn load_checkpoint_publication_core(
             FROM checkpoint_publication_metadata
             WHERE checkpoint_seq = ?1
             "#,
-            params![checkpoint_seq as i64],
+            params![checkpoint_seq],
             |row| {
                 Ok(PersistedCheckpointPublicationCore {
                     publication_schema: row.get::<_, String>(0)?,
@@ -359,7 +359,7 @@ fn load_checkpoint_publication_trust_anchor_binding(
             FROM checkpoint_publication_trust_anchor_bindings
             WHERE checkpoint_seq = ?1
             "#,
-            params![checkpoint_seq as i64],
+            params![checkpoint_seq],
             |row| row.get::<_, String>(0),
         )
         .optional()?;

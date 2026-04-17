@@ -772,7 +772,7 @@ fn cluster_authority_lease_view_locked(
 
 fn cluster_authority_lease_view(state: &TrustServiceState) -> Option<ClusterAuthorityLeaseView> {
     let cluster = state.cluster.as_ref()?;
-    Some(match cluster.lock() {
+    match cluster.lock() {
         Ok(mut guard) => {
             let consensus = compute_cluster_consensus_locked(&mut guard);
             cluster_authority_lease_view_locked(&mut guard, &consensus)
@@ -782,7 +782,7 @@ fn cluster_authority_lease_view(state: &TrustServiceState) -> Option<ClusterAuth
             let consensus = compute_cluster_consensus_locked(&mut guard);
             cluster_authority_lease_view_locked(&mut guard, &consensus)
         }
-    }?)
+    }
 }
 
 fn current_budget_event_authority(

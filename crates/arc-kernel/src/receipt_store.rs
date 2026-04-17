@@ -143,6 +143,7 @@ pub trait ReceiptStore: Send {
     }
 
     /// Persist a serialized `RequestLineageRecord` while the concrete P1-A type remains in flight.
+    #[allow(clippy::too_many_arguments)]
     fn record_request_lineage(
         &mut self,
         _session_id: &str,
@@ -157,6 +158,7 @@ pub trait ReceiptStore: Send {
     }
 
     /// Persist a serialized `ReceiptLineageStatement` while the concrete P1-A type remains in flight.
+    #[allow(clippy::too_many_arguments)]
     fn record_receipt_lineage_statement(
         &mut self,
         _child_receipt_id: &str,

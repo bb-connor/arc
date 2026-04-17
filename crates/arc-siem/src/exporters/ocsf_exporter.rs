@@ -23,22 +23,17 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::ocsf::receipt_to_ocsf;
 
 /// Payload serialization format for the OCSF exporter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OcsfPayloadFormat {
     /// Send the batch as a single JSON array: `[{...}, {...}]`.
     JsonArray,
     /// Send the batch as newline-delimited JSON objects.
+    #[default]
     Ndjson,
 }
 
-impl Default for OcsfPayloadFormat {
-    fn default() -> Self {
-        Self::Ndjson
-    }
-}
-
 /// Configuration for the OCSF exporter.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OcsfExporterConfig {
     /// HTTPS endpoint that accepts OCSF events.
     ///
@@ -55,17 +50,6 @@ pub struct OcsfExporterConfig {
     /// `application/json` for [`OcsfPayloadFormat::JsonArray`] and
     /// `application/x-ndjson` for [`OcsfPayloadFormat::Ndjson`].
     pub content_type: Option<String>,
-}
-
-impl Default for OcsfExporterConfig {
-    fn default() -> Self {
-        Self {
-            endpoint: String::new(),
-            bearer_token: None,
-            payload_format: OcsfPayloadFormat::default(),
-            content_type: None,
-        }
-    }
 }
 
 /// Exporter that transforms ARC receipts into OCSF 1.3.0 Authorization events
