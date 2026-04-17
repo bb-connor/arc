@@ -305,6 +305,17 @@ fn redact_columns(row: &mut Value, denied: &[String], marker: &str) {
         })
         .collect();
 
+    // Truly-bare entries (no `table.` qualifier) are the only ones that
+    // apply table-agnostically under the nested `{table:{column:...}}`
+    // shape. Using the flat-row `bare` list there would widen a
+    // qualified denylist like ["users.email"] to also redact
+    // `orders.email` in nested payloads, corrupting unrelated tables.
+    let truly_bare: Vec<&str> = denied
+        .iter()
+        .filter(|s| !s.contains('.'))
+        .map(|s| s.as_str())
+        .collect();
+
     let keys: Vec<String> = map.keys().cloned().collect();
     for key in &keys {
         let lower = key.to_ascii_lowercase();
@@ -319,18 +330,17 @@ fn redact_columns(row: &mut Value, denied: &[String], marker: &str) {
         }
 
         // Nested table shape: "table" with a nested object whose columns
-        // we need to scrub. We check both the `table.column` dotted
-        // denylist entries AND the bare column names -- documented
-        // "bare column names apply to any table" behavior, which the
-        // previous code missed for nested objects and leaked e.g.
-        // `{"users": {"email": ...}}` when only `"email"` was denied.
+        // we need to scrub. Check exact `table.column` dotted entries
+        // AND truly-bare entries (no `.` qualifier). A qualified entry
+        // like `users.email` must NOT table-agnostically match
+        // `orders.email` in nested rows.
         if let Some(Value::Object(inner)) = map.get_mut(key) {
             let inner_keys: Vec<String> = inner.keys().cloned().collect();
             for col in inner_keys {
                 let col_lower = col.to_ascii_lowercase();
                 let dotted = format!("{}.{}", lower, col_lower);
                 let hit = denied.iter().any(|d| d == &dotted)
-                    || bare.iter().any(|b| b.as_ref() == col_lower);
+                    || truly_bare.iter().any(|b| *b == col_lower);
                 if hit {
                     if let Some(v) = inner.get_mut(&col) {
                         *v = Value::String(marker.to_string());
