@@ -3,7 +3,7 @@
 Reference deployment manifests for running the ARC (Chio) kernel as a sidecar
 alongside an application container on managed multi-container platforms.
 
-All manifests assume the sidecar listens on `:9090` and exposes `GET /health`.
+All manifests assume the sidecar listens on `:9090` and exposes `GET /arc/health`.
 The application talks to the kernel over `http://localhost:9090`.
 
 See `docs/protocols/CLOUD-SIDECAR-INTEGRATION.md` for the architectural
@@ -44,7 +44,7 @@ Additional non-secret configuration:
 - `ARC_POLICY_SOURCE` -- policy bundle location (bundled, `gs://`, `s3://`, `https://`)
 - `ARC_RECEIPT_SINK` -- receipt destination (BigQuery, DynamoDB, Cosmos DB, stdout, ...)
 - `ARC_LISTEN_ADDR` (default `0.0.0.0:9090`)
-- `ARC_HEALTH_PATH` (default `/health`)
+- `ARC_HEALTH_PATH` (default `/arc/health`)
 
 ## Startup ordering
 
@@ -52,11 +52,11 @@ All three platforms enforce that the app container cannot serve traffic until
 the sidecar is healthy:
 
 - **Cloud Run** -- `run.googleapis.com/container-dependencies` annotation plus
-  sidecar `startupProbe` on `:9090/health`.
+  sidecar `startupProbe` on `:9090/arc/health`.
 - **ECS Fargate** -- `dependsOn: [{ containerName: "arc-sidecar", condition: "HEALTHY" }]`
   on the app, combined with a `healthCheck` block on the sidecar.
 - **Azure Container Apps** -- sidecar `startupProbe` plus `readinessProbe` on
-  `:9090/health`; the app's own `startupProbe` ensures it does not report
+  `:9090/arc/health`; the app's own `startupProbe` ensures it does not report
   healthy until it can reach the sidecar.
 
 ## Fail-closed behaviour

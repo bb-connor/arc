@@ -1,6 +1,6 @@
 //! Reverse proxy server that evaluates requests and forwards to upstream.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -21,8 +21,9 @@ use arc_core_types::capability::{
 };
 use arc_core_types::crypto::Keypair;
 use arc_http_core::{
-    ArcHttpRequest, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, SidecarStatus,
-    Verdict, VerifyReceiptResponse,
+    http_status_metadata_decision, http_status_metadata_final, ArcHttpRequest, AuthMethod,
+    CallerIdentity, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, HttpReceiptBody,
+    SidecarStatus, Verdict, VerifyReceiptResponse,
 };
 use arc_openapi::{ArcExtensions, DefaultPolicy};
 
@@ -65,6 +66,9 @@ impl SqliteReceiptStore {
                     id TEXT PRIMARY KEY,
                     receipt_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS revoked_capabilities (
+                    capability_id TEXT PRIMARY KEY
+                );
                 ",
             )
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
@@ -102,6 +106,34 @@ impl SqliteReceiptStore {
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         Ok(())
     }
+
+    fn load_revoked_capability_ids(&self) -> Result<HashSet<String>, ProtectError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT capability_id FROM revoked_capabilities ORDER BY rowid ASC")
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+
+        let mut capability_ids = HashSet::new();
+        for row in rows {
+            let capability_id =
+                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            capability_ids.insert(capability_id);
+        }
+        Ok(capability_ids)
+    }
+
+    fn revoke_capability(&mut self, capability_id: &str) -> Result<(), ProtectError> {
+        self.connection
+            .execute(
+                "INSERT OR REPLACE INTO revoked_capabilities (capability_id) VALUES (?1)",
+                params![capability_id],
+            )
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        Ok(())
+    }
 }
 
 /// Shared proxy state.
@@ -112,6 +144,7 @@ struct ProxyState {
     http_client: reqwest::Client,
     receipt_log: Mutex<ReceiptLog>,
     receipt_store: Option<Mutex<SqliteReceiptStore>>,
+    revoked_capability_ids: Mutex<HashSet<String>>,
 }
 
 /// The protect proxy.
@@ -178,18 +211,25 @@ impl ProtectProxy {
 
         let evaluator = RequestEvaluator::new(routes, keypair.clone(), policy_hash);
 
-        let (receipt_log, receipt_store) = if let Some(path) = &self.config.receipt_db {
-            let store = SqliteReceiptStore::open(path)?;
-            let receipts = store.load_receipts()?;
-            (ReceiptLog { receipts }, Some(Mutex::new(store)))
-        } else {
-            (
-                ReceiptLog {
-                    receipts: Vec::new(),
-                },
-                None,
-            )
-        };
+        let (receipt_log, receipt_store, revoked_capability_ids) =
+            if let Some(path) = &self.config.receipt_db {
+                let store = SqliteReceiptStore::open(path)?;
+                let receipts = store.load_receipts()?;
+                let revoked_capability_ids = store.load_revoked_capability_ids()?;
+                (
+                    ReceiptLog { receipts },
+                    Some(Mutex::new(store)),
+                    revoked_capability_ids,
+                )
+            } else {
+                (
+                    ReceiptLog {
+                        receipts: Vec::new(),
+                    },
+                    None,
+                    HashSet::new(),
+                )
+            };
 
         let state = Arc::new(ProxyState {
             evaluator,
@@ -198,6 +238,7 @@ impl ProtectProxy {
             http_client: reqwest::Client::new(),
             receipt_log: Mutex::new(receipt_log),
             receipt_store,
+            revoked_capability_ids: Mutex::new(revoked_capability_ids),
         });
 
         let app = build_app(Arc::clone(&state));
@@ -280,6 +321,12 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
     } else {
         Some(arc_core_types::sha256_hex(&body_bytes))
     };
+
+    if let Some(response) =
+        revoked_proxy_response(&state, method, &path, &query, &headers, body_hash.clone()).await
+    {
+        return response;
+    }
 
     // Evaluate.
     let result =
@@ -437,6 +484,13 @@ async fn sidecar_evaluate_handler(
                 .into_response();
         }
     };
+
+    if let Some(response) =
+        revoked_sidecar_evaluate_response(&state, &arc_request, presented_capability.as_deref())
+            .await
+    {
+        return response;
+    }
 
     let result = match state
         .evaluator
@@ -658,7 +712,7 @@ async fn sidecar_mint_handler(
 }
 
 async fn sidecar_release_handler(
-    State(_state): State<Arc<ProxyState>>,
+    State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
     let (_parts, body) = request.into_parts();
@@ -683,6 +737,22 @@ async fn sidecar_release_handler(
         return sidecar_bad_request("capability_id must not be empty").into_response();
     }
 
+    let capability_id = release_request.capability_id.trim().to_string();
+    if let Some(store) = &state.receipt_store {
+        let mut store = store.lock().await;
+        if let Err(error) = store.revoke_capability(&capability_id) {
+            warn!("failed to persist capability revocation: {error}");
+            return internal_json_error_response(
+                "arc_capability_release_failed",
+                &error.to_string(),
+            );
+        }
+    }
+    state
+        .revoked_capability_ids
+        .lock()
+        .await
+        .insert(capability_id);
     let _ = (release_request.job_uid, release_request.reason);
 
     (
@@ -693,7 +763,7 @@ async fn sidecar_release_handler(
 }
 
 async fn sidecar_submit_receipt_handler(
-    State(_state): State<Arc<ProxyState>>,
+    State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
 ) -> Response {
     let (_parts, body) = request.into_parts();
@@ -736,16 +806,55 @@ async fn sidecar_submit_receipt_handler(
         }
     }
 
-    let _ = (
-        receipt_request.capability_id,
-        receipt_request.started_at,
-        receipt_request.completed_at,
-    );
+    let caller_identity_hash = match CallerIdentity::anonymous().identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash synthetic receipt caller identity: {error}");
+            return internal_json_error_response("arc_receipt_sign_failed", &error.to_string());
+        }
+    };
+
+    let receipt_id = uuid::Uuid::now_v7().to_string();
+    let capability_id = receipt_request
+        .capability_id
+        .clone()
+        .filter(|value| !value.trim().is_empty());
+    let receipt = match HttpReceipt::sign(
+        HttpReceiptBody {
+            id: receipt_id.clone(),
+            request_id: format!("job-receipt-submission:{}", receipt_request.job_uid),
+            route_pattern: "/v1/receipts".to_string(),
+            method: HttpMethod::Post,
+            caller_identity_hash,
+            session_id: None,
+            verdict: Verdict::Allow,
+            evidence: Vec::new(),
+            response_status: StatusCode::OK.as_u16(),
+            timestamp: chrono::Utc::now().timestamp() as u64,
+            content_hash: arc_core_types::sha256_hex(&body_bytes),
+            policy_hash: manual_receipt_policy_hash("arc_api_protect_sidecar_receipt_submission"),
+            capability_id,
+            metadata: Some(sidecar_submit_receipt_metadata(&receipt_request)),
+            kernel_key: state.signer_keypair.public_key(),
+        },
+        &state.signer_keypair,
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign submitted sidecar receipt: {error}");
+            return internal_json_error_response("arc_receipt_sign_failed", &error.to_string());
+        }
+    };
+
+    if let Err(error) = record_receipt(&state, &receipt).await {
+        warn!("failed to persist submitted sidecar receipt: {error}");
+        return internal_json_error_response("arc_receipt_persistence_failed", &error.to_string());
+    }
 
     (
         StatusCode::OK,
         axum::Json(SidecarSubmitReceiptResponse {
-            receipt_id: uuid::Uuid::now_v7().to_string(),
+            receipt_id,
             accepted: true,
         }),
     )
@@ -791,11 +900,12 @@ fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Val
     )
 }
 
-fn ttl_seconds_from_wire(ttl_nanos: Option<u64>) -> u64 {
+fn ttl_seconds_from_wire(ttl_wire: Option<u64>) -> u64 {
     const DEFAULT_TTL_SECONDS: u64 = 3600;
-    match ttl_nanos {
+    match ttl_wire {
         Some(0) | None => DEFAULT_TTL_SECONDS,
-        Some(ttl_nanos) => std::cmp::max(1, ttl_nanos / 1_000_000_000),
+        Some(ttl) if ttl < 1_000_000_000 => ttl,
+        Some(ttl) => std::cmp::max(1, ttl / 1_000_000_000),
     }
 }
 
@@ -892,7 +1002,7 @@ fn parse_sidecar_operation(raw: &str, shorthand: bool) -> Result<Operation, Stri
         "invoke" | "call" | "exec" | "execute" => Ok(Operation::Invoke),
         "write" if shorthand => Ok(Operation::Invoke),
         "read_result" | "result" => Ok(Operation::ReadResult),
-        "read" if shorthand => Ok(Operation::Invoke),
+        "read" if shorthand => Ok(Operation::Read),
         "read" => Ok(Operation::Read),
         "subscribe" | "watch" => Ok(Operation::Subscribe),
         "get" => Ok(Operation::Get),
@@ -928,6 +1038,378 @@ fn evaluation_error_response(error: &ProtectError) -> Response {
         )
             .into_response(),
     }
+}
+
+fn internal_json_error_response(error: &str, message: &str) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        axum::Json(serde_json::json!({
+            "error": error,
+            "message": message,
+        })),
+    )
+        .into_response()
+}
+
+fn extract_presented_capability_from_maps<'a>(
+    headers: &'a HashMap<String, String>,
+    query: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    headers
+        .get("x-arc-capability")
+        .or_else(|| headers.get("X-Arc-Capability"))
+        .map(String::as_str)
+        .or_else(|| query.get("arc_capability").map(String::as_str))
+}
+
+fn extract_caller_identity(headers: &HashMap<String, String>) -> CallerIdentity {
+    if let Some(auth) = headers
+        .get("authorization")
+        .or_else(|| headers.get("Authorization"))
+    {
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            let token_hash = arc_core_types::sha256_hex(token.as_bytes());
+            return CallerIdentity {
+                subject: format!("bearer:{}", &token_hash[..16]),
+                auth_method: AuthMethod::Bearer { token_hash },
+                verified: false,
+                tenant: None,
+                agent_id: None,
+            };
+        }
+    }
+
+    for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
+        if let Some(key_value) = headers.get(*key_header) {
+            let key_hash = arc_core_types::sha256_hex(key_value.as_bytes());
+            return CallerIdentity {
+                subject: format!("apikey:{}", &key_hash[..16]),
+                auth_method: AuthMethod::ApiKey {
+                    key_name: key_header.to_string(),
+                    key_hash,
+                },
+                verified: false,
+                tenant: None,
+                agent_id: None,
+            };
+        }
+    }
+
+    CallerIdentity::anonymous()
+}
+
+fn presented_capability_id(raw_capability: Option<&str>) -> Option<String> {
+    serde_json::from_str::<CapabilityToken>(raw_capability?)
+        .ok()
+        .map(|token| token.id)
+}
+
+async fn find_revoked_capability_id(
+    state: &Arc<ProxyState>,
+    raw_capability: Option<&str>,
+    capability_id_hint: Option<&str>,
+) -> Option<String> {
+    let capability_id = presented_capability_id(raw_capability)
+        .or_else(|| capability_id_hint.map(ToOwned::to_owned))?;
+    let revoked_capability_ids = state.revoked_capability_ids.lock().await;
+    revoked_capability_ids
+        .contains(&capability_id)
+        .then_some(capability_id)
+}
+
+fn revoked_capability_verdict() -> Verdict {
+    Verdict::deny_with_status(
+        "capability token has been revoked",
+        "CapabilityRevocation",
+        403,
+    )
+}
+
+fn manual_receipt_policy_hash(label: &str) -> String {
+    arc_core_types::sha256_hex(label.as_bytes())
+}
+
+fn build_manual_receipt(
+    state: &Arc<ProxyState>,
+    request_id: String,
+    route_pattern: String,
+    method: HttpMethod,
+    caller_identity_hash: String,
+    session_id: Option<String>,
+    verdict: Verdict,
+    response_status: u16,
+    timestamp: u64,
+    content_hash: String,
+    capability_id: Option<String>,
+    metadata: Option<serde_json::Value>,
+    policy_label: &str,
+) -> Result<HttpReceipt, ProtectError> {
+    HttpReceipt::sign(
+        HttpReceiptBody {
+            id: uuid::Uuid::now_v7().to_string(),
+            request_id,
+            route_pattern,
+            method,
+            caller_identity_hash,
+            session_id,
+            verdict,
+            evidence: Vec::new(),
+            response_status,
+            timestamp,
+            content_hash,
+            policy_hash: manual_receipt_policy_hash(policy_label),
+            capability_id,
+            metadata,
+            kernel_key: state.signer_keypair.public_key(),
+        },
+        &state.signer_keypair,
+    )
+    .map_err(|error| ProtectError::ReceiptSign(error.to_string()))
+}
+
+async fn revoked_proxy_response(
+    state: &Arc<ProxyState>,
+    method: HttpMethod,
+    path: &str,
+    query: &HashMap<String, String>,
+    headers: &HashMap<String, String>,
+    body_hash: Option<String>,
+) -> Option<Response> {
+    let capability_id = find_revoked_capability_id(
+        state,
+        extract_presented_capability_from_maps(headers, query),
+        None,
+    )
+    .await?;
+    let caller = extract_caller_identity(headers);
+    let caller_identity_hash = match caller.identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash caller identity for revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    let mut request = ArcHttpRequest::new(
+        uuid::Uuid::now_v7().to_string(),
+        method,
+        path.to_string(),
+        path.to_string(),
+        caller,
+    );
+    request.query = query.clone();
+    request.body_hash = body_hash;
+
+    let content_hash = match request.content_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to compute revocation request content hash: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    let verdict = revoked_capability_verdict();
+    let receipt = match build_manual_receipt(
+        state,
+        request.request_id.clone(),
+        request.route_pattern.clone(),
+        request.method,
+        caller_identity_hash,
+        None,
+        verdict.clone(),
+        StatusCode::FORBIDDEN.as_u16(),
+        request.timestamp,
+        content_hash,
+        Some(capability_id),
+        Some(http_status_metadata_final(None)),
+        "arc_api_protect_revoked_capability",
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    if let Err(error) = record_receipt(state, &receipt).await {
+        warn!("failed to persist revocation receipt: {error}");
+        return Some(internal_json_error_response(
+            "arc_receipt_persistence_failed",
+            &error.to_string(),
+        ));
+    }
+
+    let denied_status =
+        StatusCode::from_u16(verdict_http_status(&verdict)).unwrap_or(StatusCode::FORBIDDEN);
+    let error_body = serde_json::json!({
+        "error": "arc_access_denied",
+        "message": "capability token has been revoked",
+        "receipt_id": receipt.id,
+        "suggestion": "request a fresh capability token before retrying",
+    });
+
+    Some(
+        Response::builder()
+            .status(denied_status)
+            .header("content-type", "application/json")
+            .header("X-Arc-Receipt-Id", &receipt.id)
+            .body(Body::from(
+                serde_json::to_string(&error_body).unwrap_or_default(),
+            ))
+            .unwrap_or_else(|_| denied_status.into_response()),
+    )
+}
+
+async fn revoked_sidecar_evaluate_response(
+    state: &Arc<ProxyState>,
+    request: &ArcHttpRequest,
+    presented_capability: Option<&str>,
+) -> Option<Response> {
+    let capability_id = find_revoked_capability_id(
+        state,
+        presented_capability,
+        request.capability_id.as_deref(),
+    )
+    .await?;
+    let caller_identity_hash = match request.caller.identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash caller identity for sidecar revocation: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+    let content_hash = match request.content_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to compute sidecar revocation content hash: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+    let route_pattern = if request.route_pattern.is_empty() {
+        request.path.clone()
+    } else {
+        request.route_pattern.clone()
+    };
+    let verdict = revoked_capability_verdict();
+    let receipt = match build_manual_receipt(
+        state,
+        request.request_id.clone(),
+        route_pattern,
+        request.method,
+        caller_identity_hash,
+        request.session_id.clone(),
+        verdict.clone(),
+        StatusCode::FORBIDDEN.as_u16(),
+        request.timestamp,
+        content_hash,
+        Some(capability_id),
+        Some(http_status_metadata_decision()),
+        "arc_api_protect_revoked_capability",
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign sidecar revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    if let Err(error) = record_receipt(state, &receipt).await {
+        warn!("failed to persist sidecar revocation receipt: {error}");
+        return Some(internal_json_error_response(
+            "arc_receipt_persistence_failed",
+            &error.to_string(),
+        ));
+    }
+
+    Some(
+        (
+            StatusCode::OK,
+            axum::Json(EvaluateResponse {
+                verdict,
+                receipt,
+                evidence: Vec::new(),
+                execution_nonce: None,
+            }),
+        )
+            .into_response(),
+    )
+}
+
+fn sidecar_submit_receipt_metadata(
+    receipt_request: &SidecarSubmitReceiptRequest,
+) -> serde_json::Value {
+    let mut metadata = match http_status_metadata_final(None) {
+        serde_json::Value::Object(object) => object,
+        _ => serde_json::Map::new(),
+    };
+    metadata.insert(
+        "submission_kind".to_string(),
+        serde_json::Value::String("job_receipt".to_string()),
+    );
+    metadata.insert(
+        "job_name".to_string(),
+        serde_json::Value::String(receipt_request.job_name.clone()),
+    );
+    metadata.insert(
+        "namespace".to_string(),
+        serde_json::Value::String(receipt_request.namespace.clone()),
+    );
+    metadata.insert(
+        "job_uid".to_string(),
+        serde_json::Value::String(receipt_request.job_uid.clone()),
+    );
+    metadata.insert(
+        "outcome".to_string(),
+        serde_json::Value::String(receipt_request.outcome.clone()),
+    );
+    if let Some(started_at) = &receipt_request.started_at {
+        metadata.insert(
+            "started_at".to_string(),
+            serde_json::Value::String(started_at.clone()),
+        );
+    }
+    if let Some(completed_at) = &receipt_request.completed_at {
+        metadata.insert(
+            "completed_at".to_string(),
+            serde_json::Value::String(completed_at.clone()),
+        );
+    }
+    metadata.insert(
+        "steps".to_string(),
+        serde_json::Value::Array(
+            receipt_request
+                .steps
+                .iter()
+                .map(|step| {
+                    serde_json::json!({
+                        "pod_name": step.pod_name,
+                        "phase": step.phase,
+                        "payload": step.payload,
+                        "observed_at": step.observed_at,
+                    })
+                })
+                .collect(),
+        ),
+    );
+    serde_json::Value::Object(metadata)
 }
 
 fn should_forward_request_header(name: &str) -> bool {
@@ -1166,25 +1648,24 @@ paths:
         receipt_db: Option<&str>,
     ) -> Arc<ProxyState> {
         let keypair = Keypair::generate();
-        let receipt_store = receipt_db.map(|path| {
-            Mutex::new(SqliteReceiptStore::open(path).expect("open sqlite receipt store"))
-        });
+        let (receipt_store, receipts, revoked_capability_ids) = if let Some(path) = receipt_db {
+            let store = SqliteReceiptStore::open(path).expect("open sqlite receipt store");
+            let receipts = store.load_receipts().expect("load persisted receipts");
+            let revoked_capability_ids = store
+                .load_revoked_capability_ids()
+                .expect("load revoked capability ids");
+            (Some(Mutex::new(store)), receipts, revoked_capability_ids)
+        } else {
+            (None, Vec::new(), HashSet::new())
+        };
         Arc::new(ProxyState {
             evaluator: RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string()),
             signer_keypair: keypair,
             upstream,
             http_client: reqwest::Client::new(),
-            receipt_log: Mutex::new(ReceiptLog {
-                receipts: receipt_db
-                    .map(|path| {
-                        SqliteReceiptStore::open(path)
-                            .expect("open sqlite receipt store")
-                            .load_receipts()
-                            .expect("load persisted receipts")
-                    })
-                    .unwrap_or_default(),
-            }),
+            receipt_log: Mutex::new(ReceiptLog { receipts }),
             receipt_store,
+            revoked_capability_ids: Mutex::new(revoked_capability_ids),
         })
     }
 
@@ -1916,6 +2397,148 @@ paths:
             serde_json::from_slice(&bytes).expect("decode receipt response");
         assert!(receipt.accepted);
         assert!(!receipt.receipt_id.is_empty());
+    }
+
+    #[test]
+    fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
+        assert_eq!(ttl_seconds_from_wire(None), 3600);
+        assert_eq!(ttl_seconds_from_wire(Some(3600)), 3600);
+        assert_eq!(ttl_seconds_from_wire(Some(3_600_000_000_000)), 3600);
+    }
+
+    #[test]
+    fn parse_sidecar_operation_shorthand_read_preserves_read_scope() {
+        assert_eq!(
+            parse_sidecar_operation("read", true).expect("read shorthand"),
+            Operation::Read
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_release_persists_revocation_and_blocks_reuse() {
+        let receipt_db = temp_receipt_db_path();
+        let state = test_state_with_receipt_db(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+
+        let release_request = Request::builder()
+            .method("POST")
+            .uri("/v1/capabilities/release")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "capability_id": "cap-revoked",
+                    "job_uid": "job-uid-1",
+                    "reason": "completed",
+                }))
+                .expect("serialize release request"),
+            ))
+            .expect("request");
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::OK);
+
+        let reloaded = test_state_with_receipt_db(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri("/pets")
+            .header(
+                "x-arc-capability",
+                valid_capability_token_json("cap-revoked"),
+            )
+            .body(Body::from(r#"{"name":"fido"}"#))
+            .expect("request");
+        let response = proxy_handler(State(Arc::clone(&reloaded)), request).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["message"], "capability token has been revoked");
+
+        let _ = std::fs::remove_file(receipt_db);
+    }
+
+    #[tokio::test]
+    async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
+        let receipt_db = temp_receipt_db_path();
+        let state = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/receipts")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "job_name": "demo",
+                    "namespace": "default",
+                    "job_uid": "job-uid-1",
+                    "capability_id": "cap-1",
+                    "outcome": "succeeded",
+                    "started_at": "2026-04-17T10:00:00Z",
+                    "completed_at": "2026-04-17T10:05:00Z",
+                    "steps": [{
+                        "pod_name": "demo-pod",
+                        "phase": "Succeeded",
+                        "payload": "{\"ok\":true}",
+                        "observed_at": "2026-04-17T10:05:00Z"
+                    }]
+                }))
+                .expect("serialize receipt request"),
+            ))
+            .expect("request");
+
+        let response = sidecar_submit_receipt_handler(State(Arc::clone(&state)), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let submit_response: SidecarSubmitReceiptResponse =
+            serde_json::from_slice(&bytes).expect("decode receipt response");
+
+        let reloaded = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let log = reloaded.receipt_log.lock().await;
+        let stored = log
+            .receipts
+            .iter()
+            .find(|receipt| receipt.id == submit_response.receipt_id)
+            .expect("stored receipt");
+        assert_eq!(stored.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(
+            stored.metadata.as_ref().expect("metadata")["job_uid"],
+            "job-uid-1"
+        );
+        assert_eq!(
+            stored.metadata.as_ref().expect("metadata")["steps"][0]["pod_name"],
+            "demo-pod"
+        );
+        assert!(stored.verify_signature().expect("receipt signature"));
+
+        let _ = std::fs::remove_file(receipt_db);
     }
 
     #[tokio::test]

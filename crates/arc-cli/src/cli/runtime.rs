@@ -260,9 +260,11 @@ fn cmd_check(
     kernel.begin_draining_session(&session_id)?;
     kernel.close_session(&session_id)?;
 
+    let verdict_str = verdict_label(response.verdict);
+
     if json_output {
         let output = serde_json::json!({
-            "verdict": format!("{:?}", response.verdict),
+            "verdict": verdict_str,
             "tool": tool,
             "server": server,
             "params": params,
@@ -276,11 +278,6 @@ fn cmd_check(
             serde_json::to_string_pretty(&output).unwrap_or_default()
         );
     } else {
-        let verdict_str = match response.verdict {
-            arc_kernel::Verdict::Allow => "ALLOW",
-            arc_kernel::Verdict::Deny => "DENY",
-            arc_kernel::Verdict::PendingApproval => "PENDING_APPROVAL",
-        };
         println!("verdict:    {verdict_str}");
         println!("tool:       {tool}");
         println!("server:     {server}");
@@ -303,6 +300,14 @@ fn cmd_check(
             // human has approved out-of-band.
             std::process::exit(3);
         }
+    }
+}
+
+fn verdict_label(verdict: arc_kernel::Verdict) -> &'static str {
+    match verdict {
+        arc_kernel::Verdict::Allow => "ALLOW",
+        arc_kernel::Verdict::Deny => "DENY",
+        arc_kernel::Verdict::PendingApproval => "PENDING_APPROVAL",
     }
 }
 

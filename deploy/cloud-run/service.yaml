@@ -12,7 +12,7 @@
 # Cloud Run container dependency graph (annotation
 # run.googleapis.com/container-dependencies) enforces startup ordering: the
 # `app` container is not started until `arc-sidecar` reports healthy via its
-# startupProbe on :9090/health. The sidecar must fail closed if
+# startupProbe on :9090/arc/health. The sidecar must fail closed if
 # ARC_KERNEL_CONFIG_PATH cannot be loaded; Cloud Run will restart the revision.
 apiVersion: serving.knative.dev/v1
 kind: Service
@@ -47,7 +47,7 @@ spec:
             - name: ARC_SIDECAR_URL
               value: "http://localhost:9090"
             - name: ARC_SIDECAR_HEALTH_URL
-              value: "http://localhost:9090/health"
+              value: "http://localhost:9090/arc/health"
           resources:
             limits:
               cpu: "1"
@@ -75,7 +75,7 @@ spec:
             - containerPort: 9090
           # The sidecar image's CMD default is `--help`, which exits
           # immediately. Override CMD (via `args`) with a long-running
-          # ARC subcommand so the container stays up and serves /health.
+          # ARC subcommand so the container stays up and serves /arc/health.
           # `command` is intentionally omitted so the image ENTRYPOINT
           # (`/sbin/tini -- /usr/local/bin/arc`) is preserved. `api
           # protect` reverse-proxies app traffic through the kernel;
@@ -92,7 +92,7 @@ spec:
             - name: ARC_LISTEN_ADDR
               value: "0.0.0.0:9090"
             - name: ARC_HEALTH_PATH
-              value: "/health"
+              value: "/arc/health"
             - name: ARC_KERNEL_CONFIG_PATH
               value: "/etc/arc/kernel.yaml"
             - name: ARC_POLICY_SOURCE
@@ -117,14 +117,14 @@ spec:
               memory: 128Mi
           startupProbe:
             httpGet:
-              path: /health
+              path: /arc/health
               port: 9090
             initialDelaySeconds: 1
             periodSeconds: 1
             failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /health
+              path: /arc/health
               port: 9090
             periodSeconds: 10
             failureThreshold: 3

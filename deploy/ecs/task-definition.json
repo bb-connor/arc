@@ -22,7 +22,7 @@
       ],
       "environment": [
         { "name": "ARC_SIDECAR_URL", "value": "http://localhost:9090" },
-        { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/health" }
+        { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
       ],
       "dependsOn": [
         { "containerName": "arc-sidecar", "condition": "HEALTHY" }
@@ -61,7 +61,7 @@
       ],
       "environment": [
         { "name": "ARC_LISTEN_ADDR", "value": "0.0.0.0:9090" },
-        { "name": "ARC_HEALTH_PATH", "value": "/health" },
+        { "name": "ARC_HEALTH_PATH", "value": "/arc/health" },
         { "name": "ARC_KERNEL_CONFIG_PATH", "value": "/etc/arc/kernel.yaml" },
         { "name": "ARC_POLICY_SOURCE", "value": "s3://ACCOUNT_ID-arc-config/policy.yaml" },
         { "name": "ARC_RECEIPT_SINK", "value": "dynamodb://arc-receipts" },
@@ -78,7 +78,7 @@
         }
       ],
       "healthCheck": {
-        "command": ["CMD-SHELL", "curl -fsS http://localhost:9090/health || exit 1"],
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,

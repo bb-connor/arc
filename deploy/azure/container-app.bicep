@@ -12,7 +12,7 @@
 //     --template-file deploy/azure/container-app.bicep \
 //     --parameters location=eastus ...
 //
-// Startup ordering: the ARC sidecar declares a startupProbe on :9090/health;
+// Startup ordering: the ARC sidecar declares a startupProbe on :9090/arc/health;
 // the app container declares a startupProbe on :8080/healthz that depends on
 // the sidecar URL being reachable. The sidecar fails closed if
 // ARC_KERNEL_CONFIG_PATH cannot be loaded, causing the revision to be marked
@@ -96,7 +96,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'ARC_SIDECAR_HEALTH_URL'
-              value: 'http://localhost:9090/health'
+              value: 'http://localhost:9090/arc/health'
             }
           ]
           probes: [
@@ -148,7 +148,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             }
             {
               name: 'ARC_HEALTH_PATH'
-              value: '/health'
+              value: '/arc/health'
             }
             {
               name: 'ARC_KERNEL_CONFIG_PATH'
@@ -179,7 +179,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Startup'
               httpGet: {
-                path: '/health'
+                path: '/arc/health'
                 port: 9090
               }
               initialDelaySeconds: 1
@@ -189,7 +189,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Liveness'
               httpGet: {
-                path: '/health'
+                path: '/arc/health'
                 port: 9090
               }
               periodSeconds: 10
@@ -198,7 +198,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Readiness'
               httpGet: {
-                path: '/health'
+                path: '/arc/health'
                 port: 9090
               }
               periodSeconds: 5

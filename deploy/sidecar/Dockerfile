@@ -5,7 +5,7 @@
 # Build:
 #   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/arc-sidecar:latest .
 #
-# The sidecar exposes :9090 and responds to GET /health. It reads policy and
+# The sidecar exposes :9090 and responds to GET /arc/health. It reads policy and
 # signing material from env vars documented in
 # docs/protocols/CLOUD-SIDECAR-INTEGRATION.md; if ARC_KERNEL_CONFIG_PATH is
 # unreadable the process exits non-zero and the platform marks the container
@@ -101,7 +101,7 @@ LABEL org.opencontainers.image.title="arc-sidecar" \
 
 # Runtime config defaults (overridable at deploy time).
 ENV ARC_LISTEN_ADDR=0.0.0.0:9090 \
-    ARC_HEALTH_PATH=/health \
+    ARC_HEALTH_PATH=/arc/health \
     ARC_LOG_LEVEL=info \
     ARC_KERNEL_CONFIG_PATH=/etc/arc/kernel.yaml
 
@@ -124,12 +124,12 @@ EXPOSE 9090
 # Fail closed: if the health endpoint is not reachable the platform recycles
 # the container. The probe uses the baked-in curl binary to hit localhost.
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
-  CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/health"]
+  CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"]
 
 ENTRYPOINT ["/usr/local/bin/arc-sidecar"]
 # `serve-sidecar` is not a real subcommand in the arc CLI tree; a
 # container built from the old default exited immediately with CLI
-# usage errors before ever opening /health. There is no single
+# usage errors before ever opening /arc/health. There is no single
 # zero-argument default that makes sense because every arc subcommand
 # needs operator input (policy path, wrapped server command, etc.).
 # Default to --help so `docker run <image>` prints usage instead of
