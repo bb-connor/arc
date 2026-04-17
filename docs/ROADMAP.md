@@ -32,14 +32,14 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**52 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**53 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
 | Phase group | Shipped | In flight | Pending |
 |---|---|---|---|
 | 0 (DX) | 0.3, 0.4, 0.5 | -- | 0.1, 0.2 |
-| 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
+| 1 (Structural security) | 1.1, 1.2, 1.3, 1.4 | -- | 1.5 |
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
 | 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
@@ -152,7 +152,7 @@ developer exactly what scope to request.
 > **Depends on**: Nothing (can run parallel to Phase 0).
 > **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md`
 
-### 1.1 Execution Nonces (TOCTOU Fix)
+### 1.1 Execution Nonces (TOCTOU Fix) [SHIPPED f6d42a3]
 
 **What**: Kernel issues a short-lived `ExecutionNonce` with each allow
 verdict. Tool servers validate the nonce before executing. Closes the
