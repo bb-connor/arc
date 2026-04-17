@@ -173,9 +173,45 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release
+          # Copy the archives themselves.
           find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec cp {} release/ \;
+          # Copy the per-archive .sha256 files. Needed because the Publish
+          # release step matches `release/*.sha256` with
+          # `fail_on_unmatched_files: true`, so missing per-archive files
+          # would fail every release.
+          find artifacts -type f -name "*.sha256" -exec cp {} release/ \;
+          # Concatenate the per-archive .sha256 files into the combined
+          # SHA256SUMS for `shasum -a 256 -c`.
           find artifacts -type f -name "*.sha256" -exec cat {} + | sort > release/SHA256SUMS
           (cd release && ls -la)
+
+      - name: Render Homebrew formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          formula_src="Homebrew/arc.rb"
+          formula_out="release/arc.rb"
+          if [[ ! -f "$formula_src" ]]; then
+            echo "formula source missing: $formula_src" >&2
+            exit 1
+          fi
+          # Derive SHA-256 for each platform tarball.
+          arm_mac=$(sha256sum "release/arc-${version}-aarch64-apple-darwin.tar.gz" | awk '{print $1}')
+          x86_mac=$(sha256sum "release/arc-${version}-x86_64-apple-darwin.tar.gz" | awk '{print $1}')
+          arm_lin=$(sha256sum "release/arc-${version}-aarch64-unknown-linux-gnu.tar.gz" | awk '{print $1}')
+          x86_lin=$(sha256sum "release/arc-${version}-x86_64-unknown-linux-gnu.tar.gz" | awk '{print $1}')
+          # Replace the four deterministic placeholder strings. Using distinct
+          # placeholders keeps the substitution unambiguous vs. a single shared
+          # placeholder that would be impossible to map back to platforms.
+          sed -e "s|1111111111111111111111111111111111111111111111111111111111111111|${arm_mac}|" \
+              -e "s|2222222222222222222222222222222222222222222222222222222222222222|${x86_mac}|" \
+              -e "s|3333333333333333333333333333333333333333333333333333333333333333|${arm_lin}|" \
+              -e "s|4444444444444444444444444444444444444444444444444444444444444444|${x86_lin}|" \
+              -e "s|version \"0.1.0\"|version \"${version}\"|" \
+              "$formula_src" > "$formula_out"
+          echo "updated formula at ${formula_out}:"
+          grep -E "version |sha256 " "$formula_out"
 
       - name: Render release notes
         id: notes
@@ -225,3 +261,4 @@ jobs:
             release/*.zip
             release/*.sha256
             release/SHA256SUMS
+            release/arc.rb
