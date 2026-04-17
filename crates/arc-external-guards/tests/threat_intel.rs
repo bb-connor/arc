@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use arc_guards::external::{
+use arc_external_guards::external::{
     AsyncGuardAdapter, BackoffStrategy, GuardCallContext, RetryConfig, SafeBrowsingConfig,
     SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, VirusTotalConfig, VirusTotalGuard,
 };
@@ -389,10 +389,8 @@ async fn virustotal_cache_dedupes_repeat_lookups() {
         .cache_ttl(Duration::from_secs(60))
         .build();
 
-    // Two identical lookups — the second must hit the cache.
     for _ in 0..2 {
         let ctx = make_ctx("w", json!({"hash": KNOWN_BAD_HASH}));
         assert_eq!(adapter.evaluate(&ctx).await, Verdict::Deny);
     }
-    // Mock's `.expect(1)` asserts only one HTTP call was made.
 }

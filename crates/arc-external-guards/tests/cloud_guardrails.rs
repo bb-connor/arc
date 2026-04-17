@@ -9,7 +9,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use arc_guards::external::{
+use arc_external_guards::external::{
     AsyncGuardAdapter, AzureContentSafetyConfig, AzureContentSafetyGuard, BackoffStrategy,
     BedrockGuardrailConfig, BedrockGuardrailGuard, GuardCallContext, RetryConfig,
     VertexProbability, VertexSafetyConfig, VertexSafetyGuard,
@@ -129,7 +129,7 @@ async fn bedrock_fails_closed_on_5xx() {
 
 #[tokio::test]
 async fn bedrock_evidence_captures_action() {
-    use arc_guards::external::BedrockDecisionDetails;
+    use arc_external_guards::external::BedrockDecisionDetails;
 
     let cfg = BedrockGuardrailConfig::new("test-token", "us-east-1", "gr-123", "1")
         .with_endpoint("http://localhost");
@@ -355,7 +355,7 @@ async fn vertex_allows_when_all_ratings_below_threshold() {
 
 #[tokio::test]
 async fn evidence_records_capture_structured_details() {
-    use arc_guards::external::{AzureCategoryBreakdown, AzureDecisionDetails};
+    use arc_external_guards::external::{AzureCategoryBreakdown, AzureDecisionDetails};
 
     let cfg = AzureContentSafetyConfig::new("k", "http://localhost");
     let guard = AzureContentSafetyGuard::new(cfg).expect("guard build");
