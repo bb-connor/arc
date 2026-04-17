@@ -27,6 +27,7 @@ pub mod authority;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod checkpoint;
+pub mod compliance_score;
 pub mod cost_attribution;
 pub mod dpop;
 pub mod evidence_export;
@@ -327,6 +328,15 @@ pub use operator_report::{
     ARC_OAUTH_SENDER_PROOF_ARC_DPOP, BEHAVIORAL_FEED_SCHEMA, MAX_AUTHORIZATION_CONTEXT_LIMIT,
     MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT, MAX_METERED_BILLING_LIMIT, MAX_OPERATOR_BUDGET_LIMIT,
     MAX_SETTLEMENT_BACKLOG_LIMIT, MAX_SHARED_EVIDENCE_LIMIT,
+};
+pub use operator_report::{
+    behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState,
+};
+pub use compliance_score::{
+    compliance_factor_breakdown, compliance_score, ComplianceFactor, ComplianceFactorBreakdown,
+    ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs, COMPLIANCE_SCORE_MAX,
+    DEFAULT_ATTESTATION_STALENESS_SECS, WEIGHT_ATTESTATION_FRESHNESS, WEIGHT_DENY_RATE,
+    WEIGHT_POLICY_COVERAGE, WEIGHT_REVOCATION, WEIGHT_VELOCITY_ANOMALY,
 };
 pub use payment::{
     AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext, PaymentAdapter,

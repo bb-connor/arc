@@ -31,6 +31,7 @@ base64 = { workspace = true }
 zeroize = "1"
 
 [dev-dependencies]
+arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
 serde_json = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 wiremock = "0.6"

@@ -47,6 +47,7 @@ pub mod external;
 
 pub mod advisory;
 pub mod agent_velocity;
+pub mod behavioral_profile;
 pub mod behavioral_sequence;
 pub mod data_flow;
 mod egress_allowlist;
@@ -71,6 +72,11 @@ pub use advisory::{
     DataTransferAdvisoryGuard, GuardOutput, PromotionPolicy, PromotionRule,
 };
 pub use agent_velocity::{AgentVelocityConfig, AgentVelocityGuard};
+pub use behavioral_profile::{
+    BehavioralMetric, BehavioralProfileConfig, BehavioralProfileGuard, InMemoryReceiptFeed,
+    ObservationOutcome, ReceiptFeedSource, DEFAULT_BASELINE_MIN_WINDOWS, DEFAULT_EMA_ALPHA,
+    DEFAULT_SIGMA_THRESHOLD, DEFAULT_WINDOW_SECS,
+};
 pub use behavioral_sequence::{BehavioralSequenceGuard, SequencePolicy};
 pub use data_flow::{DataFlowConfig, DataFlowGuard};
 pub use egress_allowlist::EgressAllowlistGuard;

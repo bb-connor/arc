@@ -1203,6 +1203,7 @@ dependencies = [
  "arc-core-types",
  "arc-http-session",
  "arc-kernel",
+ "arc-store-sqlite",
  "async-trait",
  "base64 0.22.1",
  "glob",
@@ -1251,6 +1252,7 @@ dependencies = [
 name = "arc-http-core"
 version = "0.1.0"
 dependencies = [
+ "arc-core",
  "arc-core-types",
  "arc-cross-protocol",
  "arc-kernel",

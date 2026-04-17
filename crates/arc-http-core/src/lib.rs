@@ -7,12 +7,14 @@
 
 pub mod approvals;
 mod authority;
+pub mod compliance;
 pub mod emergency;
 mod evaluation;
 mod identity;
 mod method;
 pub mod plan;
 mod receipt;
+pub mod regulatory_api;
 mod request;
 pub mod routes;
 mod session;
@@ -44,10 +46,22 @@ pub use receipt::{
 };
 pub use request::ArcHttpRequest;
 pub use routes::{
-    approval_route_registrations, emergency_route_registrations, EmergencyRouteRegistration,
-    APPROVALS_BATCH_RESPOND_PATH, APPROVALS_GET_PATH, APPROVALS_PENDING_PATH,
-    APPROVALS_RESPOND_PATH, EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH,
-    EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH,
+    approval_route_registrations, emergency_route_registrations, regulatory_route_registrations,
+    EmergencyRouteRegistration, APPROVALS_BATCH_RESPOND_PATH, APPROVALS_GET_PATH,
+    APPROVALS_PENDING_PATH, APPROVALS_RESPOND_PATH, COMPLIANCE_SCORE_PATH,
+    EMERGENCY_ADMIN_TOKEN_HEADER, EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH,
+    EMERGENCY_STOP_PATH, EVALUATE_PLAN_PATH, REGULATORY_RECEIPTS_PATH,
+    REGULATORY_TOKEN_HEADER,
+};
+pub use compliance::{
+    handle_compliance_score, ComplianceScoreError, ComplianceScoreRequest,
+    ComplianceScoreResponse, ComplianceScoreWindow, ComplianceSource, ComplianceSourceResult,
+};
+pub use regulatory_api::{
+    handle_regulatory_receipts_signed, sign_regulatory_export, verify_regulatory_export,
+    RegulatorIdentity, RegulatoryApiError, RegulatoryReceiptExport, RegulatoryReceiptQueryResult,
+    RegulatoryReceiptSource, RegulatoryReceiptsQuery, SignedRegulatoryReceiptExport,
+    MAX_REGULATORY_EXPORT_LIMIT, REGULATORY_RECEIPT_EXPORT_SCHEMA,
 };
 pub use session::SessionContext;
 pub use verdict::{DenyDetails, Verdict};

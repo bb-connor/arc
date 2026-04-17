@@ -127,6 +127,47 @@ pub const fn emergency_route_registrations() -> [EmergencyRouteRegistration; 3] 
     ]
 }
 
+// ---------------------------------------------------------------------------
+// Phase 19.1 -- compliance score endpoint.
+// ---------------------------------------------------------------------------
+
+/// `POST /compliance/score` -- compute a 0..=1000 compliance score for
+/// an agent over a window. Substrate adapters delegate to
+/// [`crate::compliance::handle_compliance_score`].
+pub const COMPLIANCE_SCORE_PATH: &str = "/compliance/score";
+
+// ---------------------------------------------------------------------------
+// Phase 19.3 -- regulatory receipt export endpoint.
+// ---------------------------------------------------------------------------
+
+/// `GET /regulatory/receipts` -- read-only signed export of receipts
+/// for regulators. Every response is a
+/// [`crate::regulatory_api::SignedRegulatoryReceiptExport`].
+pub const REGULATORY_RECEIPTS_PATH: &str = "/regulatory/receipts";
+
+/// Header that carries the regulator token. Adapters must not expose
+/// `/regulatory/*` without requiring this header; the handler fails
+/// closed when the caller identity is missing.
+pub const REGULATORY_TOKEN_HEADER: &str = "X-Regulatory-Token";
+
+/// Route descriptors for the regulatory API. Appended here (do not
+/// reorder existing registrations) per the phase-19 bundle contract.
+#[must_use]
+pub const fn regulatory_route_registrations() -> [EmergencyRouteRegistration; 2] {
+    [
+        EmergencyRouteRegistration {
+            method: HttpMethod::Post,
+            path: COMPLIANCE_SCORE_PATH,
+            name: "compliance_score",
+        },
+        EmergencyRouteRegistration {
+            method: HttpMethod::Get,
+            path: REGULATORY_RECEIPTS_PATH,
+            name: "regulatory_receipts",
+        },
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,6 +178,19 @@ mod tests {
         assert_eq!(EMERGENCY_RESUME_PATH, "/emergency-resume");
         assert_eq!(EMERGENCY_STATUS_PATH, "/emergency-status");
         assert_eq!(EMERGENCY_ADMIN_TOKEN_HEADER, "X-Admin-Token");
+    }
+
+    #[test]
+    fn regulatory_route_constants_match_spec() {
+        assert_eq!(COMPLIANCE_SCORE_PATH, "/compliance/score");
+        assert_eq!(REGULATORY_RECEIPTS_PATH, "/regulatory/receipts");
+        assert_eq!(REGULATORY_TOKEN_HEADER, "X-Regulatory-Token");
+
+        let registrations = regulatory_route_registrations();
+        assert_eq!(registrations.len(), 2);
+        let names: Vec<&str> = registrations.iter().map(|r| r.name).collect();
+        assert!(names.contains(&"compliance_score"));
+        assert!(names.contains(&"regulatory_receipts"));
     }
 
     #[test]

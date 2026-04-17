@@ -21,6 +21,9 @@ arc-core-types = { path = "../arc-core-types" }
 arc-cross-protocol = { path = "../arc-cross-protocol" }
 arc-kernel = { path = "../arc-kernel" }
 
+[dev-dependencies]
+arc-core = { path = "../arc-core" }
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"

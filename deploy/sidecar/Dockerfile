@@ -51,12 +51,28 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 
 # -----------------------------------------------------------------------------
 # Stage 2: healthcheck helper (distroless has no shell or curl).
-# We bake a tiny statically linked HTTP probe in a throwaway stage.
+# We bake a tiny statically linked HTTP probe in a throwaway stage. The
+# install + relocate step packs curl plus all its shared-library deps into
+# a single /out directory using the Debian multiarch dir derived from
+# dpkg-architecture, so the runtime COPY below works unmodified on both
+# linux/amd64 and linux/arm64 (where libs live at aarch64-linux-gnu
+# instead of x86_64-linux-gnu).
 # -----------------------------------------------------------------------------
 FROM debian:${DEBIAN_VERSION}-slim AS healthcheck
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /out/bin /out/lib \
+    && cp /usr/bin/curl /out/bin/curl \
+    && ARCH_DIR="$(dpkg-architecture -qDEB_HOST_MULTIARCH)" \
+    && for dep in libcurl.so.4 libnghttp2.so.14 libidn2.so.0 librtmp.so.1 \
+                  libssh2.so.1 libpsl.so.5 libgssapi_krb5.so.2 \
+                  libldap-2.5.so.0 liblber-2.5.so.0 libzstd.so.1 \
+                  libbrotlidec.so.1 libbrotlicommon.so.1; do \
+         if [ -f "/usr/lib/${ARCH_DIR}/${dep}" ]; then \
+           cp -a "/usr/lib/${ARCH_DIR}/${dep}" "/out/lib/${dep}"; \
+         fi; \
+       done
 
 # -----------------------------------------------------------------------------
 # Stage 3: runtime image. Distroless cc-debian12 nonroot (uid 65532).
@@ -75,21 +91,15 @@ ENV ARC_LISTEN_ADDR=0.0.0.0:9090 \
     ARC_LOG_LEVEL=info \
     ARC_KERNEL_CONFIG_PATH=/etc/arc/kernel.yaml
 
-# Copy the binary and the healthcheck helper from earlier stages.
+# Copy the binary and the healthcheck helper from earlier stages. The
+# healthcheck stage has already arch-normalized curl + its shared libs
+# into /out/{bin,lib}, so the runtime image no longer hardcodes the
+# x86_64-linux-gnu multiarch path. distroless/cc-debian12 already has
+# /usr/lib on the default ld.so search path, so dropping libs there
+# resolves for both amd64 and arm64 builds.
 COPY --from=builder /out/arc-sidecar /usr/local/bin/arc-sidecar
-COPY --from=healthcheck /usr/bin/curl /usr/bin/curl
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libcurl.so.4 /usr/lib/x86_64-linux-gnu/libcurl.so.4
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libnghttp2.so.14 /usr/lib/x86_64-linux-gnu/libnghttp2.so.14
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libidn2.so.0 /usr/lib/x86_64-linux-gnu/libidn2.so.0
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/librtmp.so.1 /usr/lib/x86_64-linux-gnu/librtmp.so.1
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libssh2.so.1 /usr/lib/x86_64-linux-gnu/libssh2.so.1
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libpsl.so.5 /usr/lib/x86_64-linux-gnu/libpsl.so.5
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2 /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0 /usr/lib/x86_64-linux-gnu/libldap-2.5.so.0
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/liblber-2.5.so.0 /usr/lib/x86_64-linux-gnu/liblber-2.5.so.0
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libzstd.so.1 /usr/lib/x86_64-linux-gnu/libzstd.so.1
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libbrotlidec.so.1 /usr/lib/x86_64-linux-gnu/libbrotlidec.so.1
-COPY --from=healthcheck /usr/lib/x86_64-linux-gnu/libbrotlicommon.so.1 /usr/lib/x86_64-linux-gnu/libbrotlicommon.so.1
+COPY --from=healthcheck /out/bin/curl /usr/bin/curl
+COPY --from=healthcheck /out/lib/ /usr/lib/
 
 # Nonroot (uid/gid 65532) is already the default user in distroless:nonroot;
 # make it explicit so manifests that introspect the image know.
@@ -103,4 +113,13 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
   CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/health"]
 
 ENTRYPOINT ["/usr/local/bin/arc-sidecar"]
-CMD ["serve-sidecar", "--listen", "0.0.0.0:9090"]
+# `serve-sidecar` is not a real subcommand in the arc CLI tree; a
+# container built from the old default exited immediately with CLI
+# usage errors before ever opening /health. There is no single
+# zero-argument default that makes sense because every arc subcommand
+# needs operator input (policy path, wrapped server command, etc.).
+# Default to --help so `docker run <image>` prints usage instead of
+# crashing; operators override this at deploy time with the real
+# subcommand, e.g. `arc mcp serve-http --policy /etc/arc/policy.yaml
+# --server-id my-tool -- npx @modelcontextprotocol/server-filesystem /data`.
+CMD ["--help"]
