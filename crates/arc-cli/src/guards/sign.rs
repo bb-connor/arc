@@ -102,13 +102,26 @@ pub fn cmd_guard_verify(wasm_path: &Path) -> Result<(), CliError> {
     // parse errors, permission errors, or any other I/O failure must reject
     // fail-closed so a malformed or unreadable manifest cannot silently
     // bypass the pinned trust anchor.
-    let manifest_path = wasm_path
-        .parent()
-        .map(|p| p.join(arc_wasm_guards::manifest::MANIFEST_FILENAME));
-    let manifest_exists = manifest_path
-        .as_deref()
-        .map(|p| p.try_exists().unwrap_or(false))
-        .unwrap_or(false);
+    let manifest_parent = wasm_path.parent().ok_or_else(|| {
+        CliError::Other(format!(
+            "wasm path {} has no parent directory; cannot locate adjacent guard-manifest.yaml",
+            wasm_path.display()
+        ))
+    })?;
+    let manifest_path = manifest_parent.join(arc_wasm_guards::manifest::MANIFEST_FILENAME);
+    // Distinguish a real "not found" (fall back to sidecar key) from any
+    // other I/O failure (permission denied, broken symlink, etc.), which
+    // must abort verification instead of silently reverting to the
+    // sidecar-embedded trust anchor.
+    let manifest_exists = match manifest_path.try_exists() {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(CliError::Other(format!(
+                "failed to stat adjacent guard-manifest.yaml at {}: {e}",
+                manifest_path.display()
+            )));
+        }
+    };
 
     let trusted_key = if manifest_exists {
         let manifest = load_manifest(wasm_path_str).map_err(|e| {
