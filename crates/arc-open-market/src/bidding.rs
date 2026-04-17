@@ -263,12 +263,10 @@ pub fn bid(
         .requested_scope
         .capability_scope_prefix
         .starts_with(listing.pricing.body.capability_scope.as_str())
-        && !listing
-            .pricing
-            .body
-            .capability_scope
-            .starts_with(request.requested_scope.capability_scope_prefix.as_str())
     {
+        return Err(BiddingError::ScopeOutsideListing);
+    }
+    if request.requested_scope.server_id != listing.listing.body.subject.actor_id {
         return Err(BiddingError::ScopeOutsideListing);
     }
 
@@ -284,7 +282,7 @@ pub fn bid(
         subject: context.agent_subject.clone(),
         scope: ArcScope {
             grants: vec![ToolGrant {
-                server_id: request.requested_scope.server_id.clone(),
+                server_id: listing.listing.body.subject.actor_id.clone(),
                 tool_name: request.requested_scope.tool_name.clone(),
                 operations: vec![Operation::Invoke],
                 constraints: Vec::new(),
@@ -412,7 +410,7 @@ mod tests {
             namespace_ownership: namespace(keypair),
             subject: GenericListingSubject {
                 actor_kind: GenericListingActorKind::ToolServer,
-                actor_id: format!("server-{listing_id}"),
+                actor_id: "demo-server".to_string(),
                 display_name: None,
                 metadata_url: None,
                 resolution_url: None,
@@ -584,6 +582,37 @@ mod tests {
             .token_offer
             .verify_signature()
             .expect("verify token"));
+    }
+
+    #[test]
+    fn bid_rejects_scope_widening_outside_listing_server() {
+        let registry_keypair = Keypair::generate();
+        let operator_keypair = Keypair::generate();
+        let issuer_keypair = Keypair::generate();
+        let agent_keypair = Keypair::generate();
+        let listing = listing_entry(
+            &registry_keypair,
+            &operator_keypair,
+            GenericListingStatus::Active,
+            100,
+            110,
+            600,
+        );
+        let mut request = bid_request("agent-alpha", 200, 300, 120);
+        request.requested_scope.server_id = "other-server".to_string();
+
+        let error = bid(
+            &request,
+            BidMintContext {
+                listing: &listing,
+                issuer_keypair: &issuer_keypair,
+                agent_subject: agent_keypair.public_key(),
+                token_id: "token-1".to_string(),
+                now: 120,
+            },
+        )
+        .expect_err("scope widening rejected");
+        assert_eq!(error, BiddingError::ScopeOutsideListing);
     }
 
     #[test]

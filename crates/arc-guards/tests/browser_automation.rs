@@ -126,9 +126,15 @@ fn read_only_session_denies_type_and_click() {
         "navigate",
         serde_json::json!({"url": "https://example.com"}),
     );
-    assert!(matches!(v, Verdict::Allow), "navigate must Allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "navigate must Allow, got {v:?}"
+    );
     let v = eval(&guard, "screenshot", serde_json::json!({}));
-    assert!(matches!(v, Verdict::Allow), "screenshot must Allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "screenshot must Allow, got {v:?}"
+    );
 }
 
 #[test]
@@ -161,7 +167,10 @@ fn type_with_credential_shaped_value_denied() {
             "value": "password = hunter21234"
         }),
     );
-    assert!(matches!(v, Verdict::Deny), "password shape must Deny, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "password shape must Deny, got {v:?}"
+    );
 
     // Benign text allowed.
     let v = eval(
@@ -172,7 +181,10 @@ fn type_with_credential_shaped_value_denied() {
             "text": "hello world"
         }),
     );
-    assert!(matches!(v, Verdict::Allow), "benign text must Allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "benign text must Allow, got {v:?}"
+    );
 }
 
 #[test]
@@ -189,7 +201,10 @@ fn blocked_domain_takes_precedence() {
         "navigate",
         serde_json::json!({"url": "https://bad.example.com/path"}),
     );
-    assert!(matches!(v, Verdict::Deny), "blocked domain must Deny, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "blocked domain must Deny, got {v:?}"
+    );
 }
 
 #[test]

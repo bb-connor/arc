@@ -255,8 +255,7 @@ pub fn verify_regulatory_export(
     // Ensure canonical-JSON is computable before asking the library to
     // verify. Any failure here is reported as a signing error so the
     // caller can distinguish malformed bodies from bad signatures.
-    canonical_json_bytes(&envelope.body)
-        .map_err(|e| RegulatoryApiError::Signing(e.to_string()))?;
+    canonical_json_bytes(&envelope.body).map_err(|e| RegulatoryApiError::Signing(e.to_string()))?;
     envelope
         .verify_signature()
         .map_err(|e| RegulatoryApiError::Signing(e.to_string()))

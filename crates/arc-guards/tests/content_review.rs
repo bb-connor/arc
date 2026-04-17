@@ -63,8 +63,7 @@ fn eval_with<G: Guard>(
     intent: Option<GovernedTransactionIntent>,
     matched_grant_index: Option<usize>,
 ) -> Verdict {
-    let (request, scope, agent_id, server_id) =
-        make_request_with_scope(tool, args, scope, intent);
+    let (request, scope, agent_id, server_id) = make_request_with_scope(tool, args, scope, intent);
     let ctx = GuardContext {
         request: &request,
         scope: &scope,
@@ -253,11 +252,7 @@ fn profanity_banned_word_denies() {
 #[test]
 fn non_external_api_actions_pass_through() {
     let guard = ContentReviewGuard::new();
-    let v = eval_simple(
-        &guard,
-        "read_file",
-        serde_json::json!({"path": "/tmp/x"}),
-    );
+    let v = eval_simple(&guard, "read_file", serde_json::json!({"path": "/tmp/x"}));
     assert!(matches!(v, Verdict::Allow));
 }
 

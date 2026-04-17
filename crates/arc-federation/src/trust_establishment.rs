@@ -16,8 +16,10 @@
 //!    + declared public key).
 //! 3. Each side verifies the remote envelope's signature against the
 //!    declared public key, checks freshness (`nonce`, `timestamp` skew),
-//!    and pins the remote public key as a [`FederationPeer`] with a
-//!    rotation deadline derived from the configured freshness window.
+//!    verifies that the key matches either a pre-configured trust anchor
+//!    or an already-pinned peer, and then pins the remote public key as a
+//!    [`FederationPeer`] with a rotation deadline derived from the
+//!    configured freshness window.
 //!
 //! ## Freshness rotation
 //!
@@ -191,6 +193,16 @@ pub enum PeerHandshakeError {
     #[error("peer {0} is stale and must be re-handshaked before use")]
     PeerStale(String),
 
+    #[error("peer {0} is not trusted for first contact; configure a trust anchor before accepting handshakes")]
+    MissingTrustAnchor(String),
+
+    #[error("peer {kernel_id} declared unexpected public key; expected {expected}, got {actual}")]
+    UnexpectedPeerKey {
+        kernel_id: String,
+        expected: String,
+        actual: String,
+    },
+
     #[error("trust store is poisoned and cannot service requests")]
     StorePoisoned,
 }
@@ -277,6 +289,7 @@ pub struct KernelTrustExchange {
     local_keypair: Keypair,
     config: KernelTrustExchangeConfig,
     store: Box<dyn FederationPeerStore>,
+    trusted_peers: HashMap<String, PublicKey>,
 }
 
 impl core::fmt::Debug for KernelTrustExchange {
@@ -295,6 +308,7 @@ impl KernelTrustExchange {
             local_keypair,
             config: KernelTrustExchangeConfig::default(),
             store: Box::new(InMemoryPeerStore::new()),
+            trusted_peers: HashMap::new(),
         }
     }
 
@@ -305,6 +319,15 @@ impl KernelTrustExchange {
 
     pub fn with_store(mut self, store: Box<dyn FederationPeerStore>) -> Self {
         self.store = store;
+        self
+    }
+
+    pub fn with_trusted_peer(
+        mut self,
+        kernel_id: impl Into<String>,
+        public_key: PublicKey,
+    ) -> Self {
+        self.trusted_peers.insert(kernel_id.into(), public_key);
         self
     }
 
@@ -338,8 +361,9 @@ impl KernelTrustExchange {
 
     /// Accept an envelope received from `expected_remote_kernel_id` at
     /// local clock `now`. Verifies the signature, the addressee, the
-    /// claimed remote kernel ID, and the clock skew; on success, pins the
-    /// remote public key as a fresh [`FederationPeer`].
+    /// claimed remote kernel ID, the clock skew, and the expected remote
+    /// public key; on success, pins the remote public key as a fresh
+    /// [`FederationPeer`].
     pub fn accept_envelope(
         &self,
         envelope: &PeerHandshakeEnvelope,
@@ -369,6 +393,23 @@ impl KernelTrustExchange {
                 envelope: envelope_ts,
                 local: now,
                 skew,
+            });
+        }
+
+        let pinned_peer = self.store.get(expected_remote_kernel_id)?;
+        let expected_public_key = self
+            .trusted_peers
+            .get(expected_remote_kernel_id)
+            .cloned()
+            .or_else(|| pinned_peer.as_ref().map(|peer| peer.public_key.clone()))
+            .ok_or_else(|| {
+                PeerHandshakeError::MissingTrustAnchor(expected_remote_kernel_id.to_string())
+            })?;
+        if envelope.declared_public_key != expected_public_key {
+            return Err(PeerHandshakeError::UnexpectedPeerKey {
+                kernel_id: expected_remote_kernel_id.to_string(),
+                expected: expected_public_key.to_hex(),
+                actual: envelope.declared_public_key.to_hex(),
             });
         }
 

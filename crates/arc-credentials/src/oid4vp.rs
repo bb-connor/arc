@@ -826,7 +826,7 @@ pub fn respond_to_oid4vp_request(
     request.validate(now)?;
     let requested = &request.dcql_query.credentials[0];
     let inspected = inspect_arc_passport_sd_jwt_vc_unverified(portable_credential)?;
-    let holder_did = DidArc::from_public_key(holder_keypair.public_key());
+    let holder_did = DidArc::from_public_key(holder_keypair.public_key())?;
     if holder_did.to_string() != inspected.subject_did {
         return Err(CredentialError::InvalidOid4vpResponse(
             "holder key does not match the portable credential subject".to_string(),

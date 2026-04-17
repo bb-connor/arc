@@ -32,7 +32,9 @@ pub enum AttestationVerifierFamily {
 pub(crate) enum RuntimeAttestationTrustMaterialError {
     #[cfg_attr(
         feature = "std",
-        error("runtime attestation schema `{schema}` is not supported by the shared trust boundary")
+        error(
+            "runtime attestation schema `{schema}` is not supported by the shared trust boundary"
+        )
     )]
     UnsupportedSchema { schema: String },
 }

@@ -145,8 +145,7 @@ impl ComputerUseGuard {
 
     /// Build a guard with an explicit configuration.
     pub fn with_config(config: ComputerUseConfig) -> Self {
-        let allowed_actions: HashSet<String> =
-            config.allowed_action_types.into_iter().collect();
+        let allowed_actions: HashSet<String> = config.allowed_action_types.into_iter().collect();
         let screenshot_bucket = match config.screenshot_rate_per_second {
             Some(rate) if rate > 0.0 && rate.is_finite() => {
                 let burst = config.screenshot_burst.unwrap_or(5).max(1);
@@ -297,7 +296,10 @@ impl Guard for ComputerUseGuard {
             }
 
             // Navigation domain check.
-            if matches!(verb.to_ascii_lowercase().as_str(), "navigate" | "goto" | "open") {
+            if matches!(
+                verb.to_ascii_lowercase().as_str(),
+                "navigate" | "goto" | "open"
+            ) {
                 if let Some(url) = target {
                     return Ok(self.check_navigation(url));
                 }
@@ -374,9 +376,18 @@ mod tests {
 
     #[test]
     fn extract_host_handles_common_urls() {
-        assert_eq!(extract_host("https://example.com/x"), Some("example.com".into()));
-        assert_eq!(extract_host("http://localhost:8080"), Some("localhost".into()));
-        assert_eq!(extract_host("example.com:443/y"), Some("example.com".into()));
+        assert_eq!(
+            extract_host("https://example.com/x"),
+            Some("example.com".into())
+        );
+        assert_eq!(
+            extract_host("http://localhost:8080"),
+            Some("localhost".into())
+        );
+        assert_eq!(
+            extract_host("example.com:443/y"),
+            Some("example.com".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
     }

@@ -32,6 +32,15 @@ use tokio::sync::{mpsc, Mutex};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+use arc_core_types::capability::CapabilityToken;
+use arc_core_types::crypto::PublicKey;
+use arc_kernel_core::{
+    evaluate as evaluate_capability, EvaluateInput, FixedClock, PortableToolCallRequest,
+};
+
+#[cfg(test)]
+use arc_core_types::crypto::Keypair;
+
 mod dynamodb_flush;
 mod lifecycle;
 
@@ -58,6 +67,8 @@ const RECEIPT_TABLE_ENV: &str = "ARC_RECEIPT_TABLE";
 /// Optional override for the evaluator listen address. Most callers will
 /// leave this unset.
 const LISTEN_ADDR_ENV: &str = "ARC_EXTENSION_ADDR";
+const TRUSTED_ISSUERS_ENV: &str = "ARC_TRUSTED_ISSUERS";
+const CAPABILITY_TOKENS_ENV: &str = "ARC_CAPABILITY_TOKENS_JSON";
 
 #[derive(Debug, thiserror::Error)]
 enum BootError {
@@ -226,11 +237,16 @@ struct EvaluateRequest {
     tool_server: String,
     #[serde(default)]
     tool_name: String,
+    #[serde(default)]
+    capability: Option<serde_json::Value>,
+    #[serde(default)]
+    // Wire-compatible, but ignored for trust decisions. Trusted issuers are
+    // sourced from deployment configuration only.
+    trusted_issuers: Vec<String>,
     // `scope` and `arguments` are accepted by the wire protocol so future
-    // policy checks can inspect them, but the Phase 10.2 evaluator only
-    // branches on capability_id + tool_name. Marked `allow(dead_code)` so
-    // their presence in the schema is enforced by serde without triggering
-    // a compiler warning in the trivial evaluation path.
+    // policy checks can inspect them. Marked `allow(dead_code)` so their
+    // presence in the schema is enforced by serde without triggering a
+    // compiler warning in the current evaluator.
     #[serde(default)]
     #[allow(dead_code)]
     scope: Option<String>,
@@ -321,24 +337,12 @@ async fn read_body(req: Request<Incoming>) -> Result<Vec<u8>, hyper::Error> {
 }
 
 async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Full<Bytes>> {
-    // Minimal evaluation: the extension produces a receipt for every call.
-    // This is deliberately a Phase 10.2 foundation -- policy evaluation is
-    // delegated to the embedded kernel crate in a follow-up phase (the
-    // dependency is wired in so future expansion is mechanical). Until then
-    // every well-formed request that carries a non-empty capability_id and
-    // tool_name is allowed. Requests missing either field are denied.
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let (decision, reason): (&'static str, Option<String>) = if request.capability_id.is_empty() {
-        ("deny", Some("missing capability_id".into()))
-    } else if request.tool_name.is_empty() {
-        ("deny", Some("missing tool_name".into()))
-    } else {
-        ("allow", None)
-    };
+    let (decision, reason): (&'static str, Option<String>) = evaluate_request(&request, now);
 
     let receipt_id = uuid::Uuid::now_v7().to_string();
     let response = EvaluateResponse {
@@ -374,6 +378,99 @@ async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Fu
     ok_json(&response)
 }
 
+fn evaluate_request(request: &EvaluateRequest, now: u64) -> (&'static str, Option<String>) {
+    if request.capability_id.is_empty() {
+        return ("deny", Some("missing capability_id".into()));
+    }
+    if request.tool_server.is_empty() {
+        return ("deny", Some("missing tool_server".into()));
+    }
+    if request.tool_name.is_empty() {
+        return ("deny", Some("missing tool_name".into()));
+    }
+
+    let capability = match resolve_capability(request) {
+        Ok(capability) => capability,
+        Err(reason) => return ("deny", Some(reason)),
+    };
+    if capability.id != request.capability_id {
+        return (
+            "deny",
+            Some("capability_id does not match resolved capability token".into()),
+        );
+    }
+
+    let trusted_issuers = match resolve_trusted_issuers(request) {
+        Ok(trusted_issuers) if !trusted_issuers.is_empty() => trusted_issuers,
+        Ok(_) => return ("deny", Some("missing trusted_issuers".into())),
+        Err(reason) => return ("deny", Some(reason)),
+    };
+
+    let portable_request = PortableToolCallRequest {
+        request_id: format!("lambda-eval-{}", uuid::Uuid::now_v7()),
+        tool_name: request.tool_name.clone(),
+        server_id: request.tool_server.clone(),
+        agent_id: capability.subject.to_hex(),
+        arguments: request.arguments.clone().unwrap_or(serde_json::Value::Null),
+    };
+    let clock = FixedClock::new(now);
+    let guards: [&dyn arc_kernel_core::Guard; 0] = [];
+    let verdict = evaluate_capability(EvaluateInput {
+        request: &portable_request,
+        capability: &capability,
+        trusted_issuers: &trusted_issuers,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    if verdict.is_allow() {
+        ("allow", None)
+    } else {
+        (
+            "deny",
+            verdict
+                .reason
+                .or_else(|| Some("capability evaluation denied the request".into())),
+        )
+    }
+}
+
+fn resolve_capability(request: &EvaluateRequest) -> Result<CapabilityToken, String> {
+    if let Some(capability) = request.capability.as_ref() {
+        return serde_json::from_value(capability.clone())
+            .map_err(|error| format!("invalid capability token: {error}"));
+    }
+
+    let raw = std::env::var(CAPABILITY_TOKENS_ENV)
+        .map_err(|_| format!("missing {CAPABILITY_TOKENS_ENV} and no inline capability token"))?;
+    let tokens: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&raw)
+        .map_err(|error| format!("invalid {CAPABILITY_TOKENS_ENV}: {error}"))?;
+    let capability = tokens
+        .get(&request.capability_id)
+        .ok_or_else(|| format!("unknown capability_id {}", request.capability_id))?;
+    serde_json::from_value(capability.clone())
+        .map_err(|error| format!("invalid capability token for {}: {error}", request.capability_id))
+}
+
+fn resolve_trusted_issuers(request: &EvaluateRequest) -> Result<Vec<PublicKey>, String> {
+    if !request.trusted_issuers.is_empty() {
+        warn!(
+            ignored_count = request.trusted_issuers.len(),
+            "ignoring request-supplied trusted_issuers; using deployment configuration only"
+        );
+    }
+    let raw = std::env::var(TRUSTED_ISSUERS_ENV)
+        .map_err(|_| format!("missing {TRUSTED_ISSUERS_ENV} deployment configuration"))?;
+    let issuer_values = serde_json::from_str::<Vec<String>>(&raw)
+        .map_err(|error| format!("invalid {TRUSTED_ISSUERS_ENV}: {error}"))?;
+
+    issuer_values
+        .into_iter()
+        .map(|value| PublicKey::from_hex(&value).map_err(|error| format!("invalid trusted issuer {value}: {error}")))
+        .collect()
+}
+
 fn ok_json<T: Serialize>(body: &T) -> Response<Full<Bytes>> {
     let bytes = serde_json::to_vec(body).unwrap_or_else(|_| b"{}".to_vec());
     build_response(StatusCode::OK, bytes)
@@ -402,7 +499,32 @@ fn build_response(status: StatusCode, bytes: Vec<u8>) -> Response<Full<Bytes>> {
 
 #[cfg(test)]
 mod tests {
+    use std::future::Future;
     use super::*;
+    use std::ffi::OsString;
+    use std::sync::{LazyLock, Mutex as StdMutex};
+
+    static ENV_LOCK: LazyLock<StdMutex<()>> = LazyLock::new(|| StdMutex::new(()));
+
+    async fn with_env_var<T>(
+        key: &str,
+        value: &str,
+        future: impl Future<Output = T>,
+    ) -> T {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let previous = std::env::var_os(key);
+        std::env::set_var(key, value);
+        let output = future.await;
+        restore_env_var(key, previous);
+        output
+    }
+
+    fn restore_env_var(key: &str, previous: Option<OsString>) {
+        match previous {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+    }
 
     #[tokio::test]
     async fn evaluate_denies_missing_capability_id() {
@@ -415,6 +537,8 @@ mod tests {
             capability_id: "".into(),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
+            capability: None,
+            trusted_issuers: Vec::new(),
             scope: None,
             arguments: None,
         };
@@ -437,6 +561,8 @@ mod tests {
             capability_id: "cap".into(),
             tool_server: "srv".into(),
             tool_name: "".into(),
+            capability: None,
+            trusted_issuers: Vec::new(),
             scope: None,
             arguments: None,
         };
@@ -453,14 +579,50 @@ mod tests {
             receipt_tx: tx,
             buffer: Mutex::new(ReceiptBuffer::new(rx)),
         });
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap();
         let request = EvaluateRequest {
             capability_id: "cap".into(),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
+            capability: Some(serde_json::to_value(capability).unwrap()),
+            trusted_issuers: Vec::new(),
             scope: Some("read".into()),
             arguments: Some(serde_json::json!({"q": "hello"})),
         };
-        let response = evaluate(request, state.clone()).await;
+        let trusted = serde_json::to_string(&vec![issuer.public_key().to_hex()]).unwrap();
+        let response = with_env_var(
+            TRUSTED_ISSUERS_ENV,
+            &trusted,
+            evaluate(request, state.clone()),
+        )
+        .await;
         let body = response.into_body().collect().await.unwrap().to_bytes();
         let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(parsed["decision"], "allow");
@@ -474,17 +636,141 @@ mod tests {
             receipt_tx: tx,
             buffer: Mutex::new(ReceiptBuffer::new(rx)),
         });
+        let issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .unwrap();
         let request = EvaluateRequest {
             capability_id: "cap".into(),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
+            capability: Some(serde_json::to_value(capability).unwrap()),
+            trusted_issuers: Vec::new(),
             scope: None,
             arguments: None,
         };
-        let _ = evaluate(request, state.clone()).await;
+        let trusted = serde_json::to_string(&vec![issuer.public_key().to_hex()]).unwrap();
+        let _ = with_env_var(
+            TRUSTED_ISSUERS_ENV,
+            &trusted,
+            evaluate(request, state.clone()),
+        )
+        .await;
         let drained = state.buffer.lock().await.drain_available();
         assert_eq!(drained.len(), 1);
         assert_eq!(drained[0].decision, "allow");
+    }
+
+    #[tokio::test]
+    async fn evaluate_ignores_request_supplied_trusted_issuers() {
+        let (tx, rx) = mpsc::channel(16);
+        let state = Arc::new(AppState {
+            receipt_tx: tx,
+            buffer: Mutex::new(ReceiptBuffer::new(rx)),
+        });
+        let trusted_issuer = Keypair::generate();
+        let untrusted_issuer = Keypair::generate();
+        let subject = Keypair::generate();
+        let capability = CapabilityToken::sign(
+            arc_core_types::capability::CapabilityTokenBody {
+                id: "cap".into(),
+                issuer: untrusted_issuer.public_key(),
+                subject: subject.public_key(),
+                scope: arc_core_types::capability::ArcScope {
+                    grants: vec![arc_core_types::capability::ToolGrant {
+                        server_id: "srv".into(),
+                        tool_name: "tool".into(),
+                        operations: vec![arc_core_types::capability::Operation::Invoke],
+                        constraints: Vec::new(),
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &untrusted_issuer,
+        )
+        .unwrap();
+        let request = EvaluateRequest {
+            capability_id: "cap".into(),
+            tool_server: "srv".into(),
+            tool_name: "tool".into(),
+            capability: Some(serde_json::to_value(capability).unwrap()),
+            trusted_issuers: vec![untrusted_issuer.public_key().to_hex()],
+            scope: None,
+            arguments: None,
+        };
+        let trusted = serde_json::to_string(&vec![trusted_issuer.public_key().to_hex()]).unwrap();
+        let response = with_env_var(
+            TRUSTED_ISSUERS_ENV,
+            &trusted,
+            evaluate(request, state.clone()),
+        )
+        .await;
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed["decision"], "deny");
+        let reason = parsed["reason"].as_str().unwrap_or_default();
+        assert!(
+            reason.contains("issuer") || reason.contains("trust"),
+            "{reason}"
+        );
+    }
+
+    #[tokio::test]
+    async fn evaluate_denies_without_resolvable_capability_token() {
+        let (tx, rx) = mpsc::channel(16);
+        let state = Arc::new(AppState {
+            receipt_tx: tx,
+            buffer: Mutex::new(ReceiptBuffer::new(rx)),
+        });
+        let request = EvaluateRequest {
+            capability_id: "cap".into(),
+            tool_server: "srv".into(),
+            tool_name: "tool".into(),
+            capability: None,
+            trusted_issuers: Vec::new(),
+            scope: None,
+            arguments: None,
+        };
+        let response = evaluate(request, state).await;
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let parsed: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed["decision"], "deny");
+        assert!(parsed["reason"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("capability"));
     }
 
     #[tokio::test]

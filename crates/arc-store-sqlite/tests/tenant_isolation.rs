@@ -83,14 +83,22 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
 
     // 5 receipts for tenant A.
     for i in 0..5 {
-        let r = signed_receipt(&format!("rcpt-a-{i}"), &format!("cap-a-{i}"), Some("tenant-A"));
+        let r = signed_receipt(
+            &format!("rcpt-a-{i}"),
+            &format!("cap-a-{i}"),
+            Some("tenant-A"),
+        );
         store
             .append_arc_receipt_returning_seq(&r)
             .expect("append tenant-A receipt");
     }
     // 3 receipts for tenant B.
     for i in 0..3 {
-        let r = signed_receipt(&format!("rcpt-b-{i}"), &format!("cap-b-{i}"), Some("tenant-B"));
+        let r = signed_receipt(
+            &format!("rcpt-b-{i}"),
+            &format!("cap-b-{i}"),
+            Some("tenant-B"),
+        );
         store
             .append_arc_receipt_returning_seq(&r)
             .expect("append tenant-B receipt");
@@ -98,7 +106,11 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
     // 2 pre-migration legacy receipts without a tenant_id. These land in
     // the store with `tenant_id IS NULL`.
     for i in 0..2 {
-        let r = signed_receipt(&format!("rcpt-legacy-{i}"), &format!("cap-legacy-{i}"), None);
+        let r = signed_receipt(
+            &format!("rcpt-legacy-{i}"),
+            &format!("cap-legacy-{i}"),
+            None,
+        );
         store
             .append_arc_receipt_returning_seq(&r)
             .expect("append legacy receipt");
@@ -186,12 +198,14 @@ fn tenant_filter_none_returns_all_rows_regardless_of_tags() {
     let store = SqliteReceiptStore::open(&path).expect("open store");
 
     // Three distinct tenants + legacy nulls.
-    for (tenant, count) in [(Some("ten-1"), 4usize), (Some("ten-2"), 1), (Some("ten-3"), 2), (None, 3)] {
+    for (tenant, count) in [
+        (Some("ten-1"), 4usize),
+        (Some("ten-2"), 1),
+        (Some("ten-3"), 2),
+        (None, 3),
+    ] {
         for i in 0..count {
-            let id = format!(
-                "rcpt-{}-{i}",
-                tenant.unwrap_or("legacy")
-            );
+            let id = format!("rcpt-{}-{i}", tenant.unwrap_or("legacy"));
             let capability_id = format!("cap-{id}");
             let r = signed_receipt(&id, &capability_id, tenant);
             store

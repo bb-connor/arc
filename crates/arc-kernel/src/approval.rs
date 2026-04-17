@@ -53,6 +53,11 @@ pub struct ApprovalRequest {
     /// Capability token ID bound to this request.
     pub capability_id: String,
 
+    /// Public key of the capability subject this approval is bound to.
+    /// A presented approval token must carry the same subject.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject_public_key: Option<PublicKey>,
+
     /// Server hosting the target tool.
     pub tool_server: ServerId,
 
@@ -89,6 +94,12 @@ pub struct ApprovalRequest {
     /// envelope they are signing off on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub governed_intent: Option<GovernedTransactionIntent>,
+
+    /// Public keys allowed to approve this request. The kernel fails
+    /// closed when the set is empty or when the presented approver is
+    /// not in the set.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub trusted_approvers: Vec<PublicKey>,
 
     /// Guards that triggered the approval requirement.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -171,6 +182,30 @@ impl ApprovalToken {
             return Err(KernelError::ApprovalRejected(
                 "approval token approver mismatch".into(),
             ));
+        }
+        if request.trusted_approvers.is_empty() {
+            return Err(KernelError::ApprovalRejected(
+                "approval request does not declare any trusted approvers".into(),
+            ));
+        }
+        if !request.trusted_approvers.contains(&self.approver) {
+            return Err(KernelError::ApprovalRejected(
+                "approval token approver is not trusted for this request".into(),
+            ));
+        }
+        match request.subject_public_key.as_ref() {
+            Some(expected_subject) if &self.governed_token.subject != expected_subject => {
+                return Err(KernelError::ApprovalRejected(
+                    "approval token subject does not match the request subject".into(),
+                ));
+            }
+            Some(_) => {}
+            None if self.governed_token.subject.to_hex() != request.subject_id => {
+                return Err(KernelError::ApprovalRejected(
+                    "approval request is missing a subject binding".into(),
+                ));
+            }
+            None => {}
         }
 
         // Time bounds.
@@ -280,19 +315,11 @@ pub trait ApprovalStore: Send + Sync {
     /// been resolved (double-resolve protection) and
     /// `ApprovalStoreError::Replay` if the bound token has already been
     /// consumed on a different request.
-    fn resolve(
-        &self,
-        id: &str,
-        decision: &ApprovalDecision,
-    ) -> Result<(), ApprovalStoreError>;
+    fn resolve(&self, id: &str, decision: &ApprovalDecision) -> Result<(), ApprovalStoreError>;
 
     /// Count approved calls for a given subject / grant pair. Used by
     /// `Constraint::RequireApprovalAbove` threshold accounting.
-    fn count_approved(
-        &self,
-        subject_id: &str,
-        policy_id: &str,
-    ) -> Result<u64, ApprovalStoreError>;
+    fn count_approved(&self, subject_id: &str, policy_id: &str) -> Result<u64, ApprovalStoreError>;
 
     /// Record that a token (by `token_id` and `parameter_hash`) has
     /// been consumed. Used to reject replays of the same approval
@@ -309,17 +336,11 @@ pub trait ApprovalStore: Send + Sync {
     ) -> Result<(), ApprovalStoreError>;
 
     /// Returns `true` if the token has already been consumed.
-    fn is_consumed(
-        &self,
-        token_id: &str,
-        parameter_hash: &str,
-    ) -> Result<bool, ApprovalStoreError>;
+    fn is_consumed(&self, token_id: &str, parameter_hash: &str)
+        -> Result<bool, ApprovalStoreError>;
 
     /// Fetch the resolution record for a previously resolved approval.
-    fn get_resolution(
-        &self,
-        id: &str,
-    ) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
+    fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
 }
 
 /// Batch approvals let a human pre-approve a class of calls.
@@ -494,11 +515,7 @@ impl ApprovalGuard {
 
     /// Evaluate the grant's constraints against the request. Returns
     /// a `HitlVerdict` describing the next step.
-    pub fn evaluate(
-        &self,
-        ctx: ApprovalContext<'_>,
-        now: u64,
-    ) -> Result<HitlVerdict, KernelError> {
+    pub fn evaluate(&self, ctx: ApprovalContext<'_>, now: u64) -> Result<HitlVerdict, KernelError> {
         let mut triggered = Vec::<String>::new();
         let mut threshold_hit = false;
         let mut always_hit = false;
@@ -515,9 +532,7 @@ impl ApprovalGuard {
                     match amount {
                         Some(amt) if amt.units >= *threshold_units => {
                             threshold_hit = true;
-                            triggered.push(format!(
-                                "require_approval_above:{threshold_units}"
-                            ));
+                            triggered.push(format!("require_approval_above:{threshold_units}"));
                         }
                         Some(_) => {
                             // Below threshold -- no approval triggered.
@@ -566,6 +581,11 @@ impl ApprovalGuard {
         if !needs_approval {
             return Ok(HitlVerdict::Allow);
         }
+        if ctx.trusted_approvers.is_empty() {
+            return Ok(HitlVerdict::Deny {
+                reason: "approval required but no trusted approvers are configured".to_string(),
+            });
+        }
 
         // If the caller attached an approval token, try to satisfy the
         // request with it before creating a new pending entry.
@@ -598,6 +618,7 @@ impl ApprovalGuard {
                     policy_id: ctx.policy_id.to_string(),
                     subject_id: ctx.request.agent_id.clone(),
                     capability_id: ctx.request.capability.id.clone(),
+                    subject_public_key: Some(ctx.request.capability.subject.clone()),
                     tool_server: ctx.request.server_id.clone(),
                     tool_name: ctx.request.tool_name.clone(),
                     action: "invoke".to_string(),
@@ -607,6 +628,7 @@ impl ApprovalGuard {
                     created_at: now,
                     summary: String::new(),
                     governed_intent: ctx.request.governed_intent.clone(),
+                    trusted_approvers: ctx.trusted_approvers.to_vec(),
                     triggered_by: triggered.clone(),
                 })
             }) {
@@ -622,10 +644,7 @@ impl ApprovalGuard {
             // verification, fail-closed on a previously consumed token.
             let already_consumed = self
                 .store
-                .is_consumed(
-                    &token.governed_token.id,
-                    &approval_request.parameter_hash,
-                )
+                .is_consumed(&token.governed_token.id, &approval_request.parameter_hash)
                 .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?;
             if already_consumed {
                 return Err(KernelError::ApprovalRejected(
@@ -662,6 +681,7 @@ impl ApprovalGuard {
                 policy_id: ctx.policy_id.to_string(),
                 subject_id: ctx.request.agent_id.clone(),
                 capability_id: ctx.request.capability.id.clone(),
+                subject_public_key: Some(ctx.request.capability.subject.clone()),
                 tool_server: ctx.request.server_id.clone(),
                 tool_name: ctx.request.tool_name.clone(),
                 action: "invoke".to_string(),
@@ -671,6 +691,7 @@ impl ApprovalGuard {
                 created_at: now,
                 summary,
                 governed_intent: ctx.request.governed_intent.clone(),
+                trusted_approvers: ctx.trusted_approvers.to_vec(),
                 triggered_by: triggered,
             };
             self.store
@@ -710,6 +731,8 @@ pub struct ApprovalContext<'a> {
     pub request: &'a ToolCallRequest,
     pub constraints: &'a [Constraint],
     pub policy_id: &'a str,
+    /// Public keys trusted to sign the approval token for this request.
+    pub trusted_approvers: &'a [PublicKey],
     /// Approval token presented by the caller, if any.
     pub presented_token: Option<&'a ApprovalToken>,
     /// When `true`, force the guard into the pending path regardless
@@ -767,7 +790,9 @@ pub fn resume_with_decision(
     // counters before we bail out, corrupting approval-threshold state
     // and replay-protection bookkeeping while still returning an error.
     let outcome = match (token_decision, &decision.outcome) {
-        (GovernedApprovalDecision::Approved, ApprovalOutcome::Approved) => ApprovalOutcome::Approved,
+        (GovernedApprovalDecision::Approved, ApprovalOutcome::Approved) => {
+            ApprovalOutcome::Approved
+        }
         (GovernedApprovalDecision::Denied, ApprovalOutcome::Denied) => ApprovalOutcome::Denied,
         _ => {
             return Err(KernelError::ApprovalRejected(
@@ -780,8 +805,9 @@ pub fn resume_with_decision(
     // restart: `resolve` is expected to atomically mark the request
     // resolved AND record the consumed token id. We only reach this
     // point once the envelope/token consistency check has passed.
-    store.resolve(&decision.approval_id, decision).map_err(|e| {
-        match e {
+    store
+        .resolve(&decision.approval_id, decision)
+        .map_err(|e| match e {
             ApprovalStoreError::AlreadyResolved(m) => {
                 KernelError::ApprovalRejected(format!("already resolved: {m}"))
             }
@@ -789,8 +815,7 @@ pub fn resume_with_decision(
                 KernelError::ApprovalRejected(format!("replay detected: {m}"))
             }
             other => KernelError::Internal(format!("approval store: {other}")),
-        }
-    })?;
+        })?;
 
     Ok(outcome)
 }
@@ -862,9 +887,7 @@ impl ApprovalStore for InMemoryApprovalStore {
                         .tool_name
                         .as_deref()
                         .is_none_or(|s| req.tool_name == s)
-                    && filter
-                        .not_expired_at
-                        .is_none_or(|t| req.expires_at > t)
+                    && filter.not_expired_at.is_none_or(|t| req.expires_at > t)
             })
             .cloned()
             .collect();
@@ -875,11 +898,7 @@ impl ApprovalStore for InMemoryApprovalStore {
         Ok(out)
     }
 
-    fn resolve(
-        &self,
-        id: &str,
-        decision: &ApprovalDecision,
-    ) -> Result<(), ApprovalStoreError> {
+    fn resolve(&self, id: &str, decision: &ApprovalDecision) -> Result<(), ApprovalStoreError> {
         let mut pending_guard = self
             .pending
             .write()
@@ -933,11 +952,7 @@ impl ApprovalStore for InMemoryApprovalStore {
         Ok(())
     }
 
-    fn count_approved(
-        &self,
-        subject_id: &str,
-        policy_id: &str,
-    ) -> Result<u64, ApprovalStoreError> {
+    fn count_approved(&self, subject_id: &str, policy_id: &str) -> Result<u64, ApprovalStoreError> {
         let counts = self
             .approved_counts
             .lock()
@@ -980,10 +995,7 @@ impl ApprovalStore for InMemoryApprovalStore {
         Ok(consumed.contains_key(&Self::consumed_key(token_id, parameter_hash)))
     }
 
-    fn get_resolution(
-        &self,
-        id: &str,
-    ) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
+    fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
         let guard = self
             .resolved
             .read()
@@ -1120,11 +1132,14 @@ mod tests {
     use arc_core::crypto::Keypair;
 
     fn make_request(approval_id: &str, parameter_hash: &str) -> ApprovalRequest {
+        let subject = Keypair::generate();
+        let approver = Keypair::generate();
         ApprovalRequest {
             approval_id: approval_id.to_string(),
             policy_id: "policy-1".into(),
             subject_id: "agent-1".into(),
             capability_id: "cap-1".into(),
+            subject_public_key: Some(subject.public_key()),
             tool_server: "srv".into(),
             tool_name: "invoke".into(),
             action: "invoke".into(),
@@ -1134,6 +1149,7 @@ mod tests {
             created_at: 0,
             summary: String::new(),
             governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         }
     }
@@ -1161,11 +1177,13 @@ mod tests {
     #[test]
     fn resume_flow_approved() {
         let store = InMemoryApprovalStore::new();
-        let req = make_request("a-1", "h-1");
-        store.store_pending(&req).unwrap();
-
         let approver = Keypair::generate();
         let subject = Keypair::generate();
+        let mut req = make_request("a-1", "h-1");
+        req.subject_public_key = Some(subject.public_key());
+        req.trusted_approvers = vec![approver.public_key()];
+        store.store_pending(&req).unwrap();
+
         let token = make_token(
             &approver,
             &subject,
@@ -1190,11 +1208,13 @@ mod tests {
     #[test]
     fn resume_flow_replay_rejected() {
         let store = InMemoryApprovalStore::new();
-        let req = make_request("a-2", "h-2");
-        store.store_pending(&req).unwrap();
-
         let approver = Keypair::generate();
         let subject = Keypair::generate();
+        let mut req = make_request("a-2", "h-2");
+        req.subject_public_key = Some(subject.public_key());
+        req.trusted_approvers = vec![approver.public_key()];
+        store.store_pending(&req).unwrap();
+
         let token = make_token(
             &approver,
             &subject,
@@ -1241,6 +1261,94 @@ mod tests {
         let err = approval_token.verify_against(&req, 50).unwrap_err();
         match err {
             KernelError::ApprovalRejected(_) => {}
+            other => panic!("expected ApprovalRejected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_against_rejects_untrusted_approver() {
+        let trusted_approver = Keypair::generate();
+        let rogue_approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let token = make_token(
+            &rogue_approver,
+            &subject,
+            "a-1",
+            "h-1",
+            GovernedApprovalDecision::Approved,
+        );
+        let req = ApprovalRequest {
+            approval_id: "a-1".into(),
+            policy_id: "policy-1".into(),
+            subject_id: "agent-1".into(),
+            capability_id: "cap-1".into(),
+            subject_public_key: Some(subject.public_key()),
+            tool_server: "srv".into(),
+            tool_name: "invoke".into(),
+            action: "invoke".into(),
+            parameter_hash: "h-1".into(),
+            expires_at: 1_000_000,
+            callback_hint: None,
+            created_at: 0,
+            summary: String::new(),
+            governed_intent: None,
+            trusted_approvers: vec![trusted_approver.public_key()],
+            triggered_by: vec![],
+        };
+        let approval_token = ApprovalToken {
+            approval_id: "a-1".into(),
+            governed_token: token,
+            approver: rogue_approver.public_key(),
+        };
+        let err = approval_token.verify_against(&req, 50).unwrap_err();
+        match err {
+            KernelError::ApprovalRejected(reason) => {
+                assert!(reason.contains("not trusted"), "{reason}");
+            }
+            other => panic!("expected ApprovalRejected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_against_rejects_subject_mismatch() {
+        let approver = Keypair::generate();
+        let expected_subject = Keypair::generate();
+        let rogue_subject = Keypair::generate();
+        let token = make_token(
+            &approver,
+            &rogue_subject,
+            "a-1",
+            "h-1",
+            GovernedApprovalDecision::Approved,
+        );
+        let req = ApprovalRequest {
+            approval_id: "a-1".into(),
+            policy_id: "policy-1".into(),
+            subject_id: "agent-1".into(),
+            capability_id: "cap-1".into(),
+            subject_public_key: Some(expected_subject.public_key()),
+            tool_server: "srv".into(),
+            tool_name: "invoke".into(),
+            action: "invoke".into(),
+            parameter_hash: "h-1".into(),
+            expires_at: 1_000_000,
+            callback_hint: None,
+            created_at: 0,
+            summary: String::new(),
+            governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
+            triggered_by: vec![],
+        };
+        let approval_token = ApprovalToken {
+            approval_id: "a-1".into(),
+            governed_token: token,
+            approver: approver.public_key(),
+        };
+        let err = approval_token.verify_against(&req, 50).unwrap_err();
+        match err {
+            KernelError::ApprovalRejected(reason) => {
+                assert!(reason.contains("subject"), "{reason}");
+            }
             other => panic!("expected ApprovalRejected, got {other:?}"),
         }
     }

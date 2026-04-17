@@ -303,15 +303,13 @@ pub fn compliance_factor_breakdown(
     let policy_coverage_gap = if report.matching_receipts == 0 {
         0.0
     } else {
-        let checkpoint_coverage = report
-            .checkpoint_coverage_rate
-            .unwrap_or_else(|| {
-                if report.matching_receipts == 0 {
-                    1.0
-                } else {
-                    report.evidence_ready_receipts as f64 / report.matching_receipts as f64
-                }
-            });
+        let checkpoint_coverage = report.checkpoint_coverage_rate.unwrap_or_else(|| {
+            if report.matching_receipts == 0 {
+                1.0
+            } else {
+                report.evidence_ready_receipts as f64 / report.matching_receipts as f64
+            }
+        });
         let lineage_coverage = report.lineage_coverage_rate.unwrap_or_else(|| {
             if report.matching_receipts == 0 {
                 1.0

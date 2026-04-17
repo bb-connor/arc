@@ -6,6 +6,7 @@ use arc_core::capability::{
     GovernedCallChainContext, GovernedCallChainEvidenceSource, GovernedCallChainProvenance,
     GovernedProvenanceEvidenceClass, GovernedUpstreamCallChainProof,
 };
+use arc_core::receipt::GuardEvidence;
 use uuid::Uuid;
 
 use crate::evidence_export::EvidenceLineageReferences;
@@ -27,6 +28,8 @@ thread_local! {
         const { RefCell::new(None) };
     static GOVERNED_RUNTIME_ATTESTATION_RECORD: RefCell<Option<VerifiedRuntimeAttestationRecord>> =
         const { RefCell::new(None) };
+    static POST_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 pub(crate) struct ScopedGovernedCallChainReceiptEvidence {
@@ -75,6 +78,30 @@ pub(crate) fn scope_governed_runtime_attestation_receipt_record(
 
 fn current_governed_runtime_attestation_record() -> Option<VerifiedRuntimeAttestationRecord> {
     GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| slot.borrow().clone())
+}
+
+pub(crate) struct ScopedPostInvocationGuardEvidence {
+    previous: Vec<GuardEvidence>,
+}
+
+impl Drop for ScopedPostInvocationGuardEvidence {
+    fn drop(&mut self) {
+        let previous = core::mem::take(&mut self.previous);
+        POST_INVOCATION_GUARD_EVIDENCE.with(|slot| {
+            slot.replace(previous);
+        });
+    }
+}
+
+pub(crate) fn scope_post_invocation_guard_evidence(
+    evidence: Vec<GuardEvidence>,
+) -> ScopedPostInvocationGuardEvidence {
+    let previous = POST_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.replace(evidence));
+    ScopedPostInvocationGuardEvidence { previous }
+}
+
+pub(crate) fn current_post_invocation_guard_evidence() -> Vec<GuardEvidence> {
+    POST_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.borrow().clone())
 }
 
 fn governed_call_chain_provenance(
@@ -669,7 +696,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 0)
@@ -743,7 +770,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -832,7 +859,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -901,7 +928,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 150)
@@ -942,7 +969,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata =
@@ -1003,7 +1030,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
@@ -1065,7 +1092,7 @@ mod tests {
             }),
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));

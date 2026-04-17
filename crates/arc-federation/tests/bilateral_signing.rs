@@ -179,19 +179,17 @@ fn canonical_body_roundtrip_is_stable() {
     let tool_host_kp = Keypair::generate();
     let receipt = sample_receipt(&tool_host_kp);
 
-    let body_a =
-        CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
-    let body_b =
-        CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
-    assert_eq!(body_a.canonical_bytes().unwrap(), body_b.canonical_bytes().unwrap());
+    let body_a = CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
+    let body_b = CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
+    assert_eq!(
+        body_a.canonical_bytes().unwrap(),
+        body_b.canonical_bytes().unwrap()
+    );
 
     // Demonstrate that a DualSignedReceipt serializes and deserializes without
     // drift (receipt body stays intact, both signatures survive).
-    let cosigner = InProcessCoSigner::new(
-        "kernel.org-a",
-        origin_kp.clone(),
-        tool_host_kp.public_key(),
-    );
+    let cosigner =
+        InProcessCoSigner::new("kernel.org-a", origin_kp.clone(), tool_host_kp.public_key());
     let dual = co_sign_with_origin(
         "kernel.org-a",
         &origin_kp.public_key(),

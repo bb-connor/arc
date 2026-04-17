@@ -189,11 +189,7 @@ pub trait ExecutionNonceStore: Send + Sync {
     /// The default implementation falls back to [`Self::reserve`] for
     /// in-memory / best-effort stores that already track retention
     /// internally. `nonce_expires_at` is wall-clock unix seconds.
-    fn reserve_until(
-        &self,
-        nonce_id: &str,
-        _nonce_expires_at: i64,
-    ) -> Result<bool, KernelError> {
+    fn reserve_until(&self, nonce_id: &str, _nonce_expires_at: i64) -> Result<bool, KernelError> {
         self.reserve(nonce_id)
     }
 }
@@ -223,8 +219,7 @@ impl InMemoryExecutionNonceStore {
     #[must_use]
     pub fn new(capacity: usize, ttl: Duration) -> Self {
         let nz = NonZeroUsize::new(capacity).unwrap_or_else(|| {
-            NonZeroUsize::new(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY)
-                .unwrap_or(NonZeroUsize::MIN)
+            NonZeroUsize::new(DEFAULT_EXECUTION_NONCE_STORE_CAPACITY).unwrap_or(NonZeroUsize::MIN)
         });
         Self {
             inner: Mutex::new(LruCache::new(nz)),
@@ -255,9 +250,7 @@ impl ExecutionNonceStore for InMemoryExecutionNonceStore {
     fn reserve(&self, nonce_id: &str) -> Result<bool, KernelError> {
         let mut cache = self.inner.lock().map_err(|_| {
             error!("execution nonce store mutex poisoned; denying fail-closed");
-            KernelError::Internal(
-                "execution nonce store mutex poisoned; fail-closed".to_string(),
-            )
+            KernelError::Internal("execution nonce store mutex poisoned; fail-closed".to_string())
         })?;
 
         let key = nonce_id.to_string();
@@ -415,9 +408,7 @@ pub fn verify_execution_nonce(
         });
     }
     if bound.tool_name != expected.tool_name {
-        return Err(ExecutionNonceError::BindingMismatch {
-            field: "tool_name",
-        });
+        return Err(ExecutionNonceError::BindingMismatch { field: "tool_name" });
     }
     if bound.parameter_hash != expected.parameter_hash {
         return Err(ExecutionNonceError::BindingMismatch {
@@ -439,9 +430,7 @@ pub fn verify_execution_nonce(
     // consumed marker for the full validity window — otherwise the row
     // can be pruned while the nonce is still cryptographically valid,
     // allowing replay within the remaining window.
-    match nonce_store
-        .reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at)
-    {
+    match nonce_store.reserve_until(&presented.nonce.nonce_id, presented.nonce.expires_at) {
         Ok(true) => Ok(()),
         Ok(false) => {
             warn!(
@@ -466,8 +455,8 @@ mod tests {
             capability_id: "cap-123".to_string(),
             tool_server: "fs".to_string(),
             tool_name: "read_file".to_string(),
-            parameter_hash:
-                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            parameter_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+                .to_string(),
         }
     }
 

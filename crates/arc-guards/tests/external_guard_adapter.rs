@@ -60,7 +60,9 @@ impl ExternalGuard for MockGuard {
             if self.permanent_failure {
                 return Err(ExternalGuardError::Permanent("mock permanent".into()));
             }
-            return Err(ExternalGuardError::Transient(format!("mock transient #{n}")));
+            return Err(ExternalGuardError::Transient(format!(
+                "mock transient #{n}"
+            )));
         }
         Ok(self.verdict)
     }
@@ -117,7 +119,10 @@ async fn happy_path_allows_and_calls_once() {
         .cache_capacity(NonZeroUsize::new(16).expect("nz"))
         .build();
 
-    assert_eq!(adapter.evaluate(&mock_ctx("read_file")).await, Verdict::Allow);
+    assert_eq!(
+        adapter.evaluate(&mock_ctx("read_file")).await,
+        Verdict::Allow
+    );
     assert_eq!(guard.calls(), 1);
 }
 

@@ -14,8 +14,10 @@ fn handshake_succeeds_and_pins_both_sides() {
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
 
-    let exchange_a = KernelTrustExchange::new("kernel.org-a", kp_a.clone());
-    let exchange_b = KernelTrustExchange::new("kernel.org-b", kp_b.clone());
+    let exchange_a = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
+    let exchange_b = KernelTrustExchange::new("kernel.org-b", kp_b.clone())
+        .with_trusted_peer("kernel.org-a", kp_a.public_key());
 
     // Each side builds its own signed envelope.
     let envelope_a = exchange_a
@@ -49,12 +51,12 @@ fn stale_peer_is_rejected_fail_closed() {
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
 
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone()).with_config(
-        KernelTrustExchangeConfig {
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_config(KernelTrustExchangeConfig {
             rotation_window_secs: 3_600,
             max_handshake_skew_secs: DEFAULT_HANDSHAKE_MAX_SKEW_SECS,
-        },
-    );
+        })
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
     let envelope_b =
         PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-a", "nonce-b", now, &kp_b).unwrap();
     exchange
@@ -75,12 +77,12 @@ fn freshness_rotation_reissues_pin() {
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
 
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone()).with_config(
-        KernelTrustExchangeConfig {
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_config(KernelTrustExchangeConfig {
             rotation_window_secs: 3_600,
             max_handshake_skew_secs: DEFAULT_HANDSHAKE_MAX_SKEW_SECS,
-        },
-    );
+        })
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
 
     let envelope_b1 =
         PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-a", "nonce-1", now, &kp_b).unwrap();
@@ -91,14 +93,9 @@ fn freshness_rotation_reissues_pin() {
     // After expiry, re-running the handshake re-pins the peer with a
     // later rotation_due.
     let later = now + 3_600 + 10;
-    let envelope_b2 = PeerHandshakeEnvelope::sign(
-        "kernel.org-b",
-        "kernel.org-a",
-        "nonce-2",
-        later,
-        &kp_b,
-    )
-    .unwrap();
+    let envelope_b2 =
+        PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-a", "nonce-2", later, &kp_b)
+            .unwrap();
     let peer2 = exchange
         .accept_envelope(&envelope_b2, "kernel.org-b", later)
         .unwrap();
@@ -114,7 +111,8 @@ fn accept_rejects_clock_skew() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone());
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
 
     let skewed_ts = now + DEFAULT_HANDSHAKE_MAX_SKEW_SECS + 60;
     let envelope_b = PeerHandshakeEnvelope::sign(
@@ -136,17 +134,12 @@ fn accept_rejects_wrong_addressee() {
     let kp_a = Keypair::generate();
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone());
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
 
     // Envelope addressed to someone else.
-    let envelope_b = PeerHandshakeEnvelope::sign(
-        "kernel.org-b",
-        "kernel.org-c",
-        "nonce-x",
-        now,
-        &kp_b,
-    )
-    .unwrap();
+    let envelope_b =
+        PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-c", "nonce-x", now, &kp_b).unwrap();
     let err = exchange
         .accept_envelope(&envelope_b, "kernel.org-b", now)
         .expect_err("misaddressed envelope must be rejected");
@@ -159,7 +152,8 @@ fn accept_rejects_tampered_signature() {
     let kp_b = Keypair::generate();
     let kp_c = Keypair::generate();
     let now: u64 = 1_800_000_000;
-    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone());
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a.clone())
+        .with_trusted_peer("kernel.org-b", kp_b.public_key());
 
     // Sign with kp_b but declare kp_c's public key.
     let mut envelope =
@@ -181,4 +175,19 @@ fn resolve_unknown_peer_fails_closed() {
         .resolve("kernel.org-b", now)
         .expect_err("unknown peer must be rejected");
     assert!(matches!(err, PeerHandshakeError::PeerNotPinned(_)));
+}
+
+#[test]
+fn accept_rejects_untrusted_first_contact() {
+    let kp_a = Keypair::generate();
+    let kp_b = Keypair::generate();
+    let now: u64 = 1_800_000_000;
+    let exchange = KernelTrustExchange::new("kernel.org-a", kp_a);
+
+    let envelope_b =
+        PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-a", "nonce-b", now, &kp_b).unwrap();
+    let err = exchange
+        .accept_envelope(&envelope_b, "kernel.org-b", now)
+        .expect_err("untrusted first contact must be rejected");
+    assert!(matches!(err, PeerHandshakeError::MissingTrustAnchor(_)));
 }

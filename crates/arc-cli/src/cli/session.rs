@@ -440,6 +440,7 @@ mod tests {
             kernel: policy.kernel.clone(),
             default_capabilities,
             guard_pipeline: policy::build_guard_pipeline(&policy.guards),
+            post_invocation_pipeline: policy::build_post_invocation_pipeline(&policy.guards),
             issuance_policy: None,
             runtime_assurance_policy: None,
         }

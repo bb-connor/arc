@@ -867,6 +867,7 @@ pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 pub struct ArcKernel {
     config: KernelConfig,
     guards: Vec<Box<dyn Guard>>,
+    post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     budget_store: Mutex<Box<dyn BudgetStore>>,
     revocation_store: Mutex<Box<dyn RevocationStore>>,
     capability_authority: Box<dyn CapabilityAuthority>,
@@ -1301,6 +1302,7 @@ impl ArcKernel {
         Self {
             config,
             guards: Vec::new(),
+            post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Mutex::new(Box::new(InMemoryBudgetStore::new())),
             revocation_store: Mutex::new(Box::new(InMemoryRevocationStore::new())),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
@@ -1366,6 +1368,20 @@ impl ArcKernel {
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.budget_store = Mutex::new(budget_store);
+    }
+
+    pub fn set_post_invocation_pipeline(
+        &mut self,
+        pipeline: crate::post_invocation::PostInvocationPipeline,
+    ) {
+        self.post_invocation_pipeline = pipeline;
+    }
+
+    pub fn add_post_invocation_hook(
+        &mut self,
+        hook: Box<dyn crate::post_invocation::PostInvocationHook>,
+    ) {
+        self.post_invocation_pipeline.add(hook);
     }
 
     /// Phase 18.2: install a memory-provenance chain.
@@ -3131,6 +3147,11 @@ impl ArcKernel {
 
     pub fn guard_count(&self) -> usize {
         self.guards.len()
+    }
+
+    #[must_use]
+    pub fn post_invocation_hook_count(&self) -> usize {
+        self.post_invocation_pipeline.len()
     }
 
     pub fn drain_tool_server_events(&self) -> Vec<ToolServerEvent> {

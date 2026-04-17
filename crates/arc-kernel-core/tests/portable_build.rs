@@ -9,7 +9,7 @@
 //! `wasm32-unknown-unknown` unchanged.
 
 use arc_core_types::capability::{
-    ArcScope, CapabilityToken, CapabilityTokenBody, Operation, ToolGrant,
+    ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, Operation, ToolGrant,
 };
 use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::{ArcReceiptBody, Decision, ToolCallAction, TrustLevel};
@@ -22,12 +22,20 @@ const ISSUED_AT: u64 = 1_700_000_000;
 const EXPIRES_AT: u64 = 1_700_100_000;
 
 fn make_capability(subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
+    make_capability_with_constraints(subject, issuer, vec![])
+}
+
+fn make_capability_with_constraints(
+    subject: &Keypair,
+    issuer: &Keypair,
+    constraints: Vec<Constraint>,
+) -> CapabilityToken {
     let scope = ArcScope {
         grants: vec![ToolGrant {
             server_id: "srv-a".to_string(),
             tool_name: "echo".to_string(),
             operations: vec![Operation::Invoke],
-            constraints: vec![],
+            constraints,
             max_invocations: None,
             max_cost_per_invocation: None,
             max_total_cost: None,
@@ -153,6 +161,186 @@ fn evaluate_out_of_scope() {
     assert!(verdict.is_deny());
     let reason = verdict.reason.unwrap();
     assert!(reason.contains("not in capability scope"));
+}
+
+#[test]
+fn evaluate_enforces_path_prefix_constraint() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_with_constraints(
+        &subject,
+        &issuer,
+        vec![Constraint::PathPrefix("/workspace/safe".to_string())],
+    );
+    let mut request = make_request(&subject);
+    request.arguments = serde_json::json!({"path": "/workspace/unsafe/file.txt"});
+    let clock = FixedClock::new(ISSUED_AT + 1);
+    let trusted = [issuer.public_key()];
+    let guards: Vec<&dyn Guard> = vec![];
+
+    let verdict = evaluate(EvaluateInput {
+        request: &request,
+        capability: &capability,
+        trusted_issuers: &trusted,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    assert!(verdict.is_deny());
+    let reason = verdict.reason.unwrap();
+    assert!(
+        reason.contains("not in capability scope"),
+        "reason was: {reason}"
+    );
+}
+
+#[test]
+fn evaluate_rejects_path_traversal_against_path_prefix_constraint() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_with_constraints(
+        &subject,
+        &issuer,
+        vec![Constraint::PathPrefix("/workspace/safe".to_string())],
+    );
+    let mut request = make_request(&subject);
+    request.arguments = serde_json::json!({"path": "/workspace/safe/../secret.txt"});
+    let clock = FixedClock::new(ISSUED_AT + 1);
+    let trusted = [issuer.public_key()];
+    let guards: Vec<&dyn Guard> = vec![];
+
+    let verdict = evaluate(EvaluateInput {
+        request: &request,
+        capability: &capability,
+        trusted_issuers: &trusted,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    assert!(verdict.is_deny());
+}
+
+#[test]
+fn evaluate_rejects_sibling_prefix_match_for_path_constraint() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_with_constraints(
+        &subject,
+        &issuer,
+        vec![Constraint::PathPrefix("/workspace/safe".to_string())],
+    );
+    let mut request = make_request(&subject);
+    request.arguments = serde_json::json!({"path": "/workspace/safeX/file.txt"});
+    let clock = FixedClock::new(ISSUED_AT + 1);
+    let trusted = [issuer.public_key()];
+    let guards: Vec<&dyn Guard> = vec![];
+
+    let verdict = evaluate(EvaluateInput {
+        request: &request,
+        capability: &capability,
+        trusted_issuers: &trusted,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    assert!(verdict.is_deny());
+}
+
+#[test]
+fn evaluate_fails_closed_on_unsupported_constraint() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = make_capability_with_constraints(
+        &subject,
+        &issuer,
+        vec![Constraint::MinimumRuntimeAssurance(
+            arc_core_types::capability::RuntimeAssuranceTier::Attested,
+        )],
+    );
+    let request = make_request(&subject);
+    let clock = FixedClock::new(ISSUED_AT + 1);
+    let trusted = [issuer.public_key()];
+    let guards: Vec<&dyn Guard> = vec![];
+
+    let verdict = evaluate(EvaluateInput {
+        request: &request,
+        capability: &capability,
+        trusted_issuers: &trusted,
+        clock: &clock,
+        guards: &guards,
+        session_filesystem_roots: None,
+    });
+
+    assert!(verdict.is_deny());
+    let reason = verdict.reason.unwrap();
+    assert!(
+        reason.contains("constraint evaluation failed"),
+        "reason was: {reason}"
+    );
+    assert!(
+        reason.contains("minimum_runtime_assurance"),
+        "reason was: {reason}"
+    );
+}
+
+#[test]
+fn resolve_matching_grants_skips_unsupported_match_when_later_grant_allows() {
+    let subject = Keypair::generate();
+    let issuer = Keypair::generate();
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-1".to_string(),
+            issuer: issuer.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope {
+                grants: vec![
+                    ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::MinimumRuntimeAssurance(
+                            arc_core_types::capability::RuntimeAssuranceTier::Attested,
+                        )],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                    ToolGrant {
+                        server_id: "srv-a".to_string(),
+                        tool_name: "echo".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    },
+                ],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            issued_at: ISSUED_AT,
+            expires_at: EXPIRES_AT,
+            delegation_chain: vec![],
+        },
+        &issuer,
+    )
+    .unwrap();
+
+    let matches = arc_kernel_core::scope::resolve_matching_grants(
+        &capability.scope,
+        "echo",
+        "srv-a",
+        &serde_json::json!({"msg": "hello"}),
+    )
+    .unwrap();
+
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0].index, 1);
 }
 
 #[test]

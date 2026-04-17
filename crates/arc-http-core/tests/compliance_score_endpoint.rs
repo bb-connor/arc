@@ -8,6 +8,7 @@
 
 use std::sync::Arc;
 
+use arc_core_types::crypto::Keypair;
 use arc_http_core::{
     handle_compliance_score, ComplianceScoreError, ComplianceScoreRequest, ComplianceScoreWindow,
     ComplianceSource, ComplianceSourceResult,
@@ -16,7 +17,6 @@ use arc_kernel::compliance_score::ComplianceScoreInputs;
 use arc_kernel::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use arc_kernel::operator_report::ComplianceReport;
 use arc_kernel::{ArcKernel, KernelConfig};
-use arc_core_types::crypto::Keypair;
 
 fn build_kernel() -> Arc<ArcKernel> {
     let keypair = Keypair::generate();

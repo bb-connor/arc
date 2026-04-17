@@ -156,13 +156,11 @@ impl Guard for RemoteDesktopSideChannelGuard {
             return Ok(Verdict::Allow);
         }
 
-        let channel = match Self::channel_action_type(
-            &ctx.request.tool_name,
-            &ctx.request.arguments,
-        ) {
-            Some(c) => c,
-            None => return Ok(Verdict::Allow),
-        };
+        let channel =
+            match Self::channel_action_type(&ctx.request.tool_name, &ctx.request.arguments) {
+                Some(c) => c,
+                None => return Ok(Verdict::Allow),
+            };
 
         match channel.as_str() {
             "remote.clipboard" => Ok(if self.config.clipboard_enabled {

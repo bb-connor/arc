@@ -20,6 +20,7 @@ path = "src/main.rs"
 
 [dependencies]
 arc-kernel = { path = "../../../crates/arc-kernel" }
+arc-kernel-core = { path = "../../../crates/arc-kernel-core" }
 arc-core-types = { path = "../../../crates/arc-core-types" }
 arc-store-sqlite = { path = "../../../crates/arc-store-sqlite" }
 

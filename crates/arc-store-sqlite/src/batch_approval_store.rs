@@ -23,9 +23,8 @@ impl SqliteBatchApprovalStore {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| {
-                    ApprovalStoreError::Backend(format!("create dir: {e}"))
-                })?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
             }
         }
         let manager = SqliteConnectionManager::file(path);
@@ -169,7 +168,10 @@ impl BatchApprovalStore for SqliteBatchApprovalStore {
                 batch.subject_id,
                 batch.server_pattern,
                 batch.tool_pattern,
-                batch.max_amount_per_call.as_ref().map(|a| a.currency.clone()),
+                batch
+                    .max_amount_per_call
+                    .as_ref()
+                    .map(|a| a.currency.clone()),
                 batch.max_amount_per_call.as_ref().map(|a| a.units as i64),
                 batch.max_total_amount.as_ref().map(|a| a.currency.clone()),
                 batch.max_total_amount.as_ref().map(|a| a.units as i64),
@@ -259,11 +261,12 @@ impl BatchApprovalStore for SqliteBatchApprovalStore {
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        let rows = conn.execute(
-            "UPDATE arc_hitl_batches SET revoked = 1 WHERE batch_id = ?1",
-            params![batch_id],
-        )
-        .map_err(|e| ApprovalStoreError::Backend(format!("revoke: {e}")))?;
+        let rows = conn
+            .execute(
+                "UPDATE arc_hitl_batches SET revoked = 1 WHERE batch_id = ?1",
+                params![batch_id],
+            )
+            .map_err(|e| ApprovalStoreError::Backend(format!("revoke: {e}")))?;
         if rows == 0 {
             return Err(ApprovalStoreError::NotFound(batch_id.to_string()));
         }

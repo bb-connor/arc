@@ -68,10 +68,12 @@ fn hitl_force_approval_returns_pending() {
     let guard = ApprovalGuard::new(store.clone()).with_channel(recorder.clone());
 
     let request = hitl_make_request();
+    let approver = CoreKeypair::generate();
     let ctx = ApprovalContext {
         request: &request,
         constraints: &[],
         policy_id: "policy-hitl",
+        trusted_approvers: &[approver.public_key()],
         presented_token: None,
         force_approval: true,
         approval_id_override: Some("ap-force-1".into()),
@@ -113,11 +115,14 @@ fn hitl_resume_approved_executes() {
         request.governed_intent.as_ref(),
     );
 
+    let approver = CoreKeypair::generate();
+    let subject = CoreKeypair::generate();
     let approval = ApprovalRequest {
         approval_id: "ap-approve-1".into(),
         policy_id: "policy-hitl".into(),
         subject_id: request.agent_id.clone(),
         capability_id: request.capability.id.clone(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
         action: "invoke".into(),
@@ -127,12 +132,11 @@ fn hitl_resume_approved_executes() {
         created_at: 500,
         summary: "test".into(),
         governed_intent: None,
+        trusted_approvers: vec![approver.public_key()],
         triggered_by: vec![],
     };
     store.store_pending(&approval).unwrap();
 
-    let approver = CoreKeypair::generate();
-    let subject = CoreKeypair::generate();
     let token = hitl_sign_token(
         &approver,
         &subject,
@@ -180,11 +184,14 @@ fn hitl_resume_denied_records_denial() {
         request.governed_intent.as_ref(),
     );
 
+    let approver = CoreKeypair::generate();
+    let subject = CoreKeypair::generate();
     let approval = ApprovalRequest {
         approval_id: "ap-deny-1".into(),
         policy_id: "policy-hitl".into(),
         subject_id: request.agent_id.clone(),
         capability_id: request.capability.id.clone(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
         action: "invoke".into(),
@@ -194,12 +201,11 @@ fn hitl_resume_denied_records_denial() {
         created_at: 500,
         summary: "test".into(),
         governed_intent: None,
+        trusted_approvers: vec![approver.public_key()],
         triggered_by: vec![],
     };
     store.store_pending(&approval).unwrap();
 
-    let approver = CoreKeypair::generate();
-    let subject = CoreKeypair::generate();
     let token = hitl_sign_token(
         &approver,
         &subject,
@@ -243,11 +249,14 @@ fn hitl_replay_of_consumed_token_rejected() {
         &request.arguments,
         request.governed_intent.as_ref(),
     );
+    let approver = CoreKeypair::generate();
+    let subject = CoreKeypair::generate();
     let approval = ApprovalRequest {
         approval_id: "ap-replay-1".into(),
         policy_id: "policy-hitl".into(),
         subject_id: request.agent_id.clone(),
         capability_id: request.capability.id.clone(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: request.server_id.clone(),
         tool_name: request.tool_name.clone(),
         action: "invoke".into(),
@@ -257,12 +266,11 @@ fn hitl_replay_of_consumed_token_rejected() {
         created_at: 500,
         summary: "test".into(),
         governed_intent: None,
+        trusted_approvers: vec![approver.public_key()],
         triggered_by: vec![],
     };
     store.store_pending(&approval).unwrap();
 
-    let approver = CoreKeypair::generate();
-    let subject = CoreKeypair::generate();
     let token = hitl_sign_token(
         &approver,
         &subject,
@@ -333,10 +341,12 @@ fn hitl_channel_fires_on_pending() {
 
     let guard = ApprovalGuard::new(store.clone()).with_channel(recorder.clone());
     let request = hitl_make_request();
+    let approver = CoreKeypair::generate();
     let ctx = ApprovalContext {
         request: &request,
         constraints: &[],
         policy_id: "policy-webhook",
+        trusted_approvers: &[approver.public_key()],
         presented_token: None,
         force_approval: true,
         approval_id_override: Some("ap-webhook-1".into()),
@@ -347,6 +357,31 @@ fn hitl_channel_fires_on_pending() {
     assert_eq!(recorder.len(), 1);
     let captured = recorder.captured();
     assert_eq!(captured[0].approval_id, "ap-webhook-1");
+}
+
+#[test]
+fn hitl_force_approval_denies_without_trusted_approvers() {
+    let store = StdArc::new(InMemoryApprovalStore::new());
+    let guard = ApprovalGuard::new(store.clone());
+    let request = hitl_make_request();
+    let ctx = ApprovalContext {
+        request: &request,
+        constraints: &[],
+        policy_id: "policy-hitl",
+        trusted_approvers: &[],
+        presented_token: None,
+        force_approval: true,
+        approval_id_override: Some("ap-misconfigured".into()),
+    };
+
+    let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
+    match verdict {
+        HitlVerdict::Deny { reason } => {
+            assert!(reason.contains("no trusted approvers"), "{reason}");
+        }
+        other => panic!("expected Deny, got {other:?}"),
+    }
+    assert!(store.get_pending("ap-misconfigured").unwrap().is_none());
 }
 
 // ---------------------------------------------------------------------
@@ -364,6 +399,8 @@ fn hitl_batch_respond_applies_multiple_decisions() {
         request.governed_intent.as_ref(),
     );
 
+    let approver = CoreKeypair::generate();
+    let subject = CoreKeypair::generate();
     let ids = ["ap-batch-1", "ap-batch-2", "ap-batch-3"];
     for id in &ids {
         let approval = ApprovalRequest {
@@ -371,6 +408,7 @@ fn hitl_batch_respond_applies_multiple_decisions() {
             policy_id: "policy-batch".into(),
             subject_id: request.agent_id.clone(),
             capability_id: request.capability.id.clone(),
+            subject_public_key: Some(subject.public_key()),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
             action: "invoke".into(),
@@ -380,13 +418,12 @@ fn hitl_batch_respond_applies_multiple_decisions() {
             created_at: 500,
             summary: "batch".into(),
             governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         };
         store.store_pending(&approval).unwrap();
     }
 
-    let approver = CoreKeypair::generate();
-    let subject = CoreKeypair::generate();
     let decisions = [
         (ids[0], GovernedApprovalDecision::Approved, ApprovalOutcome::Approved),
         (ids[1], GovernedApprovalDecision::Denied, ApprovalOutcome::Denied),
@@ -480,6 +517,7 @@ fn hitl_token_verification_rejects_expired_tokens() {
         policy_id: "p".into(),
         subject_id: "s".into(),
         capability_id: "c".into(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: "srv".into(),
         tool_name: "tool".into(),
         action: "invoke".into(),
@@ -489,6 +527,7 @@ fn hitl_token_verification_rejects_expired_tokens() {
         created_at: 0,
         summary: String::new(),
         governed_intent: None,
+        trusted_approvers: vec![approver.public_key()],
         triggered_by: vec![],
     };
     let approval_token = ApprovalToken {

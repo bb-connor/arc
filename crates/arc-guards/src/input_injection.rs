@@ -212,7 +212,9 @@ mod tests {
     #[test]
     fn detects_action_type_argument() {
         let args = serde_json::json!({"action_type": "input.inject", "input_type": "mouse"});
-        assert!(InputInjectionCapabilityGuard::is_injection("generic", &args));
+        assert!(InputInjectionCapabilityGuard::is_injection(
+            "generic", &args
+        ));
     }
 
     #[test]

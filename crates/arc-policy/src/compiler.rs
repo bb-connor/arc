@@ -28,17 +28,21 @@
 //! |11 | `ResponseSanitizationGuard`| `rules.secret_patterns` (output path) |
 //! |12 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
 
-use crate::models::{DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection};
+use crate::models::{
+    DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
+};
 
 use arc_core::capability::{ArcScope, Operation, ToolGrant};
 use arc_guards::{
     agent_velocity::AgentVelocityConfig,
     jailbreak::{DetectorConfig as JailbreakDetectorConfig, JailbreakGuardConfig},
+    post_invocation::SanitizerHook,
     prompt_injection::PromptInjectionConfig,
     response_sanitization::{SanitizationAction, SensitivityLevel},
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
-    PromptInjectionGuard, ResponseSanitizationGuard, SecretLeakGuard, ShellCommandGuard,
+    PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard, SecretLeakGuard,
+    ShellCommandGuard,
 };
 
 /// Errors that can occur during policy compilation.
@@ -52,6 +56,8 @@ pub enum CompileError {
 pub struct CompiledPolicy {
     /// A guard pipeline configured from the policy's rule blocks.
     pub guards: GuardPipeline,
+    /// A post-invocation pipeline configured from the policy's rule blocks.
+    pub post_invocation: PostInvocationPipeline,
     /// A default capability scope derived from the policy's tool_access rules.
     pub default_scope: ArcScope,
     /// Ordered list of guard names emitted by compilation.
@@ -73,13 +79,15 @@ pub struct CompiledPolicy {
 /// is raised for policies that simply do not exercise every guard type.
 pub fn compile_policy(policy: &HushSpec) -> Result<CompiledPolicy, CompileError> {
     let mut builder = PipelineBuilder::new();
-    compile_rule_guards(policy, &mut builder)?;
+    let mut post_invocation = PostInvocationPipeline::new();
+    compile_rule_guards(policy, &mut builder, &mut post_invocation)?;
     compile_detection_guards(policy, &mut builder)?;
     compile_budget_guards(policy, &mut builder)?;
     let default_scope = compile_scope(policy);
     let (guards, guard_names) = builder.finish();
     Ok(CompiledPolicy {
         guards,
+        post_invocation,
         default_scope,
         guard_names,
     })
@@ -122,6 +130,7 @@ impl PipelineBuilder {
 fn compile_rule_guards(
     policy: &HushSpec,
     builder: &mut PipelineBuilder,
+    post_invocation: &mut PostInvocationPipeline,
 ) -> Result<(), CompileError> {
     let Some(rules) = &policy.rules else {
         return Ok(());
@@ -213,6 +222,7 @@ fn compile_rule_guards(
                 SensitivityLevel::High,
                 SanitizationAction::Redact,
             ));
+            post_invocation.add(Box::new(SanitizerHook::new()));
         }
     }
 
@@ -535,6 +545,7 @@ rules:
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
         assert_eq!(compiled.guards.len(), 2);
+        assert_eq!(compiled.post_invocation.len(), 1);
         assert_eq!(
             compiled.guard_names,
             vec![
@@ -664,11 +675,8 @@ extensions:
         .into_iter()
         .collect();
 
-        let actual: std::collections::HashSet<&str> = compiled
-            .guard_names
-            .iter()
-            .map(String::as_str)
-            .collect();
+        let actual: std::collections::HashSet<&str> =
+            compiled.guard_names.iter().map(String::as_str).collect();
 
         assert_eq!(
             actual, expected,

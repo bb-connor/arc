@@ -93,9 +93,7 @@ fn verify_entry_accepts_valid_chain() {
     let second = store
         .append(sample_append("doc-2", "rcpt-2", 101))
         .expect("second append");
-    let verification = store
-        .verify_entry(&second.entry_id)
-        .expect("verify_entry");
+    let verification = store.verify_entry(&second.entry_id).expect("verify_entry");
     match verification {
         ProvenanceVerification::Verified {
             entry,

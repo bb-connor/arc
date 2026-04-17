@@ -73,11 +73,7 @@ fn build_kernel(tools: &[&str]) -> Arc<ArcKernel> {
     Arc::new(kernel)
 }
 
-fn issue_capability(
-    kernel: &Arc<ArcKernel>,
-    agent: &Keypair,
-    tools: &[&str],
-) -> CapabilityToken {
+fn issue_capability(kernel: &Arc<ArcKernel>, agent: &Keypair, tools: &[&str]) -> CapabilityToken {
     let grants: Vec<ToolGrant> = tools
         .iter()
         .map(|tool| ToolGrant {
@@ -101,11 +97,7 @@ fn issue_capability(
         .expect("issue capability")
 }
 
-fn planned_call(
-    request_id: &str,
-    tool: &str,
-    params: serde_json::Value,
-) -> PlannedToolCall {
+fn planned_call(request_id: &str, tool: &str, params: serde_json::Value) -> PlannedToolCall {
     PlannedToolCall {
         request_id: request_id.to_string(),
         server_id: "srv-a".to_string(),
@@ -230,8 +222,7 @@ fn full_allow_plan_round_trips_through_serde() {
 fn malformed_body_returns_bad_request() {
     let kernel = build_kernel(&["read_file"]);
 
-    let error =
-        handle_evaluate_plan(&kernel, b"not-json").expect_err("garbled body must fail");
+    let error = handle_evaluate_plan(&kernel, b"not-json").expect_err("garbled body must fail");
     assert_eq!(error.status(), 400);
     assert!(matches!(error, PlanHandlerError::BadRequest(_)));
 

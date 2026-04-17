@@ -174,9 +174,10 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         &self,
         input: MemoryProvenanceAppend,
     ) -> Result<MemoryProvenanceEntry, MemoryProvenanceError> {
-        let mut conn = self.pool.get().map_err(|error| {
-            MemoryProvenanceError::Backend(format!("pool acquire: {error}"))
-        })?;
+        let mut conn = self
+            .pool
+            .get()
+            .map_err(|error| MemoryProvenanceError::Backend(format!("pool acquire: {error}")))?;
         // `IMMEDIATE` guarantees a write lock is taken before any
         // subsequent read inside the transaction -- two concurrent
         // appenders cannot both observe the same tail and fork the
@@ -246,9 +247,10 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         &self,
         entry_id: &str,
     ) -> Result<Option<MemoryProvenanceEntry>, MemoryProvenanceError> {
-        let conn = self.pool.get().map_err(|error| {
-            MemoryProvenanceError::Backend(format!("pool acquire: {error}"))
-        })?;
+        let conn = self
+            .pool
+            .get()
+            .map_err(|error| MemoryProvenanceError::Backend(format!("pool acquire: {error}")))?;
         let row = conn
             .query_row(
                 r#"
@@ -270,9 +272,10 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         store: &str,
         key: &str,
     ) -> Result<Option<MemoryProvenanceEntry>, MemoryProvenanceError> {
-        let conn = self.pool.get().map_err(|error| {
-            MemoryProvenanceError::Backend(format!("pool acquire: {error}"))
-        })?;
+        let conn = self
+            .pool
+            .get()
+            .map_err(|error| MemoryProvenanceError::Backend(format!("pool acquire: {error}")))?;
         let row = conn
             .query_row(
                 r#"
@@ -295,9 +298,10 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
         &self,
         entry_id: &str,
     ) -> Result<ProvenanceVerification, MemoryProvenanceError> {
-        let conn = self.pool.get().map_err(|error| {
-            MemoryProvenanceError::Backend(format!("pool acquire: {error}"))
-        })?;
+        let conn = self
+            .pool
+            .get()
+            .map_err(|error| MemoryProvenanceError::Backend(format!("pool acquire: {error}")))?;
 
         // Fetch the candidate row plus its seq and the prev row's hash
         // in the same query so verification is a single round-trip.
@@ -371,9 +375,10 @@ impl MemoryProvenanceStore for SqliteMemoryProvenanceStore {
     }
 
     fn chain_digest(&self) -> Result<String, MemoryProvenanceError> {
-        let conn = self.pool.get().map_err(|error| {
-            MemoryProvenanceError::Backend(format!("pool acquire: {error}"))
-        })?;
+        let conn = self
+            .pool
+            .get()
+            .map_err(|error| MemoryProvenanceError::Backend(format!("pool acquire: {error}")))?;
         let digest: Option<String> = conn
             .query_row(
                 "SELECT hash FROM arc_memory_provenance ORDER BY seq DESC LIMIT 1",

@@ -92,7 +92,7 @@ fn scope_with_constraints(constraints: Vec<Constraint>) -> ArcScope {
 fn write_outside_memory_store_allowlist_denied() {
     let guard = MemoryGovernanceGuard::new();
     let scope = scope_with_constraints(vec![Constraint::MemoryStoreAllowlist(vec![
-        "agent-notes".to_string(),
+        "agent-notes".to_string()
     ])]);
     let kp = Keypair::generate();
 
@@ -123,7 +123,7 @@ fn write_outside_memory_store_allowlist_denied() {
 fn read_outside_memory_store_allowlist_denied() {
     let guard = MemoryGovernanceGuard::new();
     let scope = scope_with_constraints(vec![Constraint::MemoryStoreAllowlist(vec![
-        "agent-notes".to_string(),
+        "agent-notes".to_string()
     ])]);
     let kp = Keypair::generate();
     let v = eval_at(
@@ -157,7 +157,10 @@ fn writes_exceeding_max_memory_entries_denied() {
             serde_json::json!({"collection": "agent-notes", "id": format!("id-{i}")}),
             None,
         );
-        assert!(matches!(v, Verdict::Allow), "write {i} must Allow, got {v:?}");
+        assert!(
+            matches!(v, Verdict::Allow),
+            "write {i} must Allow, got {v:?}"
+        );
     }
     // Third write exceeds the cap.
     let v = eval_at(
@@ -190,7 +193,10 @@ fn max_retention_ttl_honored() {
         serde_json::json!({"collection": "agent-notes", "id": "a", "ttl": 1_800}),
         None,
     );
-    assert!(matches!(v, Verdict::Allow), "small TTL must Allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "small TTL must Allow, got {v:?}"
+    );
 
     // TTL above cap → Deny
     let v = eval_at(
@@ -212,7 +218,10 @@ fn max_retention_ttl_honored() {
         serde_json::json!({"collection": "agent-notes", "id": "c"}),
         None,
     );
-    assert!(matches!(v, Verdict::Deny), "missing TTL must Deny, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "missing TTL must Deny, got {v:?}"
+    );
 }
 
 #[test]

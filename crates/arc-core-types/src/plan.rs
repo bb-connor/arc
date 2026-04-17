@@ -201,10 +201,7 @@ mod tests {
 
     #[test]
     fn aggregate_empty_plan_is_allowed() {
-        assert_eq!(
-            PlanEvaluationResponse::aggregate(&[]),
-            PlanVerdict::Allowed
-        );
+        assert_eq!(PlanEvaluationResponse::aggregate(&[]), PlanVerdict::Allowed);
     }
 
     #[test]

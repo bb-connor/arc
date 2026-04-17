@@ -384,9 +384,10 @@ impl JailbreakDetector {
         let h_div = weights.heuristic_divisor.max(f32::EPSILON);
         let h_clamped = (heuristic_score / h_div).clamp(0.0, 1.0);
         let s_clamped = statistical_score.clamp(0.0, 1.0);
-        let score =
-            (h_clamped * weights.heuristic + s_clamped * weights.statistical + ml_score * weights.ml)
-                .clamp(0.0, 1.0);
+        let score = (h_clamped * weights.heuristic
+            + s_clamped * weights.statistical
+            + ml_score * weights.ml)
+            .clamp(0.0, 1.0);
 
         Detection {
             signals,

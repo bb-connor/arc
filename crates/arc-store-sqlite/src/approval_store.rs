@@ -35,9 +35,8 @@ impl SqliteApprovalStore {
         let path = path.as_ref();
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| {
-                    ApprovalStoreError::Backend(format!("create dir: {e}"))
-                })?;
+                fs::create_dir_all(parent)
+                    .map_err(|e| ApprovalStoreError::Backend(format!("create dir: {e}")))?;
             }
         }
         let manager = SqliteConnectionManager::file(path);
@@ -116,13 +115,11 @@ impl SqliteApprovalStore {
 }
 
 fn serialize_payload(request: &ApprovalRequest) -> Result<String, ApprovalStoreError> {
-    serde_json::to_string(request)
-        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
+    serde_json::to_string(request).map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
 }
 
 fn deserialize_payload(raw: &str) -> Result<ApprovalRequest, ApprovalStoreError> {
-    serde_json::from_str(raw)
-        .map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
+    serde_json::from_str(raw).map_err(|e| ApprovalStoreError::Serialization(e.to_string()))
 }
 
 impl ApprovalStore for SqliteApprovalStore {
@@ -182,9 +179,7 @@ impl ApprovalStore for SqliteApprovalStore {
             .pool
             .get()
             .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        let mut sql = String::from(
-            "SELECT payload FROM arc_hitl_pending WHERE 1=1",
-        );
+        let mut sql = String::from("SELECT payload FROM arc_hitl_pending WHERE 1=1");
         if filter.subject_id.is_some() {
             sql.push_str(" AND subject_id = :subject_id");
         }
@@ -240,11 +235,7 @@ impl ApprovalStore for SqliteApprovalStore {
         Ok(out)
     }
 
-    fn resolve(
-        &self,
-        id: &str,
-        decision: &ApprovalDecision,
-    ) -> Result<(), ApprovalStoreError> {
+    fn resolve(&self, id: &str, decision: &ApprovalDecision) -> Result<(), ApprovalStoreError> {
         let mut conn = self
             .pool
             .get()
@@ -335,11 +326,7 @@ impl ApprovalStore for SqliteApprovalStore {
         Ok(())
     }
 
-    fn count_approved(
-        &self,
-        subject_id: &str,
-        policy_id: &str,
-    ) -> Result<u64, ApprovalStoreError> {
+    fn count_approved(&self, subject_id: &str, policy_id: &str) -> Result<u64, ApprovalStoreError> {
         let conn = self
             .pool
             .get()
@@ -397,10 +384,7 @@ impl ApprovalStore for SqliteApprovalStore {
         Ok(row.is_some())
     }
 
-    fn get_resolution(
-        &self,
-        id: &str,
-    ) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
+    fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
         let conn = self
             .pool
             .get()
@@ -450,13 +434,17 @@ impl ApprovalStore for SqliteApprovalStore {
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::*;
+    use arc_core::crypto::Keypair;
 
     fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
+        let subject = Keypair::generate();
+        let approver = Keypair::generate();
         ApprovalRequest {
             approval_id: id.into(),
             policy_id: "policy-1".into(),
             subject_id: "agent-1".into(),
             capability_id: "cap-1".into(),
+            subject_public_key: Some(subject.public_key()),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
             action: "invoke".into(),
@@ -466,6 +454,7 @@ mod tests {
             created_at: 42,
             summary: "unit".into(),
             governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         }
     }

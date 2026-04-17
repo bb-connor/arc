@@ -94,7 +94,9 @@ async fn bedrock_allows_on_action_none() {
         .build();
 
     assert_eq!(
-        adapter.evaluate(&make_ctx("chat", json!({"text": "hi"}))).await,
+        adapter
+            .evaluate(&make_ctx("chat", json!({"text": "hi"})))
+            .await,
         Verdict::Allow
     );
 }
@@ -176,7 +178,9 @@ async fn azure_denies_when_severity_above_threshold() {
         .build();
 
     assert_eq!(
-        adapter.evaluate(&make_ctx("t", json!({"text": "bad"}))).await,
+        adapter
+            .evaluate(&make_ctx("t", json!({"text": "bad"})))
+            .await,
         Verdict::Deny
     );
 }
@@ -204,7 +208,9 @@ async fn azure_allows_when_severity_below_threshold() {
         .build();
 
     assert_eq!(
-        adapter.evaluate(&make_ctx("t", json!({"text": "mild"}))).await,
+        adapter
+            .evaluate(&make_ctx("t", json!({"text": "mild"})))
+            .await,
         Verdict::Allow
     );
 }
@@ -269,7 +275,9 @@ async fn vertex_denies_on_high_probability_rating() {
         .build();
 
     assert_eq!(
-        adapter.evaluate(&make_ctx("send", json!({"text": "bad"}))).await,
+        adapter
+            .evaluate(&make_ctx("send", json!({"text": "bad"})))
+            .await,
         Verdict::Deny
     );
 }
@@ -362,8 +370,8 @@ async fn evidence_records_capture_structured_details() {
     let ev = guard.evidence_from_decision(Verdict::Deny, Some(&details));
     assert_eq!(ev.guard_name, "azure-content-safety");
     assert!(!ev.verdict);
-    let body: serde_json::Value = serde_json::from_str(ev.details.as_deref().expect("details"))
-        .expect("json");
+    let body: serde_json::Value =
+        serde_json::from_str(ev.details.as_deref().expect("details")).expect("json");
     assert_eq!(body["max_severity"], 6);
     assert_eq!(body["severity_threshold"], 4);
 }

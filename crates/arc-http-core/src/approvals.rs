@@ -16,12 +16,12 @@
 
 use std::sync::Arc;
 
+use arc_core_types::capability::GovernedApprovalToken;
+use arc_core_types::crypto::PublicKey;
 use arc_kernel::{
     resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
     ApprovalStore, ApprovalStoreError, ApprovalToken, KernelError, ResolvedApproval,
 };
-use arc_core_types::capability::GovernedApprovalToken;
-use arc_core_types::crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 
 /// Errors returned by the approval handlers. Each variant maps onto a
@@ -101,7 +101,9 @@ impl From<ApprovalStoreError> for ApprovalHandlerError {
     fn from(e: ApprovalStoreError) -> Self {
         match e {
             ApprovalStoreError::NotFound(m) => Self::NotFound(m),
-            ApprovalStoreError::AlreadyResolved(m) => Self::Conflict(format!("already resolved: {m}")),
+            ApprovalStoreError::AlreadyResolved(m) => {
+                Self::Conflict(format!("already resolved: {m}"))
+            }
             ApprovalStoreError::Replay(m) => Self::ReplayDetected(m),
             ApprovalStoreError::Backend(m) => Self::Internal(m),
             ApprovalStoreError::Serialization(m) => Self::Internal(m),

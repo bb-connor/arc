@@ -39,9 +39,7 @@ fn replayed_nonce_is_rejected_within_retention() {
     let now = 1_000_000;
     let expires_at = now + 60;
     assert!(store.try_reserve("nonce-b", now, expires_at).unwrap());
-    assert!(!store
-        .try_reserve("nonce-b", now + 1, expires_at)
-        .unwrap());
+    assert!(!store.try_reserve("nonce-b", now + 1, expires_at).unwrap());
 }
 
 #[test]

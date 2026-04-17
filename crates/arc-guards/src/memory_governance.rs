@@ -121,23 +121,19 @@ impl MemoryGovernanceGuard {
     /// code paths remain fully permissive until a capability constraint
     /// or config field is supplied.
     pub fn new() -> Self {
-        Self::with_config(MemoryGovernanceConfig::default()).unwrap_or_else(|_| {
-            Self {
-                enabled: true,
-                store_allowlist: Vec::new(),
-                max_memory_entries: None,
-                max_retention_ttl_secs: None,
-                max_content_size_bytes: None,
-                deny_patterns: Vec::new(),
-                counters: Mutex::new(HashMap::new()),
-            }
+        Self::with_config(MemoryGovernanceConfig::default()).unwrap_or_else(|_| Self {
+            enabled: true,
+            store_allowlist: Vec::new(),
+            max_memory_entries: None,
+            max_retention_ttl_secs: None,
+            max_content_size_bytes: None,
+            deny_patterns: Vec::new(),
+            counters: Mutex::new(HashMap::new()),
         })
     }
 
     /// Build a guard with explicit configuration.
-    pub fn with_config(
-        config: MemoryGovernanceConfig,
-    ) -> Result<Self, MemoryGovernanceError> {
+    pub fn with_config(config: MemoryGovernanceConfig) -> Result<Self, MemoryGovernanceError> {
         let mut deny_patterns = Vec::with_capacity(config.deny_patterns.len());
         for pat in &config.deny_patterns {
             let re = Regex::new(pat).map_err(|e| MemoryGovernanceError::InvalidPattern {
@@ -172,10 +168,7 @@ impl MemoryGovernanceGuard {
     /// Gather the effective store allowlist from the matched grant plus
     /// the guard-level config.  Returns `None` if neither source supplies
     /// a non-empty allowlist.
-    fn effective_store_allowlist<'a>(
-        &'a self,
-        ctx: &'a GuardContext<'a>,
-    ) -> Option<Vec<String>> {
+    fn effective_store_allowlist<'a>(&'a self, ctx: &'a GuardContext<'a>) -> Option<Vec<String>> {
         let mut combined: Vec<String> = self.store_allowlist.clone();
         if let Some(grant) = ctx
             .matched_grant_index
@@ -198,9 +191,7 @@ impl MemoryGovernanceGuard {
     /// Fails closed (treats poisoning as "over limit") on mutex poisoning.
     fn bump_counter(&self, key: SessionKey) -> Result<u64, KernelError> {
         let mut guard = self.counters.lock().map_err(|_| {
-            KernelError::Internal(
-                "memory-governance guard counter mutex poisoned".to_string(),
-            )
+            KernelError::Internal("memory-governance guard counter mutex poisoned".to_string())
         })?;
         let entry = guard.entry(key).or_insert(0);
         *entry = entry.saturating_add(1);
@@ -235,11 +226,7 @@ impl Guard for MemoryGovernanceGuard {
 }
 
 impl MemoryGovernanceGuard {
-    fn evaluate_write(
-        &self,
-        ctx: &GuardContext,
-        store: &str,
-    ) -> Result<Verdict, KernelError> {
+    fn evaluate_write(&self, ctx: &GuardContext, store: &str) -> Result<Verdict, KernelError> {
         // 1. Store allowlist (capability + guard config).
         if let Some(allow) = self.effective_store_allowlist(ctx) {
             if !allow.iter().any(|s| store_matches(s, store)) {
@@ -286,10 +273,7 @@ impl MemoryGovernanceGuard {
         // 5. Per-session entry limit.  We bump the counter only after
         //    the previous gates pass; denials do not consume quota.
         if let Some(max_entries) = self.max_memory_entries {
-            let key = (
-                ctx.agent_id.to_string(),
-                ctx.request.capability.id.clone(),
-            );
+            let key = (ctx.agent_id.to_string(), ctx.request.capability.id.clone());
             let count = self.bump_counter(key)?;
             if count > max_entries {
                 return Ok(Verdict::Deny);
@@ -299,11 +283,7 @@ impl MemoryGovernanceGuard {
         Ok(Verdict::Allow)
     }
 
-    fn evaluate_read(
-        &self,
-        ctx: &GuardContext,
-        store: &str,
-    ) -> Result<Verdict, KernelError> {
+    fn evaluate_read(&self, ctx: &GuardContext, store: &str) -> Result<Verdict, KernelError> {
         // Reads respect the store allowlist so an agent cannot read from
         // a forbidden store even when the write path is blocked.
         if let Some(allow) = self.effective_store_allowlist(ctx) {

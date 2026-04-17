@@ -198,9 +198,7 @@ impl ContentReviewGuard {
 
     /// Fetch compiled rules for a service, falling back to defaults.
     fn rules_for(&self, service: &str) -> &CompiledRules {
-        self.per_service
-            .get(service)
-            .unwrap_or(&self.default_rules)
+        self.per_service.get(service).unwrap_or(&self.default_rules)
     }
 }
 
@@ -469,7 +467,9 @@ mod tests {
     #[test]
     fn pii_patterns_detect_email() {
         let pats = builtin_pii_patterns();
-        assert!(pats.iter().any(|(cat, re)| *cat == "email" && re.is_match("user@example.com")));
+        assert!(pats
+            .iter()
+            .any(|(cat, re)| *cat == "email" && re.is_match("user@example.com")));
     }
 
     #[test]

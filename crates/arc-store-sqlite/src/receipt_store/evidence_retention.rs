@@ -565,11 +565,20 @@ impl SqliteReceiptStore {
                         .query_row(
                             &count_sql,
                             params![
-                                cap_id, tool_srv, tool_nm, outcome, since, until, min_cost,
-                                max_cost, agent_sub,
+                                cap_id,
+                                tool_srv,
+                                tool_nm,
+                                outcome,
+                                since,
+                                until,
+                                min_cost,
+                                max_cost,
+                                agent_sub,
                                 // ?10, ?11 unused in count_sql but bound so ?12
                                 // resolves to the tenant filter.
-                                None::<i64>, 0i64, tenant,
+                                None::<i64>,
+                                0i64,
+                                tenant,
                             ],
                             |row| row.get::<_, i64>(0),
                         )
@@ -620,10 +629,19 @@ impl SqliteReceiptStore {
             .query_row(
                 &count_sql,
                 params![
-                    cap_id, tool_srv, tool_nm, outcome, since, until, min_cost, max_cost,
+                    cap_id,
+                    tool_srv,
+                    tool_nm,
+                    outcome,
+                    since,
+                    until,
+                    min_cost,
+                    max_cost,
                     agent_sub,
                     // ?10, ?11 unused in count_sql; bound to keep ?12 stable.
-                    None::<i64>, 0i64, tenant,
+                    None::<i64>,
+                    0i64,
+                    tenant,
                 ],
                 |row| row.get::<_, i64>(0),
             )

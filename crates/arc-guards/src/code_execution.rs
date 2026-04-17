@@ -68,8 +68,18 @@ pub fn default_dangerous_modules() -> Vec<String> {
 /// an explicit flag.
 fn default_network_modules() -> &'static [&'static str] {
     &[
-        "socket", "requests", "urllib", "urllib2", "urllib3", "http", "httpx",
-        "aiohttp", "websockets", "ftplib", "smtplib", "telnetlib",
+        "socket",
+        "requests",
+        "urllib",
+        "urllib2",
+        "urllib3",
+        "http",
+        "httpx",
+        "aiohttp",
+        "websockets",
+        "ftplib",
+        "smtplib",
+        "telnetlib",
     ]
 }
 
@@ -296,8 +306,7 @@ impl Guard for CodeExecutionGuard {
 
         // 3. Network access gate.
         if !self.network_access {
-            let requested = Self::requested_network_access(&ctx.request.arguments)
-                .unwrap_or(false);
+            let requested = Self::requested_network_access(&ctx.request.arguments).unwrap_or(false);
             if requested || Self::code_uses_network(truncated) {
                 return Ok(Verdict::Deny);
             }

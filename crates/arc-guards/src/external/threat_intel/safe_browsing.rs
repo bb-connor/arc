@@ -277,6 +277,10 @@ impl ExternalGuard for SafeBrowsingGuard {
             "safe browsing response"
         );
 
-        Ok(if matched { Verdict::Deny } else { Verdict::Allow })
+        Ok(if matched {
+            Verdict::Deny
+        } else {
+            Verdict::Allow
+        })
     }
 }

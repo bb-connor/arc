@@ -96,9 +96,10 @@ impl SqliteExecutionNonceStore {
     }
 
     fn run_migrations(&self) -> Result<(), SqliteExecutionNonceStoreError> {
-        let conn = self.pool.get().map_err(|e| {
-            SqliteExecutionNonceStoreError(format!("pool acquire: {e}"))
-        })?;
+        let conn = self
+            .pool
+            .get()
+            .map_err(|e| SqliteExecutionNonceStoreError(format!("pool acquire: {e}")))?;
         conn.execute_batch(
             r#"
             PRAGMA journal_mode = WAL;
@@ -179,16 +180,11 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
         // the signed `expires_at` from the presented nonce.
         let now = now_secs();
         let expires_at = now.saturating_add(RETENTION_GRACE_SECS);
-        self.try_reserve(nonce_id, now, expires_at).map_err(|e| {
-            KernelError::Internal(format!("sqlite execution nonce store: {e}"))
-        })
+        self.try_reserve(nonce_id, now, expires_at)
+            .map_err(|e| KernelError::Internal(format!("sqlite execution nonce store: {e}")))
     }
 
-    fn reserve_until(
-        &self,
-        nonce_id: &str,
-        nonce_expires_at: i64,
-    ) -> Result<bool, KernelError> {
+    fn reserve_until(&self, nonce_id: &str, nonce_expires_at: i64) -> Result<bool, KernelError> {
         // Retain the consumed marker for the full signed validity window
         // plus a small grace, so a pruner cannot reclaim the row while
         // the nonce is still cryptographically valid. Take the max of
@@ -196,13 +192,11 @@ impl ExecutionNonceStore for SqliteExecutionNonceStore {
         // `now + RETENTION_GRACE_SECS`, preserving the original grace
         // for clock-skew safety.
         let now = now_secs();
-        let retention =
-            nonce_expires_at.saturating_add(RETENTION_GRACE_SECS);
+        let retention = nonce_expires_at.saturating_add(RETENTION_GRACE_SECS);
         let baseline = now.saturating_add(RETENTION_GRACE_SECS);
         let expires_at = retention.max(baseline);
-        self.try_reserve(nonce_id, now, expires_at).map_err(|e| {
-            KernelError::Internal(format!("sqlite execution nonce store: {e}"))
-        })
+        self.try_reserve(nonce_id, now, expires_at)
+            .map_err(|e| KernelError::Internal(format!("sqlite execution nonce store: {e}")))
     }
 }
 

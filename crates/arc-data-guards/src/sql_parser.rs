@@ -192,6 +192,11 @@ fn analyze_set_expr(expr: &SetExpr, analysis: &mut SqlAnalysis) {
 }
 
 fn analyze_select(select: &Select, analysis: &mut SqlAnalysis) {
+    if let Some(into) = &select.into {
+        analysis.operation = SqlOperation::Ddl;
+        analysis.tables.push(object_name_to_string(&into.name));
+    }
+
     // Resolve FROM/JOIN table list and build an alias -> table map so
     // qualified projections (`u.id`) can be attributed to their source
     // table.
@@ -511,5 +516,13 @@ mod tests {
     fn truncate_is_delete() {
         let a = parse("TRUNCATE TABLE orders", SqlDialect::Generic).expect("parse");
         assert_eq!(a.operation, SqlOperation::Delete);
+    }
+
+    #[test]
+    fn select_into_is_treated_as_write_ddl() {
+        let a = parse("SELECT id INTO archive FROM orders", SqlDialect::MsSql).expect("parse");
+        assert_eq!(a.operation, SqlOperation::Ddl);
+        assert!(a.tables.contains(&"archive".to_string()));
+        assert!(a.tables.contains(&"orders".to_string()));
     }
 }

@@ -635,7 +635,14 @@ pub fn quote_and_bind(
                 "effective_at ({effective_at}) + policy_duration_secs ({policy_duration_secs}) overflows u64"
             ))
         })?;
-    BoundPolicy::new(agent_id, scope, quote, coverage_limit, effective_at, expires_at)
+    BoundPolicy::new(
+        agent_id,
+        scope,
+        quote,
+        coverage_limit,
+        effective_at,
+        expires_at,
+    )
 }
 
 fn compute_policy_id(
@@ -654,9 +661,7 @@ fn compute_policy_id(
         expires_at,
     ))
     .map_err(|error| {
-        InsuranceFlowError::InvalidInput(format!(
-            "failed to canonicalize policy identity: {error}"
-        ))
+        InsuranceFlowError::InvalidInput(format!("failed to canonicalize policy identity: {error}"))
     })?;
     Ok(format!("insp-{}", sha256_hex(&canonical)))
 }
@@ -820,10 +825,7 @@ mod tests {
         .unwrap();
         let (fingerprint, resolved) = fake_receipt(&keypair, "rcpt-1");
         let receipts = InMemoryReceiptSource {
-            entries: std::collections::BTreeMap::from([(
-                fingerprint.receipt_id.clone(),
-                resolved,
-            )]),
+            entries: std::collections::BTreeMap::from([(fingerprint.receipt_id.clone(), resolved)]),
         };
         let sink = CapturingSink::new();
         let evidence = ClaimEvidence {
@@ -846,7 +848,11 @@ mod tests {
         assert_eq!(settlement.request.lane_kind, INSURANCE_CLAIM_LANE_KIND);
         assert_eq!(settlement.request.capability_commitment, policy.policy_id);
         let events = sink.events();
-        assert_eq!(events.len(), 1, "one settlement request should be submitted");
+        assert_eq!(
+            events.len(),
+            1,
+            "one settlement request should be submitted"
+        );
         assert_eq!(events[0].settlement_amount.currency, "USD");
     }
 
@@ -908,10 +914,7 @@ mod tests {
         // signer key still matches the real one, but signature won't verify.
         resolved.signature = imposter.sign(&resolved.canonical_body);
         let receipts = InMemoryReceiptSource {
-            entries: std::collections::BTreeMap::from([(
-                fingerprint.receipt_id.clone(),
-                resolved,
-            )]),
+            entries: std::collections::BTreeMap::from([(fingerprint.receipt_id.clone(), resolved)]),
         };
         let sink = CapturingSink::new();
         let evidence = ClaimEvidence {
@@ -951,10 +954,7 @@ mod tests {
         .unwrap();
         let (fingerprint, resolved) = fake_receipt(&keypair, "rcpt-huge");
         let receipts = InMemoryReceiptSource {
-            entries: std::collections::BTreeMap::from([(
-                fingerprint.receipt_id.clone(),
-                resolved,
-            )]),
+            entries: std::collections::BTreeMap::from([(fingerprint.receipt_id.clone(), resolved)]),
         };
         let sink = CapturingSink::new();
         let huge_request = policy.coverage_limit.amount_cents.saturating_mul(10);
@@ -996,10 +996,7 @@ mod tests {
         .unwrap();
         let (fingerprint, resolved) = fake_receipt(&keypair, "rcpt-late");
         let receipts = InMemoryReceiptSource {
-            entries: std::collections::BTreeMap::from([(
-                fingerprint.receipt_id.clone(),
-                resolved,
-            )]),
+            entries: std::collections::BTreeMap::from([(fingerprint.receipt_id.clone(), resolved)]),
         };
         let sink = CapturingSink::new();
         let evidence = ClaimEvidence {

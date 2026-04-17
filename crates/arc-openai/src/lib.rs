@@ -288,7 +288,7 @@ impl ArcOpenAiAdapter {
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
 
         let route_plan = match plan_authoritative_route(

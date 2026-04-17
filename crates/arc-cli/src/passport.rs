@@ -811,7 +811,8 @@ pub(crate) fn cmd_passport_create(
         now,
         now + validity_seconds(validity_days),
     )?;
-    let subject_did = DidArc::from_public_key(subject_public_key);
+    let subject_did = DidArc::from_public_key(subject_public_key)
+        .map_err(|error| CliError::Other(error.to_string()))?;
     let passport = build_agent_passport(&subject_did.to_string(), vec![credential])?;
     let (enterprise_provenance_count, enterprise_provider_ids) =
         summarize_enterprise_provenance(&passport.enterprise_identity_provenance);

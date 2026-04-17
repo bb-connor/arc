@@ -36,7 +36,9 @@ fn detects_aws_secret_access_key() {
     let input = "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
     let r = s.sanitize_text(input);
     assert!(r.was_redacted);
-    assert!(!r.sanitized.contains("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"));
+    assert!(!r
+        .sanitized
+        .contains("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"));
 }
 
 #[test]
@@ -400,7 +402,10 @@ fn strategy_drop_collapses_field_to_null_in_json() {
     let sv = s.sanitize_value(&response);
     assert!(sv.was_redacted);
     assert_eq!(sv.value["token"], serde_json::Value::Null);
-    assert_eq!(sv.value["other"], serde_json::Value::String("clean".to_string()));
+    assert_eq!(
+        sv.value["other"],
+        serde_json::Value::String("clean".to_string())
+    );
 }
 
 #[test]
@@ -426,7 +431,11 @@ fn strategy_type_label_uses_data_type() {
     let s = sanitizer_with_secret_strategy(RedactionStrategy::TypeLabel);
     let key = format!("ghp_{}", "a".repeat(36));
     let r = s.sanitize_text(&key);
-    assert!(r.sanitized.contains("[REDACTED:github_token]"), "got {}", r.sanitized);
+    assert!(
+        r.sanitized.contains("[REDACTED:github_token]"),
+        "got {}",
+        r.sanitized
+    );
 }
 
 #[test]
@@ -527,7 +536,10 @@ fn sanitizer_hook_dirty_response_emits_evidence() {
     let details = ev.details.as_deref().unwrap_or("");
     // Evidence mentions detector ids so operators know what fired.
     assert!(details.contains("pii_email"), "got: {details}");
-    assert!(details.contains("secret_aws_access_key_id"), "got: {details}");
+    assert!(
+        details.contains("secret_aws_access_key_id"),
+        "got: {details}"
+    );
     // But not the raw secrets themselves.
     assert!(!details.contains("alice@example.com"));
     assert!(!details.contains("AKIAIOSFODNN7EXAMPLE"));

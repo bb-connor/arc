@@ -20,22 +20,14 @@ fn inputs(score: Option<u32>) -> PremiumInputs {
 
 #[test]
 fn clean_receipt_history_quote_is_lower_than_denial_heavy_quote() {
-    let clean = price_premium(
-        "agent-clean",
-        "tool:exec",
-        window(),
-        &inputs(Some(950)),
-    );
-    let dirty = price_premium(
-        "agent-denials",
-        "tool:exec",
-        window(),
-        &inputs(Some(560)),
-    );
+    let clean = price_premium("agent-clean", "tool:exec", window(), &inputs(Some(950)));
+    let dirty = price_premium("agent-denials", "tool:exec", window(), &inputs(Some(560)));
 
     let clean_cents = match &clean {
         PremiumQuote::Quoted { quoted_cents, .. } => *quoted_cents,
-        PremiumQuote::Declined { .. } => panic!("clean agent should receive a quote, got {clean:?}"),
+        PremiumQuote::Declined { .. } => {
+            panic!("clean agent should receive a quote, got {clean:?}")
+        }
     };
     let dirty_cents = match &dirty {
         PremiumQuote::Quoted { quoted_cents, .. } => *quoted_cents,

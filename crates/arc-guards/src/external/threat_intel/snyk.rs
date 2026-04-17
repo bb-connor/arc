@@ -321,7 +321,11 @@ impl ExternalGuard for SnykGuard {
             "snyk response"
         );
 
-        Ok(if denied { Verdict::Deny } else { Verdict::Allow })
+        Ok(if denied {
+            Verdict::Deny
+        } else {
+            Verdict::Allow
+        })
     }
 }
 

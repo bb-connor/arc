@@ -144,8 +144,8 @@ impl PatternDb {
     /// - all embeddings share the same non-zero dimensionality;
     /// - every embedding value is finite.
     pub fn from_json(json: &str) -> Result<Self, SpiderSenseError> {
-        let entries: Vec<PatternEntry> = serde_json::from_str(json)
-            .map_err(|e| SpiderSenseError::Parse(e.to_string()))?;
+        let entries: Vec<PatternEntry> =
+            serde_json::from_str(json).map_err(|e| SpiderSenseError::Parse(e.to_string()))?;
         Self::from_entries(entries)
     }
 
@@ -217,9 +217,7 @@ impl SpiderSenseGuard {
                 config.similarity_threshold
             )));
         }
-        if !config.ambiguity_band.is_finite()
-            || !(0.0..=1.0).contains(&config.ambiguity_band)
-        {
+        if !config.ambiguity_band.is_finite() || !(0.0..=1.0).contains(&config.ambiguity_band) {
             return Err(SpiderSenseError::Config(format!(
                 "ambiguity_band must be finite in [0.0, 1.0], got {}",
                 config.ambiguity_band

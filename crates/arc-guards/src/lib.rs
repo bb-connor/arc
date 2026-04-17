@@ -96,10 +96,11 @@ pub use egress_allowlist::EgressAllowlistGuard;
 pub use forbidden_path::ForbiddenPathGuard;
 pub use internal_network::InternalNetworkGuard;
 pub use jailbreak::{
-    JailbreakGuard, JailbreakGuardConfig, DEFAULT_FINGERPRINT_CAPACITY as JAILBREAK_DEFAULT_FINGERPRINT_CAPACITY,
+    JailbreakGuard, JailbreakGuardConfig,
+    DEFAULT_FINGERPRINT_CAPACITY as JAILBREAK_DEFAULT_FINGERPRINT_CAPACITY,
 };
 pub use jailbreak_detector::{
-    DetectorConfig as JailbreakDetectorConfig, Detection as JailbreakDetection, JailbreakCategory,
+    Detection as JailbreakDetection, DetectorConfig as JailbreakDetectorConfig, JailbreakCategory,
     JailbreakDetector, LayerScores as JailbreakLayerScores, LayerWeights,
     LinearModel as JailbreakLinearModel, Signal as JailbreakSignal,
     StatisticalThresholds as JailbreakStatisticalThresholds,
@@ -120,8 +121,8 @@ pub use prompt_injection::{
 pub use response_sanitization::{
     AllowlistConfig, CategoryConfig, DenylistConfig, EntropyConfig, OutputSanitizer,
     OutputSanitizerConfig, ProcessingStats, Redaction, RedactionStrategy,
-    ResponseSanitizationGuard, SanitizationAction, SanitizationResult, SanitizedValue,
-    ScanResult, SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span, TokenVault,
+    ResponseSanitizationGuard, SanitizationAction, SanitizationResult, SanitizedValue, ScanResult,
+    SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span, TokenVault,
 };
 pub use secret_leak::SecretLeakGuard;
 pub use shell_command::ShellCommandGuard;
@@ -169,6 +170,4 @@ pub use code_execution::{
 pub use content_review::{
     ContentReviewConfig, ContentReviewError, ContentReviewGuard, ContentReviewRules,
 };
-pub use memory_governance::{
-    MemoryGovernanceConfig, MemoryGovernanceError, MemoryGovernanceGuard,
-};
+pub use memory_governance::{MemoryGovernanceConfig, MemoryGovernanceError, MemoryGovernanceGuard};

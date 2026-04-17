@@ -98,6 +98,12 @@ pub enum HttpAuthorityError {
     #[error("kernel-backed authorization failed: {0}")]
     Kernel(String),
 
+    #[error("kernel-backed authorization requires approval")]
+    PendingApproval {
+        approval_id: Option<String>,
+        kernel_receipt_id: String,
+    },
+
     #[error("failed to sign receipt: {0}")]
     ReceiptSign(String),
 }
@@ -294,14 +300,13 @@ impl HttpAuthority {
                 return Err(HttpAuthorityError::Kernel(reason));
             }
             (KernelVerdict::PendingApproval, _) => {
-                // Phase 3.4: HTTP projection of a tool call that ended
-                // in PendingApproval is not representable in this code
-                // path yet. Surface a dedicated kernel error so callers
-                // can pivot to the `/approvals/*` endpoints.
-                return Err(HttpAuthorityError::Kernel(
-                    "kernel returned PendingApproval; resume via /approvals/{id}/respond"
-                        .to_string(),
-                ));
+                return Err(HttpAuthorityError::PendingApproval {
+                    approval_id: pending_approval_id(
+                        kernel_response.receipt.metadata.as_ref(),
+                        kernel_response.reason.as_deref(),
+                    ),
+                    kernel_receipt_id: kernel_response.receipt.id,
+                });
             }
         }
 
@@ -427,7 +432,7 @@ impl HttpAuthority {
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
-        federated_origin_kernel_id: None,
+            federated_origin_kernel_id: None,
         };
         let route_plan = plan_authoritative_route(
             request_id,
@@ -664,6 +669,39 @@ fn metadata_value<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a Valu
         .and_then(|map| map.get(key))
 }
 
+fn pending_approval_id(metadata: Option<&Value>, reason: Option<&str>) -> Option<String> {
+    metadata_string(metadata, "approval_id")
+        .or_else(|| {
+            metadata_value(metadata, "pending_approval")
+                .and_then(Value::as_object)
+                .and_then(|pending| pending.get("approval_id"))
+                .and_then(Value::as_str)
+        })
+        .map(ToOwned::to_owned)
+        .or_else(|| extract_approval_id(reason))
+}
+
+fn extract_approval_id(reason: Option<&str>) -> Option<String> {
+    let reason = reason?;
+    for marker in ["/approvals/", "approval_id=", "approval_id:"] {
+        if let Some(start) = reason.find(marker) {
+            let suffix = reason[start + marker.len()..].trim_start();
+            let approval_id = suffix
+                .split(|character: char| {
+                    character == '/'
+                        || character == ','
+                        || character == ';'
+                        || character.is_whitespace()
+                })
+                .next()?;
+            if !approval_id.is_empty() {
+                return Some(approval_id.to_string());
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -895,6 +933,42 @@ mod tests {
                 .and_then(|value| value.get("selectedTargetProtocol"))
                 .and_then(Value::as_str),
             Some("native")
+        );
+    }
+
+    #[test]
+    fn extract_approval_id_parses_resume_path() {
+        assert_eq!(
+            extract_approval_id(Some(
+                "kernel returned PendingApproval; resume via /approvals/ap-123/respond"
+            ))
+            .as_deref(),
+            Some("ap-123")
+        );
+        assert_eq!(
+            extract_approval_id(Some("kernel returned PendingApproval; approval_id=ap-456"))
+                .as_deref(),
+            Some("ap-456")
+        );
+        assert_eq!(
+            extract_approval_id(Some("kernel returned PendingApproval; approval_id: ap-789"))
+                .as_deref(),
+            Some("ap-789")
+        );
+        assert!(extract_approval_id(Some("kernel returned PendingApproval")).is_none());
+    }
+
+    #[test]
+    fn pending_approval_id_reads_nested_metadata() {
+        let metadata = serde_json::json!({
+            "pending_approval": {
+                "approval_id": "ap-structured"
+            }
+        });
+        assert_eq!(
+            pending_approval_id(Some(&metadata), Some("kernel returned PendingApproval"))
+                .as_deref(),
+            Some("ap-structured")
         );
     }
 }

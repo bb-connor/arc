@@ -43,7 +43,7 @@ fn signed_listing(
         namespace_ownership: namespace(keypair),
         subject: GenericListingSubject {
             actor_kind: GenericListingActorKind::ToolServer,
-            actor_id: format!("server-{listing_id}"),
+            actor_id: "demo-server".to_string(),
             display_name: None,
             metadata_url: None,
             resolution_url: None,
@@ -86,13 +86,31 @@ fn pricing_hint(
     issued_at: u64,
     expires_at: u64,
 ) -> SignedListingPricingHint {
+    pricing_hint_with_scope(
+        operator,
+        listing_id,
+        units,
+        issued_at,
+        expires_at,
+        "tools:search",
+    )
+}
+
+fn pricing_hint_with_scope(
+    operator: &Keypair,
+    listing_id: &str,
+    units: u64,
+    issued_at: u64,
+    expires_at: u64,
+    capability_scope: &str,
+) -> SignedListingPricingHint {
     SignedListingPricingHint::sign(
         ListingPricingHint {
             schema: LISTING_PRICING_HINT_SCHEMA.to_string(),
             listing_id: listing_id.to_string(),
             namespace: "https://registry.arc.example".to_string(),
             provider_operator_id: "operator-a".to_string(),
-            capability_scope: "tools:search".to_string(),
+            capability_scope: capability_scope.to_string(),
             price_per_call: MonetaryAmount {
                 units,
                 currency: "USD".to_string(),
@@ -279,6 +297,47 @@ fn bid_refuses_mismatched_listing_id() {
     )
     .expect_err("mismatched listing rejected");
     assert_eq!(error, BiddingError::ListingMismatch);
+}
+
+#[test]
+fn bid_allows_deeper_scope_prefix_without_rewriting_tool_name() {
+    let registry_keypair = Keypair::generate();
+    let operator_keypair = Keypair::generate();
+    let issuer_keypair = Keypair::generate();
+    let agent_keypair = Keypair::generate();
+    let mut listing = listing_entry(
+        &registry_keypair,
+        &operator_keypair,
+        GenericListingStatus::Active,
+        100,
+        600,
+    );
+    listing.pricing = pricing_hint_with_scope(
+        &operator_keypair,
+        "listing-1",
+        100,
+        110,
+        600,
+        "tools:search:premium",
+    );
+
+    let mut request = bid_request("agent-alpha", 200, 600, 120);
+    request.requested_scope.capability_scope_prefix = "tools:search:premium".to_string();
+    request.requested_scope.tool_name = "search".to_string();
+
+    let ask = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &issuer_keypair,
+            agent_subject: agent_keypair.public_key(),
+            token_id: "token-premium".to_string(),
+            now: 120,
+        },
+    )
+    .expect("bid succeeds for deeper capability scope");
+
+    assert_eq!(ask.body.token_offer.scope.grants[0].tool_name, "search");
 }
 
 #[test]

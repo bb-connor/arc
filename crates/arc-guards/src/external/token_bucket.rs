@@ -109,7 +109,9 @@ impl TokenBucket {
             inner.last_refill = now;
             return;
         }
-        let elapsed = now.saturating_duration_since(inner.last_refill).as_secs_f64();
+        let elapsed = now
+            .saturating_duration_since(inner.last_refill)
+            .as_secs_f64();
         if elapsed <= 0.0 {
             return;
         }

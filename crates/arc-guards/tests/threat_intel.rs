@@ -225,10 +225,7 @@ async fn safe_browsing_denies_listed_url() {
         .cache_ttl(Duration::from_secs(5))
         .build();
 
-    let ctx = make_ctx(
-        "fetch",
-        json!({"url": "https://malicious.example/bad"}),
-    );
+    let ctx = make_ctx("fetch", json!({"url": "https://malicious.example/bad"}));
     assert_eq!(adapter.evaluate(&ctx).await, Verdict::Deny);
 }
 

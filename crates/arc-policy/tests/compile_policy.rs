@@ -161,6 +161,8 @@ extensions:
 "#;
     let spec = HushSpec::parse(yaml).expect("parse hushspec");
     let compiled = compile_policy(&spec).expect("compile should succeed");
-    assert!(!compiled.guard_names.contains(&"prompt-injection".to_string()));
+    assert!(!compiled
+        .guard_names
+        .contains(&"prompt-injection".to_string()));
     assert!(!compiled.guard_names.contains(&"jailbreak".to_string()));
 }

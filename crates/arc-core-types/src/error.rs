@@ -114,10 +114,9 @@ impl core::fmt::Display for Error {
             Error::DelegationDepthExceeded { depth, max } => {
                 write!(f, "delegation depth {depth} exceeds maximum {max}")
             }
-            Error::InvalidHashLength { expected, actual } => write!(
-                f,
-                "invalid hash length: expected {expected}, got {actual}"
-            ),
+            Error::InvalidHashLength { expected, actual } => {
+                write!(f, "invalid hash length: expected {expected}, got {actual}")
+            }
             Error::MerkleProofFailed => write!(f, "merkle proof verification failed"),
             Error::EmptyTree => write!(f, "empty tree: cannot compute root"),
             Error::InvalidProofIndex { index, leaves } => write!(

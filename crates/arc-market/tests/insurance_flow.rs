@@ -64,7 +64,10 @@ impl ClaimSettlementSink for CapturingSink {
     }
 }
 
-fn make_receipt(keypair: &Keypair, receipt_id: &str) -> (ReceiptFingerprint, ResolvedReceiptEvidence) {
+fn make_receipt(
+    keypair: &Keypair,
+    receipt_id: &str,
+) -> (ReceiptFingerprint, ResolvedReceiptEvidence) {
     let body = ("arc.receipt.fixture.v1", receipt_id, 1_000_000u64);
     let canonical = canonical_json_bytes(&body).expect("canonical JSON");
     let body_sha256 = sha256_hex(&canonical);

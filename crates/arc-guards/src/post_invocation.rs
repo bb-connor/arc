@@ -18,160 +18,14 @@
 //! `GuardEvidence`.
 
 use arc_core::receipt::GuardEvidence;
+pub use arc_kernel::{
+    PipelineOutcome, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+};
 use serde_json::Value;
 
 use crate::response_sanitization::{
     OutputSanitizer, OutputSanitizerConfig, SanitizationResult, SensitiveDataFinding,
 };
-
-// ---------------------------------------------------------------------------
-// PostInvocationVerdict
-// ---------------------------------------------------------------------------
-
-/// Verdict from a post-invocation hook.
-#[derive(Debug, Clone)]
-pub enum PostInvocationVerdict {
-    /// Allow the response to pass through unmodified.
-    Allow,
-    /// Block the response entirely, replacing it with the given error message.
-    Block(String),
-    /// Allow the response but with redacted content.
-    Redact(Value),
-    /// Escalate the response for operator review. The response is still
-    /// delivered, but an escalation signal is emitted.
-    Escalate(String),
-}
-
-// ---------------------------------------------------------------------------
-// PostInvocationHook trait
-// ---------------------------------------------------------------------------
-
-/// A hook that inspects tool responses after invocation.
-///
-/// Hooks may optionally report [`GuardEvidence`] that is propagated into the
-/// kernel's receipt. The default implementation emits no evidence.
-pub trait PostInvocationHook: Send + Sync {
-    /// Human-readable hook name.
-    fn name(&self) -> &str;
-
-    /// Inspect the response and return a verdict.
-    fn inspect(&self, tool_name: &str, response: &Value) -> PostInvocationVerdict;
-
-    /// Optional evidence accessor. Called immediately after `inspect` returns
-    /// a verdict. The default returns `None`.
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        None
-    }
-}
-
-// ---------------------------------------------------------------------------
-// PostInvocationPipeline
-// ---------------------------------------------------------------------------
-
-/// Outcome of running the pipeline.
-#[derive(Debug, Clone)]
-pub struct PipelineOutcome {
-    /// Final verdict after all hooks have executed.
-    pub verdict: PostInvocationVerdict,
-    /// Escalation messages collected along the way.
-    pub escalations: Vec<String>,
-    /// Aggregated guard evidence from hooks that emitted any.
-    pub evidence: Vec<GuardEvidence>,
-}
-
-/// Pipeline of post-invocation hooks evaluated in registration order.
-///
-/// If any hook returns Block, the pipeline short-circuits and returns Block.
-/// If any hook returns Redact, subsequent hooks see the redacted version.
-/// Escalate signals are collected but do not stop the pipeline.
-pub struct PostInvocationPipeline {
-    hooks: Vec<Box<dyn PostInvocationHook>>,
-}
-
-impl PostInvocationPipeline {
-    /// Create an empty pipeline.
-    pub fn new() -> Self {
-        Self { hooks: Vec::new() }
-    }
-
-    /// Add a hook to the end of the pipeline.
-    pub fn add(&mut self, hook: Box<dyn PostInvocationHook>) {
-        self.hooks.push(hook);
-    }
-
-    /// Number of hooks.
-    pub fn len(&self) -> usize {
-        self.hooks.len()
-    }
-
-    /// Whether the pipeline has no hooks.
-    pub fn is_empty(&self) -> bool {
-        self.hooks.is_empty()
-    }
-
-    /// Run all hooks against a response.
-    ///
-    /// Returns the final verdict, escalation messages, and any evidence emitted
-    /// by hooks (see [`PostInvocationHook::take_evidence`]).
-    pub fn evaluate_with_evidence(&self, tool_name: &str, response: &Value) -> PipelineOutcome {
-        let mut current_response = response.clone();
-        let mut escalations = Vec::new();
-        let mut evidence = Vec::new();
-
-        for hook in &self.hooks {
-            let verdict = hook.inspect(tool_name, &current_response);
-            if let Some(ev) = hook.take_evidence() {
-                evidence.push(ev);
-            }
-            match verdict {
-                PostInvocationVerdict::Allow => continue,
-                PostInvocationVerdict::Block(reason) => {
-                    return PipelineOutcome {
-                        verdict: PostInvocationVerdict::Block(reason),
-                        escalations,
-                        evidence,
-                    };
-                }
-                PostInvocationVerdict::Redact(redacted) => {
-                    current_response = redacted;
-                }
-                PostInvocationVerdict::Escalate(msg) => {
-                    escalations.push(msg);
-                }
-            }
-        }
-
-        let final_verdict = if current_response != *response {
-            PostInvocationVerdict::Redact(current_response)
-        } else if !escalations.is_empty() {
-            PostInvocationVerdict::Escalate(escalations.join("; "))
-        } else {
-            PostInvocationVerdict::Allow
-        };
-        PipelineOutcome {
-            verdict: final_verdict,
-            escalations,
-            evidence,
-        }
-    }
-
-    /// Backwards-compatible shim returning (verdict, escalations). New code
-    /// should use [`evaluate_with_evidence`] to receive sanitization evidence.
-    pub fn evaluate(
-        &self,
-        tool_name: &str,
-        response: &Value,
-    ) -> (PostInvocationVerdict, Vec<String>) {
-        let outcome = self.evaluate_with_evidence(tool_name, response);
-        (outcome.verdict, outcome.escalations)
-    }
-}
-
-impl Default for PostInvocationPipeline {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 // ---------------------------------------------------------------------------
 // SanitizerHook -- post-invocation hook wrapping the full OutputSanitizer.
@@ -291,17 +145,18 @@ fn summarize_findings(
         .into_iter()
         .map(|(id, n)| format!("{id}:{n}"))
         .collect();
-    format!("sanitizer detected {} findings ({})", findings.len(), parts.join(","))
+    format!(
+        "sanitizer detected {} findings ({})",
+        findings.len(),
+        parts.join(",")
+    )
 }
 
 /// Run the sanitizer over a JSON value and return the sanitized value plus a
 /// [`SanitizationResult`] aggregating all findings/redactions. Useful for
 /// tests and for callers that want the raw details without wiring a full
 /// pipeline.
-pub fn sanitize_json(
-    sanitizer: &OutputSanitizer,
-    value: &Value,
-) -> (Value, SanitizationResult) {
+pub fn sanitize_json(sanitizer: &OutputSanitizer, value: &Value) -> (Value, SanitizationResult) {
     let sv = sanitizer.sanitize_value(value);
     let sanitized_text = sv.value.to_string();
     let stats = crate::response_sanitization::ProcessingStats {

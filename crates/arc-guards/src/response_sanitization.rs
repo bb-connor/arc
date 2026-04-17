@@ -1002,8 +1002,7 @@ impl OutputSanitizer {
         // High-entropy detector.
         if self.config.categories.secrets && self.config.entropy.enabled {
             static TOKEN_RE: OnceLock<Regex> = OnceLock::new();
-            let token_re =
-                TOKEN_RE.get_or_init(|| compile_or_nomatch(r"[A-Za-z0-9+/=_-]{16,}"));
+            let token_re = TOKEN_RE.get_or_init(|| compile_or_nomatch(r"[A-Za-z0-9+/=_-]{16,}"));
             for m in token_re.find_iter(limited) {
                 let token = m.as_str();
                 if token.len() < self.config.entropy.min_token_len {

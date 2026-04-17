@@ -235,10 +235,8 @@ pub trait MemoryProvenanceStore: Send + Sync {
     /// `prev_hash` matches the entry that sits immediately before it
     /// (or the genesis marker for entry #1), and return
     /// [`ProvenanceVerification::Verified`] when everything checks out.
-    fn verify_entry(
-        &self,
-        entry_id: &str,
-    ) -> Result<ProvenanceVerification, MemoryProvenanceError>;
+    fn verify_entry(&self, entry_id: &str)
+        -> Result<ProvenanceVerification, MemoryProvenanceError>;
 
     /// Aggregate digest of the chain -- the `hash` of the tail entry,
     /// or [`MEMORY_PROVENANCE_GENESIS_PREV_HASH`] when the chain is

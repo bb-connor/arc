@@ -15,13 +15,10 @@ use arc_core_types::capability::{
 };
 use arc_core_types::crypto::Keypair;
 use arc_http_core::approvals::{
-    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond,
-    ApprovalAdmin, ApprovalHandlerError, BatchDecisionEntry, BatchRespondRequest, PendingQuery,
-    RespondRequest,
+    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond, ApprovalAdmin,
+    ApprovalHandlerError, BatchDecisionEntry, BatchRespondRequest, PendingQuery, RespondRequest,
 };
-use arc_kernel::{
-    ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore,
-};
+use arc_kernel::{ApprovalOutcome, ApprovalRequest, ApprovalStore, InMemoryApprovalStore};
 
 fn make_admin() -> (ApprovalAdmin, Arc<InMemoryApprovalStore>) {
     let store = Arc::new(InMemoryApprovalStore::new());
@@ -29,12 +26,19 @@ fn make_admin() -> (ApprovalAdmin, Arc<InMemoryApprovalStore>) {
     (admin, store)
 }
 
-fn store_pending(store: &InMemoryApprovalStore, id: &str, hash: &str) {
+fn store_pending(
+    store: &InMemoryApprovalStore,
+    id: &str,
+    hash: &str,
+    subject: &Keypair,
+    trusted_approvers: &[arc_core_types::crypto::PublicKey],
+) {
     let req = ApprovalRequest {
         approval_id: id.into(),
         policy_id: "p".into(),
         subject_id: "agent-1".into(),
         capability_id: "cap-1".into(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: "srv".into(),
         tool_name: "tool".into(),
         action: "invoke".into(),
@@ -44,6 +48,7 @@ fn store_pending(store: &InMemoryApprovalStore, id: &str, hash: &str) {
         created_at: 100,
         summary: "e2e".into(),
         governed_intent: None,
+        trusted_approvers: trusted_approvers.to_vec(),
         triggered_by: vec![],
     };
     store.store_pending(&req).unwrap();
@@ -72,8 +77,10 @@ fn sign_token(
 #[test]
 fn list_pending_returns_stored_approvals() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-    store_pending(&store, "a-2", "h-2");
+    let subject = Keypair::generate();
+    let approver = Keypair::generate();
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
+    store_pending(&store, "a-2", "h-2", &subject, &[approver.public_key()]);
 
     let response = handle_list_pending(&admin, PendingQuery::default()).unwrap();
     assert_eq!(response.count, 2);
@@ -83,8 +90,10 @@ fn list_pending_returns_stored_approvals() {
 #[test]
 fn list_pending_respects_filters() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-    store_pending(&store, "a-2", "h-2");
+    let subject = Keypair::generate();
+    let approver = Keypair::generate();
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
+    store_pending(&store, "a-2", "h-2", &subject, &[approver.public_key()]);
 
     let response = handle_list_pending(
         &admin,
@@ -100,16 +109,22 @@ fn list_pending_respects_filters() {
 #[test]
 fn get_approval_returns_pending_then_resolution() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
+    let subject = Keypair::generate();
+    let approver = Keypair::generate();
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
 
     let resp = handle_get_approval(&admin, "a-1").unwrap();
     assert!(resp.pending.is_some());
     assert!(resp.resolution.is_none());
 
     // Resolve and fetch again.
-    let approver = Keypair::generate();
-    let subject = Keypair::generate();
-    let token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let body = RespondRequest {
         outcome: ApprovalOutcome::Approved,
         reason: Some("approved".into()),
@@ -134,11 +149,16 @@ fn get_approval_404_for_unknown_id() {
 #[test]
 fn respond_approves_pending_request() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let body = RespondRequest {
         outcome: ApprovalOutcome::Approved,
         reason: Some("OK".into()),
@@ -154,12 +174,17 @@ fn respond_approves_pending_request() {
 #[test]
 fn respond_rejects_mismatched_approval_id() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
     // Token signed for a different approval id.
-    let token = sign_token(&approver, &subject, "a-OTHER", "h-1", GovernedApprovalDecision::Approved);
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-OTHER",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let body = RespondRequest {
         outcome: ApprovalOutcome::Approved,
         reason: None,
@@ -177,11 +202,16 @@ fn respond_rejects_mismatched_approval_id() {
 #[test]
 fn respond_rejects_replay() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let body = RespondRequest {
         outcome: ApprovalOutcome::Approved,
         reason: None,
@@ -191,7 +221,7 @@ fn respond_rejects_replay() {
     handle_respond(&admin, "a-1", body, 500).unwrap();
 
     // Store the pending row again and replay the same token.
-    store_pending(&store, "a-1", "h-1");
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
     let body = RespondRequest {
         outcome: ApprovalOutcome::Approved,
         reason: None,
@@ -209,15 +239,26 @@ fn respond_rejects_replay() {
 #[test]
 fn batch_respond_mixes_success_and_rejection() {
     let (admin, store) = make_admin();
-    store_pending(&store, "a-1", "h-1");
-    store_pending(&store, "a-2", "h-2");
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let ok_token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    store_pending(&store, "a-1", "h-1", &subject, &[approver.public_key()]);
+    store_pending(&store, "a-2", "h-2", &subject, &[approver.public_key()]);
+    let ok_token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     // This token's request_id doesn't match its envelope's approval_id
     // -- should be rejected per-entry but not fail the whole batch.
-    let bad_token = sign_token(&approver, &subject, "a-MISMATCH", "h-2", GovernedApprovalDecision::Approved);
+    let bad_token = sign_token(
+        &approver,
+        &subject,
+        "a-MISMATCH",
+        "h-2",
+        GovernedApprovalDecision::Approved,
+    );
 
     let body = BatchRespondRequest {
         decisions: vec![
@@ -249,11 +290,44 @@ fn batch_respond_mixes_success_and_rejection() {
 #[test]
 fn batch_respond_empty_is_bad_request() {
     let (admin, _) = make_admin();
-    let err = handle_batch_respond(
-        &admin,
-        BatchRespondRequest { decisions: vec![] },
-        500,
-    )
-    .unwrap_err();
+    let err =
+        handle_batch_respond(&admin, BatchRespondRequest { decisions: vec![] }, 500).unwrap_err();
     assert_eq!(err.status(), 400);
+}
+
+#[test]
+fn respond_rejects_untrusted_approver() {
+    let (admin, store) = make_admin();
+    let trusted_approver = Keypair::generate();
+    let rogue_approver = Keypair::generate();
+    let subject = Keypair::generate();
+    store_pending(
+        &store,
+        "a-1",
+        "h-1",
+        &subject,
+        &[trusted_approver.public_key()],
+    );
+
+    let token = sign_token(
+        &rogue_approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
+    let body = RespondRequest {
+        outcome: ApprovalOutcome::Approved,
+        reason: None,
+        approver: rogue_approver.public_key(),
+        token,
+    };
+    let err = handle_respond(&admin, "a-1", body, 500).unwrap_err();
+    assert_eq!(err.status(), 403);
+    match err {
+        ApprovalHandlerError::Rejected(message) => {
+            assert!(message.contains("not trusted"), "{message}");
+        }
+        other => panic!("expected Rejected, got {other:?}"),
+    }
 }

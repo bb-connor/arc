@@ -125,16 +125,13 @@ fn computer_use_screenshot_rate_limit_enforced() {
     let guard = ComputerUseGuard::with_config(config);
 
     let args = || serde_json::json!({});
-    assert!(matches!(
-        eval(&guard, "screenshot", args()),
-        Verdict::Allow
-    ));
-    assert!(matches!(
-        eval(&guard, "screenshot", args()),
-        Verdict::Allow
-    ));
+    assert!(matches!(eval(&guard, "screenshot", args()), Verdict::Allow));
+    assert!(matches!(eval(&guard, "screenshot", args()), Verdict::Allow));
     let v = eval(&guard, "screenshot", args());
-    assert!(matches!(v, Verdict::Deny), "3rd screenshot should Deny; got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "3rd screenshot should Deny; got {v:?}"
+    );
 }
 
 #[test]
@@ -148,12 +145,11 @@ fn computer_use_observe_mode_allows_unknown_actions() {
     let guard = ComputerUseGuard::with_config(config);
 
     // Unknown remote.* action — Observe allows
-    let v = eval(
-        &guard,
-        "remote.unknown",
-        serde_json::json!({}),
+    let v = eval(&guard, "remote.unknown", serde_json::json!({}));
+    assert!(
+        matches!(v, Verdict::Allow),
+        "Observe mode must allow, got {v:?}"
     );
-    assert!(matches!(v, Verdict::Allow), "Observe mode must allow, got {v:?}");
 
     // Navigation to blocked domain — Observe allows (passive)
     let v = eval(
@@ -161,7 +157,10 @@ fn computer_use_observe_mode_allows_unknown_actions() {
         "navigate",
         serde_json::json!({"url": "https://evil.example.com/x"}),
     );
-    assert!(matches!(v, Verdict::Allow), "Observe mode must allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "Observe mode must allow, got {v:?}"
+    );
 }
 
 #[test]
@@ -213,7 +212,11 @@ fn input_injection_allows_keyboard() {
 #[test]
 fn input_injection_strict_mode_denies_missing_input_type() {
     let guard = InputInjectionCapabilityGuard::new();
-    let v = eval(&guard, "input.inject", serde_json::json!({"action": "click"}));
+    let v = eval(
+        &guard,
+        "input.inject",
+        serde_json::json!({"action": "click"}),
+    );
     assert!(matches!(v, Verdict::Deny), "expected Deny, got {v:?}");
 }
 
@@ -384,40 +387,46 @@ fn bundled_pattern_json() -> String {
 
 #[test]
 fn spider_sense_bundled_pattern_db_loads() {
-    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json())
-        .expect("bundled DB must parse");
-    assert!(guard.pattern_count() >= 9, "expected 10-20 entries from clawdstrike DB");
+    let guard =
+        SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB must parse");
+    assert!(
+        guard.pattern_count() >= 9,
+        "expected 10-20 entries from clawdstrike DB"
+    );
     assert_eq!(guard.dim(), 6, "clawdstrike DB uses 6-dim embeddings");
 }
 
 #[test]
 fn spider_sense_known_bad_embedding_denies() {
-    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json())
-        .expect("bundled DB parses");
+    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB parses");
     // First bundled pattern is prompt-injection system override.
     let exact_match = serde_json::json!({
         "embedding": [0.95, 0.05, 0.02, 0.03, 0.12, 0.01]
     });
     let v = eval(&guard, "inspect", exact_match);
-    assert!(matches!(v, Verdict::Deny), "identical embedding must Deny, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "identical embedding must Deny, got {v:?}"
+    );
 }
 
 #[test]
 fn spider_sense_benign_embedding_allows() {
-    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json())
-        .expect("bundled DB parses");
+    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB parses");
     // Unit vector far from any pattern cluster.
     let benign = serde_json::json!({
         "embedding": [-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]
     });
     let v = eval(&guard, "inspect", benign);
-    assert!(matches!(v, Verdict::Allow), "orthogonal/opposite embedding must Allow, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Allow),
+        "orthogonal/opposite embedding must Allow, got {v:?}"
+    );
 }
 
 #[test]
 fn spider_sense_no_embedding_is_allow() {
-    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json())
-        .expect("bundled DB parses");
+    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB parses");
     let v = eval(&guard, "inspect", serde_json::json!({"other": 1}));
     assert!(matches!(v, Verdict::Allow));
 }
@@ -465,14 +474,16 @@ fn spider_sense_threshold_configurable() {
 
 #[test]
 fn spider_sense_dimension_mismatch_denies() {
-    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json())
-        .expect("bundled DB parses");
+    let guard = SpiderSenseGuard::from_json(&bundled_pattern_json()).expect("bundled DB parses");
     let v = eval(
         &guard,
         "inspect",
         serde_json::json!({"embedding": [0.1, 0.2]}),
     );
-    assert!(matches!(v, Verdict::Deny), "dim mismatch must fail-closed, got {v:?}");
+    assert!(
+        matches!(v, Verdict::Deny),
+        "dim mismatch must fail-closed, got {v:?}"
+    );
 }
 
 #[test]

@@ -306,7 +306,10 @@ pub struct WorkloadIdentity {
 #[cfg_attr(feature = "std", derive(thiserror::Error))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkloadIdentityError {
-    #[cfg_attr(feature = "std", error("runtime_identity must not be empty when provided"))]
+    #[cfg_attr(
+        feature = "std",
+        error("runtime_identity must not be empty when provided")
+    )]
     EmptyRuntimeIdentity,
 
     #[cfg_attr(feature = "std", error("workload identity URI must not be empty"))]
@@ -318,7 +321,10 @@ pub enum WorkloadIdentityError {
     #[cfg_attr(feature = "std", error("workload identity URI is malformed: {0}"))]
     MalformedUri(String),
 
-    #[cfg_attr(feature = "std", error("SPIFFE workload identity must include a trust domain"))]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must include a trust domain")
+    )]
     MissingTrustDomain,
 
     #[cfg_attr(
@@ -333,7 +339,10 @@ pub enum WorkloadIdentityError {
     )]
     InvalidSuffix,
 
-    #[cfg_attr(feature = "std", error("SPIFFE workload identity path '{0}' is invalid"))]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity path '{0}' is invalid")
+    )]
     InvalidPath(String),
 
     #[cfg_attr(
@@ -1205,16 +1214,8 @@ impl CallChainContinuationToken {
 
     pub fn verify_signature(&self) -> Result<bool> {
         if let Some(legacy_upstream_proof) = &self.legacy_upstream_proof {
-            return Ok(legacy_upstream_proof.verify_signature()?
-                && legacy_upstream_proof.chain_id == self.chain_id
-                && legacy_upstream_proof.parent_request_id == self.parent_request_id
-                && legacy_upstream_proof.parent_receipt_id == self.parent_receipt_id
-                && legacy_upstream_proof.origin_subject == self.origin_subject
-                && legacy_upstream_proof.delegator_subject == self.delegator_subject
-                && legacy_upstream_proof.signer == self.signer
-                && legacy_upstream_proof.subject == self.subject
-                && legacy_upstream_proof.issued_at == self.issued_at
-                && legacy_upstream_proof.expires_at == self.expires_at);
+            let expected = Self::from_legacy_upstream_proof(legacy_upstream_proof)?;
+            return Ok(legacy_upstream_proof.verify_signature()? && expected == *self);
         }
         let body = self.body();
         self.signer.verify_canonical(&body, &self.signature)
@@ -2891,6 +2892,35 @@ mod tests {
             token.parent_receipt_id.as_deref(),
             Some("rc-parent-legacy-1")
         );
+    }
+
+    #[test]
+    fn continuation_token_rejects_unsigned_bindings_when_using_legacy_proof() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let proof = GovernedUpstreamCallChainProof::sign(
+            GovernedUpstreamCallChainProofBody {
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: "chain-legacy-2".to_string(),
+                parent_request_id: "req-parent-legacy-2".to_string(),
+                parent_receipt_id: Some("rc-parent-legacy-2".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+                issued_at: 1000,
+                expires_at: 2000,
+            },
+            &signer,
+        )
+        .unwrap();
+        let mut token = CallChainContinuationToken::from_legacy_upstream_proof(&proof).unwrap();
+        token.audience = Some(CallChainContinuationAudience {
+            server_id: "srv-pay".to_string(),
+            tool_name: "charge".to_string(),
+        });
+        token.governed_intent_hash = Some("intent-hash".to_string());
+
+        assert!(!token.verify_signature().unwrap());
     }
 
     #[test]

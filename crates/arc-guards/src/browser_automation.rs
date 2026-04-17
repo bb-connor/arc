@@ -153,9 +153,7 @@ impl BrowserAutomationGuard {
     }
 
     /// Build a guard with explicit configuration.
-    pub fn with_config(
-        config: BrowserAutomationConfig,
-    ) -> Result<Self, BrowserAutomationError> {
+    pub fn with_config(config: BrowserAutomationConfig) -> Result<Self, BrowserAutomationError> {
         let mut extra_patterns = Vec::with_capacity(config.extra_credential_patterns.len());
         for pat in &config.extra_credential_patterns {
             let re = Regex::new(pat).map_err(|e| BrowserAutomationError::InvalidPattern {
@@ -410,7 +408,10 @@ mod tests {
 
     #[test]
     fn extract_host_basic() {
-        assert_eq!(extract_host("https://example.com/x"), Some("example.com".into()));
+        assert_eq!(
+            extract_host("https://example.com/x"),
+            Some("example.com".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
     }

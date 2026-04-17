@@ -35,6 +35,7 @@ pub mod execution_nonce;
 pub mod memory_provenance;
 pub mod operator_report;
 pub mod payment;
+pub mod post_invocation;
 pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
@@ -89,6 +90,14 @@ pub use request_matching::{
     capability_matches_resource_subscription,
 };
 
+pub use approval::{
+    compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
+    ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore,
+    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
+    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+};
+pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use arc_core::credit::{
     CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
     CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
@@ -252,14 +261,6 @@ pub use arc_core::underwriting::{
     UNDERWRITING_POLICY_INPUT_SCHEMA, UNDERWRITING_RISK_TAXONOMY_VERSION,
     UNDERWRITING_SIMULATION_REPORT_SCHEMA,
 };
-pub use approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
-    ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
-    ApprovalStore, ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore,
-    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
-    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
-};
-pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use authority::{
     AuthoritySnapshot, AuthorityStatus, AuthorityStoreError, AuthorityTrustedKeySnapshot,
     CapabilityAuthority, LocalCapabilityAuthority,
@@ -274,6 +275,12 @@ pub use checkpoint::{
     verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
     ReceiptInclusionProof, CHECKPOINT_SCHEMA,
 };
+pub use compliance_score::{
+    compliance_factor_breakdown, compliance_score, ComplianceFactor, ComplianceFactorBreakdown,
+    ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs, COMPLIANCE_SCORE_MAX,
+    DEFAULT_ATTESTATION_STALENESS_SECS, WEIGHT_ATTESTATION_FRESHNESS, WEIGHT_DENY_RATE,
+    WEIGHT_POLICY_COVERAGE, WEIGHT_REVOCATION, WEIGHT_VELOCITY_ANOMALY,
+};
 pub use cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
     CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
@@ -282,6 +289,11 @@ pub use cost_attribution::{
 pub use dpop::{
     is_supported_dpop_schema, verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof,
     DpopProofBody, DPOP_SCHEMA,
+};
+pub use evidence_export::{
+    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
+    EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+    EvidenceUncheckpointedReceipt,
 };
 pub use execution_nonce::{
     is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
@@ -297,11 +309,7 @@ pub use memory_provenance::{
     MemoryProvenanceStore, ProvenanceVerification, UnverifiedReason,
     MEMORY_PROVENANCE_ENTRY_SCHEMA, MEMORY_PROVENANCE_GENESIS_PREV_HASH,
 };
-pub use evidence_export::{
-    EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
-    EvidenceUncheckpointedReceipt,
-};
+pub use operator_report::{behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState};
 pub use operator_report::{
     ArcOAuthArtifactBoundary, ArcOAuthAuthorizationDiscoveryMetadata,
     ArcOAuthAuthorizationExampleMapping, ArcOAuthAuthorizationMetadataReport,
@@ -337,19 +345,13 @@ pub use operator_report::{
     MAX_BEHAVIORAL_FEED_RECEIPT_LIMIT, MAX_METERED_BILLING_LIMIT, MAX_OPERATOR_BUDGET_LIMIT,
     MAX_SETTLEMENT_BACKLOG_LIMIT, MAX_SHARED_EVIDENCE_LIMIT,
 };
-pub use operator_report::{
-    behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState,
-};
-pub use compliance_score::{
-    compliance_factor_breakdown, compliance_score, ComplianceFactor, ComplianceFactorBreakdown,
-    ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs, COMPLIANCE_SCORE_MAX,
-    DEFAULT_ATTESTATION_STALENESS_SECS, WEIGHT_ATTESTATION_FRESHNESS, WEIGHT_DENY_RATE,
-    WEIGHT_POLICY_COVERAGE, WEIGHT_REVOCATION, WEIGHT_VELOCITY_ANOMALY,
-};
 pub use payment::{
     AcpPaymentAdapter, CommercePaymentContext, GovernedPaymentContext, PaymentAdapter,
     PaymentAuthorization, PaymentAuthorizeRequest, PaymentError, PaymentResult,
     RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
+};
+pub use post_invocation::{
+    PipelineOutcome, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
 };
 pub use receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,

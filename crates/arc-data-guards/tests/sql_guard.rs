@@ -310,3 +310,20 @@ fn delete_with_where_allowed_when_configured() {
     );
     assert_eq!(verdict, Verdict::Allow);
 }
+
+#[test]
+fn select_into_is_denied_by_read_only_policy() {
+    let cfg = SqlGuardConfig {
+        dialect: SqlDialect::MsSql,
+        operation_allowlist: vec![SqlOperation::Select],
+        table_allowlist: vec!["orders".into(), "archive".into()],
+        ..Default::default()
+    };
+    let guard = SqlQueryGuard::new(cfg);
+    let verdict = evaluate(
+        &guard,
+        "sql",
+        serde_json::json!({"query": "SELECT id INTO archive FROM orders"}),
+    );
+    assert_eq!(verdict, Verdict::Deny);
+}

@@ -217,9 +217,7 @@ impl CircuitBreaker {
 
     fn drop_stale_failures(&self, inner: &mut CircuitInner, now: Instant) {
         let window = self.config.failure_window;
-        inner
-            .failures
-            .retain(|ts| now.duration_since(*ts) < window);
+        inner.failures.retain(|ts| now.duration_since(*ts) < window);
     }
 }
 

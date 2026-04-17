@@ -149,8 +149,9 @@ impl PremiumInputs {
             ));
         }
         if self.behavioral_threshold.is_nan() || self.behavioral_threshold < 0.0 {
-            return Err("premium behavioral_threshold must be a finite non-negative number"
-                .to_string());
+            return Err(
+                "premium behavioral_threshold must be a finite non-negative number".to_string(),
+            );
         }
         if let Some(score) = self.compliance_score {
             if score > 1000 {
@@ -447,7 +448,12 @@ mod tests {
 
     #[test]
     fn clean_history_quotes_lowest_band() {
-        let quote = price_premium("agent-clean", "tool:exec", window(), &inputs(Some(950), None));
+        let quote = price_premium(
+            "agent-clean",
+            "tool:exec",
+            window(),
+            &inputs(Some(950), None),
+        );
         match quote {
             PremiumQuote::Quoted {
                 score_adjustment,
@@ -481,7 +487,12 @@ mod tests {
 
     #[test]
     fn high_risk_band_multiplies_base_rate_by_six() {
-        let quote = price_premium("agent-risk", "tool:exec", window(), &inputs(Some(550), None));
+        let quote = price_premium(
+            "agent-risk",
+            "tool:exec",
+            window(),
+            &inputs(Some(550), None),
+        );
         match quote {
             PremiumQuote::Quoted {
                 score_adjustment,

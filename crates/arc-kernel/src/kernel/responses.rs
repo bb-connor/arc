@@ -9,6 +9,13 @@ pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) cap: &'a CapabilityToken,
 }
 
+struct PostInvocationHandling {
+    output: ToolServerOutput,
+    extra_metadata: Option<serde_json::Value>,
+    blocked_reason: Option<String>,
+    evidence: Vec<arc_core::receipt::GuardEvidence>,
+}
+
 impl ArcKernel {
     /// denial reason is monetary budget exhaustion.
     pub(crate) fn build_monetary_deny_response(
@@ -262,13 +269,28 @@ impl ArcKernel {
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        match self.apply_stream_limits(output, elapsed)? {
+        let output = self.apply_stream_limits(output, elapsed)?;
+        let post_invocation =
+            self.apply_post_invocation_pipeline(request, output, extra_metadata)?;
+        let _post_invocation_evidence_scope =
+            scope_post_invocation_guard_evidence(post_invocation.evidence);
+        if let Some(reason) = post_invocation.blocked_reason.as_deref() {
+            return self.build_deny_response_with_metadata(
+                request,
+                reason,
+                timestamp,
+                Some(matched_grant_index),
+                post_invocation.extra_metadata,
+            );
+        }
+
+        match post_invocation.output {
             ToolServerOutput::Value(value) => self.build_allow_response_with_metadata(
                 request,
                 ToolCallOutput::Value(value),
                 timestamp,
                 Some(matched_grant_index),
-                extra_metadata.clone(),
+                post_invocation.extra_metadata,
             ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
                 .build_allow_response_with_metadata(
@@ -276,7 +298,7 @@ impl ArcKernel {
                     ToolCallOutput::Stream(stream),
                     timestamp,
                     Some(matched_grant_index),
-                    extra_metadata.clone(),
+                    post_invocation.extra_metadata,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -285,7 +307,7 @@ impl ArcKernel {
                     &reason,
                     timestamp,
                     Some(matched_grant_index),
-                    extra_metadata,
+                    post_invocation.extra_metadata,
                 ),
         }
     }
@@ -515,9 +537,27 @@ impl ArcKernel {
             oracle_evidence,
             attempted_cost: None,
         };
+        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
 
         let limited_output = self.apply_stream_limits(output, elapsed)?;
-        let tool_call_output = match &limited_output {
+        let post_invocation = self.apply_post_invocation_pipeline(
+            request,
+            limited_output,
+            merge_metadata_objects(financial_json, extra_metadata.clone()),
+        )?;
+        let _post_invocation_evidence_scope =
+            scope_post_invocation_guard_evidence(post_invocation.evidence);
+        if let Some(reason) = post_invocation.blocked_reason.as_deref() {
+            return self.build_deny_response_with_metadata(
+                request,
+                reason,
+                timestamp,
+                Some(charge.grant_index),
+                post_invocation.extra_metadata,
+            );
+        }
+
+        let tool_call_output = match &post_invocation.output {
             ToolServerOutput::Value(v) => ToolCallOutput::Value(v.clone()),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(s)) => {
                 ToolCallOutput::Stream(s.clone())
@@ -527,10 +567,7 @@ impl ArcKernel {
             }
         };
 
-        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata = merge_metadata_objects(financial_json, extra_metadata.clone());
-
-        match limited_output {
+        match post_invocation.output {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
                 .build_allow_response_with_metadata(
@@ -538,7 +575,7 @@ impl ArcKernel {
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata.clone(),
+                    post_invocation.extra_metadata,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -547,8 +584,199 @@ impl ArcKernel {
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata,
+                    post_invocation.extra_metadata,
                 ),
+        }
+    }
+
+    fn apply_post_invocation_pipeline(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<PostInvocationHandling, KernelError> {
+        if self.post_invocation_pipeline.is_empty() {
+            return Ok(PostInvocationHandling {
+                output,
+                extra_metadata,
+                blocked_reason: None,
+                evidence: Vec::new(),
+            });
+        }
+
+        let response = self.output_to_post_invocation_value(&output);
+        let outcome = self
+            .post_invocation_pipeline
+            .evaluate_with_evidence(&request.tool_name, &response);
+        let metadata =
+            merge_metadata_objects(extra_metadata, self.post_invocation_metadata(&outcome));
+
+        match outcome.verdict {
+            crate::post_invocation::PostInvocationVerdict::Allow
+            | crate::post_invocation::PostInvocationVerdict::Escalate(_) => {
+                Ok(PostInvocationHandling {
+                    output,
+                    extra_metadata: metadata,
+                    blocked_reason: None,
+                    evidence: outcome.evidence,
+                })
+            }
+            crate::post_invocation::PostInvocationVerdict::Block(reason) => {
+                Ok(PostInvocationHandling {
+                    output,
+                    extra_metadata: metadata,
+                    blocked_reason: Some(reason),
+                    evidence: outcome.evidence,
+                })
+            }
+            crate::post_invocation::PostInvocationVerdict::Redact(redacted) => {
+                Ok(PostInvocationHandling {
+                    output: self.apply_redacted_output(redacted)?,
+                    extra_metadata: metadata,
+                    blocked_reason: None,
+                    evidence: outcome.evidence,
+                })
+            }
+        }
+    }
+
+    fn output_to_post_invocation_value(&self, output: &ToolServerOutput) -> serde_json::Value {
+        match output {
+            ToolServerOutput::Value(value) => serde_json::json!({
+                "kind": "value",
+                "value": value,
+            }),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                serde_json::json!({
+                    "kind": "stream",
+                    "stream": {
+                        "complete": true,
+                        "chunks": stream.chunks.iter().map(|chunk| chunk.data.clone()).collect::<Vec<_>>(),
+                    }
+                })
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
+                serde_json::json!({
+                    "kind": "stream",
+                    "stream": {
+                        "complete": false,
+                        "reason": reason,
+                        "chunks": stream.chunks.iter().map(|chunk| chunk.data.clone()).collect::<Vec<_>>(),
+                    }
+                })
+            }
+        }
+    }
+
+    fn apply_redacted_output(
+        &self,
+        redacted: serde_json::Value,
+    ) -> Result<ToolServerOutput, KernelError> {
+        let envelope = redacted.as_object().ok_or_else(|| {
+            KernelError::Internal(
+                "post-invocation hook returned a non-object output envelope".to_string(),
+            )
+        })?;
+        let kind = envelope
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                KernelError::Internal(
+                    "post-invocation hook output envelope is missing kind".to_string(),
+                )
+            })?;
+
+        match kind {
+            "value" => Ok(ToolServerOutput::Value(
+                envelope
+                    .get("value")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null),
+            )),
+            "stream" => {
+                let stream = envelope
+                    .get("stream")
+                    .and_then(serde_json::Value::as_object)
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "post-invocation hook output envelope is missing stream".to_string(),
+                        )
+                    })?;
+                let chunks = stream
+                    .get("chunks")
+                    .and_then(serde_json::Value::as_array)
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "post-invocation hook stream envelope is missing chunks".to_string(),
+                        )
+                    })?
+                    .iter()
+                    .cloned()
+                    .map(|data| ToolCallChunk { data })
+                    .collect();
+                let tool_stream = ToolCallStream { chunks };
+                let complete = stream
+                    .get("complete")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true);
+                if complete {
+                    Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(
+                        tool_stream,
+                    )))
+                } else {
+                    let reason = stream
+                        .get("reason")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(|| {
+                            KernelError::Internal(
+                                "post-invocation hook incomplete stream is missing reason"
+                                    .to_string(),
+                            )
+                        })?;
+                    Ok(ToolServerOutput::Stream(
+                        ToolServerStreamResult::Incomplete {
+                            stream: tool_stream,
+                            reason: reason.to_string(),
+                        },
+                    ))
+                }
+            }
+            other => Err(KernelError::Internal(format!(
+                "post-invocation hook returned unsupported output kind {other}"
+            ))),
+        }
+    }
+
+    fn post_invocation_metadata(
+        &self,
+        outcome: &crate::post_invocation::PipelineOutcome,
+    ) -> Option<serde_json::Value> {
+        let mut metadata = serde_json::Map::new();
+
+        if matches!(
+            outcome.verdict,
+            crate::post_invocation::PostInvocationVerdict::Redact(_)
+        ) {
+            metadata.insert("sanitized".to_string(), serde_json::Value::Bool(true));
+        }
+        if !outcome.escalations.is_empty() {
+            metadata.insert(
+                "escalations".to_string(),
+                serde_json::Value::Array(
+                    outcome
+                        .escalations
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            );
+        }
+
+        if metadata.is_empty() {
+            None
+        } else {
+            Some(serde_json::json!({ "post_invocation": metadata }))
         }
     }
 
@@ -1120,7 +1348,7 @@ impl ArcKernel {
             decision: params.decision,
             content_hash: params.content_hash,
             policy_hash: self.config.policy_hash.clone(),
-            evidence: vec![],
+            evidence: current_post_invocation_guard_evidence(),
             metadata: params.metadata,
             trust_level: params.trust_level,
             tenant_id,

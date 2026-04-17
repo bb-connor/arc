@@ -71,7 +71,8 @@ impl CoSigningBody {
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, BilateralCoSigningError> {
-        canonical_json_bytes(self).map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))
+        canonical_json_bytes(self)
+            .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))
     }
 }
 
@@ -109,11 +110,8 @@ impl DualSignedReceipt {
         org_a_public_key: &PublicKey,
         org_b_public_key: &PublicKey,
     ) -> Result<(), BilateralCoSigningError> {
-        let body = CoSigningBody::from_receipt(
-            &self.body,
-            &self.org_a_kernel_id,
-            &self.org_b_kernel_id,
-        )?;
+        let body =
+            CoSigningBody::from_receipt(&self.body, &self.org_a_kernel_id, &self.org_b_kernel_id)?;
         let bytes = body.canonical_bytes()?;
 
         if !org_a_public_key.verify(&bytes, &self.org_a_signature) {

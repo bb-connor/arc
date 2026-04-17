@@ -726,8 +726,8 @@ mod tests {
             kernel_key: Keypair::generate().public_key(),
         };
 
-        let receipt = sign_receipt_pure(SignReceiptRequestJson { body }, &seed)
-            .expect("sign_receipt_pure");
+        let receipt =
+            sign_receipt_pure(SignReceiptRequestJson { body }, &seed).expect("sign_receipt_pure");
         assert!(receipt.verify_signature().unwrap());
 
         let seed_pubkey = Keypair::from_seed(&seed).public_key();
@@ -782,8 +782,7 @@ mod tests {
         let single = parse_authority_input("deadbeef").expect("single");
         assert_eq!(single, std::vec!["deadbeef".to_string()]);
 
-        let multi =
-            parse_authority_input("[\"aa\",\"bb\"]").expect("array");
+        let multi = parse_authority_input("[\"aa\",\"bb\"]").expect("array");
         assert_eq!(multi, std::vec!["aa".to_string(), "bb".to_string()]);
 
         assert!(parse_authority_input("").is_err());

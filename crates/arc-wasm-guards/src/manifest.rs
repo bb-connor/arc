@@ -324,8 +324,9 @@ pub fn verify_signed_module(
 ///
 /// - If `guard-manifest.yaml` pins a `signer_public_key`, the `.wasm.sig`
 ///   sidecar MUST exist and MUST carry a valid signature under that key.
-/// - If the manifest does NOT pin a signer_public_key and the sidecar is
-///   absent, loading is permitted only when `manifest.allow_unsigned` is
+/// - If the manifest does NOT pin a signer_public_key, any `.wasm.sig`
+///   sidecar is treated as informational only. It is NOT a trust anchor by
+///   itself. Loading is permitted only when `manifest.allow_unsigned` is
 ///   `true` (a `WARN` is emitted through `tracing`). Otherwise loading is
 ///   rejected with a clear "not signed" error.
 /// - If the manifest pins a signer but allow_unsigned is also true and the
@@ -339,6 +340,16 @@ pub fn verify_guard_signature(
     wasm_bytes: &[u8],
     manifest: &GuardManifest,
 ) -> Result<(), WasmGuardError> {
+    if manifest.signer_public_key.is_none() && manifest.allow_unsigned {
+        tracing::warn!(
+            wasm_path = %wasm_path,
+            guard = %manifest.name,
+            version = %manifest.version,
+            "loading unsigned WASM guard: allow_unsigned=true in manifest"
+        );
+        return Ok(());
+    }
+
     let sidecar = load_signature_sidecar(wasm_path)?;
 
     match (&manifest.signer_public_key, sidecar) {
@@ -362,9 +373,6 @@ pub fn verify_guard_signature(
             "guard module {wasm_path} is not signed: manifest pins signer_public_key but no {SIGNATURE_SUFFIX} sidecar was found"
         ))),
         (None, Some(signed)) => {
-            // No pinning: verify the sidecar against its own embedded key.
-            // This is weaker than pinning (no trust anchor from the manifest),
-            // but still rejects tampered bytes and corrupted signatures.
             if signed.module_name != manifest.name {
                 return Err(WasmGuardError::SignatureVerification(format!(
                     "signature sidecar module_name {:?} does not match manifest name {:?}",
@@ -377,23 +385,24 @@ pub fn verify_guard_signature(
                     signed.version, manifest.version
                 )));
             }
-            let self_signed_key = signed.signer_public_key.clone();
-            verify_signed_module(wasm_bytes, &signed, &self_signed_key)
-        }
-        (None, None) => {
             if manifest.allow_unsigned {
                 tracing::warn!(
                     wasm_path = %wasm_path,
                     guard = %manifest.name,
                     version = %manifest.version,
-                    "loading unsigned WASM guard: allow_unsigned=true in manifest"
+                    "ignoring unpinned WASM signature sidecar: allow_unsigned=true and manifest does not pin signer_public_key"
                 );
                 Ok(())
             } else {
                 Err(WasmGuardError::SignatureVerification(format!(
-                    "guard module {wasm_path} is not signed: no {SIGNATURE_SUFFIX} sidecar found and allow_unsigned is false"
+                    "guard module {wasm_path} has an unpinned {SIGNATURE_SUFFIX} sidecar but manifest does not declare signer_public_key"
                 )))
             }
+        }
+        (None, None) => {
+            Err(WasmGuardError::SignatureVerification(format!(
+                "guard module {wasm_path} is not signed: no {SIGNATURE_SUFFIX} sidecar found and allow_unsigned is false"
+            )))
         }
     }
 }
@@ -792,6 +801,28 @@ config:
     }
 
     #[test]
+    fn verify_guard_signature_ignores_malformed_sidecar_when_unsigned_is_allowed() {
+        let dir = tempfile::tempdir().unwrap();
+        let wasm_path = dir.path().join("g.wasm");
+        let sidecar_path = dir.path().join(format!("g.wasm{SIGNATURE_SUFFIX}"));
+        std::fs::write(&wasm_path, SIGN_TEST_WASM).unwrap();
+        std::fs::write(&sidecar_path, b"{not-json").unwrap();
+
+        let manifest = GuardManifest {
+            name: "g".to_string(),
+            version: "0.1.0".to_string(),
+            abi_version: "1".to_string(),
+            wasm_path: "g.wasm".to_string(),
+            wasm_sha256: hex::encode(Sha256::digest(SIGN_TEST_WASM)),
+            config: HashMap::new(),
+            signer_public_key: None,
+            allow_unsigned: true,
+        };
+
+        verify_guard_signature(wasm_path.to_str().unwrap(), SIGN_TEST_WASM, &manifest).unwrap();
+    }
+
+    #[test]
     fn verify_guard_signature_rejects_name_mismatch() {
         let dir = tempfile::tempdir().unwrap();
         let wasm_path = dir.path().join("g.wasm");
@@ -819,6 +850,37 @@ config:
         match err {
             WasmGuardError::SignatureVerification(msg) => {
                 assert!(msg.contains("module_name"), "{msg}");
+            }
+            other => panic!("expected SignatureVerification, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn verify_guard_signature_rejects_unpinned_sidecar_without_opt_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let wasm_path = dir.path().join("g.wasm");
+        std::fs::write(&wasm_path, SIGN_TEST_WASM).unwrap();
+
+        let sk = SigningKey::generate(&mut OsRng);
+        let signed = make_signed(&sk, SIGN_TEST_WASM, "g", "0.1.0");
+        write_signature_sidecar(wasm_path.to_str().unwrap(), &signed).unwrap();
+
+        let manifest = GuardManifest {
+            name: "g".to_string(),
+            version: "0.1.0".to_string(),
+            abi_version: "1".to_string(),
+            wasm_path: "g.wasm".to_string(),
+            wasm_sha256: hex::encode(Sha256::digest(SIGN_TEST_WASM)),
+            config: HashMap::new(),
+            signer_public_key: None,
+            allow_unsigned: false,
+        };
+
+        let err = verify_guard_signature(wasm_path.to_str().unwrap(), SIGN_TEST_WASM, &manifest)
+            .unwrap_err();
+        match err {
+            WasmGuardError::SignatureVerification(msg) => {
+                assert!(msg.contains("unpinned"), "{msg}");
             }
             other => panic!("expected SignatureVerification, got {other:?}"),
         }

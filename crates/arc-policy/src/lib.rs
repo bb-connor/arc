@@ -31,9 +31,6 @@ pub mod version;
 
 // Re-exports for convenience
 pub use compiler::{compile_policy, CompileError, CompiledPolicy};
-pub use rulesets::{
-    builtin_yaml, list_builtin_names, load_builtin, RulesetError, BUILTIN_RULESETS,
-};
 pub use conditions::{evaluate_condition, Condition, RuntimeContext};
 pub use evaluate::{
     activate_panic, deactivate_panic, evaluate, evaluate_with_context, is_panic_active,
@@ -44,6 +41,9 @@ pub use merge::merge;
 pub use models::{HushSpec, OriginMatch};
 pub use receipt::{evaluate_audited, AuditConfig, DecisionReceipt};
 pub use resolve::{resolve_from_path, resolve_with_loader, LoadedSpec, ResolveError};
+pub use rulesets::{
+    builtin_yaml, list_builtin_names, load_builtin, RulesetError, BUILTIN_RULESETS,
+};
 pub use validate::{validate, ValidationError, ValidationResult};
 pub use version::HUSHSPEC_VERSION;
 

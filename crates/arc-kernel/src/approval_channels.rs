@@ -78,9 +78,7 @@ impl ApprovalChannel for WebhookChannel {
         let body = serde_json::to_string(&payload)
             .map_err(|e| ChannelError::Config(format!("cannot serialize payload: {e}")))?;
 
-        let agent = ureq::AgentBuilder::new()
-            .timeout(self.timeout)
-            .build();
+        let agent = ureq::AgentBuilder::new().timeout(self.timeout).build();
         let mut req = agent
             .post(&self.endpoint)
             .set("content-type", "application/json");
@@ -105,9 +103,7 @@ impl ApprovalChannel for WebhookChannel {
                 let body = resp.into_string().unwrap_or_default();
                 Err(ChannelError::Remote { status, body })
             }
-            Err(ureq::Error::Transport(err)) => {
-                Err(ChannelError::Transport(err.to_string()))
-            }
+            Err(ureq::Error::Transport(err)) => Err(ChannelError::Transport(err.to_string())),
         }
     }
 }
@@ -136,10 +132,7 @@ impl RecordingChannel {
 
     /// Number of requests dispatched so far.
     pub fn len(&self) -> usize {
-        self.captured
-            .lock()
-            .map(|guard| guard.len())
-            .unwrap_or(0)
+        self.captured.lock().map(|guard| guard.len()).unwrap_or(0)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -169,15 +162,19 @@ impl ApprovalChannel for RecordingChannel {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arc_core::crypto::Keypair;
 
     #[test]
     fn recording_channel_captures_dispatches() {
+        let subject = Keypair::generate();
+        let approver = Keypair::generate();
         let channel = RecordingChannel::new();
         let req = ApprovalRequest {
             approval_id: "a-1".into(),
             policy_id: "p-1".into(),
             subject_id: "agent-1".into(),
             capability_id: "c-1".into(),
+            subject_public_key: Some(subject.public_key()),
             tool_server: "srv".into(),
             tool_name: "tool".into(),
             action: "invoke".into(),
@@ -187,6 +184,7 @@ mod tests {
             created_at: 0,
             summary: String::new(),
             governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
             triggered_by: vec![],
         };
         let handle = channel.dispatch(&req).unwrap();

@@ -15,6 +15,10 @@ use arc_reputation::{
     ReliabilityMetrics, ResourceStewardshipMetrics, SpecializationMetrics,
 };
 
+fn did_from_public_key(public_key: arc_core::PublicKey) -> DidArc {
+    DidArc::from_public_key(public_key).expect("ed25519 key")
+}
+
 fn sample_scorecard(subject_key: &str) -> LocalReputationScorecard {
     LocalReputationScorecard {
         subject_key: subject_key.to_string(),
@@ -100,7 +104,7 @@ fn sample_passport(subject_seed: u8, issuer_seed: u8) -> AgentPassport {
         1_710_086_400,
     )
     .expect("credential");
-    let subject_did = DidArc::from_public_key(subject.public_key());
+    let subject_did = did_from_public_key(subject.public_key());
     build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport")
 }
 

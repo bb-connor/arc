@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
-use arc_core::crypto::{Keypair, PublicKey, Signature};
+use arc_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
 use arc_core::hashing::sha256_hex;
 use arc_core::hashing::Hash;
 use arc_core::merkle::{MerkleProof, MerkleTree};
@@ -241,10 +241,13 @@ pub struct CheckpointTransparencySummary {
 
 #[must_use]
 pub fn checkpoint_log_id(checkpoint: &KernelCheckpoint) -> String {
-    format!(
-        "local-log-{}",
-        sha256_hex(checkpoint.body.kernel_key.as_bytes())
-    )
+    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.algorithm() {
+        SigningAlgorithm::Ed25519 => checkpoint.body.kernel_key.as_bytes().to_vec(),
+        SigningAlgorithm::P256 | SigningAlgorithm::P384 => {
+            checkpoint.body.kernel_key.to_hex().into_bytes()
+        }
+    };
+    format!("local-log-{}", sha256_hex(&log_key_bytes))
 }
 
 #[must_use]
@@ -1047,6 +1050,18 @@ mod tests {
         assert_eq!(transparency.witnesses[0].witness_checkpoint_seq, 2);
         assert_eq!(transparency.consistency_proofs[0].from_log_tree_size, 3);
         assert_eq!(transparency.consistency_proofs[0].to_log_tree_size, 6);
+    }
+
+    #[test]
+    fn checkpoint_log_id_preserves_historical_ed25519_hashing() {
+        let kp = Keypair::generate();
+        let checkpoint =
+            build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build checkpoint");
+
+        assert_eq!(
+            checkpoint_log_id(&checkpoint),
+            format!("local-log-{}", sha256_hex(kp.public_key().as_bytes()))
+        );
     }
 
     #[test]

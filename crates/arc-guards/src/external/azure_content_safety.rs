@@ -242,10 +242,7 @@ impl ExternalGuard for AzureContentSafetyGuard {
         let url = self.cfg.analyze_url();
 
         let cats_ref: Vec<&str> = if self.cfg.categories.is_empty() {
-            AzureCategory::all()
-                .iter()
-                .map(|c| c.as_str())
-                .collect()
+            AzureCategory::all().iter().map(|c| c.as_str()).collect()
         } else {
             self.cfg.categories.iter().map(|c| c.as_str()).collect()
         };

@@ -11,7 +11,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-use arc_core::PublicKey;
+use arc_core::{crypto::SigningAlgorithm, PublicKey};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -33,6 +33,9 @@ pub enum DidError {
     #[error("invalid did:arc public key: {0}")]
     InvalidPublicKey(String),
 
+    #[error("did:arc only supports ed25519 public keys, got {0}")]
+    UnsupportedKeyAlgorithm(String),
+
     #[error("invalid service endpoint URL: {0}")]
     InvalidServiceEndpoint(String),
 }
@@ -43,9 +46,17 @@ pub struct DidArc {
 }
 
 impl DidArc {
-    #[must_use]
-    pub fn from_public_key(public_key: PublicKey) -> Self {
-        Self { public_key }
+    pub fn from_public_key(public_key: PublicKey) -> Result<Self, DidError> {
+        if public_key.algorithm() != SigningAlgorithm::Ed25519 {
+            return Err(DidError::UnsupportedKeyAlgorithm(
+                public_key.algorithm().prefix().to_string(),
+            ));
+        }
+        Ok(Self { public_key })
+    }
+
+    pub fn try_from_public_key(public_key: PublicKey) -> Result<Self, DidError> {
+        Self::from_public_key(public_key)
     }
 
     #[must_use]
@@ -102,8 +113,10 @@ impl fmt::Display for DidArc {
     }
 }
 
-impl From<PublicKey> for DidArc {
-    fn from(value: PublicKey) -> Self {
+impl TryFrom<PublicKey> for DidArc {
+    type Error = DidError;
+
+    fn try_from(value: PublicKey) -> Result<Self, Self::Error> {
         Self::from_public_key(value)
     }
 }
@@ -124,7 +137,7 @@ impl FromStr for DidArc {
         }
         let public_key = PublicKey::from_hex(suffix)
             .map_err(|error| DidError::InvalidPublicKey(error.to_string()))?;
-        Ok(Self::from_public_key(public_key))
+        Self::from_public_key(public_key)
     }
 }
 
@@ -244,7 +257,7 @@ mod tests {
 
     fn fixed_did() -> DidArc {
         let seed = [7u8; 32];
-        DidArc::from_public_key(Keypair::from_seed(&seed).public_key())
+        DidArc::from_public_key(Keypair::from_seed(&seed).public_key()).expect("ed25519 key")
     }
 
     #[test]
@@ -259,6 +272,17 @@ mod tests {
     fn rejects_invalid_method_specific_id() {
         let error = DidArc::from_str("did:arc:not-hex").expect_err("invalid did");
         assert!(matches!(error, DidError::InvalidMethodSpecificId));
+    }
+
+    #[test]
+    fn rejects_non_ed25519_public_keys() {
+        let p256_generator = PublicKey::from_hex(
+            "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+        )
+        .expect("valid p256 public key");
+
+        let error = DidArc::try_from_public_key(p256_generator).expect_err("unsupported algorithm");
+        assert!(matches!(error, DidError::UnsupportedKeyAlgorithm(_)));
     }
 
     #[test]

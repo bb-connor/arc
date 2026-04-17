@@ -238,9 +238,7 @@ impl BehavioralProfileGuard {
             .baselines
             .lock()
             .map_err(|_| KernelError::Internal("baseline lock poisoned".to_string()))?;
-        let entry = baselines
-            .entry((agent_id.to_string(), metric))
-            .or_default();
+        let entry = baselines.entry((agent_id.to_string(), metric)).or_default();
 
         // Only record one sample per window-start pair. Callers that
         // pass the same window_start multiple times get the same
@@ -264,7 +262,9 @@ impl BehavioralProfileGuard {
             && z.map(|z| z.abs() > self.config.sigma_threshold)
                 .unwrap_or(false);
 
-        entry.state.update(sample, self.config.ema_alpha, window_start);
+        entry
+            .state
+            .update(sample, self.config.ema_alpha, window_start);
         entry.last_window_start = window_start;
         let baseline = entry.state.clone();
 
@@ -296,15 +296,11 @@ impl BehavioralProfileGuard {
         (now / window) * window
     }
 
-    fn sample_for_window(
-        &self,
-        agent_id: &str,
-        window_start: u64,
-    ) -> Result<f64, KernelError> {
+    fn sample_for_window(&self, agent_id: &str, window_start: u64) -> Result<f64, KernelError> {
         let window_end = window_start + self.config.window_secs.max(1);
-        let receipts = self
-            .feed
-            .receipts_for_agent(agent_id, window_start, window_end.saturating_sub(1))?;
+        let receipts =
+            self.feed
+                .receipts_for_agent(agent_id, window_start, window_end.saturating_sub(1))?;
         Ok(receipts.len() as f64)
     }
 }

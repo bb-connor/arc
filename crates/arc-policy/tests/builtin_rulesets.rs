@@ -73,8 +73,7 @@ fn every_builtin_compiles_without_error() {
 #[test]
 fn load_builtin_accepts_raw_and_prefixed_names() {
     for (name, _) in BUILTIN_RULESETS {
-        load_builtin(name)
-            .unwrap_or_else(|e| panic!("load_builtin({name:?}) should succeed: {e}"));
+        load_builtin(name).unwrap_or_else(|e| panic!("load_builtin({name:?}) should succeed: {e}"));
 
         let prefixed = format!("arc:{name}");
         load_builtin(&prefixed)
@@ -110,9 +109,13 @@ fn load_builtin_rejects_unknown_names() {
 fn default_ruleset_blocks_ssh_and_restricts_egress() {
     let compiled = load_builtin("default").expect("compile default");
     assert!(compiled.guard_names.contains(&"forbidden-path".to_string()));
-    assert!(compiled.guard_names.contains(&"egress-allowlist".to_string()));
+    assert!(compiled
+        .guard_names
+        .contains(&"egress-allowlist".to_string()));
     // SSRF companion comes along for the ride.
-    assert!(compiled.guard_names.contains(&"internal-network".to_string()));
+    assert!(compiled
+        .guard_names
+        .contains(&"internal-network".to_string()));
 }
 
 #[test]

@@ -38,10 +38,9 @@ jobs:
             bin_suffix: ""
             cross: true
           - target: x86_64-apple-darwin
-            # macos-13 is the only GitHub-hosted Intel Mac runner label.
-            # macos-14/15 are Apple Silicon only; `macos-15-intel` is not a
-            # real label and would queue indefinitely.
-            runner: macos-13
+            # GitHub retired macos-13; macos-15-intel is the supported
+            # hosted Intel macOS label for x86_64 release builds.
+            runner: macos-15-intel
             archive: tar.gz
             bin_suffix: ""
             cross: false
@@ -320,7 +319,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: arc ${{ steps.version.outputs.tag }}
           body_path: release/NOTES.md
-          draft: true
+          draft: false
           fail_on_unmatched_files: true
           files: |
             release/*.tar.gz

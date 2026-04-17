@@ -18,7 +18,7 @@ use arc_core::capability::{
 };
 use arc_guards::{
     EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline, McpToolGuard, PatchIntegrityGuard,
-    PathAllowlistGuard, SecretLeakGuard, ShellCommandGuard,
+    PathAllowlistGuard, PostInvocationPipeline, SanitizerHook, SecretLeakGuard, ShellCommandGuard,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +96,7 @@ pub struct LoadedPolicy {
     pub kernel: KernelPolicyConfig,
     pub default_capabilities: Vec<DefaultCapability>,
     pub guard_pipeline: GuardPipeline,
+    pub post_invocation_pipeline: PostInvocationPipeline,
     pub issuance_policy: Option<ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
 }
@@ -559,6 +560,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         kernel: policy.kernel.clone(),
         default_capabilities,
         guard_pipeline: build_guard_pipeline(&policy.guards),
+        post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards),
         issuance_policy: None,
         runtime_assurance_policy: None,
     })
@@ -593,6 +595,7 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         kernel,
         default_capabilities,
         guard_pipeline: compiled.guards,
+        post_invocation_pipeline: compiled.post_invocation,
         issuance_policy,
         runtime_assurance_policy,
     })
@@ -871,6 +874,19 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
                     max_imbalance_ratio: patch_integrity.max_imbalance_ratio,
                 },
             )));
+        }
+    }
+
+    pipeline
+}
+
+/// Build a `PostInvocationPipeline` from a policy's guard configuration.
+pub fn build_post_invocation_pipeline(config: &GuardPolicyConfig) -> PostInvocationPipeline {
+    let mut pipeline = PostInvocationPipeline::new();
+
+    if let Some(secret_patterns) = &config.secret_patterns {
+        if secret_patterns.enabled {
+            pipeline.add(Box::new(SanitizerHook::new()));
         }
     }
 
@@ -1283,6 +1299,13 @@ kernel:
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards);
         assert_eq!(pipeline.len(), 7);
+    }
+
+    #[test]
+    fn build_post_invocation_pipeline_from_secret_patterns() {
+        let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
+        let pipeline = build_post_invocation_pipeline(&policy.guards);
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]

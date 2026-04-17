@@ -83,6 +83,7 @@ name = "arc-core-types"
 version = "0.1.0"
 dependencies = [
  "ed25519-dalek",
+ "getrandom 0.2.17",
  "hex",
  "percent-encoding",
  "rand_core 0.6.4",
@@ -137,7 +138,9 @@ dependencies = [
  "arc-core",
  "arc-core-types",
  "arc-credit",
+ "arc-federation",
  "arc-governance",
+ "arc-kernel-core",
  "arc-link",
  "arc-listing",
  "arc-market",
@@ -156,11 +159,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "arc-kernel-core"
+version = "0.1.0"
+dependencies = [
+ "arc-core-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "arc-lambda-extension"
 version = "0.1.0"
 dependencies = [
  "arc-core-types",
  "arc-kernel",
+ "arc-kernel-core",
  "arc-store-sqlite",
  "aws-config",
  "aws-sdk-dynamodb",

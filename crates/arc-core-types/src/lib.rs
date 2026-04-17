@@ -55,11 +55,11 @@ pub use manifest::{
 };
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
-pub use plan::{
-    PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall,
-    PlannedToolCallId, StepVerdict, StepVerdictKind,
-};
 pub use oracle::{OracleConversionEvidence, ARC_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
+pub use plan::{
+    PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall, PlannedToolCallId,
+    StepVerdict, StepVerdictKind,
+};
 pub use receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
     FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedAutonomyReceiptMetadata,

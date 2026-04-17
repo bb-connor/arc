@@ -103,6 +103,8 @@ pub enum KernelCoreError {
     SubjectMismatch { expected: String, actual: String },
     /// No grant in scope covers the requested tool/server.
     OutOfScope { tool: String, server: String },
+    /// Portable scope matching failed closed on an unsupported constraint.
+    ConstraintError { reason: String },
     /// A guard returned a fail-closed error.
     GuardError { guard: String, reason: String },
     /// A guard denied the request outright.
@@ -140,6 +142,11 @@ impl KernelCoreError {
                 out.push_str(" on server ");
                 out.push_str(server);
                 out.push_str(" is not in capability scope");
+                out
+            }
+            KernelCoreError::ConstraintError { reason } => {
+                let mut out = String::from("constraint evaluation failed: ");
+                out.push_str(reason);
                 out
             }
             KernelCoreError::GuardError { guard, reason } => {
@@ -193,18 +200,35 @@ pub fn evaluate(input: EvaluateInput<'_>) -> EvaluationVerdict {
     }
 
     // Step 3: scope match.
-    let matches: Vec<MatchedGrant<'_>> = resolve_matching_grants(
+    let matches: Vec<MatchedGrant<'_>> = match resolve_matching_grants(
         &verified.scope,
         &input.request.tool_name,
         &input.request.server_id,
-    );
-    if matches.is_empty() {
-        let core_err = KernelCoreError::OutOfScope {
-            tool: input.request.tool_name.clone(),
-            server: input.request.server_id.clone(),
-        };
-        return deny(core_err, None, Some(verified));
-    }
+        &input.request.arguments,
+    ) {
+        Ok(matches) if matches.is_empty() => {
+            let core_err = KernelCoreError::OutOfScope {
+                tool: input.request.tool_name.clone(),
+                server: input.request.server_id.clone(),
+            };
+            return deny(core_err, None, Some(verified));
+        }
+        Ok(matches) => matches,
+        Err(crate::ScopeMatchError::OutOfScope) => {
+            let core_err = KernelCoreError::OutOfScope {
+                tool: input.request.tool_name.clone(),
+                server: input.request.server_id.clone(),
+            };
+            return deny(core_err, None, Some(verified));
+        }
+        Err(crate::ScopeMatchError::ConstraintError(reason)) => {
+            return deny(
+                KernelCoreError::ConstraintError { reason },
+                None,
+                Some(verified),
+            );
+        }
+    };
     // Safe: guarded above.
     let matched_grant_index = matches[0].index;
 

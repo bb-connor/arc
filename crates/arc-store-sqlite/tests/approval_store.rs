@@ -28,11 +28,14 @@ fn unique_path(prefix: &str) -> std::path::PathBuf {
 }
 
 fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
+    let subject = Keypair::generate();
+    let approver = Keypair::generate();
     ApprovalRequest {
         approval_id: id.into(),
         policy_id: "policy-test".into(),
         subject_id: "agent-test".into(),
         capability_id: "cap-test".into(),
+        subject_public_key: Some(subject.public_key()),
         tool_server: "srv".into(),
         tool_name: "tool".into(),
         action: "invoke".into(),
@@ -42,6 +45,7 @@ fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
         created_at: 500,
         summary: "sqlite contract".into(),
         governed_intent: None,
+        trusted_approvers: vec![approver.public_key()],
         triggered_by: vec![],
     }
 }
@@ -112,12 +116,20 @@ fn filter_list_by_subject_and_server() {
 #[test]
 fn resolve_marks_approved_and_records_consumption() {
     let store = SqliteApprovalStore::open_in_memory().unwrap();
-    let r = sample_request("a-1", "h-1");
-    store.store_pending(&r).unwrap();
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    let mut r = sample_request("a-1", "h-1");
+    r.subject_public_key = Some(subject.public_key());
+    r.trusted_approvers = vec![approver.public_key()];
+    store.store_pending(&r).unwrap();
+
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let decision = ApprovalDecision {
         approval_id: "a-1".into(),
         outcome: ApprovalOutcome::Approved,
@@ -131,18 +143,29 @@ fn resolve_marks_approved_and_records_consumption() {
     assert!(store.get_pending("a-1").unwrap().is_none());
     assert!(store.get_resolution("a-1").unwrap().is_some());
     assert!(store.is_consumed(&token.id, "h-1").unwrap());
-    assert_eq!(store.count_approved("agent-test", "policy-test").unwrap(), 1);
+    assert_eq!(
+        store.count_approved("agent-test", "policy-test").unwrap(),
+        1
+    );
 }
 
 #[test]
 fn resolve_rejects_replay() {
     let store = SqliteApprovalStore::open_in_memory().unwrap();
-    let r = sample_request("a-1", "h-1");
-    store.store_pending(&r).unwrap();
-
     let approver = Keypair::generate();
     let subject = Keypair::generate();
-    let token = sign_token(&approver, &subject, "a-1", "h-1", GovernedApprovalDecision::Approved);
+    let mut r = sample_request("a-1", "h-1");
+    r.subject_public_key = Some(subject.public_key());
+    r.trusted_approvers = vec![approver.public_key()];
+    store.store_pending(&r).unwrap();
+
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
     let decision = ApprovalDecision {
         approval_id: "a-1".into(),
         outcome: ApprovalOutcome::Approved,
@@ -166,11 +189,15 @@ fn resolve_rejects_replay() {
 #[test]
 fn persistence_survives_restart() {
     let path = unique_path("arc-hitl-restart");
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
 
     // First "kernel" writes a pending approval.
     {
         let store = SqliteApprovalStore::open(&path).unwrap();
-        let r = sample_request("ap-restart", "h-restart");
+        let mut r = sample_request("ap-restart", "h-restart");
+        r.subject_public_key = Some(subject.public_key());
+        r.trusted_approvers = vec![approver.public_key()];
         store.store_pending(&r).unwrap();
     }
 
@@ -182,8 +209,6 @@ fn persistence_survives_restart() {
 
     // Resume via the kernel's resume_with_decision now that the store
     // is re-opened; the approval must resolve cleanly.
-    let approver = Keypair::generate();
-    let subject = Keypair::generate();
     let token = sign_token(
         &approver,
         &subject,
@@ -230,8 +255,16 @@ fn count_approved_ignores_denied_rows() {
     let mut r_a = sample_request("r-a", "h-a");
     r_a.subject_id = "agent-x".into();
     r_a.policy_id = "policy-x".into();
+    r_a.subject_public_key = Some(subject.public_key());
+    r_a.trusted_approvers = vec![approver.public_key()];
     store.store_pending(&r_a).unwrap();
-    let tok_a = sign_token(&approver, &subject, "r-a", "h-a", GovernedApprovalDecision::Approved);
+    let tok_a = sign_token(
+        &approver,
+        &subject,
+        "r-a",
+        "h-a",
+        GovernedApprovalDecision::Approved,
+    );
     store
         .resolve(
             "r-a",
@@ -249,8 +282,16 @@ fn count_approved_ignores_denied_rows() {
     let mut r_b = sample_request("r-b", "h-b");
     r_b.subject_id = "agent-x".into();
     r_b.policy_id = "policy-x".into();
+    r_b.subject_public_key = Some(subject.public_key());
+    r_b.trusted_approvers = vec![approver.public_key()];
     store.store_pending(&r_b).unwrap();
-    let tok_b = sign_token(&approver, &subject, "r-b", "h-b", GovernedApprovalDecision::Denied);
+    let tok_b = sign_token(
+        &approver,
+        &subject,
+        "r-b",
+        "h-b",
+        GovernedApprovalDecision::Denied,
+    );
     store
         .resolve(
             "r-b",

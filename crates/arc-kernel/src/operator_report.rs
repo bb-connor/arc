@@ -1250,8 +1250,7 @@ impl EmaBaselineState {
             self.ema_mean = prev_mean + alpha * (sample - prev_mean);
             // Incremental EWMA variance, following West (1979) / Welford.
             let diff = sample - prev_mean;
-            self.ema_variance =
-                (1.0 - alpha) * (self.ema_variance + alpha * diff * diff);
+            self.ema_variance = (1.0 - alpha) * (self.ema_variance + alpha * diff * diff);
         }
         self.sample_count = self.sample_count.saturating_add(1);
         self.last_update = now;

@@ -410,24 +410,26 @@ impl PublicKey {
 
     /// Raw 32-byte Ed25519 representation.
     ///
-    /// # Panics in debug / returns all-zero placeholder in release
+    /// This accessor is intentionally Ed25519-only. Non-Ed25519 callers must
+    /// use [`Self::to_hex`] or another algorithm-aware representation instead
+    /// of coercing P-256 / P-384 material into a lossy 32-byte placeholder.
     ///
-    /// ARC consumers of `as_bytes()` (on-chain anchoring, DID documents)
-    /// strictly expect Ed25519 semantics and only ever see Ed25519 keys. The
-    /// helper keeps the historical signature (`-> &[u8; 32]`) so we do not
-    /// break any downstream crate. For non-Ed25519 keys it returns a reference
-    /// to a static all-zero buffer so the return type remains infallible; such
-    /// a key can never reach Ed25519-only consumers in practice.
+    /// # Panics
+    ///
+    /// Panics when called on a non-Ed25519 key so Ed25519-only consumers fail
+    /// closed instead of silently collapsing distinct keys onto the same bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8; 32] {
         match &self.material {
             PublicKeyMaterial::Ed25519 { verifying_key } => verifying_key.as_bytes(),
-            _ => &ED25519_ZERO_BYTES,
+            PublicKeyMaterial::P256 { .. } | PublicKeyMaterial::P384 { .. } => {
+                panic!(
+                    "PublicKey::as_bytes is only valid for Ed25519 keys; use to_hex() for algorithm-aware encoding"
+                )
+            }
         }
     }
 }
-
-const ED25519_ZERO_BYTES: [u8; 32] = [0u8; 32];
 
 // ---------------------------------------------------------------------------
 // Signature
@@ -1031,6 +1033,19 @@ mod tests {
         let kp = Keypair::generate();
         let fake_p256_sig = Signature::from_p256_der(&[0x30, 0x02, 0x02, 0x01]);
         assert!(!kp.public_key().verify(b"x", &fake_p256_sig));
+    }
+
+    #[test]
+    fn non_ed25519_as_bytes_fails_closed() {
+        let p256_generator = PublicKey::from_hex(
+            "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+        )
+        .unwrap();
+
+        let panic = std::panic::catch_unwind(|| {
+            let _ = p256_generator.as_bytes();
+        });
+        assert!(panic.is_err());
     }
 
     #[cfg(feature = "fips")]

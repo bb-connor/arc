@@ -27,7 +27,8 @@ use arc_http_core::{
 use arc_kernel::{
     mint_execution_nonce, verify_execution_nonce, ArcKernel, KernelConfig, KernelError,
     NestedFlowBridge, ServerId, ToolCallRequest, ToolServerConnection,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
 struct EchoServer {
@@ -49,7 +50,9 @@ impl ToolServerConnection for EchoServer {
         _bridge: Option<&mut dyn NestedFlowBridge>,
     ) -> Result<serde_json::Value, KernelError> {
         if tool_name != self.tool {
-            return Err(KernelError::Internal(format!("unexpected tool {tool_name}")));
+            return Err(KernelError::Internal(format!(
+                "unexpected tool {tool_name}"
+            )));
         }
         Ok(arguments)
     }
@@ -248,7 +251,10 @@ fn kernel_issued_nonce_verifies_and_replay_fails_end_to_end() {
         .verify_presented_execution_nonce(&signed, &binding)
         .unwrap_err();
     let msg = format!("{err}");
-    assert!(msg.contains("consumed") || msg.contains("Replayed"), "{msg}");
+    assert!(
+        msg.contains("consumed") || msg.contains("Replayed"),
+        "{msg}"
+    );
 }
 
 #[test]

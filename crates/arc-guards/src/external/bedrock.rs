@@ -329,17 +329,9 @@ pub(crate) fn classify_status_error(
 ) -> ExternalGuardError {
     let snippet = body.chars().take(256).collect::<String>();
     if status.is_server_error() || status == StatusCode::TOO_MANY_REQUESTS {
-        ExternalGuardError::Transient(format!(
-            "{provider} HTTP {}: {}",
-            status.as_u16(),
-            snippet
-        ))
+        ExternalGuardError::Transient(format!("{provider} HTTP {}: {}", status.as_u16(), snippet))
     } else {
-        ExternalGuardError::Permanent(format!(
-            "{provider} HTTP {}: {}",
-            status.as_u16(),
-            snippet
-        ))
+        ExternalGuardError::Permanent(format!("{provider} HTTP {}: {}", status.as_u16(), snippet))
     }
 }
 
