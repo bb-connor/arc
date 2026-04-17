@@ -51,7 +51,6 @@
       "portMappings": [
         { "containerPort": 9090, "hostPort": 9090, "protocol": "tcp" }
       ],
-      "entryPoint": ["/usr/local/bin/arc-sidecar"],
       "command": [
         "api",
         "protect",

@@ -126,10 +126,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           image: arcSidecarImage
           // The sidecar image's CMD default is `--help`; override with
           // a long-running subcommand so the probes succeed and the
-          // app container becomes ready.
-          command: [
-            '/usr/local/bin/arc-sidecar'
-          ]
+          // app container becomes ready. Only `args` is set so the
+          // image ENTRYPOINT (`/sbin/tini -- /usr/local/bin/arc`) is
+          // preserved.
           args: [
             'api'
             'protect'

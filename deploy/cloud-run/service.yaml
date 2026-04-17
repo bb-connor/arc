@@ -74,12 +74,13 @@ spec:
           ports:
             - containerPort: 9090
           # The sidecar image's CMD default is `--help`, which exits
-          # immediately. Override with a long-running ARC subcommand so
-          # the container stays up and serves /health. `api protect`
-          # reverse-proxies app traffic through the kernel; swap to
-          # `arc mcp serve-http -- <wrapped server cmd>` when the
+          # immediately. Override CMD (via `args`) with a long-running
+          # ARC subcommand so the container stays up and serves /health.
+          # `command` is intentionally omitted so the image ENTRYPOINT
+          # (`/sbin/tini -- /usr/local/bin/arc`) is preserved. `api
+          # protect` reverse-proxies app traffic through the kernel;
+          # swap to `mcp serve-http -- <wrapped server cmd>` when the
           # sidecar is fronting an MCP tool server instead of an app.
-          command: ["/usr/local/bin/arc-sidecar"]
           args:
             - "api"
             - "protect"
