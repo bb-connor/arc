@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**70 of 73 numbered phases shipped** on `project/full-roadmap` (14.1 marked PARTIAL — core extraction done, WASM32 cross-compile blocked on arc-core-types upgrade). Plus adjacent
+**70 of 73 numbered phases shipped** on `project/full-roadmap`. 14.1 WASM32 acceptance unblocked by the arc-core-types no_std modernization at `ce43897`. Remaining: 14.2 (browser bindings), 14.3 (mobile FFI), 20.1 (passport, in flight), 20.3 (cross-kernel federation, blocks on 20.1). Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -52,7 +52,7 @@ roadmap phase.
 | 11 (Content / streaming / IaC) | 11.1, 11.2, 11.3 | -- | -- |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1, 13.2, 13.3 | -- | -- |
-| 14 (Portable kernel) | 14.1 (partial) | -- | 14.2, 14.3 |
+| 14 (Portable kernel) | 14.1 | -- | 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
@@ -1016,14 +1016,14 @@ guard denies navigation to a flagged URL.
 > kernel must be stable before extracting a portable subset).
 > **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`
 
-### 14.1 arc-kernel-core Extraction [PARTIAL 38b230e]
+### 14.1 arc-kernel-core Extraction [SHIPPED ce43897]
 
 > Portable `#![no_std] + alloc` crate extracted with pure evaluate,
-> sign, and verify entry points. Native + `--no-default-features`
-> builds clean; `arc-kernel` delegates pure signing to the new crate.
-> WASM32 target blocked on arc-core-types modernization (getrandom
-> `js` feature + std import removal) — the arc-kernel-core source is
-> no_std-clean and will cross-compile unchanged once that lands.
+> sign, and verify entry points (`38b230e`). WASM32 cross-compile
+> unblocked by the arc-core-types `std`/`no_std + alloc` feature
+> split landed as part of `ce43897` (bundled via staging race):
+> `cargo build --target wasm32-unknown-unknown -p arc-kernel-core`
+> now succeeds on both default and `--no-default-features` paths.
 
 
 **What**: Extract a `no_std + alloc` kernel core with capability validation,
