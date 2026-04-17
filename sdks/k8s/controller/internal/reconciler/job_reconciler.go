@@ -332,6 +332,11 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 		id, err := r.Arc.SubmitReceipt(ctx, receipt)
 		if err != nil {
 			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
+				// Increment attempts first, THEN check the cap. Otherwise
+				// the counter stays one behind the actual number of
+				// attempts and a MaxAttempts=5 policy would schedule a
+				// 6th sidecar submission before giving up.
+				backoff := r.backoffFor(job.UID)
 				if r.attemptExceeded(job.UID) {
 					r.event(job, corev1.EventTypeWarning, "ArcReceiptDropped",
 						"exceeded max receipt submission attempts; giving up")
@@ -339,7 +344,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 				} else {
 					r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
 						"receipt submission deferred; requeueing: "+err.Error())
-					return ctrl.Result{RequeueAfter: r.backoffFor(job.UID)}, nil
+					return ctrl.Result{RequeueAfter: backoff}, nil
 				}
 			} else {
 				r.event(job, corev1.EventTypeWarning, "ArcReceiptFailed", err.Error())
