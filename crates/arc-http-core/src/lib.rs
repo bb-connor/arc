@@ -52,6 +52,13 @@ pub use routes::{
 pub use session::SessionContext;
 pub use verdict::{DenyDetails, Verdict};
 
+// Phase 1.1: re-export execution-nonce types so HTTP SDKs don't need to
+// depend on arc-kernel directly just to read the nonce off the response.
+pub use arc_kernel::{
+    ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceStore,
+    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce, EXECUTION_NONCE_SCHEMA,
+};
+
 // Re-export types from arc-core-types that HTTP adapters commonly need.
 pub use arc_core_types::canonical::{canonical_json_bytes, canonical_json_string};
 pub use arc_core_types::crypto::{Keypair, PublicKey, Signature};

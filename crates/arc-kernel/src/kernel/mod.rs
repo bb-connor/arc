@@ -804,6 +804,14 @@ pub struct ArcKernel {
     dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     dpop_config: Option<dpop::DpopConfig>,
+    /// Phase 1.1 execution-nonce config (TTL, capacity, strict-mode flag).
+    /// When `None`, no nonce is minted on allow and strict verification is
+    /// disabled (legacy deployments keep working).
+    execution_nonce_config: Option<crate::execution_nonce::ExecutionNonceConfig>,
+    /// Phase 1.1 replay-prevention store for execution nonces. Shared with
+    /// any tool server that delegates verification to the kernel. Boxed
+    /// trait object so SQLite-backed stores can be plugged in.
+    execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
     /// Replay store for governed approval tokens. Prevents a signed approval
     /// from being consumed more than once. Uses the same LRU + TTL pattern as
     /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
@@ -1174,6 +1182,8 @@ impl ArcKernel {
             last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
+            execution_nonce_config: None,
+            execution_nonce_store: None,
             approval_replay_store: Some(dpop::DpopNonceStore::new(
                 8192,
                 std::time::Duration::from_secs(3600),
@@ -1314,6 +1324,153 @@ impl ArcKernel {
     pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
         self.dpop_nonce_store = Some(nonce_store);
         self.dpop_config = Some(config);
+    }
+
+    /// Phase 1.1: install an execution-nonce config and replay store.
+    ///
+    /// Once installed, every `Verdict::Allow` carries a short-lived signed
+    /// nonce on `ToolCallResponse::execution_nonce`. Tool servers re-present
+    /// that nonce via `ToolCallRequest::execution_nonce` and the kernel's
+    /// `verify_presented_execution_nonce` helper (or directly via the
+    /// free-standing `verify_execution_nonce` function) before executing.
+    ///
+    /// Set `config.require_nonce = true` to put the kernel into strict mode:
+    /// any call that reaches `require_presented_execution_nonce` without a
+    /// nonce is denied. When `require_nonce == false` the feature is opt-in
+    /// per tool server and non-nonce callers continue to work (backward
+    /// compatibility).
+    pub fn set_execution_nonce_store(
+        &mut self,
+        config: crate::execution_nonce::ExecutionNonceConfig,
+        store: Box<dyn crate::execution_nonce::ExecutionNonceStore>,
+    ) {
+        self.execution_nonce_config = Some(config);
+        self.execution_nonce_store = Some(store);
+    }
+
+    /// Returns `true` when execution-nonce strict mode is active.
+    ///
+    /// Strict mode requires every presented tool call to carry a fresh,
+    /// valid, single-use nonce. When `false` the kernel is either not
+    /// minting nonces at all (no config installed) or is in opt-in mode
+    /// where tool servers can verify presented nonces but non-nonce calls
+    /// are not outright rejected.
+    #[must_use]
+    pub fn execution_nonce_required(&self) -> bool {
+        self.execution_nonce_config
+            .as_ref()
+            .is_some_and(|cfg| cfg.require_nonce)
+    }
+
+    /// Phase 1.1: mint a signed execution nonce for an allow verdict.
+    ///
+    /// Returns `Ok(None)` when no config is installed (nonces disabled);
+    /// returns `Ok(Some(nonce))` once configured. The nonce binding is
+    /// derived from the capability subject, capability ID, target
+    /// server/tool, and the canonical parameter hash embedded in the
+    /// just-signed allow receipt so the verify-time check is always
+    /// comparing apples to apples.
+    pub(crate) fn mint_execution_nonce_for_allow(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        receipt: &ArcReceipt,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        let Some(config) = self.execution_nonce_config.as_ref() else {
+            return Ok(None);
+        };
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        let binding = crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash: receipt.action.parameter_hash.clone(),
+        };
+        let signed = crate::execution_nonce::mint_execution_nonce(
+            &self.config.keypair,
+            binding,
+            config,
+            now,
+        )?;
+        Ok(Some(Box::new(signed)))
+    }
+
+    /// Phase 1.1: verify a caller-presented execution nonce against the
+    /// expected binding, consuming it in the replay store on success.
+    ///
+    /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
+    /// by this kernel, and has not been consumed. Returns an error
+    /// wrapping `ExecutionNonceError` on any failure (expired, tampered,
+    /// replayed, binding mismatch, store unreachable).
+    pub fn verify_presented_execution_nonce(
+        &self,
+        presented: &crate::execution_nonce::SignedExecutionNonce,
+        expected: &crate::execution_nonce::NonceBinding,
+    ) -> Result<(), crate::execution_nonce::ExecutionNonceError> {
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            crate::execution_nonce::ExecutionNonceError::Store(
+                "execution nonce store is not installed".to_string(),
+            )
+        })?;
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        crate::execution_nonce::verify_execution_nonce(
+            presented,
+            &self.config.keypair.public_key(),
+            expected,
+            now,
+            store,
+        )
+    }
+
+    /// Phase 1.1: strict-mode gate. Denies the call fail-closed when the
+    /// kernel is configured to require nonces on every execution-bound
+    /// tool call but the caller did not present one.
+    ///
+    /// `presented` is the nonce the tool server forwarded with the
+    /// execution attempt (for example, lifted from the
+    /// `X-Arc-Execution-Nonce` header). Passing the nonce as a separate
+    /// argument keeps `ToolCallRequest` wire-stable: every other call
+    /// site that builds a request (guards, adapters, tests) continues to
+    /// compile unchanged, and strict mode is gated on the integration
+    /// layer that knows how to shuttle the nonce header.
+    ///
+    /// Returns `Ok(())` when:
+    /// * strict mode is disabled (backward-compat path), OR
+    /// * a nonce is presented, signed by this kernel, correctly bound,
+    ///   non-expired, and has not been consumed.
+    ///
+    /// Returns `Err(KernelError::Internal(...))` fail-closed otherwise.
+    pub fn require_presented_execution_nonce(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        presented: Option<&crate::execution_nonce::SignedExecutionNonce>,
+    ) -> Result<(), KernelError> {
+        if !self.execution_nonce_required() {
+            return Ok(());
+        }
+        let presented = presented.ok_or_else(|| {
+            KernelError::Internal(
+                "execution nonce required but not presented on tool call".to_string(),
+            )
+        })?;
+        let parameter_hash = arc_core::receipt::ToolCallAction::from_parameters(
+            request.arguments.clone(),
+        )
+        .map_err(|e| {
+            KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
+        })?
+        .parameter_hash;
+        let expected = crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash,
+        };
+        self.verify_presented_execution_nonce(presented, &expected)
+            .map_err(|e| KernelError::Internal(format!("{e}")))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {

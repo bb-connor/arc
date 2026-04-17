@@ -126,6 +126,7 @@ impl ArcKernel {
                 reason: Some(reason.to_string()),
                 terminal_state: OperationTerminalState::Completed,
                 receipt,
+                execution_nonce: None,
             });
         }
 
@@ -228,6 +229,7 @@ impl ArcKernel {
             reason: Some(reason.to_string()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -674,6 +676,7 @@ impl ArcKernel {
             reason: Some(reason.to_string()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -747,6 +750,7 @@ impl ArcKernel {
                 reason: reason.to_string(),
             },
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -840,6 +844,7 @@ impl ArcKernel {
                 reason: reason.to_string(),
             },
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -915,6 +920,12 @@ impl ArcKernel {
             "tool call allowed"
         );
 
+        // Phase 1.1: mint a short-lived, single-use execution nonce bound
+        // to this allow verdict so tool servers can verify the kernel
+        // authorized this exact invocation. Opt-in; when no config is
+        // installed the field remains `None` for backward compatibility.
+        let execution_nonce = self.mint_execution_nonce_for_allow(request, cap, &receipt)?;
+
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
             verdict: Verdict::Allow,
@@ -922,6 +933,7 @@ impl ArcKernel {
             reason: None,
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce,
         })
     }
 

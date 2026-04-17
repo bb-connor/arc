@@ -463,6 +463,12 @@ async fn sidecar_evaluate_handler(
             verdict: result.verdict,
             receipt: result.receipt,
             evidence: result.evidence,
+            // Phase 1.1: this proxy path does not mint execution nonces
+            // today. When the kernel gets a nonce config, the caller
+            // lifts the nonce out of the kernel's tool-call response and
+            // populates this field; for now it stays `None`, which keeps
+            // the JSON wire shape identical to the pre-1.1 contract.
+            execution_nonce: None,
         }),
     )
         .into_response()

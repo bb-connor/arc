@@ -8,6 +8,7 @@ use arc_core::session::{
 };
 
 use crate::dpop;
+use crate::execution_nonce::SignedExecutionNonce;
 use crate::{AgentId, KernelError, ServerId};
 
 /// Verdict of a guard or capability evaluation.
@@ -65,6 +66,12 @@ pub struct ToolCallRequest {
 }
 
 /// The kernel's response to a tool call request.
+///
+/// Phase 1.1 added `execution_nonce` as a sibling field so the `Verdict`
+/// enum can keep its `Copy` semantics. The nonce is only populated for
+/// `Verdict::Allow` and only when the kernel has an `ExecutionNonceConfig`
+/// installed; non-allow responses and nonce-disabled deployments continue
+/// to carry `None` here.
 #[derive(Debug)]
 pub struct ToolCallResponse {
     /// Correlation identifier (matches the request).
@@ -79,6 +86,15 @@ pub struct ToolCallResponse {
     pub terminal_state: OperationTerminalState,
     /// Signed receipt attesting to this decision.
     pub receipt: ArcReceipt,
+    /// Phase 1.1: short-lived, single-use execution nonce bound to this
+    /// allow verdict. Populated only on `Verdict::Allow` when an
+    /// `ExecutionNonceConfig` is installed on the kernel. Legacy
+    /// deployments without a config leave this `None` and keep working.
+    ///
+    /// Boxed so the deny/cancel/incomplete hot paths (which all carry
+    /// `None`) don't widen the `SessionOperationResponse::ToolCall`
+    /// variant and trip clippy's `large_enum_variant`.
+    pub execution_nonce: Option<Box<SignedExecutionNonce>>,
 }
 
 /// Streamed tool output emitted before the final tool response frame.

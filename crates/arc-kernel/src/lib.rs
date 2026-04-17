@@ -30,6 +30,7 @@ pub mod checkpoint;
 pub mod cost_attribution;
 pub mod dpop;
 pub mod evidence_export;
+pub mod execution_nonce;
 pub mod operator_report;
 pub mod payment;
 pub mod receipt_analytics;
@@ -279,6 +280,13 @@ pub use cost_attribution::{
 pub use dpop::{
     is_supported_dpop_schema, verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof,
     DpopProofBody, DPOP_SCHEMA,
+};
+pub use execution_nonce::{
+    is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
+    ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceStore,
+    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
+    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
+    EXECUTION_NONCE_SCHEMA,
 };
 pub use evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
