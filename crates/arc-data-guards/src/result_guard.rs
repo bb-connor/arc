@@ -288,12 +288,8 @@ fn locate_rows_array_mut<'a>(
 fn redact_unstructured_result(value: &mut Value, marker: &str) {
     match value {
         Value::Object(map) => {
-            if let Some(data) = map.get_mut("data") {
-                redact_nested_values(data, marker);
-            } else {
-                for field in map.values_mut() {
-                    redact_nested_values(field, marker);
-                }
+            for field in map.values_mut() {
+                redact_nested_values(field, marker);
             }
         }
         _ => redact_nested_values(value, marker),

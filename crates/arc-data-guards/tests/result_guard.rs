@@ -171,6 +171,32 @@ fn constrained_unknown_row_shape_is_redacted_in_pipeline() {
     }
 }
 
+#[test]
+fn constrained_unknown_shape_redacts_all_top_level_fields() {
+    let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+    let scope = scope(vec![Constraint::ColumnDenylist(vec!["email".into()])]);
+    let mut pipeline = PostInvocationPipeline::new();
+    pipeline.add(Box::new(OwnedHook { guard, scope }));
+
+    let response = serde_json::json!({
+        "data": {"summary": "ok"},
+        "items": [{"id": 1, "email": "a@b.com"}]
+    });
+    let (verdict, _) = pipeline.evaluate("sql", &response);
+    match verdict {
+        PostInvocationVerdict::Redact(v) => {
+            assert_eq!(
+                v,
+                serde_json::json!({
+                    "data": {"summary": "[REDACTED]"},
+                    "items": [{"id": "[REDACTED]", "email": "[REDACTED]"}]
+                })
+            );
+        }
+        other => panic!("expected Redact, got {other:?}"),
+    }
+}
+
 /// A helper hook that owns both the guard and the scope so it satisfies
 /// the `PostInvocationHook: Send + Sync` bounds required by the
 /// pipeline's `Box<dyn PostInvocationHook>`.
