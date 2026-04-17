@@ -63,6 +63,15 @@ pub struct ToolCallRequest {
     /// Absent in legacy callers; when the matched grant carries a
     /// `ModelConstraint` with any requirement, the call is denied.
     pub model_metadata: Option<ModelMetadata>,
+    /// Phase 20.3: identifier of the origin kernel when this request
+    /// crosses a federation boundary (agent in Org A invoking a tool in
+    /// Org B). When set, the local (tool-host) kernel dispatches the
+    /// signed receipt to the origin kernel for bilateral co-signing
+    /// before the receipt is persisted. Absent for intra-org calls.
+    ///
+    /// The field is skipped from wire serialization when `None` so the
+    /// legacy wire format stays byte-identical.
+    pub federated_origin_kernel_id: Option<String>,
 }
 
 /// The kernel's response to a tool call request.

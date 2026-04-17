@@ -784,6 +784,7 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
                     model_metadata: None,
+                federated_origin_kernel_id: None,
                 },
                 Some(route_metadata),
             )
@@ -957,6 +958,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
                         model_metadata: None,
+                    federated_origin_kernel_id: None,
                     },
                     &deny_reason,
                     Some(route_selection_metadata(&planning.evidence)?),
@@ -1061,6 +1063,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
                         model_metadata: None,
+                    federated_origin_kernel_id: None,
                     },
                     Some(route_metadata),
                 )
@@ -1532,6 +1535,7 @@ mod tests {
                         governed_intent: request.execution.governed_intent.clone(),
                         approval_token: request.execution.approval_token.clone(),
                         model_metadata: None,
+                    federated_origin_kernel_id: None,
                     },
                     Some(route_metadata),
                 )

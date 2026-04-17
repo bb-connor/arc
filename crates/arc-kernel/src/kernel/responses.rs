@@ -118,7 +118,7 @@ impl ArcKernel {
                 tenant_id: None,
             })?;
 
-            self.record_arc_receipt(&receipt)?;
+            self.record_arc_receipt_with_federation(request, &receipt)?;
 
             return Ok(ToolCallResponse {
                 request_id: request.request_id.clone(),
@@ -222,7 +222,7 @@ impl ArcKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -670,7 +670,7 @@ impl ArcKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -743,7 +743,7 @@ impl ArcKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -838,7 +838,7 @@ impl ArcKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -936,7 +936,7 @@ impl ArcKernel {
             tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         info!(
             request_id = %request.request_id,
@@ -1142,6 +1142,22 @@ impl ArcKernel {
             };
             KernelError::ReceiptSigningFailed(message)
         })
+    }
+
+    /// Phase 20.3: record the receipt AND drive the bilateral co-signing
+    /// hook when the request crosses a federation boundary.
+    ///
+    /// Fail-closed: a co-sign failure aborts the record path so the
+    /// receipt is never persisted without its paired remote signature.
+    /// Non-federated requests (request.federated_origin_kernel_id is
+    /// `None`) behave identically to [`Self::record_arc_receipt`].
+    pub(crate) fn record_arc_receipt_with_federation(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ArcReceipt,
+    ) -> Result<(), KernelError> {
+        self.apply_federation_cosign(request, receipt)?;
+        self.record_arc_receipt(receipt)
     }
 
     pub(crate) fn record_arc_receipt(&self, receipt: &ArcReceipt) -> Result<(), KernelError> {

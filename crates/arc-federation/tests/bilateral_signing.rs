@@ -1,0 +1,210 @@
+//! Phase 20.3 -- bilateral cross-kernel co-signing tests.
+//!
+//! Covers the happy path (two kernels both sign the same receipt and either
+//! side can verify the dual-signed artifact), the wrong-peer-key rejection
+//! (a third-party key cannot impersonate either org), and the tampered-body
+//! rejection (a mutated body fails verification fail-closed).
+
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+
+use arc_core_types::crypto::{sha256_hex, Keypair};
+use arc_core_types::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction, TrustLevel};
+use arc_federation::{
+    co_sign_with_origin, BilateralCoSigningError, CoSigningBody, DualSignedReceipt,
+    InProcessCoSigner,
+};
+
+fn sample_action() -> ToolCallAction {
+    ToolCallAction::from_parameters(serde_json::json!({
+        "path": "/data/federation-test.txt"
+    }))
+    .unwrap()
+}
+
+fn sample_receipt(tool_host_kp: &Keypair) -> ArcReceipt {
+    let body = ArcReceiptBody {
+        id: "rcpt-fed-20.3".to_string(),
+        timestamp: 1_734_000_000,
+        capability_id: "cap-fed-001".to_string(),
+        tool_server: "srv-orgb-files".to_string(),
+        tool_name: "file_read".to_string(),
+        action: sample_action(),
+        decision: Decision::Allow,
+        content_hash: sha256_hex(br#"{"ok":true}"#),
+        policy_hash: "fed-policy-hash".to_string(),
+        evidence: Vec::new(),
+        metadata: None,
+        trust_level: TrustLevel::default(),
+        tenant_id: None,
+        kernel_key: tool_host_kp.public_key(),
+    };
+    ArcReceipt::sign(body, tool_host_kp).unwrap()
+}
+
+#[test]
+fn happy_path_dual_signs_and_verifies_on_both_sides() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+
+    let cosigner = InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_kp.clone(),
+        tool_host_kp.public_key(),
+    );
+
+    let receipt = sample_receipt(&tool_host_kp);
+    let dual = co_sign_with_origin(
+        origin_kernel_id,
+        &origin_kp.public_key(),
+        tool_host_kernel_id,
+        &tool_host_kp,
+        receipt.clone(),
+        &cosigner,
+    )
+    .expect("co-sign happy path");
+
+    assert_eq!(dual.org_a_kernel_id, origin_kernel_id);
+    assert_eq!(dual.org_b_kernel_id, tool_host_kernel_id);
+    assert_eq!(dual.body.id, receipt.id);
+
+    // Both sides can verify with the same pinned peer keys.
+    dual.verify(&origin_kp.public_key(), &tool_host_kp.public_key())
+        .expect("dual-signed receipt verifies with both pinned peer keys");
+}
+
+#[test]
+fn verify_fails_when_wrong_peer_key_is_supplied_for_either_side() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let attacker_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+
+    let cosigner = InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_kp.clone(),
+        tool_host_kp.public_key(),
+    );
+    let receipt = sample_receipt(&tool_host_kp);
+    let dual = co_sign_with_origin(
+        origin_kernel_id,
+        &origin_kp.public_key(),
+        tool_host_kernel_id,
+        &tool_host_kp,
+        receipt,
+        &cosigner,
+    )
+    .unwrap();
+
+    // Swap origin key with a stranger's -- origin signature must fail.
+    let err = dual
+        .verify(&attacker_kp.public_key(), &tool_host_kp.public_key())
+        .expect_err("attacker origin key must be rejected");
+    assert_eq!(err, BilateralCoSigningError::OrgASignatureInvalid);
+
+    // Swap tool-host key with a stranger's -- tool-host signature must fail.
+    let err = dual
+        .verify(&origin_kp.public_key(), &attacker_kp.public_key())
+        .expect_err("attacker tool-host key must be rejected");
+    assert_eq!(err, BilateralCoSigningError::OrgBSignatureInvalid);
+}
+
+#[test]
+fn verify_fails_when_body_is_tampered() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+
+    let cosigner = InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_kp.clone(),
+        tool_host_kp.public_key(),
+    );
+    let receipt = sample_receipt(&tool_host_kp);
+    let mut dual = co_sign_with_origin(
+        origin_kernel_id,
+        &origin_kp.public_key(),
+        tool_host_kernel_id,
+        &tool_host_kp,
+        receipt,
+        &cosigner,
+    )
+    .unwrap();
+
+    // Mutate a covered field in the body.
+    dual.body.tool_name = "file_write".to_string();
+    let err = dual
+        .verify(&origin_kp.public_key(), &tool_host_kp.public_key())
+        .expect_err("tampered body must be rejected");
+    // The origin signature is checked first, so we get OrgASignatureInvalid.
+    assert_eq!(err, BilateralCoSigningError::OrgASignatureInvalid);
+}
+
+#[test]
+fn cosigner_rejects_forged_org_b_signature() {
+    // Attacker tries to dump a receipt signed by their own key and have
+    // the origin kernel co-sign it. The origin verifies Org B's declared
+    // signature against the pinned tool-host key before signing, so this
+    // must fail fail-closed.
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let attacker_kp = Keypair::generate();
+    let origin_kernel_id = "kernel.org-a";
+    let tool_host_kernel_id = "kernel.org-b";
+
+    let cosigner = InProcessCoSigner::new(
+        origin_kernel_id,
+        origin_kp.clone(),
+        tool_host_kp.public_key(),
+    );
+
+    let err = co_sign_with_origin(
+        origin_kernel_id,
+        &origin_kp.public_key(),
+        tool_host_kernel_id,
+        &attacker_kp,
+        sample_receipt(&attacker_kp),
+        &cosigner,
+    )
+    .expect_err("origin must refuse to co-sign an attacker-signed body");
+    assert_eq!(err, BilateralCoSigningError::OrgBSignatureInvalid);
+}
+
+#[test]
+fn canonical_body_roundtrip_is_stable() {
+    let origin_kp = Keypair::generate();
+    let tool_host_kp = Keypair::generate();
+    let receipt = sample_receipt(&tool_host_kp);
+
+    let body_a =
+        CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
+    let body_b =
+        CoSigningBody::from_receipt(&receipt, "kernel.org-a", "kernel.org-b").unwrap();
+    assert_eq!(body_a.canonical_bytes().unwrap(), body_b.canonical_bytes().unwrap());
+
+    // Demonstrate that a DualSignedReceipt serializes and deserializes without
+    // drift (receipt body stays intact, both signatures survive).
+    let cosigner = InProcessCoSigner::new(
+        "kernel.org-a",
+        origin_kp.clone(),
+        tool_host_kp.public_key(),
+    );
+    let dual = co_sign_with_origin(
+        "kernel.org-a",
+        &origin_kp.public_key(),
+        "kernel.org-b",
+        &tool_host_kp,
+        receipt,
+        &cosigner,
+    )
+    .unwrap();
+
+    let json = serde_json::to_string(&dual).unwrap();
+    let restored: DualSignedReceipt = serde_json::from_str(&json).unwrap();
+    restored
+        .verify(&origin_kp.public_key(), &tool_host_kp.public_key())
+        .expect("round-tripped dual receipt must still verify");
+}

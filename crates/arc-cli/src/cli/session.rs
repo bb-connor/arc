@@ -80,6 +80,7 @@ fn handle_agent_message(
                     governed_intent: None,
                     approval_token: None,
                     model_metadata: None,
+                federated_origin_kernel_id: None,
                 };
 
                 match make_error_receipt(kernel, &request) {
@@ -568,6 +569,7 @@ capabilities:
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+        federated_origin_kernel_id: None,
         };
 
         let response = restarted.evaluate_tool_call_blocking(&request).unwrap();
@@ -767,6 +769,7 @@ capabilities:
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+        federated_origin_kernel_id: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -810,6 +813,7 @@ capabilities:
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+        federated_origin_kernel_id: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

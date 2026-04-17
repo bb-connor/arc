@@ -930,6 +930,26 @@ pub struct ArcKernel {
     /// backward-compatible: memory-shaped tool calls behave exactly as
     /// they did before Phase 18.2.
     memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
+    /// Phase 20.3 cross-kernel federation peer set. When a request
+    /// carries a `federated_origin_kernel_id` and that peer is pinned
+    /// here (fresh), the kernel invokes `federation_cosigner` after
+    /// locally signing the receipt to obtain the origin kernel's
+    /// co-signature. Absent in non-federated deployments.
+    federation_peers: RwLock<HashMap<String, arc_federation::FederationPeer>>,
+    /// Phase 20.3 bilateral co-signer. Separate from the peer set so
+    /// runtime can install it independently -- for instance, a deployment
+    /// can declare peers while still using a mock cosigner in tests.
+    federation_cosigner: Option<Arc<dyn arc_federation::BilateralCoSigningProtocol>>,
+    /// Phase 20.3 locally-signed dual receipts, indexed by ArcReceipt.id.
+    /// Populated only when the post-sign hook fires successfully. Kept
+    /// in-memory; persistent storage plugs in via the federation-state
+    /// APIs already in arc-federation.
+    federation_dual_receipts: Mutex<HashMap<String, arc_federation::DualSignedReceipt>>,
+    /// Phase 20.3 operator-declared kernel identifier used as the
+    /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
+    /// encoding of the kernel's signing public key, but operators can
+    /// override it to a stable DNS name via `with_federation_peers`.
+    federation_local_kernel_id: Mutex<Option<String>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1310,6 +1330,10 @@ impl ArcKernel {
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: Mutex::new(None),
             memory_provenance: None,
+            federation_peers: RwLock::new(HashMap::new()),
+            federation_cosigner: None,
+            federation_dual_receipts: Mutex::new(HashMap::new()),
+            federation_local_kernel_id: Mutex::new(None),
         }
     }
 
@@ -1376,6 +1400,150 @@ impl ArcKernel {
         &self,
     ) -> Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>> {
         self.memory_provenance.as_ref().map(Arc::clone)
+    }
+
+    /// Phase 20.3: install a set of [`arc_federation::FederationPeer`]s
+    /// this kernel trusts for bilateral co-signing. Overwrites any
+    /// previously declared set. Callers typically obtain these peers
+    /// from [`arc_federation::KernelTrustExchange::accept_envelope`]
+    /// after a successful mTLS handshake.
+    ///
+    /// Builder-style so deployments can chain `.with_federation_peers(...)`
+    /// onto `ArcKernel::new(config)`.
+    #[must_use]
+    pub fn with_federation_peers(self, peers: Vec<arc_federation::FederationPeer>) -> Self {
+        if let Ok(mut map) = self.federation_peers.write() {
+            map.clear();
+            for peer in peers {
+                map.insert(peer.kernel_id.clone(), peer);
+            }
+        }
+        self
+    }
+
+    /// Phase 20.3: install the bilateral cosigner responsible for
+    /// contacting a peer kernel to obtain a co-signature. Production
+    /// deployments plug in an mTLS-backed RPC client; tests can use
+    /// [`arc_federation::InProcessCoSigner`].
+    pub fn set_federation_cosigner(
+        &mut self,
+        cosigner: Arc<dyn arc_federation::BilateralCoSigningProtocol>,
+    ) {
+        self.federation_cosigner = Some(cosigner);
+    }
+
+    /// Phase 20.3: advertise this kernel's stable identifier as seen by
+    /// remote federation peers. When unset, the hex encoding of the
+    /// signing public key is used. Setting this is recommended in
+    /// production so receipts reference DNS names rather than raw keys.
+    pub fn set_federation_local_kernel_id(&self, kernel_id: impl Into<String>) {
+        if let Ok(mut slot) = self.federation_local_kernel_id.lock() {
+            *slot = Some(kernel_id.into());
+        }
+    }
+
+    /// Phase 20.3: resolve the active federation peer for
+    /// `remote_kernel_id`, refusing stale pins fail-closed.
+    pub fn federation_peer(
+        &self,
+        remote_kernel_id: &str,
+        now: u64,
+    ) -> Option<arc_federation::FederationPeer> {
+        let map = self.federation_peers.read().ok()?;
+        let peer = map.get(remote_kernel_id)?.clone();
+        if peer.is_fresh(now) {
+            Some(peer)
+        } else {
+            None
+        }
+    }
+
+    /// Phase 20.3: snapshot the currently-pinned federation peer set.
+    pub fn federation_peers_snapshot(&self) -> Vec<arc_federation::FederationPeer> {
+        self.federation_peers
+            .read()
+            .map(|map| map.values().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Phase 20.3: look up a dual-signed receipt by the underlying
+    /// [`arc_core::receipt::ArcReceipt`] id. Returns `None` when the
+    /// receipt did not cross a federation boundary or when the
+    /// co-signing hook has not yet produced a dual-signed artifact
+    /// for it.
+    pub fn dual_signed_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Option<arc_federation::DualSignedReceipt> {
+        self.federation_dual_receipts
+            .lock()
+            .ok()?
+            .get(receipt_id)
+            .cloned()
+    }
+
+    /// Local kernel identifier used in bilateral co-signing. Falls back
+    /// to the hex encoding of the signing public key.
+    pub fn federation_local_kernel_id(&self) -> String {
+        if let Ok(slot) = self.federation_local_kernel_id.lock() {
+            if let Some(id) = slot.as_ref() {
+                return id.clone();
+            }
+        }
+        self.config.keypair.public_key().to_hex()
+    }
+
+    /// Phase 20.3 post-sign hook. Invoked immediately after
+    /// [`Self::build_and_sign_receipt`] so the local (tool-host)
+    /// signature has already landed in the `ArcReceipt`. When
+    /// `federated_origin_kernel_id` is set and the peer is pinned fresh,
+    /// this dispatches the receipt to the cosigner, assembles a
+    /// [`arc_federation::DualSignedReceipt`], and stashes it for
+    /// retrieval via [`Self::dual_signed_receipt`].
+    ///
+    /// Fail-closed: any error from the peer lookup or the cosigner is
+    /// surfaced as a [`KernelError::Internal`] so operators see the
+    /// federation drift rather than silently shipping a receipt without
+    /// the remote signature. Non-federated requests (`None` origin) are
+    /// a no-op.
+    pub(crate) fn apply_federation_cosign(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &arc_core::receipt::ArcReceipt,
+    ) -> Result<(), KernelError> {
+        let Some(origin_kernel_id) = request.federated_origin_kernel_id.as_ref() else {
+            return Ok(());
+        };
+        let Some(cosigner) = self.federation_cosigner.as_ref() else {
+            return Err(KernelError::Internal(format!(
+                "federation cosigner missing for request {request_id} bound to origin kernel {origin_kernel_id}",
+                request_id = request.request_id,
+            )));
+        };
+        let now = current_unix_timestamp();
+        let Some(peer) = self.federation_peer(origin_kernel_id, now) else {
+            return Err(KernelError::Internal(format!(
+                "federation peer {origin_kernel_id} is not pinned or has gone stale"
+            )));
+        };
+
+        let local_kernel_id = self.federation_local_kernel_id();
+        let dual = arc_federation::co_sign_with_origin(
+            origin_kernel_id,
+            &peer.public_key,
+            &local_kernel_id,
+            &self.config.keypair,
+            receipt.clone(),
+            cosigner.as_ref(),
+        )
+        .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
+
+        let mut map = self
+            .federation_dual_receipts
+            .lock()
+            .map_err(|_| KernelError::Internal("federation dual receipts lock poisoned".into()))?;
+        map.insert(receipt.id.clone(), dual);
+        Ok(())
     }
 
     /// Engage the emergency kill switch.
@@ -1951,6 +2119,7 @@ impl ArcKernel {
             governed_intent: None,
             approval_token: None,
             model_metadata: step.model_metadata.clone(),
+            federated_origin_kernel_id: None,
         };
 
         let matching_grants = match resolve_matching_grants(

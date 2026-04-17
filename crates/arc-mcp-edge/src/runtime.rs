@@ -175,6 +175,7 @@ pub fn execute_bridge_mcp_tool_call(
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+            federated_origin_kernel_id: None,
             },
             request.route_selection_metadata,
         )

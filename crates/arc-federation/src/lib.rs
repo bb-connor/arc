@@ -9,6 +9,20 @@ pub use arc_core_types::{capability, receipt};
 pub use arc_listing as listing;
 pub use arc_open_market as open_market;
 
+pub mod bilateral;
+pub mod trust_establishment;
+
+pub use bilateral::{
+    co_sign_with_origin, BilateralCoSigningError, BilateralCoSigningProtocol, CoSigningBody,
+    CoSigningRequest, CoSigningResponse, DualSignedReceipt, InProcessCoSigner,
+    BILATERAL_COSIGNING_SCHEMA, BILATERAL_DUAL_RECEIPT_SCHEMA,
+};
+pub use trust_establishment::{
+    FederationPeer, FederationPeerStore, HandshakeChallenge, InMemoryPeerStore,
+    KernelTrustExchange, KernelTrustExchangeConfig, PeerHandshakeEnvelope, PeerHandshakeError,
+    DEFAULT_HANDSHAKE_MAX_SKEW_SECS, DEFAULT_ROTATION_WINDOW_SECS, FEDERATION_HANDSHAKE_SCHEMA,
+};
+
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
