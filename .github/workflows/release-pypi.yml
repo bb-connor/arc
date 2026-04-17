@@ -194,10 +194,15 @@ jobs:
           # publishes. Match release-binaries.yml's `${tag#v}` shape.
           if [[ "$REF_NAME" =~ ^py/v(.+)$ ]]; then
             tag_version="${BASH_REMATCH[1]}"
-          elif [[ "$REF_NAME" =~ ^py/.+-v(.+)$ ]]; then
+          elif [[ "$REF_NAME" =~ ^py/$SLUG-v(.+)$ ]]; then
+            # Anchor against the known package slug rather than
+            # `^py/.+-v(.+)$`. Greedy `.+` on a valid semver prerelease
+            # that contains `-v` (e.g. `py/arc-crewai-v1.2.3-preview-v1`)
+            # would otherwise consume through the suffix and capture
+            # `1` instead of `1.2.3-preview-v1`.
             tag_version="${BASH_REMATCH[1]}"
           else
-            echo "Tag $REF_NAME does not match py/v* or py/<slug>-v*" >&2
+            echo "Tag $REF_NAME does not match py/v* or py/$SLUG-v*" >&2
             exit 1
           fi
           if [[ "$tag_version" != "$EXPECTED" ]]; then

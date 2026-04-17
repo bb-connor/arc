@@ -182,10 +182,15 @@ jobs:
           # correctly. See release-pypi.yml for the same fix.
           if [[ "$REF_NAME" =~ ^ts/v(.+)$ ]]; then
             tag_version="${BASH_REMATCH[1]}"
-          elif [[ "$REF_NAME" =~ ^ts/.+-v(.+)$ ]]; then
+          elif [[ "$REF_NAME" =~ ^ts/$SLUG-v(.+)$ ]]; then
+            # Anchor against the known package slug instead of a greedy
+            # `.+-v`. Without this anchor, a valid semver prerelease
+            # containing `-v` (e.g. `ts/ai-sdk-v1.2.3-preview-v1`)
+            # would let the greedy match consume through the prerelease
+            # suffix and capture `1` instead of `1.2.3-preview-v1`.
             tag_version="${BASH_REMATCH[1]}"
           else
-            echo "Tag $REF_NAME does not match ts/v* or ts/<slug>-v*" >&2
+            echo "Tag $REF_NAME does not match ts/v* or ts/$SLUG-v*" >&2
             exit 1
           fi
           if [[ "$REF_NAME" == ts/v* ]] && [[ "$tag_version" != "$EXPECTED" ]]; then
