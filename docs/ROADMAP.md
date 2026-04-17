@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**56 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**59 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -57,7 +57,7 @@ roadmap phase.
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
 | 18 (Memory) | -- | -- | 18.1, 18.2 |
-| 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
+| 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
 
 **Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
@@ -1327,7 +1327,7 @@ provenance are flagged as unverified.
 > **Depends on**: Receipts and metering (already shipped).
 > **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md`
 
-### 19.1 Receipt Compliance Scoring
+### 19.1 Receipt Compliance Scoring [SHIPPED c5c5d06]
 
 **What**: Productize the existing `ComplianceReport` in
 `arc-kernel/src/operator_report.rs` into a user-facing `compliance_score()`
@@ -1345,7 +1345,7 @@ model (0-1000 range, weighted factors) and the CLI/HTTP surface.
 An agent with zero denials in 1000 calls scores above 900. An agent with
 a revoked capability scores below 500.
 
-### 19.2 Agent Behavioral Profiling
+### 19.2 Agent Behavioral Profiling [SHIPPED c5c5d06]
 
 **What**: Productize the existing `BehavioralFeedReport` and
 `SignedBehavioralFeed` in `arc-kernel/src/operator_report.rs` into a
@@ -1364,7 +1364,7 @@ with the velocity guard pipeline.
 advisory signal when it suddenly makes 500. The behavioral guard reads
 from `arc-store-sqlite` receipt queries.
 
-### 19.3 Regulatory API
+### 19.3 Regulatory API [SHIPPED c5c5d06]
 
 **What**: Read-only API over receipt store for regulators. Every response
 wrapped in `SignedExportEnvelope`.
