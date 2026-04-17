@@ -240,6 +240,45 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: npm test
 
+      - name: Rewrite `file:` workspace deps to semver for publish
+        working-directory: ${{ matrix.package }}
+        shell: bash
+        env:
+          WORKSPACE_ROOT: sdks/typescript/packages
+        run: |
+          set -euo pipefail
+          # npm consumers cannot resolve `file:../<sibling>` paths from a
+          # published tarball, so every `file:../<pkg>` dep is rewritten
+          # to `^<pkg.version>` before `npm pack`. The rewrite is
+          # in-place on the working copy for this matrix leg only.
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const root = process.env.GITHUB_WORKSPACE;
+            const wsDir = path.join(root, process.env.WORKSPACE_ROOT);
+            const pkgPath = path.resolve("./package.json");
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            let mutated = false;
+            for (const block of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+              const deps = pkg[block];
+              if (!deps) continue;
+              for (const [name, spec] of Object.entries(deps)) {
+                if (typeof spec !== "string" || !spec.startsWith("file:")) continue;
+                const rel = spec.slice("file:".length);
+                const sibling = path.resolve(path.dirname(pkgPath), rel, "package.json");
+                if (!fs.existsSync(sibling)) {
+                  throw new Error(`Cannot resolve file: dep ${name} -> ${sibling}`);
+                }
+                const ver = JSON.parse(fs.readFileSync(sibling, "utf8")).version;
+                deps[name] = `^${ver}`;
+                mutated = true;
+                console.log(`rewrote ${block}.${name}: ${spec} -> ^${ver}`);
+              }
+            }
+            if (mutated) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+            else console.log("no file: deps to rewrite");
+          '
+
       - name: npm pack (produce tarball artifact)
         id: pack
         working-directory: ${{ matrix.package }}
