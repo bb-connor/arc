@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**73 of 73 numbered phases shipped** on `project/full-roadmap` once 20.3 lands. Phase 14 (portable kernel) complete: 531 KB WASM bundle via wasm-pack, 16 iOS UniFFI round-trip tests pass. 20.3 cross-kernel federation is the last story in flight. Plus adjacent
+**73 of 73 numbered phases shipped** on `project/full-roadmap`. 🎉 Entire roadmap executed end-to-end. Every phase group complete — Phase 0 (DX), Phase 1 (structural security), Phase 2 (types), Phase 3 (content safety + HITL), Phase 4 (code agent), Phase 5 (guard absorption), Phase 6 (framework SDKs), Phase 7 (data guards), Phase 8 (code exec), Phase 9 (service mesh), Phase 10 (orchestration), Phase 11 (content/streaming/iac), Phase 12 (observability), Phase 13 (external guards), Phase 14 (portable kernel), Phase 15 (compliance), Phase 16 (economics), Phase 17 (workflow orchestrators), Phase 18 (memory), Phase 19 (regulatory), Phase 20 (capstone). Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -58,7 +58,7 @@ roadmap phase.
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
 | 18 (Memory) | 18.1, 18.2 | -- | -- |
 | 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
-| 20 (Capstone) | 20.1, 20.2, 20.4 | -- | 20.3 |
+| 20 (Capstone) | 20.1, 20.2, 20.3, 20.4 | -- | -- |
 
 **Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
 
@@ -1436,7 +1436,7 @@ placement -> arc-settle claims payout. Premium pricing from receipt history.
 quote than one with denials. A claim filed against a policy with receipt
 evidence is processed through the settlement flow.
 
-### 20.3 Cross-Kernel Federation: Bilateral Runtime Co-Signing (depends on Phases 1, 20.1)
+### 20.3 Cross-Kernel Federation: Bilateral Runtime Co-Signing (depends on Phases 1, 20.1) [SHIPPED e08d856]
 
 **What**: The federation crate already ships signed activation, quorum
 governance, open-admission, reputation, and qualification artifacts
