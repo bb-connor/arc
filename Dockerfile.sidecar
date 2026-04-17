@@ -6,9 +6,14 @@
 #   docker build -f Dockerfile.sidecar -t arc-sidecar:local .
 #
 # Run:
-#   docker run --rm -p 8939:8939 arc-sidecar:local
+#   docker run --rm -p 8939:8939 arc-sidecar:local <subcommand> [args...]
 #
-# Default entrypoint is `arc run`. Override with `docker run <image> <args>`.
+# There is no useful zero-argument default: the `arc` subcommands require
+# operator input (policy path, wrapped MCP server command, etc.). The
+# image therefore defaults CMD to `--help` so `docker run <image>` prints
+# usage instead of crashing at startup. Production deployments MUST
+# override CMD (or the compose/k8s `args`) with a real subcommand, e.g.
+# `arc mcp serve-http --policy /etc/arc/policy.yaml --server-id my-tool`.
 
 ARG RUST_VERSION=1.93
 ARG ALPINE_VERSION=3.22
@@ -60,4 +65,9 @@ LABEL org.opencontainers.image.title="arc-sidecar" \
       org.opencontainers.image.source="https://github.com/backbay/arc"
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/arc"]
-CMD ["run"]
+# No sensible zero-argument default — `arc run` and `arc mcp serve-http`
+# both require `--policy` plus additional positional input. Fall through
+# to `--help` so bare `docker run <image>` prints usage instead of
+# exiting non-zero before the health endpoint opens. Operators override
+# this with the real subcommand + flags at deploy time.
+CMD ["--help"]
