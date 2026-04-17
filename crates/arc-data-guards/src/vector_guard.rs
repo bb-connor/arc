@@ -419,6 +419,22 @@ impl VectorDbGuard {
                     _ => {}
                 }
             }
+        } else if let Some(class) = strictest_operation_class(scope) {
+            // No explicit operation verb was provided, but the active grant
+            // narrows to a specific OperationClass. Fail closed: a ReadOnly
+            // scope must not allow a call that could be a write, and any
+            // OperationClass stricter than Admin requires knowing the verb
+            // to make an allow decision. This closes the vector-write bypass
+            // where a MemoryWrite-shaped call omits `operation` and would
+            // otherwise skip the mutation gate entirely.
+            if matches!(
+                class,
+                SqlOperationClass::ReadOnly | SqlOperationClass::ReadWrite
+            ) {
+                return Err(VectorGuardDenyReason::OperationNotAllowed {
+                    operation: String::new(),
+                });
+            }
         }
 
         // top_k ceiling.
