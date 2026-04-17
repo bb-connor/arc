@@ -15,6 +15,7 @@
 //! - [`conditions`] -- Conditional rule activation
 //! - [`detection`] -- Regex-based content detectors
 //! - [`receipt`] -- Decision receipts with timing and hashing
+//! - [`rulesets`] -- Built-in HushSpec rulesets embedded at compile time
 
 pub mod compiler;
 pub mod conditions;
@@ -24,11 +25,15 @@ pub mod merge;
 pub mod models;
 pub mod receipt;
 pub mod resolve;
+pub mod rulesets;
 pub mod validate;
 pub mod version;
 
 // Re-exports for convenience
 pub use compiler::{compile_policy, CompileError, CompiledPolicy};
+pub use rulesets::{
+    builtin_yaml, list_builtin_names, load_builtin, RulesetError, BUILTIN_RULESETS,
+};
 pub use conditions::{evaluate_condition, Condition, RuntimeContext};
 pub use evaluate::{
     activate_panic, deactivate_panic, evaluate, evaluate_with_context, is_panic_active,
