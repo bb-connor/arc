@@ -1,5 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use arc_appraisal::VerifiedRuntimeAttestationRecord;
 
@@ -922,6 +922,14 @@ pub struct ArcKernel {
     /// because the payload is a heap-allocated `String`; callers that only
     /// need presence information can read `emergency_stopped` instead.
     emergency_stop_reason: Mutex<Option<String>>,
+    /// Phase 18.2 memory-provenance chain. When installed, every
+    /// governed `MemoryWrite` action appends an entry after the allow
+    /// receipt is signed, and every `MemoryRead` attaches the latest
+    /// entry (or an `Unverified` marker) to its receipt as
+    /// `memory_provenance` evidence metadata. `None` keeps the kernel
+    /// backward-compatible: memory-shaped tool calls behave exactly as
+    /// they did before Phase 18.2.
+    memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1301,6 +1309,7 @@ impl ArcKernel {
             emergency_stopped: AtomicBool::new(false),
             emergency_stopped_since: AtomicU64::new(0),
             emergency_stop_reason: Mutex::new(None),
+            memory_provenance: None,
         }
     }
 
@@ -1333,6 +1342,40 @@ impl ArcKernel {
 
     pub fn set_budget_store(&mut self, budget_store: Box<dyn BudgetStore>) {
         self.budget_store = Mutex::new(budget_store);
+    }
+
+    /// Phase 18.2: install a memory-provenance chain.
+    ///
+    /// Once installed, every governed `MemoryWrite`-shaped tool call
+    /// appends an entry to the chain after the allow receipt is
+    /// signed. A chain-store failure on that path is fatal: the call
+    /// surfaces `KernelError::Internal(...)` so operators can detect
+    /// and repair the drift rather than silently shipping a write
+    /// without provenance evidence.
+    ///
+    /// Every `MemoryRead`-shaped tool call looks the entry up by
+    /// `(store, key)` and attaches the result to the receipt as
+    /// `memory_provenance` evidence metadata. Reads with no chain
+    /// entry or with a tampered chain surface as
+    /// [`crate::memory_provenance::ProvenanceVerification::Unverified`]
+    /// so the receipt unambiguously records the gap.
+    pub fn set_memory_provenance_store(
+        &mut self,
+        store: Arc<dyn crate::memory_provenance::MemoryProvenanceStore>,
+    ) {
+        self.memory_provenance = Some(store);
+    }
+
+    /// Return a clone of the active memory-provenance store handle,
+    /// or `None` when no provenance chain has been installed.
+    ///
+    /// Useful for integration tests that want to assert on the chain
+    /// state directly after driving `evaluate_tool_call`.
+    #[must_use]
+    pub fn memory_provenance_store(
+        &self,
+    ) -> Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>> {
+        self.memory_provenance.as_ref().map(Arc::clone)
     }
 
     /// Engage the emergency kill switch.

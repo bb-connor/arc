@@ -32,6 +32,7 @@ pub mod cost_attribution;
 pub mod dpop;
 pub mod evidence_export;
 pub mod execution_nonce;
+pub mod memory_provenance;
 pub mod operator_report;
 pub mod payment;
 pub mod receipt_analytics;
@@ -288,6 +289,13 @@ pub use execution_nonce::{
     InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
     DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
     EXECUTION_NONCE_SCHEMA,
+};
+pub use memory_provenance::{
+    classify_memory_action, next_entry_id as next_memory_provenance_entry_id,
+    recompute_entry_hash as recompute_memory_provenance_entry_hash, InMemoryMemoryProvenanceStore,
+    MemoryActionKind, MemoryProvenanceAppend, MemoryProvenanceEntry, MemoryProvenanceError,
+    MemoryProvenanceStore, ProvenanceVerification, UnverifiedReason,
+    MEMORY_PROVENANCE_ENTRY_SCHEMA, MEMORY_PROVENANCE_GENESIS_PREV_HASH,
 };
 pub use evidence_export::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,

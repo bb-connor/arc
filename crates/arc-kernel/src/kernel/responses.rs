@@ -884,20 +884,36 @@ impl ArcKernel {
         };
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
 
+        // Phase 18.2: classify the call against the memory-provenance
+        // action conventions and, for reads, look up the latest chain
+        // entry BEFORE the receipt is signed so the provenance evidence
+        // rides in the signed metadata. Writes append AFTER signing
+        // (see below) because the chain entry needs the receipt id.
+        let memory_action_kind =
+            crate::memory_provenance::classify_memory_action(&request.tool_name, &request.arguments);
+        let memory_read_metadata = match memory_action_kind.as_ref() {
+            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => self
+                .resolve_memory_read_provenance_metadata(store, key),
+            _ => None,
+        };
+
         // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.
         let metadata = merge_metadata_objects(
             merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_content.metadata,
-                    governed_request_metadata(
-                        request,
-                        self.attestation_trust_policy.as_ref(),
-                        timestamp,
-                    )?,
+                    merge_metadata_objects(
+                        receipt_content.metadata,
+                        governed_request_metadata(
+                            request,
+                            self.attestation_trust_policy.as_ref(),
+                            timestamp,
+                        )?,
+                    ),
+                    extra_metadata,
                 ),
-                extra_metadata,
+                receipt_attribution_metadata(cap, matched_grant_index),
             ),
-            receipt_attribution_metadata(cap, matched_grant_index),
+            memory_read_metadata,
         );
 
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
@@ -926,6 +942,22 @@ impl ArcKernel {
             "tool call allowed"
         );
 
+        // Phase 18.2: for governed writes, append an entry to the
+        // provenance chain once the receipt is signed. A failure here
+        // is fatal (fail-closed): we do not want to acknowledge the
+        // write to the caller while silently dropping provenance.
+        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
+            memory_action_kind.as_ref()
+        {
+            self.append_memory_provenance_for_write(
+                store,
+                key,
+                &cap.id,
+                &receipt.id,
+                receipt.timestamp,
+            )?;
+        }
+
         // Phase 1.1: mint a short-lived, single-use execution nonce bound
         // to this allow verdict so tool servers can verify the kernel
         // authorized this exact invocation. Opt-in; when no config is
@@ -941,6 +973,119 @@ impl ArcKernel {
             receipt,
             execution_nonce,
         })
+    }
+
+    /// Phase 18.2: build receipt metadata describing the provenance
+    /// record that governs the memory read identified by `(store, key)`.
+    ///
+    /// Returns `None` when no provenance store has been installed
+    /// (backward-compatible no-op), and returns an `unverified` metadata
+    /// object when the store is installed but the key has no chain
+    /// entry OR the chain is tampered / unavailable. This is the
+    /// fail-closed signal: the receipt explicitly records that the
+    /// memory read was not backed by a provenance record.
+    fn resolve_memory_read_provenance_metadata(
+        &self,
+        store: &str,
+        key: &str,
+    ) -> Option<serde_json::Value> {
+        let chain = self.memory_provenance_store()?;
+
+        let latest = match chain.latest_for_key(store, key) {
+            Ok(entry) => entry,
+            Err(error) => {
+                warn!(
+                    store = %store,
+                    key = %key,
+                    error = %error,
+                    "memory provenance lookup failed; marking read unverified"
+                );
+                return Some(memory_read_unverified_metadata(
+                    store,
+                    key,
+                    crate::memory_provenance::UnverifiedReason::StoreUnavailable,
+                ));
+            }
+        };
+
+        let Some(entry) = latest else {
+            return Some(memory_read_unverified_metadata(
+                store,
+                key,
+                crate::memory_provenance::UnverifiedReason::NoProvenance,
+            ));
+        };
+
+        let verification = match chain.verify_entry(&entry.entry_id) {
+            Ok(verification) => verification,
+            Err(error) => {
+                warn!(
+                    store = %store,
+                    key = %key,
+                    entry_id = %entry.entry_id,
+                    error = %error,
+                    "memory provenance verification failed; marking read unverified"
+                );
+                return Some(memory_read_unverified_metadata(
+                    store,
+                    key,
+                    crate::memory_provenance::UnverifiedReason::StoreUnavailable,
+                ));
+            }
+        };
+
+        match verification {
+            crate::memory_provenance::ProvenanceVerification::Verified {
+                entry,
+                chain_digest,
+            } => Some(serde_json::json!({
+                "memory_provenance": {
+                    "status": "verified",
+                    "store": entry.store,
+                    "key": entry.key,
+                    "entry_id": entry.entry_id,
+                    "capability_id": entry.capability_id,
+                    "receipt_id": entry.receipt_id,
+                    "written_at": entry.written_at,
+                    "prev_hash": entry.prev_hash,
+                    "hash": entry.hash,
+                    "chain_digest": chain_digest,
+                }
+            })),
+            crate::memory_provenance::ProvenanceVerification::Unverified { reason } => Some(
+                memory_read_unverified_metadata(store, key, reason),
+            ),
+        }
+    }
+
+    /// Phase 18.2: append a provenance entry for a governed memory write
+    /// once the allow receipt is signed. Fails closed on chain-store
+    /// errors.
+    fn append_memory_provenance_for_write(
+        &self,
+        store: &str,
+        key: &str,
+        capability_id: &str,
+        receipt_id: &str,
+        written_at: u64,
+    ) -> Result<(), KernelError> {
+        let Some(chain) = self.memory_provenance_store() else {
+            return Ok(());
+        };
+        chain
+            .append(crate::memory_provenance::MemoryProvenanceAppend {
+                store: store.to_string(),
+                key: key.to_string(),
+                capability_id: capability_id.to_string(),
+                receipt_id: receipt_id.to_string(),
+                written_at,
+            })
+            .map(|_| ())
+            .map_err(|error| {
+                KernelError::Internal(format!(
+                    "memory provenance append failed for store={store} key={key}: {error}"
+                ))
+            })
     }
 
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
@@ -1047,4 +1192,24 @@ impl ArcKernel {
             .store(batch_end_seq, Ordering::SeqCst);
         Ok(())
     }
+}
+
+/// Phase 18.2 helper: produce the canonical `memory_provenance`
+/// metadata object that signals an unverified read.
+///
+/// Kept as a free function so both the pre-sign metadata resolver and
+/// the fallback paths share a single serialisation shape.
+fn memory_read_unverified_metadata(
+    store: &str,
+    key: &str,
+    reason: crate::memory_provenance::UnverifiedReason,
+) -> serde_json::Value {
+    serde_json::json!({
+        "memory_provenance": {
+            "status": "unverified",
+            "store": store,
+            "key": key,
+            "reason": reason.as_str(),
+        }
+    })
 }
