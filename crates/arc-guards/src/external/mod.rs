@@ -53,6 +53,11 @@ pub mod circuit_breaker;
 pub mod retry;
 pub mod token_bucket;
 
+pub mod azure_content_safety;
+pub mod bedrock;
+pub mod threat_intel;
+pub mod vertex_safety;
+
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::time::Duration;
@@ -65,6 +70,22 @@ pub use cache::{Clock, TokioClock, TtlCache};
 pub use circuit_breaker::{CircuitBreaker, CircuitBreakerConfig, CircuitState};
 pub use retry::{retry_with_jitter, retry_with_jitter_rng, BackoffStrategy, RetryConfig};
 pub use token_bucket::TokenBucket;
+
+pub use azure_content_safety::{
+    AzureCategory, AzureCategoryBreakdown, AzureContentSafetyConfig, AzureContentSafetyGuard,
+    AzureDecisionDetails,
+};
+pub use bedrock::{
+    BedrockDecisionDetails, BedrockGuardrailConfig, BedrockGuardrailGuard, BedrockSource,
+};
+pub use threat_intel::{
+    SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity, VirusTotalConfig,
+    VirusTotalGuard,
+};
+pub use vertex_safety::{
+    VertexDecisionDetails, VertexProbability, VertexRatingBreakdown, VertexSafetyConfig,
+    VertexSafetyGuard,
+};
 
 /// Subset of guard-request information passed to an [`ExternalGuard`].
 ///

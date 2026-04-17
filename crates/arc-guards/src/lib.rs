@@ -115,3 +115,10 @@ pub use external::{
     CircuitBreakerConfig, CircuitOpenVerdict, CircuitState, ExternalGuard, ExternalGuardError,
     GuardCallContext, RateLimitedVerdict, RetryConfig, TokenBucket, TtlCache,
 };
+pub use external::{
+    AzureCategory, AzureCategoryBreakdown, AzureContentSafetyConfig, AzureContentSafetyGuard,
+    AzureDecisionDetails, BedrockDecisionDetails, BedrockGuardrailConfig, BedrockGuardrailGuard,
+    BedrockSource, SafeBrowsingConfig, SafeBrowsingGuard, SnykConfig, SnykGuard, SnykSeverity,
+    VertexDecisionDetails, VertexProbability, VertexRatingBreakdown, VertexSafetyConfig,
+    VertexSafetyGuard, VirusTotalConfig, VirusTotalGuard,
+};
