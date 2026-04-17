@@ -66,7 +66,7 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           CARGO_TARGET_DIR: /mnt/arc-msrv-target
-          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "-D warnings -C debuginfo=0"
         run: cargo build --workspace && cargo test --workspace --exclude arc-conformance
 
   coverage:
@@ -106,7 +106,7 @@ jobs:
           TARPAULIN_LOCAL_LLVM_PROFILE_FILE: /mnt/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "-D warnings -C debuginfo=0"
         run: ./scripts/run-coverage.sh
 
       - name: Upload coverage artifacts
