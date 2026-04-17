@@ -159,9 +159,20 @@ impl SqlQueryGuard {
                 continue;
             }
 
-            // Computed/opaque projections skip column enforcement (the
-            // guard still enforced the table allowlist above).
+            // Computed/opaque projections (`"?"` from the parser, e.g.
+            // `SELECT lower(ssn) FROM users`). Skipping these silently
+            // would let `lower(ssn)` bypass a column allowlist that only
+            // permits non-sensitive columns. Fail closed whenever the
+            // table has a column allowlist configured; there is no way
+            // to prove the computed expression stays inside the allowed
+            // set without evaluating it.
             if column == "?" {
+                if self.config.table_has_column_allowlist(table) {
+                    return Err(SqlGuardDenyReason::ColumnNotAllowed {
+                        table: table.clone(),
+                        column: "?".to_string(),
+                    });
+                }
                 continue;
             }
 
