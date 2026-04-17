@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**44 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**47 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -42,7 +42,7 @@ roadmap phase.
 | 1 (Structural security) | 1.2, 1.3, 1.4 | -- | 1.1, 1.5 |
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
-| 4 (Code agent) | -- | -- | 4.1, 4.2, 4.3 |
+| 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
 | 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
@@ -425,7 +425,7 @@ and dashboard channels follow.
 > **Depends on**: Phase 0 (package publishing, test fixtures).
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 4
 
-### 4.1 arc-code-agent Python Package
+### 4.1 arc-code-agent Python Package [SHIPPED e38d41b]
 
 **What**: Wraps file, shell, and git tool calls for coding agents. Ships
 with a zero-config default policy. Works with Claude Code, Cursor, or
@@ -443,7 +443,7 @@ any MCP-based coding agent.
 **Acceptance**: `pip install arc-code-agent` works. A 10-line Python script
 demonstrates safe file reads allowed and `.env` writes denied.
 
-### 4.2 MCP Sidecar Wrapper for Coding Agents
+### 4.2 MCP Sidecar Wrapper for Coding Agents [SHIPPED e38d41b]
 
 **What**: `arc mcp serve` with the default code-agent policy. One command
 wraps any MCP filesystem server with ARC.
@@ -457,7 +457,7 @@ wraps any MCP filesystem server with ARC.
 **Acceptance**: `arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
 wraps the MCP server with ARC. File reads allowed, `.env` writes denied.
 
-### 4.3 Migration Guide: MCP to ARC
+### 4.3 Migration Guide: MCP to ARC [SHIPPED e38d41b]
 
 **What**: Step-by-step guide for adding ARC to existing MCP setups.
 
