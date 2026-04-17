@@ -153,16 +153,25 @@ func (r *JobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, fmt.Errorf("get job: %w", err)
 	}
 
-	// Governed-label gate. The predicate already filtered, but we re-check
-	// because the label can be removed post-admission.
-	if !isGoverned(&job) {
-		logger.V(1).Info("ignoring ungoverned job")
+	// Handle deletion first so that if the governed label was removed
+	// post-admission on a Job we had already finalized, we still run the
+	// release + finalizer cleanup. Otherwise the Job would stay stuck
+	// terminating with a dangling ARC finalizer.
+	if !job.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(&job, FinalizerName) {
+			return r.handleDeletion(ctx, logger, &job)
+		}
+		// Being deleted without our finalizer: nothing for us to do.
 		return ctrl.Result{}, nil
 	}
 
-	// Handle deletion: release the grant and drop the finalizer.
-	if !job.DeletionTimestamp.IsZero() {
-		return r.handleDeletion(ctx, logger, &job)
+	// Governed-label gate. The predicate already filtered, but we re-check
+	// because the label can be removed post-admission. After we've cleared
+	// any pending deletion, losing the label means the Job is no longer our
+	// responsibility.
+	if !isGoverned(&job) {
+		logger.V(1).Info("ignoring ungoverned job")
+		return ctrl.Result{}, nil
 	}
 
 	// Ensure we own a finalizer so we can release the grant even if the Job
