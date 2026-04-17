@@ -6,26 +6,119 @@
 // aggregated JobReceipts to the ARC receipt store.
 package arc
 
-import "time"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"time"
+)
 
 // CapabilityToken is an ARC capability token minted by the sidecar.
 //
-// The controller treats the token as an opaque bearer value from the Job's
-// point of view: it is stored on the Job as an annotation so that Pods and
-// sidecars within the Job can reference it.
+// The wire format matches the canonical ARC capability token JSON shape.
+// The controller additionally keeps the raw serialized token bytes so the
+// exact artifact can be stored on the pod template as a bearer annotation.
 type CapabilityToken struct {
 	// ID is the unique identifier of the capability grant.
-	ID string `json:"id"`
-	// Token is the opaque serialized capability token.
-	Token string `json:"token"`
-	// Subject is the principal the capability was minted for (the Job).
-	Subject string `json:"subject"`
-	// Scopes is the list of scopes granted by the capability.
-	Scopes []string `json:"scopes"`
+	ID string
+	// Token is the serialized capability token stored on the pod template.
+	Token string
+	// Issuer is the public key of the issuing ARC authority.
+	Issuer string
+	// Subject is the public key identifying the token subject.
+	Subject string
+	// Scope is the canonical ARC scope carried by the token.
+	Scope capabilityScope
 	// IssuedAt is the time the capability was issued.
-	IssuedAt time.Time `json:"issued_at"`
+	IssuedAt time.Time
 	// ExpiresAt is the time the capability expires.
-	ExpiresAt time.Time `json:"expires_at"`
+	ExpiresAt time.Time
+	// Signature is the detached ARC capability signature.
+	Signature string
+}
+
+type capabilityScope struct {
+	Grants         []toolGrant     `json:"grants,omitempty"`
+	ResourceGrants []resourceGrant `json:"resource_grants,omitempty"`
+	PromptGrants   []promptGrant   `json:"prompt_grants,omitempty"`
+}
+
+type toolGrant struct {
+	ServerID   string   `json:"server_id"`
+	ToolName   string   `json:"tool_name"`
+	Operations []string `json:"operations"`
+}
+
+type resourceGrant struct {
+	URIPattern string   `json:"uri_pattern"`
+	Operations []string `json:"operations"`
+}
+
+type promptGrant struct {
+	PromptName string   `json:"prompt_name"`
+	Operations []string `json:"operations"`
+}
+
+type capabilityTokenWire struct {
+	ID        string          `json:"id"`
+	Issuer    string          `json:"issuer"`
+	Subject   string          `json:"subject"`
+	Scope     capabilityScope `json:"scope"`
+	IssuedAt  uint64          `json:"issued_at"`
+	ExpiresAt uint64          `json:"expires_at"`
+	Signature string          `json:"signature"`
+}
+
+// UnmarshalJSON decodes the canonical ARC token shape and preserves the raw
+// token bytes so the reconciler can persist the exact bearer artifact.
+func (c *CapabilityToken) UnmarshalJSON(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+
+	var wire capabilityTokenWire
+	if err := decoder.Decode(&wire); err != nil {
+		return fmt.Errorf("decode capability token: %w", err)
+	}
+	if wire.ID == "" || wire.Issuer == "" || wire.Signature == "" {
+		return fmt.Errorf("decode capability token: missing required fields")
+	}
+
+	c.ID = wire.ID
+	c.Token = string(data)
+	c.Issuer = wire.Issuer
+	c.Subject = wire.Subject
+	c.Scope = wire.Scope
+	c.IssuedAt = time.Unix(int64(wire.IssuedAt), 0).UTC()
+	c.ExpiresAt = time.Unix(int64(wire.ExpiresAt), 0).UTC()
+	c.Signature = wire.Signature
+	return nil
+}
+
+// MarshalJSON emits the canonical ARC token shape used by the sidecar.
+func (c CapabilityToken) MarshalJSON() ([]byte, error) {
+	if c.Token != "" {
+		var raw json.RawMessage
+		if err := json.Unmarshal([]byte(c.Token), &raw); err == nil {
+			return raw, nil
+		}
+	}
+
+	return json.Marshal(capabilityTokenWire{
+		ID:        c.ID,
+		Issuer:    c.Issuer,
+		Subject:   c.Subject,
+		Scope:     c.Scope,
+		IssuedAt:  unixSeconds(c.IssuedAt),
+		ExpiresAt: unixSeconds(c.ExpiresAt),
+		Signature: c.Signature,
+	})
+}
+
+func unixSeconds(t time.Time) uint64 {
+	if t.IsZero() {
+		return 0
+	}
+	return uint64(t.UTC().Unix())
 }
 
 // MintRequest requests a capability grant for a Kubernetes Job.

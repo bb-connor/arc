@@ -265,12 +265,10 @@ pub fn bid(
     if request.body.max_price_per_call.units < advertised_price.units {
         return Err(BiddingError::BidCeilingTooLow);
     }
-    if !request
-        .body
-        .requested_scope
-        .capability_scope_prefix
-        .starts_with(listing.pricing.body.capability_scope.as_str())
-    {
+    if !capability_scope_covers(
+        &request.body.requested_scope.capability_scope_prefix,
+        &listing.pricing.body.capability_scope,
+    ) {
         return Err(BiddingError::ScopeOutsideListing);
     }
     if request.body.requested_scope.server_id != listing.listing.body.subject.actor_id {
@@ -370,6 +368,23 @@ pub fn accept(
         token_subject: ask.body.token_offer.subject.clone(),
         token_expires_at: ask.body.token_offer.expires_at,
     })
+}
+
+fn capability_scope_covers(candidate: &str, advertised: &str) -> bool {
+    let candidate_segments: Vec<&str> = candidate.split(':').collect();
+    let advertised_segments: Vec<&str> = advertised.split(':').collect();
+    if candidate_segments.iter().any(|segment| segment.is_empty())
+        || advertised_segments.iter().any(|segment| segment.is_empty())
+    {
+        return false;
+    }
+    if advertised_segments.len() > candidate_segments.len() {
+        return false;
+    }
+    advertised_segments
+        .iter()
+        .zip(candidate_segments.iter())
+        .all(|(expected, actual)| expected == actual)
 }
 
 fn canonical_digest<T: serde::Serialize>(value: &T) -> Result<String, BiddingError> {

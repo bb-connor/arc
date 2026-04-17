@@ -72,10 +72,11 @@ func (s *stubArcClient) Mint(_ context.Context, req arcapi.MintRequest) (*arcapi
 	return &arcapi.CapabilityToken{
 		ID:        id,
 		Token:     "token-" + id,
+		Issuer:    "issuer-test",
 		Subject:   req.Subject,
-		Scopes:    req.Scopes,
 		IssuedAt:  time.Now().UTC(),
 		ExpiresAt: time.Now().UTC().Add(1 * time.Hour),
+		Signature: "signature-test",
 	}, nil
 }
 
@@ -441,8 +442,12 @@ func TestArcClient_EndToEndViaHTTPStub(t *testing.T) {
 			return
 		}
 		resp := arcapi.MintResponse{Capability: arcapi.CapabilityToken{
-			ID: "server-cap", Token: "tok", Subject: req.Subject, Scopes: req.Scopes,
-			IssuedAt: time.Now().UTC(), ExpiresAt: time.Now().Add(time.Hour).UTC(),
+			ID:        "server-cap",
+			Issuer:    "issuer-server",
+			Subject:   req.Subject,
+			IssuedAt:  time.Now().UTC(),
+			ExpiresAt: time.Now().Add(time.Hour).UTC(),
+			Signature: "signature-server",
 		}}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)

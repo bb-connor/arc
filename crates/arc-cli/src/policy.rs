@@ -857,6 +857,7 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
                 arc_guards::secret_leak::SecretLeakConfig {
                     enabled: true,
                     skip_paths: secret_patterns.skip_paths.clone(),
+                    custom_patterns: Vec::new(),
                 },
             )));
         }

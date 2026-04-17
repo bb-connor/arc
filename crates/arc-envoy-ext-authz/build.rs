@@ -8,6 +8,16 @@
 use std::io;
 
 fn main() -> io::Result<()> {
+    if std::env::var_os("PROTOC").is_none() {
+        let protoc = protoc_bin_vendored::protoc_bin_path().map_err(|error| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("failed to locate vendored protoc: {error}"),
+            )
+        })?;
+        std::env::set_var("PROTOC", protoc);
+    }
+
     let proto_root = "proto";
 
     let protos = [

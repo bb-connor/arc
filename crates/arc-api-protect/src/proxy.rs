@@ -10,9 +10,15 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
 use axum::Router;
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
+use arc_core_types::capability::{
+    ArcScope, CapabilityToken, CapabilityTokenBody, Operation, PromptGrant, ResourceGrant,
+    ToolGrant,
+};
 use arc_core_types::crypto::Keypair;
 use arc_http_core::{
     ArcHttpRequest, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, SidecarStatus,
@@ -101,6 +107,7 @@ impl SqliteReceiptStore {
 /// Shared proxy state.
 struct ProxyState {
     evaluator: RequestEvaluator,
+    signer_keypair: Keypair,
     upstream: String,
     http_client: reqwest::Client,
     receipt_log: Mutex<ReceiptLog>,
@@ -169,7 +176,7 @@ impl ProtectProxy {
         let keypair = Keypair::generate();
         let policy_hash = arc_core_types::sha256_hex(spec_content.as_bytes());
 
-        let evaluator = RequestEvaluator::new(routes, keypair, policy_hash);
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), policy_hash);
 
         let (receipt_log, receipt_store) = if let Some(path) = &self.config.receipt_db {
             let store = SqliteReceiptStore::open(path)?;
@@ -186,6 +193,7 @@ impl ProtectProxy {
 
         let state = Arc::new(ProxyState {
             evaluator,
+            signer_keypair: keypair,
             upstream: self.config.upstream.clone(),
             http_client: reqwest::Client::new(),
             receipt_log: Mutex::new(receipt_log),
@@ -221,6 +229,9 @@ fn build_app(state: Arc<ProxyState>) -> Router {
         .route("/arc/evaluate", post(sidecar_evaluate_handler))
         .route("/arc/verify", post(sidecar_verify_handler))
         .route("/arc/health", get(sidecar_health_handler))
+        .route("/v1/capabilities/mint", post(sidecar_mint_handler))
+        .route("/v1/capabilities/release", post(sidecar_release_handler))
+        .route("/v1/receipts", post(sidecar_submit_receipt_handler))
         .route("/{*path}", any(proxy_handler))
         .route("/", any(proxy_handler))
         .with_state(state)
@@ -517,6 +528,230 @@ async fn sidecar_health_handler(State(_state): State<Arc<ProxyState>>) -> Respon
         .into_response()
 }
 
+#[derive(Debug, Deserialize)]
+struct SidecarMintRequest {
+    subject: String,
+    #[serde(default)]
+    scopes: Vec<String>,
+    #[serde(default)]
+    ttl: Option<u64>,
+    #[serde(default)]
+    job_uid: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarMintResponse {
+    capability: CapabilityToken,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarReleaseRequest {
+    capability_id: String,
+    #[serde(default)]
+    job_uid: String,
+    #[serde(default)]
+    reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarReleaseResponse {
+    released: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSubmitReceiptRequest {
+    job_name: String,
+    namespace: String,
+    job_uid: String,
+    #[serde(default)]
+    capability_id: Option<String>,
+    outcome: String,
+    #[serde(default)]
+    started_at: Option<String>,
+    #[serde(default)]
+    completed_at: Option<String>,
+    #[serde(default)]
+    steps: Vec<SidecarSubmitStepReceipt>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSubmitStepReceipt {
+    pod_name: String,
+    phase: String,
+    payload: String,
+    observed_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarSubmitReceiptResponse {
+    receipt_id: String,
+    accepted: bool,
+}
+
+async fn sidecar_mint_handler(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read capability mint body: {error}");
+            return sidecar_bad_request("failed to read capability mint body").into_response();
+        }
+    };
+
+    let mint_request: SidecarMintRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode capability mint request: {error}");
+            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if mint_request.subject.trim().is_empty() {
+        return sidecar_bad_request("subject must not be empty").into_response();
+    }
+
+    let scope = match build_sidecar_scope(&mint_request.scopes) {
+        Ok(scope) => scope,
+        Err(error) => return sidecar_bad_request(&error).into_response(),
+    };
+
+    let issued_at = chrono::Utc::now().timestamp() as u64;
+    let ttl_seconds = ttl_seconds_from_wire(mint_request.ttl);
+    let expires_at = issued_at.saturating_add(ttl_seconds);
+    let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
+
+    let capability = match CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: uuid::Uuid::now_v7().to_string(),
+            issuer: state.signer_keypair.public_key(),
+            subject,
+            scope,
+            issued_at,
+            expires_at,
+            delegation_chain: Vec::new(),
+        },
+        &state.signer_keypair,
+    ) {
+        Ok(capability) => capability,
+        Err(error) => {
+            warn!("failed to sign compatibility capability token: {error}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "error": "arc_capability_mint_failed",
+                    "message": error.to_string(),
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarMintResponse { capability }),
+    )
+        .into_response()
+}
+
+async fn sidecar_release_handler(
+    State(_state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read capability release body: {error}");
+            return sidecar_bad_request("failed to read capability release body").into_response();
+        }
+    };
+
+    let release_request: SidecarReleaseRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode capability release request: {error}");
+            return sidecar_bad_request(&format!("invalid capability release payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if release_request.capability_id.trim().is_empty() {
+        return sidecar_bad_request("capability_id must not be empty").into_response();
+    }
+
+    let _ = (release_request.job_uid, release_request.reason);
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarReleaseResponse { released: true }),
+    )
+        .into_response()
+}
+
+async fn sidecar_submit_receipt_handler(
+    State(_state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read receipt submission body: {error}");
+            return sidecar_bad_request("failed to read receipt submission body").into_response();
+        }
+    };
+
+    let receipt_request: SidecarSubmitReceiptRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode receipt submission payload: {error}");
+            return sidecar_bad_request(&format!("invalid receipt submission payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if receipt_request.job_name.trim().is_empty()
+        || receipt_request.namespace.trim().is_empty()
+        || receipt_request.job_uid.trim().is_empty()
+        || receipt_request.outcome.trim().is_empty()
+    {
+        return sidecar_bad_request("job_name, namespace, job_uid, and outcome are required")
+            .into_response();
+    }
+
+    for step in &receipt_request.steps {
+        if step.pod_name.trim().is_empty()
+            || step.phase.trim().is_empty()
+            || step.payload.trim().is_empty()
+            || step.observed_at.trim().is_empty()
+        {
+            return sidecar_bad_request(
+                "receipt steps must include pod_name, phase, payload, and observed_at",
+            )
+            .into_response();
+        }
+    }
+
+    let _ = (
+        receipt_request.capability_id,
+        receipt_request.started_at,
+        receipt_request.completed_at,
+    );
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarSubmitReceiptResponse {
+            receipt_id: uuid::Uuid::now_v7().to_string(),
+            accepted: true,
+        }),
+    )
+        .into_response()
+}
+
 fn parse_query_params(raw_query: Option<&str>) -> HashMap<String, String> {
     raw_query
         .map(|query| {
@@ -544,6 +779,126 @@ fn forwarded_query_string(raw_query: Option<&str>) -> Option<String> {
     }
     let query = serializer.finish();
     (!query.is_empty()).then_some(query)
+}
+
+fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Value>) {
+    (
+        StatusCode::BAD_REQUEST,
+        axum::Json(serde_json::json!({
+            "error": "arc_bad_request",
+            "message": message,
+        })),
+    )
+}
+
+fn ttl_seconds_from_wire(ttl_nanos: Option<u64>) -> u64 {
+    const DEFAULT_TTL_SECONDS: u64 = 3600;
+    match ttl_nanos {
+        Some(0) | None => DEFAULT_TTL_SECONDS,
+        Some(ttl_nanos) => std::cmp::max(1, ttl_nanos / 1_000_000_000),
+    }
+}
+
+fn derive_sidecar_subject_key(subject: &str, job_uid: &str) -> arc_core_types::crypto::PublicKey {
+    let mut hasher = Sha256::new();
+    hasher.update(subject.as_bytes());
+    hasher.update([0]);
+    hasher.update(job_uid.as_bytes());
+    let seed: [u8; 32] = hasher.finalize().into();
+    Keypair::from_seed(&seed).public_key()
+}
+
+fn build_sidecar_scope(scopes: &[String]) -> Result<ArcScope, String> {
+    let mut tool_grants = Vec::new();
+    let mut resource_grants = Vec::new();
+    let mut prompt_grants = Vec::new();
+
+    for scope in scopes {
+        match parse_sidecar_scope(scope)? {
+            SidecarScopeGrant::Tool(grant) => tool_grants.push(grant),
+            SidecarScopeGrant::Resource(grant) => resource_grants.push(grant),
+            SidecarScopeGrant::Prompt(grant) => prompt_grants.push(grant),
+        }
+    }
+
+    Ok(ArcScope {
+        grants: tool_grants,
+        resource_grants,
+        prompt_grants,
+    })
+}
+
+enum SidecarScopeGrant {
+    Tool(ToolGrant),
+    Resource(ResourceGrant),
+    Prompt(PromptGrant),
+}
+
+fn parse_sidecar_scope(raw: &str) -> Result<SidecarScopeGrant, String> {
+    let parts: Vec<&str> = raw
+        .split(':')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+
+    if parts.first() == Some(&"tools") && parts.len() >= 2 {
+        return Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: parts[1..].join(":"),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }));
+    }
+
+    match parts.as_slice() {
+        [tool_name, operation] => Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: (*tool_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, true)?],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        })),
+        ["tool", server_id, tool_name, operation] => Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: (*server_id).to_string(),
+            tool_name: (*tool_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        })),
+        ["resource", uri_pattern, operation] => Ok(SidecarScopeGrant::Resource(ResourceGrant {
+            uri_pattern: (*uri_pattern).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+        })),
+        ["prompt", prompt_name, operation] => Ok(SidecarScopeGrant::Prompt(PromptGrant {
+            prompt_name: (*prompt_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+        })),
+        _ => Err(format!("unsupported controller scope syntax: {raw}")),
+    }
+}
+
+fn parse_sidecar_operation(raw: &str, shorthand: bool) -> Result<Operation, String> {
+    match raw.to_ascii_lowercase().as_str() {
+        "invoke" | "call" | "exec" | "execute" => Ok(Operation::Invoke),
+        "write" if shorthand => Ok(Operation::Invoke),
+        "read_result" | "result" => Ok(Operation::ReadResult),
+        "read" if shorthand => Ok(Operation::Invoke),
+        "read" => Ok(Operation::Read),
+        "subscribe" | "watch" => Ok(Operation::Subscribe),
+        "get" => Ok(Operation::Get),
+        "delegate" => Ok(Operation::Delegate),
+        _ => Err(format!("unsupported controller scope operation: {raw}")),
+    }
 }
 
 fn evaluation_error_response(error: &ProtectError) -> Response {
@@ -810,15 +1165,13 @@ paths:
         upstream: String,
         receipt_db: Option<&str>,
     ) -> Arc<ProxyState> {
+        let keypair = Keypair::generate();
         let receipt_store = receipt_db.map(|path| {
             Mutex::new(SqliteReceiptStore::open(path).expect("open sqlite receipt store"))
         });
         Arc::new(ProxyState {
-            evaluator: RequestEvaluator::new(
-                routes,
-                Keypair::generate(),
-                "test-policy".to_string(),
-            ),
+            evaluator: RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string()),
+            signer_keypair: keypair,
             upstream,
             http_client: reqwest::Client::new(),
             receipt_log: Mutex::new(ReceiptLog {
@@ -1488,6 +1841,81 @@ paths:
         let verification: VerifyReceiptResponse =
             serde_json::from_slice(&bytes).expect("decode verify response");
         assert!(verification.valid);
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_returns_canonical_capability_tokens() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/capabilities/mint")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "subject": "job/default/demo",
+                    "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
+                    "job_uid": "job-uid-1",
+                }))
+                .expect("serialize mint request"),
+            ))
+            .expect("request");
+
+        let response = sidecar_mint_handler(State(Arc::clone(&state)), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let mint: SidecarMintResponse =
+            serde_json::from_slice(&bytes).expect("decode mint response");
+
+        assert_eq!(mint.capability.issuer, state.signer_keypair.public_key());
+        assert_eq!(mint.capability.scope.grants.len(), 2);
+        assert_eq!(mint.capability.scope.grants[0].server_id, "*");
+        assert_eq!(mint.capability.scope.grants[0].tool_name, "search");
+        assert!(mint
+            .capability
+            .verify_signature()
+            .expect("capability signature"));
+    }
+
+    #[tokio::test]
+    async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/receipts")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "job_name": "demo",
+                    "namespace": "default",
+                    "job_uid": "job-uid-1",
+                    "capability_id": "cap-1",
+                    "outcome": "succeeded",
+                    "started_at": "2026-04-17T10:00:00Z",
+                    "completed_at": "2026-04-17T10:05:00Z",
+                    "steps": [{
+                        "pod_name": "demo-pod",
+                        "phase": "Succeeded",
+                        "payload": "{\"ok\":true}",
+                        "observed_at": "2026-04-17T10:05:00Z"
+                    }]
+                }))
+                .expect("serialize receipt request"),
+            ))
+            .expect("request");
+
+        let response = sidecar_submit_receipt_handler(State(state), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let receipt: SidecarSubmitReceiptResponse =
+            serde_json::from_slice(&bytes).expect("decode receipt response");
+        assert!(receipt.accepted);
+        assert!(!receipt.receipt_id.is_empty());
     }
 
     #[tokio::test]

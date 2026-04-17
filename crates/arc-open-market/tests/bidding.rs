@@ -361,6 +361,39 @@ fn bid_allows_deeper_scope_prefix_without_rewriting_tool_name() {
 }
 
 #[test]
+fn bid_rejects_sibling_scope_prefixes() {
+    let registry_keypair = Keypair::generate();
+    let operator_keypair = Keypair::generate();
+    let issuer_keypair = Keypair::generate();
+    let agent_keypair = Keypair::generate();
+    let listing = listing_entry(
+        &registry_keypair,
+        &operator_keypair,
+        GenericListingStatus::Active,
+        100,
+        600,
+    );
+
+    let mut request = signed_bid_request(&agent_keypair, "agent-alpha", 200, 600, 120);
+    request.body.requested_scope.capability_scope_prefix = "tools:searchable".to_string();
+    request = resign_bid_request(&agent_keypair, &request.body);
+
+    let error = bid(
+        &request,
+        BidMintContext {
+            listing: &listing,
+            issuer_keypair: &issuer_keypair,
+            agent_subject: agent_keypair.public_key(),
+            token_id: "token-sibling".to_string(),
+            now: 120,
+        },
+    )
+    .expect_err("sibling scope should be rejected");
+
+    assert_eq!(error, BiddingError::ScopeOutsideListing);
+}
+
+#[test]
 fn accept_refuses_empty_bid_receipt_id() {
     let registry_keypair = Keypair::generate();
     let operator_keypair = Keypair::generate();

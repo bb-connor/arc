@@ -334,7 +334,9 @@ fn constraint_matches(
                 .map(|leaf| leaf.value.as_str())
                 .collect();
             Ok(!candidates.is_empty()
-                && candidates.into_iter().all(|path| path.starts_with(prefix)))
+                && candidates
+                    .into_iter()
+                    .all(|path| path_has_prefix(path, prefix)))
         }
         Constraint::DomainExact(expected) => {
             let expected = normalize_domain(expected);
@@ -466,6 +468,67 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn path_prefix_constraint_rejects_traversal_and_sibling_prefixes() {
+        let capability = capability_with_constraints(vec![Constraint::PathPrefix(
+            "/workspace/safe".to_string(),
+        )]);
+
+        assert!(capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safe/report.txt"}),
+        )
+        .expect("allow matching path"),);
+        assert!(!capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safe/../secret.txt"}),
+        )
+        .expect("deny traversal path"),);
+        assert!(!capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safeX/report.txt"}),
+        )
+        .expect("deny sibling prefix"),);
+    }
+
+    #[test]
+    fn audience_allowlist_rejects_non_string_values() {
+        assert!(audience_allowlist_matches(
+            &serde_json::json!({"recipient": "#ops"}),
+            &["#ops".to_string()]
+        ));
+        assert!(!audience_allowlist_matches(
+            &serde_json::json!({"recipient": {"channel": "#ops"}}),
+            &["#ops".to_string()]
+        ));
+        assert!(!audience_allowlist_matches(
+            &serde_json::json!({"recipients": []}),
+            &["#ops".to_string()]
+        ));
+    }
+
+    #[test]
+    fn memory_store_allowlist_rejects_non_string_values() {
+        assert!(memory_store_allowlist_matches(
+            &serde_json::json!({"store": "session-cache"}),
+            &["session-cache".to_string()]
+        ));
+        assert!(!memory_store_allowlist_matches(
+            &serde_json::json!({"store": {"name": "session-cache"}}),
+            &["session-cache".to_string()]
+        ));
+        assert!(!memory_store_allowlist_matches(
+            &serde_json::json!({"store": null}),
+            &["session-cache".to_string()]
+        ));
+    }
 }
 
 /// Evaluate `Constraint::ModelConstraint` against the request-supplied
@@ -522,22 +585,32 @@ fn model_constraint_matches(
 /// Recognised argument keys: `recipient`, `recipients`, `audience`,
 /// `to`, `channel`, `channels`. Nested objects and arrays are walked.
 fn audience_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
-    let mut observed: Vec<String> = Vec::new();
+    let mut observed = ObservedStringValues::default();
     collect_audience_values(arguments, &mut observed);
-    if observed.is_empty() {
+    if observed.invalid {
+        return false;
+    }
+    if !observed.saw_relevant_key {
         return true;
     }
     observed
+        .values
         .iter()
         .all(|value| allowed.iter().any(|a| a == value))
 }
 
-fn collect_audience_values(arguments: &serde_json::Value, out: &mut Vec<String>) {
+fn collect_audience_values(arguments: &serde_json::Value, out: &mut ObservedStringValues) {
     match arguments {
         serde_json::Value::Object(map) => {
             for (key, value) in map {
                 if is_audience_key(key) {
-                    collect_string_values(value, out);
+                    let before = out.values.len();
+                    out.saw_relevant_key = true;
+                    if !collect_string_values_strict(value, &mut out.values)
+                        || out.values.len() == before
+                    {
+                        out.invalid = true;
+                    }
                 } else {
                     collect_audience_values(value, out);
                 }
@@ -559,37 +632,53 @@ fn is_audience_key(key: &str) -> bool {
     )
 }
 
-fn collect_string_values(value: &serde_json::Value, out: &mut Vec<String>) {
+fn collect_string_values_strict(value: &serde_json::Value, out: &mut Vec<String>) -> bool {
     match value {
-        serde_json::Value::String(s) => out.push(s.clone()),
+        serde_json::Value::String(s) => {
+            out.push(s.clone());
+            true
+        }
         serde_json::Value::Array(values) => {
             for v in values {
-                collect_string_values(v, out);
+                if !collect_string_values_strict(v, out) {
+                    return false;
+                }
             }
+            true
         }
-        _ => {}
+        _ => false,
     }
 }
 
 /// Returns true when no `store` argument is present, or when every
 /// `store` value the call carries is in the allowlist.
 fn memory_store_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
-    let mut observed: Vec<String> = Vec::new();
+    let mut observed = ObservedStringValues::default();
     collect_memory_store_values(arguments, &mut observed);
-    if observed.is_empty() {
+    if observed.invalid {
+        return false;
+    }
+    if !observed.saw_relevant_key {
         return true;
     }
     observed
+        .values
         .iter()
         .all(|value| allowed.iter().any(|a| a == value))
 }
 
-fn collect_memory_store_values(arguments: &serde_json::Value, out: &mut Vec<String>) {
+fn collect_memory_store_values(arguments: &serde_json::Value, out: &mut ObservedStringValues) {
     match arguments {
         serde_json::Value::Object(map) => {
             for (key, value) in map {
                 if is_memory_store_key(key) {
-                    collect_string_values(value, out);
+                    let before = out.values.len();
+                    out.saw_relevant_key = true;
+                    if !collect_string_values_strict(value, &mut out.values)
+                        || out.values.len() == before
+                    {
+                        out.invalid = true;
+                    }
                 } else {
                     collect_memory_store_values(value, out);
                 }
@@ -662,10 +751,62 @@ fn matches_pattern(pattern: &str, value: &str) -> bool {
     pattern == value
 }
 
+fn path_has_prefix(candidate: &str, prefix: &str) -> bool {
+    let Some(candidate) = normalize_path(candidate) else {
+        return false;
+    };
+    let Some(prefix) = normalize_path(prefix) else {
+        return false;
+    };
+    if candidate.is_absolute != prefix.is_absolute {
+        return false;
+    }
+    if prefix.segments.len() > candidate.segments.len() {
+        return false;
+    }
+    prefix
+        .segments
+        .iter()
+        .zip(candidate.segments.iter())
+        .all(|(expected, actual)| expected == actual)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct NormalizedPath {
+    is_absolute: bool,
+    segments: Vec<String>,
+}
+
+fn normalize_path(path: &str) -> Option<NormalizedPath> {
+    let is_absolute = path.starts_with('/') || path.starts_with('\\');
+    let mut segments = Vec::new();
+    for segment in path.split(['/', '\\']) {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            segments.pop()?;
+            continue;
+        }
+        segments.push(segment.to_string());
+    }
+    Some(NormalizedPath {
+        is_absolute,
+        segments,
+    })
+}
+
 #[derive(Clone)]
 struct StringLeaf {
     key: Option<String>,
     value: String,
+}
+
+#[derive(Default)]
+struct ObservedStringValues {
+    values: Vec<String>,
+    saw_relevant_key: bool,
+    invalid: bool,
 }
 
 fn collect_string_leaves(arguments: &serde_json::Value) -> Vec<StringLeaf> {

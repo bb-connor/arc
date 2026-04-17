@@ -258,6 +258,9 @@ jobs:
           # Dependency resolution correctness is already covered by the
           # per-package test suite; this smoke test only needs to prove
           # the wheel imports cleanly in a fresh venv.
+          if [[ "$PKG_NAME" != "arc-sdk-python" ]]; then
+            pip install --quiet "${GITHUB_WORKSPACE}/sdks/python/arc-sdk-python"
+          fi
           pip install --quiet "$wheel"
           # Derive import name: hyphens -> underscores, "arc-sdk-python" ->
           # "arc_sdk", "arc-lambda-python" -> "arc_lambda".
