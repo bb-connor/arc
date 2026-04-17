@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**55 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**56 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -43,7 +43,7 @@ roadmap phase.
 | 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
 | 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
 | 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
-| 5 (Guard absorption) | 5.6 | -- | 5.1, 5.2, 5.3, 5.4, 5.5 |
+| 5 (Guard absorption) | 5.5, 5.6 | -- | 5.1, 5.2, 5.3, 5.4 |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
 | 8 (Code exec) | -- | -- | 8.1, 8.2 |
@@ -535,7 +535,7 @@ pre-computed pattern database.
 threat patterns return Deny. Arguments below the ambiguity threshold
 return Allow. Pattern database loads from JSON at guard init.
 
-### 5.5 Policy Engine: Guard Compilation
+### 5.5 Policy Engine: Guard Compilation [SHIPPED b595653]
 
 **What**: Port ClawdStrike's policy-to-guard compiler. HushSpec YAML compiles
 to guard instances registered on the kernel. Complete the 5 missing guard
