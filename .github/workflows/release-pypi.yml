@@ -113,15 +113,30 @@ jobs:
               selected=("${all_packages[@]}")
             fi
           else
-            # Tag push. Parse ref name.
+            # Tag push. Parse ref name. Slug-specific tags are matched
+            # by iterating the known `all_packages` list and testing
+            # each candidate slug explicitly, rather than a greedy
+            # `.+-v` capture -- a greedy regex would misparse slugs
+            # that themselves contain `-v` (e.g. a hypothetical
+            # `arc-v2-client`), selecting the wrong package from
+            # `resolve_slug`.
             if [[ "$REF_NAME" =~ ^py/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
               selected=("${all_packages[@]}")
-            elif [[ "$REF_NAME" =~ ^py/(.+)-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-              slug="${BASH_REMATCH[1]}"
-              selected+=("$(resolve_slug "$slug")")
             else
-              echo "Tag $REF_NAME does not match py/v*.*.* or py/<slug>-v*.*.*" >&2
-              exit 1
+              matched=""
+              for candidate in "${all_packages[@]}"; do
+                slug="$(basename "$candidate")"
+                if [[ "$REF_NAME" =~ ^py/${slug}-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                  matched="$candidate"
+                  break
+                fi
+              done
+              if [[ -n "$matched" ]]; then
+                selected+=("$matched")
+              else
+                echo "Tag $REF_NAME does not match py/v*.*.* or py/<slug>-v*.*.* for any known slug" >&2
+                exit 1
+              fi
             fi
           fi
 
@@ -235,10 +250,15 @@ jobs:
           # shellcheck disable=SC1091
           source /tmp/smoke-venv/bin/activate
           pip install --quiet --upgrade pip
-          # Install wheel without dependencies to isolate import-time
-          # failures inside the package itself. Dependency resolution is
-          # validated separately by the per-package test suite.
-          pip install --quiet --no-deps "$wheel"
+          # Install the wheel WITH its declared runtime deps: packages
+          # like arc-airflow / arc-temporal / arc-crewai import their
+          # third-party deps at load time, so `--no-deps` produced a
+          # false ModuleNotFoundError even when the wheel itself was
+          # perfectly valid and would install correctly in production.
+          # Dependency resolution correctness is already covered by the
+          # per-package test suite; this smoke test only needs to prove
+          # the wheel imports cleanly in a fresh venv.
+          pip install --quiet "$wheel"
           # Derive import name: hyphens -> underscores, "arc-sdk-python" ->
           # "arc_sdk", "arc-lambda-python" -> "arc_lambda".
           import_name=$(echo "$PKG_NAME" | tr '-' '_')

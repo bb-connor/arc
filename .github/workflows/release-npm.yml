@@ -104,14 +104,27 @@ jobs:
               selected=("${all_packages[@]}")
             fi
           else
+            # Slug-specific tags are matched by iterating the known
+            # `all_packages` list rather than a greedy `.+-v` capture
+            # — the greedy regex would misparse slugs that themselves
+            # contain `-v` (e.g. a hypothetical `ai-sdk-v2-preview`).
             if [[ "$REF_NAME" =~ ^ts/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
               selected=("${all_packages[@]}")
-            elif [[ "$REF_NAME" =~ ^ts/(.+)-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
-              slug="${BASH_REMATCH[1]}"
-              selected+=("$(resolve_slug "$slug")")
             else
-              echo "Tag $REF_NAME does not match ts/v*.*.* or ts/<slug>-v*.*.*" >&2
-              exit 1
+              matched=""
+              for candidate in "${all_packages[@]}"; do
+                slug="$(basename "$candidate")"
+                if [[ "$REF_NAME" =~ ^ts/${slug}-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                  matched="$candidate"
+                  break
+                fi
+              done
+              if [[ -n "$matched" ]]; then
+                selected+=("$matched")
+              else
+                echo "Tag $REF_NAME does not match ts/v*.*.* or ts/<slug>-v*.*.* for any known slug" >&2
+                exit 1
+              fi
             fi
           fi
 
