@@ -46,6 +46,15 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY wit ./wit
 COPY examples ./examples
+# `formal/` is copied so `cargo build --workspace` Cargo.lock
+# resolution stays consistent with CI, but the Docker build only runs
+# `cargo build --package arc-cli --bin arc`. arc-cli does NOT depend
+# on any formal-methods crate, and the current formal/ contents
+# (diff-tests + lean4) have no Rust `build.rs` that invokes `lake`,
+# so Lean/elan does NOT need to be installed in this image. If a
+# formal/ member later declares an arc-cli edge or a Rust build-
+# script that shells out to `lake`, install elan alongside protoc in
+# the builder apk step.
 COPY formal ./formal
 COPY tests ./tests
 # `sdks/` holds non-workspace-member SDKs today (Python packages, TS
