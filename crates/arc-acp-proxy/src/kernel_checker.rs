@@ -255,6 +255,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+            model_metadata: None,
                 },
             )
             .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;

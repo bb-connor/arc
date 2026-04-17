@@ -22,7 +22,9 @@
 
 use std::collections::BTreeMap;
 
-use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
+use arc_core::capability::{
+    CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent, ModelMetadata,
+};
 use arc_cross_protocol::{
     runtime_lifecycle_contract, runtime_lifecycle_metadata, semantic_hints_for_tool,
     target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity, CapabilityBridge,
@@ -246,6 +248,8 @@ pub struct A2aKernelExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional approval token for governed transaction execution.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Optional metadata about the model that originated this invocation.
+    pub model_metadata: Option<ModelMetadata>,
 }
 
 /// The A2A edge server.
@@ -568,6 +572,7 @@ impl ArcA2aEdge {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
         };
         let orchestrated = execute_orchestrated_a2a_request(kernel, request)?;
         Ok(task_response_from_orchestrated(task_id, orchestrated))
@@ -595,6 +600,7 @@ impl ArcA2aEdge {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
         };
 
         let response = TaskResponse {
@@ -2117,6 +2123,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge
@@ -2172,6 +2179,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge
@@ -2211,6 +2219,7 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
             },
         )
         .unwrap();
@@ -2267,6 +2276,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge
@@ -2387,6 +2397,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2424,6 +2435,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2464,6 +2476,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2497,6 +2510,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2575,6 +2589,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge.handle_jsonrpc(
@@ -2619,6 +2634,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge.handle_jsonrpc(
@@ -2688,6 +2704,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge.handle_jsonrpc(
@@ -2741,6 +2758,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge
@@ -2795,6 +2813,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge

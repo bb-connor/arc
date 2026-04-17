@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical_json_bytes;
 use arc_core::capability::{
-    ArcScope, CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent,
+    ArcScope, CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent, ModelMetadata,
 };
 use arc_core::sha256_hex;
 use arc_kernel::dpop;
@@ -564,6 +564,7 @@ pub struct CrossProtocolExecutionRequest {
     pub dpop_proof: Option<dpop::DpopProof>,
     pub governed_intent: Option<GovernedTransactionIntent>,
     pub approval_token: Option<GovernedApprovalToken>,
+    pub model_metadata: Option<ModelMetadata>,
 }
 
 /// Result of executing a bridged call through the shared orchestrator.
@@ -786,7 +787,7 @@ impl TargetProtocolExecutor for OpenAiTargetExecutor {
                     dpop_proof: request.execution.dpop_proof.clone(),
                     governed_intent: request.execution.governed_intent.clone(),
                     approval_token: request.execution.approval_token.clone(),
-                    model_metadata: None,
+                    model_metadata: request.execution.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 },
                 Some(route_metadata),
@@ -960,7 +961,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         dpop_proof: request.dpop_proof.clone(),
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
-                        model_metadata: None,
+                        model_metadata: request.model_metadata.clone(),
                         federated_origin_kernel_id: None,
                     },
                     &deny_reason,
@@ -1066,7 +1067,7 @@ impl<'a> CrossProtocolOrchestrator<'a> {
                         dpop_proof: request.dpop_proof.clone(),
                         governed_intent: request.governed_intent.clone(),
                         approval_token: request.approval_token.clone(),
-                        model_metadata: None,
+                        model_metadata: request.model_metadata.clone(),
                         federated_origin_kernel_id: None,
                     },
                     Some(route_metadata),
@@ -1442,7 +1443,9 @@ fn schema_string_extension(schema: &Value, key: &str) -> Option<String> {
 mod tests {
     use super::*;
 
-    use arc_core::capability::{CapabilityTokenBody, Operation, ToolGrant};
+    use arc_core::capability::{
+        CapabilityTokenBody, Constraint, ModelMetadata, ModelSafetyTier, Operation, ToolGrant,
+    };
     use arc_core::crypto::Keypair;
     use arc_kernel::{
         KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
@@ -1539,7 +1542,7 @@ mod tests {
                         dpop_proof: request.execution.dpop_proof.clone(),
                         governed_intent: request.execution.governed_intent.clone(),
                         approval_token: request.execution.approval_token.clone(),
-                        model_metadata: None,
+                        model_metadata: request.execution.model_metadata.clone(),
                         federated_origin_kernel_id: None,
                     },
                     Some(route_metadata),
@@ -1623,6 +1626,16 @@ mod tests {
         server_id: &str,
         tool_name: &str,
     ) -> CapabilityToken {
+        capability_for_tool_with_constraints(issuer, subject, server_id, tool_name, vec![])
+    }
+
+    fn capability_for_tool_with_constraints(
+        issuer: &Keypair,
+        subject: &Keypair,
+        server_id: &str,
+        tool_name: &str,
+        constraints: Vec<Constraint>,
+    ) -> CapabilityToken {
         let now = unix_now();
         CapabilityToken::sign(
             CapabilityTokenBody {
@@ -1634,7 +1647,7 @@ mod tests {
                         server_id: server_id.to_string(),
                         tool_name: tool_name.to_string(),
                         operations: vec![Operation::Invoke],
-                        constraints: vec![],
+                        constraints,
                         max_invocations: None,
                         max_cost_per_invocation: None,
                         max_total_cost: None,
@@ -1754,6 +1767,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
@@ -1821,6 +1835,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
@@ -1863,6 +1878,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
@@ -1906,6 +1922,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
@@ -1937,6 +1954,52 @@ mod tests {
     }
 
     #[test]
+    fn orchestrator_preserves_model_metadata_for_model_constrained_grant() {
+        let (issuer, kernel) = test_kernel();
+        let subject = Keypair::generate();
+        let orchestrator = CrossProtocolOrchestrator::new(&kernel);
+
+        let result = orchestrator
+            .execute(
+                &MockBridge,
+                CrossProtocolExecutionRequest {
+                    origin_request_id: "a2a-model-1".to_string(),
+                    kernel_request_id: "a2a-model-kernel-1".to_string(),
+                    target_protocol: DiscoveryProtocol::Native,
+                    target_server_id: "test-srv".to_string(),
+                    target_tool_name: "echo".to_string(),
+                    agent_id: subject.public_key().to_hex(),
+                    arguments: json!({"message":"hello"}),
+                    capability: capability_for_tool_with_constraints(
+                        &issuer,
+                        &subject,
+                        "test-srv",
+                        "echo",
+                        vec![Constraint::ModelConstraint {
+                            allowed_model_ids: vec!["gpt-5".to_string()],
+                            min_safety_tier: Some(ModelSafetyTier::High),
+                        }],
+                    ),
+                    source_envelope: json!({
+                        "message": {"role":"user"},
+                        "metadata": { "arc": { "targetSkillId": "echo" } }
+                    }),
+                    dpop_proof: None,
+                    governed_intent: None,
+                    approval_token: None,
+                    model_metadata: Some(ModelMetadata {
+                        model_id: "gpt-5".to_string(),
+                        safety_tier: Some(ModelSafetyTier::High),
+                        provider: Some("openai".to_string()),
+                    }),
+                },
+            )
+            .unwrap();
+
+        assert!(matches!(result.response.verdict, KernelVerdict::Allow));
+    }
+
+    #[test]
     fn orchestrator_denies_unregistered_non_native_target_with_signed_route_selection() {
         let (issuer, kernel) = test_kernel();
         let subject = Keypair::generate();
@@ -1961,6 +2024,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
@@ -2002,6 +2066,7 @@ mod tests {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
                 },
             )
             .unwrap();
