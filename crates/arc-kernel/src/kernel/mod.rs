@@ -881,7 +881,6 @@ pub struct ArcKernel {
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
-    session_counter: AtomicU64,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
     checkpoint_batch_size: u64,
     /// Monotonic counter for checkpoint_seq values.
@@ -1316,7 +1315,6 @@ impl ArcKernel {
             payment_adapter: None,
             price_oracle: None,
             attestation_trust_policy: None,
-            session_counter: AtomicU64::new(0),
             checkpoint_batch_size,
             checkpoint_seq_counter: AtomicU64::new(0),
             last_checkpoint_seq: AtomicU64::new(0),

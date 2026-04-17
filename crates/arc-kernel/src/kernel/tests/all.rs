@@ -2484,6 +2484,17 @@ fn session_lifecycle_is_hosted_by_kernel() {
 }
 
 #[test]
+fn open_session_assigns_unique_ids_across_kernel_instances() {
+    let kernel_a = ArcKernel::new(make_config());
+    let kernel_b = ArcKernel::new(make_config());
+
+    let session_a = kernel_a.open_session("agent-a".to_string(), Vec::new());
+    let session_b = kernel_b.open_session("agent-b".to_string(), Vec::new());
+
+    assert_ne!(session_a, session_b);
+}
+
+#[test]
 fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;

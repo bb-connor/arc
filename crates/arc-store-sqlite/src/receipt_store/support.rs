@@ -3994,7 +3994,7 @@ impl SqliteReceiptStore {
         anchor_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         persist_session_anchor_tx(
             &tx,
             session_id,
@@ -4021,7 +4021,7 @@ impl SqliteReceiptStore {
         lineage_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         persist_request_lineage_tx(
             &tx,
             session_id,
@@ -4051,7 +4051,7 @@ impl SqliteReceiptStore {
         statement_json: &serde_json::Value,
     ) -> Result<(), ReceiptStoreError> {
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         persist_receipt_lineage_statement_tx(
             &tx,
             child_receipt_id,
@@ -4074,7 +4074,7 @@ impl SqliteReceiptStore {
         receipt_id: &str,
     ) -> Result<Vec<ReceiptLineageStatementLink>, ReceiptStoreError> {
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, receipt_id)?;
         refresh_receipt_lineage_rows_for_parent_receipt_tx(&tx, receipt_id)?;
         let links = load_receipt_lineage_statement_links(&tx, receipt_id)?;
@@ -4087,7 +4087,7 @@ impl SqliteReceiptStore {
         receipt_id: &str,
     ) -> Result<Option<ReceiptLineageVerification>, ReceiptStoreError> {
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, receipt_id)?;
         let verification = load_receipt_lineage_verification(&tx, receipt_id)?;
         tx.commit()?;
@@ -4100,7 +4100,7 @@ impl SqliteReceiptStore {
     ) -> Result<(), ReceiptStoreError> {
         let raw_json = serde_json::to_string(receipt)?;
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         tx.execute(
             r#"
             INSERT INTO arc_child_receipts (
@@ -4160,7 +4160,7 @@ impl ReceiptStore for SqliteReceiptStore {
         verify_latest_checkpoint_integrity(&connection)?;
         let seq = SqliteReceiptStore::append_arc_receipt_returning_seq(self, receipt)?;
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         ensure_receipt_lineage_statement_for_receipt_id_tx(&tx, &receipt.id)?;
         tx.commit()?;
         Ok(Some(seq))

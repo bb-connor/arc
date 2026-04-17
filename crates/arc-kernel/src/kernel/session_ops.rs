@@ -1,6 +1,8 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::*;
+
+static GLOBAL_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl ArcKernel {
     pub fn open_session(
@@ -8,7 +10,7 @@ impl ArcKernel {
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
     ) -> SessionId {
-        let session_number = self.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        let session_number = GLOBAL_SESSION_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
         let session_id = SessionId::new(format!("sess-{}", session_number));
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");

@@ -13,7 +13,7 @@ impl SqliteReceiptStore {
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         let mut subject_key = attribution.subject_key;
         let mut issuer_key = attribution.issuer_key;
         if subject_key.is_none() || issuer_key.is_none() {
