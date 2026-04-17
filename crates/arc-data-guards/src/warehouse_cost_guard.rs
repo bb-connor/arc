@@ -574,7 +574,7 @@ mod tests {
 
     fn cfg_1gb_5usd() -> WarehouseCostGuardConfig {
         WarehouseCostGuardConfig {
-            max_bytes_scanned: Some(1 * 1024 * 1024 * 1024),
+            max_bytes_scanned: Some(1024 * 1024 * 1024),
             max_cost_per_query_usd: Some("5.00".into()),
             ..Default::default()
         }
