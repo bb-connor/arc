@@ -65,7 +65,7 @@ jobs:
       - name: MSRV workspace lane
         env:
           CARGO_BUILD_JOBS: "1"
-          CARGO_TARGET_DIR: /mnt/arc-msrv-target
+          CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
           RUSTFLAGS: "-D warnings -C debuginfo=0"
         run: cargo build --workspace && cargo test --workspace --exclude arc-conformance
 
@@ -101,9 +101,9 @@ jobs:
       - name: Coverage lane
         env:
           COVERAGE_FAIL_UNDER: "65"
-          COVERAGE_ROOT: /mnt/arc-coverage
-          TARPAULIN_TARGET_DIR: /mnt/arc-tarpaulin-target
-          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: /mnt/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
+          COVERAGE_ROOT: ${{ runner.temp }}/arc-coverage
+          TARPAULIN_TARGET_DIR: ${{ runner.temp }}/arc-tarpaulin-target
+          TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
           RUSTFLAGS: "-D warnings -C debuginfo=0"
@@ -114,5 +114,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: /mnt/arc-coverage
+          path: ${{ runner.temp }}/arc-coverage
           retention-days: 21

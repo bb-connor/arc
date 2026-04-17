@@ -27,7 +27,7 @@ use arc_http_core::{
     http_status_metadata_decision, http_status_metadata_final, ApprovalAdmin, ApprovalHandlerError,
     ArcHttpRequest, AuthMethod, BatchRespondRequest, CallerIdentity, EvaluateResponse,
     HealthResponse, HttpMethod, HttpReceipt, HttpReceiptBody, PendingQuery, RespondRequest,
-    RespondResponse, SidecarStatus, Verdict, VerifyReceiptResponse,
+    SidecarStatus, Verdict, VerifyReceiptResponse,
 };
 use arc_kernel::{ApprovalStore, InMemoryApprovalStore};
 use arc_openapi::{ArcExtensions, DefaultPolicy};
@@ -1660,7 +1660,8 @@ mod tests {
         GovernedApprovalToken, GovernedApprovalTokenBody,
     };
     use arc_http_core::{
-        http_status_scope, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL,
+        http_status_scope, RespondResponse, ARC_HTTP_STATUS_SCOPE_DECISION,
+        ARC_HTTP_STATUS_SCOPE_FINAL,
     };
     use arc_kernel::{ApprovalOutcome, ApprovalRequest};
     use arc_openapi::PolicyDecision;
