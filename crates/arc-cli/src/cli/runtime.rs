@@ -307,7 +307,8 @@ fn cmd_check(
 }
 
 fn cmd_mcp_serve(
-    policy_path: &Path,
+    policy_path: Option<&Path>,
+    preset: Option<&str>,
     server_id: &str,
     server_name: Option<&str>,
     server_version: Option<&str>,
@@ -324,14 +325,49 @@ fn cmd_mcp_serve(
     control_url: Option<&str>,
     control_token: Option<&str>,
 ) -> Result<(), CliError> {
-    let loaded_policy = load_policy(policy_path)?;
+    // Resolve `--preset` to a materialized YAML on disk so the rest
+    // of the plumbing can use `load_policy` unchanged. Keeping the
+    // preset on disk also keeps the source_policy_hash deterministic
+    // across runs so receipt verification continues to work.
+    let materialized_preset = match (policy_path, preset) {
+        (Some(_), None) => None,
+        (None, Some(name)) => {
+            let preset = policies::McpPreset::from_name(name).ok_or_else(|| {
+                CliError::Other(format!(
+                    "unknown --preset {name:?} (known: code-agent)"
+                ))
+            })?;
+            Some(preset.materialize_to_temp()?)
+        }
+        (Some(_), Some(_)) => {
+            // clap's `conflicts_with` should prevent this, but we
+            // guard defensively in case the CLI wiring ever drifts.
+            return Err(CliError::Other(
+                "--policy and --preset are mutually exclusive".to_string(),
+            ));
+        }
+        (None, None) => {
+            return Err(CliError::Other(
+                "either --policy <path> or --preset <name> is required".to_string(),
+            ));
+        }
+    };
+
+    let resolved_policy_path: &Path = match (policy_path, &materialized_preset) {
+        (Some(p), _) => p,
+        (None, Some(m)) => m.path(),
+        _ => unreachable!("policy path resolution validated above"),
+    };
+
+    let loaded_policy = load_policy(resolved_policy_path)?;
     let policy_identity = loaded_policy.identity.clone();
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
 
     info!(
-        policy_path = %policy_path.display(),
+        policy_path = %resolved_policy_path.display(),
+        preset = preset.unwrap_or(""),
         policy_format = loaded_policy.format_name(),
         source_policy_hash = %policy_identity.source_hash,
         runtime_policy_hash = %policy_identity.runtime_hash,

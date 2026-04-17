@@ -292,12 +292,22 @@ enum GuardCommands {
 enum McpCommands {
     /// Wrap an MCP server subprocess and expose a secured MCP edge over stdio.
     Serve {
-        /// Path to the policy YAML file.
+        /// Path to the policy YAML file. Mutually exclusive with `--preset`.
+        #[arg(long, conflicts_with = "preset")]
+        policy: Option<PathBuf>,
+
+        /// Bundled policy preset to use instead of `--policy`.
+        ///
+        /// Available presets:
+        /// * `code-agent` -- zero-config policy for coding agents
+        ///   (Claude Code, Cursor, MCP filesystem/git/shell servers).
+        ///   Allows safe file reads, denies `.env` / `.git/**` /
+        ///   `.ssh/**` writes, denies `git push --force`.
         #[arg(long)]
-        policy: PathBuf,
+        preset: Option<String>,
 
         /// Server ID to assign to the wrapped MCP server inside ARC.
-        #[arg(long)]
+        #[arg(long, default_value = "mcp")]
         server_id: String,
 
         /// Human-readable name for the wrapped MCP server.

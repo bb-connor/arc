@@ -19,6 +19,7 @@ mod did;
 mod guard;
 mod guards;
 mod passport;
+mod policies;
 mod scaffold;
 
 include!("cli/types.rs");

@@ -69,6 +69,7 @@ fn main() {
         Commands::Mcp { command } => match command {
             McpCommands::Serve {
                 policy,
+                preset,
                 server_id,
                 server_name,
                 server_version,
@@ -77,7 +78,8 @@ fn main() {
                 tools_list_changed,
                 command,
             } => cmd_mcp_serve(
-                &policy,
+                policy.as_deref(),
+                preset.as_deref(),
                 &server_id,
                 server_name.as_deref(),
                 server_version.as_deref(),
