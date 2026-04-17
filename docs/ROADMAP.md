@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**70 of 73 numbered phases shipped** on `project/full-roadmap`. 14.1 WASM32 acceptance unblocked by the arc-core-types no_std modernization at `ce43897`. Remaining: 14.2 (browser bindings), 14.3 (mobile FFI), 20.1 (passport, in flight), 20.3 (cross-kernel federation, blocks on 20.1). Plus adjacent
+**71 of 73 numbered phases shipped** on `project/full-roadmap`. WASM32 cross-compile proven against arc-core-types + arc-kernel-core + passport_verify. Remaining: 14.2 (browser bindings), 14.3 (mobile FFI), 20.3 (cross-kernel federation, unblocked now that 20.1 has landed). Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -58,7 +58,7 @@ roadmap phase.
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
 | 18 (Memory) | 18.1, 18.2 | -- | -- |
 | 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
-| 20 (Capstone) | 20.2, 20.4 | -- | 20.1, 20.3 |
+| 20 (Capstone) | 20.1, 20.2, 20.4 | -- | 20.3 |
 
 **Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
 
@@ -1397,7 +1397,7 @@ kernel's public key.
 > on receipts and choreography patterns.
 > **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md`
 
-### 20.1 Agent Passport: Trust-Tier Synthesis and WASM Portability (depends on Phases 14, 19.1, 19.2)
+### 20.1 Agent Passport: Trust-Tier Synthesis and WASM Portability (depends on Phases 14, 19.1, 19.2) [SHIPPED 1da2900]
 
 **What**: The core passport system already ships: `AgentPassport` in
 `crates/arc-credentials/src/passport.rs`, challenge flows, OID4VCI/VP,
