@@ -189,7 +189,7 @@ export function arcTool<PARAMS, RESULT>(
       receipt = await client.evaluateToolCall(request, clientArgs);
     } catch (error) {
       if (error instanceof ArcClientError) {
-        if (!failClosed) {
+        if (!failClosed && isFailOpenTransportError(error)) {
           // Fail-open: forward straight to the underlying execute. We only
           // reach this branch when the caller has explicitly accepted the
           // risk of dispatching tool calls without a signed receipt.
@@ -245,6 +245,17 @@ export function arcTool<PARAMS, RESULT>(
     execute: wrappedExecute,
   };
   return wrapped;
+}
+
+function isFailOpenTransportError(error: ArcClientError): boolean {
+  if (error.statusCode != null) {
+    return false;
+  }
+  return (
+    error.code === "arc_sidecar_unreachable"
+    || error.code === "arc_timeout"
+    || error.code === "arc_fetch_unavailable"
+  );
 }
 
 /**

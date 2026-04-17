@@ -549,20 +549,14 @@ impl ApprovalGuard {
                         }
                     }
                 }
-                Constraint::MinimumAutonomyTier(GovernedAutonomyTier::Autonomous) => {
+                Constraint::MinimumAutonomyTier(GovernedAutonomyTier::Autonomous)
+                    if ctx.request.governed_intent.is_some() =>
+                {
                     // When paired with the HITL guard, Autonomous tier
                     // is treated as "requires human approval". Direct
                     // / Delegated pass through.
-                    if ctx
-                        .request
-                        .governed_intent
-                        .as_ref()
-                        .map(|_| true)
-                        .unwrap_or(false)
-                    {
-                        tier_hit = true;
-                        triggered.push("minimum_autonomy_tier:autonomous".to_string());
-                    }
+                    tier_hit = true;
+                    triggered.push("minimum_autonomy_tier:autonomous".to_string());
                 }
                 _ => {}
             }
@@ -901,7 +895,7 @@ impl ApprovalStore for InMemoryApprovalStore {
             })
             .cloned()
             .collect();
-        out.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        out.sort_by_key(|approval| approval.created_at);
         if let Some(limit) = filter.limit {
             out.truncate(limit);
         }

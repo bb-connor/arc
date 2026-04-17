@@ -813,7 +813,9 @@ version = "0.1.0"
 dependencies = [
  "arc-core-types",
  "arc-http-core",
+ "arc-kernel",
  "arc-openapi",
+ "arc-store-sqlite",
  "axum 0.8.8",
  "chrono",
  "hex",
@@ -825,6 +827,7 @@ dependencies = [
  "sha2",
  "thiserror 1.0.69",
  "tokio",
+ "tower 0.5.3",
  "tracing",
  "url",
  "uuid",

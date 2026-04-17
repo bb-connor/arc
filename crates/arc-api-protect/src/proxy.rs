@@ -5,10 +5,11 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{Request, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
+use axum::Json;
 use axum::Router;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -22,11 +23,15 @@ use arc_core_types::capability::{
 };
 use arc_core_types::crypto::Keypair;
 use arc_http_core::{
-    http_status_metadata_decision, http_status_metadata_final, ArcHttpRequest, AuthMethod,
-    CallerIdentity, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, HttpReceiptBody,
-    SidecarStatus, Verdict, VerifyReceiptResponse,
+    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond,
+    http_status_metadata_decision, http_status_metadata_final, ApprovalAdmin, ApprovalHandlerError,
+    ArcHttpRequest, AuthMethod, BatchRespondRequest, CallerIdentity, EvaluateResponse,
+    HealthResponse, HttpMethod, HttpReceipt, HttpReceiptBody, PendingQuery, RespondRequest,
+    RespondResponse, SidecarStatus, Verdict, VerifyReceiptResponse,
 };
+use arc_kernel::{ApprovalStore, InMemoryApprovalStore};
 use arc_openapi::{ArcExtensions, DefaultPolicy};
+use arc_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
 use crate::evaluator::{RequestEvaluator, RouteEntry};
@@ -143,6 +148,7 @@ struct ProxyState {
     signer_keypair: Keypair,
     upstream: String,
     http_client: reqwest::Client,
+    approval_admin: ApprovalAdmin,
     receipt_log: Mutex<ReceiptLog>,
     receipt_store: Option<Mutex<SqliteReceiptStore>>,
     revoked_capability_ids: Mutex<HashSet<String>>,
@@ -232,11 +238,21 @@ impl ProtectProxy {
                 )
             };
 
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
+            Arc::new(
+                SqliteApprovalStore::open(path)
+                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
+            )
+        } else {
+            Arc::new(InMemoryApprovalStore::new())
+        };
+
         let state = Arc::new(ProxyState {
             evaluator,
             signer_keypair: keypair,
             upstream: self.config.upstream.clone(),
             http_client: reqwest::Client::new(),
+            approval_admin: ApprovalAdmin::new(approval_store),
             receipt_log: Mutex::new(receipt_log),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
@@ -276,12 +292,80 @@ fn build_app(state: Arc<ProxyState>) -> Router {
         .route("/arc/evaluate", post(sidecar_evaluate_handler))
         .route("/arc/verify", post(sidecar_verify_handler))
         .route("/arc/health", get(sidecar_health_handler))
+        .route("/approvals/pending", get(list_pending_approvals_handler))
+        .route(
+            "/approvals/batch/respond",
+            post(batch_respond_approvals_handler),
+        )
+        .route("/approvals/{id}/respond", post(respond_approval_handler))
+        .route("/approvals/{id}", get(get_approval_handler))
         .route("/v1/capabilities/mint", post(sidecar_mint_handler))
         .route("/v1/capabilities/release", post(sidecar_release_handler))
         .route("/v1/receipts", post(sidecar_submit_receipt_handler))
         .route("/{*path}", any(proxy_handler))
         .route("/", any(proxy_handler))
         .with_state(state)
+}
+
+async fn list_pending_approvals_handler(
+    State(state): State<Arc<ProxyState>>,
+    Query(query): Query<PendingQuery>,
+) -> Response {
+    match handle_list_pending(&state.approval_admin, query) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn get_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(approval_id): Path<String>,
+) -> Response {
+    match handle_get_approval(&state.approval_admin, &approval_id) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn respond_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(approval_id): Path<String>,
+    body: Result<Json<RespondRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid approval response payload: {error}"
+            )));
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_respond(&state.approval_admin, &approval_id, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn batch_respond_approvals_handler(
+    State(state): State<Arc<ProxyState>>,
+    body: Result<Json<BatchRespondRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid batch approval payload: {error}"
+            )));
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_batch_respond(&state.approval_admin, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
 }
 
 /// Axum handler that evaluates the request and proxies to upstream.
@@ -1081,6 +1165,18 @@ fn evaluation_error_response(error: &ProtectError) -> Response {
     }
 }
 
+fn approval_json<T>(status: StatusCode, response: T) -> Response
+where
+    T: Serialize,
+{
+    (status, Json(response)).into_response()
+}
+
+fn approval_error_response(error: ApprovalHandlerError) -> Response {
+    let status = StatusCode::from_u16(error.status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    (status, Json(error.body())).into_response()
+}
+
 fn internal_json_error_response(error: &str, message: &str) -> Response {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -1554,15 +1650,20 @@ async fn finalize_bad_gateway(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
+    use arc_core_types::capability::{
+        ArcScope, CapabilityToken, CapabilityTokenBody, GovernedApprovalDecision,
+        GovernedApprovalToken, GovernedApprovalTokenBody,
+    };
     use arc_http_core::{
         http_status_scope, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL,
     };
+    use arc_kernel::{ApprovalOutcome, ApprovalRequest};
     use arc_openapi::PolicyDecision;
     use axum::body::to_bytes;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread;
+    use tower::ServiceExt;
 
     const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"
@@ -1690,6 +1791,11 @@ paths:
         receipt_db: Option<&str>,
     ) -> Arc<ProxyState> {
         let keypair = Keypair::generate();
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
+            Arc::new(SqliteApprovalStore::open(path).expect("open sqlite approval store"))
+        } else {
+            Arc::new(InMemoryApprovalStore::new())
+        };
         let (receipt_store, receipts, revoked_capability_ids) = if let Some(path) = receipt_db {
             let store = SqliteReceiptStore::open(path).expect("open sqlite receipt store");
             let receipts = store.load_receipts().expect("load persisted receipts");
@@ -1705,10 +1811,58 @@ paths:
             signer_keypair: keypair,
             upstream,
             http_client: reqwest::Client::new(),
+            approval_admin: ApprovalAdmin::new(approval_store),
             receipt_log: Mutex::new(ReceiptLog { receipts }),
             receipt_store,
             revoked_capability_ids: Mutex::new(revoked_capability_ids),
         })
+    }
+
+    fn pending_approval_request(approval_id: &str) -> (ApprovalRequest, Keypair, Keypair) {
+        let request_subject = Keypair::generate();
+        let approver = Keypair::generate();
+        let approval = ApprovalRequest {
+            approval_id: approval_id.to_string(),
+            policy_id: "policy-hitl".to_string(),
+            subject_id: "agent-1".to_string(),
+            capability_id: "cap-1".to_string(),
+            subject_public_key: Some(request_subject.public_key()),
+            tool_server: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            action: "invoke".to_string(),
+            parameter_hash: "hash-1".to_string(),
+            expires_at: 4_000_000_000,
+            callback_hint: None,
+            created_at: 123,
+            summary: "pending approval".to_string(),
+            governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
+            triggered_by: vec!["force_approval".to_string()],
+        };
+        (approval, request_subject, approver)
+    }
+
+    fn signed_approval_response_token(
+        approval_id: &str,
+        subject: &Keypair,
+        approver: &Keypair,
+        decision: GovernedApprovalDecision,
+    ) -> GovernedApprovalToken {
+        let now = chrono::Utc::now().timestamp() as u64;
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: format!("tok-{approval_id}"),
+                approver: approver.public_key(),
+                subject: subject.public_key(),
+                governed_intent_hash: "hash-1".to_string(),
+                request_id: approval_id.to_string(),
+                issued_at: now.saturating_sub(10),
+                expires_at: now + 600,
+                decision,
+            },
+            approver,
+        )
+        .expect("approval token should sign")
     }
 
     fn temp_receipt_db_path() -> String {
@@ -1963,6 +2117,57 @@ paths:
         assert_eq!(json["approval_id"], "ap-123");
         assert_eq!(json["kernel_receipt_id"], "kr-456");
         assert_eq!(json["resume_path"], "/approvals/ap-123/respond");
+    }
+
+    #[tokio::test]
+    async fn approval_routes_are_handled_before_proxy_catch_all() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let (approval, subject, approver) = pending_approval_request("ap-route-1");
+        state
+            .approval_admin
+            .store()
+            .store_pending(&approval)
+            .expect("store pending approval");
+
+        let token = signed_approval_response_token(
+            &approval.approval_id,
+            &subject,
+            &approver,
+            GovernedApprovalDecision::Approved,
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri(format!("/approvals/{}/respond", approval.approval_id))
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::to_vec(&RespondRequest {
+                    outcome: ApprovalOutcome::Approved,
+                    reason: Some("approved".to_string()),
+                    approver: approver.public_key(),
+                    token,
+                })
+                .expect("serialize approval response"),
+            ))
+            .expect("request");
+
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .expect("approval response");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: RespondResponse = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json.approval_id, "ap-route-1");
+        assert_eq!(json.outcome, ApprovalOutcome::Approved);
+        assert!(state
+            .approval_admin
+            .store()
+            .get_pending("ap-route-1")
+            .expect("approval lookup")
+            .is_none());
     }
 
     #[tokio::test]

@@ -51,6 +51,24 @@ function fakeFetch(
   return { fetch: impl, calls };
 }
 
+function throwingFetch(error: Error): { fetch: typeof fetch; calls: FetchCall[] } {
+  const calls: FetchCall[] = [];
+  const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const body = init?.body != null ? JSON.parse(init.body as string) : null;
+    const headers: Record<string, string> = {};
+    const rawHeaders = init?.headers;
+    if (rawHeaders != null && typeof rawHeaders === "object" && !Array.isArray(rawHeaders)) {
+      for (const [k, v] of Object.entries(rawHeaders as Record<string, string>)) {
+        headers[k.toLowerCase()] = v;
+      }
+    }
+    calls.push({ url, body, headers });
+    throw error;
+  }) as typeof fetch;
+  return { fetch: impl, calls };
+}
+
 function allowReceipt(id = "r-allow"): ArcReceipt {
   return {
     id,
@@ -269,8 +287,8 @@ describe("arcTool: deny path throws ArcToolError", () => {
     });
   });
 
-  it("fails open (forwards to execute) when onSidecarError=allow", async () => {
-    const { fetch } = fakeFetch([{ error: "boom", status: 500 }]);
+  it("fails open only for transport outages when onSidecarError=allow", async () => {
+    const { fetch } = throwingFetch(new Error("connect ECONNREFUSED"));
     const wrapped = arcTool({
       parameters: z.object({}),
       execute: async () => "ran",
@@ -281,6 +299,27 @@ describe("arcTool: deny path throws ArcToolError", () => {
 
     const result = await wrapped.execute!({});
     expect(result).toBe("ran");
+  });
+
+  it("keeps sidecar control responses blocking even when onSidecarError=allow", async () => {
+    const { fetch } = fakeFetch([{ error: "approval required", status: 409 }]);
+    let called = false;
+    const wrapped = arcTool({
+      parameters: z.object({}),
+      execute: async () => {
+        called = true;
+        return "ran";
+      },
+      scope: { toolServer: "s", toolName: "t" },
+      clientOptions: { fetch },
+      onSidecarError: "allow",
+    });
+
+    await expect(wrapped.execute!({})).rejects.toMatchObject({
+      name: "ArcToolError",
+      verdict: "sidecar_unreachable",
+    });
+    expect(called).toBe(false);
   });
 });
 
