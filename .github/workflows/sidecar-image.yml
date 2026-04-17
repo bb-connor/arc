@@ -16,6 +16,13 @@ concurrency:
   group: sidecar-image-${{ github.ref }}
   cancel-in-progress: false
 
+# Workflow-level principle-of-least-privilege default. Consistent with
+# release-binaries.yml and release-pypi.yml. The build-and-push job
+# extends this with `packages: write` + `id-token: write` for ghcr
+# push and OIDC attestation.
+permissions:
+  contents: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: backbay/arc-sidecar
