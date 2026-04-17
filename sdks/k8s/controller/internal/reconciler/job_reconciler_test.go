@@ -506,14 +506,18 @@ func TestBackoff_GrowsExponentially(t *testing.T) {
 	uid := types.UID("u")
 	var last time.Duration
 	for i := 0; i < 5; i++ {
-		d := r.backoffFor(uid)
+		d := r.backoffFor(uid, retryPhaseReceipt)
 		if d < last && d != r.Retry.MaxDelay {
 			t.Fatalf("backoff decreased at iteration %d: %v -> %v", i, last, d)
 		}
 		last = d
 	}
-	if !r.attemptExceeded(uid) {
+	if !r.attemptExceeded(uid, retryPhaseReceipt) {
 		t.Fatalf("expected attemptExceeded to be true after MaxAttempts")
+	}
+	// Release phase has an independent budget.
+	if r.attemptExceeded(uid, retryPhaseRelease) {
+		t.Fatalf("release phase should not share the receipt budget")
 	}
 }
 

@@ -106,15 +106,32 @@ type JobReconciler struct {
 	// operator's CLI flag actually takes effect.
 	MaxConcurrentReconciles int
 
-	// attempts tracks receipt submission attempts keyed by Job UID so that
-	// we can enforce MaxAttempts across requeues. It is purely in-memory.
+	// attempts tracks retry counts keyed by (Job UID, phase) so receipt
+	// submission retries do NOT consume the release retry budget (and
+	// vice versa) — a flaky release path would otherwise exhaust
+	// MaxAttempts before the first SubmitReceipt runs and land the Job
+	// in ArcReceiptDropped without ever attempting the receipt.
 	// attemptsMu guards concurrent access from multiple Reconcile workers
 	// when MaxConcurrentReconciles > 1; without it, concurrent writes on
 	// the plain map trigger Go's fatal "concurrent map writes" panic and
 	// crash the controller under load.
 	attemptsMu sync.Mutex
-	attempts   map[types.UID]int
+	attempts   map[attemptKey]int
 }
+
+// attemptKey composes a Job UID with a retry phase so the release and
+// receipt paths each keep their own MaxAttempts budget.
+type attemptKey struct {
+	uid   types.UID
+	phase retryPhase
+}
+
+type retryPhase uint8
+
+const (
+	retryPhaseRelease retryPhase = iota
+	retryPhaseReceipt
+)
 
 // NewJobReconciler constructs a JobReconciler with default state.
 func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ArcClient, recorder record.EventRecorder) *JobReconciler {
@@ -124,7 +141,7 @@ func NewJobReconciler(c client.Client, scheme *runtime.Scheme, arc ArcClient, re
 		Arc:      arc,
 		Recorder: recorder,
 		Retry:    DefaultRetryPolicy(),
-		attempts: make(map[types.UID]int),
+		attempts: make(map[attemptKey]int),
 	}
 }
 
@@ -292,7 +309,7 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
 				r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
 					"release deferred; requeueing: "+err.Error())
-				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID)}, nil
+				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 			}
 			r.event(job, corev1.EventTypeWarning, "ArcReleaseFailed", err.Error())
 			return ctrl.Result{}, fmt.Errorf("release capability: %w", err)
@@ -335,9 +352,11 @@ func (r *JobReconciler) handleTerminal(ctx context.Context, logger logr.Logger, 
 				// Increment attempts first, THEN check the cap. Otherwise
 				// the counter stays one behind the actual number of
 				// attempts and a MaxAttempts=5 policy would schedule a
-				// 6th sidecar submission before giving up.
-				backoff := r.backoffFor(job.UID)
-				if r.attemptExceeded(job.UID) {
+				// 6th sidecar submission before giving up. This uses
+				// the receipt phase so the release retry budget stays
+				// independent.
+				backoff := r.backoffFor(job.UID, retryPhaseReceipt)
+				if r.attemptExceeded(job.UID, retryPhaseReceipt) {
 					r.event(job, corev1.EventTypeWarning, "ArcReceiptDropped",
 						"exceeded max receipt submission attempts; giving up")
 					// Fall through to finalizer removal so the Job can be deleted.
@@ -394,7 +413,7 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 			if errors.Is(err, arcapi.ErrSidecarUnreachable) {
 				r.event(job, corev1.EventTypeWarning, "ArcSidecarUnreachable",
 					"release on delete deferred; requeueing: "+err.Error())
-				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID)}, nil
+				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 			}
 			r.event(job, corev1.EventTypeWarning, "ArcReleaseFailed", err.Error())
 			logger.Error(err, "release on delete failed; dropping finalizer to unblock deletion")
@@ -450,12 +469,16 @@ func (r *JobReconciler) event(obj client.Object, eventType, reason, message stri
 	r.Recorder.Event(obj, eventType, reason, message)
 }
 
-// backoffFor returns an exponentially growing delay keyed by Job UID.
-func (r *JobReconciler) backoffFor(uid types.UID) time.Duration {
+// backoffFor returns an exponentially growing delay keyed by (Job UID,
+// phase). Each phase keeps an independent retry budget so a flaky
+// release path cannot consume the receipt budget and trigger a
+// premature ArcReceiptDropped.
+func (r *JobReconciler) backoffFor(uid types.UID, phase retryPhase) time.Duration {
 	r.attemptsMu.Lock()
 	defer r.attemptsMu.Unlock()
-	r.attempts[uid]++
-	n := r.attempts[uid]
+	k := attemptKey{uid: uid, phase: phase}
+	r.attempts[k]++
+	n := r.attempts[k]
 	if n < 1 {
 		n = 1
 	}
@@ -469,16 +492,20 @@ func (r *JobReconciler) backoffFor(uid types.UID) time.Duration {
 	return d
 }
 
-func (r *JobReconciler) attemptExceeded(uid types.UID) bool {
+func (r *JobReconciler) attemptExceeded(uid types.UID, phase retryPhase) bool {
 	r.attemptsMu.Lock()
 	defer r.attemptsMu.Unlock()
-	return r.attempts[uid] >= r.Retry.MaxAttempts
+	return r.attempts[attemptKey{uid: uid, phase: phase}] >= r.Retry.MaxAttempts
 }
 
+// forgetAttempts drops the retry counters for both phases when the Job
+// leaves the reconcile lifecycle (release + receipt both done, or
+// finalizer removed).
 func (r *JobReconciler) forgetAttempts(uid types.UID) {
 	r.attemptsMu.Lock()
 	defer r.attemptsMu.Unlock()
-	delete(r.attempts, uid)
+	delete(r.attempts, attemptKey{uid: uid, phase: retryPhaseRelease})
+	delete(r.attempts, attemptKey{uid: uid, phase: retryPhaseReceipt})
 }
 
 // isGoverned returns true if a Job carries the governed label set to "true".
