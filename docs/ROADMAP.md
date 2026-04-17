@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**67 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**68 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -46,17 +46,17 @@ roadmap phase.
 | 5 (Guard absorption) | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 | -- | -- |
 | 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
 | 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
-| 8 (Code exec) | -- | -- | 8.1, 8.2 |
+| 8 (Code exec) | 8.1, 8.2 | -- | -- |
 | 9 (Service mesh) | 9.1, 9.2 | -- | -- |
 | 10 (Orchestration) | 10.1, 10.2, 10.3 | -- | -- |
-| 11 (Content / streaming / IaC) | 11.2, 11.3 | -- | 11.1 |
+| 11 (Content / streaming / IaC) | 11.1, 11.2, 11.3 | -- | -- |
 | 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
 | 13 (External guards) | 13.1, 13.2, 13.3 | -- | -- |
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
 | 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
-| 18 (Memory) | -- | -- | 18.1, 18.2 |
+| 18 (Memory) | 18.1, 18.2 | -- | -- |
 | 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
 | 20 (Capstone) | 20.4 | -- | 20.1, 20.2, 20.3 |
 
@@ -715,7 +715,7 @@ before returning to the agent.
 > **Depends on**: Phase 2 (CodeExecution and BrowserAction ToolAction variants).
 > **Refs**: `docs/guards/13-CODE-EXECUTION-GUARDS.md`
 
-### 8.1 CodeExecutionGuard
+### 8.1 CodeExecutionGuard [SHIPPED 8b650e1]
 
 **What**: Language allowlist, network access control, execution time
 limits, dangerous module detection (os, subprocess, socket).
@@ -730,7 +730,7 @@ is `["python"]`. Code containing `import subprocess` denied by dangerous
 module detection. Network access denied when `network_access=false` on
 the constraint.
 
-### 8.2 BrowserAutomationGuard
+### 8.2 BrowserAutomationGuard [SHIPPED 8b650e1]
 
 **What**: Domain allowlists, action-type restrictions, credential
 detection in Type actions.
@@ -851,7 +851,7 @@ Subgraph nodes cannot exceed the parent graph's scope ceiling.
 > **Refs**: `docs/protocols/SAAS-COMMUNICATION-INTEGRATION.md`,
 > `docs/protocols/EVENT-STREAMING-INTEGRATION.md`
 
-### 11.1 Content-Review Guard
+### 11.1 Content-Review Guard [SHIPPED 8b650e1]
 
 **What**: Pre-invocation guard that inspects outbound content (message body,
 email text, payment amounts). PII detection, tone/profanity, configurable
@@ -1285,7 +1285,7 @@ application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
 > **Depends on**: Phase 2 (MemoryWrite ToolAction).
 > **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 3
 
-### 18.1 Memory Write/Read Guards
+### 18.1 Memory Write/Read Guards [SHIPPED 8b650e1]
 
 **What**: Guards for `ToolAction::MemoryWrite` and `ToolAction::MemoryRead`.
 Enforce `MemoryStoreAllowlist`, `MaxRetentionTtl`, `MaxMemoryEntries`.
