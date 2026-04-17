@@ -168,7 +168,7 @@ describe("arcTool: allow path invokes underlying execute", () => {
     const result = await wrapped.execute!({ n: 21 });
     expect(result).toEqual({ doubled: 42 });
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.url).toBe("http://127.0.0.1:9090/v1/evaluate");
+    expect(calls[0]!.url).toBe("http://127.0.0.1:9090/arc/evaluate");
     expect(calls[0]!.body).toMatchObject({
       tool_server: "math",
       tool_name: "double",

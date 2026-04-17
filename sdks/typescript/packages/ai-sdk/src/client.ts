@@ -1,7 +1,7 @@
 /**
  * Minimal HTTP client for the ARC sidecar's tool-call evaluation endpoint.
  *
- * The sidecar exposes `POST /v1/evaluate` which accepts a JSON envelope
+ * The sidecar exposes `POST /arc/evaluate` which accepts a JSON envelope
  * describing a single tool call (capability, server, name, arguments) and
  * returns either the historical receipt envelope or the Lambda evaluator's
  * flatter `{ receipt_id, decision }` shape. This client normalizes both wire
@@ -93,7 +93,7 @@ export class ArcClientError extends Error {
 }
 
 /**
- * Minimal client targeting `POST /v1/evaluate` on the ARC sidecar.
+ * Minimal client targeting `POST /arc/evaluate` on the ARC sidecar.
  *
  * Intentionally distinct from `@arc-protocol/node-http`'s HTTP-substrate
  * client, which evaluates inbound HTTP requests rather than outbound tool
@@ -134,7 +134,7 @@ export class ArcClient {
     body: ArcEvaluateToolCallRequest,
     options: { capabilityToken?: string | undefined } = {},
   ): Promise<ArcReceipt> {
-    const url = `${this.baseUrl}/v1/evaluate`;
+    const url = `${this.baseUrl}/arc/evaluate`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const headers: Record<string, string> = {

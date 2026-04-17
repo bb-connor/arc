@@ -1041,12 +1041,6 @@ fn require_sidecar_control_request(
     request: &Request<Body>,
     expected_bearer_token: Option<&str>,
 ) -> Result<(), Response> {
-    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
-        if peer.0.ip().is_loopback() {
-            return Ok(());
-        }
-    }
-
     if let Some(expected_bearer_token) = expected_bearer_token.map(str::trim) {
         if expected_bearer_token.is_empty() {
             warn!("rejecting sidecar control request with blank bearer token configuration");
@@ -1064,6 +1058,12 @@ fn require_sidecar_control_request(
             warn!("rejecting sidecar control request without valid bearer token");
         }
         return Err(sidecar_control_forbidden_response(true));
+    }
+
+    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        if peer.0.ip().is_loopback() {
+            return Ok(());
+        }
     }
 
     if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
@@ -3074,6 +3074,43 @@ paths:
         let receipt_response =
             sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
         assert_eq!(receipt_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configured() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+
+        let mint_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
+        assert_eq!(
+            json["message"],
+            "sidecar control endpoints require a loopback caller or valid bearer token"
+        );
     }
 
     #[tokio::test]
