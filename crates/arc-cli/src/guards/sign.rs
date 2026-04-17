@@ -97,12 +97,29 @@ pub fn cmd_guard_verify(wasm_path: &Path) -> Result<(), CliError> {
             ))
         })?;
 
-    // Prefer the manifest's declared signer_public_key if adjacent.
-    let trusted_key = match load_manifest(wasm_path_str) {
-        Ok(manifest) => {
-            if let Some(k) = manifest.signer_public_key {
-                k
-            } else {
+    // Prefer the manifest's declared signer_public_key if adjacent. Only a
+    // genuine "no manifest here" falls back to the sidecar-embedded key;
+    // parse errors, permission errors, or any other I/O failure must reject
+    // fail-closed so a malformed or unreadable manifest cannot silently
+    // bypass the pinned trust anchor.
+    let manifest_path = wasm_path
+        .parent()
+        .map(|p| p.join(arc_wasm_guards::manifest::MANIFEST_FILENAME));
+    let manifest_exists = manifest_path
+        .as_deref()
+        .map(|p| p.try_exists().unwrap_or(false))
+        .unwrap_or(false);
+
+    let trusted_key = if manifest_exists {
+        let manifest = load_manifest(wasm_path_str).map_err(|e| {
+            CliError::Other(format!(
+                "failed to load adjacent guard-manifest.yaml for {}: {e}",
+                wasm_path.display()
+            ))
+        })?;
+        match manifest.signer_public_key {
+            Some(k) => k,
+            None => {
                 // Manifest exists but does not pin a signer -- reject per
                 // fail-closed policy so operators add the key to the manifest.
                 return Err(CliError::Other(format!(
@@ -112,10 +129,11 @@ pub fn cmd_guard_verify(wasm_path: &Path) -> Result<(), CliError> {
                 )));
             }
         }
-        // If there is no adjacent manifest, fall back to trusting the key
-        // embedded in the sidecar. This is useful for standalone verification
-        // of a `.wasm` + `.sig` pair outside a guard project.
-        Err(_) => signed.signer_public_key.clone(),
+    } else {
+        // No adjacent manifest. Fall back to trusting the key embedded in the
+        // sidecar. Useful for standalone verification of a `.wasm` + `.sig`
+        // pair outside a guard project.
+        signed.signer_public_key.clone()
     };
 
     verify_signed_module(&wasm_bytes, &signed, &trusted_key).map_err(|e| {
