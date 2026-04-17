@@ -32,7 +32,7 @@ unstarted or in-flight.
 
 ## Shipment Status (2026-04-16)
 
-**47 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
+**48 of 73 numbered phases shipped** on `project/full-roadmap`. Plus adjacent
 TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
 roadmap phase.
 
@@ -55,7 +55,7 @@ roadmap phase.
 | 14 (Portable kernel) | -- | -- | 14.1, 14.2, 14.3 |
 | 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
 | 16 (Economics) | 16.1, 16.2 | -- | -- |
-| 17 (Workflow orchestrators) | 17.1, 17.5, 17.6 | -- | 17.2, 17.3, 17.4 |
+| 17 (Workflow orchestrators) | 17.1, 17.2, 17.5, 17.6 | -- | 17.3, 17.4 |
 | 18 (Memory) | -- | -- | 18.1, 18.2 |
 | 19 (Regulatory) | -- | -- | 19.1, 19.2, 19.3 |
 | 20 (Capstone) | -- | -- | 20.1, 20.2, 20.3, 20.4 |
@@ -1215,7 +1215,7 @@ team.
 **Acceptance**: A Prefect flow where each task is capability-checked.
 Denied tasks raise `PermissionError`. Receipts emitted as Prefect events.
 
-### 17.2 arc-dagster
+### 17.2 arc-dagster [SHIPPED ac31e21]
 
 **What**: `@arc_asset` decorator, partition-scoped capabilities, IO Manager.
 
