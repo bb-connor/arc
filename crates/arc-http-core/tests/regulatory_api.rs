@@ -35,6 +35,7 @@ fn make_receipt(keypair: &Keypair, id: &str, timestamp: u64) -> ArcReceipt {
             metadata: None,
             trust_level: arc_core::TrustLevel::default(),
             kernel_key: keypair.public_key(),
+            tenant_id: None,
         },
         keypair,
     )

@@ -23,7 +23,11 @@ use std::process::Command;
 
 fn arc_cli_binary() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_BIN_EXE_arc"));
-    assert!(path.exists(), "CARGO_BIN_EXE_arc does not exist: {}", path.display());
+    assert!(
+        path.exists(),
+        "CARGO_BIN_EXE_arc does not exist: {}",
+        path.display()
+    );
     path = path.canonicalize().unwrap_or(path);
     path
 }
@@ -67,7 +71,10 @@ fn preset_yaml_matches_python_sdk() {
     if !python_yaml.exists() {
         // The Python SDK lives in the same repo; if this test runs
         // outside that checkout, skip rather than fail.
-        eprintln!("python default_policy.yaml not found at {}", python_yaml.display());
+        eprintln!(
+            "python default_policy.yaml not found at {}",
+            python_yaml.display()
+        );
         return;
     }
 
@@ -96,7 +103,10 @@ fn mcp_serve_rejects_unknown_preset() {
         ])
         .output()
         .expect("spawn arc");
-    assert!(!output.status.success(), "unknown preset unexpectedly succeeded");
+    assert!(
+        !output.status.success(),
+        "unknown preset unexpectedly succeeded"
+    );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         stderr.contains("unknown --preset") || stderr.contains("code-agent"),
@@ -109,14 +119,7 @@ fn mcp_serve_requires_policy_or_preset() {
     // Neither --policy nor --preset supplied: the command should
     // refuse to start rather than picking an implicit default.
     let output = Command::new(arc_cli_binary())
-        .args([
-            "mcp",
-            "serve",
-            "--server-id",
-            "test",
-            "--",
-            "/bin/true",
-        ])
+        .args(["mcp", "serve", "--server-id", "test", "--", "/bin/true"])
         .output()
         .expect("spawn arc");
     assert!(!output.status.success());
@@ -135,11 +138,7 @@ fn mcp_serve_rejects_policy_and_preset_together() {
     std::fs::write(tmp.path(), "kernel: {}\nguards: {}\ncapabilities: {}\n").unwrap();
 
     let output = Command::new(arc_cli_binary())
-        .args([
-            "mcp",
-            "serve",
-            "--policy",
-        ])
+        .args(["mcp", "serve", "--policy"])
         .arg(tmp.path())
         .args([
             "--preset",
@@ -179,12 +178,7 @@ fn write_preset_to_temp() -> tempfile::NamedTempFile {
 fn preset_denies_dotenv_write_via_arc_check() {
     let preset = write_preset_to_temp();
     let output = Command::new(arc_cli_binary())
-        .args([
-            "--format",
-            "json",
-            "check",
-            "--policy",
-        ])
+        .args(["--format", "json", "check", "--policy"])
         .arg(preset.path())
         .args([
             "--server",
@@ -220,12 +214,7 @@ fn preset_denies_dotenv_write_via_arc_check() {
 fn preset_allows_safe_file_read_via_arc_check() {
     let preset = write_preset_to_temp();
     let output = Command::new(arc_cli_binary())
-        .args([
-            "--format",
-            "json",
-            "check",
-            "--policy",
-        ])
+        .args(["--format", "json", "check", "--policy"])
         .arg(preset.path())
         .args([
             "--server",

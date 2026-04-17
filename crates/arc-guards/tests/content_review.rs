@@ -50,6 +50,7 @@ fn make_request_with_scope(
         governed_intent: intent,
         approval_token: None,
         model_metadata: None,
+        federated_origin_kernel_id: None,
     };
     (req, scope, agent_id, server_id)
 }

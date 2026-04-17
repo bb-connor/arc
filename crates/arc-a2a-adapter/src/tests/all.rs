@@ -1783,6 +1783,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -1845,6 +1846,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate query-auth A2A tool call");
 
@@ -1906,6 +1908,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate basic-auth A2A tool call");
 
@@ -1976,6 +1979,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate mTLS A2A tool call");
 
@@ -2063,6 +2067,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate initial A2A tool call");
         assert_eq!(initial.verdict, Verdict::Allow);
@@ -2090,6 +2095,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate follow-up A2A tool call");
 
@@ -2157,6 +2163,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate cancel-task A2A tool call");
 
@@ -2217,6 +2224,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate streaming A2A tool call");
 
@@ -2277,6 +2285,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate incomplete streaming A2A tool call");
 
@@ -2337,6 +2346,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate subscribe-to-task A2A tool call");
 
@@ -2400,6 +2410,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate incomplete subscribe-to-task A2A tool call");
 
@@ -2460,6 +2471,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -2518,6 +2530,7 @@ mod tests {
                 governed_intent: None,
                 approval_token: None,
                 model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate OAuth-backed A2A tool call");
 

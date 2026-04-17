@@ -367,7 +367,7 @@ fn evidence_export_require_proofs_fails_when_receipts_are_uncheckpointed() {
     let output_dir = unique_path("evidence-export-require-proofs-output", "");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-require-proofs", &subject, &issuer);
@@ -414,7 +414,7 @@ fn evidence_export_with_signed_federation_policy_roundtrips() {
     let signing_seed_path = unique_path("federation-policy-seed", ".txt");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-federated", &subject, &issuer);
@@ -514,7 +514,7 @@ fn evidence_import_roundtrip_surfaces_imported_trust_without_rewriting_local_his
     let subject_hex = subject.public_key().to_hex();
 
     {
-        let mut store =
+        let store =
             SqliteReceiptStore::open(&source_receipt_db_path).expect("open source receipt store");
         let capability = capability_with_id("cap-federated-reputation", &subject, &issuer);
         store
@@ -663,7 +663,7 @@ fn evidence_export_rejects_scope_outside_federation_policy() {
     let signing_seed_path = unique_path("federation-policy-scope-seed", ".txt");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-one", &subject, &issuer);
@@ -718,7 +718,7 @@ fn evidence_export_supports_remote_trust_control_with_federation_policy() {
     let signing_seed_path = dir.join("federation-policy-seed.txt");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-remote-federated", &subject, &issuer);
@@ -834,7 +834,7 @@ fn evidence_verify_detects_tampered_receipt_even_if_manifest_hash_is_updated() {
     let output_dir = unique_path("evidence-verify-tamper-output", "");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         let issuer = Keypair::generate();
         let subject = Keypair::generate();
         let capability = capability_with_id("cap-evidence-verify", &subject, &issuer);

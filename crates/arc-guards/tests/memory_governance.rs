@@ -47,6 +47,7 @@ fn make_request_in_scope(
         governed_intent: None,
         approval_token: None,
         model_metadata: None,
+        federated_origin_kernel_id: None,
     };
     (req, agent_id, server_id)
 }

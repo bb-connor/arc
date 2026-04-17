@@ -116,6 +116,7 @@ fn make_request(id: &str, cap: &CapabilityToken) -> ToolCallRequest {
         governed_intent: None,
         approval_token: None,
         model_metadata: None,
+        federated_origin_kernel_id: None,
     }
 }
 

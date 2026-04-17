@@ -116,6 +116,7 @@ fn make_request(id: &str, cap: &CapabilityToken) -> ToolCallRequest {
         governed_intent: None,
         approval_token: None,
         model_metadata: None,
+        federated_origin_kernel_id: None,
     }
 }
 
@@ -162,6 +163,7 @@ fn evaluate_response_serializes_execution_nonce_field() {
         metadata: None,
         trust_level: TrustLevel::default(),
         kernel_key: kp.public_key(),
+        tenant_id: None,
     };
     let arc_receipt = ArcReceipt::sign(arc_body, &kp).unwrap();
     let http_rcpt = http_receipt(&kp, "http-rcpt-nonce");

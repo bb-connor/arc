@@ -4498,7 +4498,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
-            tenant_id: None,
+                tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -4792,7 +4792,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
-            tenant_id: None,
+                tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -4926,7 +4926,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
-            tenant_id: None,
+                tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,

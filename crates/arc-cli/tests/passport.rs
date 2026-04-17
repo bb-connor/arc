@@ -618,7 +618,7 @@ fn passport_create_verify_and_present_roundtrip() {
     let capability = capability_with_id("cap-passport", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -956,7 +956,7 @@ fn passport_create_and_verify_surface_enterprise_identity_provenance() {
     let capability = capability_with_id("cap-passport-enterprise", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -1450,7 +1450,7 @@ fn passport_create_require_checkpoints_fails_for_uncheckpointed_receipts() {
     let capability = capability_with_id("cap-passport-no-checkpoint", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -1513,7 +1513,7 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
     let capability = capability_with_id("cap-passport-ref", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");

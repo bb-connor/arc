@@ -131,6 +131,8 @@ fn make_request(
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
     }
 }
 
@@ -371,6 +373,8 @@ async fn full_flow_revocation_cascade() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "before revocation"}),
         dpop_proof: None,
         governed_intent: None,
@@ -393,6 +397,8 @@ async fn full_flow_revocation_cascade() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "after revocation"}),
         dpop_proof: None,
         governed_intent: None,
@@ -705,6 +711,8 @@ async fn full_flow_untrusted_issuer() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         arguments: serde_json::json!({}),
         dpop_proof: None,
         governed_intent: None,

@@ -320,6 +320,7 @@ mod tests {
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -369,6 +370,7 @@ mod tests {
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -422,6 +424,7 @@ mod tests {
             governed_intent: None,
             approval_token: None,
             model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {

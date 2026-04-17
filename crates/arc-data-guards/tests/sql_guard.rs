@@ -45,6 +45,7 @@ fn make_request(
         governed_intent: None,
         approval_token: None,
         model_metadata: None,
+        federated_origin_kernel_id: None,
     };
 
     (kp, scope, agent_id, server_id, request)
