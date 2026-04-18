@@ -886,7 +886,8 @@ fn rollback_budget_authorize_exposure(
         payload.hold_id.as_deref(),
         Some(&rollback_event_id),
         authority,
-    )
+    )?;
+    Ok(())
 }
 
 async fn respond_after_budget_write_quorum_commit<T>(

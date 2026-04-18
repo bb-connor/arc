@@ -5,6 +5,7 @@
 #   ghcr.io/backbay/arc-sidecar      -- replace with the sidecar image you pushed
 #   PROJECT_ID / REGION              -- substitute for your GCP project and region
 #   projects/PROJECT_ID/secrets/...  -- create the secrets in Secret Manager first
+#   arc-kernel-config / arc-openapi-spec -- Secret Manager secrets mounted below
 #
 # Deploy:
 #   gcloud run services replace deploy/cloud-run/service.yaml --region REGION
@@ -86,6 +87,8 @@ spec:
             - "protect"
             - "--upstream"
             - "http://127.0.0.1:8080"
+            - "--spec"
+            - "/etc/arc/spec/openapi.yaml"
             - "--listen"
             - "0.0.0.0:9090"
           env:
@@ -94,7 +97,7 @@ spec:
             - name: ARC_HEALTH_PATH
               value: "/arc/health"
             - name: ARC_KERNEL_CONFIG_PATH
-              value: "/etc/arc/kernel.yaml"
+              value: "/etc/arc/kernel/kernel.yaml"
             - name: ARC_POLICY_SOURCE
               value: "gs://PROJECT_ID-arc-config/policy.yaml"
             - name: ARC_RECEIPT_SINK
@@ -111,6 +114,11 @@ spec:
                 secretKeyRef:
                   name: arc-signing-key
                   key: latest
+          volumeMounts:
+            - name: arc-kernel-config
+              mountPath: /etc/arc/kernel
+            - name: arc-openapi-spec
+              mountPath: /etc/arc/spec
           resources:
             limits:
               cpu: "500m"
@@ -128,3 +136,16 @@ spec:
               port: 9090
             periodSeconds: 10
             failureThreshold: 3
+      volumes:
+        - name: arc-kernel-config
+          secret:
+            secretName: arc-kernel-config
+            items:
+              - key: latest
+                path: kernel.yaml
+        - name: arc-openapi-spec
+          secret:
+            secretName: arc-openapi-spec
+            items:
+              - key: latest
+                path: openapi.yaml
