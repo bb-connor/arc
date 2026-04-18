@@ -50,6 +50,8 @@ jobs:
         run: ./scripts/ci-workspace.sh
 
       - name: SDK parity contract lane
+        env:
+          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }}"
         run: ./scripts/check-sdk-parity.sh
 
   msrv:
