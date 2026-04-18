@@ -1875,9 +1875,7 @@ impl SqliteReceiptStore {
                 runtime_assurance_receipts: authorization_context
                     .summary
                     .runtime_assurance_bound_receipts,
-                delegated_call_chain_receipts: authorization_context
-                    .summary
-                    .delegated_sender_bound_receipts,
+                delegated_call_chain_receipts: authorization_context.summary.call_chain_receipts,
                 asserted_call_chain_receipts: authorization_context
                     .summary
                     .asserted_call_chain_receipts,

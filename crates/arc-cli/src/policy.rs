@@ -853,16 +853,15 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
 
     if let Some(secret_patterns) = &config.secret_patterns {
         if secret_patterns.enabled {
-            let guard = match SecretLeakGuard::with_config(
-                arc_guards::secret_leak::SecretLeakConfig {
+            let guard =
+                match SecretLeakGuard::with_config(arc_guards::secret_leak::SecretLeakConfig {
                     enabled: true,
                     skip_paths: secret_patterns.skip_paths.clone(),
                     custom_patterns: Vec::new(),
-                },
-            ) {
-                Ok(guard) => guard,
-                Err(error) => panic!("invalid secret leak guard config: {error}"),
-            };
+                }) {
+                    Ok(guard) => guard,
+                    Err(error) => panic!("invalid secret leak guard config: {error}"),
+                };
             pipeline.add(Box::new(guard));
         }
     }
