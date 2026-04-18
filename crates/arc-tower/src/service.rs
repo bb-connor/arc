@@ -178,8 +178,7 @@ mod tests {
 
     type TestBody = Full<Bytes>;
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn valid_capability_token_json(id: &str, issuer: &Keypair) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -285,7 +284,7 @@ mod tests {
 
     #[tokio::test]
     async fn service_allows_post_with_capability() {
-        let (_kp, evaluator) = make_service();
+        let (kp, evaluator) = make_service();
 
         let inner = tower::service_fn(|_req: http::Request<TestBody>| async {
             let mut response = http::Response::new(Full::new(Bytes::new()));
@@ -300,7 +299,7 @@ mod tests {
             .uri("/pets")
             .header(
                 "x-arc-capability",
-                valid_capability_token_json("cap-service"),
+                valid_capability_token_json("cap-service", &kp),
             )
             .body(Full::new(Bytes::from_static(br#"{"name":"Rex"}"#)))
             .unwrap_or_else(|e| panic!("build failed: {e}"));

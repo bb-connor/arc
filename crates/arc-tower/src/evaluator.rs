@@ -142,6 +142,9 @@ impl ArcEvaluator {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: extract_presented_capability(headers, query),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: policy_mode(http_method),
             })
             .map_err(Into::into)
@@ -249,8 +252,7 @@ mod tests {
         http_status_scope, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL,
     };
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn valid_capability_token_json(id: &str, issuer: &Keypair) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -347,12 +349,12 @@ mod tests {
     #[test]
     fn evaluate_unsafe_method_allowed_with_capability() {
         let keypair = Keypair::generate();
-        let evaluator = ArcEvaluator::new(keypair, "test-policy".to_string());
+        let evaluator = ArcEvaluator::new(keypair.clone(), "test-policy".to_string());
         let caller = CallerIdentity::anonymous();
         let mut headers = http::HeaderMap::new();
         headers.insert(
             "x-arc-capability",
-            http::HeaderValue::from_str(&valid_capability_token_json("cap-123"))
+            http::HeaderValue::from_str(&valid_capability_token_json("cap-123", &keypair))
                 .unwrap_or_else(|e| panic!("header build failed: {e}")),
         );
 
