@@ -439,6 +439,17 @@ impl Default for OutputSanitizerConfig {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum OutputSanitizerConfigError {
+    #[error("invalid {list_name} regex `{pattern}`: {source}")]
+    InvalidPattern {
+        list_name: &'static str,
+        pattern: String,
+        #[source]
+        source: regex::Error,
+    },
+}
+
 // ---------------------------------------------------------------------------
 // Compiled detector registry (lazy, built once per process).
 // ---------------------------------------------------------------------------
@@ -866,34 +877,49 @@ impl Clone for OutputSanitizer {
 
 impl OutputSanitizer {
     pub fn new() -> Self {
-        Self::with_config(OutputSanitizerConfig::default())
+        match Self::with_config(OutputSanitizerConfig::default()) {
+            Ok(sanitizer) => sanitizer,
+            Err(error) => panic!("default output sanitizer config should be valid: {error}"),
+        }
     }
 
-    pub fn with_config(config: OutputSanitizerConfig) -> Self {
-        let allowlist_patterns: Vec<Regex> = config
+    pub fn with_config(config: OutputSanitizerConfig) -> Result<Self, OutputSanitizerConfigError> {
+        let allowlist_patterns = config
             .allowlist
             .patterns
             .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-        let denylist_patterns: Vec<(String, Regex)> = config
+            .map(|pattern| {
+                Regex::new(pattern).map_err(|source| OutputSanitizerConfigError::InvalidPattern {
+                    list_name: "allowlist",
+                    pattern: pattern.clone(),
+                    source,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let denylist_patterns = config
             .denylist
             .patterns
             .iter()
-            .filter_map(|pattern| {
-                Regex::new(pattern).ok().map(|re| {
-                    let id = format!("denylist_{}", fingerprint(pattern));
-                    (id, re)
-                })
+            .map(|pattern| {
+                Regex::new(pattern)
+                    .map(|re| {
+                        let id = format!("denylist_{}", fingerprint(pattern));
+                        (id, re)
+                    })
+                    .map_err(|source| OutputSanitizerConfigError::InvalidPattern {
+                        list_name: "denylist",
+                        pattern: pattern.clone(),
+                        source,
+                    })
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Self {
+        Ok(Self {
             config,
             allowlist_patterns,
             denylist_patterns,
             token_vault: Arc::new(TokenVault::new()),
-        }
+        })
     }
 
     pub fn token_vault(&self) -> Arc<TokenVault> {

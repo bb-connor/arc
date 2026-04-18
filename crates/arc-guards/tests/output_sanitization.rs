@@ -8,10 +8,17 @@
 
 use arc_guards::{
     sanitize_json, AllowlistConfig, DenylistConfig, EntropyConfig, OutputSanitizer,
-    OutputSanitizerConfig, PostInvocationPipeline, PostInvocationVerdict, RedactionStrategy,
-    SanitizerHook, SensitiveCategory,
+    OutputSanitizerConfig, OutputSanitizerConfigError, PostInvocationPipeline,
+    PostInvocationVerdict, RedactionStrategy, SanitizerHook, SensitiveCategory,
 };
 use std::collections::HashMap;
+
+fn sanitizer_with_config(cfg: OutputSanitizerConfig) -> OutputSanitizer {
+    match OutputSanitizer::with_config(cfg) {
+        Ok(sanitizer) => sanitizer,
+        Err(error) => panic!("expected sanitizer config to compile: {error}"),
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Per-detector sanity: every secret detector redacts a canonical example.
@@ -267,7 +274,7 @@ fn entropy_threshold_configurable() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let r = s.sanitize_text("aaaabbbbccccddddeeeeffff");
     assert!(r.was_redacted);
 }
@@ -285,7 +292,7 @@ fn allowlist_exact_suppresses_redaction() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let r = s.sanitize_text("alice@example.com");
     assert!(!r.was_redacted);
     assert_eq!(r.sanitized, "alice@example.com");
@@ -300,7 +307,7 @@ fn allowlist_pattern_suppresses_redaction() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let r = s.sanitize_text("bob@example.com");
     assert!(!r.was_redacted);
     assert_eq!(r.sanitized, "bob@example.com");
@@ -315,7 +322,7 @@ fn denylist_exact_forces_redaction() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let r = s.sanitize_text("this message is CONFIDENTIAL_TAG bye");
     assert!(r.was_redacted);
     assert!(!r.sanitized.contains("CONFIDENTIAL_TAG"));
@@ -330,7 +337,7 @@ fn denylist_pattern_forces_redaction() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let r = s.sanitize_text("code: internal-abcdef");
     assert!(r.was_redacted);
     assert!(!r.sanitized.contains("internal-abcdef"));
@@ -370,7 +377,7 @@ fn overlap_prefers_stronger_strategy() {
         },
         ..Default::default()
     };
-    let s = OutputSanitizer::with_config(cfg);
+    let s = sanitizer_with_config(cfg);
     let input = "AKIAIOSFODNN7EXAMPLE";
     let r = s.sanitize_text(input);
     assert!(r.was_redacted);
@@ -391,7 +398,28 @@ fn sanitizer_with_secret_strategy(strategy: RedactionStrategy) -> OutputSanitize
         redaction_strategies: strategies,
         ..Default::default()
     };
-    OutputSanitizer::with_config(cfg)
+    sanitizer_with_config(cfg)
+}
+
+#[test]
+fn invalid_denylist_regex_is_rejected() {
+    let cfg = OutputSanitizerConfig {
+        denylist: DenylistConfig {
+            exact: vec![],
+            patterns: vec!["(".to_string()],
+        },
+        ..Default::default()
+    };
+
+    match OutputSanitizer::with_config(cfg) {
+        Ok(_) => panic!("expected invalid denylist regex to be rejected"),
+        Err(OutputSanitizerConfigError::InvalidPattern {
+            list_name, pattern, ..
+        }) => {
+            assert_eq!(list_name, "denylist");
+            assert_eq!(pattern, "(");
+        }
+    }
 }
 
 #[test]

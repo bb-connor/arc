@@ -232,9 +232,10 @@ fn compile_rule_guards(
                 SensitivityLevel::High,
                 SanitizationAction::Redact,
             ));
-            post_invocation.add(Box::new(SanitizerHook::with_config(
-                compile_output_sanitizer_config(sp),
-            )));
+            post_invocation.add(Box::new(
+                SanitizerHook::with_config(compile_output_sanitizer_config(sp))
+                    .map_err(|error| CompileError::Invalid(error.to_string()))?,
+            ));
         }
     }
 

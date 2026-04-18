@@ -120,9 +120,10 @@ pub use prompt_injection::{
 };
 pub use response_sanitization::{
     AllowlistConfig, CategoryConfig, DenylistConfig, EntropyConfig, OutputSanitizer,
-    OutputSanitizerConfig, ProcessingStats, Redaction, RedactionStrategy,
-    ResponseSanitizationGuard, SanitizationAction, SanitizationResult, SanitizedValue, ScanResult,
-    SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span, TokenVault,
+    OutputSanitizerConfig, OutputSanitizerConfigError, ProcessingStats, Redaction,
+    RedactionStrategy, ResponseSanitizationGuard, SanitizationAction, SanitizationResult,
+    SanitizedValue, ScanResult, SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span,
+    TokenVault,
 };
 pub use secret_leak::SecretLeakGuard;
 pub use shell_command::ShellCommandGuard;

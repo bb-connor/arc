@@ -24,7 +24,8 @@ pub use arc_kernel::{
 use serde_json::Value;
 
 use crate::response_sanitization::{
-    OutputSanitizer, OutputSanitizerConfig, SanitizationResult, SensitiveDataFinding,
+    OutputSanitizer, OutputSanitizerConfig, OutputSanitizerConfigError, SanitizationResult,
+    SensitiveDataFinding,
 };
 
 // ---------------------------------------------------------------------------
@@ -57,12 +58,12 @@ impl SanitizerHook {
     }
 
     /// Build a sanitizer hook with a custom sanitizer configuration.
-    pub fn with_config(config: OutputSanitizerConfig) -> Self {
-        Self {
-            sanitizer: OutputSanitizer::with_config(config),
+    pub fn with_config(config: OutputSanitizerConfig) -> Result<Self, OutputSanitizerConfigError> {
+        Ok(Self {
+            sanitizer: OutputSanitizer::with_config(config)?,
             hook_name: "output-sanitizer".to_string(),
             evidence: std::sync::Mutex::new(None),
-        }
+        })
     }
 
     /// Build a sanitizer hook from a pre-constructed sanitizer.
