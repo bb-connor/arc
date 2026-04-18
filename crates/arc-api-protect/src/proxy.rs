@@ -846,10 +846,25 @@ async fn sidecar_mint_handler(
     );
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
+    let capability_id = match derive_sidecar_capability_id(
+        &mint_request.subject,
+        &mint_request.job_uid,
+        ttl_seconds,
+        &scope,
+    ) {
+        Ok(capability_id) => capability_id,
+        Err(error) => {
+            warn!("failed to derive deterministic capability id: {error}");
+            return internal_json_error_response(
+                "arc_capability_mint_failed",
+                "failed to derive deterministic capability id",
+            );
+        }
+    };
 
     let capability = match CapabilityToken::sign(
         CapabilityTokenBody {
-            id: uuid::Uuid::now_v7().to_string(),
+            id: capability_id,
             issuer: state.signer_keypair.public_key(),
             subject,
             scope,
@@ -1197,6 +1212,45 @@ fn derive_sidecar_subject_key(subject: &str, job_uid: &str) -> arc_core_types::c
     hasher.update(job_uid.as_bytes());
     let seed: [u8; 32] = hasher.finalize().into();
     Keypair::from_seed(&seed).public_key()
+}
+
+fn derive_sidecar_capability_id(
+    subject: &str,
+    job_uid: &str,
+    ttl_seconds: u64,
+    scope: &ArcScope,
+) -> Result<String, serde_json::Error> {
+    #[derive(Serialize)]
+    struct SidecarCapabilityIdMaterial<'a> {
+        subject: &'a str,
+        job_uid: &'a str,
+        ttl_seconds: u64,
+        tool_grants: Vec<String>,
+        resource_grants: Vec<String>,
+        prompt_grants: Vec<String>,
+    }
+
+    fn sorted_grant_encodings<T: Serialize>(
+        grants: &[T],
+    ) -> Result<Vec<String>, serde_json::Error> {
+        let mut encodings = grants
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()?;
+        encodings.sort_unstable();
+        Ok(encodings)
+    }
+
+    let id_material = SidecarCapabilityIdMaterial {
+        subject,
+        job_uid,
+        ttl_seconds,
+        tool_grants: sorted_grant_encodings(&scope.grants)?,
+        resource_grants: sorted_grant_encodings(&scope.resource_grants)?,
+        prompt_grants: sorted_grant_encodings(&scope.prompt_grants)?,
+    };
+    let encoded = serde_json::to_vec(&id_material)?;
+    Ok(format!("sidecar-{}", arc_core_types::sha256_hex(&encoded)))
 }
 
 fn build_sidecar_scope(scopes: &[String]) -> Result<ArcScope, String> {
@@ -2841,6 +2895,113 @@ paths:
             .capability
             .verify_signature()
             .expect("capability signature"));
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request_body = serde_json::to_vec(&serde_json::json!({
+            "subject": "job/default/demo",
+            "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
+            "job_uid": "job-uid-1",
+            "ttl_seconds": 300,
+        }))
+        .expect("serialize mint request");
+
+        let first_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body.clone()))
+                .expect("request"),
+        );
+        let second_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))
+                .expect("request"),
+        );
+
+        let first_response = sidecar_mint_handler(State(Arc::clone(&state)), first_request).await;
+        let second_response = sidecar_mint_handler(State(Arc::clone(&state)), second_request).await;
+        assert_eq!(first_response.status(), StatusCode::OK);
+        assert_eq!(second_response.status(), StatusCode::OK);
+
+        let first_bytes = to_bytes(first_response.into_body(), 1024 * 1024)
+            .await
+            .expect("first response body");
+        let second_bytes = to_bytes(second_response.into_body(), 1024 * 1024)
+            .await
+            .expect("second response body");
+        let first_mint: SidecarMintResponse =
+            serde_json::from_slice(&first_bytes).expect("decode first mint response");
+        let second_mint: SidecarMintResponse =
+            serde_json::from_slice(&second_bytes).expect("decode second mint response");
+
+        assert_eq!(
+            first_mint.capability.body().id,
+            second_mint.capability.body().id
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+
+        let search_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+        let fetch_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tool:server-a:fetch:invoke"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+
+        let search_response = sidecar_mint_handler(State(Arc::clone(&state)), search_request).await;
+        let fetch_response = sidecar_mint_handler(State(Arc::clone(&state)), fetch_request).await;
+        assert_eq!(search_response.status(), StatusCode::OK);
+        assert_eq!(fetch_response.status(), StatusCode::OK);
+
+        let search_bytes = to_bytes(search_response.into_body(), 1024 * 1024)
+            .await
+            .expect("search response body");
+        let fetch_bytes = to_bytes(fetch_response.into_body(), 1024 * 1024)
+            .await
+            .expect("fetch response body");
+        let search_mint: SidecarMintResponse =
+            serde_json::from_slice(&search_bytes).expect("decode search mint response");
+        let fetch_mint: SidecarMintResponse =
+            serde_json::from_slice(&fetch_bytes).expect("decode fetch mint response");
+
+        assert_ne!(
+            search_mint.capability.body().id,
+            fetch_mint.capability.body().id
+        );
     }
 
     #[tokio::test]
