@@ -424,13 +424,57 @@ fn export_trust_network(output: &Path) -> Result<MercuryTrustNetworkExportSummar
     write_json_file(&trust_anchor_record_path, &trust_anchor_record)?;
 
     let mut shared_proof_package: MercuryProofPackage = read_json_file(&shared_proof_package_src)?;
-    shared_proof_package.publication_profile.witness_record =
-        Some(relative_display(output, &witness_record_path)?);
-    shared_proof_package.publication_profile.trust_anchor =
-        Some(relative_display(output, &trust_anchor_record_path)?);
+    let witness_record_ref = relative_display(output, &witness_record_path)?;
+    let trust_anchor_ref = relative_display(output, &trust_anchor_record_path)?;
+    let anchored_publications = shared_proof_package
+        .arc_bundle
+        .checkpoints
+        .iter()
+        .map(|checkpoint| {
+            let binding = arc_core::receipt::CheckpointPublicationTrustAnchorBinding {
+                publication_identity: arc_core::receipt::CheckpointPublicationIdentity::new(
+                    arc_core::receipt::CheckpointPublicationIdentityKind::LocalLog,
+                    arc_kernel::checkpoint::checkpoint_log_id(checkpoint),
+                ),
+                trust_anchor_identity: arc_core::receipt::CheckpointTrustAnchorIdentity::new(
+                    arc_core::receipt::CheckpointTrustAnchorIdentityKind::ChainRoot,
+                    "arc-checkpoint-witness-chain",
+                ),
+                trust_anchor_ref: trust_anchor_ref.clone(),
+                signer_cert_ref: "arc-kernel-signing-key".to_string(),
+                publication_profile_version: "arc.mercury.trust_network.append_only.v1"
+                    .to_string(),
+            };
+            arc_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+                checkpoint,
+                binding,
+            )
+            .map_err(|error| CliError::Other(error.to_string()))
+        })
+        .collect::<Result<Vec<_>, CliError>>()?;
+    let mut checkpoint_transparency = match shared_proof_package.checkpoint_transparency.clone() {
+        Some(summary) => summary,
+        None => arc_kernel::checkpoint::validate_checkpoint_transparency(
+            &shared_proof_package.arc_bundle.checkpoints,
+        )
+        .map_err(|error| CliError::Other(error.to_string()))?,
+    };
+    checkpoint_transparency.publications = anchored_publications;
+
+    shared_proof_package.publication_profile.checkpoint_continuity = "append_only".to_string();
+    shared_proof_package.publication_profile.witness_record = Some(witness_record_ref);
+    shared_proof_package.publication_profile.trust_anchor = Some(trust_anchor_ref.clone());
     shared_proof_package
         .publication_profile
         .freshness_window_secs = Some(86_400);
+    shared_proof_package.publication_claim_boundary = Some(
+        arc_kernel::evidence_export::build_evidence_transparency_claims(
+            &shared_proof_package.arc_bundle,
+            &checkpoint_transparency,
+            Some(&trust_anchor_ref),
+        ),
+    );
+    shared_proof_package.checkpoint_transparency = Some(checkpoint_transparency);
     shared_proof_package
         .validate()
         .map_err(|error| CliError::Other(error.to_string()))?;
