@@ -31,6 +31,8 @@ tests: pass a :class:`arc_sdk.testing.MockArcClient` as ``arc_client``.
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -38,7 +40,7 @@ from typing import Any
 
 from arc_sdk.client import ArcClient
 from arc_sdk.errors import ArcDeniedError, ArcError
-from arc_sdk.models import ArcReceipt
+from arc_sdk.models import ArcReceipt, Decision, ToolCallAction
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import (
@@ -443,14 +445,13 @@ class _ArcInboundInterceptor(ActivityInboundInterceptor):
                 parameters=parameters,
             )
         except ArcDeniedError as exc:
-            # Re-raise as an ApplicationError so Temporal logs the
-            # denial in workflow history. Wrap the underlying error so
-            # callers retain access to the SDK-level details.
-            raise ApplicationError(
-                exc.message or "ARC capability denied",
-                type=DENIED_ERROR_TYPE,
-                non_retryable=True,
-            ) from _arc_tool_error_from_denied(info, exc)
+            return _deny_receipt_from_error(
+                info=info,
+                capability_id=grant.capability_id,
+                tool_server=tool_server,
+                parameters=parameters,
+                exc=exc,
+            )
         except ArcError as exc:
             # Sidecar/transport failure -- let Temporal retry per its
             # retry policy. Callers can still inspect the underlying
@@ -497,6 +498,56 @@ def _denied_application_error(
     )
 
 
+def _deny_receipt_from_error(
+    *,
+    info: activity.Info,
+    capability_id: str,
+    tool_server: str,
+    parameters: dict[str, Any],
+    exc: ArcDeniedError,
+) -> ArcReceipt:
+    """Materialize a deny receipt for sidecar 403 responses."""
+    canonical_parameters = json.dumps(
+        parameters,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    parameter_hash = hashlib.sha256(canonical_parameters).hexdigest()
+    receipt_id = exc.receipt_id or (
+        f"arc-temporal-deny-{info.workflow_id}-{info.activity_id}-{int(time.time())}"
+    )
+    return ArcReceipt(
+        id=receipt_id,
+        timestamp=int(time.time()),
+        capability_id=capability_id,
+        tool_server=exc.tool_server or tool_server,
+        tool_name=exc.tool_name or info.activity_type,
+        action=ToolCallAction(
+            parameters=dict(parameters),
+            parameter_hash=parameter_hash,
+        ),
+        decision=Decision.deny(
+            reason=exc.reason or exc.message or "ARC capability denied",
+            guard=exc.guard or "ArcDeniedError",
+        ),
+        content_hash="synthetic-deny-receipt",
+        policy_hash="synthetic-deny-receipt",
+        evidence=[],
+        metadata={
+            "synthetic": True,
+            "reason_code": exc.reason_code,
+            "requested_action": exc.requested_action,
+            "required_scope": exc.required_scope,
+            "granted_scope": exc.granted_scope,
+            "hint": exc.hint,
+            "docs_url": exc.docs_url,
+        },
+        kernel_key="0" * 64,
+        signature="0" * 128,
+    )
+
+
 def _denied_application_error_from_config(
     info: activity.Info, *, reason: str, message: str
 ) -> ApplicationError:
@@ -515,23 +566,6 @@ def _denied_application_error_from_config(
         type=DENIED_ERROR_TYPE,
         non_retryable=True,
     )
-
-
-def _arc_tool_error_from_denied(
-    info: activity.Info, exc: ArcDeniedError
-) -> ArcTemporalError:
-    """Translate an :class:`ArcDeniedError` into an :class:`ArcTemporalError`."""
-    return ArcTemporalError(
-        exc.message,
-        activity_type=info.activity_type,
-        activity_id=info.activity_id,
-        workflow_id=info.workflow_id,
-        run_id=info.workflow_run_id,
-        guard=exc.guard,
-        reason=exc.reason,
-        receipt_id=exc.receipt_id,
-    )
-
 
 __all__ = [
     "DENIED_ERROR_TYPE",

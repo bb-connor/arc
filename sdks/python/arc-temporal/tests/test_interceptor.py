@@ -315,6 +315,12 @@ class TestDenyVerdict:
         err = exc_info.value
         assert err.non_retryable is True
         assert err.type == DENIED_ERROR_TYPE
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.deny_count == 1
+        assert receipt.allow_count == 0
+        assert receipt.steps[0].receipt.is_denied
+        assert receipt.steps[0].receipt.id
 
     async def test_missing_workflow_grant_raises_config_error(self) -> None:
         """Activities with no registered grant must be refused before dispatch.
