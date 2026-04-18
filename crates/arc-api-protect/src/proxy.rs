@@ -22,7 +22,7 @@ use arc_core_types::capability::{
     ArcScope, CapabilityToken, CapabilityTokenBody, Operation, PromptGrant, ResourceGrant,
     ToolGrant,
 };
-use arc_core_types::crypto::Keypair;
+use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_http_core::{
     handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond,
     http_status_metadata_decision, http_status_metadata_final, ApprovalAdmin, ApprovalHandlerError,
@@ -39,7 +39,6 @@ use crate::evaluator::{RequestEvaluator, RouteEntry};
 use crate::spec_discovery::{discover_spec, load_spec_from_file};
 
 /// Configuration for the protect proxy.
-#[derive(Debug, Clone)]
 pub struct ProtectConfig {
     /// Upstream URL to proxy to.
     pub upstream: String,
@@ -53,6 +52,37 @@ pub struct ProtectConfig {
     pub receipt_db: Option<String>,
     /// Optional bearer token that authorizes remote sidecar control requests.
     pub sidecar_control_token: Option<String>,
+    /// Optional seed used to keep the sidecar signer stable across restarts.
+    pub signer_seed_hex: Option<String>,
+    /// Explicit capability issuers trusted by the HTTP authority.
+    pub trusted_capability_issuers: Vec<PublicKey>,
+}
+
+impl std::fmt::Debug for ProtectConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProtectConfig")
+            .field("upstream", &self.upstream)
+            .field(
+                "spec_content",
+                &self.spec_content.as_ref().map(|_| "<inline>"),
+            )
+            .field("spec_path", &self.spec_path)
+            .field("listen_addr", &self.listen_addr)
+            .field("receipt_db", &self.receipt_db)
+            .field(
+                "sidecar_control_token",
+                &self.sidecar_control_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "signer_seed_hex",
+                &self.signer_seed_hex.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "trusted_capability_issuers",
+                &self.trusted_capability_issuers,
+            )
+            .finish()
+    }
 }
 
 /// Stored receipts for inspection and querying.
@@ -217,7 +247,11 @@ impl ProtectProxy {
         let routes = Self::build_routes(&spec_content)?;
         let route_count = routes.len();
 
-        let keypair = Keypair::generate();
+        let keypair = match &self.config.signer_seed_hex {
+            Some(seed_hex) => Keypair::from_seed_hex(seed_hex)
+                .map_err(|error| ProtectError::Config(error.to_string()))?,
+            None => Keypair::generate(),
+        };
         let policy_hash = arc_core_types::sha256_hex(spec_content.as_bytes());
 
         let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
@@ -229,11 +263,12 @@ impl ProtectProxy {
             Arc::new(InMemoryApprovalStore::new())
         };
 
-        let evaluator = RequestEvaluator::new_with_approval_store(
+        let evaluator = RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers(
             routes,
             keypair.clone(),
             policy_hash,
             Arc::clone(&approval_store),
+            self.config.trusted_capability_issuers.clone(),
         );
 
         let (receipt_log, receipt_store, revoked_capability_ids) =

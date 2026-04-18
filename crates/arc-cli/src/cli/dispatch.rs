@@ -64,6 +64,7 @@ fn main() {
                 spec.as_deref(),
                 &listen,
                 receipt_store.as_deref().or(receipt_db.as_deref()),
+                authority_seed_file.as_deref(),
             ),
         },
         Commands::Mcp { command } => match command {

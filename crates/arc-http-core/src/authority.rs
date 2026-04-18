@@ -212,7 +212,12 @@ impl Guard for HttpProjectionGuard {
 impl HttpAuthority {
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
-        Self::new_with_approval_store(keypair, policy_hash, Arc::new(InMemoryApprovalStore::new()))
+        Self::new_with_approval_store_and_trusted_issuers(
+            keypair,
+            policy_hash,
+            Arc::new(InMemoryApprovalStore::new()),
+            Vec::new(),
+        )
     }
 
     #[must_use]
@@ -221,14 +226,32 @@ impl HttpAuthority {
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
+        Self::new_with_approval_store_and_trusted_issuers(
+            keypair,
+            policy_hash,
+            approval_store,
+            Vec::new(),
+        )
+    }
+
+    #[must_use]
+    pub fn new_with_approval_store_and_trusted_issuers(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        mut trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
         let keypair = Arc::new(keypair);
-        let trusted_capability_issuers = vec![keypair.public_key()];
+        let signer_public_key = keypair.public_key();
+        if !trusted_capability_issuers.contains(&signer_public_key) {
+            trusted_capability_issuers.push(signer_public_key.clone());
+        }
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
 
         let mut kernel = ArcKernel::new(KernelConfig {
             keypair: keypair.as_ref().clone(),
-            ca_public_keys: vec![keypair.public_key()],
+            ca_public_keys: trusted_capability_issuers.clone(),
             max_delegation_depth: 8,
             policy_hash: policy_hash.clone(),
             allow_sampling: false,
@@ -846,6 +869,15 @@ mod tests {
         )
     }
 
+    fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
+        HttpAuthority::new_with_approval_store_and_trusted_issuers(
+            Keypair::generate(),
+            "policy-hash".to_string(),
+            Arc::new(InMemoryApprovalStore::new()),
+            vec![trusted_issuer],
+        )
+    }
+
     #[test]
     fn safe_policy_allows_without_capability() {
         let query = HashMap::new();
@@ -1032,6 +1064,39 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("capability issuer is not trusted")
+        );
+    }
+
+    #[test]
+    fn configured_external_issuer_allows_deny_by_default() {
+        let query = HashMap::new();
+        let external_issuer = Keypair::generate();
+        let authority = authority_with_trusted_issuer(external_issuer.public_key());
+        let capability = signed_capability_token_json(&external_issuer, "cap-external");
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-external".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("issuer".to_string()),
+                body_length: 6,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-external")
         );
     }
 

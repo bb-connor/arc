@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use arc_core_types::crypto::Keypair;
+use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
 use arc_http_core::{
     ArcHttpRequest, AuthMethod, CallerIdentity, HttpAuthority, HttpAuthorityError,
@@ -38,9 +38,23 @@ pub struct RequestEvaluator {
 
 impl RequestEvaluator {
     pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_with_trusted_capability_issuers(routes, keypair, policy_hash, Vec::new())
+    }
+
+    pub fn new_with_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new(keypair, policy_hash),
+            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+                keypair,
+                policy_hash,
+                Arc::new(arc_kernel::InMemoryApprovalStore::new()),
+                trusted_capability_issuers,
+            ),
         }
     }
 
@@ -50,9 +64,30 @@ impl RequestEvaluator {
         policy_hash: String,
         approval_store: Arc<dyn ApprovalStore>,
     ) -> Self {
+        Self::new_with_approval_store_and_trusted_capability_issuers(
+            routes,
+            keypair,
+            policy_hash,
+            approval_store,
+            Vec::new(),
+        )
+    }
+
+    pub fn new_with_approval_store_and_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new_with_approval_store(keypair, policy_hash, approval_store),
+            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+                keypair,
+                policy_hash,
+                approval_store,
+                trusted_capability_issuers,
+            ),
         }
     }
 
@@ -407,6 +442,39 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("capability does not authorize tool increment on server math")
+        );
+    }
+
+    #[test]
+    fn evaluate_arc_request_allows_capability_from_configured_external_issuer() {
+        let signer = Keypair::generate();
+        let external_issuer = Keypair::generate();
+        let evaluator = RequestEvaluator::new_with_trusted_capability_issuers(
+            vec![],
+            signer,
+            "test-policy".to_string(),
+            vec![external_issuer.public_key()],
+        );
+        let capability = signed_capability_token_json(&external_issuer, "cap-external");
+
+        let mut request = ArcHttpRequest::new(
+            "req-external-issuer".to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.body_hash = Some("body".to_string());
+        request.body_length = 1;
+
+        let result = evaluator
+            .evaluate_arc_request(request, Some(&capability))
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-external")
         );
     }
 

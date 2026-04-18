@@ -145,6 +145,7 @@ fn cmd_api_protect(
     spec_path: Option<&Path>,
     listen_addr: &str,
     receipt_store: Option<&Path>,
+    authority_seed_path: Option<&Path>,
 ) -> Result<(), CliError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -157,6 +158,11 @@ fn cmd_api_protect(
             .or_else(|| std::env::var("ARC_API_PROTECT_CONTROL_TOKEN").ok())
             .map(|token| token.trim().to_string())
             .filter(|token| !token.is_empty());
+        let signer_seed_hex = authority_seed_path
+            .map(load_or_create_authority_keypair)
+            .transpose()?
+            .map(|keypair| keypair.seed_hex());
+        let trusted_capability_issuers = parse_trusted_capability_issuers_from_env()?;
         let config = ProtectConfig {
             upstream: upstream.to_string(),
             spec_content: None,
@@ -164,12 +170,50 @@ fn cmd_api_protect(
             listen_addr: listen_addr.to_string(),
             receipt_db: receipt_store.map(|path| path.display().to_string()),
             sidecar_control_token,
+            signer_seed_hex,
+            trusted_capability_issuers,
         };
         ProtectProxy::new(config)
             .run()
             .await
             .map_err(|error| CliError::Other(format!("failed to start arc api protect: {error}")))
     })
+}
+
+fn parse_trusted_capability_issuers_from_env() -> Result<Vec<arc_core::PublicKey>, CliError> {
+    let mut issuers = Vec::new();
+
+    if let Ok(single_issuer) = std::env::var("ARC_TRUSTED_ISSUER_KEY") {
+        let single_issuer = single_issuer.trim();
+        if !single_issuer.is_empty() {
+            issuers.push(
+                arc_core::PublicKey::from_hex(single_issuer).map_err(|error| {
+                    CliError::Other(format!(
+                        "failed to parse ARC_TRUSTED_ISSUER_KEY as a public key: {error}"
+                    ))
+                })?,
+            );
+        }
+    }
+
+    if let Ok(multiple_issuers) = std::env::var("ARC_TRUSTED_ISSUER_KEYS") {
+        for issuer in multiple_issuers
+            .split(',')
+            .map(str::trim)
+            .filter(|issuer| !issuer.is_empty())
+        {
+            let parsed = arc_core::PublicKey::from_hex(issuer).map_err(|error| {
+                CliError::Other(format!(
+                    "failed to parse ARC_TRUSTED_ISSUER_KEYS entry as a public key: {error}"
+                ))
+            })?;
+            if !issuers.contains(&parsed) {
+                issuers.push(parsed);
+            }
+        }
+    }
+
+    Ok(issuers)
 }
 
 fn cmd_check(
