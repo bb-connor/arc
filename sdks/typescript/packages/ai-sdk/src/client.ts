@@ -45,6 +45,13 @@ export interface ArcEvaluateToolCallRequest {
   arguments?: unknown;
   parameters?: unknown;
   capability?: unknown;
+  model_metadata?:
+    | {
+      model_id: string;
+      safety_tier?: "low" | "standard" | "high" | "restricted" | undefined;
+      provider?: string | undefined;
+    }
+    | undefined;
   /** Optional compatibility metadata forwarded alongside the evaluation payload. */
   metadata?: Record<string, unknown> | undefined;
 }
@@ -68,6 +75,13 @@ interface ArcSidecarEvaluateRequest extends ArcEvaluateToolCallRequest {
   body_hash?: string | undefined;
   body_length: number;
   session_id?: string | undefined;
+  model_metadata?:
+    | {
+      model_id: string;
+      safety_tier?: "low" | "standard" | "high" | "restricted" | undefined;
+      provider?: string | undefined;
+    }
+    | undefined;
   timestamp: number;
 }
 

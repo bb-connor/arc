@@ -125,6 +125,7 @@ impl RequestEvaluator {
             requested_tool_server: None,
             requested_tool_name: None,
             requested_arguments: None,
+            model_metadata: None,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -150,6 +151,7 @@ impl RequestEvaluator {
             tool_server,
             tool_name,
             arguments,
+            model_metadata,
             ..
         } = request;
         let (route_pattern, matched_policy) = self.match_route(method, &path);
@@ -171,6 +173,7 @@ impl RequestEvaluator {
             requested_tool_server: tool_server.as_deref(),
             requested_tool_name: tool_name.as_deref(),
             requested_arguments: Some(&arguments),
+            model_metadata: model_metadata.as_ref(),
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -313,7 +316,8 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
 mod tests {
     use super::*;
     use arc_core_types::capability::{
-        ArcScope, CapabilityToken, CapabilityTokenBody, Operation, ToolGrant,
+        ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, ModelMetadata, ModelSafetyTier,
+        Operation, ToolGrant,
     };
     use arc_http_core::{
         http_status_scope, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
@@ -442,6 +446,60 @@ mod tests {
         assert_eq!(
             result.receipt.evidence[0].details.as_deref(),
             Some("capability does not authorize tool increment on server math")
+        );
+    }
+
+    #[test]
+    fn evaluate_arc_request_allows_model_constrained_capability_when_metadata_matches() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-model-scope",
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![Constraint::ModelConstraint {
+                        allowed_model_ids: vec!["gpt-5".to_string()],
+                        min_safety_tier: Some(ModelSafetyTier::Standard),
+                    }],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+        );
+
+        let mut request = ArcHttpRequest::new(
+            "req-model-scope".to_string(),
+            HttpMethod::Post,
+            "/arc/tools/math/double".to_string(),
+            "/arc/tools/math/double".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("math".to_string());
+        request.tool_name = Some("double".to_string());
+        request.arguments = Some(serde_json::json!({ "value": 2 }));
+        request.model_metadata = Some(ModelMetadata {
+            model_id: "gpt-5".to_string(),
+            safety_tier: Some(ModelSafetyTier::Standard),
+            provider: Some("openai".to_string()),
+        });
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 1;
+
+        let result = evaluator
+            .evaluate_arc_request(request, Some(&capability))
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-model-scope")
         );
     }
 

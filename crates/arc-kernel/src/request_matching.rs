@@ -202,7 +202,17 @@ pub fn capability_matches_request(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<bool, KernelError> {
-    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments, None)?.is_empty())
+    capability_matches_request_with_model_metadata(cap, tool_name, server_id, arguments, None)
+}
+
+pub fn capability_matches_request_with_model_metadata(
+    cap: &CapabilityToken,
+    tool_name: &str,
+    server_id: &str,
+    arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
+) -> Result<bool, KernelError> {
+    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments, model_metadata)?.is_empty())
 }
 
 pub fn capability_matches_resource_request(

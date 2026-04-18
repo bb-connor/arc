@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use arc_core_types::capability::ModelMetadata;
 use serde::{Deserialize, Serialize};
 
 use crate::identity::CallerIdentity;
@@ -67,6 +68,10 @@ pub struct ArcHttpRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arguments: Option<serde_json::Value>,
 
+    /// Optional model identity and safety tier for model-constrained grants.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_metadata: Option<ModelMetadata>,
+
     /// Unix timestamp (seconds) when the request was received.
     pub timestamp: u64,
 }
@@ -97,6 +102,7 @@ impl ArcHttpRequest {
             tool_server: None,
             tool_name: None,
             arguments: None,
+            model_metadata: None,
             timestamp: now,
         }
     }

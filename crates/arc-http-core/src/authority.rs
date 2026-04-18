@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use arc_core_types::capability::{ArcScope, CapabilityToken, Operation, ToolGrant};
+use arc_core_types::capability::{ArcScope, CapabilityToken, ModelMetadata, Operation, ToolGrant};
 use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
 use arc_cross_protocol::{
@@ -68,6 +68,7 @@ pub struct HttpAuthorityInput<'a> {
     pub requested_tool_server: Option<&'a str>,
     pub requested_tool_name: Option<&'a str>,
     pub requested_arguments: Option<&'a Value>,
+    pub model_metadata: Option<&'a ModelMetadata>,
     pub policy: HttpAuthorityPolicy,
 }
 
@@ -310,6 +311,7 @@ impl HttpAuthority {
             input.requested_tool_server,
             input.requested_tool_name,
             input.requested_arguments,
+            input.model_metadata,
         );
         let caller_identity_hash = input
             .caller
@@ -331,6 +333,7 @@ impl HttpAuthority {
             tool_server: input.requested_tool_server.map(str::to_owned),
             tool_name: input.requested_tool_name.map(str::to_owned),
             arguments: input.requested_arguments.cloned(),
+            model_metadata: input.model_metadata.cloned(),
             timestamp: chrono::Utc::now().timestamp() as u64,
         };
 
@@ -579,6 +582,7 @@ fn validate_presented_capability(
     requested_tool_server: Option<&str>,
     requested_tool_name: Option<&str>,
     requested_arguments: Option<&Value>,
+    model_metadata: Option<&ModelMetadata>,
 ) -> PresentedCapabilityState {
     let requested_tool = match (requested_tool_server, requested_tool_name) {
         (Some(server_id), Some(tool_name)) => Some(RequestedToolInvocation {
@@ -603,7 +607,12 @@ fn validate_presented_capability(
         };
     };
 
-    match validate_capability_token(raw_capability, trusted_issuers, requested_tool) {
+    match validate_capability_token(
+        raw_capability,
+        trusted_issuers,
+        requested_tool,
+        model_metadata,
+    ) {
         Ok(token) => {
             if let Some(hint) = capability_id_hint {
                 if hint != token.id {
@@ -685,6 +694,7 @@ fn validate_capability_token(
     raw: &str,
     trusted_issuers: &[PublicKey],
     requested_tool: Option<RequestedToolInvocation<'_>>,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<CapabilityToken, String> {
     let token: CapabilityToken =
         serde_json::from_str(raw).map_err(|e| format!("invalid capability token: {e}"))?;
@@ -702,11 +712,12 @@ fn validate_capability_token(
         .map_err(|e| format!("invalid capability token: {e}"))?;
 
     if let Some(requested_tool) = requested_tool {
-        let matches = arc_kernel::capability_matches_request(
+        let matches = arc_kernel::capability_matches_request_with_model_metadata(
             &token,
             requested_tool.tool_name,
             requested_tool.server_id,
             requested_tool.arguments,
+            model_metadata,
         )
         .map_err(|e| format!("failed to evaluate capability scope: {e}"))?;
         if !matches {
@@ -897,6 +908,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -936,6 +948,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -963,6 +976,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -993,6 +1007,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -1026,6 +1041,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -1055,6 +1071,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -1089,6 +1106,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -1120,6 +1138,7 @@ mod tests {
                 requested_tool_server: None,
                 requested_tool_name: None,
                 requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap()
@@ -1230,6 +1249,7 @@ mod tests {
                 requested_tool_server: Some("math"),
                 requested_tool_name: Some("increment"),
                 requested_arguments: Some(&Value::Null),
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();

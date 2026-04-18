@@ -86,8 +86,8 @@ pub(crate) use request_matching::{
 };
 pub use request_matching::{
     capability_matches_prompt_request, capability_matches_request,
-    capability_matches_resource_pattern, capability_matches_resource_request,
-    capability_matches_resource_subscription,
+    capability_matches_request_with_model_metadata, capability_matches_resource_pattern,
+    capability_matches_resource_request, capability_matches_resource_subscription,
 };
 
 pub use approval::{
