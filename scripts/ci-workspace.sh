@@ -11,4 +11,9 @@ cargo fmt --all -- --check
 # lint backlogs are exercised by `cargo test` and can be migrated separately.
 cargo clippy --workspace --lib --bins --examples -- -D warnings
 cargo build --workspace
-cargo test --workspace
+# `arc-wasm-guards` pulls in large wasmtime-backed integration binaries when
+# features unify across the workspace, which has been tripping the Linux CI
+# linker. Keep the default lane on the full workspace minus that package and
+# run its lighter library tests separately.
+cargo test --workspace --exclude arc-wasm-guards
+cargo test -p arc-wasm-guards --lib

@@ -4,6 +4,8 @@ extends: "hushspec-base.yaml"
 
 rules:
   tool_access:
+    enabled: true
+    default: block
     allow:
       - read_file
       - list_directory

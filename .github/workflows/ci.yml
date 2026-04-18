@@ -46,6 +46,7 @@ jobs:
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
 
       - name: SDK parity contract lane
@@ -69,7 +70,10 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
           RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
-        run: cargo build --workspace && cargo test --workspace --exclude arc-conformance
+        run: |
+          cargo build --workspace
+          cargo test --workspace --exclude arc-conformance --exclude arc-wasm-guards
+          cargo test -p arc-wasm-guards --lib
 
   coverage:
     name: Coverage
