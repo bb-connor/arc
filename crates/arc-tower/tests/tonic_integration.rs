@@ -17,8 +17,7 @@ use tower::{Layer, Service, ServiceExt};
 
 type TestBody = Full<Bytes>;
 
-fn valid_capability_token_json(id: &str) -> String {
-    let issuer = Keypair::generate();
+fn valid_capability_token_json(id: &str, issuer: &Keypair) -> String {
     let now = chrono::Utc::now().timestamp() as u64;
     let token = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -84,7 +83,7 @@ async fn grpc_post_denied_without_capability() {
 #[tokio::test]
 async fn grpc_post_allowed_with_capability() {
     let keypair = Keypair::generate();
-    let layer = ArcLayer::new(keypair, "test-policy-grpc".to_string());
+    let layer = ArcLayer::new(keypair.clone(), "test-policy-grpc".to_string());
 
     let inner = tower::service_fn(|_req: Request<TestBody>| async {
         let mut resp = http::Response::new(());
@@ -103,7 +102,7 @@ async fn grpc_post_allowed_with_capability() {
         .header("content-type", "application/grpc")
         .header(
             "x-arc-capability",
-            valid_capability_token_json("grpc-cap-1"),
+            valid_capability_token_json("grpc-cap-1", &keypair),
         )
         .body(Full::new(Bytes::new()))
         .unwrap_or_else(|e| panic!("build failed: {e}"));
@@ -133,7 +132,7 @@ async fn grpc_post_allowed_with_capability() {
 #[tokio::test]
 async fn grpc_receipt_id_format() {
     let keypair = Keypair::generate();
-    let layer = ArcLayer::new(keypair, "test-policy-grpc".to_string());
+    let layer = ArcLayer::new(keypair.clone(), "test-policy-grpc".to_string());
 
     let inner = tower::service_fn(|_req: Request<TestBody>| async {
         Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(()))
@@ -147,7 +146,7 @@ async fn grpc_receipt_id_format() {
         .header("content-type", "application/grpc")
         .header(
             "x-arc-capability",
-            valid_capability_token_json("grpc-cap-2"),
+            valid_capability_token_json("grpc-cap-2", &keypair),
         )
         .body(Full::new(Bytes::new()))
         .unwrap_or_else(|e| panic!("build failed: {e}"));
@@ -181,7 +180,7 @@ async fn grpc_receipt_id_format() {
 #[tokio::test]
 async fn grpc_bearer_identity() {
     let keypair = Keypair::generate();
-    let layer = ArcLayer::new(keypair, "test-policy-grpc".to_string());
+    let layer = ArcLayer::new(keypair.clone(), "test-policy-grpc".to_string());
 
     let inner = tower::service_fn(|_req: Request<TestBody>| async {
         Ok::<http::Response<()>, Box<dyn std::error::Error + Send + Sync>>(http::Response::new(()))
@@ -196,7 +195,7 @@ async fn grpc_bearer_identity() {
         .header("authorization", "Bearer grpc-secret-token")
         .header(
             "x-arc-capability",
-            valid_capability_token_json("grpc-cap-3"),
+            valid_capability_token_json("grpc-cap-3", &keypair),
         )
         .body(Full::new(Bytes::new()))
         .unwrap_or_else(|e| panic!("build failed: {e}"));

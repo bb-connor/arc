@@ -405,24 +405,57 @@ fn extract_path(arguments: &Value) -> Option<String> {
 }
 
 fn parse_host_port(url: &str) -> Option<(String, u16)> {
-    // Try parsing as a URL
-    if let Some(rest) = url.strip_prefix("https://") {
-        let host = rest.split('/').next().unwrap_or(rest);
-        let (host, port) = split_host_port(host, 443);
-        return Some((host, port));
+    let url = url.trim();
+    if url.is_empty() {
+        return None;
     }
-    if let Some(rest) = url.strip_prefix("http://") {
-        let host = rest.split('/').next().unwrap_or(rest);
-        let (host, port) = split_host_port(host, 80);
-        return Some((host, port));
+
+    let lowered = url.to_ascii_lowercase();
+    if lowered.starts_with("data:")
+        || lowered.starts_with("javascript:")
+        || lowered.starts_with("about:")
+        || lowered.starts_with("file:")
+    {
+        return None;
     }
-    // Bare host
-    let host = url.split('/').next().unwrap_or(url);
-    if host.contains('.') || host == "localhost" {
-        let (host, port) = split_host_port(host, 443);
-        return Some((host, port));
+
+    let (rest, default_port, parsed_as_url) = if lowered.starts_with("https://") {
+        (&url["https://".len()..], 443, true)
+    } else if lowered.starts_with("http://") {
+        (&url["http://".len()..], 80, true)
+    } else if url.starts_with("//") {
+        (&url["//".len()..], 443, true)
+    } else {
+        (url, 443, false)
+    };
+
+    let host_with_port = rest.split('/').next().unwrap_or(rest);
+    let host_without_userinfo = host_with_port
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(host_with_port);
+
+    let (host, port) = if let Some(bracketed) = host_without_userinfo.strip_prefix('[') {
+        let (host, remainder) = bracketed.split_once(']')?;
+        let port = if remainder.is_empty() {
+            default_port
+        } else if let Some(port_str) = remainder.strip_prefix(':') {
+            port_str.parse::<u16>().ok()?
+        } else {
+            return None;
+        };
+        (host.to_string(), port)
+    } else {
+        split_host_port(host_without_userinfo, default_port)
+    };
+
+    let host = host.trim_matches(|c: char| c == '/' || c == '.');
+    let looks_like_host = host.contains('.') || host == "localhost" || host.contains(':');
+    if host.is_empty() || (!parsed_as_url && !looks_like_host) {
+        return None;
     }
-    None
+
+    Some((host.to_ascii_lowercase(), port))
 }
 
 fn split_host_port(host_with_port: &str, default_port: u16) -> (String, u16) {
@@ -471,6 +504,35 @@ mod tests {
         let args = serde_json::json!({"url": "http://localhost:8080/health"});
         let action = extract_action("fetch", &args);
         assert!(matches!(action, ToolAction::NetworkEgress(ref h, 8080) if h == "localhost"));
+    }
+
+    #[test]
+    fn extract_network_with_scheme_relative_url() {
+        let args = serde_json::json!({"url": "//169.254.169.254/latest"});
+        let action = extract_action("http_request", &args);
+        assert!(matches!(action, ToolAction::NetworkEgress(ref h, 443) if h == "169.254.169.254"));
+    }
+
+    #[test]
+    fn extract_network_with_mixed_case_scheme() {
+        let args = serde_json::json!({"url": "HTTPS://Example.COM/api"});
+        let action = extract_action("fetch", &args);
+        assert!(matches!(action, ToolAction::NetworkEgress(ref h, 443) if h == "example.com"));
+    }
+
+    #[test]
+    fn extract_network_strips_userinfo_and_ipv6_brackets() {
+        let userinfo_args = serde_json::json!({"url": "https://user:pass@evil.com/path"});
+        let userinfo_action = extract_action("http_request", &userinfo_args);
+        assert!(
+            matches!(userinfo_action, ToolAction::NetworkEgress(ref h, 443) if h == "evil.com")
+        );
+
+        let ipv6_args = serde_json::json!({"url": "https://[fd00:ec2::254]/latest"});
+        let ipv6_action = extract_action("http_request", &ipv6_args);
+        assert!(
+            matches!(ipv6_action, ToolAction::NetworkEgress(ref h, 443) if h == "fd00:ec2::254")
+        );
     }
 
     #[test]

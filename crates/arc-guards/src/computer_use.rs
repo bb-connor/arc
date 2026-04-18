@@ -345,11 +345,15 @@ fn extract_host(url: &str) -> Option<String> {
     {
         return None;
     }
-    let rest = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .or_else(|| url.strip_prefix("//"))
-        .unwrap_or(url);
+    let rest = if lowered.starts_with("https://") {
+        &url["https://".len()..]
+    } else if lowered.starts_with("http://") {
+        &url["http://".len()..]
+    } else if url.starts_with("//") {
+        &url["//".len()..]
+    } else {
+        url
+    };
     let host_with_port = rest.split('/').next().unwrap_or(rest);
     let host_without_userinfo = host_with_port
         .rsplit_once('@')
@@ -392,6 +396,10 @@ mod tests {
         assert_eq!(
             extract_host("https://example.com/x"),
             Some("example.com".into())
+        );
+        assert_eq!(
+            extract_host("HTTPS://169.254.169.254/latest"),
+            Some("169.254.169.254".into())
         );
         assert_eq!(
             extract_host("https://user:pass@example.com:8443/x"),
@@ -455,6 +463,20 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation("https://[fd00:ec2::254]/latest"),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_mixed_case_scheme_urls() {
+        let guard = ComputerUseGuard::with_config(ComputerUseConfig {
+            mode: EnforcementMode::FailClosed,
+            blocked_domains: vec!["169.254.169.254".into()],
+            ..ComputerUseConfig::default()
+        });
+
+        assert_eq!(
+            guard.check_navigation("HTTPS://169.254.169.254/latest"),
             Verdict::Deny
         );
     }

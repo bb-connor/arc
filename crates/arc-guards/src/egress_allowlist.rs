@@ -10,6 +10,25 @@ use arc_kernel::{GuardContext, KernelError, Verdict};
 
 use crate::action::{extract_action, ToolAction};
 
+/// Errors produced when building an [`EgressAllowlistGuard`].
+#[derive(Debug, thiserror::Error)]
+pub enum EgressAllowlistConfigError {
+    /// An allowlist pattern was not a valid glob.
+    #[error("invalid egress allowlist pattern `{pattern}`: {source}")]
+    InvalidAllowPattern {
+        pattern: String,
+        #[source]
+        source: glob::PatternError,
+    },
+    /// A blocklist pattern was not a valid glob.
+    #[error("invalid egress blocklist pattern `{pattern}`: {source}")]
+    InvalidBlockPattern {
+        pattern: String,
+        #[source]
+        source: glob::PatternError,
+    },
+}
+
 fn default_allow_patterns() -> Vec<String> {
     vec![
         // Common AI/ML APIs
@@ -37,16 +56,36 @@ pub struct EgressAllowlistGuard {
 
 impl EgressAllowlistGuard {
     pub fn new() -> Self {
-        Self::with_lists(default_allow_patterns(), vec![])
+        match Self::with_lists(default_allow_patterns(), vec![]) {
+            Ok(guard) => guard,
+            Err(error) => panic!("default egress patterns must be valid: {error}"),
+        }
     }
 
-    pub fn with_lists(allow: Vec<String>, block: Vec<String>) -> Self {
-        let allow_patterns = allow.iter().filter_map(|p| Pattern::new(p).ok()).collect();
-        let block_patterns = block.iter().filter_map(|p| Pattern::new(p).ok()).collect();
-        Self {
+    pub fn with_lists(
+        allow: Vec<String>,
+        block: Vec<String>,
+    ) -> Result<Self, EgressAllowlistConfigError> {
+        let allow_patterns = allow
+            .into_iter()
+            .map(|pattern| {
+                Pattern::new(&pattern).map_err(|source| {
+                    EgressAllowlistConfigError::InvalidAllowPattern { pattern, source }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let block_patterns = block
+            .into_iter()
+            .map(|pattern| {
+                Pattern::new(&pattern).map_err(|source| {
+                    EgressAllowlistConfigError::InvalidBlockPattern { pattern, source }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Self {
             allow_patterns,
             block_patterns,
-        }
+        })
     }
 
     pub fn is_allowed(&self, domain: &str) -> bool {
@@ -124,7 +163,8 @@ mod tests {
         let guard = EgressAllowlistGuard::with_lists(
             vec!["*.mycompany.com".to_string()],
             vec!["blocked.mycompany.com".to_string()],
-        );
+        )
+        .expect("valid egress patterns");
         assert!(guard.is_allowed("api.mycompany.com"));
         assert!(!guard.is_allowed("blocked.mycompany.com"));
         assert!(!guard.is_allowed("other.com"));
@@ -132,10 +172,25 @@ mod tests {
 
     #[test]
     fn wildcard_subdomain_matching() {
-        let guard = EgressAllowlistGuard::with_lists(vec!["*.example.com".to_string()], vec![]);
+        let guard = EgressAllowlistGuard::with_lists(vec!["*.example.com".to_string()], vec![])
+            .expect("valid egress patterns");
         assert!(guard.is_allowed("api.example.com"));
         assert!(guard.is_allowed("www.example.com"));
         // Bare domain does not match *.example.com with glob
         assert!(!guard.is_allowed("example.com"));
+    }
+
+    #[test]
+    fn rejects_invalid_block_pattern() {
+        let error = match EgressAllowlistGuard::with_lists(
+            vec!["*.example.com".to_string()],
+            vec!["[".to_string()],
+        ) {
+            Ok(_) => panic!("invalid block pattern should fail"),
+            Err(error) => error,
+        };
+        assert!(error
+            .to_string()
+            .contains("invalid egress blocklist pattern"));
     }
 }

@@ -559,7 +559,7 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         },
         kernel: policy.kernel.clone(),
         default_capabilities,
-        guard_pipeline: build_guard_pipeline(&policy.guards),
+        guard_pipeline: build_guard_pipeline(&policy.guards)?,
         post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards),
         issuance_policy: None,
         runtime_assurance_policy: None,
@@ -770,7 +770,7 @@ pub fn parse_policy(yaml: &str) -> Result<ArcPolicy, PolicyError> {
 }
 
 /// Build a `GuardPipeline` from a policy's guard configuration.
-pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
+pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline, PolicyError> {
     let mut pipeline = GuardPipeline::new();
 
     if let Some(fp) = &config.forbidden_path {
@@ -825,10 +825,13 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
             if eg.allowed_domains.is_empty() && eg.blocked_domains.is_empty() {
                 pipeline.add(Box::new(EgressAllowlistGuard::new()));
             } else {
-                pipeline.add(Box::new(EgressAllowlistGuard::with_lists(
-                    eg.allowed_domains.clone(),
-                    eg.blocked_domains.clone(),
-                )));
+                pipeline.add(Box::new(
+                    EgressAllowlistGuard::with_lists(
+                        eg.allowed_domains.clone(),
+                        eg.blocked_domains.clone(),
+                    )
+                    .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+                ));
             }
         }
     }
@@ -881,7 +884,7 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
         }
     }
 
-    pipeline
+    Ok(pipeline)
 }
 
 /// Build a `PostInvocationPipeline` from a policy's guard configuration.
@@ -1282,7 +1285,7 @@ kernel:
     #[test]
     fn build_pipeline_from_policy() {
         let policy = parse_policy(EXAMPLE_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 4);
     }
 
@@ -1301,8 +1304,33 @@ kernel:
     #[test]
     fn build_pipeline_from_full_guard_policy() {
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 7);
+    }
+
+    #[test]
+    fn build_pipeline_rejects_invalid_egress_patterns() {
+        let policy = parse_policy(
+            r#"
+guards:
+  egress_allowlist:
+    enabled: true
+    allowed_domains:
+      - "["
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("invalid egress patterns should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid egress allowlist pattern"),
+            "unexpected error: {error}"
+        );
     }
 
     #[test]
@@ -1430,7 +1458,7 @@ capabilities:
         assert!(!policy.kernel.allow_sampling);
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -1463,7 +1491,7 @@ guards:
     enabled: false
 "#;
         let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -1481,7 +1509,7 @@ guards:
       - "**"
 "#;
         let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 1);
 
         let kp = arc_core::crypto::Keypair::generate();

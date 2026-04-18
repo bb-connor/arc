@@ -181,10 +181,10 @@ fn compile_rule_guards(
             if eg.allow.is_empty() && eg.block.is_empty() {
                 builder.add(EgressAllowlistGuard::new());
             } else {
-                builder.add(EgressAllowlistGuard::with_lists(
-                    eg.allow.clone(),
-                    eg.block.clone(),
-                ));
+                builder.add(
+                    EgressAllowlistGuard::with_lists(eg.allow.clone(), eg.block.clone())
+                        .map_err(|error| CompileError::Invalid(error.to_string()))?,
+                );
             }
             builder.add(InternalNetworkGuard::new());
         }
@@ -682,6 +682,31 @@ rules:
                 "egress-allowlist".to_string(),
                 "internal-network".to_string()
             ]
+        );
+    }
+
+    #[test]
+    fn compile_egress_rejects_invalid_globs() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  egress:
+    enabled: true
+    allow: ["["]
+"#,
+        )
+        .unwrap();
+
+        let error = match compile_policy(&spec) {
+            Ok(_) => panic!("invalid egress patterns should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid egress allowlist pattern"),
+            "unexpected error: {error}"
         );
     }
 
