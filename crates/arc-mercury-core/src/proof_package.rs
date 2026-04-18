@@ -203,6 +203,7 @@ impl MercuryProofPackage {
         if arc_bundle.uncheckpointed_receipts.is_empty() {
             publication_profile.completeness_mode = "full_checkpoint_coverage".to_string();
         }
+        publication_profile.validate()?;
 
         let evidence_export_manifest_hash = evidence_export_manifest_hash.into();
         let evidence_export_schema = evidence_export_schema.into();

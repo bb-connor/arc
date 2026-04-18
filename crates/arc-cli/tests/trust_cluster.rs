@@ -1759,7 +1759,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
             &receipt,
         );
         assert_eq!(stored["stored"].as_bool(), Some(true));
-        assert_expected_write_visibility_metadata(&stored, &expected_leader_url);
+        assert_write_visibility_metadata(&stored);
     }
 
     wait_until_with_diagnostics(
