@@ -1,50 +1,6 @@
 # CLAUDE.md
 
-## What is ARC?
+This repository keeps its canonical agent instructions in `AGENTS.md`.
 
-ARC (Provable Agent Capability Transport) is a protocol for secure, attested tool access in AI agent systems. It replaces MCP with a ground-up design built on capability-based security, cryptographic attestation, and privilege separation.
-
-ARC is the protocol layer. ClawdStrike is the policy engine that plugs into the ARC kernel as the guard evaluation backend.
-
-## Five Components
-
-1. **Agent** -- untrusted LLM-powered process that consumes tools
-2. **Runtime Kernel** -- trusted mediator (TCB) that validates capabilities, runs guards, signs receipts
-3. **Tool Servers** -- sandboxed processes that implement tools, isolated from each other
-4. **Capability Authority** -- issues and revokes time-bounded capability tokens
-5. **Receipt Log** -- append-only Merkle-committed log of signed attestations
-
-## Crate Map
-
-| Crate | Purpose |
-|-------|---------|
-| `arc-core` | Shared types: capabilities, scopes, grants, receipts, canonical JSON, signing |
-| `arc-kernel` | Runtime kernel: capability validation, guard pipeline, receipt signing |
-| `arc-manifest` | Tool server manifest format: tool definitions, signing, verification |
-| `arc-mcp-adapter` | Wraps existing MCP servers as ARC tool servers |
-| `hello-tool` | Example tool server (in `examples/`) |
-
-## Build and Test
-
-```bash
-cargo build --workspace
-cargo test --workspace
-cargo clippy --workspace -- -D warnings
-cargo fmt --all -- --check
-```
-
-## Conventions
-
-- **Fail-closed**: errors during evaluation deny access. Invalid policies reject at load time.
-- **Clippy**: `unwrap_used = "deny"`, `expect_used = "deny"` in all crates.
-- **Serialization**: canonical JSON (RFC 8785) for all signed payloads.
-- **Commit messages**: conventional commits (`feat:`, `fix:`, `docs:`, `test:`, etc.).
-- **No em dashes** in code comments or documentation.
-
-## Key Files
-
-- Protocol spec: `spec/PROTOCOL.md`
-- Core types: `crates/arc-core/src/lib.rs`
-- Kernel: `crates/arc-kernel/src/lib.rs`
-- Manifest: `crates/arc-manifest/src/lib.rs`
-- MCP adapter: `crates/arc-mcp-adapter/src/lib.rs`
+Read and follow `AGENTS.md` for the project overview, crate map, build and
+test commands, conventions, and key files.

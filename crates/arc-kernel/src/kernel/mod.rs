@@ -3113,6 +3113,8 @@ impl ArcKernel {
             "issuing capability"
         );
 
+        self.record_observed_capability_snapshot(&capability)?;
+
         Ok(capability)
     }
 
