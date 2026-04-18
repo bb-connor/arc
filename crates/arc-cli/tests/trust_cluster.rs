@@ -647,17 +647,31 @@ fn assert_child_receipt_visible(
     request_id: &str,
     receipt_id: &str,
 ) {
-    let receipts = get_json(
-        client,
-        &format!("{base_url}/v1/receipts/children?requestId={request_id}&limit=10"),
-        token,
+    let url = format!("{base_url}/v1/receipts/children?requestId={request_id}&limit=10");
+    wait_until_with_diagnostics(
+        &format!("child receipt {receipt_id} visible for {request_id}"),
+        Duration::from_secs(30),
+        || {
+            let Some(receipts) = try_get_json(client, &url, token) else {
+                return false;
+            };
+            receipts["receipts"]
+                .as_array()
+                .map(|receipts| {
+                    receipts
+                        .iter()
+                        .any(|receipt| receipt["id"].as_str() == Some(receipt_id))
+                })
+                .unwrap_or(false)
+        },
+        || {
+            json!({
+                "url": url,
+                "health": try_get_json(client, &format!("{base_url}/health"), token),
+                "children": try_get_json(client, &url, token),
+            })
+        },
     );
-    let receipts = receipts["receipts"]
-        .as_array()
-        .expect("child receipts array");
-    assert!(receipts
-        .iter()
-        .any(|receipt| receipt["id"].as_str() == Some(receipt_id)));
 }
 
 fn assert_revocation_visible(client: &Client, base_url: &str, token: &str, capability_id: &str) {
