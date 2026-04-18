@@ -381,6 +381,25 @@ fn cluster_timeout_diagnostics(
     })
 }
 
+fn wait_for_node_health(client: &Client, base_url: &str, token: &str, label: &str) {
+    wait_until_with_diagnostics(
+        label,
+        Duration::from_secs(30),
+        || try_get_json(client, &format!("{base_url}/health"), token).is_some(),
+        || {
+            json!({
+                "baseUrl": base_url,
+                "health": try_get_json(client, &format!("{base_url}/health"), token),
+                "clusterStatus": try_get_json(
+                    client,
+                    &format!("{base_url}/v1/internal/cluster/status"),
+                    token,
+                ),
+            })
+        },
+    );
+}
+
 fn post_json(client: &Client, url: &str, token: &str, body: &Value) -> Value {
     let mut last_error = None;
     for _ in 0..12 {
@@ -1092,21 +1111,89 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     assert_expected_write_visibility_metadata(&revoked_follower, &leader_url);
     assert_revocation_visible(&client, &leader_url, service_token, "cap-revoke-follower");
 
-    wait_until("revocation replication", Duration::from_secs(90), || {
-        let leader_revocation = try_get_json(
-            &client,
-            &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=1"),
-            service_token,
-        )
-        .and_then(|value| value["revoked"].as_bool());
-        let follower_revocation = try_get_json(
-            &client,
-            &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=1"),
-            service_token,
-        )
-        .and_then(|value| value["revoked"].as_bool());
-        leader_revocation == Some(true) && follower_revocation == Some(true)
-    });
+    wait_until_with_diagnostics(
+        "revocation replication",
+        Duration::from_secs(120),
+        || {
+            let revocation_visible = |value: &Value, capability_id: &str| {
+                value["revoked"].as_bool() == Some(true)
+                    && value["revocations"]
+                        .as_array()
+                        .map(|revocations| {
+                            revocations
+                                .iter()
+                                .any(|entry| entry["capabilityId"].as_str() == Some(capability_id))
+                        })
+                        .unwrap_or(false)
+            };
+            let Some(leader_revocation) = try_get_json(
+                &client,
+                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"),
+                service_token,
+            ) else {
+                return false;
+            };
+            let Some(follower_revocation) = try_get_json(
+                &client,
+                &format!("{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"),
+                service_token,
+            ) else {
+                return false;
+            };
+            revocation_visible(&leader_revocation, "cap-revoke-leader")
+                && revocation_visible(&follower_revocation, "cap-revoke-follower")
+        },
+        || {
+            json!({
+                "leaderUrl": leader_url,
+                "followerUrl": follower_url,
+                "leader": {
+                    "health": try_get_json(&client, &format!("{leader_url}/health"), service_token),
+                    "clusterStatus": try_get_json(
+                        &client,
+                        &format!("{leader_url}/v1/internal/cluster/status"),
+                        service_token,
+                    ),
+                    "capRevokeLeader": try_get_json(
+                        &client,
+                        &format!(
+                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
+                        ),
+                        service_token,
+                    ),
+                    "capRevokeFollower": try_get_json(
+                        &client,
+                        &format!(
+                            "{leader_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
+                        ),
+                        service_token,
+                    ),
+                },
+                "follower": {
+                    "health": try_get_json(&client, &format!("{follower_url}/health"), service_token),
+                    "clusterStatus": try_get_json(
+                        &client,
+                        &format!("{follower_url}/v1/internal/cluster/status"),
+                        service_token,
+                    ),
+                    "capRevokeLeader": try_get_json(
+                        &client,
+                        &format!(
+                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-leader&limit=10"
+                        ),
+                        service_token,
+                    ),
+                    "capRevokeFollower": try_get_json(
+                        &client,
+                        &format!(
+                            "{follower_url}/v1/revocations?capabilityId=cap-revoke-follower&limit=10"
+                        ),
+                        service_token,
+                    ),
+                },
+            })
+        },
+    );
 
     let leader_budget = post_json(
         &client,
@@ -1785,10 +1872,11 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
         .expect("build client");
 
     for base_url in &warm_urls {
-        wait_until(
+        wait_for_node_health(
+            &client,
+            base_url,
+            service_token,
             "warm node health reachable",
-            Duration::from_secs(20),
-            || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
         );
     }
 
@@ -1853,10 +1941,11 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
         &[url_a.clone(), url_b.clone()],
     );
 
-    wait_until(
+    wait_for_node_health(
+        &client,
+        &url_c,
+        service_token,
         "late joiner health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{url_c}/health"), service_token).is_some(),
     );
 
     wait_until_with_diagnostics(
@@ -1967,10 +2056,11 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         .expect("build client");
 
     for base_url in &warm_urls {
-        wait_until(
+        wait_for_node_health(
+            &client,
+            base_url,
+            service_token,
             "warm budget node health reachable",
-            Duration::from_secs(20),
-            || try_get_json(&client, &format!("{base_url}/health"), service_token).is_some(),
         );
     }
 
@@ -2056,10 +2146,11 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         &[url_a.clone(), url_b.clone()],
     );
 
-    wait_until(
+    wait_for_node_health(
+        &client,
+        &late_url,
+        service_token,
         "late budget node health reachable",
-        Duration::from_secs(20),
-        || try_get_json(&client, &format!("{late_url}/health"), service_token).is_some(),
     );
 
     wait_until_with_diagnostics(

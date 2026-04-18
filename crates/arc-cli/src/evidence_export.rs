@@ -498,6 +498,11 @@ pub(crate) fn merge_export_query(
         cli_query.agent_subject.as_deref(),
         "agent_subject",
     )?;
+    let tenant = merge_exact_scope(
+        policy_query.tenant.as_deref(),
+        cli_query.tenant.as_deref(),
+        "tenant",
+    )?;
     let since = match (policy_query.since, cli_query.since) {
         (Some(policy), Some(cli)) => Some(max(policy, cli)),
         (Some(policy), None) => Some(policy),
@@ -522,7 +527,7 @@ pub(crate) fn merge_export_query(
         agent_subject,
         since,
         until,
-        tenant: None,
+        tenant,
     })
 }
 
@@ -557,6 +562,11 @@ pub(crate) fn ensure_query_within_federation_policy(
     {
         return Err(CliError::Other(
             "evidence package query exceeds federation policy agent scope".to_string(),
+        ));
+    }
+    if policy_query.tenant.is_some() && policy_query.tenant != export_query.tenant {
+        return Err(CliError::Other(
+            "evidence package query exceeds federation policy tenant scope".to_string(),
         ));
     }
     if let Some(policy_since) = policy_query.since {
@@ -1797,6 +1807,77 @@ mod tests {
                 oldest_live_receipt_timestamp: Some(1_775_137_626),
             },
         }
+    }
+
+    #[test]
+    fn merge_export_query_preserves_policy_tenant_scope() {
+        let merged = merge_export_query(
+            &EvidenceExportQuery {
+                capability_id: Some("cap-1".to_string()),
+                agent_subject: None,
+                since: None,
+                until: None,
+                tenant: Some("tenant-a".to_string()),
+            },
+            &EvidenceExportQuery {
+                capability_id: None,
+                agent_subject: Some("agent-1".to_string()),
+                since: None,
+                until: None,
+                tenant: None,
+            },
+        )
+        .expect("merge should preserve tenant scope");
+
+        assert_eq!(merged.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(merged.agent_subject.as_deref(), Some("agent-1"));
+        assert_eq!(merged.tenant.as_deref(), Some("tenant-a"));
+    }
+
+    #[test]
+    fn merge_export_query_rejects_tenant_scope_expansion() {
+        let error = merge_export_query(
+            &EvidenceExportQuery {
+                capability_id: None,
+                agent_subject: None,
+                since: None,
+                until: None,
+                tenant: Some("tenant-a".to_string()),
+            },
+            &EvidenceExportQuery {
+                capability_id: None,
+                agent_subject: None,
+                since: None,
+                until: None,
+                tenant: Some("tenant-b".to_string()),
+            },
+        )
+        .expect_err("tenant scope expansion should fail");
+
+        assert!(error.to_string().contains("tenant"));
+    }
+
+    #[test]
+    fn ensure_query_within_federation_policy_rejects_tenant_scope_expansion() {
+        let error = ensure_query_within_federation_policy(
+            &EvidenceExportQuery {
+                capability_id: None,
+                agent_subject: None,
+                since: None,
+                until: None,
+                tenant: Some("tenant-a".to_string()),
+            },
+            &EvidenceExportQuery {
+                capability_id: None,
+                agent_subject: None,
+                since: None,
+                until: None,
+                tenant: Some("tenant-b".to_string()),
+            },
+        )
+        .expect_err("tenant scope expansion should fail");
+
+        assert!(error.to_string().contains("tenant scope"));
     }
 
     #[test]
