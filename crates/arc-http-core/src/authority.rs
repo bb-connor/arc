@@ -65,6 +65,9 @@ pub struct HttpAuthorityInput<'a> {
     pub session_id: Option<String>,
     pub capability_id_hint: Option<&'a str>,
     pub presented_capability: Option<&'a str>,
+    pub requested_tool_server: Option<&'a str>,
+    pub requested_tool_name: Option<&'a str>,
+    pub requested_arguments: Option<&'a Value>,
     pub policy: HttpAuthorityPolicy,
 }
 
@@ -115,6 +118,13 @@ pub enum HttpAuthorityError {
 struct PresentedCapabilityState {
     capability_id: Option<String>,
     invalid_reason: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+struct RequestedToolInvocation<'a> {
+    server_id: &'a str,
+    tool_name: &'a str,
+    arguments: &'a Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,6 +284,9 @@ impl HttpAuthority {
             input.capability_id_hint,
             input.presented_capability,
             self.trusted_capability_issuers(),
+            input.requested_tool_server,
+            input.requested_tool_name,
+            input.requested_arguments,
         );
         let caller_identity_hash = input
             .caller
@@ -292,6 +305,9 @@ impl HttpAuthority {
             body_length: input.body_length,
             session_id: input.session_id.clone(),
             capability_id: presented_capability.capability_id.clone(),
+            tool_server: input.requested_tool_server.map(str::to_owned),
+            tool_name: input.requested_tool_name.map(str::to_owned),
+            arguments: input.requested_arguments.cloned(),
             timestamp: chrono::Utc::now().timestamp() as u64,
         };
 
@@ -537,7 +553,26 @@ fn validate_presented_capability(
     capability_id_hint: Option<&str>,
     presented_capability: Option<&str>,
     trusted_issuers: &[PublicKey],
+    requested_tool_server: Option<&str>,
+    requested_tool_name: Option<&str>,
+    requested_arguments: Option<&Value>,
 ) -> PresentedCapabilityState {
+    let requested_tool = match (requested_tool_server, requested_tool_name) {
+        (Some(server_id), Some(tool_name)) => Some(RequestedToolInvocation {
+            server_id,
+            tool_name,
+            arguments: requested_arguments.unwrap_or(&Value::Null),
+        }),
+        (None, None) => None,
+        _ => {
+            return PresentedCapabilityState {
+                capability_id: None,
+                invalid_reason: Some(
+                    "tool-call evaluation requires both tool_server and tool_name".to_string(),
+                ),
+            };
+        }
+    };
     let Some(raw_capability) = presented_capability else {
         return PresentedCapabilityState {
             capability_id: None,
@@ -545,7 +580,7 @@ fn validate_presented_capability(
         };
     };
 
-    match validate_capability_token(raw_capability, trusted_issuers) {
+    match validate_capability_token(raw_capability, trusted_issuers, requested_tool) {
         Ok(token) => {
             if let Some(hint) = capability_id_hint {
                 if hint != token.id {
@@ -626,6 +661,7 @@ fn projected_evidence(
 fn validate_capability_token(
     raw: &str,
     trusted_issuers: &[PublicKey],
+    requested_tool: Option<RequestedToolInvocation<'_>>,
 ) -> Result<CapabilityToken, String> {
     let token: CapabilityToken =
         serde_json::from_str(raw).map_err(|e| format!("invalid capability token: {e}"))?;
@@ -641,6 +677,22 @@ fn validate_capability_token(
     token
         .validate_time(chrono::Utc::now().timestamp() as u64)
         .map_err(|e| format!("invalid capability token: {e}"))?;
+
+    if let Some(requested_tool) = requested_tool {
+        let matches = arc_kernel::capability_matches_request(
+            &token,
+            requested_tool.tool_name,
+            requested_tool.server_id,
+            requested_tool.arguments,
+        )
+        .map_err(|e| format!("failed to evaluate capability scope: {e}"))?;
+        if !matches {
+            return Err(format!(
+                "capability does not authorize tool {} on server {}",
+                requested_tool.tool_name, requested_tool.server_id
+            ));
+        }
+    }
     Ok(token)
 }
 
@@ -744,16 +796,24 @@ mod tests {
         http_status_scope, AuthMethod, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
         ARC_HTTP_STATUS_SCOPE_FINAL,
     };
-    use arc_core_types::capability::{ArcScope, CapabilityTokenBody};
+    use arc_core_types::capability::{ArcScope, CapabilityTokenBody, Operation, ToolGrant};
 
     fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
+        signed_capability_token_json_with_scope(issuer, id, ArcScope::default())
+    }
+
+    fn signed_capability_token_json_with_scope(
+        issuer: &Keypair,
+        id: &str,
+        scope: ArcScope,
+    ) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: id.to_string(),
                 issuer: issuer.public_key(),
                 subject: issuer.public_key(),
-                scope: ArcScope::default(),
+                scope,
                 issued_at: now.saturating_sub(60),
                 expires_at: now + 3600,
                 delegation_chain: Vec::new(),
@@ -802,6 +862,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -838,6 +901,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -862,6 +928,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: Some("{not-json"),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -889,6 +958,9 @@ mod tests {
                 session_id: Some("session-1".to_string()),
                 capability_id_hint: None,
                 presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -919,6 +991,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: Some("cap-other"),
                 presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -945,6 +1020,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -974,6 +1052,9 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap()
@@ -1043,6 +1124,56 @@ mod tests {
             pending_approval_id(Some(&metadata), Some("kernel returned PendingApproval"))
                 .as_deref(),
             Some("ap-structured")
+        );
+    }
+
+    #[test]
+    fn deny_by_default_requires_matching_tool_grant() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-tool-scope",
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tool-mismatch".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/arc/tools/math/increment".to_string(),
+                path: "/arc/tools/math/increment",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("toolhash".to_string()),
+                body_length: 8,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: Some("increment"),
+                requested_arguments: Some(&Value::Null),
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool increment on server math")
         );
     }
 }

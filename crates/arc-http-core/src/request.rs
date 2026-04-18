@@ -55,6 +55,18 @@ pub struct ArcHttpRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub capability_id: Option<String>,
 
+    /// Optional sidecar tool server identity for synthetic tool-call evaluations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_server: Option<String>,
+
+    /// Optional sidecar tool name for synthetic tool-call evaluations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+
+    /// Optional structured tool-call arguments for synthetic sidecar evaluations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<serde_json::Value>,
+
     /// Unix timestamp (seconds) when the request was received.
     pub timestamp: u64,
 }
@@ -82,6 +94,9 @@ impl ArcHttpRequest {
             body_length: 0,
             session_id: None,
             capability_id: None,
+            tool_server: None,
+            tool_name: None,
+            arguments: None,
             timestamp: now,
         }
     }
