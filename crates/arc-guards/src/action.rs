@@ -423,8 +423,8 @@ fn parse_host_port(url: &str) -> Option<(String, u16)> {
         (&url["https://".len()..], 443, true)
     } else if lowered.starts_with("http://") {
         (&url["http://".len()..], 80, true)
-    } else if url.starts_with("//") {
-        (&url["//".len()..], 443, true)
+    } else if let Some(rest) = url.strip_prefix("//") {
+        (rest, 443, true)
     } else {
         (url, 443, false)
     };

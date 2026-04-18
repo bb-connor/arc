@@ -349,8 +349,8 @@ fn extract_host(url: &str) -> Option<String> {
         &url["https://".len()..]
     } else if lowered.starts_with("http://") {
         &url["http://".len()..]
-    } else if url.starts_with("//") {
-        &url["//".len()..]
+    } else if let Some(rest) = url.strip_prefix("//") {
+        rest
     } else {
         url
     };
