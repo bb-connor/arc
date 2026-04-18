@@ -94,6 +94,19 @@ function lambdaAllowReceipt(id = "r-allow"): Record<string, unknown> {
   };
 }
 
+function sidecarAllowEvaluateResponse(id = "r-allow"): Record<string, unknown> {
+  return {
+    verdict: { verdict: "allow" },
+    receipt: {
+      id,
+      verdict: { verdict: "allow" },
+      route_pattern: "/arc/tools/math/double",
+      method: "POST",
+    },
+    evidence: [],
+  };
+}
+
 // -- arcTool: basic shape --------------------------------------------------
 
 describe("arcTool: shape and type preservation", () => {
@@ -170,6 +183,23 @@ describe("arcTool: allow path invokes underlying execute", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe("http://127.0.0.1:9090/arc/evaluate");
     expect(calls[0]!.body).toMatchObject({
+      request_id: expect.any(String),
+      method: "POST",
+      route_pattern: "/arc/tools/math/double",
+      path: "/arc/tools/math/double",
+      query: {},
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(JSON.stringify({ n: 21 }).length),
+      },
+      caller: {
+        subject: "anonymous",
+        auth_method: { method: "anonymous" },
+        verified: false,
+      },
+      body_hash: expect.any(String),
+      body_length: JSON.stringify({ n: 21 }).length,
+      timestamp: expect.any(Number),
       tool_server: "math",
       tool_name: "double",
       capability_id: "cap-1",
@@ -220,6 +250,19 @@ describe("arcTool: allow path invokes underlying execute", () => {
 
   it("normalizes the Lambda evaluator response contract", async () => {
     const { fetch } = fakeFetch([lambdaAllowReceipt()]);
+    const wrapped = arcTool({
+      parameters: z.object({ n: z.number() }),
+      execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
+      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      clientOptions: { fetch },
+    });
+
+    const result = await wrapped.execute!({ n: 21 });
+    expect(result).toEqual({ doubled: 42 });
+  });
+
+  it("normalizes the sidecar EvaluateResponse contract", async () => {
+    const { fetch } = fakeFetch([sidecarAllowEvaluateResponse()]);
     const wrapped = arcTool({
       parameters: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),

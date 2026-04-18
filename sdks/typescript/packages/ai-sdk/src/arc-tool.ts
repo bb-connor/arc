@@ -83,7 +83,7 @@ export interface ArcToolScope {
    * when the key differs from the registered name.
    */
   toolName: string;
-  /** Optional free-form metadata persisted in the receipt. */
+  /** Optional free-form metadata forwarded alongside the evaluation payload. */
   metadata?: Record<string, unknown> | undefined;
 }
 

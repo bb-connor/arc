@@ -1,16 +1,20 @@
 /**
  * Minimal HTTP client for the ARC sidecar's tool-call evaluation endpoint.
  *
- * The sidecar exposes `POST /arc/evaluate` which accepts a JSON envelope
- * describing a single tool call (capability, server, name, arguments) and
- * returns either the historical receipt envelope or the Lambda evaluator's
- * flatter `{ receipt_id, decision }` shape. This client normalizes both wire
- * formats to a stable `ArcReceipt` API and stays deliberately small so the
- * Vercel AI SDK wrapper does not pull in the HTTP-substrate surface.
+ * The sidecar exposes `POST /arc/evaluate` which accepts an `ArcHttpRequest`
+ * payload. For AI SDK tool calls, this client builds a synthetic HTTP request
+ * envelope that carries the tool identity plus arguments while remaining
+ * decodable by the sidecar's HTTP substrate. It also normalizes both the
+ * canonical `EvaluateResponse { verdict, receipt, evidence }` shape and the
+ * older Lambda evaluator's flatter `{ receipt_id, decision }` shape to a
+ * stable `ArcReceipt` API, while staying deliberately small so the Vercel AI
+ * SDK wrapper does not pull in the full HTTP-substrate package.
  *
  * Transport uses `globalThis.fetch` (Node >= 20 ships it natively) and
  * supports a pluggable `fetch` override for testing.
  */
+
+import { createHash, randomUUID } from "node:crypto";
 
 /** Canonical decision verdict values returned by the sidecar. */
 export type ArcVerdict = "allow" | "deny" | "cancel" | "incomplete";
@@ -41,8 +45,30 @@ export interface ArcEvaluateToolCallRequest {
   arguments?: unknown;
   parameters?: unknown;
   capability?: unknown;
-  /** Caller-supplied metadata persisted in the receipt for observability. */
+  /** Optional compatibility metadata forwarded alongside the evaluation payload. */
   metadata?: Record<string, unknown> | undefined;
+}
+
+interface ArcCallerIdentity {
+  subject: string;
+  auth_method: { method: "anonymous" };
+  verified: boolean;
+  tenant?: string | undefined;
+  agent_id?: string | undefined;
+}
+
+interface ArcSidecarEvaluateRequest extends ArcEvaluateToolCallRequest {
+  request_id: string;
+  method: "POST";
+  route_pattern: string;
+  path: string;
+  query: Record<string, string>;
+  headers: Record<string, string>;
+  caller: ArcCallerIdentity;
+  body_hash?: string | undefined;
+  body_length: number;
+  session_id?: string | undefined;
+  timestamp: number;
 }
 
 /** Options accepted by the `ArcClient` constructor. */
@@ -155,18 +181,20 @@ export class ArcClient {
         normalizedBody.capability_id = capability.id;
       }
     }
+    const sidecarBody = buildSidecarRequest(normalizedBody);
 
     this.debug?.("arc.evaluate.request", {
       url,
-      tool_server: normalizedBody.tool_server,
-      tool_name: normalizedBody.tool_name,
+      tool_server: sidecarBody.tool_server,
+      tool_name: sidecarBody.tool_name,
+      route_pattern: sidecarBody.route_pattern,
     });
 
     try {
       const response = await this.fetchImpl(url, {
         method: "POST",
         headers,
-        body: JSON.stringify(normalizedBody),
+        body: JSON.stringify(sidecarBody),
         signal: controller.signal,
       });
 
@@ -228,6 +256,47 @@ function parseCapabilityToken(capabilityToken: string): Record<string, unknown> 
   }
 }
 
+function buildSidecarRequest(body: ArcEvaluateToolCallRequest): ArcSidecarEvaluateRequest {
+  const argumentsJson = JSON.stringify(body.arguments ?? null);
+  const argumentsBytes = new TextEncoder().encode(argumentsJson);
+  const toolPath = buildToolPath(body.tool_server, body.tool_name);
+  const requestHeaders: Record<string, string> = {
+    "content-type": "application/json",
+    "content-length": String(argumentsBytes.byteLength),
+  };
+
+  return {
+    ...body,
+    request_id: randomUUID(),
+    method: "POST",
+    route_pattern: toolPath,
+    path: toolPath,
+    query: {},
+    headers: requestHeaders,
+    caller: anonymousCallerIdentity(),
+    body_hash: sha256Hex(argumentsBytes),
+    body_length: argumentsBytes.byteLength,
+    session_id: undefined,
+    timestamp: Math.floor(Date.now() / 1000),
+  };
+}
+
+function buildToolPath(toolServer: string, toolName: string): string {
+  return `/arc/tools/${encodeURIComponent(toolServer)}/${encodeURIComponent(toolName)}`;
+}
+
+function anonymousCallerIdentity(): ArcCallerIdentity {
+  return {
+    subject: "anonymous",
+    auth_method: { method: "anonymous" },
+    verified: false,
+  };
+}
+
+function sha256Hex(input: Uint8Array): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
 function normalizeReceipt(raw: unknown): ArcReceipt {
   if (raw == null || typeof raw !== "object") {
     throw new ArcClientError(
@@ -236,8 +305,25 @@ function normalizeReceipt(raw: unknown): ArcReceipt {
     );
   }
   const record = raw as Record<string, unknown>;
-  if (record.decision != null && typeof record.decision === "object") {
-    return record as ArcReceipt;
+  const recordDecision = normalizeDecision(record.decision) ?? normalizeDecision(record.verdict);
+  if (typeof record.id === "string" && recordDecision != null) {
+    return {
+      ...record,
+      decision: recordDecision,
+    } as ArcReceipt;
+  }
+  if (record.receipt != null && typeof record.receipt === "object") {
+    const receipt = record.receipt as Record<string, unknown>;
+    const receiptDecision =
+      normalizeDecision(receipt.decision)
+      ?? normalizeDecision(receipt.verdict)
+      ?? normalizeDecision(record.verdict);
+    if (typeof receipt.id === "string" && receiptDecision != null) {
+      return {
+        ...receipt,
+        decision: receiptDecision,
+      } as ArcReceipt;
+    }
   }
   if (typeof record.receipt_id === "string" && typeof record.decision === "string") {
     return {
@@ -253,4 +339,36 @@ function normalizeReceipt(raw: unknown): ArcReceipt {
     "arc_invalid_receipt",
     "sidecar response missing a recognizable receipt decision shape",
   );
+}
+
+function normalizeDecision(raw: unknown): ArcDecision | undefined {
+  if (raw == null || typeof raw !== "object") {
+    return undefined;
+  }
+  const record = raw as Record<string, unknown>;
+  if (typeof record.verdict !== "string") {
+    return undefined;
+  }
+  switch (record.verdict) {
+    case "allow":
+      return { verdict: "allow" };
+    case "deny":
+      return {
+        verdict: "deny",
+        guard: typeof record.guard === "string" ? record.guard : undefined,
+        reason: typeof record.reason === "string" ? record.reason : undefined,
+      };
+    case "cancel":
+      return {
+        verdict: "cancel",
+        reason: typeof record.reason === "string" ? record.reason : undefined,
+      };
+    case "incomplete":
+      return {
+        verdict: "incomplete",
+        reason: typeof record.reason === "string" ? record.reason : undefined,
+      };
+    default:
+      return undefined;
+  }
 }

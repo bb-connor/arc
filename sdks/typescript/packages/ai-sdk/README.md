@@ -118,10 +118,11 @@ fail-closed mode. Fields: `verdict`, `guard`, `reason`, `receiptId`.
 ### `ArcClient`
 
 Minimal HTTP client for `POST /arc/evaluate`. Can be shared across many
-`arcTool()` instances to amortize construction cost. The client accepts
-both the Lambda evaluator wire contract (`arguments`, inline capability,
-`receipt_id`) and the older header-based contract, normalizing both into
-the same `ArcReceipt` API.
+`arcTool()` instances to amortize construction cost. The client builds an
+`ArcHttpRequest`-compatible payload for tool calls, accepts the sidecar's
+canonical `EvaluateResponse { verdict, receipt, evidence }` shape, and
+still normalizes the Lambda evaluator's legacy `{ receipt_id, decision }`
+wire contract into the same `ArcReceipt` API.
 
 ## License
 
