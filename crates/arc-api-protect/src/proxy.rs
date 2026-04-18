@@ -711,6 +711,10 @@ struct SidecarMintRequest {
     #[serde(default)]
     ttl: Option<u64>,
     #[serde(default)]
+    ttl_seconds: Option<u64>,
+    #[serde(default)]
+    ttl_nanos: Option<u64>,
+    #[serde(default)]
     job_uid: String,
 }
 
@@ -800,7 +804,11 @@ async fn sidecar_mint_handler(
     };
 
     let issued_at = chrono::Utc::now().timestamp() as u64;
-    let ttl_seconds = ttl_seconds_from_wire(mint_request.ttl);
+    let ttl_seconds = ttl_seconds_from_wire(
+        mint_request.ttl_seconds,
+        mint_request.ttl_nanos,
+        mint_request.ttl,
+    );
     let expires_at = issued_at.saturating_add(ttl_seconds);
     let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
 
@@ -1112,12 +1120,38 @@ fn sidecar_control_forbidden_response(remote_auth_configured: bool) -> Response 
         .into_response()
 }
 
-fn ttl_seconds_from_wire(ttl_wire: Option<u64>) -> u64 {
+fn ttl_seconds_from_wire(
+    ttl_seconds_wire: Option<u64>,
+    ttl_nanos_wire: Option<u64>,
+    ttl_legacy_wire: Option<u64>,
+) -> u64 {
     const DEFAULT_TTL_SECONDS: u64 = 3600;
-    match ttl_wire {
+    const NANOS_PER_SECOND: u64 = 1_000_000_000;
+
+    if let Some(ttl_seconds) = ttl_seconds_wire {
+        return match ttl_seconds {
+            0 => DEFAULT_TTL_SECONDS,
+            ttl_seconds => ttl_seconds,
+        };
+    }
+
+    if let Some(ttl_nanos) = ttl_nanos_wire {
+        return match ttl_nanos {
+            0 => DEFAULT_TTL_SECONDS,
+            ttl_nanos => std::cmp::max(
+                1,
+                ttl_nanos.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
+            ),
+        };
+    }
+
+    match ttl_legacy_wire {
         Some(0) | None => DEFAULT_TTL_SECONDS,
-        Some(ttl) if ttl < 1_000_000_000 => ttl,
-        Some(ttl) => std::cmp::max(1, ttl / 1_000_000_000),
+        Some(ttl) if ttl < NANOS_PER_SECOND => ttl,
+        Some(ttl) => std::cmp::max(
+            1,
+            ttl.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
+        ),
     }
 }
 
@@ -2817,9 +2851,14 @@ paths:
 
     #[test]
     fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
-        assert_eq!(ttl_seconds_from_wire(None), 3600);
-        assert_eq!(ttl_seconds_from_wire(Some(3600)), 3600);
-        assert_eq!(ttl_seconds_from_wire(Some(3_600_000_000_000)), 3600);
+        assert_eq!(ttl_seconds_from_wire(None, None, None), 3600);
+        assert_eq!(ttl_seconds_from_wire(Some(3600), None, None), 3600);
+        assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000), None), 1);
+        assert_eq!(ttl_seconds_from_wire(None, None, Some(3600)), 3600);
+        assert_eq!(
+            ttl_seconds_from_wire(None, None, Some(3_600_000_000_000)),
+            3600
+        );
     }
 
     #[test]

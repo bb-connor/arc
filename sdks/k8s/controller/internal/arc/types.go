@@ -130,9 +130,34 @@ type MintRequest struct {
 	// Labels mirrors the governed Job's labels (for audit).
 	Labels map[string]string `json:"labels,omitempty"`
 	// TTL is an optional time-to-live for the grant.
-	TTL time.Duration `json:"ttl,omitempty"`
+	TTL time.Duration `json:"-"`
 	// JobUID is the Kubernetes UID of the Job (for idempotency).
 	JobUID string `json:"job_uid"`
+}
+
+type mintRequestWire struct {
+	Subject    string            `json:"subject"`
+	Scopes     []string          `json:"scopes"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	TTLNanos   *uint64           `json:"ttl_nanos,omitempty"`
+	TTLSeconds *uint64           `json:"ttl_seconds,omitempty"`
+	JobUID     string            `json:"job_uid"`
+}
+
+// MarshalJSON emits an explicit TTL unit so the sidecar never has to guess
+// whether a small integer came from seconds or nanoseconds.
+func (r MintRequest) MarshalJSON() ([]byte, error) {
+	wire := mintRequestWire{
+		Subject: r.Subject,
+		Scopes:  r.Scopes,
+		Labels:  r.Labels,
+		JobUID:  r.JobUID,
+	}
+	if r.TTL > 0 {
+		ttlNanos := uint64(r.TTL)
+		wire.TTLNanos = &ttlNanos
+	}
+	return json.Marshal(wire)
 }
 
 // ReleaseRequest asks the ARC sidecar to revoke an outstanding capability.

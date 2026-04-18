@@ -25,7 +25,7 @@
         { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
       ],
       "dependsOn": [
-        { "containerName": "arc-sidecar", "condition": "START" }
+        { "containerName": "arc-sidecar", "condition": "HEALTHY" }
       ],
       "restartPolicy": {
         "enabled": true,

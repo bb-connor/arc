@@ -62,3 +62,25 @@ func TestCapabilityTokenMarshalJSON_EmitsCanonicalShape(t *testing.T) {
 		t.Fatalf("expected unix issued_at in %s", jsonText)
 	}
 }
+
+func TestMintRequestMarshalJSON_UsesExplicitTTLNanos(t *testing.T) {
+	request := MintRequest{
+		Subject: "job/default/demo",
+		Scopes:  []string{"tools:search"},
+		TTL:     500 * time.Millisecond,
+		JobUID:  "job-uid-1",
+	}
+
+	bytes, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("marshal mint request: %v", err)
+	}
+
+	jsonText := string(bytes)
+	if strings.Contains(jsonText, `"ttl":`) {
+		t.Fatalf("unexpected ambiguous ttl field in %s", jsonText)
+	}
+	if !strings.Contains(jsonText, `"ttl_nanos":500000000`) {
+		t.Fatalf("expected ttl_nanos field in %s", jsonText)
+	}
+}
