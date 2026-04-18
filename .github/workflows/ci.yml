@@ -40,15 +40,17 @@ jobs:
         run: |
           set -euo pipefail
           toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
-          for attempt in 1 2 3 4 5; do
-            if "$HOME/.elan/bin/elan" toolchain install "$toolchain"; then
-              break
-            fi
-            if [ "$attempt" -eq 5 ]; then
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
+          if ! "$HOME/.elan/bin/elan" toolchain list | tr -d '\r' | grep -Fq "$toolchain"; then
+            for attempt in 1 2 3 4 5; do
+              if "$HOME/.elan/bin/elan" toolchain install "$toolchain"; then
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                exit 1
+              fi
+              sleep $((attempt * 5))
+            done
+          fi
           (
             cd formal/lean4/Pact
             "$HOME/.elan/bin/lake" --version

@@ -41,9 +41,6 @@ spec:
         # ------------------------------------------------------------------
         - name: app
           image: APP_IMAGE_PLACEHOLDER
-          ports:
-            - name: http1
-              containerPort: 8080
           env:
             - name: ARC_SIDECAR_URL
               value: "http://localhost:9090"
@@ -72,6 +69,9 @@ spec:
         # ------------------------------------------------------------------
         - name: arc-sidecar
           image: ghcr.io/backbay/arc-sidecar:latest
+          # Cloud Run sends all external traffic to the only container that
+          # declares a containerPort, so the proxy must be the ingress
+          # container and the app stays reachable only over localhost.
           ports:
             - containerPort: 9090
           # The sidecar image's CMD default is `--help`, which exits
