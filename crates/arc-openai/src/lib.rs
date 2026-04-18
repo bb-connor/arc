@@ -331,7 +331,7 @@ impl ArcOpenAiAdapter {
 
         match kernel.evaluate_tool_call_blocking_with_metadata(&request, Some(route_metadata)) {
             Ok(response) => {
-                let denied = matches!(response.verdict, KernelVerdict::Deny);
+                let denied = !matches!(response.verdict, KernelVerdict::Allow);
                 let content = render_response_content(&response.output, response.reason.as_deref());
                 let receipt_ref = Some(response.receipt.id.clone());
                 ToolCallResult {
@@ -470,7 +470,10 @@ fn render_response_content(output: &Option<ToolCallOutput>, reason: Option<&str>
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use arc_core::capability::{ArcScope, Constraint, ModelSafetyTier, Operation, ToolGrant};
+    use arc_core::capability::{
+        ArcScope, Constraint, GovernedTransactionIntent, ModelSafetyTier, MonetaryAmount,
+        Operation, ToolGrant,
+    };
     use arc_core::crypto::Keypair;
     use arc_kernel::{
         ArcKernel, KernelConfig, KernelError, NestedFlowBridge, ToolServerConnection,
@@ -798,6 +801,65 @@ mod tests {
         let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
         assert!(!result.denied);
         assert!(result.receipt.is_some());
+    }
+
+    #[test]
+    fn execute_tool_call_treats_pending_approval_as_denied() {
+        let adapter = ArcOpenAiAdapter::new(test_config(), vec![test_manifest()]).unwrap();
+        let mut kernel = ArcKernel::new(test_kernel_config());
+        kernel.register_tool_server(Box::new(test_server()));
+        let agent_kp = Keypair::generate();
+        let capability = kernel
+            .issue_capability(
+                &agent_kp.public_key(),
+                ArcScope {
+                    grants: vec![ToolGrant {
+                        server_id: "test-srv".to_string(),
+                        tool_name: "get_weather".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints: vec![Constraint::RequireApprovalAbove {
+                            threshold_units: 50,
+                        }],
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    resource_grants: Vec::new(),
+                    prompt_grants: Vec::new(),
+                },
+                3600,
+            )
+            .expect("capability should issue");
+        let execution = OpenAiExecutionContext {
+            capability,
+            agent_id: agent_kp.public_key().to_hex(),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-openai-approval-1".to_string(),
+                server_id: "test-srv".to_string(),
+                tool_name: "get_weather".to_string(),
+                purpose: "require human approval".to_string(),
+                max_amount: Some(MonetaryAmount {
+                    units: 100,
+                    currency: "USD".to_string(),
+                }),
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: None,
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+        };
+
+        let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
+        assert!(result.denied);
+        assert!(result.content.contains("approval"));
+        assert!(result.receipt.is_some());
+        assert!(result.receipt_ref.is_some());
     }
 
     #[test]
