@@ -500,6 +500,7 @@ class ArcHttpRequest(BaseModel):
     body_length: int = 0
     session_id: str | None = None
     capability_id: str | None = None
+    model_metadata: dict[str, Any] | None = None
     timestamp: int
 
 

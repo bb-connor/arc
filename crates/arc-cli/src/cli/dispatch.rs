@@ -64,11 +64,13 @@ fn main() {
                 spec.as_deref(),
                 &listen,
                 receipt_store.as_deref().or(receipt_db.as_deref()),
+                authority_seed_file.as_deref(),
             ),
         },
         Commands::Mcp { command } => match command {
             McpCommands::Serve {
                 policy,
+                preset,
                 server_id,
                 server_name,
                 server_version,
@@ -77,7 +79,8 @@ fn main() {
                 tools_list_changed,
                 command,
             } => cmd_mcp_serve(
-                &policy,
+                policy.as_deref(),
+                preset.as_deref(),
                 &server_id,
                 server_name.as_deref(),
                 server_version.as_deref(),
@@ -1763,6 +1766,20 @@ fn main() {
             ),
         },
         Commands::Passport { command } => match command {
+            PassportCommands::Generate {
+                agent,
+                output,
+                compliance_score,
+                behavioral_anomaly,
+                validity_days,
+            } => passport::cmd_passport_generate(
+                &agent,
+                output.as_deref(),
+                compliance_score,
+                behavioral_anomaly,
+                validity_days,
+                json_output,
+            ),
             PassportCommands::Create {
                 subject_public_key,
                 output,
@@ -2209,6 +2226,10 @@ fn main() {
             GuardCommands::Bench { path, iterations, fuel_limit } => guard::cmd_guard_bench(&path, iterations, fuel_limit),
             GuardCommands::Pack => guard::cmd_guard_pack(),
             GuardCommands::Install { path, target_dir } => guard::cmd_guard_install(&path, &target_dir),
+            GuardCommands::Sign { wasm, key, name, version } => {
+                guards::sign::cmd_guard_sign(&wasm, &key, &name, &version)
+            }
+            GuardCommands::Verify { wasm } => guards::sign::cmd_guard_verify(&wasm),
         },
     };
 

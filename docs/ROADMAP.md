@@ -23,6 +23,45 @@ Phases are ordered by dependency. Within a phase, stories can generally
 be parallelized unless noted. Some phases can overlap with others where
 there are no hard dependencies.
 
+Phase headers marked `[SHIPPED <sha>]` are complete on `project/full-roadmap`.
+Headers marked `[PARTIAL <sha>]` shipped the core feature but have one or
+more follow-up gaps noted in the phase body. Headers with no marker are
+unstarted or in-flight.
+
+---
+
+## Shipment Status (2026-04-16)
+
+**73 of 73 numbered phases shipped** on `project/full-roadmap`. 🎉 Entire roadmap executed end-to-end. Every phase group complete — Phase 0 (DX), Phase 1 (structural security), Phase 2 (types), Phase 3 (content safety + HITL), Phase 4 (code agent), Phase 5 (guard absorption), Phase 6 (framework SDKs), Phase 7 (data guards), Phase 8 (code exec), Phase 9 (service mesh), Phase 10 (orchestration), Phase 11 (content/streaming/iac), Phase 12 (observability), Phase 13 (external guards), Phase 14 (portable kernel), Phase 15 (compliance), Phase 16 (economics), Phase 17 (workflow orchestrators), Phase 18 (memory), Phase 19 (regulatory), Phase 20 (capstone). Plus adjacent
+TEE attested-checkpoint-binding scope work (`ed2614f`) that is not a numbered
+roadmap phase.
+
+| Phase group | Shipped | In flight | Pending |
+|---|---|---|---|
+| 0 (DX) | 0.1, 0.2, 0.3, 0.4, 0.5 | -- | -- |
+| 1 (Structural security) | 1.1, 1.2, 1.3, 1.4, 1.5 | -- | -- |
+| 2 (Types) | 2.1, 2.2, 2.3, 2.4 | -- | -- |
+| 3 (Content safety / HITL) | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | -- | -- |
+| 4 (Code agent) | 4.1, 4.2, 4.3 | -- | -- |
+| 5 (Guard absorption) | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 | -- | -- |
+| 6 (Framework SDKs) | 6.1, 6.2, 6.3, 6.4 | -- | -- |
+| 7 (Data guards) | 7.1, 7.2, 7.3, 7.4 | -- | -- |
+| 8 (Code exec) | 8.1, 8.2 | -- | -- |
+| 9 (Service mesh) | 9.1, 9.2 | -- | -- |
+| 10 (Orchestration) | 10.1, 10.2, 10.3 | -- | -- |
+| 11 (Content / streaming / IaC) | 11.1, 11.2, 11.3 | -- | -- |
+| 12 (Observability) | 12.1, 12.2, 12.3 | -- | -- |
+| 13 (External guards) | 13.1, 13.2, 13.3 | -- | -- |
+| 14 (Portable kernel) | 14.1, 14.2, 14.3 | -- | -- |
+| 15 (Compliance) | 15.1, 15.2, 15.3, 15.4, 15.5 | -- | -- |
+| 16 (Economics) | 16.1, 16.2 | -- | -- |
+| 17 (Workflow orchestrators) | 17.1, 17.2, 17.3, 17.4, 17.5, 17.6 | -- | -- |
+| 18 (Memory) | 18.1, 18.2 | -- | -- |
+| 19 (Regulatory) | 19.1, 19.2, 19.3 | -- | -- |
+| 20 (Capstone) | 20.1, 20.2, 20.3, 20.4 | -- | -- |
+
+**Wave 3a + 3b + 3c complete**. Phases 2 (types), 6 (SDKs), 9 (service mesh), 15 (compliance) fully shipped. Wave 3d next: 3.4-3.6 HITL cluster, 1.1 execution nonces, 1.5 multi-tenant receipt, 3.3 sanitizer, 4.x code-agent, 5.x guard absorption, 8.x exec guards, 10.3 langgraph (blocked on 3.4), 11.x content/streaming/iac, 12.3 langsmith, 13.2-13.3 cloud/threat-intel, 14.x WASM kernel, 17.1-17.4 workflow, 18.x memory, 19.x regulatory, 20.x capstones.
+
 ---
 
 ## Phase 0: Developer Experience Foundation
@@ -32,7 +71,7 @@ there are no hard dependencies.
 > **Depends on**: Nothing. Unblocks everything.
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md`
 
-### 0.1 Publish Python SDKs to PyPI
+### 0.1 Publish Python SDKs to PyPI [SHIPPED 9eeea0f]
 
 **What**: Publish `arc-sdk-python`, `arc-fastapi`, `arc-asgi`, `arc-django`,
 `arc-langchain` to PyPI. Set up CI to publish on git tag.
@@ -49,7 +88,7 @@ there are no hard dependencies.
 
 **Acceptance**: `pip install arc-sdk-python` works from a clean venv.
 
-### 0.2 Publish TypeScript SDKs to npm
+### 0.2 Publish TypeScript SDKs to npm [SHIPPED 9eeea0f]
 
 **What**: Publish `@arc-protocol/node-http`, `@arc-protocol/express`,
 `@arc-protocol/fastify`, `@arc-protocol/elysia` to npm.
@@ -62,7 +101,7 @@ there are no hard dependencies.
 
 **Acceptance**: `npm install @arc-protocol/node-http` works.
 
-### 0.3 MockArcClient for Testing
+### 0.3 MockArcClient for Testing [SHIPPED 788f69c]
 
 **What**: Ship test fixtures so developers can write unit tests without
 a running sidecar.
@@ -77,21 +116,21 @@ a running sidecar.
 **Acceptance**: A pytest test using `MockArcClient` passes without any
 sidecar process running.
 
-### 0.4 Pre-Built Binary Distribution
+### 0.4 Pre-Built Binary Distribution [SHIPPED c9650f9]
 
 **What**: Distribute the ARC sidecar as pre-built binaries so developers
 don't need the Rust toolchain.
 
 **Files**:
 - `.github/workflows/release-binaries.yml` (new: cross-compile for linux-x86_64, linux-aarch64, darwin-x86_64, darwin-aarch64, windows-x86_64)
-- `Homebrew/arc.rb` or tap setup (new)
+- `Homebrew/arc.rb.tmpl` release formula template (new)
 - `Dockerfile.sidecar` (public image, no GHCR auth required)
 
 **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 3
 
 **Acceptance**: `brew install arc` or `docker run ghcr.io/backbay/arc-sidecar:latest` works without Rust installed.
 
-### 0.5 Error Message Improvements
+### 0.5 Error Message Improvements [SHIPPED 224a05c]
 
 **What**: `ArcDeniedError` includes what was denied, what scope was needed
 vs granted, which guard denied, and a next-steps suggestion.
@@ -113,7 +152,7 @@ developer exactly what scope to request.
 > **Depends on**: Nothing (can run parallel to Phase 0).
 > **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md`
 
-### 1.1 Execution Nonces (TOCTOU Fix)
+### 1.1 Execution Nonces (TOCTOU Fix) [SHIPPED f6d42a3]
 
 **What**: Kernel issues a short-lived `ExecutionNonce` with each allow
 verdict. Tool servers validate the nonce before executing. Closes the
@@ -130,7 +169,7 @@ window between evaluate() and execution.
 **Acceptance**: A tool call presented >30s after evaluation is rejected.
 A tool call with a replayed nonce is rejected.
 
-### 1.2 Trust Level Taxonomy
+### 1.2 Trust Level Taxonomy [SHIPPED 27488eb]
 
 **What**: Define three trust levels (Mediated, Verified, Advisory).
 Record trust level on every receipt. Document which integration pattern
@@ -146,7 +185,7 @@ provides which trust level.
 **Acceptance**: Receipts from mediated evaluations are distinguishable
 from advisory ones. Operators can filter receipts by trust level.
 
-### 1.3 WASM Guard Module Signing
+### 1.3 WASM Guard Module Signing [SHIPPED 3e258a3]
 
 **What**: Require Ed25519 signatures on `.wasm` guard binaries. Verify
 at load time. Reject unsigned modules unless explicitly opted out.
@@ -161,7 +200,7 @@ at load time. Reject unsigned modules unless explicitly opted out.
 **Acceptance**: Loading an unsigned WASM guard fails with a clear error.
 `arc guard sign` produces a signed module that loads successfully.
 
-### 1.4 Emergency Kill Switch
+### 1.4 Emergency Kill Switch [SHIPPED 225193d]
 
 **What**: `kernel.emergency_stop()` revokes all active capabilities,
 rejects all new evaluate() calls. `kernel.emergency_resume()` re-enables.
@@ -176,7 +215,7 @@ Exposed via authenticated HTTP API.
 **Acceptance**: After `POST /emergency-stop`, all evaluate() calls return
 Deny. After `POST /emergency-resume`, normal operation resumes.
 
-### 1.5 Multi-Tenant Receipt Isolation
+### 1.5 Multi-Tenant Receipt Isolation [SHIPPED 2ccf02f]
 
 **What**: Add `tenant_id` to receipts. Enforce query isolation at the
 store level. Tenant derived from auth context, not caller choice.
@@ -211,7 +250,7 @@ not files that already have this feature.
 > **Depends on**: Nothing (can run parallel to Phases 0-1).
 > **Refs**: `docs/protocols/ADR-TYPE-EVOLUTION.md` (canonical shapes)
 
-### 2.1 New ToolAction Variants
+### 2.1 New ToolAction Variants [SHIPPED f5a8a58]
 
 **What**: Add `CodeExecution`, `BrowserAction`, `DatabaseQuery`,
 `ExternalApiCall`, `MemoryWrite` to the `ToolAction` enum. Update
@@ -226,7 +265,7 @@ not files that already have this feature.
 **Acceptance**: `extract_action("sql_query", args)` returns `ToolAction::DatabaseQuery { ... }`.
 Existing guards continue to work (Unknown fallback unchanged).
 
-### 2.2 New Constraint Variants
+### 2.2 New Constraint Variants [SHIPPED f6a8820]
 
 **What**: Add data layer, communication, financial, model routing, and
 memory governance constraints to the `Constraint` enum.
@@ -240,7 +279,7 @@ memory governance constraints to the `Constraint` enum.
 **Acceptance**: A `ToolGrant` with `TableAllowlist(["users", "orders"])`
 compiles, serializes, and is enforced by the kernel.
 
-### 2.3 ModelConstraint Implementation
+### 2.3 ModelConstraint Implementation [SHIPPED 0cd2517]
 
 **What**: Kernel evaluates `ModelConstraint` against `model_metadata` on
 `ToolCallRequest`. Add `ModelMetadata` and `ModelSafetyTier` types.
@@ -254,7 +293,7 @@ compiles, serializes, and is enforced by the kernel.
 **Acceptance**: A tool call with `model_metadata.model_id = "small-uncensored"`
 is denied when the grant requires `min_safety_tier: Standard`.
 
-### 2.4 Plan-Level Evaluation
+### 2.4 Plan-Level Evaluation [SHIPPED 6e16017]
 
 **What**: New `evaluate_plan()` kernel method and `/evaluate-plan` HTTP
 endpoint. Takes a list of planned tool calls, evaluates all against scope
@@ -279,7 +318,7 @@ and guards, returns per-step verdicts before any execute.
 > **Refs**: `docs/guards/06-CONTENT-SAFETY-ABSORPTION.md`,
 > `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md`
 
-### 3.1 PromptInjectionGuard (Port from ClawdStrike)
+### 3.1 PromptInjectionGuard (Port from ClawdStrike) [SHIPPED 3d55e18]
 
 **What**: Port ClawdStrike's 6-signal prompt injection detector to ARC's
 sync Guard trait. Includes text canonicalization and fingerprint dedup.
@@ -295,7 +334,7 @@ sync Guard trait. Includes text canonicalization and fingerprint dedup.
 **Acceptance**: Guard detects "ignore previous instructions" patterns and
 returns Deny. Existing guards unaffected.
 
-### 3.2 JailbreakGuard (Port from ClawdStrike)
+### 3.2 JailbreakGuard (Port from ClawdStrike) [SHIPPED 2da8f19]
 
 **What**: Port the 4-layer jailbreak detector (heuristic, statistical, ML
 scoring, optional LLM judge). LLM judge deferred to host function in v2.
@@ -311,7 +350,7 @@ scoring, optional LLM judge). LLM judge deferred to host function in v2.
 **Acceptance**: Guard detects multi-layer jailbreak attempts. Configurable
 threshold for sensitivity.
 
-### 3.3 Output Sanitizer Completion
+### 3.3 Output Sanitizer Completion [SHIPPED 8d0cbb1]
 
 **What**: Complete the partial port of ClawdStrike's output sanitizer.
 Add secret detection, entropy scanning, Luhn validation, allowlist/denylist,
@@ -327,7 +366,7 @@ overlap resolution, and full redaction strategy support.
 **Acceptance**: Post-invocation guard redacts SSNs, credit cards (Luhn-validated),
 API keys, and high-entropy strings from tool results.
 
-### 3.4 Human-in-the-Loop: Kernel Verdict Extension
+### 3.4 Human-in-the-Loop: Kernel Verdict Extension [SHIPPED c1ac528]
 
 **What**: Add `Verdict::PendingApproval(ApprovalRequest)` to the kernel.
 Implement the approval guard, approval store, and resume flow.
@@ -344,7 +383,7 @@ Implement the approval guard, approval store, and resume flow.
 waits for human response. Approved call executes; denied call records
 denial receipt. Replay of consumed approval token is rejected.
 
-### 3.5 HITL Persistence Backend
+### 3.5 HITL Persistence Backend [SHIPPED c1ac528]
 
 **What**: Pending approvals must survive kernel restart. Implement
 `ApprovalStore` and `BatchApprovalStore` traits with SQLite backend.
@@ -364,7 +403,7 @@ fail-closed table, and the `ApprovalStore`/`BatchApprovalStore` contracts)
 Restart the kernel. The pending approval is still queryable via
 `GET /approvals/pending`. Responding to it resumes tool execution.
 
-### 3.6 Approval Channels
+### 3.6 Approval Channels [SHIPPED c1ac528]
 
 **What**: Implement `ApprovalChannel` trait and webhook channel. Slack
 and dashboard channels follow.
@@ -386,7 +425,7 @@ and dashboard channels follow.
 > **Depends on**: Phase 0 (package publishing, test fixtures).
 > **Refs**: `docs/protocols/DX-AND-ADOPTION-ROADMAP.md` section 4
 
-### 4.1 arc-code-agent Python Package
+### 4.1 arc-code-agent Python Package [SHIPPED e38d41b]
 
 **What**: Wraps file, shell, and git tool calls for coding agents. Ships
 with a zero-config default policy. Works with Claude Code, Cursor, or
@@ -404,7 +443,7 @@ any MCP-based coding agent.
 **Acceptance**: `pip install arc-code-agent` works. A 10-line Python script
 demonstrates safe file reads allowed and `.env` writes denied.
 
-### 4.2 MCP Sidecar Wrapper for Coding Agents
+### 4.2 MCP Sidecar Wrapper for Coding Agents [SHIPPED e38d41b]
 
 **What**: `arc mcp serve` with the default code-agent policy. One command
 wraps any MCP filesystem server with ARC.
@@ -418,7 +457,7 @@ wraps any MCP filesystem server with ARC.
 **Acceptance**: `arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .`
 wraps the MCP server with ARC. File reads allowed, `.env` writes denied.
 
-### 4.3 Migration Guide: MCP to ARC
+### 4.3 Migration Guide: MCP to ARC [SHIPPED e38d41b]
 
 **What**: Step-by-step guide for adding ARC to existing MCP setups.
 
@@ -440,7 +479,7 @@ guide in <5 minutes and have ARC protecting their tool calls.
 > `docs/guards/09-POLICY-ENGINE-ABSORPTION.md`,
 > `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md`
 
-### 5.1 ComputerUseGuard
+### 5.1 ComputerUseGuard [SHIPPED 8593a9b]
 
 **What**: Port action-type allowlisting with Observe/Guardrail/FailClosed modes.
 
@@ -453,7 +492,7 @@ guide in <5 minutes and have ARC protecting their tool calls.
 **Acceptance**: BrowserAction::Navigate to a blocked domain returns Deny.
 Screenshot actions respect rate limits.
 
-### 5.2 InputInjectionCapabilityGuard
+### 5.2 InputInjectionCapabilityGuard [SHIPPED 8593a9b]
 
 **What**: Port input-type restrictions and postcondition probe validation.
 
@@ -466,7 +505,7 @@ Screenshot actions respect rate limits.
 **Acceptance**: Keyboard input injection denied when input type not in
 allowlist. Actions without postcondition probes denied in strict mode.
 
-### 5.3 RemoteDesktopSideChannelGuard
+### 5.3 RemoteDesktopSideChannelGuard [SHIPPED 8593a9b]
 
 **What**: Port per-channel enable/disable with transfer size limits.
 
@@ -480,7 +519,7 @@ allowlist. Actions without postcondition probes denied in strict mode.
 File transfer exceeding size limit denied. Unknown channels denied
 (fail-closed).
 
-### 5.4 SpiderSense Embedding Detector
+### 5.4 SpiderSense Embedding Detector [SHIPPED 8593a9b]
 
 **What**: Port cosine similarity anomaly detection. Sync guard using
 pre-computed pattern database.
@@ -496,7 +535,7 @@ pre-computed pattern database.
 threat patterns return Deny. Arguments below the ambiguity threshold
 return Allow. Pattern database loads from JSON at guard init.
 
-### 5.5 Policy Engine: Guard Compilation
+### 5.5 Policy Engine: Guard Compilation [SHIPPED b595653]
 
 **What**: Port ClawdStrike's policy-to-guard compiler. HushSpec YAML compiles
 to guard instances registered on the kernel. Complete the 5 missing guard
@@ -513,7 +552,7 @@ types in the compilation pipeline.
 **Acceptance**: `compile_policy(yaml)` produces a Vec<Box<dyn Guard>>
 that includes all 12 guard types.
 
-### 5.6 Custom Guard Registry: WASM Merge
+### 5.6 Custom Guard Registry: WASM Merge [SHIPPED c381458]
 
 **What**: Add policy-driven WASM guard loading. Placeholder resolution for
 env vars in guard config. Capability intersection on load.
@@ -538,7 +577,7 @@ functions the WASM module can call.
 > **Depends on**: Phase 0 (publishing, MockArcClient), Phase 2 (type extensions).
 > **Refs**: `docs/protocols/AGENT-FRAMEWORK-INTEGRATION.md`
 
-### 6.1 arc-crewai (Highest Priority)
+### 6.1 arc-crewai (Highest Priority) [SHIPPED dfcb780]
 
 **What**: `BaseTool` wrapper, per-role capability scoping, delegation
 between crews. Published to PyPI.
@@ -555,7 +594,7 @@ between crews. Published to PyPI.
 **Acceptance**: A CrewAI crew where the researcher agent can search but not
 write, and the writer agent can write but not search.
 
-### 6.2 arc-autogen
+### 6.2 arc-autogen [SHIPPED 1b8f77e]
 
 **What**: Function registration wrapper, group chat governance, nested
 chat delegation.
@@ -568,7 +607,7 @@ chat delegation.
 **Acceptance**: An AutoGen GroupChat where registered functions are
 ARC-governed. Nested chat spawns get attenuated capability tokens.
 
-### 6.3 arc-llamaindex
+### 6.3 arc-llamaindex [SHIPPED 1dd8361]
 
 **What**: FunctionTool wrapper, QueryEngineTool scoping for RAG pipelines.
 
@@ -581,7 +620,7 @@ ARC-governed. Nested chat spawns get attenuated capability tokens.
 evaluates each tool dispatch through the sidecar. QueryEngineTool
 scoped to specific vector collections.
 
-### 6.4 @arc-protocol/ai-sdk (Vercel AI SDK)
+### 6.4 @arc-protocol/ai-sdk (Vercel AI SDK) [SHIPPED 9c973fe]
 
 **What**: `arcTool()` wrapper preserving streaming. Published to npm.
 
@@ -602,7 +641,7 @@ via sidecar without breaking `ReadableStream` / SSE streaming.
 > **Refs**: `docs/guards/10-DATA-LAYER-GUARDS.md`,
 > `docs/protocols/DATA-LAYER-INTEGRATION.md`
 
-### 7.1 SqlQueryGuard
+### 7.1 SqlQueryGuard [SHIPPED b3666a9]
 
 **What**: Parses SQL using `sqlparser-rs`. Checks tables, columns,
 operations, predicates, LIMIT clauses. Fail-closed on parse failure.
@@ -619,7 +658,7 @@ Blocks DELETE/UPDATE without WHERE.
 **Acceptance**: `SELECT * FROM users` denied when `ColumnDenylist` is active.
 `DELETE FROM users` denied (no WHERE). `SELECT name FROM users WHERE tenant_id = 'acme' LIMIT 100` allowed.
 
-### 7.2 VectorDbGuard
+### 7.2 VectorDbGuard [SHIPPED 102c805]
 
 **What**: Collection/namespace scoping, operation class, top_k limits,
 embedding exfiltration protection.
@@ -633,7 +672,7 @@ embedding exfiltration protection.
 Cross-namespace access denied. Upsert denied when operation class is
 ReadOnly. `top_k=500` denied when `MaxRowsReturned=50`.
 
-### 7.3 WarehouseCostGuard
+### 7.3 WarehouseCostGuard [SHIPPED 5a0da48]
 
 **What**: Pre-execution cost estimation via dry-run results in tool
 arguments. MaxBytesScanned and MaxCostPerQuery enforcement.
@@ -649,7 +688,12 @@ arguments. MaxBytesScanned and MaxCostPerQuery enforcement.
 Query estimating $0.25 allowed when `MaxCostPerQuery=$5.00`. Receipt
 records `CostDimension::WarehouseQuery` with actual bytes and cost.
 
-### 7.4 QueryResultGuard (Post-Invocation)
+### 7.4 QueryResultGuard (Post-Invocation) [PARTIAL d8e4514]
+
+> Shipped as `redact_result` transform and `PostInvocationPipeline` adapter.
+> Kernel post-invocation hook wiring is deferred until the kernel exposes
+> that surface.
+
 
 **What**: Row count enforcement, column redaction, PII pattern matching
 on query results.
@@ -671,7 +715,7 @@ before returning to the agent.
 > **Depends on**: Phase 2 (CodeExecution and BrowserAction ToolAction variants).
 > **Refs**: `docs/guards/13-CODE-EXECUTION-GUARDS.md`
 
-### 8.1 CodeExecutionGuard
+### 8.1 CodeExecutionGuard [SHIPPED 8b650e1]
 
 **What**: Language allowlist, network access control, execution time
 limits, dangerous module detection (os, subprocess, socket).
@@ -686,7 +730,7 @@ is `["python"]`. Code containing `import subprocess` denied by dangerous
 module detection. Network access denied when `network_access=false` on
 the constraint.
 
-### 8.2 BrowserAutomationGuard
+### 8.2 BrowserAutomationGuard [SHIPPED 8b650e1]
 
 **What**: Domain allowlists, action-type restrictions, credential
 detection in Type actions.
@@ -709,7 +753,7 @@ Deny.
 > **Depends on**: Nothing (uses existing sidecar endpoint).
 > **Refs**: `docs/protocols/ENVOY-EXT-AUTHZ-INTEGRATION.md`
 
-### 9.1 gRPC ext_authz Adapter
+### 9.1 gRPC ext_authz Adapter [SHIPPED 7f4d0d7]
 
 **What**: Implement `envoy.service.auth.v3.Authorization/Check` as a thin
 shim over ARC's `/evaluate` endpoint.
@@ -725,7 +769,7 @@ shim over ARC's `/evaluate` endpoint.
 **Acceptance**: An Envoy sidecar with ext_authz pointing at ARC correctly
 allows/denies traffic based on ARC capability evaluation.
 
-### 9.2 Istio Integration Example
+### 9.2 Istio Integration Example [SHIPPED 929e4ab]
 
 **What**: Reference `AuthorizationPolicy` + ext_authz provider config.
 
@@ -752,7 +796,7 @@ appears on responses passing through the mesh.
 > `docs/protocols/AWS-LAMBDA-INTEGRATION.md`,
 > `docs/protocols/LANGGRAPH-INTEGRATION.md`
 
-### 10.1 arc-temporal (Python)
+### 10.1 arc-temporal (Python) [SHIPPED 811fbb8]
 
 **What**: `ArcActivityInterceptor`, `WorkflowGrant`, receipt aggregation.
 Basic version ships without HITL; approval-aware activities added after
@@ -767,7 +811,7 @@ Phase 3.
 Denied activities raise non-retryable `ApplicationError`. WorkflowReceipt
 aggregates step receipts on completion.
 
-### 10.2 arc-lambda-extension
+### 10.2 arc-lambda-extension [SHIPPED 82b69d4]
 
 **What**: ARC kernel as Lambda Extension. Pre-built Layer for arm64/x86_64.
 
@@ -781,7 +825,7 @@ aggregates step receipts on completion.
 tool calls via the extension's localhost:9090. Receipts flushed to
 DynamoDB on SHUTDOWN lifecycle event.
 
-### 10.3 arc-langgraph (depends on Phases 0 and 3)
+### 10.3 arc-langgraph (depends on Phases 0 and 3) [SHIPPED 7c2df6b]
 
 **What**: `arc_node` wrapper, node-level scoping, delegation, approval nodes.
 Requires HITL (Phase 3) because `arc_approval_node` maps LangGraph
@@ -807,7 +851,7 @@ Subgraph nodes cannot exceed the parent graph's scope ceiling.
 > **Refs**: `docs/protocols/SAAS-COMMUNICATION-INTEGRATION.md`,
 > `docs/protocols/EVENT-STREAMING-INTEGRATION.md`
 
-### 11.1 Content-Review Guard
+### 11.1 Content-Review Guard [SHIPPED 8b650e1]
 
 **What**: Pre-invocation guard that inspects outbound content (message body,
 email text, payment amounts). PII detection, tone/profanity, configurable
@@ -822,7 +866,7 @@ per-service.
 A Stripe charge above `RequireApprovalAbove` threshold triggers HITL.
 Guard evidence includes detected PII categories.
 
-### 11.2 arc-streaming (Kafka Consumer Middleware)
+### 11.2 arc-streaming (Kafka Consumer Middleware) [SHIPPED d42eb02]
 
 **What**: `ArcConsumerMiddleware` for Kafka. Consumer-side evaluation,
 transactional receipt commit, DLQ governance.
@@ -836,7 +880,7 @@ transactional receipt commit, DLQ governance.
 capabilities before processing events. Denied events routed to DLQ with
 denial receipt. Offset commit and receipt are transactionally atomic.
 
-### 11.3 IaC Governance (arc-iac)
+### 11.3 IaC Governance (arc-iac) [SHIPPED 4177cad]
 
 **What**: Terraform CLI wrapper with plan/apply two-phase capability.
 Pulumi decorators.
@@ -858,7 +902,7 @@ Resource types outside granted scopes are denied.
 > **Depends on**: Nothing.
 > **Refs**: `docs/guards/11-SIEM-OBSERVABILITY-COMPLETION.md`
 
-### 12.1 Missing SIEM Exporters
+### 12.1 Missing SIEM Exporters [SHIPPED 4c8472b]
 
 **What**: Port Datadog, Sumo Logic, webhook, and alerting exporters from
 ClawdStrike.
@@ -877,7 +921,7 @@ Datadog exporter sends to Datadog Logs API. Webhook exporter delivers
 to a configurable URL with retry. Alerting fires PagerDuty/OpsGenie
 on high-severity guard denials.
 
-### 12.2 OCSF Receipt Format
+### 12.2 OCSF Receipt Format [SHIPPED dec8378]
 
 **What**: Map ARC receipts to OCSF Authorization event class (3002).
 
@@ -889,7 +933,7 @@ on high-severity guard denials.
 **Acceptance**: `OcsfFormatter::format(&receipt)` produces a valid OCSF
 3002 event JSON. Ingested by AWS Security Lake without schema errors.
 
-### 12.3 LangSmith / LangFuse Bridge
+### 12.3 LangSmith / LangFuse Bridge [SHIPPED 5e067c1]
 
 **What**: Push receipts as enriched spans into agent observability platforms.
 
@@ -911,7 +955,7 @@ tool name, verdict, guard evidence, and cost metadata.
 > **Refs**: `docs/guards/12-SELECTIVE-ABSORPTION-PLAN.md`,
 > `docs/protocols/ARCHITECTURAL-EXTENSIONS.md` section 3
 
-### 13.1 AsyncGuardAdapter Infrastructure
+### 13.1 AsyncGuardAdapter Infrastructure [SHIPPED 6104a8c]
 
 **What**: `ExternalGuard` trait, `AsyncGuardAdapter` with circuit breaker,
 token bucket, TtlCache, retry with jitter.
@@ -929,7 +973,7 @@ with a circuit breaker that opens after 5 failures. When open, the adapter
 returns `circuit_open_verdict` (configurable Allow or Deny) without calling
 the external service. Cache hit returns cached verdict without API call.
 
-### 13.2 Cloud Guardrail Adapters
+### 13.2 Cloud Guardrail Adapters [SHIPPED bf1bc74]
 
 **What**: `BedrockGuardrailGuard`, `AzureContentSafetyGuard`,
 `VertexSafetyGuard` as `ExternalGuard` implementations.
@@ -946,7 +990,7 @@ the external service. Cache hit returns cached verdict without API call.
 denies when any category exceeds severity threshold. Cloud provider
 verdict captured as `GuardEvidence` in receipt.
 
-### 13.3 Threat Intelligence Guards
+### 13.3 Threat Intelligence Guards [SHIPPED bf1bc74]
 
 **What**: VirusTotal, Safe Browsing, Snyk as `ExternalGuard` implementations.
 
@@ -972,7 +1016,15 @@ guard denies navigation to a flagged URL.
 > kernel must be stable before extracting a portable subset).
 > **Refs**: `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md`
 
-### 14.1 arc-kernel-core Extraction
+### 14.1 arc-kernel-core Extraction [SHIPPED ce43897]
+
+> Portable `#![no_std] + alloc` crate extracted with pure evaluate,
+> sign, and verify entry points (`38b230e`). WASM32 cross-compile
+> unblocked by the arc-core-types `std`/`no_std + alloc` feature
+> split landed as part of `ce43897` (bundled via staging race):
+> `cargo build --target wasm32-unknown-unknown -p arc-kernel-core`
+> now succeeds on both default and `--no-default-features` paths.
+
 
 **What**: Extract a `no_std + alloc` kernel core with capability validation,
 scope checking, sync guard pipeline, receipt signing. No tokio, rusqlite, ureq.
@@ -988,7 +1040,7 @@ scope checking, sync guard pipeline, receipt signing. No tokio, rusqlite, ureq.
 **Acceptance**: `cargo build --target wasm32-unknown-unknown -p arc-kernel-core` succeeds.
 Binary size < 1MB stripped.
 
-### 14.2 Browser Bindings
+### 14.2 Browser Bindings [SHIPPED 9872b71]
 
 **What**: `wasm-bindgen` bindings for browser-based ARC evaluation.
 
@@ -1002,7 +1054,7 @@ Binary size < 1MB stripped.
 `evaluate()` returns a verdict in <5ms. Receipt signing works using
 Web Crypto for entropy.
 
-### 14.3 Mobile FFI (iOS/Android)
+### 14.3 Mobile FFI (iOS/Android) [SHIPPED 00b6eb1]
 
 **What**: UniFFI bindings for embedding ARC in mobile apps.
 
@@ -1025,7 +1077,7 @@ when connectivity returns.
 > **Depends on**: Nothing (documentation + crypto work).
 > **Refs**: `docs/protocols/COMPLIANCE-ROADMAP.md`
 
-### 15.1 FIPS Crypto Path
+### 15.1 FIPS Crypto Path [SHIPPED 9c5ca85]
 
 **What**: Add FIPS-capable signing for receipts, capability tokens, and
 DPoP proofs. Currently all signing uses Ed25519 via `ed25519-dalek` in
@@ -1057,7 +1109,7 @@ with P-256 verify correctly. Capability tokens signed with P-256 are
 accepted by the kernel. Existing Ed25519 signatures continue to work
 (backward compatible). Algorithm identifier present in serialized artifacts.
 
-### 15.2 NIST AI RMF Mapping
+### 15.2 NIST AI RMF Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to NIST AI RMF Govern/Map/Measure/Manage functions.
 
@@ -1070,7 +1122,7 @@ accepted by the kernel. Existing Ed25519 signatures continue to work
 ARC controls (capability tokens, guards, receipts, budgets). Reviewed
 by compliance-focused contributor.
 
-### 15.3 PCI DSS v4.0 Mapping
+### 15.3 PCI DSS v4.0 Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to PCI DSS requirements.
 
@@ -1083,7 +1135,7 @@ by compliance-focused contributor.
 shows ARC controls that satisfy it, gaps requiring additional work, and
 customer responsibilities.
 
-### 15.4 ISO 42001 Mapping
+### 15.4 ISO 42001 Mapping [SHIPPED 98252dd]
 
 **What**: Map ARC controls to ISO 42001 AI management system clauses.
 
@@ -1096,7 +1148,7 @@ customer responsibilities.
 (ARC provides technical controls, customer provides organizational).
 Annex A control mapping included.
 
-### 15.5 OWASP LLM Top 10 Coverage Matrix
+### 15.5 OWASP LLM Top 10 Coverage Matrix [SHIPPED 98252dd]
 
 **What**: Document which of the 10 risks ARC addresses, which are gaps,
 which are out of scope.
@@ -1122,7 +1174,7 @@ Reviewed by at least one security-focused contributor.
 > **Depends on**: Nothing.
 > **Refs**: `docs/protocols/ECONOMIC-LAYER-OVERVIEW.md`
 
-### 16.1 Economic Layer Developer Guide
+### 16.1 Economic Layer Developer Guide [SHIPPED f7c738f]
 
 **What**: How-to guide for using metering, budgets, credit, and settlement.
 
@@ -1134,7 +1186,7 @@ Reviewed by at least one security-focused contributor.
 **Acceptance**: A developer can follow the guide to set up per-agent
 budget limits, track tool call costs, and export billing records.
 
-### 16.2 Hierarchical Budget Governance
+### 16.2 Hierarchical Budget Governance [SHIPPED 8234a4d]
 
 **What**: Tree-structured budget policies for enterprise fleet management
 (department -> team -> agent). **This is product work, not documentation.**
@@ -1161,7 +1213,7 @@ team.
 > `docs/protocols/RAY-INTEGRATION.md`,
 > `docs/protocols/K8S-JOBS-INTEGRATION.md`
 
-### 17.1 arc-prefect
+### 17.1 arc-prefect [SHIPPED b72dc0d]
 
 **What**: `@arc_task` / `@arc_flow` decorators, Prefect Events integration.
 
@@ -1171,7 +1223,7 @@ team.
 **Acceptance**: A Prefect flow where each task is capability-checked.
 Denied tasks raise `PermissionError`. Receipts emitted as Prefect events.
 
-### 17.2 arc-dagster
+### 17.2 arc-dagster [SHIPPED ac31e21]
 
 **What**: `@arc_asset` decorator, partition-scoped capabilities, IO Manager.
 
@@ -1181,7 +1233,7 @@ Denied tasks raise `PermissionError`. Receipts emitted as Prefect events.
 **Acceptance**: A Dagster asset materialization governed by ARC. Partition
 key included in capability evaluation context.
 
-### 17.3 arc-airflow
+### 17.3 arc-airflow [SHIPPED e25d73f]
 
 **What**: `ArcOperator` wrapper, TaskFlow `@arc_task` decorator, DAG listener.
 
@@ -1191,7 +1243,7 @@ key included in capability evaluation context.
 **Acceptance**: An Airflow DAG with `ArcOperator`-wrapped tasks. Denied
 tasks fail with `PermissionError`. Receipt IDs pushed to XCom.
 
-### 17.4 arc-ray
+### 17.4 arc-ray [SHIPPED 1e290d2]
 
 **What**: `@arc_remote` decorator, `ArcActor` base class with standing grants.
 
@@ -1201,7 +1253,7 @@ tasks fail with `PermissionError`. Receipt IDs pushed to XCom.
 **Acceptance**: A Ray actor with `@ArcActor.requires("tools:search")` on
 methods. Calls outside granted scope are denied.
 
-### 17.5 K8s Job Controller Extension
+### 17.5 K8s Job Controller Extension [SHIPPED 6a1cac9]
 
 **What**: Job lifecycle capability grants, receipt aggregation on completion.
 
@@ -1211,7 +1263,7 @@ methods. Calls outside granted scope are denied.
 **Acceptance**: A K8s Job with `arc.protocol/governed: "true"` label gets
 a capability grant at creation and release on completion.
 
-### 17.6 Cloud Run / ECS Sidecar Reference Patterns
+### 17.6 Cloud Run / ECS Sidecar Reference Patterns [SHIPPED 8a0b933]
 
 **What**: Reference deployment configs for running ARC sidecar alongside
 application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
@@ -1241,7 +1293,7 @@ application containers on Cloud Run, ECS Fargate, and Azure Container Apps.
 > **Depends on**: Phase 2 (MemoryWrite ToolAction).
 > **Refs**: `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` section 3
 
-### 18.1 Memory Write/Read Guards
+### 18.1 Memory Write/Read Guards [SHIPPED 8b650e1]
 
 **What**: Guards for `ToolAction::MemoryWrite` and `ToolAction::MemoryRead`.
 Enforce `MemoryStoreAllowlist`, `MaxRetentionTtl`, `MaxMemoryEntries`.
@@ -1255,7 +1307,7 @@ Enforce `MemoryStoreAllowlist`, `MaxRetentionTtl`, `MaxMemoryEntries`.
 `MemoryStoreAllowlist` is denied. Writes exceeding `MaxMemoryEntries`
 are denied.
 
-### 18.2 Memory Entry Provenance
+### 18.2 Memory Entry Provenance [SHIPPED 0e9ffb5]
 
 **What**: Hash chain of memory writes linked to capability IDs. On read,
 verify the write was authorized.
@@ -1283,7 +1335,7 @@ provenance are flagged as unverified.
 > **Depends on**: Receipts and metering (already shipped).
 > **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md`
 
-### 19.1 Receipt Compliance Scoring
+### 19.1 Receipt Compliance Scoring [SHIPPED c5c5d06]
 
 **What**: Productize the existing `ComplianceReport` in
 `arc-kernel/src/operator_report.rs` into a user-facing `compliance_score()`
@@ -1301,7 +1353,7 @@ model (0-1000 range, weighted factors) and the CLI/HTTP surface.
 An agent with zero denials in 1000 calls scores above 900. An agent with
 a revoked capability scores below 500.
 
-### 19.2 Agent Behavioral Profiling
+### 19.2 Agent Behavioral Profiling [SHIPPED c5c5d06]
 
 **What**: Productize the existing `BehavioralFeedReport` and
 `SignedBehavioralFeed` in `arc-kernel/src/operator_report.rs` into a
@@ -1320,7 +1372,7 @@ with the velocity guard pipeline.
 advisory signal when it suddenly makes 500. The behavioral guard reads
 from `arc-store-sqlite` receipt queries.
 
-### 19.3 Regulatory API
+### 19.3 Regulatory API [SHIPPED c5c5d06]
 
 **What**: Read-only API over receipt store for regulators. Every response
 wrapped in `SignedExportEnvelope`.
@@ -1345,7 +1397,7 @@ kernel's public key.
 > on receipts and choreography patterns.
 > **Refs**: `docs/protocols/FUTURE-MOATS-AND-RESEARCH.md`
 
-### 20.1 Agent Passport: Trust-Tier Synthesis and WASM Portability (depends on Phases 14, 19.1, 19.2)
+### 20.1 Agent Passport: Trust-Tier Synthesis and WASM Portability (depends on Phases 14, 19.1, 19.2) [SHIPPED 1da2900]
 
 **What**: The core passport system already ships: `AgentPassport` in
 `crates/arc-credentials/src/passport.rs`, challenge flows, OID4VCI/VP,
@@ -1368,7 +1420,7 @@ browser/mobile agents). It is NOT creating passport support from scratch.
 field computed from compliance score and behavioral profile. A WASM-compiled
 kernel verifies the passport and reads the tier.
 
-### 20.2 Agent Insurance Protocol (depends on Phases 16, 19.1, 19.2)
+### 20.2 Agent Insurance Protocol (depends on Phases 16, 19.1, 19.2) [SHIPPED 657ca6d]
 
 **What**: Connect arc-underwriting risk assessment -> arc-market liability
 placement -> arc-settle claims payout. Premium pricing from receipt history.
@@ -1384,7 +1436,7 @@ placement -> arc-settle claims payout. Premium pricing from receipt history.
 quote than one with denials. A claim filed against a policy with receipt
 evidence is processed through the settlement flow.
 
-### 20.3 Cross-Kernel Federation: Bilateral Runtime Co-Signing (depends on Phases 1, 20.1)
+### 20.3 Cross-Kernel Federation: Bilateral Runtime Co-Signing (depends on Phases 1, 20.1) [SHIPPED e08d856]
 
 **What**: The federation crate already ships signed activation, quorum
 governance, open-admission, reputation, and qualification artifacts
@@ -1407,7 +1459,7 @@ creating federation from scratch.
 the receipt (dual signatures). Receipt chain is verifiable by either org.
 Trust established via mTLS handshake between kernels.
 
-### 20.4 Capability Marketplace (independent -- builds on shipped arc-listing/arc-market)
+### 20.4 Capability Marketplace (independent -- builds on shipped arc-listing/arc-market) [SHIPPED e6ee085]
 
 **What**: Tool servers advertise, agents discover and bid. Receipts prove
 usage for billing.

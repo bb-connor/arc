@@ -148,9 +148,10 @@ pub fn issue_reputation_credential_with_enterprise_identity(
         provenance.validate()?;
     }
 
-    let issuer = DidArc::from_public_key(issuer_keypair.public_key());
-    let subject_did =
-        DidArc::from_public_key(arc_core::PublicKey::from_hex(&scorecard.subject_key)?);
+    let issuer = DidArc::from_public_key(issuer_keypair.public_key())?;
+    let subject_did = DidArc::from_public_key(arc_core::PublicKey::from_hex(
+        &scorecard.subject_key,
+    )?)?;
     let unsigned = UnsignedReputationCredential {
         context: vec![
             VC_CONTEXT_V1.to_string(),
@@ -263,6 +264,7 @@ pub fn build_agent_passport(
         enterprise_identity_provenance,
         issued_at: rfc3339_from_unix(issued_at)?,
         valid_until: rfc3339_from_unix(valid_until)?,
+        trust_tier: None,
     })
 }
 

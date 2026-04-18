@@ -1,5 +1,5 @@
-use std::sync::atomic::AtomicU64;
-use std::sync::{Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 use arc_appraisal::VerifiedRuntimeAttestationRecord;
 
@@ -19,6 +19,98 @@ pub type CapabilityId = String;
 /// A string-typed server identifier.
 pub type ServerId = String;
 
+/// Deny reason surfaced by every evaluate path when the emergency kill
+/// switch is engaged. Exposed as `pub` so HTTP adapters and SDKs can
+/// pattern-match on the exact string without drifting.
+pub const EMERGENCY_STOP_DENY_REASON: &str = "kernel emergency stop active";
+
+// ---------------------------------------------------------------------------
+// Phase 1.5 multi-tenant receipt isolation.
+//
+// The kernel must tag every receipt it signs with the tenant that the active
+// session belongs to. The natural place to derive that is the authenticated
+// session's `enterprise_identity.tenant_id`, but the existing response
+// builders accept only a `&ToolCallRequest` (no session handle) across ~40
+// call sites.  Rather than plumb a new parameter through every builder we
+// stash the resolved tenant_id in a thread-local scope for the duration of
+// one evaluate call; `build_and_sign_receipt` consults it when filling in the
+// receipt body.
+//
+// The scope is RAII: the guard resets the previous value on drop, which
+// keeps reentrant evaluations (e.g. a kernel that recursively evaluates a
+// sub-call inside the same thread) isolated.
+//
+// Tenant_id is NEVER extracted from the caller-provided `ToolCallRequest` --
+// allowing caller choice would defeat the isolation the store-level WHERE
+// clause enforces.
+thread_local! {
+    static RECEIPT_TENANT_ID_SCOPE: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Guard returned by [`scope_receipt_tenant_id`]. Restores the previously
+/// active tenant scope when dropped.
+pub(crate) struct ScopedReceiptTenantId {
+    previous: Option<String>,
+}
+
+impl Drop for ScopedReceiptTenantId {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        RECEIPT_TENANT_ID_SCOPE.with(|slot| {
+            *slot.borrow_mut() = previous;
+        });
+    }
+}
+
+/// Install `tenant_id` as the active scope for this thread until the
+/// returned guard is dropped. Passing `None` explicitly clears the scope
+/// (so a child evaluate that lacks a session cannot inherit a parent's
+/// tenant tag by accident).
+pub(crate) fn scope_receipt_tenant_id(tenant_id: Option<String>) -> ScopedReceiptTenantId {
+    let previous = RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.replace(tenant_id));
+    ScopedReceiptTenantId { previous }
+}
+
+/// Read the tenant_id currently in scope on this thread.
+///
+/// Exposed to `build_and_sign_receipt` (in `responses.rs`) so the receipt
+/// body picks up the tag without rewiring every builder signature.
+pub(crate) fn current_scoped_receipt_tenant_id() -> Option<String> {
+    RECEIPT_TENANT_ID_SCOPE.with(|slot| slot.borrow().clone())
+}
+
+/// Extract tenant_id from a session's authenticated auth context.
+///
+/// Preference order:
+///   1. OAuth bearer `enterprise_identity.tenant_id` (the richer SSO
+///      claim, preferred because IdP integrations that surface full
+///      EnterpriseIdentityContext use this path).
+///   2. OAuth bearer `federated_claims.tenant_id` (the minimal OIDC
+///      claim set; populated when the IdP only emits `tid`).
+///
+/// Anonymous sessions and static-bearer sessions return `None`.
+pub(crate) fn extract_tenant_id_from_auth_context(
+    auth_context: &SessionAuthContext,
+) -> Option<String> {
+    if let arc_core::session::SessionAuthMethod::OAuthBearer {
+        enterprise_identity,
+        federated_claims,
+        ..
+    } = &auth_context.method
+    {
+        if let Some(identity) = enterprise_identity.as_ref() {
+            if let Some(id) = identity.tenant_id.as_ref() {
+                return Some(id.clone());
+            }
+        }
+        if let Some(id) = federated_claims.tenant_id.as_ref() {
+            return Some(id.clone());
+        }
+    }
+    None
+}
+
 #[derive(Debug)]
 pub(crate) struct ReceiptContent {
     pub(crate) content_hash: String,
@@ -30,6 +122,12 @@ struct ValidatedGovernedCallChainProof {
     upstream_proof: Option<arc_core::capability::GovernedUpstreamCallChainProof>,
     continuation_token_id: Option<String>,
     session_anchor_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ValidatedGovernedAdmission {
+    call_chain_proof: Option<ValidatedGovernedCallChainProof>,
+    verified_runtime_attestation: Option<VerifiedRuntimeAttestationRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -286,6 +384,12 @@ pub enum KernelError {
 
     #[error("DPoP proof verification failed: {0}")]
     DpopVerificationFailed(String),
+
+    /// Phase 3.4: a human-in-the-loop approval token failed to satisfy
+    /// the pending approval contract (bad binding, bad signature,
+    /// expired, or replayed).
+    #[error("approval rejected: {0}")]
+    ApprovalRejected(String),
 }
 
 impl KernelError {
@@ -541,6 +645,11 @@ impl KernelError {
                 serde_json::json!({ "reason": reason }),
                 "Attach a valid DPoP proof bound to the current capability, request, server, and tool before retrying.",
             ),
+            Self::ApprovalRejected(reason) => self.report_with_context(
+                "ARC-KERNEL-APPROVAL-REJECTED",
+                serde_json::json!({ "reason": reason }),
+                "Obtain a fresh approval token bound to this exact request and retry once a human approver has signed it.",
+            ),
         }
     }
 }
@@ -758,6 +867,7 @@ pub const DEFAULT_MAX_SIZE_BYTES: u64 = 10_737_418_240;
 pub struct ArcKernel {
     config: KernelConfig,
     guards: Vec<Box<dyn Guard>>,
+    post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline,
     budget_store: Mutex<Box<dyn BudgetStore>>,
     revocation_store: Mutex<Box<dyn RevocationStore>>,
     capability_authority: Box<dyn CapabilityAuthority>,
@@ -771,7 +881,6 @@ pub struct ArcKernel {
     payment_adapter: Option<Box<dyn PaymentAdapter>>,
     price_oracle: Option<Box<dyn PriceOracle>>,
     attestation_trust_policy: Option<AttestationTrustPolicy>,
-    session_counter: AtomicU64,
     /// How many receipts per Merkle checkpoint batch. Default: 100.
     checkpoint_batch_size: u64,
     /// Monotonic counter for checkpoint_seq values.
@@ -782,10 +891,65 @@ pub struct ArcKernel {
     dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Configuration for DPoP proof verification TTLs and clock skew.
     dpop_config: Option<dpop::DpopConfig>,
+    /// Phase 1.1 execution-nonce config (TTL, capacity, strict-mode flag).
+    /// When `None`, no nonce is minted on allow and strict verification is
+    /// disabled (legacy deployments keep working).
+    execution_nonce_config: Option<crate::execution_nonce::ExecutionNonceConfig>,
+    /// Phase 1.1 replay-prevention store for execution nonces. Shared with
+    /// any tool server that delegates verification to the kernel. Boxed
+    /// trait object so SQLite-backed stores can be plugged in.
+    execution_nonce_store: Option<Box<dyn crate::execution_nonce::ExecutionNonceStore>>,
     /// Replay store for governed approval tokens. Prevents a signed approval
     /// from being consumed more than once. Uses the same LRU + TTL pattern as
     /// DPoP nonce verification. Key: (request_id, governed_intent_hash).
     approval_replay_store: Option<dpop::DpopNonceStore>,
+    /// Emergency kill switch. When `true`, every evaluate entry point returns
+    /// `Verdict::Deny` without performing capability validation or guard
+    /// evaluation. Flipped by `emergency_stop` / `emergency_resume`.
+    ///
+    /// Reads use `Ordering::SeqCst` even on the hot path. The emergency check
+    /// is a single atomic load per evaluate call (negligible cost relative to
+    /// the guard pipeline) and `SeqCst` is the safest default for a rarely
+    /// taken control path.
+    emergency_stopped: AtomicBool,
+    /// Unix timestamp (seconds) at which the kill switch was last engaged.
+    /// `0` means "never engaged" or "currently resumed". Written with
+    /// `SeqCst` before `emergency_stopped` is set to `true`, cleared to `0`
+    /// after `emergency_stopped` is set to `false`.
+    emergency_stopped_since: AtomicU64,
+    /// Operator-supplied reason for the most recent emergency stop. Set on
+    /// `emergency_stop`, cleared on `emergency_resume`. Guarded by a mutex
+    /// because the payload is a heap-allocated `String`; callers that only
+    /// need presence information can read `emergency_stopped` instead.
+    emergency_stop_reason: Mutex<Option<String>>,
+    /// Phase 18.2 memory-provenance chain. When installed, every
+    /// governed `MemoryWrite` action appends an entry after the allow
+    /// receipt is signed, and every `MemoryRead` attaches the latest
+    /// entry (or an `Unverified` marker) to its receipt as
+    /// `memory_provenance` evidence metadata. `None` keeps the kernel
+    /// backward-compatible: memory-shaped tool calls behave exactly as
+    /// they did before Phase 18.2.
+    memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
+    /// Phase 20.3 cross-kernel federation peer set. When a request
+    /// carries a `federated_origin_kernel_id` and that peer is pinned
+    /// here (fresh), the kernel invokes `federation_cosigner` after
+    /// locally signing the receipt to obtain the origin kernel's
+    /// co-signature. Absent in non-federated deployments.
+    federation_peers: RwLock<HashMap<String, arc_federation::FederationPeer>>,
+    /// Phase 20.3 bilateral co-signer. Separate from the peer set so
+    /// runtime can install it independently -- for instance, a deployment
+    /// can declare peers while still using a mock cosigner in tests.
+    federation_cosigner: Option<Arc<dyn arc_federation::BilateralCoSigningProtocol>>,
+    /// Phase 20.3 locally-signed dual receipts, indexed by ArcReceipt.id.
+    /// Populated only when the post-sign hook fires successfully. Kept
+    /// in-memory; persistent storage plugs in via the federation-state
+    /// APIs already in arc-federation.
+    federation_dual_receipts: Mutex<HashMap<String, arc_federation::DualSignedReceipt>>,
+    /// Phase 20.3 operator-declared kernel identifier used as the
+    /// `org_b_kernel_id` in bilateral co-signing. Defaults to the hex
+    /// encoding of the kernel's signing public key, but operators can
+    /// override it to a stable DNS name via `with_federation_peers`.
+    federation_local_kernel_id: Mutex<Option<String>>,
 }
 
 #[derive(Clone, Copy)]
@@ -1059,6 +1223,29 @@ impl ArcKernel {
         })
     }
 
+    /// Phase 1.5: resolve the tenant_id for a given session by walking its
+    /// authenticated auth context into the enterprise identity's tenant
+    /// claim. Returns `None` for single-tenant / anonymous sessions, for
+    /// unknown session IDs, or when the caller did not supply one.
+    ///
+    /// Tenant_id is taken from the OAuth bearer's `enterprise_identity`
+    /// (preferred, richer SSO claims) and falls back to the OAuth
+    /// `federated_claims.tenant_id` when the IdP surfaces only the minimal
+    /// federated claim set. Both sources originate from the authenticated
+    /// session -- never from caller-provided request fields, because
+    /// caller choice would defeat the isolation guarantee.
+    pub(crate) fn resolve_tenant_id_for_session(
+        &self,
+        session_id: Option<&SessionId>,
+    ) -> Option<String> {
+        let id = session_id?;
+        self.with_session(id, |session| {
+            Ok(extract_tenant_id_from_auth_context(session.auth_context()))
+        })
+        .ok()
+        .flatten()
+    }
+
     fn with_session_mut<R>(
         &self,
         session_id: &SessionId,
@@ -1114,6 +1301,7 @@ impl ArcKernel {
         Self {
             config,
             guards: Vec::new(),
+            post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
             budget_store: Mutex::new(Box::new(InMemoryBudgetStore::new())),
             revocation_store: Mutex::new(Box::new(InMemoryRevocationStore::new())),
             capability_authority: Box::new(LocalCapabilityAuthority::new(authority_keypair)),
@@ -1127,16 +1315,25 @@ impl ArcKernel {
             payment_adapter: None,
             price_oracle: None,
             attestation_trust_policy: None,
-            session_counter: AtomicU64::new(0),
             checkpoint_batch_size,
             checkpoint_seq_counter: AtomicU64::new(0),
             last_checkpoint_seq: AtomicU64::new(0),
             dpop_nonce_store: None,
             dpop_config: None,
+            execution_nonce_config: None,
+            execution_nonce_store: None,
             approval_replay_store: Some(dpop::DpopNonceStore::new(
                 8192,
                 std::time::Duration::from_secs(3600),
             )),
+            emergency_stopped: AtomicBool::new(false),
+            emergency_stopped_since: AtomicU64::new(0),
+            emergency_stop_reason: Mutex::new(None),
+            memory_provenance: None,
+            federation_peers: RwLock::new(HashMap::new()),
+            federation_cosigner: None,
+            federation_dual_receipts: Mutex::new(HashMap::new()),
+            federation_local_kernel_id: Mutex::new(None),
         }
     }
 
@@ -1171,6 +1368,289 @@ impl ArcKernel {
         self.budget_store = Mutex::new(budget_store);
     }
 
+    pub fn set_post_invocation_pipeline(
+        &mut self,
+        pipeline: crate::post_invocation::PostInvocationPipeline,
+    ) {
+        self.post_invocation_pipeline = pipeline;
+    }
+
+    pub fn add_post_invocation_hook(
+        &mut self,
+        hook: Box<dyn crate::post_invocation::PostInvocationHook>,
+    ) {
+        self.post_invocation_pipeline.add(hook);
+    }
+
+    /// Phase 18.2: install a memory-provenance chain.
+    ///
+    /// Once installed, every governed `MemoryWrite`-shaped tool call
+    /// appends an entry to the chain after the allow receipt is
+    /// signed. A chain-store failure on that path is fatal: the call
+    /// surfaces `KernelError::Internal(...)` so operators can detect
+    /// and repair the drift rather than silently shipping a write
+    /// without provenance evidence.
+    ///
+    /// Every `MemoryRead`-shaped tool call looks the entry up by
+    /// `(store, key)` and attaches the result to the receipt as
+    /// `memory_provenance` evidence metadata. Reads with no chain
+    /// entry or with a tampered chain surface as
+    /// [`crate::memory_provenance::ProvenanceVerification::Unverified`]
+    /// so the receipt unambiguously records the gap.
+    pub fn set_memory_provenance_store(
+        &mut self,
+        store: Arc<dyn crate::memory_provenance::MemoryProvenanceStore>,
+    ) {
+        self.memory_provenance = Some(store);
+    }
+
+    /// Return a clone of the active memory-provenance store handle,
+    /// or `None` when no provenance chain has been installed.
+    ///
+    /// Useful for integration tests that want to assert on the chain
+    /// state directly after driving `evaluate_tool_call`.
+    #[must_use]
+    pub fn memory_provenance_store(
+        &self,
+    ) -> Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>> {
+        self.memory_provenance.as_ref().map(Arc::clone)
+    }
+
+    /// Phase 20.3: install a set of [`arc_federation::FederationPeer`]s
+    /// this kernel trusts for bilateral co-signing. Overwrites any
+    /// previously declared set. Callers typically obtain these peers
+    /// from [`arc_federation::KernelTrustExchange::accept_envelope`]
+    /// after a successful mTLS handshake.
+    ///
+    /// Builder-style so deployments can chain `.with_federation_peers(...)`
+    /// onto `ArcKernel::new(config)`.
+    #[must_use]
+    pub fn with_federation_peers(self, peers: Vec<arc_federation::FederationPeer>) -> Self {
+        if let Ok(mut map) = self.federation_peers.write() {
+            map.clear();
+            for peer in peers {
+                map.insert(peer.kernel_id.clone(), peer);
+            }
+        }
+        self
+    }
+
+    /// Phase 20.3: install the bilateral cosigner responsible for
+    /// contacting a peer kernel to obtain a co-signature. Production
+    /// deployments plug in an mTLS-backed RPC client; tests can use
+    /// [`arc_federation::InProcessCoSigner`].
+    pub fn set_federation_cosigner(
+        &mut self,
+        cosigner: Arc<dyn arc_federation::BilateralCoSigningProtocol>,
+    ) {
+        self.federation_cosigner = Some(cosigner);
+    }
+
+    /// Phase 20.3: advertise this kernel's stable identifier as seen by
+    /// remote federation peers. When unset, the hex encoding of the
+    /// signing public key is used. Setting this is recommended in
+    /// production so receipts reference DNS names rather than raw keys.
+    pub fn set_federation_local_kernel_id(&self, kernel_id: impl Into<String>) {
+        if let Ok(mut slot) = self.federation_local_kernel_id.lock() {
+            *slot = Some(kernel_id.into());
+        }
+    }
+
+    /// Phase 20.3: resolve the active federation peer for
+    /// `remote_kernel_id`, refusing stale pins fail-closed.
+    pub fn federation_peer(
+        &self,
+        remote_kernel_id: &str,
+        now: u64,
+    ) -> Option<arc_federation::FederationPeer> {
+        let map = self.federation_peers.read().ok()?;
+        let peer = map.get(remote_kernel_id)?.clone();
+        if peer.is_fresh(now) {
+            Some(peer)
+        } else {
+            None
+        }
+    }
+
+    /// Phase 20.3: snapshot the currently-pinned federation peer set.
+    pub fn federation_peers_snapshot(&self) -> Vec<arc_federation::FederationPeer> {
+        self.federation_peers
+            .read()
+            .map(|map| map.values().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Phase 20.3: look up a dual-signed receipt by the underlying
+    /// [`arc_core::receipt::ArcReceipt`] id. Returns `None` when the
+    /// receipt did not cross a federation boundary or when the
+    /// co-signing hook has not yet produced a dual-signed artifact
+    /// for it.
+    pub fn dual_signed_receipt(
+        &self,
+        receipt_id: &str,
+    ) -> Option<arc_federation::DualSignedReceipt> {
+        self.federation_dual_receipts
+            .lock()
+            .ok()?
+            .get(receipt_id)
+            .cloned()
+    }
+
+    /// Local kernel identifier used in bilateral co-signing. Falls back
+    /// to the hex encoding of the signing public key.
+    pub fn federation_local_kernel_id(&self) -> String {
+        if let Ok(slot) = self.federation_local_kernel_id.lock() {
+            if let Some(id) = slot.as_ref() {
+                return id.clone();
+            }
+        }
+        self.config.keypair.public_key().to_hex()
+    }
+
+    /// Phase 20.3 post-sign hook. Invoked immediately after
+    /// [`Self::build_and_sign_receipt`] so the local (tool-host)
+    /// signature has already landed in the `ArcReceipt`. When
+    /// `federated_origin_kernel_id` is set and the peer is pinned fresh,
+    /// this dispatches the receipt to the cosigner, assembles a
+    /// [`arc_federation::DualSignedReceipt`], and stashes it for
+    /// retrieval via [`Self::dual_signed_receipt`].
+    ///
+    /// Fail-closed: any error from the peer lookup or the cosigner is
+    /// surfaced as a [`KernelError::Internal`] so operators see the
+    /// federation drift rather than silently shipping a receipt without
+    /// the remote signature. Non-federated requests (`None` origin) are
+    /// a no-op.
+    pub(crate) fn apply_federation_cosign(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &arc_core::receipt::ArcReceipt,
+    ) -> Result<(), KernelError> {
+        let Some(origin_kernel_id) = request.federated_origin_kernel_id.as_ref() else {
+            return Ok(());
+        };
+        let Some(cosigner) = self.federation_cosigner.as_ref() else {
+            return Err(KernelError::Internal(format!(
+                "federation cosigner missing for request {request_id} bound to origin kernel {origin_kernel_id}",
+                request_id = request.request_id,
+            )));
+        };
+        let now = current_unix_timestamp();
+        let Some(peer) = self.federation_peer(origin_kernel_id, now) else {
+            return Err(KernelError::Internal(format!(
+                "federation peer {origin_kernel_id} is not pinned or has gone stale"
+            )));
+        };
+
+        let local_kernel_id = self.federation_local_kernel_id();
+        let dual = arc_federation::co_sign_with_origin(
+            origin_kernel_id,
+            &peer.public_key,
+            &local_kernel_id,
+            &self.config.keypair,
+            receipt.clone(),
+            cosigner.as_ref(),
+        )
+        .map_err(|e| KernelError::Internal(format!("bilateral co-sign failed: {e}")))?;
+
+        let mut map = self
+            .federation_dual_receipts
+            .lock()
+            .map_err(|_| KernelError::Internal("federation dual receipts lock poisoned".into()))?;
+        map.insert(receipt.id.clone(), dual);
+        Ok(())
+    }
+
+    /// Engage the emergency kill switch.
+    ///
+    /// After this call, every `evaluate_tool_call*` path returns a signed
+    /// deny receipt with reason `"kernel emergency stop active"` before
+    /// touching capability validation or the guard pipeline. The kernel
+    /// remains running so orchestrators and health probes see a live
+    /// process; it is simply inert.
+    ///
+    /// The active capability set is NOT purged from the revocation store:
+    /// the current `RevocationStore` trait has no bulk revoke API and
+    /// capability expiration plus the kill-switch flag together satisfy
+    /// Phase 1.4 acceptance. When a future revision adds `revoke_all`,
+    /// this method should call it; until then, capability revocation is
+    /// delegated to natural expiration.
+    ///
+    /// Fails closed: if the reason mutex is poisoned we still leave the
+    /// kernel in the stopped state (the flag is set before any fallible
+    /// step) and surface the poison to the caller.
+    pub fn emergency_stop(&self, reason: &str) -> Result<(), KernelError> {
+        let now = current_unix_timestamp();
+        // Record the timestamp first so any concurrent reader that observes
+        // `emergency_stopped == true` sees a non-zero `since` value.
+        self.emergency_stopped_since.store(now, Ordering::SeqCst);
+        self.emergency_stopped.store(true, Ordering::SeqCst);
+
+        warn!(
+            reason = %reason,
+            timestamp = now,
+            "emergency stop engaged -- all evaluations will be denied"
+        );
+
+        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
+            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
+        })?;
+        *slot = Some(reason.to_string());
+        Ok(())
+    }
+
+    /// Disengage the emergency kill switch and resume normal operation.
+    ///
+    /// Subsequent `evaluate_tool_call*` calls follow the full validation
+    /// pipeline again. Capabilities that naturally expired while the
+    /// kernel was stopped remain expired; the kill switch does not
+    /// retroactively grant anything.
+    pub fn emergency_resume(&self) -> Result<(), KernelError> {
+        self.emergency_stopped.store(false, Ordering::SeqCst);
+        self.emergency_stopped_since.store(0, Ordering::SeqCst);
+
+        warn!("emergency stop disengaged -- evaluations will resume");
+
+        let mut slot = self.emergency_stop_reason.lock().map_err(|_| {
+            KernelError::Internal("emergency stop reason mutex poisoned".to_string())
+        })?;
+        *slot = None;
+        Ok(())
+    }
+
+    /// Return `true` when the emergency kill switch is engaged.
+    #[must_use]
+    pub fn is_emergency_stopped(&self) -> bool {
+        self.emergency_stopped.load(Ordering::SeqCst)
+    }
+
+    /// Return the unix timestamp (seconds) at which the kill switch was
+    /// engaged, or `None` when the kernel is currently running normally.
+    #[must_use]
+    pub fn emergency_stopped_since(&self) -> Option<u64> {
+        if !self.is_emergency_stopped() {
+            return None;
+        }
+        let since = self.emergency_stopped_since.load(Ordering::SeqCst);
+        if since == 0 {
+            None
+        } else {
+            Some(since)
+        }
+    }
+
+    /// Return the operator-supplied reason for the current emergency stop,
+    /// or `None` when the kernel is running normally or the mutex is
+    /// poisoned (fail-closed readers should treat `None` as "no reason
+    /// available").
+    #[must_use]
+    pub fn emergency_stop_reason(&self) -> Option<String> {
+        if !self.is_emergency_stopped() {
+            return None;
+        }
+        let guard = self.emergency_stop_reason.lock().ok()?;
+        guard.clone()
+    }
+
     /// Install a DPoP nonce replay store and verification config.
     ///
     /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`
@@ -1179,6 +1659,152 @@ impl ArcKernel {
     pub fn set_dpop_store(&mut self, nonce_store: dpop::DpopNonceStore, config: dpop::DpopConfig) {
         self.dpop_nonce_store = Some(nonce_store);
         self.dpop_config = Some(config);
+    }
+
+    /// Phase 1.1: install an execution-nonce config and replay store.
+    ///
+    /// Once installed, every `Verdict::Allow` carries a short-lived signed
+    /// nonce on `ToolCallResponse::execution_nonce`. Tool servers re-present
+    /// that nonce via `ToolCallRequest::execution_nonce` and the kernel's
+    /// `verify_presented_execution_nonce` helper (or directly via the
+    /// free-standing `verify_execution_nonce` function) before executing.
+    ///
+    /// Set `config.require_nonce = true` to put the kernel into strict mode:
+    /// any call that reaches `require_presented_execution_nonce` without a
+    /// nonce is denied. When `require_nonce == false` the feature is opt-in
+    /// per tool server and non-nonce callers continue to work (backward
+    /// compatibility).
+    pub fn set_execution_nonce_store(
+        &mut self,
+        config: crate::execution_nonce::ExecutionNonceConfig,
+        store: Box<dyn crate::execution_nonce::ExecutionNonceStore>,
+    ) {
+        self.execution_nonce_config = Some(config);
+        self.execution_nonce_store = Some(store);
+    }
+
+    /// Returns `true` when execution-nonce strict mode is active.
+    ///
+    /// Strict mode requires every presented tool call to carry a fresh,
+    /// valid, single-use nonce. When `false` the kernel is either not
+    /// minting nonces at all (no config installed) or is in opt-in mode
+    /// where tool servers can verify presented nonces but non-nonce calls
+    /// are not outright rejected.
+    #[must_use]
+    pub fn execution_nonce_required(&self) -> bool {
+        self.execution_nonce_config
+            .as_ref()
+            .is_some_and(|cfg| cfg.require_nonce)
+    }
+
+    /// Phase 1.1: mint a signed execution nonce for an allow verdict.
+    ///
+    /// Returns `Ok(None)` when no config is installed (nonces disabled);
+    /// returns `Ok(Some(nonce))` once configured. The nonce binding is
+    /// derived from the capability subject, capability ID, target
+    /// server/tool, and the canonical parameter hash embedded in the
+    /// just-signed allow receipt so the verify-time check is always
+    /// comparing apples to apples.
+    pub(crate) fn mint_execution_nonce_for_allow(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        receipt: &ArcReceipt,
+    ) -> Result<Option<Box<crate::execution_nonce::SignedExecutionNonce>>, KernelError> {
+        let Some(config) = self.execution_nonce_config.as_ref() else {
+            return Ok(None);
+        };
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        let binding = crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash: receipt.action.parameter_hash.clone(),
+        };
+        let signed = crate::execution_nonce::mint_execution_nonce(
+            &self.config.keypair,
+            binding,
+            config,
+            now,
+        )?;
+        Ok(Some(Box::new(signed)))
+    }
+
+    /// Phase 1.1: verify a caller-presented execution nonce against the
+    /// expected binding, consuming it in the replay store on success.
+    ///
+    /// Returns `Ok(())` when the nonce is fresh, correctly bound, signed
+    /// by this kernel, and has not been consumed. Returns an error
+    /// wrapping `ExecutionNonceError` on any failure (expired, tampered,
+    /// replayed, binding mismatch, store unreachable).
+    pub fn verify_presented_execution_nonce(
+        &self,
+        presented: &crate::execution_nonce::SignedExecutionNonce,
+        expected: &crate::execution_nonce::NonceBinding,
+    ) -> Result<(), crate::execution_nonce::ExecutionNonceError> {
+        let store = self.execution_nonce_store.as_deref().ok_or_else(|| {
+            crate::execution_nonce::ExecutionNonceError::Store(
+                "execution nonce store is not installed".to_string(),
+            )
+        })?;
+        let now = i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX);
+        crate::execution_nonce::verify_execution_nonce(
+            presented,
+            &self.config.keypair.public_key(),
+            expected,
+            now,
+            store,
+        )
+    }
+
+    /// Phase 1.1: strict-mode gate. Denies the call fail-closed when the
+    /// kernel is configured to require nonces on every execution-bound
+    /// tool call but the caller did not present one.
+    ///
+    /// `presented` is the nonce the tool server forwarded with the
+    /// execution attempt (for example, lifted from the
+    /// `X-Arc-Execution-Nonce` header). Passing the nonce as a separate
+    /// argument keeps `ToolCallRequest` wire-stable: every other call
+    /// site that builds a request (guards, adapters, tests) continues to
+    /// compile unchanged, and strict mode is gated on the integration
+    /// layer that knows how to shuttle the nonce header.
+    ///
+    /// Returns `Ok(())` when:
+    /// * strict mode is disabled (backward-compat path), OR
+    /// * a nonce is presented, signed by this kernel, correctly bound,
+    ///   non-expired, and has not been consumed.
+    ///
+    /// Returns `Err(KernelError::Internal(...))` fail-closed otherwise.
+    pub fn require_presented_execution_nonce(
+        &self,
+        request: &ToolCallRequest,
+        cap: &CapabilityToken,
+        presented: Option<&crate::execution_nonce::SignedExecutionNonce>,
+    ) -> Result<(), KernelError> {
+        if !self.execution_nonce_required() {
+            return Ok(());
+        }
+        let presented = presented.ok_or_else(|| {
+            KernelError::Internal(
+                "execution nonce required but not presented on tool call".to_string(),
+            )
+        })?;
+        let parameter_hash =
+            arc_core::receipt::ToolCallAction::from_parameters(request.arguments.clone())
+                .map_err(|e| {
+                    KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {e}"))
+                })?
+                .parameter_hash;
+        let expected = crate::execution_nonce::NonceBinding {
+            subject_id: cap.subject.to_hex(),
+            capability_id: cap.id.clone(),
+            tool_server: request.server_id.clone(),
+            tool_name: request.tool_name.clone(),
+            parameter_hash,
+        };
+        self.verify_presented_execution_nonce(presented, &expected)
+            .map_err(|e| KernelError::Internal(format!("{e}")))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {
@@ -1245,6 +1871,14 @@ impl ArcKernel {
         capability: &CapabilityToken,
         agent_id: &str,
     ) -> Result<(), KernelError> {
+        // Phase 1.4 emergency kill switch: resource/prompt operations that go
+        // through this helper must also deny-fast so the kill switch applies
+        // to every capability-backed surface, not just tool calls.
+        if self.is_emergency_stopped() {
+            return Err(KernelError::GuardDenied(
+                EMERGENCY_STOP_DENY_REASON.to_string(),
+            ));
+        }
         self.verify_capability_signature(capability)
             .map_err(|_| KernelError::InvalidSignature)?;
         check_time_bounds(capability, current_unix_timestamp())?;
@@ -1307,14 +1941,318 @@ impl ArcKernel {
         )
     }
 
+    /// Phase 2.4 plan-level evaluation.
+    ///
+    /// Takes an ordered list of planned tool calls under a single
+    /// capability token and evaluates every step INDEPENDENTLY against
+    /// the pre-invocation portion of the evaluation pipeline: capability
+    /// signature / time-bound / revocation / subject binding, the
+    /// request-matching pass (scope + constraints + model constraint),
+    /// and the registered guard pipeline. No tool-server dispatch, no
+    /// budget mutation, no receipt emission, and no cross-step state
+    /// propagation take place: this is a stateless pre-flight check.
+    ///
+    /// Dependencies between planned steps are advisory metadata only in
+    /// v1: the kernel does not topologically sort the graph, refuse on
+    /// cycles, or short-circuit downstream steps when an earlier step
+    /// denies. Callers are expected to make that decision themselves
+    /// once they have the per-step verdict list.
+    ///
+    /// Guards that require post-invocation output (response-shaping,
+    /// streaming sanitizers, etc.) are inherently skipped because no
+    /// tool output exists; in Phase 2.4 every registered guard is
+    /// invoked against the synthesised pre-flight request, matching the
+    /// set of guards that run in `evaluate_tool_call` before dispatch.
+    ///
+    /// Receipt emission is deferred to a future phase. The kernel emits
+    /// structured trace spans for the plan and every per-step verdict
+    /// so operators can correlate plan evaluations with subsequent
+    /// tool-call receipts.
+    pub async fn evaluate_plan(
+        &self,
+        req: arc_core_types::PlanEvaluationRequest,
+    ) -> arc_core_types::PlanEvaluationResponse {
+        self.evaluate_plan_blocking(&req)
+    }
+
+    /// Synchronous variant of [`Self::evaluate_plan`] for substrate
+    /// adapters that do not run on an async runtime.
+    ///
+    /// Plan evaluation never touches the network, so the async method
+    /// is a thin wrapper over this blocking implementation.
+    pub fn evaluate_plan_blocking(
+        &self,
+        req: &arc_core_types::PlanEvaluationRequest,
+    ) -> arc_core_types::PlanEvaluationResponse {
+        use arc_core_types::{PlanEvaluationResponse, PlanVerdict, StepVerdict, StepVerdictKind};
+
+        debug!(
+            plan_id = %req.plan_id,
+            planner_capability_id = %req.planner_capability_id,
+            step_count = req.steps.len(),
+            "evaluating plan"
+        );
+
+        let mut step_verdicts = Vec::with_capacity(req.steps.len());
+
+        // Reject capability-id mismatches once, up front: every step is
+        // evaluated under the same token so a mismatch is fatal for the
+        // whole plan. Fail-closed: every step is flagged denied.
+        if req.planner_capability.id != req.planner_capability_id {
+            let reason = format!(
+                "planner_capability_id {} does not match embedded token id {}",
+                req.planner_capability_id, req.planner_capability.id
+            );
+            for (index, _) in req.steps.iter().enumerate() {
+                step_verdicts.push(StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(reason.clone()),
+                    guard: None,
+                });
+            }
+            let plan_verdict = if step_verdicts.is_empty() {
+                PlanVerdict::FullyDenied
+            } else {
+                PlanEvaluationResponse::aggregate(&step_verdicts)
+            };
+            return PlanEvaluationResponse {
+                plan_id: req.plan_id.clone(),
+                plan_verdict,
+                step_verdicts,
+            };
+        }
+
+        // Emergency stop applies to plan evaluation too: a stopped kernel
+        // must not leak any information about what the plan might allow.
+        if self.is_emergency_stopped() {
+            warn!(
+                plan_id = %req.plan_id,
+                "emergency stop active -- denying evaluate_plan"
+            );
+            for (index, _) in req.steps.iter().enumerate() {
+                step_verdicts.push(StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(EMERGENCY_STOP_DENY_REASON.to_string()),
+                    guard: None,
+                });
+            }
+            let plan_verdict = if step_verdicts.is_empty() {
+                PlanVerdict::FullyDenied
+            } else {
+                PlanEvaluationResponse::aggregate(&step_verdicts)
+            };
+            return PlanEvaluationResponse {
+                plan_id: req.plan_id.clone(),
+                plan_verdict,
+                step_verdicts,
+            };
+        }
+
+        for (index, step) in req.steps.iter().enumerate() {
+            let verdict = self.evaluate_plan_step(req, step, index);
+            step_verdicts.push(verdict);
+        }
+
+        let plan_verdict = PlanEvaluationResponse::aggregate(&step_verdicts);
+
+        debug!(
+            plan_id = %req.plan_id,
+            plan_verdict = ?plan_verdict,
+            "plan evaluation complete"
+        );
+
+        PlanEvaluationResponse {
+            plan_id: req.plan_id.clone(),
+            plan_verdict,
+            step_verdicts,
+        }
+    }
+
+    fn evaluate_plan_step(
+        &self,
+        req: &arc_core_types::PlanEvaluationRequest,
+        step: &arc_core_types::PlannedToolCall,
+        index: usize,
+    ) -> arc_core_types::StepVerdict {
+        use arc_core_types::{StepVerdict, StepVerdictKind};
+
+        let now = current_unix_timestamp();
+        let cap = &req.planner_capability;
+
+        // Capability-wide checks repeat per-step so a failure here is
+        // still reflected in every step's verdict, keeping the per-step
+        // output self-contained.
+        if let Err(reason) = self.verify_capability_signature(cap) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(format!("signature verification failed: {reason}")),
+                guard: None,
+            };
+        }
+        if let Err(error) = check_time_bounds(cap, now) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+        if let Err(error) = self.check_revocation(cap) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+        if let Err(error) = check_subject_binding(cap, &req.agent_id) {
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(error.to_string()),
+                guard: None,
+            };
+        }
+
+        // Synthesise a ToolCallRequest so the same request-matching and
+        // guard machinery applies to plan steps as to runtime calls. No
+        // DPoP / governed-intent / approval-token shape is carried: plan
+        // evaluation is a pre-flight check and is not a substitute for
+        // those runtime-only proofs.
+        let synthesised = ToolCallRequest {
+            request_id: step.request_id.clone(),
+            capability: cap.clone(),
+            tool_name: step.tool_name.clone(),
+            server_id: step.server_id.clone(),
+            agent_id: req.agent_id.clone(),
+            arguments: step.parameters.clone(),
+            dpop_proof: None,
+            governed_intent: None,
+            approval_token: None,
+            model_metadata: step.model_metadata.clone(),
+            federated_origin_kernel_id: None,
+        };
+
+        let matching_grants = match resolve_matching_grants(
+            cap,
+            &synthesised.tool_name,
+            &synthesised.server_id,
+            &synthesised.arguments,
+            synthesised.model_metadata.as_ref(),
+        ) {
+            Ok(grants) if !grants.is_empty() => grants,
+            Ok(_) => {
+                let error = KernelError::OutOfScope {
+                    tool: synthesised.tool_name.clone(),
+                    server: synthesised.server_id.clone(),
+                };
+                return StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(error.to_string()),
+                    guard: None,
+                };
+            }
+            Err(error) => {
+                return StepVerdict {
+                    step_index: index,
+                    verdict: StepVerdictKind::Denied,
+                    reason: Some(error.to_string()),
+                    guard: None,
+                };
+            }
+        };
+
+        let matched_grant_index = matching_grants
+            .first()
+            .map(|matching| matching.index)
+            .unwrap_or(0);
+
+        // run_guards returns Ok(()) on allow and Err(GuardDenied(...))
+        // on deny. Fail-closed: any guard error reads as a denial so the
+        // caller still sees a per-step reason string.
+        if let Err(error) =
+            self.run_guards(&synthesised, &cap.scope, None, Some(matched_grant_index))
+        {
+            // Attempt to extract the offending guard name from the
+            // canonical `guard "<name>" denied the request` format
+            // emitted by run_guards.
+            let message = error.to_string();
+            let guard = extract_guard_name(&message);
+            return StepVerdict {
+                step_index: index,
+                verdict: StepVerdictKind::Denied,
+                reason: Some(message),
+                guard,
+            };
+        }
+
+        StepVerdict {
+            step_index: index,
+            verdict: StepVerdictKind::Allowed,
+            reason: None,
+            guard: None,
+        }
+    }
+
     fn evaluate_tool_call_sync_with_session_roots(
         &self,
         request: &ToolCallRequest,
         session_filesystem_roots: Option<&[String]>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
+        self.evaluate_tool_call_sync_with_session_context(
+            request,
+            session_filesystem_roots,
+            extra_metadata,
+            None,
+        )
+    }
+
+    /// Evaluate a tool call sync path with access to the owning session,
+    /// so the kernel can tag the resulting receipt with the session's
+    /// tenant_id (Phase 1.5 multi-tenant receipt isolation).
+    ///
+    /// `session_id` is the session that authenticated the caller, used only
+    /// to resolve the tenant from `auth_context().enterprise_identity`. The
+    /// tenant_id is NEVER read from `request` itself -- accepting a caller-
+    /// provided tenant would defeat the isolation guarantee.
+    fn evaluate_tool_call_sync_with_session_context(
+        &self,
+        request: &ToolCallRequest,
+        session_filesystem_roots: Option<&[String]>,
+        extra_metadata: Option<serde_json::Value>,
+        session_id: Option<&SessionId>,
+    ) -> Result<ToolCallResponse, KernelError> {
+        // Resolve tenant_id from the session's enterprise identity context
+        // (if any) and install it for the remainder of this evaluation so
+        // every receipt `build_and_sign_receipt` signs picks up the tag.
+        let tenant_id = self.resolve_tenant_id_for_session(session_id);
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         let now = current_unix_timestamp();
+
+        // Phase 1.4 emergency kill switch: every evaluate path checks the flag
+        // BEFORE capability validation, guard evaluation, or budget mutation so
+        // a stopped kernel cannot be coerced into doing any work.
+        if self.is_emergency_stopped() {
+            warn!(
+                request_id = %request.request_id,
+                "emergency stop active -- denying evaluate_tool_call"
+            );
+            return self.build_deny_response_with_metadata(
+                request,
+                EMERGENCY_STOP_DENY_REASON,
+                now,
+                None,
+                extra_metadata.clone(),
+            );
+        }
+
+        self.validate_web3_evidence_prerequisites()?;
 
         debug!(
             request_id = %request.request_id,
@@ -1390,6 +2328,7 @@ impl ArcKernel {
             &request.tool_name,
             &request.server_id,
             &request.arguments,
+            request.model_metadata.as_ref(),
         ) {
             Ok(grants) if !grants.is_empty() => grants,
             Ok(_) => {
@@ -1495,7 +2434,7 @@ impl ArcKernel {
                 ))
             })?;
 
-        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
+        let validated_governed_admission = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
@@ -1503,7 +2442,7 @@ impl ArcKernel {
             None,
             now,
         ) {
-            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Ok(validated_governed_admission) => validated_governed_admission,
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
@@ -1534,13 +2473,23 @@ impl ArcKernel {
                 );
             }
         };
+        let _governed_runtime_attestation_receipt_scope =
+            scope_governed_runtime_attestation_receipt_record(
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
+            );
         let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
-                request,
-                cap,
-                None,
-                validated_upstream_call_chain_proof,
-            ));
+            scope_governed_call_chain_receipt_evidence(
+                self.governed_call_chain_receipt_evidence(
+                    request,
+                    cap,
+                    None,
+                    validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.call_chain_proof.clone()),
+                ),
+            );
 
         if let Err(e) = self.run_guards(
             request,
@@ -1738,8 +2687,26 @@ impl ArcKernel {
         request: &ToolCallRequest,
         client: &mut C,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.validate_web3_evidence_prerequisites()?;
+        // Phase 1.5: install the parent session's tenant_id so every
+        // receipt signed while this nested-flow evaluation is in flight
+        // carries the correct tenant tag.
+        let tenant_id = self.resolve_tenant_id_for_session(Some(&parent_context.session_id));
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         let now = current_unix_timestamp();
+
+        // Phase 1.4 emergency kill switch: the nested-flow path also deny-fast
+        // so sampling/elicitation-bearing tool calls cannot slip past while
+        // the kernel is stopped.
+        if self.is_emergency_stopped() {
+            warn!(
+                request_id = %request.request_id,
+                "emergency stop active -- denying evaluate_tool_call (nested flow)"
+            );
+            return self.build_deny_response(request, EMERGENCY_STOP_DENY_REASON, now, None);
+        }
+
+        self.validate_web3_evidence_prerequisites()?;
 
         debug!(
             request_id = %request.request_id,
@@ -1785,6 +2752,7 @@ impl ArcKernel {
             &request.tool_name,
             &request.server_id,
             &request.arguments,
+            request.model_metadata.as_ref(),
         ) {
             Ok(grants) if !grants.is_empty() => grants,
             Ok(_) => {
@@ -1856,7 +2824,7 @@ impl ArcKernel {
                 ))
             })?;
 
-        let validated_upstream_call_chain_proof = match self.validate_governed_transaction(
+        let validated_governed_admission = match self.validate_governed_transaction(
             request,
             cap,
             matched_grant,
@@ -1864,7 +2832,7 @@ impl ArcKernel {
             Some(parent_context),
             now,
         ) {
-            Ok(validated_upstream_call_chain_proof) => validated_upstream_call_chain_proof,
+            Ok(validated_governed_admission) => validated_governed_admission,
             Err(error) => {
                 let msg = error.to_string();
                 warn!(request_id = %request.request_id, reason = %msg, "governed transaction denied");
@@ -1886,13 +2854,23 @@ impl ArcKernel {
                 return self.build_deny_response(request, &msg, now, Some(matched_grant_index));
             }
         };
+        let _governed_runtime_attestation_receipt_scope =
+            scope_governed_runtime_attestation_receipt_record(
+                validated_governed_admission
+                    .as_ref()
+                    .and_then(|admission| admission.verified_runtime_attestation.clone()),
+            );
         let _governed_call_chain_receipt_evidence_scope =
-            scope_governed_call_chain_receipt_evidence(self.governed_call_chain_receipt_evidence(
-                request,
-                cap,
-                Some(parent_context),
-                validated_upstream_call_chain_proof,
-            ));
+            scope_governed_call_chain_receipt_evidence(
+                self.governed_call_chain_receipt_evidence(
+                    request,
+                    cap,
+                    Some(parent_context),
+                    validated_governed_admission
+                        .as_ref()
+                        .and_then(|admission| admission.call_chain_proof.clone()),
+                ),
+            );
 
         let session_roots =
             self.session_enforceable_filesystem_root_paths_owned(&parent_context.session_id)?;
@@ -2135,6 +3113,8 @@ impl ArcKernel {
             "issuing capability"
         );
 
+        self.record_observed_capability_snapshot(&capability)?;
+
         Ok(capability)
     }
 
@@ -2167,6 +3147,11 @@ impl ArcKernel {
 
     pub fn guard_count(&self) -> usize {
         self.guards.len()
+    }
+
+    #[must_use]
+    pub fn post_invocation_hook_count(&self) -> usize {
+        self.post_invocation_pipeline.len()
     }
 
     pub fn drain_tool_server_events(&self) -> Vec<ToolServerEvent> {
@@ -2271,29 +3256,73 @@ impl ArcKernel {
 
     /// Verify the capability's signature against the trusted CA keys or the
     /// kernel's own key (for locally-issued capabilities).
-    fn verify_capability_signature(&self, cap: &CapabilityToken) -> Result<(), String> {
-        let kernel_pk = self.config.keypair.public_key();
+    /// Resolve the trusted-issuer set for capability verification.
+    ///
+    /// This combines the configured CA public keys, the capability
+    /// authority's trusted keys, and the kernel's own public key. The
+    /// method is also used by the arc-kernel-core delegation path
+    /// so the portable TCB verifier sees the same trust set as the
+    /// legacy inline check.
+    pub(crate) fn trusted_issuer_keys(&self) -> Vec<arc_core::PublicKey> {
         let mut trusted = self.config.ca_public_keys.clone();
         for authority_pk in self.capability_authority.trusted_public_keys() {
             if !trusted.contains(&authority_pk) {
                 trusted.push(authority_pk);
             }
         }
+        let kernel_pk = self.config.keypair.public_key();
         if !trusted.contains(&kernel_pk) {
             trusted.push(kernel_pk);
         }
+        trusted
+    }
 
-        for pk in &trusted {
-            if *pk == cap.issuer {
-                return match cap.verify_signature() {
-                    Ok(true) => Ok(()),
-                    Ok(false) => Err("signature did not verify".to_string()),
-                    Err(e) => Err(e.to_string()),
-                };
-            }
+    fn verify_capability_signature(&self, cap: &CapabilityToken) -> Result<(), String> {
+        let trusted = self.trusted_issuer_keys();
+
+        if !trusted.contains(&cap.issuer) {
+            return Err("signer public key not found among trusted CAs".to_string());
         }
 
-        Err("signer public key not found among trusted CAs".to_string())
+        match cap.verify_signature() {
+            Ok(true) => Ok(()),
+            Ok(false) => Err("signature did not verify".to_string()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    /// Phase 14.1 -- run the portable pure-compute verdict path provided by
+    /// `arc-kernel-core`.
+    ///
+    /// This exposes the same synchronous checks the core kernel performs
+    /// (capability signature, issuer trust, time bounds, subject binding,
+    /// scope match, sync guard pipeline) in isolation from the
+    /// `arc-kernel`-only concerns (budget mutation, revocation lookup,
+    /// governed-transaction evaluation, tool dispatch, receipt
+    /// persistence).
+    ///
+    /// Adapters that run the kernel on constrained platforms (wasm32,
+    /// edge workers, mobile via FFI) should prefer this entry point --
+    /// it does not require a tokio runtime, a sqlite database, or any
+    /// IO adapter. The full `evaluate_tool_call_*` API remains the
+    /// authoritative path for the desktop sidecar.
+    pub fn evaluate_portable_verdict<'a>(
+        &self,
+        capability: &'a CapabilityToken,
+        request: &arc_kernel_core::PortableToolCallRequest,
+        guards: &'a [&'a dyn arc_kernel_core::Guard],
+        clock: &'a dyn arc_kernel_core::Clock,
+        session_filesystem_roots: Option<&'a [String]>,
+    ) -> arc_kernel_core::EvaluationVerdict {
+        let trusted = self.trusted_issuer_keys();
+        arc_kernel_core::evaluate(arc_kernel_core::EvaluateInput {
+            request,
+            capability,
+            trusted_issuers: &trusted,
+            clock,
+            guards,
+            session_filesystem_roots,
+        })
     }
 
     /// Check the revocation store for the capability and its entire
@@ -2324,10 +3353,11 @@ impl ArcKernel {
         )
         .map_err(|error| KernelError::DelegationInvalid(error.to_string()))?;
 
-        let last_link = cap
-            .delegation_chain
-            .last()
-            .expect("delegation chain checked as non-empty");
+        let Some(last_link) = cap.delegation_chain.last() else {
+            return Err(KernelError::DelegationInvalid(
+                "delegation chain disappeared after validation".to_string(),
+            ));
+        };
         if last_link.delegatee != cap.subject {
             return Err(KernelError::DelegationInvalid(format!(
                 "leaf capability subject {} does not match final delegation delegatee {}",
@@ -2737,6 +3767,7 @@ impl ArcKernel {
             .committed_cost_units_after)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn finalize_budgeted_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,
@@ -3165,6 +4196,24 @@ impl ArcKernel {
                             }),
                     );
                 }
+                // Phase 2.2 data-layer, communication, financial,
+                // model-routing, and memory-governance constraints do
+                // not contribute to governed-transaction requirements.
+                // Their enforcement is wired into request_matching.rs
+                // (argument-level checks) and downstream data/content
+                // guards (SQL parsing, result shaping, HITL replay).
+                Constraint::TableAllowlist(_)
+                | Constraint::ColumnDenylist(_)
+                | Constraint::MaxRowsReturned(_)
+                | Constraint::OperationClass(_)
+                | Constraint::AudienceAllowlist(_)
+                | Constraint::MaxArgsSize(_)
+                | Constraint::ContentReviewTier(_)
+                | Constraint::MaxTransactionAmountUsd(_)
+                | Constraint::RequireDualApproval(_)
+                | Constraint::ModelConstraint { .. }
+                | Constraint::MemoryStoreAllowlist(_)
+                | Constraint::MemoryWriteDenyPatterns(_) => {}
                 _ => {}
             }
         }
@@ -3182,6 +4231,12 @@ impl ArcKernel {
         &self,
         approval_token: &GovernedApprovalToken,
     ) -> Result<(), String> {
+        // Multi-algorithm dispatch happens inside `approval_token.verify_signature()`:
+        // the `approver` public key and the `signature` field are each algorithm-
+        // tagged (Ed25519 by default; `p256:` / `p384:` under the FIPS crypto
+        // path), so ECDSA approvals are validated through aws-lc-rs when the
+        // `arc-core-types/fips` feature is enabled without any kernel-side
+        // algorithm plumbing.
         let kernel_pk = self.config.keypair.public_key();
         let mut trusted = self.config.ca_public_keys.clone();
         for authority_pk in self.capability_authority.trusted_public_keys() {
@@ -4007,7 +5062,7 @@ impl ArcKernel {
         charge_result: Option<&BudgetChargeResult>,
         parent_context: Option<&OperationContext>,
         now: u64,
-    ) -> Result<Option<ValidatedGovernedCallChainProof>, KernelError> {
+    ) -> Result<Option<ValidatedGovernedAdmission>, KernelError> {
         let (
             intent_required,
             approval_threshold_units,
@@ -4134,7 +5189,10 @@ impl ArcKernel {
             )));
         }
 
-        Ok(validated_upstream_call_chain_proof)
+        Ok(Some(ValidatedGovernedAdmission {
+            call_chain_proof: validated_upstream_call_chain_proof,
+            verified_runtime_attestation,
+        }))
     }
 
     fn governed_call_chain_receipt_evidence(
@@ -4390,6 +5448,17 @@ impl ArcKernel {
                         guard.name()
                     )));
                 }
+                Ok(Verdict::PendingApproval) => {
+                    // Phase 3.4: a legacy `Guard` should not return the
+                    // HITL marker. The fully integrated approval flow
+                    // runs via `ApprovalGuard::evaluate` rather than
+                    // the `Guard` trait so this branch is unreachable
+                    // in practice. Fail-closed just in case.
+                    return Err(KernelError::GuardDenied(format!(
+                        "guard \"{}\" requested approval via legacy path",
+                        guard.name()
+                    )));
+                }
                 Err(e) => {
                     // Fail closed: guard errors are treated as denials.
                     return Err(KernelError::GuardDenied(format!(
@@ -4448,6 +5517,22 @@ impl ArcKernel {
         }
         Ok(())
     }
+}
+
+/// Extract a guard name from a `GuardDenied` error message shaped like
+/// `guard "<name>" denied the request` or `guard "<name>" error ...`.
+///
+/// Plan evaluation surfaces the offending guard in the per-step verdict
+/// so callers can target a specific guard when replanning. Parsing the
+/// name out of the canonical string is sufficient here; the structured
+/// denial payload defined by Phase 0.5 is a tool-call response type and
+/// is not shared with plan evaluation.
+fn extract_guard_name(message: &str) -> Option<String> {
+    let start_marker = "guard \"";
+    let start = message.find(start_marker)? + start_marker.len();
+    let rest = &message[start..];
+    let end = rest.find('"')?;
+    Some(rest[..end].to_string())
 }
 
 fn scope_from_capability_snapshot(
@@ -4665,6 +5750,19 @@ pub(crate) struct ReceiptParams<'a> {
     content_hash: String,
     metadata: Option<serde_json::Value>,
     timestamp: u64,
+    /// Strength of kernel mediation for this evaluation. Defaults to
+    /// `Mediated` (the safest baseline) when integration adapters do not
+    /// override it.
+    trust_level: arc_core::TrustLevel,
+    /// Phase 1.5 multi-tenant receipt isolation: explicit tenant tag for
+    /// this receipt. `None` in virtually every call site -- the evaluate
+    /// path plumbs the resolved tenant through
+    /// [`scope_receipt_tenant_id`] so `build_and_sign_receipt` can pick it
+    /// up without adding a parameter to every builder signature.
+    ///
+    /// MUST be derived from session / auth context, not caller-provided
+    /// request fields (see `STRUCTURAL-SECURITY-FIXES.md` section 6).
+    tenant_id: Option<String>,
 }
 
 pub(crate) fn current_unix_timestamp() -> u64 {

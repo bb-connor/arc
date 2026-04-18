@@ -2257,7 +2257,9 @@ mod attestation_and_telemetry_tests {
                 policy_hash: "policy-hash".to_string(),
                 evidence,
                 metadata: None,
+                trust_level: arc_core::TrustLevel::default(),
                 kernel_key: signer.public_key(),
+                tenant_id: None,
             },
             signer,
         )

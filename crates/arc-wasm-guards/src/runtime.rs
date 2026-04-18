@@ -110,6 +110,35 @@ impl WasmGuard {
             ToolAction::ShellCommand(_) => (Some("shell_command".into()), None, None),
             ToolAction::McpTool(_, _) => (Some("mcp_tool".into()), None, None),
             ToolAction::Patch(path, _) => (Some("patch".into()), Some(path.clone()), None),
+            ToolAction::CodeExecution { language, .. } => {
+                (Some("code_execution".into()), None, Some(language.clone()))
+            }
+            ToolAction::BrowserAction { verb, target } => (
+                Some("browser_action".into()),
+                None,
+                target.clone().or_else(|| Some(verb.clone())),
+            ),
+            ToolAction::DatabaseQuery { database, .. } => {
+                (Some("database_query".into()), None, Some(database.clone()))
+            }
+            ToolAction::ExternalApiCall { service, endpoint } => (
+                Some("external_api_call".into()),
+                None,
+                Some(format!("{service}:{endpoint}")),
+            ),
+            ToolAction::MemoryWrite { store, key } => (
+                Some("memory_write".into()),
+                None,
+                Some(format!("{store}/{key}")),
+            ),
+            ToolAction::MemoryRead { store, key } => (
+                Some("memory_read".into()),
+                None,
+                Some(match key {
+                    Some(k) => format!("{store}/{k}"),
+                    None => store.clone(),
+                }),
+            ),
             ToolAction::Unknown => (Some("unknown".into()), None, None),
         };
 
@@ -416,6 +445,38 @@ pub mod wasmtime_backend {
                 Ok(Box::new(backend))
             }
         }
+    }
+
+    /// Load a WASM guard enforcing the Phase 1.3 signing policy.
+    ///
+    /// Reads `wasm_path` from disk, verifies that the signature sidecar
+    /// (`wasm_path + ".sig"`) is present and valid per
+    /// [`crate::manifest::verify_guard_signature`], then checks the SHA-256
+    /// hash against the manifest declaration before instantiating the
+    /// backend via [`create_backend`].
+    ///
+    /// Errors are fail-closed: any signature, hash, or format problem
+    /// rejects the guard before any guest code runs. Operators may set
+    /// `manifest.allow_unsigned = true` (with `signer_public_key = None`)
+    /// to permit unsigned modules, in which case a WARN is logged.
+    pub fn load_signed_guard(
+        engine: Arc<Engine>,
+        wasm_path: &str,
+        fuel_limit: u64,
+        manifest: &crate::manifest::GuardManifest,
+    ) -> Result<Box<dyn crate::abi::WasmGuardAbi>, WasmGuardError> {
+        let wasm_bytes = std::fs::read(wasm_path).map_err(|e| WasmGuardError::ModuleLoad {
+            path: wasm_path.to_string(),
+            reason: e.to_string(),
+        })?;
+
+        // Signing policy (Phase 1.3) -- fail-closed.
+        crate::manifest::verify_guard_signature(wasm_path, &wasm_bytes, manifest)?;
+
+        // Hash attestation from the manifest.
+        crate::manifest::verify_wasm_hash(&wasm_bytes, &manifest.wasm_sha256)?;
+
+        create_backend(engine, &wasm_bytes, fuel_limit, manifest.config.clone())
     }
 
     // -------------------------------------------------------------------
@@ -777,6 +838,481 @@ pub mod wasmtime_backend {
         }
 
         std::str::from_utf8(&region[..end]).ok().map(String::from)
+    }
+
+    // -------------------------------------------------------------------
+    // Phase 5.6: Policy-driven loading with placeholders and capability
+    // intersection.
+    // -------------------------------------------------------------------
+
+    use crate::manifest::GuardManifest;
+    use crate::placeholders::{resolve_placeholders_in_json, PlaceholderEnv, PlaceholderError};
+    use sha2::Digest;
+
+    /// Names of `arc.*` host functions ARC currently exposes to guests.
+    ///
+    /// Operators can pass a subset of this list as `policy_allowed_host_fns`
+    /// to [`load_guards_from_policy`] to restrict which capabilities any
+    /// custom guard may request.
+    pub const KNOWN_HOST_FUNCTIONS: &[&str] =
+        &["arc.log", "arc.get_config", "arc.get_time_unix_secs"];
+
+    /// A single WASM guard declared in the policy YAML.
+    ///
+    /// This is the ARC-side equivalent of ClawdStrike's `custom.rs` plugin
+    /// entry: it names the module, points at its `.wasm` bytes (either on
+    /// disk or inline), declares the host-function capabilities the guard
+    /// needs, and carries a JSON config blob that may contain `${ENV_VAR}`
+    /// placeholders.
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    pub struct PolicyCustomGuard {
+        /// Human-readable guard name. Used for logs, receipts, and to identify
+        /// the guard in the pipeline.
+        pub name: String,
+
+        /// Semantic version of the guard. Must match the signature sidecar's
+        /// `version` field when signing is enabled.
+        #[serde(default = "default_guard_version")]
+        pub version: String,
+
+        /// Source of the `.wasm` bytes. Either a filesystem path or inline
+        /// bytes.
+        #[serde(flatten)]
+        pub module: PolicyModuleSource,
+
+        /// Host functions this guard requests access to (e.g. `arc.log`).
+        /// Capabilities not present in the policy-allowed allowlist cause
+        /// loading to fail closed.
+        #[serde(default)]
+        pub capabilities: Vec<String>,
+
+        /// Guard configuration. String leaves may contain `${VAR}` or
+        /// `${VAR:-default}` placeholders that are resolved at load time
+        /// against the injected [`PlaceholderEnv`].
+        #[serde(default)]
+        pub config: serde_json::Value,
+
+        /// Fuel budget per `evaluate()` call.
+        #[serde(default = "default_policy_fuel_limit")]
+        pub fuel_limit: u64,
+
+        /// Guard priority (lower values run first).
+        #[serde(default = "default_policy_priority")]
+        pub priority: u32,
+
+        /// If true, denials are downgraded to `Verdict::Allow` and merely
+        /// logged (consistent with [`WasmGuard::is_advisory`]).
+        #[serde(default)]
+        pub advisory: bool,
+
+        /// Hex-encoded Ed25519 public key of the trusted signer. Enforced via
+        /// the Phase 1.3 signing path ([`crate::manifest::verify_guard_signature`]).
+        /// When set the `.wasm.sig` sidecar MUST exist.
+        #[serde(default)]
+        pub signer_public_key: Option<String>,
+
+        /// Explicit opt-out for unsigned modules. Matches the field of the
+        /// same name on [`GuardManifest`]. Ignored when `signer_public_key`
+        /// is set.
+        #[serde(default)]
+        pub allow_unsigned: bool,
+    }
+
+    /// Source of the `.wasm` bytes for a [`PolicyCustomGuard`].
+    #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+    #[serde(untagged)]
+    pub enum PolicyModuleSource {
+        /// Load the module from disk. The signature sidecar (if any) lives
+        /// at `module_path + ".sig"`.
+        Path {
+            /// Filesystem path to the `.wasm` file.
+            module_path: String,
+        },
+        /// Inline raw WASM bytes. Useful for tests and for embedding small
+        /// modules in a policy file.
+        Inline {
+            /// Raw WASM bytes.
+            module_bytes: Vec<u8>,
+        },
+    }
+
+    impl PolicyModuleSource {
+        /// Borrow the module path, if this source is backed by a file.
+        pub fn path(&self) -> Option<&str> {
+            match self {
+                Self::Path { module_path } => Some(module_path.as_str()),
+                Self::Inline { .. } => None,
+            }
+        }
+    }
+
+    fn default_guard_version() -> String {
+        "0.0.0".to_string()
+    }
+
+    fn default_policy_fuel_limit() -> u64 {
+        crate::config::DEFAULT_FUEL_LIMIT
+    }
+
+    fn default_policy_priority() -> u32 {
+        1000
+    }
+
+    /// Top-level `custom_guards:` section of a policy document.
+    ///
+    /// Consumed by [`load_guards_from_policy`]. Deliberately defined here in
+    /// `arc-wasm-guards` so that arc-policy can hand this struct off without
+    /// taking a dependency on the reverse direction.
+    #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+    pub struct PolicyCustomGuards {
+        /// Ordered list of guard declarations.
+        #[serde(default)]
+        pub modules: Vec<PolicyCustomGuard>,
+    }
+
+    /// Errors returned by [`load_guards_from_policy`].
+    ///
+    /// Kept distinct from [`WasmGuardError`] so callers can tell a policy
+    /// wiring problem (missing capability, unresolved placeholder, bad
+    /// signature) apart from a pure runtime failure.
+    #[derive(Debug, thiserror::Error)]
+    pub enum LoadError {
+        /// The guard requested a host function that is not in the policy's
+        /// allowed allowlist. Fail-closed.
+        #[error(
+            "guard {guard:?} requested capability {capability:?} which is not permitted by policy"
+        )]
+        CapabilityDenied {
+            /// The guard name for which the check failed.
+            guard: String,
+            /// The offending capability string.
+            capability: String,
+        },
+
+        /// The guard's WASM module imports a host function from the `arc`
+        /// namespace that was not declared in its `capabilities` list.
+        #[error("guard {guard:?} module imports {import:?} which is not declared in capabilities")]
+        UndeclaredHostImport {
+            /// The guard name.
+            guard: String,
+            /// The import the module requires (e.g. `arc.log`).
+            import: String,
+        },
+
+        /// A placeholder in the guard config could not be resolved.
+        #[error("placeholder resolution failed for guard {guard:?}: {source}")]
+        Placeholder {
+            /// The guard name.
+            guard: String,
+            /// Underlying placeholder error.
+            #[source]
+            source: PlaceholderError,
+        },
+
+        /// The guard config was not a JSON object (the backend expects a map
+        /// of string keys to string values after placeholder expansion).
+        #[error("guard {guard:?} config must be a JSON object, got {kind}")]
+        ConfigShape {
+            /// The guard name.
+            guard: String,
+            /// Describes the actual JSON kind that was found.
+            kind: &'static str,
+        },
+
+        /// A resolved config value at key `key` was not a string after
+        /// placeholder expansion; the current host ABI only accepts strings.
+        #[error("guard {guard:?} config value at {key:?} must resolve to a string")]
+        ConfigNotString {
+            /// The guard name.
+            guard: String,
+            /// The config key that produced the non-string value.
+            key: String,
+        },
+
+        /// Underlying WASM guard runtime error.
+        #[error(transparent)]
+        Runtime(#[from] WasmGuardError),
+    }
+
+    /// Handle returned by [`load_guards_from_policy`].
+    ///
+    /// Wraps a fully loaded [`WasmGuard`] alongside metadata describing the
+    /// capabilities that were ultimately granted to the module. Callers can
+    /// feed `into_guard()` (or `into_guards()` on a collection) directly into
+    /// [`crate::build_guard_pipeline`] or register with `WasmGuardRuntime`.
+    #[derive(Debug)]
+    pub struct WasmGuardHandle {
+        guard: WasmGuard,
+        granted_capabilities: Vec<String>,
+        priority: u32,
+    }
+
+    impl WasmGuardHandle {
+        /// Consume the handle and return the inner [`WasmGuard`].
+        pub fn into_guard(self) -> WasmGuard {
+            self.guard
+        }
+
+        /// Borrow the inner guard.
+        pub fn guard(&self) -> &WasmGuard {
+            &self.guard
+        }
+
+        /// Capabilities that were granted to the guard (the intersection of
+        /// requested and policy-allowed host functions).
+        pub fn granted_capabilities(&self) -> &[String] {
+            &self.granted_capabilities
+        }
+
+        /// Guard priority (lower runs first).
+        pub fn priority(&self) -> u32 {
+            self.priority
+        }
+    }
+
+    /// Load every guard declared in `policy` and return a vector of handles.
+    ///
+    /// Steps for each entry, in order:
+    ///
+    /// 1. **Capability intersection.** Every entry in `guard.capabilities`
+    ///    must also appear in `policy_allowed_host_fns`. If any requested
+    ///    capability is missing, loading fails with
+    ///    [`LoadError::CapabilityDenied`]. An empty `capabilities` list is
+    ///    allowed and means the guard opts into no host functions.
+    ///
+    /// 2. **Placeholder resolution.** String leaves in `guard.config` are
+    ///    rewritten via [`resolve_placeholders_in_json`] against `env`.
+    ///    Undefined placeholders without a `:-default` fail closed.
+    ///
+    /// 3. **Signature verification.** If the guard declares
+    ///    `signer_public_key` (or `allow_unsigned = false` with no key), the
+    ///    Phase 1.3 signing path ([`crate::manifest::verify_guard_signature`])
+    ///    is invoked. For on-disk modules the `.wasm.sig` sidecar is
+    ///    consulted; for inline modules only `allow_unsigned = true` is
+    ///    accepted (there is no sidecar to check).
+    ///
+    /// 4. **Import check.** The module is compiled and its imports are
+    ///    inspected: any `arc.*` import not in the guard's `capabilities`
+    ///    list is rejected ([`LoadError::UndeclaredHostImport`]). This
+    ///    enforces capability intersection at the module boundary, not just
+    ///    at the policy layer.
+    ///
+    /// 5. **Backend construction.** A [`WasmtimeBackend`] is instantiated
+    ///    with the resolved config map and the supplied `engine`.
+    ///
+    /// Returned handles are sorted by priority (lower first), matching the
+    /// ordering used by [`crate::load_wasm_guards`].
+    pub fn load_guards_from_policy(
+        policy: &PolicyCustomGuards,
+        env: &dyn PlaceholderEnv,
+        policy_allowed_host_fns: &[String],
+        engine: Arc<Engine>,
+    ) -> Result<Vec<WasmGuardHandle>, LoadError> {
+        let mut handles: Vec<WasmGuardHandle> = Vec::with_capacity(policy.modules.len());
+
+        // Sort a copy of the entries so lower priority runs first, non-advisory
+        // before advisory at the same priority. Priority is the primary key;
+        // advisory is only a tie-breaker. Matches `load_wasm_guards` in
+        // `wiring.rs` so policy-driven and config-driven loading produce the
+        // same evaluation order.
+        let mut sorted: Vec<PolicyCustomGuard> = policy.modules.clone();
+        sorted.sort_by_key(|g| (g.priority, g.advisory as u8));
+
+        for guard_spec in &sorted {
+            // 1. Capability intersection (fail closed on any un-allowed capability).
+            for requested in &guard_spec.capabilities {
+                if !policy_allowed_host_fns.iter().any(|a| a == requested) {
+                    return Err(LoadError::CapabilityDenied {
+                        guard: guard_spec.name.clone(),
+                        capability: requested.clone(),
+                    });
+                }
+            }
+            let granted: Vec<String> = guard_spec.capabilities.clone();
+
+            // 2. Placeholder resolution on the config JSON.
+            let resolved_config =
+                resolve_placeholders_in_json(&guard_spec.config, env).map_err(|source| {
+                    LoadError::Placeholder {
+                        guard: guard_spec.name.clone(),
+                        source,
+                    }
+                })?;
+            let config_map = json_object_to_string_map(&resolved_config, &guard_spec.name)?;
+
+            // 3. Obtain bytes and enforce Phase 1.3 signing.
+            let wasm_bytes = match &guard_spec.module {
+                PolicyModuleSource::Path { module_path } => {
+                    let bytes = std::fs::read(module_path).map_err(|e| {
+                        LoadError::Runtime(WasmGuardError::ModuleLoad {
+                            path: module_path.clone(),
+                            reason: e.to_string(),
+                        })
+                    })?;
+
+                    // Build a transient GuardManifest describing just the
+                    // identity + signer, so we can reuse the Phase 1.3
+                    // sidecar verification path.
+                    let transient_manifest = GuardManifest {
+                        name: guard_spec.name.clone(),
+                        version: guard_spec.version.clone(),
+                        abi_version: "1".to_string(),
+                        wasm_path: module_path.clone(),
+                        wasm_sha256: hex::encode(sha2::Sha256::digest(&bytes)),
+                        config: std::collections::HashMap::new(),
+                        signer_public_key: guard_spec.signer_public_key.clone(),
+                        allow_unsigned: guard_spec.allow_unsigned,
+                    };
+                    crate::manifest::verify_guard_signature(
+                        module_path,
+                        &bytes,
+                        &transient_manifest,
+                    )
+                    .map_err(LoadError::Runtime)?;
+
+                    bytes
+                }
+                PolicyModuleSource::Inline { module_bytes } => {
+                    // Inline modules have no sidecar. Require allow_unsigned.
+                    if guard_spec.signer_public_key.is_some() {
+                        return Err(LoadError::Runtime(WasmGuardError::SignatureVerification(
+                            format!(
+                                "guard {:?} has signer_public_key but inline module_bytes have no sidecar",
+                                guard_spec.name
+                            ),
+                        )));
+                    }
+                    if !guard_spec.allow_unsigned {
+                        return Err(LoadError::Runtime(WasmGuardError::SignatureVerification(
+                            format!(
+                                "guard {:?} inline module_bytes require allow_unsigned=true",
+                                guard_spec.name
+                            ),
+                        )));
+                    }
+                    module_bytes.clone()
+                }
+            };
+
+            // 4. Compile and check imports against the granted capability set.
+            verify_module_imports_within_capabilities(&engine, &wasm_bytes, guard_spec, &granted)?;
+
+            // 5. Construct the backend + guard.
+            let mut backend =
+                WasmtimeBackend::with_engine_and_config(engine.clone(), config_map.clone());
+            backend
+                .load_module(&wasm_bytes, guard_spec.fuel_limit)
+                .map_err(LoadError::Runtime)?;
+
+            let manifest_sha = hex::encode(sha2::Sha256::digest(&wasm_bytes));
+            let guard = WasmGuard::new(
+                guard_spec.name.clone(),
+                Box::new(backend),
+                guard_spec.advisory,
+                Some(manifest_sha),
+            );
+
+            handles.push(WasmGuardHandle {
+                guard,
+                granted_capabilities: granted,
+                priority: guard_spec.priority,
+            });
+        }
+
+        Ok(handles)
+    }
+
+    /// Coerce a resolved JSON config into the string-to-string map the host
+    /// ABI exposes via `arc.get_config`.
+    ///
+    /// Only the top-level object's string values are preserved; nested
+    /// objects / arrays cause `ConfigNotString` because the `arc.get_config`
+    /// host function returns UTF-8 bytes by key.
+    fn json_object_to_string_map(
+        value: &serde_json::Value,
+        guard_name: &str,
+    ) -> Result<std::collections::HashMap<String, String>, LoadError> {
+        use serde_json::Value;
+
+        let mut out = std::collections::HashMap::new();
+        match value {
+            Value::Object(map) => {
+                for (k, v) in map {
+                    match v {
+                        Value::String(s) => {
+                            out.insert(k.clone(), s.clone());
+                        }
+                        Value::Null => {
+                            // Skip nulls -- treat as "unset".
+                        }
+                        Value::Bool(b) => {
+                            out.insert(k.clone(), b.to_string());
+                        }
+                        Value::Number(n) => {
+                            out.insert(k.clone(), n.to_string());
+                        }
+                        _ => {
+                            return Err(LoadError::ConfigNotString {
+                                guard: guard_name.to_string(),
+                                key: k.clone(),
+                            });
+                        }
+                    }
+                }
+                Ok(out)
+            }
+            Value::Null => Ok(out),
+            Value::Array(_) => Err(LoadError::ConfigShape {
+                guard: guard_name.to_string(),
+                kind: "array",
+            }),
+            Value::Bool(_) => Err(LoadError::ConfigShape {
+                guard: guard_name.to_string(),
+                kind: "bool",
+            }),
+            Value::Number(_) => Err(LoadError::ConfigShape {
+                guard: guard_name.to_string(),
+                kind: "number",
+            }),
+            Value::String(_) => Err(LoadError::ConfigShape {
+                guard: guard_name.to_string(),
+                kind: "string",
+            }),
+        }
+    }
+
+    /// Compile the module and ensure every `arc.*` import is in the granted
+    /// capabilities list.
+    ///
+    /// Modules loaded as components (WIT) are exempt from this check because
+    /// they do not declare core imports the same way.
+    fn verify_module_imports_within_capabilities(
+        engine: &Engine,
+        wasm_bytes: &[u8],
+        guard_spec: &PolicyCustomGuard,
+        granted: &[String],
+    ) -> Result<(), LoadError> {
+        // Only core modules expose the `arc.*` imports; skip components.
+        if detect_wasm_format(wasm_bytes).unwrap_or(WasmFormat::CoreModule)
+            != WasmFormat::CoreModule
+        {
+            return Ok(());
+        }
+
+        let module = Module::new(engine, wasm_bytes)
+            .map_err(|e| LoadError::Runtime(WasmGuardError::Compilation(e.to_string())))?;
+        for import in module.imports() {
+            if import.module() == "arc" {
+                let qualified = format!("arc.{}", import.name());
+                if !granted.iter().any(|g| g == &qualified) {
+                    return Err(LoadError::UndeclaredHostImport {
+                        guard: guard_spec.name.clone(),
+                        import: qualified,
+                    });
+                }
+            }
+        }
+        Ok(())
     }
 
     // -----------------------------------------------------------------------
@@ -1402,6 +1938,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         }
     }
 
@@ -1582,6 +2120,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         }
     }
 

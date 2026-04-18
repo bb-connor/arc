@@ -18,7 +18,7 @@ use arc_core::capability::{
 };
 use arc_guards::{
     EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline, McpToolGuard, PatchIntegrityGuard,
-    PathAllowlistGuard, SecretLeakGuard, ShellCommandGuard,
+    PathAllowlistGuard, PostInvocationPipeline, SanitizerHook, SecretLeakGuard, ShellCommandGuard,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +96,7 @@ pub struct LoadedPolicy {
     pub kernel: KernelPolicyConfig,
     pub default_capabilities: Vec<DefaultCapability>,
     pub guard_pipeline: GuardPipeline,
+    pub post_invocation_pipeline: PostInvocationPipeline,
     pub issuance_policy: Option<ReputationIssuancePolicy>,
     pub runtime_assurance_policy: Option<RuntimeAssuranceIssuancePolicy>,
 }
@@ -558,7 +559,8 @@ pub fn load_policy(path: &Path) -> Result<LoadedPolicy, PolicyError> {
         },
         kernel: policy.kernel.clone(),
         default_capabilities,
-        guard_pipeline: build_guard_pipeline(&policy.guards),
+        guard_pipeline: build_guard_pipeline(&policy.guards)?,
+        post_invocation_pipeline: build_post_invocation_pipeline(&policy.guards),
         issuance_policy: None,
         runtime_assurance_policy: None,
     })
@@ -593,6 +595,7 @@ fn load_hushspec_policy(path: &Path, source_hash: String) -> Result<LoadedPolicy
         kernel,
         default_capabilities,
         guard_pipeline: compiled.guards,
+        post_invocation_pipeline: compiled.post_invocation,
         issuance_policy,
         runtime_assurance_policy,
     })
@@ -767,7 +770,7 @@ pub fn parse_policy(yaml: &str) -> Result<ArcPolicy, PolicyError> {
 }
 
 /// Build a `GuardPipeline` from a policy's guard configuration.
-pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
+pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline, PolicyError> {
     let mut pipeline = GuardPipeline::new();
 
     if let Some(fp) = &config.forbidden_path {
@@ -822,10 +825,13 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
             if eg.allowed_domains.is_empty() && eg.blocked_domains.is_empty() {
                 pipeline.add(Box::new(EgressAllowlistGuard::new()));
             } else {
-                pipeline.add(Box::new(EgressAllowlistGuard::with_lists(
-                    eg.allowed_domains.clone(),
-                    eg.blocked_domains.clone(),
-                )));
+                pipeline.add(Box::new(
+                    EgressAllowlistGuard::with_lists(
+                        eg.allowed_domains.clone(),
+                        eg.blocked_domains.clone(),
+                    )
+                    .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+                ));
             }
         }
     }
@@ -850,27 +856,47 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> GuardPipeline {
 
     if let Some(secret_patterns) = &config.secret_patterns {
         if secret_patterns.enabled {
-            pipeline.add(Box::new(SecretLeakGuard::with_config(
-                arc_guards::secret_leak::SecretLeakConfig {
+            let guard =
+                match SecretLeakGuard::with_config(arc_guards::secret_leak::SecretLeakConfig {
                     enabled: true,
                     skip_paths: secret_patterns.skip_paths.clone(),
-                },
-            )));
+                    custom_patterns: Vec::new(),
+                }) {
+                    Ok(guard) => guard,
+                    Err(error) => panic!("invalid secret leak guard config: {error}"),
+                };
+            pipeline.add(Box::new(guard));
         }
     }
 
     if let Some(patch_integrity) = &config.patch_integrity {
         if patch_integrity.enabled {
-            pipeline.add(Box::new(PatchIntegrityGuard::with_config(
-                arc_guards::patch_integrity::PatchIntegrityConfig {
-                    enabled: true,
-                    max_additions: patch_integrity.max_additions,
-                    max_deletions: patch_integrity.max_deletions,
-                    forbidden_patterns: patch_integrity.forbidden_patterns.clone(),
-                    require_balance: patch_integrity.require_balance,
-                    max_imbalance_ratio: patch_integrity.max_imbalance_ratio,
-                },
-            )));
+            pipeline.add(Box::new(
+                PatchIntegrityGuard::with_config(
+                    arc_guards::patch_integrity::PatchIntegrityConfig {
+                        enabled: true,
+                        max_additions: patch_integrity.max_additions,
+                        max_deletions: patch_integrity.max_deletions,
+                        forbidden_patterns: patch_integrity.forbidden_patterns.clone(),
+                        require_balance: patch_integrity.require_balance,
+                        max_imbalance_ratio: patch_integrity.max_imbalance_ratio,
+                    },
+                )
+                .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+            ));
+        }
+    }
+
+    Ok(pipeline)
+}
+
+/// Build a `PostInvocationPipeline` from a policy's guard configuration.
+pub fn build_post_invocation_pipeline(config: &GuardPolicyConfig) -> PostInvocationPipeline {
+    let mut pipeline = PostInvocationPipeline::new();
+
+    if let Some(secret_patterns) = &config.secret_patterns {
+        if secret_patterns.enabled {
+            pipeline.add(Box::new(SanitizerHook::new()));
         }
     }
 
@@ -1262,7 +1288,7 @@ kernel:
     #[test]
     fn build_pipeline_from_policy() {
         let policy = parse_policy(EXAMPLE_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 4);
     }
 
@@ -1281,8 +1307,65 @@ kernel:
     #[test]
     fn build_pipeline_from_full_guard_policy() {
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 7);
+    }
+
+    #[test]
+    fn build_pipeline_rejects_invalid_egress_patterns() {
+        let policy = parse_policy(
+            r#"
+guards:
+  egress_allowlist:
+    enabled: true
+    allowed_domains:
+      - "["
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("invalid egress patterns should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid egress allowlist pattern"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn build_pipeline_rejects_invalid_patch_patterns() {
+        let policy = parse_policy(
+            r#"
+guards:
+  patch_integrity:
+    enabled: true
+    forbidden_patterns:
+      - "["
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("invalid patch integrity patterns should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid patch integrity forbidden pattern"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn build_post_invocation_pipeline_from_secret_patterns() {
+        let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
+        let pipeline = build_post_invocation_pipeline(&policy.guards);
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]
@@ -1403,7 +1486,7 @@ capabilities:
         assert!(!policy.kernel.allow_sampling);
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -1436,7 +1519,7 @@ guards:
     enabled: false
 "#;
         let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 0);
     }
 
@@ -1454,7 +1537,7 @@ guards:
       - "**"
 "#;
         let policy = parse_policy(yaml).unwrap();
-        let pipeline = build_guard_pipeline(&policy.guards);
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         assert_eq!(pipeline.len(), 1);
 
         let kp = arc_core::crypto::Keypair::generate();
@@ -1481,6 +1564,8 @@ guards:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
         let session_roots = vec!["/workspace/project".to_string()];
         let ctx = arc_kernel::GuardContext {

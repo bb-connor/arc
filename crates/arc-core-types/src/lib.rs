@@ -2,6 +2,19 @@
 //!
 //! This crate holds the protocol-wide types that should remain stable while
 //! heavier domain crates split away from the compatibility facade.
+//!
+//! # no_std support
+//!
+//! The crate is `no_std + alloc` by source: under `--no-default-features`
+//! every module compiles against `core` and `alloc` only. This is the
+//! foundation that lets `arc-kernel-core` cross-compile to
+//! `wasm32-unknown-unknown` and other embedded targets. The default `std`
+//! feature re-enables `std`-backed error impls via `thiserror`, along with
+//! the `std` feature on every transitive dependency.
+
+#![cfg_attr(not(feature = "std"), no_std)]
+
+extern crate alloc;
 
 pub mod canonical;
 pub mod capability;
@@ -12,6 +25,7 @@ pub mod manifest;
 pub mod merkle;
 pub mod message;
 pub mod oracle;
+pub mod plan;
 pub mod receipt;
 pub mod runtime_attestation;
 pub mod session;
@@ -20,15 +34,20 @@ pub use canonical::{canonical_json_bytes, canonical_json_string, canonicalize};
 pub use capability::{
     canonicalize_attestation_verifier, validate_attenuation, validate_delegation_chain, ArcScope,
     Attenuation, AttestationTrustError, AttestationTrustPolicy, AttestationTrustRule,
-    CapabilityToken, CapabilityTokenBody, Constraint, DelegationLink, DelegationLinkBody,
-    GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
+    CapabilityToken, CapabilityTokenBody, Constraint, ContentReviewTier, DelegationLink,
+    DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     GovernedAutonomyContext, GovernedAutonomyTier, GovernedCallChainContext,
     GovernedCommerceContext, GovernedTransactionIntent, MeteredBillingContext, MeteredBillingQuote,
-    MeteredSettlementMode, MonetaryAmount, Operation, PromptGrant, ResolvedRuntimeAssurance,
-    ResourceGrant, RuntimeAssuranceTier, RuntimeAttestationEvidence, ToolGrant,
-    WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError, WorkloadIdentityScheme,
+    MeteredSettlementMode, ModelMetadata, ModelSafetyTier, MonetaryAmount, Operation, PromptGrant,
+    ResolvedRuntimeAssurance, ResourceGrant, RuntimeAssuranceTier, RuntimeAttestationEvidence,
+    SqlOperationClass, ToolGrant, WorkloadCredentialKind, WorkloadIdentity, WorkloadIdentityError,
+    WorkloadIdentityScheme,
 };
-pub use crypto::{sha256_hex, Keypair, PublicKey, Signature};
+pub use crypto::{
+    sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
+#[cfg(feature = "fips")]
+pub use crypto::{P256Backend, P384Backend};
 pub use error::{Error, Result};
 pub use hashing::{sha256, Hash};
 pub use manifest::{
@@ -37,12 +56,17 @@ pub use manifest::{
 pub use merkle::{leaf_hash, node_hash, MerkleProof, MerkleTree};
 pub use message::{AgentMessage, KernelMessage, ToolCallError, ToolCallResult};
 pub use oracle::{OracleConversionEvidence, ARC_ORACLE_CONVERSION_EVIDENCE_SCHEMA};
+pub use plan::{
+    PlanEvaluationRequest, PlanEvaluationResponse, PlanVerdict, PlannedToolCall, PlannedToolCallId,
+    StepVerdict, StepVerdictKind,
+};
 pub use receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
     FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedAutonomyReceiptMetadata,
     GovernedCommerceReceiptMetadata, GovernedTransactionReceiptMetadata, GuardEvidence,
     MeteredBillingReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, ReceiptAttributionMetadata,
     RuntimeAssuranceReceiptMetadata, SettlementStatus, SignedExportEnvelope, ToolCallAction,
+    TrustLevel,
 };
 pub use runtime_attestation::{
     verifier_family_for_attestation_schema, AttestationVerifierFamily,
@@ -66,10 +90,10 @@ pub use session::{
 
 /// Opaque agent identifier. In practice this is a hex-encoded Ed25519 public key
 /// or a SPIFFE URI, but the core treats it as an opaque string.
-pub type AgentId = String;
+pub type AgentId = alloc::string::String;
 
 /// Opaque tool server identifier.
-pub type ServerId = String;
+pub type ServerId = alloc::string::String;
 
 /// UUIDv7 capability identifier (time-ordered).
-pub type CapabilityId = String;
+pub type CapabilityId = alloc::string::String;

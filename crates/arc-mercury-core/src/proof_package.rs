@@ -151,6 +151,7 @@ pub struct MercuryProofPackage {
 }
 
 impl MercuryProofPackage {
+    #[allow(clippy::too_many_arguments)]
     pub fn build(
         arc_bundle: EvidenceExportBundle,
         evidence_export_manifest_hash: impl Into<String>,
@@ -202,6 +203,7 @@ impl MercuryProofPackage {
         if arc_bundle.uncheckpointed_receipts.is_empty() {
             publication_profile.completeness_mode = "full_checkpoint_coverage".to_string();
         }
+        publication_profile.validate()?;
 
         let evidence_export_manifest_hash = evidence_export_manifest_hash.into();
         let evidence_export_schema = evidence_export_schema.into();
@@ -218,7 +220,8 @@ impl MercuryProofPackage {
             && checkpoint_transparency.is_none()
         {
             return Err(MercuryContractError::Validation(
-                "append_only proof packages must carry checkpoint_transparency publication records".to_string(),
+                "append_only proof packages must carry checkpoint_transparency publication records"
+                    .to_string(),
             ));
         }
         let (checkpoint_transparency, publication_claim_boundary) =
@@ -287,7 +290,8 @@ impl MercuryProofPackage {
             && self.checkpoint_transparency.is_none()
         {
             return Err(MercuryContractError::Validation(
-                "append_only proof packages must carry checkpoint_transparency publication records".to_string(),
+                "append_only proof packages must carry checkpoint_transparency publication records"
+                    .to_string(),
             ));
         }
         if let Some(publication_claim_boundary) = self.publication_claim_boundary.as_ref() {
@@ -732,9 +736,9 @@ fn shared_optional_value<'a>(values: impl Iterator<Item = Option<&'a str>>) -> O
     first.flatten().map(ToOwned::to_owned)
 }
 
-fn publication_claim_trust_anchor<'a>(
-    publication_profile: &'a MercuryPublicationProfile,
-) -> Result<Option<&'a str>, MercuryContractError> {
+fn publication_claim_trust_anchor(
+    publication_profile: &MercuryPublicationProfile,
+) -> Result<Option<&str>, MercuryContractError> {
     publication_profile.validate()?;
     Ok(
         if publication_profile.checkpoint_continuity == CHECKPOINT_CONTINUITY_APPEND_ONLY {
@@ -829,8 +833,7 @@ mod tests {
     use arc_core::receipt::{
         ArcReceipt, ArcReceiptBody, CheckpointPublicationIdentity,
         CheckpointPublicationIdentityKind, CheckpointPublicationTrustAnchorBinding,
-        CheckpointTrustAnchorIdentity, CheckpointTrustAnchorIdentityKind, Decision,
-        ToolCallAction,
+        CheckpointTrustAnchorIdentity, CheckpointTrustAnchorIdentityKind, Decision, ToolCallAction,
     };
     use arc_kernel::checkpoint::{
         build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof,
@@ -867,6 +870,8 @@ mod tests {
                 policy_hash: format!("policy-proof-{sequence}"),
                 evidence: Vec::new(),
                 metadata: Some(metadata),
+                trust_level: arc_core::TrustLevel::default(),
+                tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -899,15 +904,21 @@ mod tests {
         }
     }
 
-    fn sample_bundle_with_publication_records() -> (EvidenceExportBundle, CheckpointTransparencySummary) {
+    fn sample_bundle_with_publication_records(
+    ) -> (EvidenceExportBundle, CheckpointTransparencySummary) {
         let first_receipt = sample_receipt(1);
         let second_receipt = sample_receipt(2);
         let first_canonical = canonical_json_bytes(&first_receipt).expect("first canonical");
         let second_canonical = canonical_json_bytes(&second_receipt).expect("second canonical");
         let checkpoint_keypair = Keypair::generate();
-        let first_checkpoint =
-            build_checkpoint(1, 1, 1, std::slice::from_ref(&first_canonical), &checkpoint_keypair)
-                .expect("first checkpoint");
+        let first_checkpoint = build_checkpoint(
+            1,
+            1,
+            1,
+            std::slice::from_ref(&first_canonical),
+            &checkpoint_keypair,
+        )
+        .expect("first checkpoint");
         let second_checkpoint = build_checkpoint_with_previous(
             2,
             2,
@@ -950,9 +961,11 @@ mod tests {
                 oldest_live_receipt_timestamp: Some(1_775_137_626),
             },
         };
-        let mut transparency =
-            validate_checkpoint_transparency(&[first_checkpoint.clone(), second_checkpoint.clone()])
-                .expect("transparency");
+        let mut transparency = validate_checkpoint_transparency(&[
+            first_checkpoint.clone(),
+            second_checkpoint.clone(),
+        ])
+        .expect("transparency");
         let binding = CheckpointPublicationTrustAnchorBinding {
             publication_identity: CheckpointPublicationIdentity::new(
                 CheckpointPublicationIdentityKind::LocalLog,

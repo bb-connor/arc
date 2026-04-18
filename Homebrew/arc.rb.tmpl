@@ -1,0 +1,45 @@
+# typed: strict
+# frozen_string_literal: true
+
+# Homebrew formula template for the ARC sidecar binary.
+#
+# The release workflow renders this file into the `arc.rb` GitHub release
+# asset with concrete version and checksum values.
+class Arc < Formula
+  desc "Provable Agent Capability Transport sidecar runtime"
+  homepage "https://github.com/backbay/arc"
+  version "__ARC_VERSION__"
+  license "Apache-2.0"
+
+  on_macos do
+    on_arm do
+      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-aarch64-apple-darwin.tar.gz"
+      sha256 "__ARC_SHA256_DARWIN_ARM64__"
+    end
+    on_intel do
+      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-x86_64-apple-darwin.tar.gz"
+      sha256 "__ARC_SHA256_DARWIN_AMD64__"
+    end
+  end
+
+  on_linux do
+    on_arm do
+      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-aarch64-unknown-linux-gnu.tar.gz"
+      sha256 "__ARC_SHA256_LINUX_ARM64__"
+    end
+    on_intel do
+      url "https://github.com/backbay/arc/releases/download/v#{version}/arc-#{version}-x86_64-unknown-linux-gnu.tar.gz"
+      sha256 "__ARC_SHA256_LINUX_AMD64__"
+    end
+  end
+
+  def install
+    candidate = Dir["arc", "arc-#{version}-*/arc"].find { |path| File.file?(path) }
+    odie "ARC archive did not contain an installable binary" unless candidate
+    bin.install candidate
+  end
+
+  test do
+    assert_match(/arc/i, shell_output("#{bin}/arc --version"))
+  end
+end

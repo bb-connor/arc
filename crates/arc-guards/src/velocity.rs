@@ -242,6 +242,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         }
     }
 
@@ -484,6 +486,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
         let request_b = arc_kernel::ToolCallRequest {
             request_id: "req-b".to_string(),
@@ -495,6 +499,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         // Exhaust cap-a.

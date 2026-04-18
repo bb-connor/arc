@@ -1,0 +1,333 @@
+name: Release PyPI
+
+# Publishes ARC Python SDKs to PyPI on git tag push using OIDC Trusted
+# Publishing. See `docs/install/PUBLISHING.md` for tag format, trusted
+# publisher setup, and rollback procedures.
+#
+# Tag formats:
+#   py/v<X.Y.Z>                       -> publishes every Python package
+#   py/<package-slug>-v<X.Y.Z>        -> publishes only that package
+#                                        (e.g. py/arc-crewai-v1.2.0)
+#
+# workflow_dispatch exposes a `dry_run` input that builds and smoke-tests
+# every matrix leg without uploading to PyPI. No stored API tokens are used
+# anywhere in this workflow; all uploads rely on `id-token: write` + PyPI
+# Trusted Publishing.
+
+on:
+  push:
+    tags:
+      - "py/v*.*.*"
+      - "py/*-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package slug to publish (e.g. arc-crewai). Leave blank for all."
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Build and smoke-test only -- skip PyPI upload."
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pypi-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan matrix
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.select.outputs.packages }}
+      dry_run: ${{ steps.select.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine packages to publish
+        id: select
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          # Canonical list of publishable Python packages. Order matters
+          # only for human readability.
+          all_packages=(
+            "sdks/python/arc-sdk-python"
+            "sdks/python/arc-asgi"
+            "sdks/python/arc-django"
+            "sdks/python/arc-fastapi"
+            "sdks/python/arc-langchain"
+            "sdks/python/arc-crewai"
+            "sdks/python/arc-autogen"
+            "sdks/python/arc-llamaindex"
+            "sdks/python/arc-temporal"
+            "sdks/python/arc-prefect"
+            "sdks/python/arc-dagster"
+            "sdks/python/arc-airflow"
+            "sdks/python/arc-ray"
+            "sdks/python/arc-streaming"
+            "sdks/python/arc-iac"
+            "sdks/python/arc-observability"
+            "sdks/python/arc-langgraph"
+            "sdks/python/arc-code-agent"
+            "sdks/lambda/arc-lambda-python"
+          )
+
+          selected=()
+
+          resolve_slug() {
+            local slug="$1"
+            local match=""
+            for path in "${all_packages[@]}"; do
+              if [[ "$(basename "$path")" == "$slug" ]]; then
+                match="$path"
+                break
+              fi
+            done
+            if [[ -z "$match" ]]; then
+              echo "Unknown package slug: $slug" >&2
+              exit 1
+            fi
+            echo "$match"
+          }
+
+          dry_run="false"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$INPUT_DRY_RUN" == "true" ]]; then
+              dry_run="true"
+            fi
+            if [[ -n "$INPUT_PACKAGE" ]]; then
+              selected+=("$(resolve_slug "$INPUT_PACKAGE")")
+            else
+              selected=("${all_packages[@]}")
+            fi
+          else
+            # Tag push. Parse ref name. Slug-specific tags are matched
+            # by iterating the known `all_packages` list and testing
+            # each candidate slug explicitly, rather than a greedy
+            # `.+-v` capture -- a greedy regex would misparse slugs
+            # that themselves contain `-v` (e.g. a hypothetical
+            # `arc-v2-client`), selecting the wrong package from
+            # `resolve_slug`.
+            if [[ "$REF_NAME" =~ ^py/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+              selected=("${all_packages[@]}")
+            else
+              matched=""
+              for candidate in "${all_packages[@]}"; do
+                slug="$(basename "$candidate")"
+                if [[ "$REF_NAME" =~ ^py/${slug}-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                  matched="$candidate"
+                  break
+                fi
+              done
+              if [[ -n "$matched" ]]; then
+                selected+=("$matched")
+              else
+                echo "Tag $REF_NAME does not match py/v*.*.* or py/<slug>-v*.*.* for any known slug" >&2
+                exit 1
+              fi
+            fi
+          fi
+
+          # Emit JSON array for matrix.
+          json="["
+          for i in "${!selected[@]}"; do
+            if [[ $i -gt 0 ]]; then json+=","; fi
+            json+="\"${selected[$i]}\""
+          done
+          json+="]"
+
+          echo "packages=$json" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "Selected packages: $json"
+          echo "Dry run: $dry_run"
+
+  build:
+    name: Build ${{ matrix.package }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    outputs:
+      dry_run: ${{ needs.plan.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.5.11"
+
+      - name: Read package version
+        id: meta
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          py_script='
+          import sys, tomllib, pathlib
+          data = tomllib.loads(pathlib.Path(sys.argv[1]).read_text())
+          project = data.get("project", {})
+          print(f"name={project.get(\"name\", \"\")}")
+          print(f"version={project.get(\"version\", \"\")}")
+          '
+          python3 -c "$py_script" "$PACKAGE_DIR/pyproject.toml" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Validate tag version matches pyproject
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED: ${{ steps.meta.outputs.version }}
+          SLUG: ${{ steps.meta.outputs.name }}
+        run: |
+          set -euo pipefail
+          # Extract version with a non-greedy leading strip so
+          # pre-release tags whose suffix contains the letter "v" (e.g.
+          # py/v1.2.3-dev1, py/v1.0.0-preview.1) round-trip correctly.
+          # The previous `${REF_NAME##*v}` stripped up to the LAST `v`
+          # in the string, yielding `1` instead of `1.2.3-dev1` for
+          # `py/v1.2.3-dev1` and breaking legitimate pre-release
+          # publishes. Match release-binaries.yml's `${tag#v}` shape.
+          if [[ "$REF_NAME" =~ ^py/v(.+)$ ]]; then
+            tag_version="${BASH_REMATCH[1]}"
+          elif [[ "$REF_NAME" =~ ^py/$SLUG-v(.+)$ ]]; then
+            # Anchor against the known package slug rather than
+            # `^py/.+-v(.+)$`. Greedy `.+` on a valid semver prerelease
+            # that contains `-v` (e.g. `py/arc-crewai-v1.2.3-preview-v1`)
+            # would otherwise consume through the suffix and capture
+            # `1` instead of `1.2.3-preview-v1`.
+            tag_version="${BASH_REMATCH[1]}"
+          else
+            echo "Tag $REF_NAME does not match py/v* or py/$SLUG-v*" >&2
+            exit 1
+          fi
+          if [[ "$tag_version" != "$EXPECTED" ]]; then
+            # Only fail if the tag is slug-specific and refers to this package,
+            # or if it is the meta tag py/v<ver>. For the meta tag we require
+            # all matrix packages to be on the same version.
+            if [[ "$REF_NAME" == py/v* ]]; then
+              echo "Meta tag $REF_NAME pins version $tag_version but package $SLUG is at $EXPECTED" >&2
+              exit 1
+            fi
+            if [[ "$REF_NAME" == py/$SLUG-v* ]]; then
+              echo "Slug tag $REF_NAME pins version $tag_version but package $SLUG is at $EXPECTED" >&2
+              exit 1
+            fi
+          fi
+
+      - name: Build sdist and wheel
+        working-directory: ${{ matrix.package }}
+        run: uv build --sdist --wheel --out-dir "${GITHUB_WORKSPACE}/dist-out"
+
+      - name: Smoke import wheel
+        shell: bash
+        env:
+          PKG_NAME: ${{ steps.meta.outputs.name }}
+        run: |
+          set -euo pipefail
+          wheel=$(find "${GITHUB_WORKSPACE}/dist-out" -maxdepth 1 -name '*.whl' -print -quit)
+          echo "Smoke testing $wheel"
+          python3 -m venv /tmp/smoke-venv
+          # shellcheck disable=SC1091
+          source /tmp/smoke-venv/bin/activate
+          pip install --quiet --upgrade pip
+          # Install the wheel WITH its declared runtime deps: packages
+          # like arc-airflow / arc-temporal / arc-crewai import their
+          # third-party deps at load time, so `--no-deps` produced a
+          # false ModuleNotFoundError even when the wheel itself was
+          # perfectly valid and would install correctly in production.
+          # Dependency resolution correctness is already covered by the
+          # per-package test suite; this smoke test only needs to prove
+          # the wheel imports cleanly in a fresh venv.
+          if [[ "$PKG_NAME" != "arc-sdk-python" ]]; then
+            pip install --quiet "${GITHUB_WORKSPACE}/sdks/python/arc-sdk-python"
+          fi
+          pip install --quiet "$wheel"
+          # Derive import name: hyphens -> underscores, "arc-sdk-python" ->
+          # "arc_sdk", "arc-lambda-python" -> "arc_lambda".
+          import_name=$(echo "$PKG_NAME" | tr '-' '_')
+          case "$PKG_NAME" in
+            arc-sdk-python) import_name="arc_sdk" ;;
+            arc-lambda-python) import_name="arc_lambda" ;;
+          esac
+          python3 -c "import importlib, sys; m = importlib.import_module('$import_name'); print('imported', m.__name__, 'from', getattr(m, '__file__', '?'))"
+          deactivate
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pypi-dist-${{ steps.meta.outputs.name }}
+          path: dist-out/*
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.package }}
+    needs: [plan, build]
+    if: needs.plan.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Serialize publishes so PyPI rate limits and 5xx retries do not
+      # cascade across packages.
+      max-parallel: 1
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    environment:
+      name: pypi
+      url: https://pypi.org/p/${{ steps.meta.outputs.name }}
+    permissions:
+      # Required for PyPI Trusted Publishing via OIDC.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read package name
+        id: meta
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          py_script='
+          import sys, tomllib, pathlib
+          data = tomllib.loads(pathlib.Path(sys.argv[1]).read_text())
+          print(f"name={data[\"project\"][\"name\"]}")
+          '
+          python3 -c "$py_script" "$PACKAGE_DIR/pyproject.toml" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pypi-dist-${{ steps.meta.outputs.name }}
+          path: dist-out
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-out
+          # No `password:` -- OIDC Trusted Publishing is used. A Trusted
+          # Publisher must be pre-configured on PyPI per package. See
+          # docs/install/PUBLISHING.md.
+          skip-existing: true
+          print-hash: true

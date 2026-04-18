@@ -1,0 +1,139 @@
+# syntax=docker/dockerfile:1.7
+#
+# ARC sidecar image.
+#
+# Build:
+#   docker build -f deploy/sidecar/Dockerfile -t ghcr.io/backbay/arc-sidecar:latest .
+#
+# The sidecar exposes :9090 and responds to GET /arc/health. It reads policy and
+# signing material from env vars documented in
+# docs/protocols/CLOUD-SIDECAR-INTEGRATION.md; if ARC_KERNEL_CONFIG_PATH is
+# unreadable the process exits non-zero and the platform marks the container
+# unhealthy (fail closed).
+
+ARG RUST_VERSION=1.93
+ARG DEBIAN_VERSION=bookworm
+
+# -----------------------------------------------------------------------------
+# Stage 1: build the arc-sidecar binary.
+# -----------------------------------------------------------------------------
+FROM rust:${RUST_VERSION}-slim-${DEBIAN_VERSION} AS builder
+
+ENV CARGO_TERM_COLOR=always \
+    CARGO_NET_RETRY=5 \
+    RUSTFLAGS="-C strip=symbols"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        libssl-dev \
+        pkg-config \
+        perl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+# `wit/` is consumed by arc-wasm-guards via
+# `wasmtime::component::bindgen!(path = "../../wit/arc-guard.wit")`,
+# which resolves at compile time. arc-cli enables the component backend,
+# so the wit directory MUST be in the build context or `cargo build -p
+# arc-cli --bin arc` fails with a missing-path error.
+COPY wit ./wit
+COPY examples ./examples
+COPY formal ./formal
+COPY tests ./tests
+
+# The sidecar binary lives in arc-cli (arc serve-sidecar). If a dedicated
+# arc-sidecar bin is introduced, replace the --bin arg accordingly.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --locked -p arc-cli --bin arc \
+ && mkdir -p /out \
+ && cp /build/target/release/arc /out/arc-sidecar
+
+# -----------------------------------------------------------------------------
+# Stage 2: healthcheck helper (distroless has no shell or curl).
+# We bake a tiny statically linked HTTP probe in a throwaway stage. The
+# install + relocate step packs curl plus all its shared-library deps into
+# a single /out directory using the Debian multiarch dir derived from
+# dpkg-architecture, so the runtime COPY below works unmodified on both
+# linux/amd64 and linux/arm64 (where libs live at aarch64-linux-gnu
+# instead of x86_64-linux-gnu).
+# -----------------------------------------------------------------------------
+FROM debian:${DEBIAN_VERSION}-slim AS healthcheck
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /out/bin /out/lib \
+    && cp /usr/bin/curl /out/bin/curl \
+    && ARCH_DIR="$(dpkg-architecture -qDEB_HOST_MULTIARCH)" \
+    && for dep in libcurl.so.4 libnghttp2.so.14 libidn2.so.0 librtmp.so.1 \
+                  libssh2.so.1 libpsl.so.5 libgssapi_krb5.so.2 \
+                  libldap-2.5.so.0 liblber-2.5.so.0 libzstd.so.1 \
+                  libbrotlidec.so.1 libbrotlicommon.so.1; do \
+         src="/usr/lib/${ARCH_DIR}/${dep}"; \
+         if [ -e "$src" ]; then \
+           # `cp -L` dereferences the symlink and writes the actual
+           # shared-library payload to the soname filename. Debian
+           # `libcurl.so.4` and friends are symlinks to versioned
+           # `.so.X.Y.Z` files; `cp -a` would preserve the symlink,
+           # leaving a dangling reference in the distroless runtime
+           # where the versioned target is absent. ld.so resolves
+           # binaries by soname, so the dereferenced copy is enough.
+           cp -L "$src" "/out/lib/${dep}"; \
+         fi; \
+       done
+
+# -----------------------------------------------------------------------------
+# Stage 3: runtime image. Distroless cc-debian12 nonroot (uid 65532).
+# -----------------------------------------------------------------------------
+FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
+
+# Metadata.
+LABEL org.opencontainers.image.title="arc-sidecar" \
+      org.opencontainers.image.description="ARC (Chio) kernel sidecar for multi-container platforms" \
+      org.opencontainers.image.source="https://github.com/backbay/arc" \
+      org.opencontainers.image.licenses="Apache-2.0"
+
+# Runtime config defaults (overridable at deploy time).
+ENV ARC_LISTEN_ADDR=0.0.0.0:9090 \
+    ARC_HEALTH_PATH=/arc/health \
+    ARC_LOG_LEVEL=info \
+    ARC_KERNEL_CONFIG_PATH=/etc/arc/kernel.yaml
+
+# Copy the binary and the healthcheck helper from earlier stages. The
+# healthcheck stage has already arch-normalized curl + its shared libs
+# into /out/{bin,lib}, so the runtime image no longer hardcodes the
+# x86_64-linux-gnu multiarch path. distroless/cc-debian12 already has
+# /usr/lib on the default ld.so search path, so dropping libs there
+# resolves for both amd64 and arm64 builds.
+COPY --from=builder /out/arc-sidecar /usr/local/bin/arc-sidecar
+COPY --from=healthcheck /out/bin/curl /usr/bin/curl
+COPY --from=healthcheck /out/lib/ /usr/lib/
+
+# Nonroot (uid/gid 65532) is already the default user in distroless:nonroot;
+# make it explicit so manifests that introspect the image know.
+USER 65532:65532
+
+EXPOSE 9090
+
+# Fail closed: if the health endpoint is not reachable the platform recycles
+# the container. The probe uses the baked-in curl binary to hit localhost.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+  CMD ["/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"]
+
+ENTRYPOINT ["/usr/local/bin/arc-sidecar"]
+# `serve-sidecar` is not a real subcommand in the arc CLI tree; a
+# container built from the old default exited immediately with CLI
+# usage errors before ever opening /arc/health. There is no single
+# zero-argument default that makes sense because every arc subcommand
+# needs operator input (policy path, wrapped server command, etc.).
+# Default to --help so `docker run <image>` prints usage instead of
+# crashing; operators override this at deploy time with the real
+# subcommand, e.g. `arc mcp serve-http --policy /etc/arc/policy.yaml
+# --server-id my-tool -- npx @modelcontextprotocol/server-filesystem /data`.
+CMD ["--help"]

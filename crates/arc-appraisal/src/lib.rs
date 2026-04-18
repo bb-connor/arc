@@ -1072,6 +1072,26 @@ impl VerifiedRuntimeAttestationRecord {
     }
 
     #[must_use]
+    pub fn evidence_schema(&self) -> &str {
+        self.evidence.schema.as_str()
+    }
+
+    #[must_use]
+    pub fn evidence_sha256(&self) -> &str {
+        self.evidence.evidence_sha256.as_str()
+    }
+
+    #[must_use]
+    pub fn canonical_verifier(&self) -> &str {
+        self.provenance.canonical_verifier.as_str()
+    }
+
+    #[must_use]
+    pub fn verifier_family(&self) -> AttestationVerifierFamily {
+        self.provenance.verifier_family
+    }
+
+    #[must_use]
     pub fn effective_tier(&self) -> RuntimeAssuranceTier {
         self.policy_outcome.effective_tier
     }
@@ -1084,6 +1104,15 @@ impl VerifiedRuntimeAttestationRecord {
     #[must_use]
     pub fn matched_trust_rule(&self) -> Option<&str> {
         self.provenance.matched_trust_rule.as_deref()
+    }
+
+    #[must_use]
+    pub fn matches_evidence(&self, evidence: &RuntimeAttestationEvidence) -> bool {
+        self.evidence_schema() == evidence.schema
+            && self.evidence_sha256() == evidence.evidence_sha256
+            && self.canonical_verifier() == canonicalize_attestation_verifier(&evidence.verifier)
+            && verifier_family_for_attestation_schema(evidence.schema.as_str())
+                == Some(self.verifier_family())
     }
 }
 
@@ -2198,6 +2227,44 @@ mod tests {
         }
     }
 
+    fn sample_nitro_evidence() -> RuntimeAttestationEvidence {
+        RuntimeAttestationEvidence {
+            schema: AWS_NITRO_ATTESTATION_SCHEMA.to_string(),
+            verifier: "https://nitro.aws.example/".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: "nitro-digest-1".to_string(),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: Some(json!({
+                "awsNitro": {
+                    "moduleId": "nitro-enclave-1",
+                    "digest": "sha384:nitro-measurement",
+                    "pcrs": {"0": "0123"}
+                }
+            })),
+        }
+    }
+
+    fn sample_nitro_trust_policy() -> AttestationTrustPolicy {
+        AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "aws-nitro-contoso".to_string(),
+                schema: AWS_NITRO_ATTESTATION_SCHEMA.to_string(),
+                verifier: "https://nitro.aws.example".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(AttestationVerifierFamily::AwsNitro),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: Vec::new(),
+                required_assertions: BTreeMap::from([
+                    ("moduleId".to_string(), "nitro-enclave-1".to_string()),
+                    ("digest".to_string(), "sha384:nitro-measurement".to_string()),
+                ]),
+            }],
+        }
+    }
+
     fn sample_descriptor_document() -> RuntimeAttestationVerifierDescriptorDocument {
         RuntimeAttestationVerifierDescriptorDocument {
             schema: RUNTIME_ATTESTATION_VERIFIER_DESCRIPTOR_SCHEMA.to_string(),
@@ -2360,6 +2427,29 @@ mod tests {
             verified.policy_outcome.reason.as_deref(),
             Some("matched attestation trust rule `azure-contoso`")
         );
+    }
+
+    #[test]
+    fn verified_runtime_attestation_record_accepts_nitro_evidence_across_trust_boundary() {
+        let evidence = sample_nitro_evidence();
+        let verified =
+            verify_runtime_attestation_record(&evidence, Some(&sample_nitro_trust_policy()), 150)
+                .expect("nitro record should verify across the trust boundary");
+
+        assert!(verified.is_locally_accepted());
+        assert_eq!(verified.effective_tier(), RuntimeAssuranceTier::Verified);
+        assert_eq!(verified.evidence_schema(), AWS_NITRO_ATTESTATION_SCHEMA);
+        assert_eq!(verified.evidence_sha256(), "nitro-digest-1");
+        assert_eq!(verified.canonical_verifier(), "https://nitro.aws.example");
+        assert_eq!(
+            verified.verifier_family(),
+            AttestationVerifierFamily::AwsNitro
+        );
+        assert!(verified.matches_evidence(&evidence));
+
+        let mut modified = evidence.clone();
+        modified.evidence_sha256 = "nitro-digest-2".to_string();
+        assert!(!verified.matches_evidence(&modified));
     }
 
     #[test]

@@ -71,6 +71,8 @@ fn make_receipt_body(kp: &Keypair) -> ArcReceiptBody {
             details: None,
         }],
         metadata: None,
+        trust_level: arc_core::TrustLevel::default(),
+        tenant_id: None,
         kernel_key: kp.public_key(),
     }
 }

@@ -261,6 +261,7 @@ class ArcClient:
         session_id: str | None = None,
         capability_id: str | None = None,
         capability_token: str | None = None,
+        model_metadata: dict[str, Any] | None = None,
         timestamp: int | None = None,
     ) -> EvaluateResponse:
         """Evaluate an HTTP request through the sidecar kernel."""
@@ -279,6 +280,7 @@ class ArcClient:
             body_length=body_length,
             session_id=session_id,
             capability_id=resolved_capability_id,
+            model_metadata=model_metadata,
             timestamp=timestamp or int(time.time()),
         )
         request_headers: dict[str, str] | None = None

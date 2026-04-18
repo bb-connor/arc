@@ -232,17 +232,12 @@ pub struct ImportedIssuerIdentity {
     pub signer_public_key: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ImportedTrustMode {
+    #[default]
     BilateralEvidenceShare,
     NetworkCleared,
-}
-
-impl Default for ImportedTrustMode {
-    fn default() -> Self {
-        Self::BilateralEvidenceShare
-    }
 }
 
 impl ImportedTrustMode {

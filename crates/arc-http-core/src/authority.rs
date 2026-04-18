@@ -1,16 +1,17 @@
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
-use arc_core_types::capability::{ArcScope, CapabilityToken, Operation, ToolGrant};
+use arc_core_types::capability::{ArcScope, CapabilityToken, ModelMetadata, Operation, ToolGrant};
 use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
 use arc_cross_protocol::{
     plan_authoritative_route, route_selection_metadata, DiscoveryProtocol, TargetProtocolRegistry,
 };
 use arc_kernel::{
-    ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallRequest,
-    ToolServerConnection, Verdict as KernelVerdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    ApprovalStore, ArcKernel, Guard, GuardContext, InMemoryApprovalStore, KernelConfig,
+    KernelError, ToolCallRequest, ToolServerConnection, Verdict as KernelVerdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -39,6 +40,8 @@ pub struct HttpAuthority {
     kernel: Arc<ArcKernel>,
     kernel_subject: PublicKey,
     kernel_agent_id: String,
+    approval_store: Arc<dyn ApprovalStore>,
+    trusted_capability_issuers: Vec<PublicKey>,
 }
 
 impl std::fmt::Debug for HttpAuthority {
@@ -62,6 +65,10 @@ pub struct HttpAuthorityInput<'a> {
     pub session_id: Option<String>,
     pub capability_id_hint: Option<&'a str>,
     pub presented_capability: Option<&'a str>,
+    pub requested_tool_server: Option<&'a str>,
+    pub requested_tool_name: Option<&'a str>,
+    pub requested_arguments: Option<&'a Value>,
+    pub model_metadata: Option<&'a ModelMetadata>,
     pub policy: HttpAuthorityPolicy,
 }
 
@@ -98,6 +105,12 @@ pub enum HttpAuthorityError {
     #[error("kernel-backed authorization failed: {0}")]
     Kernel(String),
 
+    #[error("kernel-backed authorization requires approval")]
+    PendingApproval {
+        approval_id: Option<String>,
+        kernel_receipt_id: String,
+    },
+
     #[error("failed to sign receipt: {0}")]
     ReceiptSign(String),
 }
@@ -106,6 +119,13 @@ pub enum HttpAuthorityError {
 struct PresentedCapabilityState {
     capability_id: Option<String>,
     invalid_reason: Option<String>,
+}
+
+#[derive(Clone, Copy)]
+struct RequestedToolInvocation<'a> {
+    server_id: &'a str,
+    tool_name: &'a str,
+    arguments: &'a Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,13 +213,46 @@ impl Guard for HttpProjectionGuard {
 impl HttpAuthority {
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_with_approval_store_and_trusted_issuers(
+            keypair,
+            policy_hash,
+            Arc::new(InMemoryApprovalStore::new()),
+            Vec::new(),
+        )
+    }
+
+    #[must_use]
+    pub fn new_with_approval_store(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+    ) -> Self {
+        Self::new_with_approval_store_and_trusted_issuers(
+            keypair,
+            policy_hash,
+            approval_store,
+            Vec::new(),
+        )
+    }
+
+    #[must_use]
+    pub fn new_with_approval_store_and_trusted_issuers(
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        mut trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
         let keypair = Arc::new(keypair);
+        let signer_public_key = keypair.public_key();
+        if !trusted_capability_issuers.contains(&signer_public_key) {
+            trusted_capability_issuers.push(signer_public_key.clone());
+        }
         let kernel_subject = Keypair::generate().public_key();
         let kernel_agent_id = kernel_subject.to_hex();
 
         let mut kernel = ArcKernel::new(KernelConfig {
             keypair: keypair.as_ref().clone(),
-            ca_public_keys: vec![keypair.public_key()],
+            ca_public_keys: trusted_capability_issuers.clone(),
             max_delegation_depth: 8,
             policy_hash: policy_hash.clone(),
             allow_sampling: false,
@@ -220,7 +273,18 @@ impl HttpAuthority {
             kernel: Arc::new(kernel),
             kernel_subject,
             kernel_agent_id,
+            approval_store,
+            trusted_capability_issuers,
         }
+    }
+
+    #[must_use]
+    pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
+        Arc::clone(&self.approval_store)
+    }
+
+    fn trusted_capability_issuers(&self) -> &[PublicKey] {
+        &self.trusted_capability_issuers
     }
 
     pub fn evaluate(
@@ -240,8 +304,15 @@ impl HttpAuthority {
         &self,
         input: HttpAuthorityInput<'_>,
     ) -> Result<PreparedHttpEvaluation, HttpAuthorityError> {
-        let presented_capability =
-            validate_presented_capability(input.capability_id_hint, input.presented_capability);
+        let presented_capability = validate_presented_capability(
+            input.capability_id_hint,
+            input.presented_capability,
+            self.trusted_capability_issuers(),
+            input.requested_tool_server,
+            input.requested_tool_name,
+            input.requested_arguments,
+            input.model_metadata,
+        );
         let caller_identity_hash = input
             .caller
             .identity_hash()
@@ -259,6 +330,10 @@ impl HttpAuthority {
             body_length: input.body_length,
             session_id: input.session_id.clone(),
             capability_id: presented_capability.capability_id.clone(),
+            tool_server: input.requested_tool_server.map(str::to_owned),
+            tool_name: input.requested_tool_name.map(str::to_owned),
+            arguments: input.requested_arguments.cloned(),
+            model_metadata: input.model_metadata.cloned(),
             timestamp: chrono::Utc::now().timestamp() as u64,
         };
 
@@ -292,6 +367,15 @@ impl HttpAuthority {
                     .reason
                     .unwrap_or_else(|| "kernel denied an allowed HTTP projection".to_string());
                 return Err(HttpAuthorityError::Kernel(reason));
+            }
+            (KernelVerdict::PendingApproval, _) => {
+                return Err(HttpAuthorityError::PendingApproval {
+                    approval_id: pending_approval_id(
+                        kernel_response.receipt.metadata.as_ref(),
+                        kernel_response.reason.as_deref(),
+                    ),
+                    kernel_receipt_id: kernel_response.receipt.id,
+                });
             }
         }
 
@@ -369,6 +453,7 @@ impl HttpAuthority {
             .map_err(|e| HttpAuthorityError::ReceiptSign(e.to_string()))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn authorize_via_kernel(
         &self,
         request_id: &str,
@@ -416,6 +501,8 @@ impl HttpAuthority {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
         let route_plan = plan_authoritative_route(
             request_id,
@@ -491,7 +578,28 @@ fn decision_status(verdict: &Verdict) -> u16 {
 fn validate_presented_capability(
     capability_id_hint: Option<&str>,
     presented_capability: Option<&str>,
+    trusted_issuers: &[PublicKey],
+    requested_tool_server: Option<&str>,
+    requested_tool_name: Option<&str>,
+    requested_arguments: Option<&Value>,
+    model_metadata: Option<&ModelMetadata>,
 ) -> PresentedCapabilityState {
+    let requested_tool = match (requested_tool_server, requested_tool_name) {
+        (Some(server_id), Some(tool_name)) => Some(RequestedToolInvocation {
+            server_id,
+            tool_name,
+            arguments: requested_arguments.unwrap_or(&Value::Null),
+        }),
+        (None, None) => None,
+        _ => {
+            return PresentedCapabilityState {
+                capability_id: None,
+                invalid_reason: Some(
+                    "tool-call evaluation requires both tool_server and tool_name".to_string(),
+                ),
+            };
+        }
+    };
     let Some(raw_capability) = presented_capability else {
         return PresentedCapabilityState {
             capability_id: None,
@@ -499,7 +607,12 @@ fn validate_presented_capability(
         };
     };
 
-    match validate_capability_token(raw_capability) {
+    match validate_capability_token(
+        raw_capability,
+        trusted_issuers,
+        requested_tool,
+        model_metadata,
+    ) {
         Ok(token) => {
             if let Some(hint) = capability_id_hint {
                 if hint != token.id {
@@ -577,9 +690,17 @@ fn projected_evidence(
     }
 }
 
-fn validate_capability_token(raw: &str) -> Result<CapabilityToken, String> {
+fn validate_capability_token(
+    raw: &str,
+    trusted_issuers: &[PublicKey],
+    requested_tool: Option<RequestedToolInvocation<'_>>,
+    model_metadata: Option<&ModelMetadata>,
+) -> Result<CapabilityToken, String> {
     let token: CapabilityToken =
         serde_json::from_str(raw).map_err(|e| format!("invalid capability token: {e}"))?;
+    if !trusted_issuers.contains(&token.issuer) {
+        return Err("capability issuer is not trusted".to_string());
+    }
     let signature_valid = token
         .verify_signature()
         .map_err(|e| format!("capability signature verification failed: {e}"))?;
@@ -589,6 +710,23 @@ fn validate_capability_token(raw: &str) -> Result<CapabilityToken, String> {
     token
         .validate_time(chrono::Utc::now().timestamp() as u64)
         .map_err(|e| format!("invalid capability token: {e}"))?;
+
+    if let Some(requested_tool) = requested_tool {
+        let matches = arc_kernel::capability_matches_request_with_model_metadata(
+            &token,
+            requested_tool.tool_name,
+            requested_tool.server_id,
+            requested_tool.arguments,
+            model_metadata,
+        )
+        .map_err(|e| format!("failed to evaluate capability scope: {e}"))?;
+        if !matches {
+            return Err(format!(
+                "capability does not authorize tool {} on server {}",
+                requested_tool.tool_name, requested_tool.server_id
+            ));
+        }
+    }
     Ok(token)
 }
 
@@ -652,6 +790,39 @@ fn metadata_value<'a>(metadata: Option<&'a Value>, key: &str) -> Option<&'a Valu
         .and_then(|map| map.get(key))
 }
 
+fn pending_approval_id(metadata: Option<&Value>, reason: Option<&str>) -> Option<String> {
+    metadata_string(metadata, "approval_id")
+        .or_else(|| {
+            metadata_value(metadata, "pending_approval")
+                .and_then(Value::as_object)
+                .and_then(|pending| pending.get("approval_id"))
+                .and_then(Value::as_str)
+        })
+        .map(ToOwned::to_owned)
+        .or_else(|| extract_approval_id(reason))
+}
+
+fn extract_approval_id(reason: Option<&str>) -> Option<String> {
+    let reason = reason?;
+    for marker in ["/approvals/", "approval_id=", "approval_id:"] {
+        if let Some(start) = reason.find(marker) {
+            let suffix = reason[start + marker.len()..].trim_start();
+            let approval_id = suffix
+                .split(|character: char| {
+                    character == '/'
+                        || character == ','
+                        || character == ';'
+                        || character.is_whitespace()
+                })
+                .next()?;
+            if !approval_id.is_empty() {
+                return Some(approval_id.to_string());
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -659,17 +830,24 @@ mod tests {
         http_status_scope, AuthMethod, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
         ARC_HTTP_STATUS_SCOPE_FINAL,
     };
-    use arc_core_types::capability::{ArcScope, CapabilityTokenBody};
+    use arc_core_types::capability::{ArcScope, CapabilityTokenBody, Operation, ToolGrant};
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
+        signed_capability_token_json_with_scope(issuer, id, ArcScope::default())
+    }
+
+    fn signed_capability_token_json_with_scope(
+        issuer: &Keypair,
+        id: &str,
+        scope: ArcScope,
+    ) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: id.to_string(),
                 issuer: issuer.public_key(),
                 subject: issuer.public_key(),
-                scope: ArcScope::default(),
+                scope,
                 issued_at: now.saturating_sub(60),
                 expires_at: now + 3600,
                 delegation_chain: Vec::new(),
@@ -694,6 +872,23 @@ mod tests {
         HttpAuthority::new(Keypair::generate(), "policy-hash".to_string())
     }
 
+    fn authority_with_issuer() -> (HttpAuthority, Keypair) {
+        let issuer = Keypair::generate();
+        (
+            HttpAuthority::new(issuer.clone(), "policy-hash".to_string()),
+            issuer,
+        )
+    }
+
+    fn authority_with_trusted_issuer(trusted_issuer: PublicKey) -> HttpAuthority {
+        HttpAuthority::new_with_approval_store_and_trusted_issuers(
+            Keypair::generate(),
+            "policy-hash".to_string(),
+            Arc::new(InMemoryApprovalStore::new()),
+            vec![trusted_issuer],
+        )
+    }
+
     #[test]
     fn safe_policy_allows_without_capability() {
         let query = HashMap::new();
@@ -710,6 +905,10 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -746,6 +945,10 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -770,6 +973,10 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: Some("{not-json"),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap();
@@ -782,8 +989,9 @@ mod tests {
     #[test]
     fn valid_capability_allows_deny_by_default() {
         let query = HashMap::new();
-        let capability = valid_capability_token_json("cap-123");
-        let result = authority()
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-123");
+        let result = authority
             .evaluate(HttpAuthorityInput {
                 request_id: "req-3".to_string(),
                 method: HttpMethod::Patch,
@@ -796,6 +1004,10 @@ mod tests {
                 session_id: Some("session-1".to_string()),
                 capability_id_hint: None,
                 presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
@@ -811,8 +1023,9 @@ mod tests {
     #[test]
     fn capability_hint_mismatch_becomes_denial() {
         let query = HashMap::new();
-        let capability = valid_capability_token_json("cap-123");
-        let result = authority()
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json(&issuer, "cap-123");
+        let result = authority
             .evaluate(HttpAuthorityInput {
                 request_id: "req-4".to_string(),
                 method: HttpMethod::Put,
@@ -825,12 +1038,84 @@ mod tests {
                 session_id: None,
                 capability_id_hint: Some("cap-other"),
                 presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::DenyByDefault,
             })
             .unwrap();
 
         assert!(result.verdict.is_denied());
         assert!(result.receipt.capability_id.is_none());
+    }
+
+    #[test]
+    fn untrusted_capability_denies_deny_by_default() {
+        let query = HashMap::new();
+        let authority = authority();
+        let capability = signed_capability_token_json(&Keypair::generate(), "cap-untrusted");
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-untrusted".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("ghi".to_string()),
+                body_length: 3,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(result.receipt.capability_id, None);
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability issuer is not trusted")
+        );
+    }
+
+    #[test]
+    fn configured_external_issuer_allows_deny_by_default() {
+        let query = HashMap::new();
+        let external_issuer = Keypair::generate();
+        let authority = authority_with_trusted_issuer(external_issuer.public_key());
+        let capability = signed_capability_token_json(&external_issuer, "cap-external");
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-external".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/pets".to_string(),
+                path: "/pets",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("issuer".to_string()),
+                body_length: 6,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-external")
+        );
     }
 
     #[test]
@@ -850,6 +1135,10 @@ mod tests {
                 session_id: None,
                 capability_id_hint: None,
                 presented_capability: None,
+                requested_tool_server: None,
+                requested_tool_name: None,
+                requested_arguments: None,
+                model_metadata: None,
                 policy: HttpAuthorityPolicy::SessionAllow,
             })
             .unwrap()
@@ -883,6 +1172,93 @@ mod tests {
                 .and_then(|value| value.get("selectedTargetProtocol"))
                 .and_then(Value::as_str),
             Some("native")
+        );
+    }
+
+    #[test]
+    fn extract_approval_id_parses_resume_path() {
+        assert_eq!(
+            extract_approval_id(Some(
+                "kernel returned PendingApproval; resume via /approvals/ap-123/respond"
+            ))
+            .as_deref(),
+            Some("ap-123")
+        );
+        assert_eq!(
+            extract_approval_id(Some("kernel returned PendingApproval; approval_id=ap-456"))
+                .as_deref(),
+            Some("ap-456")
+        );
+        assert_eq!(
+            extract_approval_id(Some("kernel returned PendingApproval; approval_id: ap-789"))
+                .as_deref(),
+            Some("ap-789")
+        );
+        assert!(extract_approval_id(Some("kernel returned PendingApproval")).is_none());
+    }
+
+    #[test]
+    fn pending_approval_id_reads_nested_metadata() {
+        let metadata = serde_json::json!({
+            "pending_approval": {
+                "approval_id": "ap-structured"
+            }
+        });
+        assert_eq!(
+            pending_approval_id(Some(&metadata), Some("kernel returned PendingApproval"))
+                .as_deref(),
+            Some("ap-structured")
+        );
+    }
+
+    #[test]
+    fn deny_by_default_requires_matching_tool_grant() {
+        let query = HashMap::new();
+        let (authority, issuer) = authority_with_issuer();
+        let capability = signed_capability_token_json_with_scope(
+            &issuer,
+            "cap-tool-scope",
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+        );
+
+        let result = authority
+            .evaluate(HttpAuthorityInput {
+                request_id: "req-tool-mismatch".to_string(),
+                method: HttpMethod::Post,
+                route_pattern: "/arc/tools/math/increment".to_string(),
+                path: "/arc/tools/math/increment",
+                query: &query,
+                caller: caller(),
+                body_hash: Some("toolhash".to_string()),
+                body_length: 8,
+                session_id: None,
+                capability_id_hint: None,
+                presented_capability: Some(&capability),
+                requested_tool_server: Some("math"),
+                requested_tool_name: Some("increment"),
+                requested_arguments: Some(&Value::Null),
+                model_metadata: None,
+                policy: HttpAuthorityPolicy::DenyByDefault,
+            })
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert!(result.receipt.capability_id.is_none());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool increment on server math")
         );
     }
 }

@@ -1,0 +1,127 @@
+{
+  "family": "agent-tool-server",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/arc-sidecar-task-role",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "containerDefinitions": [
+    {
+      "name": "app",
+      "image": "APP_IMAGE_PLACEHOLDER",
+      "essential": true,
+      "cpu": 384,
+      "memory": 896,
+      "portMappings": [
+        { "containerPort": 8080, "hostPort": 8080, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "ARC_SIDECAR_URL", "value": "http://localhost:9090" },
+        { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
+      ],
+      "dependsOn": [
+        { "containerName": "arc-sidecar", "condition": "HEALTHY" }
+      ],
+      "restartPolicy": {
+        "enabled": true,
+        "ignoredExitCodes": [],
+        "restartAttemptPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/agent-tool-server",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "app",
+          "awslogs-create-group": "true"
+        }
+      }
+    },
+    {
+      "name": "arc-sidecar",
+      "image": "ghcr.io/backbay/arc-sidecar:latest",
+      "essential": true,
+      "cpu": 128,
+      "memory": 128,
+      "portMappings": [
+        { "containerPort": 9090, "hostPort": 9090, "protocol": "tcp" }
+      ],
+      "command": [
+        "api",
+        "protect",
+        "--upstream",
+        "http://127.0.0.1:8080",
+        "--spec",
+        "/etc/arc/spec/openapi.yaml",
+        "--listen",
+        "0.0.0.0:9090"
+      ],
+      "environment": [
+        { "name": "ARC_LISTEN_ADDR", "value": "0.0.0.0:9090" },
+        { "name": "ARC_HEALTH_PATH", "value": "/arc/health" },
+        { "name": "ARC_KERNEL_CONFIG_PATH", "value": "/etc/arc/kernel.yaml" },
+        { "name": "ARC_POLICY_SOURCE", "value": "s3://ACCOUNT_ID-arc-config/policy.yaml" },
+        { "name": "ARC_RECEIPT_SINK", "value": "dynamodb://arc-receipts" },
+        { "name": "ARC_LOG_LEVEL", "value": "info" }
+      ],
+      "secrets": [
+        {
+          "name": "ARC_SIGNING_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/signing-key"
+        },
+        {
+          "name": "ARC_CAPABILITY_AUTHORITY_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/capability-authority-url"
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "arc-config",
+          "containerPath": "/etc/arc",
+          "readOnly": true
+        }
+      ],
+      "healthCheck": {
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
+        "interval": 10,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      },
+      "restartPolicy": {
+        "enabled": true,
+        "ignoredExitCodes": [],
+        "restartAttemptPeriod": 60
+      },
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/agent-tool-server",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "arc-sidecar",
+          "awslogs-create-group": "true"
+        }
+      },
+      "readonlyRootFilesystem": true,
+      "user": "65532:65532"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "arc-config",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "EFS_FILESYSTEM_ID",
+        "rootDirectory": "/arc-config",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": {
+          "iam": "ENABLED"
+        }
+      }
+    }
+  ]
+}

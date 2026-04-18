@@ -10,7 +10,7 @@ import "encoding/json"
 const (
 	// AnnotationCapabilityToken is the pod annotation containing the ARC
 	// capability token. Required unless the pod is exempt.
-	AnnotationCapabilityToken = "arc.backbay.io/capability-token"
+	AnnotationCapabilityToken = "arc.protocol/capability-token"
 
 	// AnnotationRequiredScopes is a comma-separated list of required ARC
 	// scopes for the pod's namespace or label selector.

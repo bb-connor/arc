@@ -11,8 +11,11 @@ fn resolve_identifier(did: Option<&str>, public_key: Option<&str>) -> Result<Did
             DidArc::from_str(value).map_err(|error| CliError::Other(error.to_string()))
         }
         (None, Some(value)) => PublicKey::from_hex(value)
-            .map(DidArc::from_public_key)
-            .map_err(CliError::from),
+            .map_err(CliError::from)
+            .and_then(|public_key| {
+                DidArc::from_public_key(public_key)
+                    .map_err(|error| CliError::Other(error.to_string()))
+            }),
         (Some(_), Some(_)) => Err(CliError::Other(
             "provide either --did or --public-key, not both".to_string(),
         )),

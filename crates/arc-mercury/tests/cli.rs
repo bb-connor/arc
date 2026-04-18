@@ -52,6 +52,8 @@ fn mercury_receipt_with_ts(id: &str, capability_id: &str, timestamp: u64) -> Arc
             policy_hash: "policy-1".to_string(),
             evidence: Vec::new(),
             metadata: Some(metadata),
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: keypair.public_key(),
         },
         &keypair,
@@ -121,7 +123,7 @@ fn mercury_proof_and_inquiry_packages_export_and_verify() {
     let inquiry_package_path = unique_path("arc-mercury-inquiry-package", ".json");
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open store");
         let issuer = Keypair::generate();
         let seq = store
             .append_arc_receipt_returning_seq(&mercury_receipt_with_ts(

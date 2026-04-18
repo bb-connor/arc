@@ -1,0 +1,393 @@
+name: Release npm
+
+# Publishes ARC TypeScript SDKs to npm on git tag push, using OIDC-backed
+# `npm publish --provenance`. See `docs/install/PUBLISHING.md` for tag
+# format, npm org trust setup, and rollback procedures.
+#
+# Tag formats:
+#   ts/v<X.Y.Z>                 -> publishes every TypeScript package
+#   ts/<slug>-v<X.Y.Z>          -> publishes only that package
+#                                  (e.g. ts/express-v1.2.0 publishes
+#                                  @arc-protocol/express)
+#
+# workflow_dispatch exposes a `dry_run` input that builds and lints every
+# matrix leg without uploading to npm. No stored NPM_TOKEN is required;
+# authentication is via GitHub's OIDC token and npm's Trusted Publisher
+# configuration (`--provenance`).
+
+on:
+  push:
+    tags:
+      - "ts/v*.*.*"
+      - "ts/*-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package slug (e.g. express, node-http). Leave blank for all."
+        required: false
+        type: string
+        default: ""
+      dry_run:
+        description: "Build and lint only -- skip npm publish."
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan matrix
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.select.outputs.packages }}
+      dry_run: ${{ steps.select.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine packages to publish
+        id: select
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_PACKAGE: ${{ github.event.inputs.package }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          # Canonical list of publishable TypeScript packages. The
+          # `conformance` workspace is marked `"private": true` and is
+          # intentionally excluded.
+          #
+          # node-http must always be built first because the other
+          # packages depend on it via `file:../node-http`.
+          all_packages=(
+            "sdks/typescript/packages/node-http"
+            "sdks/typescript/packages/express"
+            "sdks/typescript/packages/fastify"
+            "sdks/typescript/packages/elysia"
+            "sdks/typescript/packages/ai-sdk"
+          )
+
+          selected=()
+
+          resolve_slug() {
+            local slug="$1"
+            local match=""
+            for path in "${all_packages[@]}"; do
+              if [[ "$(basename "$path")" == "$slug" ]]; then
+                match="$path"
+                break
+              fi
+            done
+            if [[ -z "$match" ]]; then
+              echo "Unknown package slug: $slug" >&2
+              exit 1
+            fi
+            echo "$match"
+          }
+
+          dry_run="false"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$INPUT_DRY_RUN" == "true" ]]; then
+              dry_run="true"
+            fi
+            if [[ -n "$INPUT_PACKAGE" ]]; then
+              selected+=("$(resolve_slug "$INPUT_PACKAGE")")
+            else
+              selected=("${all_packages[@]}")
+            fi
+          else
+            # Slug-specific tags are matched by iterating the known
+            # `all_packages` list rather than a greedy `.+-v` capture
+            # — the greedy regex would misparse slugs that themselves
+            # contain `-v` (e.g. a hypothetical `ai-sdk-v2-preview`).
+            if [[ "$REF_NAME" =~ ^ts/v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+              selected=("${all_packages[@]}")
+            else
+              matched=""
+              for candidate in "${all_packages[@]}"; do
+                slug="$(basename "$candidate")"
+                if [[ "$REF_NAME" =~ ^ts/${slug}-v[0-9]+\.[0-9]+\.[0-9]+.*$ ]]; then
+                  matched="$candidate"
+                  break
+                fi
+              done
+              if [[ -n "$matched" ]]; then
+                selected+=("$matched")
+              else
+                echo "Tag $REF_NAME does not match ts/v*.*.* or ts/<slug>-v*.*.* for any known slug" >&2
+                exit 1
+              fi
+            fi
+          fi
+
+          json="["
+          for i in "${!selected[@]}"; do
+            if [[ $i -gt 0 ]]; then json+=","; fi
+            json+="\"${selected[$i]}\""
+          done
+          json+="]"
+
+          echo "packages=$json" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+          echo "Selected packages: $json"
+          echo "Dry run: $dry_run"
+
+  build:
+    name: Build ${{ matrix.package }}
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Keep publishes deterministic; node-http must build before
+      # anything that depends on it.
+      max-parallel: 1
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    outputs:
+      dry_run: ${{ needs.plan.outputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          # `registry-url` must be set here so that later `npm publish`
+          # invocations pick up the OIDC-provisioned token via
+          # $NODE_AUTH_TOKEN. See docs/install/PUBLISHING.md.
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Read package metadata
+        id: meta
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          name=$(node -e "process.stdout.write(require('./${PACKAGE_DIR}/package.json').name)")
+          version=$(node -e "process.stdout.write(require('./${PACKAGE_DIR}/package.json').version)")
+          slug=$(basename "$PACKAGE_DIR")
+          {
+            echo "name=$name"
+            echo "version=$version"
+            echo "slug=$slug"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved $name@$version"
+
+      - name: Validate tag version matches package.json
+        if: github.event_name == 'push'
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          EXPECTED: ${{ steps.meta.outputs.version }}
+          SLUG: ${{ steps.meta.outputs.slug }}
+        run: |
+          set -euo pipefail
+          # Non-greedy leading strip so pre-release tags whose suffix
+          # contains `v` (e.g. ts/v1.2.3-preview.1) are extracted
+          # correctly. See release-pypi.yml for the same fix.
+          if [[ "$REF_NAME" =~ ^ts/v(.+)$ ]]; then
+            tag_version="${BASH_REMATCH[1]}"
+          elif [[ "$REF_NAME" =~ ^ts/$SLUG-v(.+)$ ]]; then
+            # Anchor against the known package slug instead of a greedy
+            # `.+-v`. Without this anchor, a valid semver prerelease
+            # containing `-v` (e.g. `ts/ai-sdk-v1.2.3-preview-v1`)
+            # would let the greedy match consume through the prerelease
+            # suffix and capture `1` instead of `1.2.3-preview-v1`.
+            tag_version="${BASH_REMATCH[1]}"
+          else
+            echo "Tag $REF_NAME does not match ts/v* or ts/$SLUG-v*" >&2
+            exit 1
+          fi
+          if [[ "$REF_NAME" == ts/v* ]] && [[ "$tag_version" != "$EXPECTED" ]]; then
+            echo "Meta tag $REF_NAME pins version $tag_version but $SLUG is at $EXPECTED" >&2
+            exit 1
+          fi
+          if [[ "$REF_NAME" == ts/$SLUG-v* ]] && [[ "$tag_version" != "$EXPECTED" ]]; then
+            echo "Slug tag $REF_NAME pins version $tag_version but $SLUG is at $EXPECTED" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.package }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t local_file_deps < <(
+            node -e '
+              const fs = require("fs");
+              const path = require("path");
+              const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+              const seen = new Set();
+              for (const block of ["dependencies", "devDependencies", "optionalDependencies"]) {
+                const deps = pkg[block] ?? {};
+                for (const spec of Object.values(deps)) {
+                  if (typeof spec !== "string" || !spec.startsWith("file:")) continue;
+                  const dir = path.resolve(spec.slice("file:".length));
+                  if (seen.has(dir)) continue;
+                  seen.add(dir);
+                  console.log(dir);
+                }
+              }
+            '
+          )
+          for dep_dir in "${local_file_deps[@]}"; do
+            [[ -n "$dep_dir" ]] || continue
+            echo "Bootstrapping local file dependency $dep_dir"
+            pushd "$dep_dir" >/dev/null
+            if [[ -f package-lock.json ]]; then
+              npm ci
+            else
+              npm install
+            fi
+            if node -e 'const pkg = require("./package.json"); process.exit(pkg.scripts?.build ? 0 : 1)'; then
+              npm run build
+            fi
+            popd >/dev/null
+          done
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Build
+        working-directory: ${{ matrix.package }}
+        run: npm run build
+
+      - name: Lint
+        working-directory: ${{ matrix.package }}
+        run: npm run lint
+
+      - name: Test
+        working-directory: ${{ matrix.package }}
+        run: npm test
+
+      - name: Rewrite `file:` workspace deps to semver for publish
+        working-directory: ${{ matrix.package }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # npm consumers cannot resolve `file:../<sibling>` paths from a
+          # published tarball, so every `file:../<pkg>` dep is rewritten
+          # to `^<pkg.version>` before `npm pack`. The rewrite is
+          # in-place on the working copy for this matrix leg only.
+          node -e '
+            const fs = require("fs");
+            const path = require("path");
+            const pkgPath = path.resolve("./package.json");
+            const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+            let mutated = false;
+            for (const block of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+              const deps = pkg[block];
+              if (!deps) continue;
+              for (const [name, spec] of Object.entries(deps)) {
+                if (typeof spec !== "string" || !spec.startsWith("file:")) continue;
+                const rel = spec.slice("file:".length);
+                const sibling = path.resolve(path.dirname(pkgPath), rel, "package.json");
+                if (!fs.existsSync(sibling)) {
+                  throw new Error(`Cannot resolve file: dep ${name} -> ${sibling}`);
+                }
+                const ver = JSON.parse(fs.readFileSync(sibling, "utf8")).version;
+                deps[name] = `^${ver}`;
+                mutated = true;
+                console.log(`rewrote ${block}.${name}: ${spec} -> ^${ver}`);
+              }
+            }
+            if (mutated) fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+            else console.log("no file: deps to rewrite");
+          '
+
+      - name: npm pack (produce tarball artifact)
+        id: pack
+        working-directory: ${{ matrix.package }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball=$(npm pack --silent)
+          mkdir -p "${GITHUB_WORKSPACE}/npm-dist"
+          mv "$tarball" "${GITHUB_WORKSPACE}/npm-dist/"
+          echo "tarball=${tarball}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-dist-${{ steps.meta.outputs.slug }}
+          path: npm-dist/*
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.package }}
+    needs: [plan, build]
+    if: needs.plan.outputs.dry_run != 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Serialize to keep provenance attestations ordered and avoid
+      # registry races when workspaces depend on each other.
+      max-parallel: 1
+      matrix:
+        package: ${{ fromJSON(needs.plan.outputs.packages) }}
+    environment:
+      name: npm
+      # Deliberately no `url:` -- `environment` is evaluated at job
+      # creation time, before any step has run, so
+      # `steps.meta.outputs.name` resolves to an empty string and
+      # produces a broken `https://www.npmjs.com/package/` link.
+      # Wiring the package name through the `plan` matrix would require
+      # restructuring the matrix to emit `{dir, name}` objects; the
+      # operator can navigate to the published package from the step
+      # output ("Publish to npm") without a preview URL in GitHub's
+      # Environments panel.
+    permissions:
+      # Required for npm provenance attestations via GitHub OIDC.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Read package metadata
+        id: meta
+        shell: bash
+        env:
+          PACKAGE_DIR: ${{ matrix.package }}
+        run: |
+          set -euo pipefail
+          name=$(node -e "process.stdout.write(require('./${PACKAGE_DIR}/package.json').name)")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "slug=$(basename "$PACKAGE_DIR")" >> "$GITHUB_OUTPUT"
+
+      - name: Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-dist-${{ steps.meta.outputs.slug }}
+          path: npm-dist
+
+      - name: Publish to npm
+        shell: bash
+        env:
+          # $NODE_AUTH_TOKEN is normally supplied by setup-node. For OIDC
+          # Trusted Publishing we rely on the `id-token: write` permission
+          # above and npm's --provenance flag; the npm CLI (>= 11.5.1) will
+          # use the workflow's OIDC token when no legacy token is present.
+          NPM_CONFIG_PROVENANCE: "true"
+        run: |
+          set -euo pipefail
+          tarball=$(find npm-dist -maxdepth 1 -name '*.tgz' -print -quit)
+          echo "Publishing $tarball"
+          # `--access public` is required for scoped packages (@arc-protocol/*)
+          # to be accessible without auth.
+          npm publish "$tarball" --access public --provenance

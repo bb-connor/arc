@@ -1,15 +1,18 @@
 //! Request evaluator: matches routes, checks capabilities, signs receipts.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use arc_core_types::crypto::Keypair;
+use arc_core_types::crypto::{Keypair, PublicKey};
 use arc_core_types::receipt::GuardEvidence;
 use arc_http_core::{
     ArcHttpRequest, AuthMethod, CallerIdentity, HttpAuthority, HttpAuthorityError,
     HttpAuthorityEvaluation, HttpAuthorityInput, HttpAuthorityPolicy, HttpMethod, HttpReceipt,
     Verdict,
 };
+use arc_kernel::ApprovalStore;
 use arc_openapi::PolicyDecision;
+use serde_json::Value;
 
 /// Evaluated result for a single HTTP request.
 pub struct EvaluationResult {
@@ -35,10 +38,63 @@ pub struct RequestEvaluator {
 
 impl RequestEvaluator {
     pub fn new(routes: Vec<RouteEntry>, keypair: Keypair, policy_hash: String) -> Self {
+        Self::new_with_trusted_capability_issuers(routes, keypair, policy_hash, Vec::new())
+    }
+
+    pub fn new_with_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
         Self {
             routes,
-            authority: HttpAuthority::new(keypair, policy_hash),
+            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+                keypair,
+                policy_hash,
+                Arc::new(arc_kernel::InMemoryApprovalStore::new()),
+                trusted_capability_issuers,
+            ),
         }
+    }
+
+    pub fn new_with_approval_store(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+    ) -> Self {
+        Self::new_with_approval_store_and_trusted_capability_issuers(
+            routes,
+            keypair,
+            policy_hash,
+            approval_store,
+            Vec::new(),
+        )
+    }
+
+    pub fn new_with_approval_store_and_trusted_capability_issuers(
+        routes: Vec<RouteEntry>,
+        keypair: Keypair,
+        policy_hash: String,
+        approval_store: Arc<dyn ApprovalStore>,
+        trusted_capability_issuers: Vec<PublicKey>,
+    ) -> Self {
+        Self {
+            routes,
+            authority: HttpAuthority::new_with_approval_store_and_trusted_issuers(
+                keypair,
+                policy_hash,
+                approval_store,
+                trusted_capability_issuers,
+            ),
+        }
+    }
+
+    #[cfg(test)]
+    #[must_use]
+    pub fn approval_store(&self) -> Arc<dyn ApprovalStore> {
+        self.authority.approval_store()
     }
 
     /// Evaluate an incoming HTTP request against the route table.
@@ -66,6 +122,10 @@ impl RequestEvaluator {
             session_id: None,
             capability_id_hint: None,
             presented_capability: extract_presented_capability(headers, query),
+            requested_tool_server: None,
+            requested_tool_name: None,
+            requested_arguments: None,
+            model_metadata: None,
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -88,11 +148,16 @@ impl RequestEvaluator {
             body_length,
             session_id,
             capability_id,
+            tool_server,
+            tool_name,
+            arguments,
+            model_metadata,
             ..
         } = request;
         let (route_pattern, matched_policy) = self.match_route(method, &path);
         let raw_capability =
             presented_capability.or_else(|| extract_presented_capability(&headers, &query));
+        let arguments = arguments.unwrap_or(Value::Null);
         let result = self.authority.evaluate(HttpAuthorityInput {
             request_id,
             method,
@@ -105,6 +170,10 @@ impl RequestEvaluator {
             session_id,
             capability_id_hint: capability_id.as_deref(),
             presented_capability: raw_capability,
+            requested_tool_server: tool_server.as_deref(),
+            requested_tool_name: tool_name.as_deref(),
+            requested_arguments: Some(&arguments),
+            model_metadata: model_metadata.as_ref(),
             policy: policy_mode(matched_policy),
         })?;
         Ok(result.into())
@@ -177,6 +246,13 @@ impl From<HttpAuthorityError> for crate::error::ProtectError {
             HttpAuthorityError::CallerIdentity(message)
             | HttpAuthorityError::ContentHash(message)
             | HttpAuthorityError::Kernel(message) => Self::Evaluation(message),
+            HttpAuthorityError::PendingApproval {
+                approval_id,
+                kernel_receipt_id,
+            } => Self::PendingApproval {
+                approval_id,
+                kernel_receipt_id,
+            },
             HttpAuthorityError::ReceiptSign(message) => Self::ReceiptSign(message),
         }
     }
@@ -239,21 +315,31 @@ fn extract_caller(headers: &HashMap<String, String>) -> CallerIdentity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
+    use arc_core_types::capability::{
+        ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, ModelMetadata, ModelSafetyTier,
+        Operation, ToolGrant,
+    };
     use arc_http_core::{
         http_status_scope, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
         ARC_HTTP_STATUS_SCOPE_FINAL,
     };
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
+        signed_capability_token_json_with_scope(issuer, id, ArcScope::default())
+    }
+
+    fn signed_capability_token_json_with_scope(
+        issuer: &Keypair,
+        id: &str,
+        scope: ArcScope,
+    ) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
                 id: id.to_string(),
                 issuer: issuer.public_key(),
                 subject: issuer.public_key(),
-                scope: ArcScope::default(),
+                scope,
                 issued_at: now.saturating_sub(60),
                 expires_at: now + 3600,
                 delegation_chain: Vec::new(),
@@ -297,7 +383,7 @@ mod tests {
             operation_id: Some("listPets".to_string()),
             policy: PolicyDecision::SessionAllow,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -318,6 +404,139 @@ mod tests {
     }
 
     #[test]
+    fn evaluate_arc_request_denies_capability_for_different_tool_identity() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-tool-scope",
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+        );
+
+        let mut request = ArcHttpRequest::new(
+            "req-sidecar-tool-mismatch".to_string(),
+            HttpMethod::Post,
+            "/arc/tools/math/increment".to_string(),
+            "/arc/tools/math/increment".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("math".to_string());
+        request.tool_name = Some("increment".to_string());
+        request.arguments = Some(serde_json::json!({ "value": 1 }));
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 1;
+
+        let result = evaluator
+            .evaluate_arc_request(request, Some(&capability))
+            .unwrap();
+
+        assert!(result.verdict.is_denied());
+        assert_eq!(
+            result.receipt.evidence[0].details.as_deref(),
+            Some("capability does not authorize tool increment on server math")
+        );
+    }
+
+    #[test]
+    fn evaluate_arc_request_allows_model_constrained_capability_when_metadata_matches() {
+        let keypair = Keypair::generate();
+        let evaluator = RequestEvaluator::new(vec![], keypair.clone(), "test-policy".to_string());
+        let capability = signed_capability_token_json_with_scope(
+            &keypair,
+            "cap-model-scope",
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "math".to_string(),
+                    tool_name: "double".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![Constraint::ModelConstraint {
+                        allowed_model_ids: vec!["gpt-5".to_string()],
+                        min_safety_tier: Some(ModelSafetyTier::Standard),
+                    }],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+        );
+
+        let mut request = ArcHttpRequest::new(
+            "req-model-scope".to_string(),
+            HttpMethod::Post,
+            "/arc/tools/math/double".to_string(),
+            "/arc/tools/math/double".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.tool_server = Some("math".to_string());
+        request.tool_name = Some("double".to_string());
+        request.arguments = Some(serde_json::json!({ "value": 2 }));
+        request.model_metadata = Some(ModelMetadata {
+            model_id: "gpt-5".to_string(),
+            safety_tier: Some(ModelSafetyTier::Standard),
+            provider: Some("openai".to_string()),
+        });
+        request.body_hash = Some("tool-body".to_string());
+        request.body_length = 1;
+
+        let result = evaluator
+            .evaluate_arc_request(request, Some(&capability))
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-model-scope")
+        );
+    }
+
+    #[test]
+    fn evaluate_arc_request_allows_capability_from_configured_external_issuer() {
+        let signer = Keypair::generate();
+        let external_issuer = Keypair::generate();
+        let evaluator = RequestEvaluator::new_with_trusted_capability_issuers(
+            vec![],
+            signer,
+            "test-policy".to_string(),
+            vec![external_issuer.public_key()],
+        );
+        let capability = signed_capability_token_json(&external_issuer, "cap-external");
+
+        let mut request = ArcHttpRequest::new(
+            "req-external-issuer".to_string(),
+            HttpMethod::Post,
+            "/pets".to_string(),
+            "/pets".to_string(),
+            CallerIdentity::anonymous(),
+        );
+        request.body_hash = Some("body".to_string());
+        request.body_length = 1;
+
+        let result = evaluator
+            .evaluate_arc_request(request, Some(&capability))
+            .unwrap();
+
+        assert!(result.verdict.is_allowed());
+        assert_eq!(
+            result.receipt.capability_id.as_deref(),
+            Some("cap-external")
+        );
+    }
+
+    #[test]
     fn evaluate_post_denied_without_capability() {
         let keypair = Keypair::generate();
         let routes = vec![RouteEntry {
@@ -326,7 +545,7 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let result = evaluator
             .evaluate(
@@ -356,12 +575,12 @@ mod tests {
             operation_id: Some("createPet".to_string()),
             policy: PolicyDecision::DenyByDefault,
         }];
-        let evaluator = RequestEvaluator::new(routes, keypair, "test-policy".to_string());
+        let evaluator = RequestEvaluator::new(routes, keypair.clone(), "test-policy".to_string());
 
         let mut headers = HashMap::new();
         headers.insert(
             "X-Arc-Capability".to_string(),
-            valid_capability_token_json("cap-123"),
+            signed_capability_token_json(&keypair, "cap-123"),
         );
 
         let result = evaluator

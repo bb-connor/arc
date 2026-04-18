@@ -174,6 +174,8 @@ mod tests {
                 details: None,
             }],
             metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: kp.public_key(),
         };
         ArcReceipt::sign(body, kp).unwrap()

@@ -32,6 +32,10 @@ use arc_store_sqlite::SqliteReceiptStore;
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
 
+fn did_from_public_key(public_key: arc_core::PublicKey) -> DidArc {
+    DidArc::from_public_key(public_key).expect("ed25519 key")
+}
+
 fn unique_path(prefix: &str, suffix: &str) -> PathBuf {
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -424,6 +428,8 @@ fn receipt_with_ts(id: &str, capability_id: &str, timestamp: u64) -> ArcReceipt 
             policy_hash: "policy-passport".to_string(),
             evidence: Vec::new(),
             metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: keypair.public_key(),
         },
         &keypair,
@@ -557,7 +563,7 @@ fn write_passport_artifact(
     )
     .expect("issue credential");
     let passport = build_agent_passport(
-        &DidArc::from_public_key(subject.public_key()).to_string(),
+        &did_from_public_key(subject.public_key()).to_string(),
         vec![credential],
     )
     .expect("passport");
@@ -616,7 +622,7 @@ fn passport_create_verify_and_present_roundtrip() {
     let capability = capability_with_id("cap-passport", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -954,7 +960,7 @@ fn passport_create_and_verify_surface_enterprise_identity_provenance() {
     let capability = capability_with_id("cap-passport-enterprise", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -1448,7 +1454,7 @@ fn passport_create_require_checkpoints_fails_for_uncheckpointed_receipts() {
     let capability = capability_with_id("cap-passport-no-checkpoint", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -1511,7 +1517,7 @@ fn passport_policy_reference_flow_is_replay_safe_locally() {
     let capability = capability_with_id("cap-passport-ref", &subject, &issuer);
 
     {
-        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
+        let store = SqliteReceiptStore::open(&receipt_db_path).expect("open receipt store");
         store
             .record_capability_snapshot(&capability, None)
             .expect("record capability snapshot");
@@ -1761,7 +1767,7 @@ fn passport_cli_supports_multi_issuer_verify_evaluate_and_present() {
 
     let subject_public_key = Keypair::from_seed(&[7u8; 32]).public_key();
     let subject_key = subject_public_key.to_hex();
-    let subject_did = DidArc::from_public_key(subject_public_key);
+    let subject_did = did_from_public_key(subject_public_key);
     let credential_a = issue_reputation_credential(
         &Keypair::from_seed(&[1u8; 32]),
         sample_scorecard(&subject_key),

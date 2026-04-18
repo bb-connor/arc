@@ -1,6 +1,8 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::*;
+
+static GLOBAL_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl ArcKernel {
     pub fn open_session(
@@ -8,7 +10,7 @@ impl ArcKernel {
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
     ) -> SessionId {
-        let session_number = self.session_counter.fetch_add(1, Ordering::SeqCst) + 1;
+        let session_number = GLOBAL_SESSION_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
         let session_id = SessionId::new(format!("sess-{}", session_number));
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
@@ -216,6 +218,8 @@ impl ArcKernel {
                 receipt_attribution_metadata(&operation.capability, None),
             ),
             timestamp: current_unix_timestamp(),
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
         self.record_arc_receipt(&receipt)?;
@@ -386,10 +390,12 @@ impl ArcKernel {
     ) -> Result<arc_core::session::SessionAnchor, KernelError> {
         let body = arc_core::session::SessionAnchorBody::new(
             session.session_anchor().id().to_string(),
-            session.id().clone(),
-            session.agent_id().to_string(),
-            session.auth_context().clone(),
-            arc_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+            arc_core::session::SessionAnchorContext::new(
+                session.id().clone(),
+                session.agent_id().to_string(),
+                session.auth_context().clone(),
+                arc_core::session::SessionProofBinding::from_auth_context(session.auth_context()),
+            ),
             session.session_anchor().auth_epoch(),
             session.session_anchor().issued_at(),
             self.config.keypair.public_key(),
@@ -542,6 +548,8 @@ impl ArcKernel {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let result = self.evaluate_tool_call_with_nested_flow_client(context, &request, client);
@@ -578,6 +586,16 @@ impl ArcKernel {
         context: &OperationContext,
         operation: &SessionOperation,
     ) -> Result<SessionOperationResponse, KernelError> {
+        // Phase 1.5: install tenant_id scope for the duration of this
+        // session-scoped evaluation so every receipt signed here (tool
+        // call, resource read deny, etc.) is tagged with the session's
+        // tenant. The ToolCall branch also installs a scope via its
+        // sync_with_session_context path; the nested scope is a no-op
+        // because the value matches, but it keeps non-tool-call branches
+        // (e.g. evaluate_resource_read) covered.
+        let tenant_id = self.resolve_tenant_id_for_session(Some(&context.session_id));
+        let _tenant_scope = scope_receipt_tenant_id(tenant_id);
+
         self.validate_web3_evidence_prerequisites()?;
         let operation_kind = operation.kind();
         let should_track_inflight = matches!(
@@ -610,14 +628,20 @@ impl ArcKernel {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
+                    federated_origin_kernel_id: None,
                 };
                 let session_roots =
                     self.session_enforceable_filesystem_root_paths_owned(&context.session_id)?;
 
-                self.evaluate_tool_call_sync_with_session_roots(
+                // Phase 1.5: pass the session_id so the evaluate path can
+                // resolve tenant_id from session.auth_context for every
+                // receipt signed during this tool call.
+                self.evaluate_tool_call_sync_with_session_context(
                     &request,
                     Some(session_roots.as_slice()),
                     None,
+                    Some(&context.session_id),
                 )
                 .map(SessionOperationResponse::ToolCall)
             }

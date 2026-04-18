@@ -530,6 +530,24 @@ mod tests {
         EvmPublicationReceipt,
     };
 
+    fn bind_mock_json_rpc_listener() -> Option<TcpListener> {
+        match TcpListener::bind("127.0.0.1:0") {
+            Ok(listener) => Some(listener),
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::PermissionDenied
+                        | std::io::ErrorKind::AddrNotAvailable
+                        | std::io::ErrorKind::Unsupported
+                ) =>
+            {
+                eprintln!("skipping EVM JSON-RPC test: loopback TCP bind unavailable: {err}");
+                None
+            }
+            Err(err) => panic!("bind mock JSON-RPC listener: {err}"),
+        }
+    }
+
     struct MockJsonRpcServer {
         base_url: String,
         requests: Arc<Mutex<Vec<Value>>>,
@@ -537,8 +555,8 @@ mod tests {
     }
 
     impl MockJsonRpcServer {
-        fn spawn(envelopes: Vec<Value>) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock JSON-RPC listener");
+        fn spawn(envelopes: Vec<Value>) -> Option<Self> {
+            let listener = bind_mock_json_rpc_listener()?;
             let address = listener.local_addr().expect("listener address");
             let base_url = format!("http://127.0.0.1:{}", address.port());
             let requests = Arc::new(Mutex::new(Vec::new()));
@@ -560,11 +578,11 @@ mod tests {
                 }
             });
 
-            Self {
+            Some(Self {
                 base_url,
                 requests,
                 handle,
-            }
+            })
         }
 
         fn base_url(&self) -> &str {
@@ -791,10 +809,12 @@ mod tests {
 
     #[tokio::test]
     async fn publish_root_estimates_gas_and_submits_transaction() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!("0x5208")),
             rpc_result(json!("0xabc123")),
-        ]);
+        ]) else {
+            return;
+        };
         let checkpoint = sample_checkpoint();
         let binding = sample_binding();
         let publication =
@@ -818,10 +838,12 @@ mod tests {
 
     #[tokio::test]
     async fn publish_root_rejects_non_string_transaction_hash() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!("0x5208")),
             rpc_result(json!({ "txHash": "0xabc123" })),
-        ]);
+        ]) else {
+            return;
+        };
         let checkpoint = sample_checkpoint();
         let binding = sample_binding();
         let publication =
@@ -838,10 +860,12 @@ mod tests {
 
     #[tokio::test]
     async fn publish_root_surfaces_rpc_error_envelope() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!("0x5208")),
             rpc_error(-32000, "denied"),
-        ]);
+        ]) else {
+            return;
+        };
         let checkpoint = sample_checkpoint();
         let binding = sample_binding();
         let publication =
@@ -872,14 +896,16 @@ mod tests {
                 operatorKeyHash: operator_key_hash(&binding),
             },
         ));
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!({
                 "blockNumber": "0x2a",
                 "blockHash": "0xabc",
                 "status": "0x1",
             })),
             rpc_result(json!(stored)),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_target(server.base_url());
 
         let receipt = confirm_root_publication(&target, &checkpoint, &binding, "0xdeadbeef")
@@ -898,11 +924,13 @@ mod tests {
 
     #[tokio::test]
     async fn confirm_root_publication_rejects_failed_transaction_status() {
-        let server = MockJsonRpcServer::spawn(vec![rpc_result(json!({
+        let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!({
             "blockNumber": "0x2a",
             "blockHash": "0xabc",
             "status": "0x0",
-        }))]);
+        }))]) else {
+            return;
+        };
         let checkpoint = sample_checkpoint();
         let binding = sample_binding();
         let target = sample_target(server.base_url());
@@ -930,14 +958,16 @@ mod tests {
                 operatorKeyHash: operator_key_hash(&binding),
             },
         ));
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!({
                 "blockNumber": "0x2a",
                 "blockHash": "0xabc",
                 "status": "0x1",
             })),
             rpc_result(json!(stored)),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_target(server.base_url());
 
         let error = confirm_root_publication(&target, &checkpoint, &binding, "0xdeadbeef")
@@ -952,14 +982,16 @@ mod tests {
 
     #[tokio::test]
     async fn inspect_publication_guard_decodes_authorization_and_sequence() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
             ))),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_delegate_target(server.base_url());
 
         let guard = inspect_publication_guard(&target)
@@ -975,14 +1007,16 @@ mod tests {
 
     #[tokio::test]
     async fn ensure_publication_ready_rejects_unauthorized_publisher() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&false)
             ))),
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
             ))),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_delegate_target(server.base_url());
 
         let error = ensure_publication_ready(&target, 42)
@@ -995,14 +1029,16 @@ mod tests {
 
     #[tokio::test]
     async fn ensure_publication_ready_rejects_checkpoint_regression() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
             ))),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_delegate_target(server.base_url());
 
         let error = ensure_publication_ready(&target, 41)
@@ -1015,14 +1051,16 @@ mod tests {
 
     #[tokio::test]
     async fn ensure_publication_ready_accepts_next_checkpoint() {
-        let server = MockJsonRpcServer::spawn(vec![
+        let Some(server) = MockJsonRpcServer::spawn(vec![
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::isAuthorizedPublisherCall::abi_encode_returns(&true)
             ))),
             rpc_result(json!(encode_hex(
                 IArcRootRegistry::getLatestSeqCall::abi_encode_returns(&41_u64)
             ))),
-        ]);
+        ]) else {
+            return;
+        };
         let target = sample_delegate_target(server.base_url());
 
         let guard = ensure_publication_ready(&target, 42)
@@ -1035,9 +1073,11 @@ mod tests {
 
     #[tokio::test]
     async fn verify_inclusion_onchain_decodes_registry_verdict() {
-        let server = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
+        let Some(server) = MockJsonRpcServer::spawn(vec![rpc_result(json!(encode_hex(
             IArcRootRegistry::verifyInclusionDetailedCall::abi_encode_returns(&true)
-        )))]);
+        )))]) else {
+            return;
+        };
         let target = sample_target(server.base_url());
         let proof = sample_primary_proof();
 

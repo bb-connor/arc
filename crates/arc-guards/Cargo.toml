@@ -13,16 +13,26 @@ name = "arc_guards"
 [dependencies]
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
 arc-core = { package = "arc-core", path = "../arc-core" }
+arc-core-types = { package = "arc-core-types", path = "../arc-core-types" }
 arc-http-session = { package = "arc-http-session", path = "../arc-http-session" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
+async-trait = "0.1"
+rand = "0.8"
 glob = "0.3"
+lru = "0.16.3"
 regex = "1"
+base64 = { workspace = true }
+zeroize = "1"
 
 [dev-dependencies]
+arc-store-sqlite = { package = "arc-store-sqlite", path = "../arc-store-sqlite" }
 serde_json = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
 
 [lints.clippy]
 unwrap_used = "deny"

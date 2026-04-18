@@ -1,6 +1,14 @@
 pub use arc_appraisal as appraisal;
 pub use arc_core_types::{canonical, capability, crypto, receipt};
 
+pub mod premium;
+pub use premium::{
+    price_premium, risk_multiplier, LookbackWindow, PremiumDeclineReason, PremiumInputs,
+    PremiumQuote, DEFAULT_BEHAVIORAL_PENALTY_CAP, DEFAULT_BEHAVIORAL_PENALTY_PER_SIGMA,
+    PREMIUM_DECLINE_FLOOR, PREMIUM_HIGH_RISK_FLOOR, PREMIUM_LOW_RISK_FLOOR,
+    PREMIUM_MEDIUM_RISK_FLOOR,
+};
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};

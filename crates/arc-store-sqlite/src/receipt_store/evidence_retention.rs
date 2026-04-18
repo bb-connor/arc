@@ -13,7 +13,7 @@ impl SqliteReceiptStore {
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
-        let tx = connection.transaction()?;
+        let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         let mut subject_key = attribution.subject_key;
         let mut issuer_key = attribution.issuer_key;
         if subject_key.is_none() || issuer_key.is_none() {
@@ -38,6 +38,12 @@ impl SqliteReceiptStore {
                 }
             }
         }
+        // Phase 1.5: tenant_id is populated directly from the signed
+        // receipt body. The evaluate path derived it from the session's
+        // enterprise_identity; we carry it through to a dedicated column
+        // so the tenant-scoped WHERE clause can filter without having
+        // to json_extract on every query.
+        let tenant_id = receipt.tenant_id.clone();
         let inserted = tx.execute(
             r#"
             INSERT INTO arc_tool_receipts (
@@ -52,8 +58,9 @@ impl SqliteReceiptStore {
                 decision_kind,
                 policy_hash,
                 content_hash,
+                tenant_id,
                 raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(receipt_id) DO NOTHING
             "#,
             params![
@@ -68,6 +75,7 @@ impl SqliteReceiptStore {
                 decision_kind(&receipt.decision),
                 receipt.policy_hash,
                 receipt.content_hash,
+                tenant_id,
                 raw_json,
             ],
         )?;
@@ -247,7 +255,8 @@ impl SqliteReceiptStore {
                 decision_kind TEXT NOT NULL,
                 policy_hash TEXT NOT NULL,
                 content_hash TEXT NOT NULL,
-                raw_json TEXT NOT NULL
+                raw_json TEXT NOT NULL,
+                tenant_id TEXT
             );
 
             CREATE TABLE IF NOT EXISTS archive.arc_child_receipts (
@@ -443,7 +452,30 @@ impl SqliteReceiptStore {
 
         let limit = query.limit.clamp(1, MAX_QUERY_LIMIT);
 
-        // Both queries share the same 9 filter parameters.
+        // Phase 1.5 multi-tenant receipt isolation: compute the tenant
+        // WHERE fragment. Three modes:
+        //
+        //   * `tenant_filter = None`           -> "1=1" (admin/compat).
+        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=false
+        //     (default) -> `tenant_id = ?X OR tenant_id IS NULL` so
+        //     legacy pre-1.5 receipts stay visible during the
+        //     transition.
+        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=true
+        //     -> `tenant_id = ?X` (legacy rows hidden).
+        //
+        // Bound parameter ?12 carries the tenant string when present.
+        // When `tenant_filter = None`, `?12 IS NULL` makes the fragment
+        // a tautology and no rows are removed.
+        let tenant_fragment = match (
+            query.tenant_filter.as_deref(),
+            self.strict_tenant_isolation_enabled(),
+        ) {
+            (None, _) => "(?12 IS NULL)",
+            (Some(_), true) => "(r.tenant_id = ?12)",
+            (Some(_), false) => "(r.tenant_id = ?12 OR r.tenant_id IS NULL)",
+        };
+
+        // Both queries share the same filter parameters.
         // Parameters:
         //   ?1  capability_id
         //   ?2  tool_server
@@ -454,13 +486,15 @@ impl SqliteReceiptStore {
         //   ?7  min_cost (json_extract cost_charged >=)
         //   ?8  max_cost (json_extract cost_charged <=)
         //   ?9  agent_subject (receipt subject_key, falling back to capability_lineage)
+        //   ?12 tenant_filter (tenant_id exact match or NULL fallback)
         // Data query also uses:
         //   ?10 cursor (seq >, exclusive)
         //   ?11 limit
         //
         // When agent_subject is None, the LEFT JOIN produces NULL for cl.subject_key,
         // and the (?9 IS NULL OR ...) guard passes -- no rows are filtered out.
-        let data_sql = r#"
+        let data_sql = format!(
+            r#"
             SELECT r.seq, r.raw_json
             FROM arc_tool_receipts r
             LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
@@ -473,14 +507,17 @@ impl SqliteReceiptStore {
               AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
               AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
               AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
+              AND {tenant_fragment}
               AND (?10 IS NULL OR r.seq > ?10)
             ORDER BY r.seq ASC
             LIMIT ?11
-        "#;
+        "#
+        );
 
         // Count query uses identical WHERE clause but no cursor and no LIMIT.
         // total_count reflects the full filtered set regardless of pagination.
-        let count_sql = r#"
+        let count_sql = format!(
+            r#"
             SELECT COUNT(*)
             FROM arc_tool_receipts r
             LEFT JOIN capability_lineage cl ON r.capability_id = cl.capability_id
@@ -493,7 +530,9 @@ impl SqliteReceiptStore {
               AND (?7 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) >= ?7)
               AND (?8 IS NULL OR CAST(json_extract(r.raw_json, '$.metadata.financial.cost_charged') AS INTEGER) <= ?8)
               AND (?9 IS NULL OR COALESCE(r.subject_key, cl.subject_key) = ?9)
-        "#;
+              AND {tenant_fragment}
+        "#
+        );
 
         let cap_id = query.capability_id.as_deref();
         let tool_srv = query.tool_server.as_deref();
@@ -504,6 +543,7 @@ impl SqliteReceiptStore {
         let min_cost = query.min_cost.map(|v| v as i64);
         let max_cost = query.max_cost.map(|v| v as i64);
         let agent_sub = query.agent_subject.as_deref();
+        let tenant = query.tenant_filter.as_deref();
         // Convert cursor to signed i64 for SQLite. SQLite AUTOINCREMENT seq
         // values are bounded by i64::MAX; a cursor above that can never be
         // exceeded. Convert with a checked cast: on overflow return an empty
@@ -516,13 +556,29 @@ impl SqliteReceiptStore {
                 Err(_) => {
                     // cursor > i64::MAX: no AUTOINCREMENT seq can exceed it.
                     // Run only the count query (no cursor applied) and return empty.
+                    // ?10 and ?11 (cursor/limit) are not used in the count query
+                    // but must still bind placeholders if we reuse `params!`;
+                    // the count SQL uses only ?1..=?9 and ?12, so we need to
+                    // bind ?10 and ?11 as NULL / 0 to keep indexes stable.
                     let total_count: u64 = self
                         .connection()?
                         .query_row(
-                            count_sql,
+                            &count_sql,
                             params![
-                                cap_id, tool_srv, tool_nm, outcome, since, until, min_cost,
-                                max_cost, agent_sub,
+                                cap_id,
+                                tool_srv,
+                                tool_nm,
+                                outcome,
+                                since,
+                                until,
+                                min_cost,
+                                max_cost,
+                                agent_sub,
+                                // ?10, ?11 unused in count_sql but bound so ?12
+                                // resolves to the tenant filter.
+                                None::<i64>,
+                                0i64,
+                                tenant,
                             ],
                             |row| row.get::<_, i64>(0),
                         )
@@ -538,7 +594,7 @@ impl SqliteReceiptStore {
 
         // Execute data query.
         let connection = self.connection()?;
-        let mut stmt = connection.prepare(data_sql)?;
+        let mut stmt = connection.prepare(&data_sql)?;
         let rows = stmt.query_map(
             params![
                 cap_id,
@@ -552,6 +608,7 @@ impl SqliteReceiptStore {
                 agent_sub,
                 cursor_i64,
                 limit as i64,
+                tenant,
             ],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )?;
@@ -570,10 +627,21 @@ impl SqliteReceiptStore {
         let total_count: u64 = self
             .connection()?
             .query_row(
-                count_sql,
+                &count_sql,
                 params![
-                    cap_id, tool_srv, tool_nm, outcome, since, until, min_cost, max_cost,
+                    cap_id,
+                    tool_srv,
+                    tool_nm,
+                    outcome,
+                    since,
+                    until,
+                    min_cost,
+                    max_cost,
                     agent_sub,
+                    // ?10, ?11 unused in count_sql; bound to keep ?12 stable.
+                    None::<i64>,
+                    0i64,
+                    tenant,
                 ],
                 |row| row.get::<_, i64>(0),
             )

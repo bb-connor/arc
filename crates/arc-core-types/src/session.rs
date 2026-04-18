@@ -4,8 +4,12 @@
 //! JSON-RPC, stdio frames, or another protocol into `SessionOperation`, and the
 //! kernel can evaluate those operations without knowing how they arrived.
 
-use std::collections::BTreeMap;
-use std::fmt;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use core::fmt;
 
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
@@ -314,7 +318,7 @@ pub struct ArcIdentityAssertion {
 }
 
 impl ArcIdentityAssertion {
-    pub fn validate(&self) -> std::result::Result<(), String> {
+    pub fn validate(&self) -> core::result::Result<(), String> {
         if self.verifier_id.trim().is_empty() {
             return Err("identityAssertion.verifierId must not be empty".to_string());
         }
@@ -356,7 +360,7 @@ impl ArcIdentityAssertion {
         Ok(())
     }
 
-    pub fn validate_at(&self, now: u64) -> std::result::Result<(), String> {
+    pub fn validate_at(&self, now: u64) -> core::result::Result<(), String> {
         self.validate()?;
         if now > self.expires_at {
             return Err("identityAssertion is stale".to_string());
@@ -571,13 +575,37 @@ pub struct SessionAnchorBody {
     pub kernel_key: PublicKey,
 }
 
-impl SessionAnchorBody {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionAnchorContext {
+    pub session_id: SessionId,
+    pub agent_id: AgentId,
+    pub auth_context: SessionAuthContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_binding: Option<SessionProofBinding>,
+}
+
+impl SessionAnchorContext {
+    #[must_use]
     pub fn new(
-        id: impl Into<String>,
         session_id: SessionId,
         agent_id: AgentId,
         auth_context: SessionAuthContext,
         proof_binding: Option<SessionProofBinding>,
+    ) -> Self {
+        Self {
+            session_id,
+            agent_id,
+            auth_context,
+            proof_binding,
+        }
+    }
+}
+
+impl SessionAnchorBody {
+    pub fn new(
+        id: impl Into<String>,
+        context: SessionAnchorContext,
         auth_epoch: u64,
         issued_at: u64,
         kernel_key: PublicKey,
@@ -585,12 +613,12 @@ impl SessionAnchorBody {
         Ok(Self {
             schema: ARC_SESSION_ANCHOR_SCHEMA.to_string(),
             id: id.into(),
-            session_id,
-            agent_id,
-            auth_context_hash: auth_context.canonical_hash()?,
-            auth_method_hash: auth_context.auth_method_hash()?,
-            auth_context,
-            proof_binding: proof_binding.filter(|binding| !binding.is_empty()),
+            session_id: context.session_id,
+            agent_id: context.agent_id,
+            auth_context_hash: context.auth_context.canonical_hash()?,
+            auth_method_hash: context.auth_context.auth_method_hash()?,
+            auth_context: context.auth_context,
+            proof_binding: context.proof_binding.filter(|binding| !binding.is_empty()),
             auth_epoch,
             issued_at,
             kernel_key,
@@ -1059,7 +1087,7 @@ impl ResourceUriClassification {
     }
 }
 
-fn normalize_local_file_uri_path(parsed: &Url) -> std::result::Result<String, &'static str> {
+fn normalize_local_file_uri_path(parsed: &Url) -> core::result::Result<String, &'static str> {
     match parsed.host_str() {
         None => {}
         Some(host) if host.eq_ignore_ascii_case("localhost") => {}
@@ -2009,10 +2037,12 @@ mod tests {
 
         let body = SessionAnchorBody::new(
             "anchor-1",
-            SessionId::new("sess-001"),
-            "agent-123".to_string(),
-            auth.clone(),
-            Some(proof_binding.clone()),
+            SessionAnchorContext::new(
+                SessionId::new("sess-001"),
+                "agent-123".to_string(),
+                auth.clone(),
+                Some(proof_binding.clone()),
+            ),
             4,
             1_710_000_000,
             kp.public_key(),
@@ -2043,10 +2073,12 @@ mod tests {
         );
         let body = SessionAnchorBody::new(
             "anchor-2",
-            SessionId::new("sess-002"),
-            "agent-456".to_string(),
-            auth.clone(),
-            SessionProofBinding::from_auth_context(&auth),
+            SessionAnchorContext::new(
+                SessionId::new("sess-002"),
+                "agent-456".to_string(),
+                auth.clone(),
+                SessionProofBinding::from_auth_context(&auth),
+            ),
             1,
             1_710_000_010,
             kp.public_key(),

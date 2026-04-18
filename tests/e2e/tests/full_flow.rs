@@ -10,11 +10,65 @@ use arc_core::capability::{
     ToolGrant,
 };
 use arc_core::crypto::Keypair;
+use arc_core::receipt::{ArcReceipt, ChildRequestReceipt};
 use arc_guards::{ForbiddenPathGuard, GuardPipeline, ShellCommandGuard};
 use arc_kernel::{
-    ArcKernel, Guard, GuardContext, KernelConfig, KernelError, ToolCallOutput, ToolCallRequest,
-    ToolServerConnection, Verdict,
+    ArcKernel, CapabilitySnapshot, Guard, GuardContext, KernelConfig, KernelError, ReceiptStore,
+    ReceiptStoreError, ToolCallOutput, ToolCallRequest, ToolServerConnection, Verdict,
 };
+use std::collections::HashMap;
+
+struct InMemoryReceiptStore {
+    snapshots: HashMap<String, CapabilitySnapshot>,
+}
+
+impl InMemoryReceiptStore {
+    fn new() -> Self {
+        Self {
+            snapshots: HashMap::new(),
+        }
+    }
+}
+
+impl ReceiptStore for InMemoryReceiptStore {
+    fn append_arc_receipt(&mut self, _receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn append_child_receipt(
+        &mut self,
+        _receipt: &ChildRequestReceipt,
+    ) -> Result<(), ReceiptStoreError> {
+        Ok(())
+    }
+
+    fn record_capability_snapshot(
+        &mut self,
+        token: &CapabilityToken,
+        parent_capability_id: Option<&str>,
+    ) -> Result<(), ReceiptStoreError> {
+        let snapshot = CapabilitySnapshot {
+            capability_id: token.id.clone(),
+            subject_key: token.subject.to_hex(),
+            issuer_key: token.issuer.to_hex(),
+            issued_at: token.issued_at,
+            expires_at: token.expires_at,
+            grants_json: serde_json::to_string(&token.scope)?,
+            delegation_depth: token.delegation_chain.len() as u64,
+            parent_capability_id: parent_capability_id.map(ToOwned::to_owned),
+        };
+        self.snapshots
+            .insert(snapshot.capability_id.clone(), snapshot);
+        Ok(())
+    }
+
+    fn get_capability_snapshot(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<CapabilitySnapshot>, ReceiptStoreError> {
+        Ok(self.snapshots.get(capability_id).cloned())
+    }
+}
 
 // Test helpers
 /// Create a kernel with the default guard pipeline (forbidden_path +
@@ -36,6 +90,7 @@ fn make_kernel_with_guards() -> (ArcKernel, Keypair) {
         retention_config: None,
     };
     let mut kernel = ArcKernel::new(config);
+    kernel.set_receipt_store(Box::new(InMemoryReceiptStore::new()));
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     kernel.add_guard(Box::new(GuardPipeline::default_pipeline()));
     (kernel, kp)
@@ -59,6 +114,7 @@ fn make_kernel_bare() -> (ArcKernel, Keypair) {
         retention_config: None,
     };
     let mut kernel = ArcKernel::new(config);
+    kernel.set_receipt_store(Box::new(InMemoryReceiptStore::new()));
     kernel.register_tool_server(Box::new(EchoServer("srv")));
     (kernel, kp)
 }
@@ -131,6 +187,8 @@ fn make_request(
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+        federated_origin_kernel_id: None,
     }
 }
 
@@ -323,7 +381,25 @@ async fn full_flow_revocation_cascade() {
     // Issue cap A so the kernel has seen agent_a as a valid subject.
     // We don't use cap_a directly -- the point is to revoke its capability ID
     // and see the cascade affect cap_b's delegation chain.
-    let cap_a = issue_wildcard_cap(&kernel, &agent_a_kp.public_key());
+    let cap_a = kernel
+        .issue_capability(
+            &agent_a_kp.public_key(),
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "*".to_string(),
+                    operations: vec![Operation::Invoke, Operation::Delegate],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+            300,
+        )
+        .expect("issue delegable cap");
 
     // Build a delegated capability B: issued by the CA (kernel) to agent_b,
     // but with a delegation chain showing that agent_a delegated to agent_b.
@@ -371,6 +447,8 @@ async fn full_flow_revocation_cascade() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "before revocation"}),
         dpop_proof: None,
         governed_intent: None,
@@ -393,6 +471,8 @@ async fn full_flow_revocation_cascade() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_b_kp.public_key().to_hex(),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
         arguments: serde_json::json!({"msg": "after revocation"}),
         dpop_proof: None,
         governed_intent: None,
@@ -705,6 +785,8 @@ async fn full_flow_untrusted_issuer() {
         tool_name: "echo".to_string(),
         server_id: "srv".to_string(),
         agent_id: agent_kp.public_key().to_hex(),
+        model_metadata: None,
+        federated_origin_kernel_id: None,
         arguments: serde_json::json!({}),
         dpop_proof: None,
         governed_intent: None,

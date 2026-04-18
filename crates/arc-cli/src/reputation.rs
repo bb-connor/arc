@@ -306,7 +306,9 @@ pub(crate) fn build_reputation_comparison(
     let passport_evaluation = verifier_policy
         .map(|policy| evaluate_agent_passport(passport, now, policy))
         .transpose()?;
-    let local_did = DidArc::from_public_key(PublicKey::from_hex(&local.subject_key)?).to_string();
+    let local_did = DidArc::from_public_key(PublicKey::from_hex(&local.subject_key)?)
+        .map_err(|error| CliError::Other(error.to_string()))?
+        .to_string();
     let subject_matches = local_did == passport.subject;
     let credential_drifts = passport
         .credentials

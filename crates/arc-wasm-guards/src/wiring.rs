@@ -42,9 +42,10 @@ use crate::runtime::WasmGuard;
 /// 1. Loads `guard-manifest.yaml` from the `.wasm` file's parent directory
 /// 2. Validates `abi_version` against `SUPPORTED_ABI_VERSIONS`
 /// 3. Reads the `.wasm` binary and verifies SHA-256 against the manifest
-/// 4. Creates a `WasmtimeBackend` with the manifest's config
-/// 5. Loads the module into the backend
-/// 6. Creates a `WasmGuard` with the manifest's `wasm_sha256` for receipt
+/// 4. Verifies the manifest-driven signing policy
+/// 5. Creates a `WasmtimeBackend` with the manifest's config
+/// 6. Loads the module into the backend
+/// 7. Creates a `WasmGuard` with the manifest's `wasm_sha256` for receipt
 ///    metadata
 ///
 /// Entries are sorted by priority (lower first) before loading. Non-advisory
@@ -54,7 +55,11 @@ pub fn load_wasm_guards(
     engine: Arc<Engine>,
 ) -> Result<Vec<WasmGuard>, WasmGuardError> {
     let mut sorted: Vec<WasmGuardEntry> = entries.to_vec();
-    sorted.sort_by_key(|e| (e.advisory as u8, e.priority));
+    // Priority ascending first, advisory flag as tie-breaker so the documented
+    // ordering ("priority ascending, advisory as tie-breaker") holds instead of
+    // partitioning non-advisory guards ahead of all advisory ones regardless
+    // of numeric priority.
+    sorted.sort_by_key(|e| (e.priority, e.advisory as u8));
 
     let mut guards = Vec::with_capacity(sorted.len());
 
@@ -74,14 +79,17 @@ pub fn load_wasm_guards(
         // 4. Verify SHA-256 of wasm binary against manifest
         manifest::verify_wasm_hash(&wasm_bytes, &guard_manifest.wasm_sha256)?;
 
-        // 5. Create backend with manifest config
+        // 5. Enforce the manifest-driven signing policy
+        manifest::verify_guard_signature(&entry.path, &wasm_bytes, &guard_manifest)?;
+
+        // 6. Create backend with manifest config
         let mut backend =
             WasmtimeBackend::with_engine_and_config(engine.clone(), guard_manifest.config.clone());
 
-        // 6. Load module into backend
+        // 7. Load module into backend
         backend.load_module(&wasm_bytes, entry.fuel_limit)?;
 
-        // 7. Create WasmGuard with manifest wasm_sha256 for receipt metadata
+        // 8. Create WasmGuard with manifest wasm_sha256 for receipt metadata
         let guard = WasmGuard::new(
             entry.name.clone(),
             Box::new(backend),
@@ -131,6 +139,7 @@ pub fn build_guard_pipeline(
 mod tests {
     use super::*;
     use arc_kernel::{GuardContext, KernelError, Verdict};
+    use ed25519_dalek::Signer;
     use sha2::{Digest, Sha256};
     use std::io::Write;
 
@@ -146,7 +155,13 @@ mod tests {
 
     /// Write a guard manifest YAML to the given directory.
     fn write_manifest(dir: &std::path::Path, wasm_filename: &str, wasm_sha256: &str) {
-        write_manifest_with_config(dir, wasm_filename, wasm_sha256, "1", "");
+        write_manifest_with_config(
+            dir,
+            wasm_filename,
+            wasm_sha256,
+            "1",
+            "allow_unsigned: true\n",
+        );
     }
 
     /// Write a guard manifest YAML to the given directory with custom ABI
@@ -261,7 +276,7 @@ mod tests {
             "guard.wasm",
             &hash,
             "1",
-            "config:\n  threshold: \"0.8\"\n  mode: strict\n",
+            "allow_unsigned: true\nconfig:\n  threshold: \"0.8\"\n  mode: strict\n",
         );
 
         let entries = vec![make_entry(
@@ -387,6 +402,59 @@ mod tests {
                 );
             }
             other => panic!("expected ManifestLoad, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_wasm_guards_rejects_unpinned_sidecar_without_opt_out() {
+        let dir = tempfile::Builder::new()
+            .prefix("arc_wiring_unpinned_sidecar_")
+            .tempdir()
+            .unwrap();
+        let wasm_path = dir.path().join("guard.wasm");
+        std::fs::write(&wasm_path, MINIMAL_WASM).unwrap();
+        let hash = sha256_hex(MINIMAL_WASM);
+        write_manifest_with_config(
+            dir.path(),
+            "guard.wasm",
+            &hash,
+            "1",
+            "allow_unsigned: false\n",
+        );
+
+        let sk = ed25519_dalek::SigningKey::generate(&mut rand_core::OsRng);
+        let module_hash = sha256_hex(MINIMAL_WASM);
+        let signer_public_key = hex::encode(sk.verifying_key().to_bytes());
+        let message = crate::manifest::signed_module_message(
+            &module_hash,
+            "test-guard",
+            "1.0.0",
+            &signer_public_key,
+        );
+        let signature = sk.sign(&message);
+        let signed = crate::manifest::SignedWasmModule {
+            module_hash,
+            module_name: "test-guard".to_string(),
+            version: "1.0.0".to_string(),
+            signer_public_key,
+            signature: hex::encode(signature.to_bytes()),
+        };
+        crate::manifest::write_signature_sidecar(wasm_path.to_str().unwrap(), &signed).unwrap();
+
+        let entries = vec![make_entry(
+            "unpinned-sidecar-guard",
+            wasm_path.to_str().unwrap(),
+            100,
+            false,
+        )];
+
+        let engine = Arc::new(Engine::default());
+        let err = load_wasm_guards(&entries, engine).unwrap_err();
+        match err {
+            WasmGuardError::SignatureVerification(msg) => {
+                assert!(msg.contains("unpinned"), "{msg}");
+            }
+            other => panic!("expected SignatureVerification, got {other:?}"),
         }
     }
 

@@ -1,0 +1,334 @@
+//! Bilateral cross-kernel runtime co-signing (Phase 20.3).
+//!
+//! When an agent from Organisation A invokes a tool hosted by Organisation B,
+//! both kernels need to sign the same receipt so that either org can
+//! independently verify the chain. This module defines the wire-level
+//! [`CoSigningRequest`] / [`CoSigningResponse`] envelope, the
+//! [`DualSignedReceipt`] artifact (which carries both signatures side-by-
+//! side without mutating the core `ArcReceipt` body), and a
+//! [`BilateralCoSigningProtocol`] trait that the kernel calls after it
+//! signs a receipt locally.
+//!
+//! ## Design notes
+//!
+//! * `arc-core-types::ArcReceipt` is intentionally untouched -- co-signatures
+//!   ride in this federation-specific envelope. An Org A verifier that only
+//!   understands the base receipt can still verify it in isolation; a Dual
+//!   verifier checks the base receipt plus the remote org's detached
+//!   signature over the same canonical body.
+//! * Verification is strict: a `DualSignedReceipt` only verifies when BOTH
+//!   signatures validate against their declared kernel IDs and both kernel
+//!   IDs match the expected pinned peers. Either half alone is not
+//!   sufficient.
+//! * Signing happens over canonical JSON (RFC 8785) of the
+//!   [`CoSigningBody`]: receipt body bytes + both kernel IDs. This keeps the
+//!   detached remote signature deterministic across implementations.
+
+use arc_core_types::canonical::canonical_json_bytes;
+use arc_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
+use arc_core_types::receipt::ArcReceipt;
+use serde::{Deserialize, Serialize};
+
+pub const BILATERAL_COSIGNING_SCHEMA: &str = "arc.federation-bilateral-cosigning.v1";
+pub const BILATERAL_DUAL_RECEIPT_SCHEMA: &str = "arc.federation-dual-signed-receipt.v1";
+
+/// Canonical body that the local and remote kernels both sign. The bytes of
+/// this structure (in canonical JSON) are the signed message for
+/// [`DualSignedReceipt::org_a_signature`] and
+/// [`DualSignedReceipt::org_b_signature`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoSigningBody {
+    pub schema: String,
+    /// Canonical JSON encoding of the underlying `ArcReceipt`, as a UTF-8
+    /// string. The string form (rather than a nested object) keeps signing
+    /// stable even if the receipt schema grows new `skip_serializing_if`
+    /// fields later: both kernels sign exactly the bytes they saw.
+    pub receipt_canonical_json: String,
+    pub org_a_kernel_id: String,
+    pub org_b_kernel_id: String,
+}
+
+impl CoSigningBody {
+    /// Construct the canonical body from a receipt and the two kernel IDs
+    /// participating in the exchange. Returns the body plus the canonical
+    /// bytes of the receipt, so callers can persist them.
+    pub fn from_receipt(
+        receipt: &ArcReceipt,
+        org_a_kernel_id: &str,
+        org_b_kernel_id: &str,
+    ) -> Result<Self, BilateralCoSigningError> {
+        let bytes = canonical_json_bytes(receipt)
+            .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
+        let receipt_canonical_json = String::from_utf8(bytes)
+            .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))?;
+        Ok(Self {
+            schema: BILATERAL_COSIGNING_SCHEMA.to_string(),
+            receipt_canonical_json,
+            org_a_kernel_id: org_a_kernel_id.to_string(),
+            org_b_kernel_id: org_b_kernel_id.to_string(),
+        })
+    }
+
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BilateralCoSigningError> {
+        canonical_json_bytes(self)
+            .map_err(|e| BilateralCoSigningError::CanonicalJson(e.to_string()))
+    }
+}
+
+/// A receipt co-signed by two kernels across a federation boundary.
+///
+/// * `body` -- the underlying `ArcReceipt` that both kernels agreed on.
+/// * `org_a_signature` -- detached signature by the origin (Org A) kernel
+///   over the canonical [`CoSigningBody`].
+/// * `org_b_signature` -- detached signature by the tool-host (Org B) kernel
+///   over the same canonical body.
+///
+/// The existing receipt's built-in `signature` and `kernel_key` fields are
+/// unchanged: a classic verifier can still check the receipt in isolation,
+/// while a federation-aware verifier additionally checks both detached
+/// signatures via [`DualSignedReceipt::verify`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DualSignedReceipt {
+    pub schema: String,
+    pub body: ArcReceipt,
+    pub org_a_kernel_id: String,
+    pub org_b_kernel_id: String,
+    pub org_a_signature: Signature,
+    pub org_b_signature: Signature,
+}
+
+impl DualSignedReceipt {
+    /// Verify both detached signatures against the provided pinned peer
+    /// public keys. Returns `Ok(())` only when BOTH signatures validate.
+    ///
+    /// Neither half of the dual signature is sufficient on its own; a
+    /// caller that can only check one side must still refuse the receipt.
+    pub fn verify(
+        &self,
+        org_a_public_key: &PublicKey,
+        org_b_public_key: &PublicKey,
+    ) -> Result<(), BilateralCoSigningError> {
+        let body =
+            CoSigningBody::from_receipt(&self.body, &self.org_a_kernel_id, &self.org_b_kernel_id)?;
+        let bytes = body.canonical_bytes()?;
+
+        if !org_a_public_key.verify(&bytes, &self.org_a_signature) {
+            return Err(BilateralCoSigningError::OrgASignatureInvalid);
+        }
+        if !org_b_public_key.verify(&bytes, &self.org_b_signature) {
+            return Err(BilateralCoSigningError::OrgBSignatureInvalid);
+        }
+        Ok(())
+    }
+}
+
+/// Request sent from the tool-host kernel (Org B) to the origin kernel
+/// (Org A) asking it to co-sign a receipt that Org B already signed
+/// locally.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoSigningRequest {
+    pub schema: String,
+    pub body: ArcReceipt,
+    pub org_a_kernel_id: String,
+    pub org_b_kernel_id: String,
+    /// Org B's own signature over the canonical cosigning body. The origin
+    /// kernel verifies this before agreeing to sign.
+    pub org_b_signature: Signature,
+}
+
+impl CoSigningRequest {
+    pub fn new(
+        body: ArcReceipt,
+        org_a_kernel_id: String,
+        org_b_kernel_id: String,
+        org_b_signature: Signature,
+    ) -> Self {
+        Self {
+            schema: BILATERAL_COSIGNING_SCHEMA.to_string(),
+            body,
+            org_a_kernel_id,
+            org_b_kernel_id,
+            org_b_signature,
+        }
+    }
+}
+
+/// Response from the origin kernel (Org A) carrying its co-signature.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CoSigningResponse {
+    pub schema: String,
+    pub org_a_signature: Signature,
+}
+
+/// Errors surfaced by the bilateral co-signing protocol. All variants are
+/// fail-closed: on any error the kernel MUST refuse to persist a dual-signed
+/// receipt for the failing exchange.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum BilateralCoSigningError {
+    #[error("canonical JSON encoding failed: {0}")]
+    CanonicalJson(String),
+
+    #[error("origin (Org A) signature failed verification")]
+    OrgASignatureInvalid,
+
+    #[error("tool-host (Org B) signature failed verification")]
+    OrgBSignatureInvalid,
+
+    #[error("remote peer {0} is not a trusted federation peer")]
+    UnknownPeer(String),
+
+    #[error("remote peer {0} has exceeded its rotation window and must re-handshake")]
+    PeerExpired(String),
+
+    #[error("co-signing transport failed: {0}")]
+    TransportFailure(String),
+
+    #[error("co-signing request rejected by peer: {0}")]
+    PeerRejected(String),
+
+    #[error("receipt body mismatch between request and signed body")]
+    ReceiptMismatch,
+}
+
+/// Trait implemented by an object that can obtain a co-signature from a
+/// remote kernel. Production deployments plug an mTLS-backed RPC client
+/// in here; in-process tests use [`InProcessCoSigner`].
+pub trait BilateralCoSigningProtocol: Send + Sync {
+    /// Request a co-signature for a receipt that this kernel already
+    /// signed. The caller is the tool-host kernel (Org B); the remote is
+    /// the origin kernel (Org A) whose agent initiated the call.
+    fn request_cosignature(
+        &self,
+        request: &CoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError>;
+}
+
+/// In-process reference implementation of [`BilateralCoSigningProtocol`].
+///
+/// Holds the origin kernel's signing keypair directly, so tests and
+/// single-host integration environments can exercise the co-signing path
+/// without an actual mTLS transport. Production deployments should wrap
+/// the remote kernel behind an attested RPC client instead.
+pub struct InProcessCoSigner {
+    origin_kernel_id: String,
+    origin_keypair: Keypair,
+    /// Expected public key of the tool-host kernel (Org B). The origin
+    /// kernel verifies Org B's signature against this key before it is
+    /// willing to co-sign.
+    tool_host_public_key: PublicKey,
+}
+
+impl core::fmt::Debug for InProcessCoSigner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InProcessCoSigner")
+            .field("origin_kernel_id", &self.origin_kernel_id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl InProcessCoSigner {
+    pub fn new(
+        origin_kernel_id: impl Into<String>,
+        origin_keypair: Keypair,
+        tool_host_public_key: PublicKey,
+    ) -> Self {
+        Self {
+            origin_kernel_id: origin_kernel_id.into(),
+            origin_keypair,
+            tool_host_public_key,
+        }
+    }
+
+    pub fn origin_kernel_id(&self) -> &str {
+        &self.origin_kernel_id
+    }
+
+    pub fn origin_public_key(&self) -> PublicKey {
+        self.origin_keypair.public_key()
+    }
+}
+
+impl BilateralCoSigningProtocol for InProcessCoSigner {
+    fn request_cosignature(
+        &self,
+        request: &CoSigningRequest,
+    ) -> Result<CoSigningResponse, BilateralCoSigningError> {
+        if request.org_a_kernel_id != self.origin_kernel_id {
+            return Err(BilateralCoSigningError::UnknownPeer(
+                request.org_a_kernel_id.clone(),
+            ));
+        }
+        let body = CoSigningBody::from_receipt(
+            &request.body,
+            &request.org_a_kernel_id,
+            &request.org_b_kernel_id,
+        )?;
+        let bytes = body.canonical_bytes()?;
+
+        if !self
+            .tool_host_public_key
+            .verify(&bytes, &request.org_b_signature)
+        {
+            return Err(BilateralCoSigningError::OrgBSignatureInvalid);
+        }
+
+        let backend = Ed25519Backend::new(self.origin_keypair.clone());
+        let signature = backend
+            .sign_bytes(&bytes)
+            .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
+        Ok(CoSigningResponse {
+            schema: BILATERAL_COSIGNING_SCHEMA.to_string(),
+            org_a_signature: signature,
+        })
+    }
+}
+
+/// Helper used by the tool-host (Org B) side to drive the full protocol:
+/// locally sign the canonical body, ask the remote [`BilateralCoSigningProtocol`]
+/// for a co-signature, and assemble the verified [`DualSignedReceipt`].
+pub fn co_sign_with_origin(
+    origin_kernel_id: &str,
+    origin_public_key: &PublicKey,
+    tool_host_kernel_id: &str,
+    tool_host_keypair: &Keypair,
+    receipt: ArcReceipt,
+    cosigner: &dyn BilateralCoSigningProtocol,
+) -> Result<DualSignedReceipt, BilateralCoSigningError> {
+    let body = CoSigningBody::from_receipt(&receipt, origin_kernel_id, tool_host_kernel_id)?;
+    let bytes = body.canonical_bytes()?;
+
+    let backend = Ed25519Backend::new(tool_host_keypair.clone());
+    let org_b_signature = backend
+        .sign_bytes(&bytes)
+        .map_err(|e| BilateralCoSigningError::TransportFailure(e.to_string()))?;
+
+    let request = CoSigningRequest::new(
+        receipt.clone(),
+        origin_kernel_id.to_string(),
+        tool_host_kernel_id.to_string(),
+        org_b_signature.clone(),
+    );
+    let response = cosigner.request_cosignature(&request)?;
+
+    if !origin_public_key.verify(&bytes, &response.org_a_signature) {
+        return Err(BilateralCoSigningError::OrgASignatureInvalid);
+    }
+
+    let dual = DualSignedReceipt {
+        schema: BILATERAL_DUAL_RECEIPT_SCHEMA.to_string(),
+        body: receipt,
+        org_a_kernel_id: origin_kernel_id.to_string(),
+        org_b_kernel_id: tool_host_kernel_id.to_string(),
+        org_a_signature: response.org_a_signature,
+        org_b_signature,
+    };
+    // Double-check the assembled artifact verifies end-to-end. The kernel
+    // relies on this invariant to persist only dual-signed artifacts that
+    // would themselves pass third-party verification.
+    dual.verify(origin_public_key, &tool_host_keypair.public_key())?;
+    Ok(dual)
+}

@@ -1,0 +1,311 @@
+# Migrating from MCP to ARC
+
+This guide adds ARC protection to an existing MCP server in about five
+minutes. It covers the most common setup: a local MCP tool server
+(filesystem, git, shell) invoked by a coding agent (Claude Code,
+Cursor, a custom CLI).
+
+You'll end with:
+
+- The same MCP client UX you have today.
+- A policy-enforced sidecar between the client and the tool server.
+- Signed receipts for every allow / deny decision.
+- Bundled defaults that immediately deny `.env` writes, `.git/**`
+  reads, and destructive shell commands.
+
+If you'd rather stay inside Python and skip the CLI, jump to
+[Alternate route: embedded Python SDK](#alternate-route-embedded-python-sdk).
+
+## Prerequisites
+
+- An MCP server you can launch locally. The examples use
+  `@modelcontextprotocol/server-filesystem`, but any MCP stdio server
+  works (see [Servers other than filesystem](#servers-other-than-filesystem)).
+- macOS or Linux. Windows works via WSL.
+- 5 minutes.
+
+## Step 1: Install `arc`
+
+Use the release binary or build from source:
+
+```bash
+# Homebrew
+brew install backbay-industries/arc/arc
+
+# Or, from a local checkout
+cargo install --path crates/arc-cli
+arc --version
+```
+
+You should see something like:
+
+```
+arc 0.1.0
+```
+
+If you're in the Backbay monorepo, `CARGO_TARGET_DIR=target/wave3d-code
+cargo build -p arc-cli` produces `target/wave3d-code/debug/arc` you can
+symlink onto your `PATH`.
+
+## Step 2: Bootstrap a project (optional)
+
+If this is a fresh project, scaffold one with `arc init`:
+
+```bash
+arc init my-arc-project
+cd my-arc-project
+```
+
+That creates a runnable `policy.yaml`, a sample tool server, and a
+demo driver so you can sanity-check your install. Skip this step if
+you already have a project tree.
+
+## Step 3: Wrap your MCP server with `arc mcp serve --preset code-agent`
+
+This is the core of the migration. The ARC CLI spawns your MCP server
+as a subprocess, mediates every tool call through the kernel, and
+re-exposes a compatible MCP edge over stdio:
+
+```bash
+arc mcp serve \
+  --preset code-agent \
+  --server-id fs \
+  -- npx -y @modelcontextprotocol/server-filesystem .
+```
+
+What the flags mean:
+
+| Flag | Purpose |
+|------|---------|
+| `--preset code-agent` | Bundled zero-config policy: allows safe file reads, denies `.env`, `.git/**`, `.ssh/**`, `git push --force`. |
+| `--server-id fs` | ARC's internal id for the wrapped server. Used in receipts. Any short string works. |
+| `--` | Everything after this is the literal command ARC runs as the MCP subprocess. |
+
+A successful launch prints a structured log line on stderr:
+
+```
+INFO arc::cli loaded policy for MCP edge policy_path="/tmp/arc-preset-.../code_agent_preset.yaml" preset="code-agent" server_id="fs" source_policy_hash="..."
+INFO arc::cli initialized MCP edge session capability_count=N wrapped_command="npx"
+```
+
+Point your MCP client at this process exactly the way you would point
+it at the upstream MCP server -- it speaks the same protocol.
+
+## Step 4: Verify that dangerous operations are denied
+
+Run `arc check` against a YAML copy of the preset to confirm the
+policy is live. The preset ships byte-identical with the Python
+`arc-code-agent` package, so one easy way to grab it is:
+
+```bash
+python -c 'from arc_code_agent import DEFAULT_POLICY_YAML; print(DEFAULT_POLICY_YAML)' \
+  > /tmp/code-agent.yaml
+
+arc check --policy /tmp/code-agent.yaml \
+  --server fs --tool write_file \
+  --params '{"path":"/workspace/project/.env","content":"BAD=1"}'
+```
+
+On a deny the command exits non-zero and prints a structured verdict:
+
+```
+verdict:    DENY
+tool:       write_file
+server:     fs
+reason:     forbidden_path: path matched **/.env
+receipt_id: 0198d2af-...
+policy:     0b4a2ef9...
+source:     9f1e73c6...
+```
+
+A safe read is the reverse:
+
+```bash
+arc check --policy ./policy.yaml \
+  --server fs --tool read_file \
+  --params '{"path":"README.md"}'
+# verdict: ALLOW, exit 0
+```
+
+End-to-end through your MCP client:
+
+| Operation | Expected outcome |
+|-----------|------------------|
+| `read_file("README.md")` | Allow. Receipt emitted. |
+| `read_file(".env")` | Deny. `forbidden_path`. |
+| `read_file(".git/config")` | Deny. `forbidden_path`. |
+| `write_file("src/main.py", ...)` | Allow. Receipt emitted. |
+| `write_file("package.json", ...)` | Deny. `not_in_writable_root`. |
+| `run_command("rm -rf /")` | Deny. `shell_command`. |
+| `run_command("git push --force")` | Deny. `shell_command`. |
+
+If you see a different result, double-check that the MCP client is
+talking to the `arc mcp serve` process -- not the upstream server
+directly.
+
+## Step 5: Next steps
+
+Once the baseline deny list is in place:
+
+1. **Author a custom policy.** The preset is a starting point. Copy
+   it to your repo and edit to taste:
+
+   ```bash
+   python -c 'from arc_code_agent import DEFAULT_POLICY_YAML; print(DEFAULT_POLICY_YAML)' \
+     > ./policy.yaml
+   # edit policy.yaml, then:
+   arc mcp serve --policy ./policy.yaml --server-id fs -- npx -y @modelcontextprotocol/server-filesystem .
+   ```
+
+2. **Add more guards.** The preset ships with `forbidden_path`,
+   `shell_command`, `secret_patterns`, and `patch_integrity`. Other
+   guards that plug in cleanly:
+
+   - `path_allowlist` -- allow-list instead of deny-list for reads
+     and writes.
+   - `egress_allowlist` -- restrict outbound HTTP domains.
+   - `tool_access` -- enforce a named allow list for tool names.
+   - `computer_use` / `input_injection` -- desktop CUA safety (Phase
+     5).
+
+   See `docs/guards/` for the catalogue.
+
+3. **Verify receipts.** Every allow / deny is a signed artefact. Use
+   `arc receipt` to query them:
+
+   ```bash
+   arc --receipt-db ./receipts.sqlite receipt list --limit 20
+   arc --receipt-db ./receipts.sqlite receipt verify <receipt-id>
+   ```
+
+4. **Enable delegation.** If you have a multi-agent crew, capability
+   attenuation lets you hand a junior agent a strictly narrower
+   token. See `sdks/python/arc-crewai/README.md`.
+
+## Alternate route: embedded Python SDK
+
+If your coding agent is a Python process, skip the CLI entirely and
+embed `arc-code-agent`:
+
+```bash
+pip install arc-code-agent arc-sdk-python
+```
+
+```python
+import asyncio
+from arc_code_agent import CodeAgent
+from arc_sdk import ArcClient
+
+async def main() -> None:
+    async with ArcClient("http://127.0.0.1:9090") as client:
+        agent = CodeAgent(arc_client=client, capability_id="cap-123")
+        result = await agent.files.read_file("README.md")   # allow
+        print(result.result)
+        await agent.files.write_file(".env", "BAD=value")   # deny
+
+asyncio.run(main())
+```
+
+The Python package uses the **same YAML** the CLI preset embeds, so
+the two surfaces enforce identical rules.
+
+## Servers other than filesystem
+
+The `code-agent` preset is designed to wrap any MCP tool server
+whose tools fall into the file / shell / git buckets. The preset
+allow-list covers:
+
+| Server id | Tools allowed |
+|-----------|---------------|
+| `fs` | `read_file`, `write_file`, `edit_file`, `list_directory`, `search_files`, `create_directory` |
+| `shell` | `run_command` |
+| `git` | `status`, `diff`, `log`, `add`, `commit` |
+
+In practice that means the preset drops in cleanly for:
+
+- `@modelcontextprotocol/server-filesystem`
+- `@modelcontextprotocol/server-git` (map `git/push` at the shell
+  guard; force-push is denied regardless)
+- Shell-style MCP servers (map your tool name to `shell/run_command`
+  via the `--server-id` flag)
+
+For servers that expose tool names the preset doesn't know, supply
+`--policy` with an edited YAML instead of `--preset code-agent`.
+
+## Troubleshooting
+
+### `error: unknown --preset "nope" (known: code-agent)`
+
+Typo in the preset name. `code-agent` is the only bundled preset
+today. Use a custom `--policy` path for anything else.
+
+### The upstream MCP server exits immediately
+
+`arc mcp serve` shells out exactly as written -- the first token is
+the executable, the rest are argv. If you'd normally write
+`npx @modelcontextprotocol/server-filesystem .` make sure the `--`
+separator is in place:
+
+```bash
+arc mcp serve --preset code-agent -- npx @modelcontextprotocol/server-filesystem .
+```
+
+### The client hangs on startup
+
+Check stderr. On a typical `stderr` the ARC CLI prints:
+
+```
+INFO arc::cli loaded policy for MCP edge ...
+INFO arc::cli initialized MCP edge session ...
+```
+
+If only the first line prints, the wrapped MCP server failed to
+initialize. Run that command standalone to see its own error output.
+
+### A known-safe file is still denied
+
+The preset enforces writes to be under `src/`, `tests/`, or `docs/`
+by default. A write to a top-level `package.json` produces:
+
+```
+DENY: not_in_writable_root
+```
+
+To permit broader writes, switch to a custom policy whose
+`path_allowlist.write` matches your layout.
+
+## What's NOT migrated by this guide
+
+Not every MCP feature lands on day one. Known gaps:
+
+- **Streaming responses.** `arc mcp serve` supports streaming chunks
+  but the bundled preset does not yet throttle them. Heavy streamers
+  (log tailers, large-file readers) should move to the HTTP edge
+  (`arc mcp serve-http`) which exposes backpressure controls.
+- **Resource / prompt endpoints.** The preset only maps tool calls.
+  MCP resources (`resources/list`, `resources/read`) and prompts
+  (`prompts/get`) are wrapped but use default-allow through the
+  upstream server. Add `resource_grants` / `prompt_grants` to a
+  custom policy to enforce scoping.
+- **Sampling.** `completions/` is proxied unchanged. If you need
+  nested sampling governance, enable `allow_sampling_tool_use` in the
+  policy's `kernel:` section and author a matching scope.
+- **Remote MCP.** This guide covers stdio edges. For remote MCP
+  (Streamable HTTP with OAuth2 / OIDC), use `arc mcp serve-http`;
+  the `--preset` flag is a stdio-only convenience today.
+- **Pre-existing receipts.** Moving to ARC does not retroactively
+  attest past tool calls; receipts start at the first call through
+  the edge.
+- **Non-coding workloads.** The `code-agent` preset is tuned for
+  developer-style workloads. For CUA (computer use) agents, data
+  agents, or e-commerce flows, start from a custom policy.
+- **Authorization beyond capability tokens.** The preset runs with
+  kernel-minted default capabilities; integrating an external
+  authority, issuing time-bounded child tokens, or wiring DPoP
+  nonces requires explicit policy and client changes (see
+  `docs/DPOP_INTEGRATION_GUIDE.md`, `sdks/python/arc-sdk-python`).
+- **Windows stdio.** Tested on macOS and Linux. Windows works via
+  WSL; native Windows stdio is untested.
+
+None of these are blockers for the five-minute flow. Come back when
+you need them.

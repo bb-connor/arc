@@ -69,6 +69,12 @@ fn is_supported_passport_presentation_response_schema(schema: &str) -> bool {
         || schema == LEGACY_PASSPORT_PRESENTATION_RESPONSE_SCHEMA
 }
 
+pub mod trust_tier;
+pub use trust_tier::{
+    synthesize_trust_tier, TrustTier, TRUST_TIER_ATTESTED_MIN, TRUST_TIER_PREMIER_MIN,
+    TRUST_TIER_VERIFIED_MIN,
+};
+
 include!("artifact.rs");
 include!("passport.rs");
 include!("cross_issuer.rs");

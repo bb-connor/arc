@@ -3,6 +3,10 @@
 //! Every tool invocation -- whether allowed or denied -- produces a receipt.
 //! Receipts are the immutable audit trail of the ARC protocol.
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::{
@@ -10,13 +14,57 @@ use crate::capability::{
     MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, ProvenanceEvidenceClass,
     RuntimeAssuranceTier, WorkloadIdentity,
 };
-use crate::crypto::{canonical_json_bytes, sha256_hex, Keypair, PublicKey, Signature};
+use crate::crypto::{
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
+    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+};
 use crate::error::{Error, Result};
 use crate::oracle::OracleConversionEvidence;
 use crate::runtime_attestation::AttestationVerifierFamily;
 use crate::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
+
+/// Trust level of a receipt's authorization, recording HOW the Kernel
+/// participated in the evaluation. Captured per-receipt so downstream
+/// consumers (audit, regulatory, dashboards) can reason about the strength
+/// of mediation that produced each authorization.
+///
+/// See `docs/protocols/STRUCTURAL-SECURITY-FIXES.md` and roadmap Phase 1.2.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TrustLevel {
+    /// Tool invocation was synchronously mediated by the kernel (the
+    /// strongest form: kernel observed the call inline and authorized it).
+    /// This is the default and the safest baseline.
+    #[default]
+    Mediated,
+    /// Authorization happened inline in the agent process (e.g. a
+    /// long-running orchestrator embedded the kernel via FFI). The kernel
+    /// observed the call but did not synchronously mediate it through a
+    /// separate trust boundary.
+    Verified,
+    /// Authorization was advisory only -- the kernel evaluated but the
+    /// caller may have proceeded regardless. Used for shadow-mode
+    /// integrations and observability-only deployments.
+    Advisory,
+}
+
+impl TrustLevel {
+    /// Return the canonical snake_case string for this trust level.
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Mediated => "mediated",
+            Self::Verified => "verified",
+            Self::Advisory => "advisory",
+        }
+    }
+}
+
+fn is_default_trust_level(level: &TrustLevel) -> bool {
+    matches!(level, TrustLevel::Mediated)
+}
 
 /// A ARC receipt. Signed proof that a tool call was evaluated by the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,9 +93,30 @@ pub struct ArcReceipt {
     /// Optional receipt metadata for stream/accounting details.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    /// Strength of kernel mediation that produced this receipt. Defaults
+    /// to `Mediated`. Older receipts that omit this field deserialize
+    /// to `Mediated` for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_trust_level")]
+    pub trust_level: TrustLevel,
+    /// Phase 1.5 multi-tenant receipt isolation: tenant identifier for
+    /// multi-tenant deployments. `None` in single-tenant mode; derived
+    /// from the authenticated session's enterprise identity context and
+    /// MUST NOT be taken from caller-provided request fields (caller
+    /// choice would defeat the isolation intent).
+    ///
+    /// Serialized only when set, so receipts emitted by single-tenant
+    /// deployments remain byte-identical on the wire.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
     /// The Kernel's public key (for verification without out-of-band lookup).
     pub kernel_key: PublicKey,
-    /// Ed25519 signature over canonical JSON of all fields above.
+    /// Signing algorithm used for [`ArcReceipt::signature`]. Absent means
+    /// Ed25519 for backward compatibility with receipts issued prior to the
+    /// introduction of [`SigningAlgorithm`]. Informational only: verification
+    /// dispatches off the self-describing encoding of the signature itself.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
 
@@ -67,6 +136,13 @@ pub struct ArcReceiptBody {
     pub evidence: Vec<GuardEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "is_default_trust_level")]
+    pub trust_level: TrustLevel,
+    /// Phase 1.5: tenant_id on the canonical signing body. Omitted from
+    /// canonical JSON when `None` so single-tenant deployments continue
+    /// to produce byte-identical signatures.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_id: Option<String>,
     pub kernel_key: PublicKey,
 }
 
@@ -85,6 +161,9 @@ pub struct ChildRequestReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
     pub kernel_key: PublicKey,
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -106,7 +185,7 @@ pub struct ChildRequestReceiptBody {
 }
 
 impl ArcReceipt {
-    /// Sign a receipt body with the Kernel's keypair.
+    /// Sign a receipt body with the Kernel's Ed25519 keypair.
     pub fn sign(body: ArcReceiptBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -121,7 +200,35 @@ impl ArcReceipt {
             policy_hash: body.policy_hash,
             evidence: body.evidence,
             metadata: body.metadata,
+            trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
             kernel_key: body.kernel_key,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a receipt body with an arbitrary [`SigningBackend`].
+    ///
+    /// The `body.kernel_key` must equal `backend.public_key()`.
+    pub fn sign_with_backend(body: ArcReceiptBody, backend: &dyn SigningBackend) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            timestamp: body.timestamp,
+            capability_id: body.capability_id,
+            tool_server: body.tool_server,
+            tool_name: body.tool_name,
+            action: body.action,
+            decision: body.decision,
+            content_hash: body.content_hash,
+            policy_hash: body.policy_hash,
+            evidence: body.evidence,
+            metadata: body.metadata,
+            trust_level: body.trust_level,
+            tenant_id: body.tenant_id,
+            kernel_key: body.kernel_key,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -141,6 +248,8 @@ impl ArcReceipt {
             policy_hash: self.policy_hash.clone(),
             evidence: self.evidence.clone(),
             metadata: self.metadata.clone(),
+            trust_level: self.trust_level,
+            tenant_id: self.tenant_id.clone(),
             kernel_key: self.kernel_key.clone(),
         }
     }
@@ -216,6 +325,30 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a child-request receipt body with an arbitrary [`SigningBackend`].
+    pub fn sign_with_backend(
+        body: ChildRequestReceiptBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            timestamp: body.timestamp,
+            session_id: body.session_id,
+            parent_request_id: body.parent_request_id,
+            request_id: body.request_id,
+            operation_kind: body.operation_kind,
+            terminal_state: body.terminal_state,
+            outcome_hash: body.outcome_hash,
+            policy_hash: body.policy_hash,
+            metadata: body.metadata,
+            kernel_key: body.kernel_key,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -279,16 +412,42 @@ pub struct ReceiptLineageStatementBody {
     pub kernel_key: PublicKey,
 }
 
-impl ReceiptLineageStatementBody {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReceiptLineageEndpoints {
+    pub parent_receipt_id: String,
+    pub child_receipt_id: String,
+    pub parent_request_id: RequestId,
+    pub child_request_id: RequestId,
+    pub parent_session_anchor: SessionAnchorReference,
+    pub child_session_anchor: SessionAnchorReference,
+}
+
+impl ReceiptLineageEndpoints {
     #[must_use]
     pub fn new(
-        id: impl Into<String>,
         parent_receipt_id: impl Into<String>,
         child_receipt_id: impl Into<String>,
         parent_request_id: RequestId,
         child_request_id: RequestId,
         parent_session_anchor: SessionAnchorReference,
         child_session_anchor: SessionAnchorReference,
+    ) -> Self {
+        Self {
+            parent_receipt_id: parent_receipt_id.into(),
+            child_receipt_id: child_receipt_id.into(),
+            parent_request_id,
+            child_request_id,
+            parent_session_anchor,
+            child_session_anchor,
+        }
+    }
+}
+
+impl ReceiptLineageStatementBody {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        endpoints: ReceiptLineageEndpoints,
         relation_kind: ReceiptLineageRelationKind,
         issued_at: u64,
         kernel_key: PublicKey,
@@ -296,12 +455,12 @@ impl ReceiptLineageStatementBody {
         Self {
             schema: ARC_RECEIPT_LINEAGE_STATEMENT_SCHEMA.to_string(),
             id: id.into(),
-            parent_receipt_id: parent_receipt_id.into(),
-            child_receipt_id: child_receipt_id.into(),
-            parent_request_id,
-            child_request_id,
-            parent_session_anchor,
-            child_session_anchor,
+            parent_receipt_id: endpoints.parent_receipt_id,
+            child_receipt_id: endpoints.child_receipt_id,
+            parent_request_id: endpoints.parent_request_id,
+            child_request_id: endpoints.child_request_id,
+            parent_session_anchor: endpoints.parent_session_anchor,
+            child_session_anchor: endpoints.child_session_anchor,
             relation_kind,
             evidence_class: default_receipt_lineage_evidence_class(),
             continuation_token_id: None,
@@ -919,6 +1078,8 @@ mod tests {
                     "enforced": true
                 }
             })),
+            trust_level: TrustLevel::default(),
+            tenant_id: None,
             kernel_key: kp.public_key(),
         }
     }
@@ -1480,12 +1641,14 @@ mod tests {
         let kp = Keypair::generate();
         let body = ReceiptLineageStatementBody::new(
             "statement-1",
-            "receipt-parent-1",
-            "receipt-child-1",
-            RequestId::new("req-parent-1"),
-            RequestId::new("req-child-1"),
-            SessionAnchorReference::new("anchor-parent-1", "anchor-parent-hash-1"),
-            SessionAnchorReference::new("anchor-child-1", "anchor-child-hash-1"),
+            ReceiptLineageEndpoints::new(
+                "receipt-parent-1",
+                "receipt-child-1",
+                RequestId::new("req-parent-1"),
+                RequestId::new("req-child-1"),
+                SessionAnchorReference::new("anchor-parent-1", "anchor-parent-hash-1"),
+                SessionAnchorReference::new("anchor-child-1", "anchor-child-hash-1"),
+            ),
             ReceiptLineageRelationKind::Continued,
             1_710_000_000,
             kp.public_key(),
@@ -1597,6 +1760,57 @@ mod tests {
         assert_eq!(receipt.id, restored.id);
         assert_eq!(receipt.parent_request_id, restored.parent_request_id);
         assert_eq!(receipt.outcome_hash, restored.outcome_hash);
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn ed25519_receipt_is_byte_identical_without_algorithm_field() {
+        // Back-compat: a standard Ed25519 receipt must still serialize
+        // without any `algorithm` envelope field. Persisted receipts from
+        // earlier ARC releases decode cleanly (the `algorithm` field is
+        // `#[serde(default)]`) and verify through the unchanged path.
+        let kp = Keypair::generate();
+        let receipt = ArcReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+        let value = serde_json::to_value(&receipt).unwrap();
+        assert!(
+            value.get("algorithm").is_none(),
+            "Ed25519 receipts must omit the `algorithm` envelope field"
+        );
+        // Simulate an old on-disk receipt by stripping any algorithm field we
+        // might later add and ensure it still verifies.
+        let wire = serde_json::to_string(&receipt).unwrap();
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn legacy_ed25519_receipt_without_algorithm_field_still_verifies() {
+        // Generate an Ed25519 receipt, then assert that parsing its JSON (which
+        // has no `algorithm` key) produces a receipt whose `algorithm` is
+        // `None` and whose signature still verifies.
+        let kp = Keypair::generate();
+        let receipt = ArcReceipt::sign(make_receipt_body(&kp), &kp).unwrap();
+        let wire = serde_json::to_string(&receipt).unwrap();
+        assert!(!wire.contains("\"algorithm\""));
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
+        assert!(restored.algorithm.is_none());
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn receipt_signs_and_verifies_under_p256_backend() {
+        use crate::crypto::{P256Backend, SigningAlgorithm, SigningBackend};
+        let backend = P256Backend::generate().expect("p256 backend");
+        let mut body = make_receipt_body(&Keypair::generate());
+        body.kernel_key = backend.public_key();
+        let receipt = ArcReceipt::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
+        assert!(receipt.verify_signature().unwrap());
+        // And through the wire.
+        let wire = serde_json::to_string(&receipt).unwrap();
+        assert!(wire.contains("\"p256:"));
+        let restored: ArcReceipt = serde_json::from_str(&wire).unwrap();
         assert!(restored.verify_signature().unwrap());
     }
 }

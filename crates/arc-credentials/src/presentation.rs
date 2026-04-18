@@ -7,7 +7,7 @@ pub fn respond_to_passport_presentation_challenge(
     verify_passport_presentation_challenge(challenge, now)?;
     verify_agent_passport(passport, now)?;
 
-    let holder_did = DidArc::from_public_key(holder_keypair.public_key());
+    let holder_did = DidArc::from_public_key(holder_keypair.public_key())?;
     if holder_did.to_string() != passport.subject {
         return Err(CredentialError::PresentationHolderMismatch);
     }

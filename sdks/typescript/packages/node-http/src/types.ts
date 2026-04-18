@@ -38,6 +38,14 @@ export interface CallerIdentity {
   agent_id?: string | undefined;
 }
 
+export type ModelSafetyTier = "low" | "standard" | "high" | "restricted";
+
+export interface ModelMetadata {
+  model_id: string;
+  safety_tier?: ModelSafetyTier | undefined;
+  provider?: string | undefined;
+}
+
 // -- Verdict (tagged union matching Rust serde) --
 
 export type Verdict =
@@ -99,6 +107,7 @@ export interface ArcHttpRequest {
   body_length: number;
   session_id?: string | undefined;
   capability_id?: string | undefined;
+  model_metadata?: ModelMetadata | undefined;
   timestamp: number;
 }
 

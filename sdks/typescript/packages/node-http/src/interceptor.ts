@@ -113,6 +113,7 @@ export interface BuildRequestOptions {
   bodyLength: number;
   routePattern: string;
   capabilityId: string | undefined;
+  modelMetadata?: ArcHttpRequest["model_metadata"] | undefined;
 }
 
 export function getBufferedNodeRequestBody(req: IncomingMessage): Buffer | undefined {
@@ -157,6 +158,7 @@ export function buildArcHttpRequest(opts: BuildRequestOptions): ArcHttpRequest {
     body_length: opts.bodyLength,
     session_id: undefined,
     capability_id: opts.capabilityId,
+    model_metadata: opts.modelMetadata,
     timestamp: Math.floor(Date.now() / 1000),
   };
 }

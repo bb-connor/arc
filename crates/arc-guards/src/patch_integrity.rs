@@ -11,6 +11,18 @@ use arc_kernel::{GuardContext, KernelError, Verdict};
 
 use crate::action::{extract_action, ToolAction};
 
+/// Errors produced when building a [`PatchIntegrityGuard`].
+#[derive(Debug, thiserror::Error)]
+pub enum PatchIntegrityConfigError {
+    /// A forbidden pattern was not a valid regex.
+    #[error("invalid patch integrity forbidden pattern `{pattern}`: {source}")]
+    InvalidForbiddenPattern {
+        pattern: String,
+        #[source]
+        source: regex::Error,
+    },
+}
+
 /// Configuration for `PatchIntegrityGuard`.
 pub struct PatchIntegrityConfig {
     /// Enable/disable this guard.
@@ -95,22 +107,32 @@ pub struct PatchIntegrityGuard {
 
 impl PatchIntegrityGuard {
     pub fn new() -> Self {
-        Self::with_config(PatchIntegrityConfig::default())
+        match Self::with_config(PatchIntegrityConfig::default()) {
+            Ok(guard) => guard,
+            Err(error) => panic!("default patch integrity config must be valid: {error}"),
+        }
     }
 
-    pub fn with_config(config: PatchIntegrityConfig) -> Self {
+    pub fn with_config(config: PatchIntegrityConfig) -> Result<Self, PatchIntegrityConfigError> {
         let enabled = config.enabled;
         let forbidden_regexes = config
             .forbidden_patterns
             .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
+            .map(|pattern| {
+                Regex::new(pattern).map_err(|source| {
+                    PatchIntegrityConfigError::InvalidForbiddenPattern {
+                        pattern: pattern.clone(),
+                        source,
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        Self {
+        Ok(Self {
             enabled,
             config,
             forbidden_regexes,
-        }
+        })
     }
 
     /// Analyze a unified diff and return a `PatchAnalysis`.
@@ -248,7 +270,7 @@ mod tests {
             max_additions: 5,
             ..Default::default()
         };
-        let guard = PatchIntegrityGuard::with_config(config);
+        let guard = PatchIntegrityGuard::with_config(config).expect("valid patch integrity config");
 
         let diff = "+line1\n+line2\n+line3\n+line4\n+line5\n+line6";
         let analysis = guard.analyze(diff);
@@ -262,7 +284,7 @@ mod tests {
             max_deletions: 2,
             ..Default::default()
         };
-        let guard = PatchIntegrityGuard::with_config(config);
+        let guard = PatchIntegrityGuard::with_config(config).expect("valid patch integrity config");
 
         let diff = "-del1\n-del2\n-del3";
         let analysis = guard.analyze(diff);
@@ -277,7 +299,7 @@ mod tests {
             max_imbalance_ratio: 2.0,
             ..Default::default()
         };
-        let guard = PatchIntegrityGuard::with_config(config);
+        let guard = PatchIntegrityGuard::with_config(config).expect("valid patch integrity config");
 
         // 6 additions, 1 deletion = ratio 6.0, exceeds 2.0
         let diff = "+a\n+b\n+c\n+d\n+e\n+f\n-x";
@@ -319,6 +341,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -367,6 +391,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -388,7 +414,7 @@ mod tests {
             enabled: false,
             ..Default::default()
         };
-        let guard = PatchIntegrityGuard::with_config(config);
+        let guard = PatchIntegrityGuard::with_config(config).expect("valid patch integrity config");
 
         let kp = arc_core::crypto::Keypair::generate();
         let scope = arc_core::capability::ArcScope::default();
@@ -419,6 +445,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -432,5 +460,22 @@ mod tests {
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
         assert_eq!(result, Verdict::Allow);
+    }
+
+    #[test]
+    fn with_config_rejects_invalid_forbidden_regex() {
+        let config = PatchIntegrityConfig {
+            forbidden_patterns: vec!["[".to_string()],
+            ..Default::default()
+        };
+
+        let error = match PatchIntegrityGuard::with_config(config) {
+            Ok(_) => panic!("invalid forbidden regex should fail closed"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error,
+            PatchIntegrityConfigError::InvalidForbiddenPattern { .. }
+        ));
     }
 }

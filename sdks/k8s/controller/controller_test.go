@@ -199,6 +199,29 @@ func TestValidate_AllowWithCapability(t *testing.T) {
 	}
 }
 
+func TestValidate_AllowWithProtocolCapabilityToken(t *testing.T) {
+	signer := newCapabilitySigner(t)
+	trustCapabilitySigner(t, signer)
+	body := buildAdmissionReview(t, map[string]string{
+		"arc.protocol/capability-token": validToolCapabilityTokenJSON(t, signer, "db", "invoke"),
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/validate", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handleValidate(rec, req)
+
+	var review AdmissionReview
+	if err := json.NewDecoder(rec.Body).Decode(&review); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !review.Response.Allowed {
+		t.Fatal("expected pod to be allowed with protocol capability token")
+	}
+}
+
 func TestValidate_AllowExempt(t *testing.T) {
 	body := buildAdmissionReview(t, map[string]string{
 		AnnotationExempt: "true",

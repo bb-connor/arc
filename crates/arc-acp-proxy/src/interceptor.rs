@@ -17,7 +17,7 @@ pub enum InterceptResult {
     /// Block the message and return an error response to the sender.
     Block(Value),
     /// Forward the message AND record an audit entry for it.
-    ForwardWithReceipt(Value, AcpToolCallAuditEntry),
+    ForwardWithReceipt(Value, Box<AcpToolCallAuditEntry>),
 }
 
 enum CapabilityGate {
@@ -359,7 +359,7 @@ impl MessageInterceptor {
                     );
                     return Ok(InterceptResult::ForwardWithReceipt(
                         message.clone(),
-                        receipt,
+                        Box::new(receipt),
                     ));
                 }
                 SessionUpdate::ToolCallUpdate(ref event) => {
@@ -378,7 +378,7 @@ impl MessageInterceptor {
                         );
                         return Ok(InterceptResult::ForwardWithReceipt(
                             message.clone(),
-                            receipt,
+                            Box::new(receipt),
                         ));
                     }
                 }

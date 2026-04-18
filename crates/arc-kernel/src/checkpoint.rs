@@ -10,7 +10,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
-use arc_core::crypto::{Keypair, PublicKey, Signature};
+use arc_core::crypto::{Keypair, PublicKey, Signature, SigningAlgorithm};
 use arc_core::hashing::sha256_hex;
 use arc_core::hashing::Hash;
 use arc_core::merkle::{MerkleProof, MerkleTree};
@@ -241,10 +241,13 @@ pub struct CheckpointTransparencySummary {
 
 #[must_use]
 pub fn checkpoint_log_id(checkpoint: &KernelCheckpoint) -> String {
-    format!(
-        "local-log-{}",
-        sha256_hex(checkpoint.body.kernel_key.as_bytes())
-    )
+    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.algorithm() {
+        SigningAlgorithm::Ed25519 => checkpoint.body.kernel_key.as_bytes().to_vec(),
+        SigningAlgorithm::P256 | SigningAlgorithm::P384 => {
+            checkpoint.body.kernel_key.to_hex().into_bytes()
+        }
+    };
+    format!("local-log-{}", sha256_hex(&log_key_bytes))
 }
 
 #[must_use]
@@ -281,7 +284,7 @@ pub fn build_checkpoint_publication(
         schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
         checkpoint_seq: checkpoint.body.checkpoint_seq,
         checkpoint_sha256: checkpoint_body_sha256(&checkpoint.body)?,
-        merkle_root: checkpoint.body.merkle_root.clone(),
+        merkle_root: checkpoint.body.merkle_root,
         published_at: checkpoint.body.issued_at,
         kernel_key: checkpoint.body.kernel_key.clone(),
         log_tree_size: checkpoint_log_tree_size(&checkpoint.body),
@@ -394,6 +397,7 @@ pub fn verify_checkpoint_consistency_proof(
     Ok(*proof == build_checkpoint_consistency_proof(previous, current)?)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn ordered_equivocation(
     kind: CheckpointEquivocationKind,
     log_id: Option<String>,
@@ -549,24 +553,6 @@ pub fn build_checkpoint_transparency(
 
     publications.sort_by_key(|publication| publication.checkpoint_seq);
 
-    let mut witnesses = Vec::new();
-    let mut consistency_proofs = Vec::new();
-    for checkpoint in checkpoints {
-        let Some(previous_checkpoint_sha256) =
-            checkpoint.body.previous_checkpoint_sha256.as_deref()
-        else {
-            continue;
-        };
-        if let Some(previous) = by_digest.get(previous_checkpoint_sha256) {
-            witnesses.push(build_checkpoint_witness(previous, checkpoint)?);
-            if checkpoint_log_id(previous) == checkpoint_log_id(checkpoint) {
-                consistency_proofs.push(build_checkpoint_consistency_proof(previous, checkpoint)?);
-            }
-        }
-    }
-    witnesses.sort_by_key(|witness| (witness.witness_checkpoint_seq, witness.checkpoint_seq));
-    consistency_proofs.sort_by_key(|proof| (proof.to_checkpoint_seq, proof.from_checkpoint_seq));
-
     let mut equivocations = Vec::new();
     for (index, checkpoint) in checkpoints.iter().enumerate() {
         for conflicting in checkpoints.iter().skip(index + 1) {
@@ -577,6 +563,40 @@ pub fn build_checkpoint_transparency(
     }
     equivocations.sort();
     equivocations.dedup();
+    let equivocated_digests = equivocations
+        .iter()
+        .flat_map(|equivocation| {
+            [
+                equivocation.first_checkpoint_sha256.clone(),
+                equivocation.second_checkpoint_sha256.clone(),
+            ]
+        })
+        .collect::<BTreeSet<_>>();
+
+    let mut witnesses = Vec::new();
+    let mut consistency_proofs = Vec::new();
+    for checkpoint in checkpoints {
+        let Some(previous_checkpoint_sha256) =
+            checkpoint.body.previous_checkpoint_sha256.as_deref()
+        else {
+            continue;
+        };
+        if let Some(previous) = by_digest.get(previous_checkpoint_sha256) {
+            let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body)?;
+            if let Err(error) = validate_checkpoint_predecessor(previous, checkpoint) {
+                if equivocated_digests.contains(&checkpoint_sha256) {
+                    continue;
+                }
+                return Err(error);
+            }
+            witnesses.push(build_checkpoint_witness(previous, checkpoint)?);
+            if checkpoint_log_id(previous) == checkpoint_log_id(checkpoint) {
+                consistency_proofs.push(build_checkpoint_consistency_proof(previous, checkpoint)?);
+            }
+        }
+    }
+    witnesses.sort_by_key(|witness| (witness.witness_checkpoint_seq, witness.checkpoint_seq));
+    consistency_proofs.sort_by_key(|proof| (proof.to_checkpoint_seq, proof.from_checkpoint_seq));
 
     Ok(CheckpointTransparencySummary {
         publications,
@@ -656,8 +676,7 @@ pub fn verify_checkpoint_transparency_records(
             .copied()
         else {
             return Err(CheckpointError::Continuity(
-                "checkpoint publication records do not match the signed checkpoint set"
-                    .to_string(),
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
             ));
         };
         let expected = match publication.trust_anchor_binding.clone() {
@@ -677,8 +696,7 @@ pub fn verify_checkpoint_transparency_records(
         };
         if publication != &expected {
             return Err(CheckpointError::Continuity(
-                "checkpoint publication records do not match the signed checkpoint set"
-                    .to_string(),
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
             ));
         }
         normalized_publications.push(expected);
@@ -1052,6 +1070,18 @@ mod tests {
     }
 
     #[test]
+    fn checkpoint_log_id_preserves_historical_ed25519_hashing() {
+        let kp = Keypair::generate();
+        let checkpoint =
+            build_checkpoint(1, 1, 3, &make_receipt_bytes(3), &kp).expect("build checkpoint");
+
+        assert_eq!(
+            checkpoint_log_id(&checkpoint),
+            format!("local-log-{}", sha256_hex(kp.public_key().as_bytes()))
+        );
+    }
+
+    #[test]
     fn build_trust_anchored_checkpoint_publication_records_binding() {
         let kp = Keypair::generate();
         let checkpoint =
@@ -1097,13 +1127,13 @@ mod tests {
     #[test]
     fn verify_checkpoint_transparency_records_rejects_duplicate_publication_coverage() {
         let kp = Keypair::generate();
-        let first = build_checkpoint(1, 1, 2, &make_receipt_bytes(2), &kp)
-            .expect("first checkpoint");
+        let first =
+            build_checkpoint(1, 1, 2, &make_receipt_bytes(2), &kp).expect("first checkpoint");
         let second =
             build_checkpoint_with_previous(2, 3, 4, &make_receipt_bytes(2), &kp, Some(&first))
                 .expect("second checkpoint");
-        let derived =
-            validate_checkpoint_transparency(&[first.clone(), second.clone()]).expect("transparency");
+        let derived = validate_checkpoint_transparency(&[first.clone(), second.clone()])
+            .expect("transparency");
         let supplied = CheckpointTransparencySummary {
             publications: vec![
                 derived.publications[0].clone(),
@@ -1117,7 +1147,9 @@ mod tests {
         let error = verify_checkpoint_transparency_records(&[first, second], &supplied)
             .expect_err("duplicate publication coverage should fail");
         assert!(
-            error.to_string().contains("duplicate checkpoint publication record"),
+            error
+                .to_string()
+                .contains("duplicate checkpoint publication record"),
             "unexpected error: {error}"
         );
     }

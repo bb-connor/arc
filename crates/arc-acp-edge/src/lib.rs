@@ -23,7 +23,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use arc_core::capability::{CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent};
+use arc_core::capability::{
+    CapabilityToken, GovernedApprovalToken, GovernedTransactionIntent, ModelMetadata,
+};
 use arc_cross_protocol::{
     runtime_lifecycle_contract, runtime_lifecycle_metadata, semantic_hints_for_tool,
     target_protocol_for_tool_with_registry, BridgeError, BridgeFidelity, CapabilityBridge,
@@ -196,6 +198,8 @@ pub struct AcpKernelExecutionContext {
     pub governed_intent: Option<GovernedTransactionIntent>,
     /// Optional approval token for governed transaction execution.
     pub approval_token: Option<GovernedApprovalToken>,
+    /// Optional metadata about the model that originated this invocation.
+    pub model_metadata: Option<ModelMetadata>,
 }
 
 /// The ACP edge server.
@@ -474,6 +478,7 @@ impl ArcAcpEdge {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
         };
         let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
@@ -510,6 +515,7 @@ impl ArcAcpEdge {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
         };
         let orchestrated = execute_orchestrated_acp_request(kernel, request)?;
         Ok(acp_invocation_result_from_orchestrated(orchestrated))
@@ -892,6 +898,7 @@ impl ArcAcpEdge {
             dpop_proof: execution.dpop_proof.clone(),
             governed_intent: execution.governed_intent.clone(),
             approval_token: execution.approval_token.clone(),
+            model_metadata: execution.model_metadata.clone(),
         };
         let task = AcpInvocationTask {
             id: task_id.clone(),
@@ -1295,12 +1302,12 @@ fn acp_invocation_result_from_orchestrated(
         .unwrap_or_else(|| kernel_output_to_value(orchestrated.response.output.as_ref()));
     let metadata = Some(orchestrated.metadata());
     let response = orchestrated.response;
-    let denied = matches!(response.verdict, KernelVerdict::Deny);
+    let success = matches!(response.verdict, KernelVerdict::Allow);
 
     AcpInvocationResult {
-        success: !denied,
+        success,
         data,
-        error: if denied { response.reason } else { None },
+        error: if success { None } else { response.reason },
         metadata,
     }
 }
@@ -1992,6 +1999,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let request = PermissionRequest {
             capability_id: "read_file".to_string(),
@@ -2016,6 +2024,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let request = PermissionRequest {
             capability_id: "write_file".to_string(),
@@ -2112,6 +2121,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = edge
@@ -2153,6 +2163,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = edge
@@ -2166,6 +2177,50 @@ mod tests {
         );
         assert_eq!(metadata["arc"]["decision"].as_str(), Some("deny"));
         assert!(metadata["arc"]["receipt"]["id"].as_str().is_some());
+    }
+
+    #[test]
+    fn pending_approval_is_not_reported_as_success() {
+        let config = test_kernel_config();
+        let issuer = config.keypair.clone();
+        let mut kernel = ArcKernel::new(config);
+        kernel.register_tool_server(Box::new(test_server()));
+
+        let subject = Keypair::generate();
+        let mut orchestrated = execute_orchestrated_acp_request(
+            &kernel,
+            CrossProtocolExecutionRequest {
+                origin_request_id: "acp-request-pending".to_string(),
+                kernel_request_id: "acp-pending".to_string(),
+                target_protocol: DiscoveryProtocol::Native,
+                target_server_id: "test-srv".to_string(),
+                target_tool_name: "read_file".to_string(),
+                agent_id: subject.public_key().to_hex(),
+                arguments: json!({"path": "/tmp"}),
+                capability: capability_for_tool(&issuer, &subject, "test-srv", "read_file"),
+                source_envelope: build_acp_source_envelope("read_file", json!({"path": "/tmp"}))
+                    .unwrap(),
+                dpop_proof: None,
+                governed_intent: None,
+                approval_token: None,
+                model_metadata: None,
+            },
+        )
+        .unwrap();
+        orchestrated.response.verdict = KernelVerdict::PendingApproval;
+        orchestrated.response.reason = Some("approval required".to_string());
+
+        let result = acp_invocation_result_from_orchestrated(orchestrated);
+        let metadata = result
+            .metadata
+            .expect("pending approval should attach metadata");
+
+        assert!(!result.success);
+        assert_eq!(result.error.as_deref(), Some("approval required"));
+        assert_eq!(
+            metadata["arc"]["decision"].as_str(),
+            Some("pending_approval")
+        );
     }
 
     #[test]
@@ -2183,6 +2238,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = edge
@@ -2237,6 +2293,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = edge
@@ -2272,6 +2329,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let result = edge
@@ -2319,6 +2377,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2363,6 +2422,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2406,6 +2466,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2440,6 +2501,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
         let response = edge.handle_jsonrpc(
             json!({
@@ -2550,6 +2612,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let response = edge.handle_jsonrpc(
@@ -2621,6 +2684,7 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
         };
 
         let created = edge.handle_jsonrpc(

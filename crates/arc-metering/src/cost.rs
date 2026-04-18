@@ -33,6 +33,22 @@ pub enum CostDimension {
         /// Provider that charged this cost (e.g. "openai", "anthropic").
         provider: String,
     },
+    /// Warehouse query cost recorded by the `WarehouseCostGuard` in
+    /// `arc-data-guards`.  Captures the dry-run cost estimate for a
+    /// warehouse-class query (BigQuery, Snowflake, Redshift, etc.).
+    ///
+    /// `estimated_cost_usd` is a decimal string rather than a fixed-width
+    /// integer because `rust_decimal` is not part of the ARC workspace;
+    /// this follows the precedent set by
+    /// `Constraint::MaxTransactionAmountUsd` in `arc-core-types`.
+    WarehouseQuery {
+        /// Bytes the warehouse reported it will scan to satisfy the query.
+        bytes_scanned: u64,
+        /// Decimal-string estimate of the monetary cost in USD (e.g.
+        /// `"0.25"`).  Parsed against the guard's `max_cost_per_query_usd`
+        /// limit; preserved verbatim on the receipt for auditability.
+        estimated_cost_usd: String,
+    },
     /// Custom cost dimension for extensibility.
     Custom {
         /// Name of the custom dimension.
@@ -344,5 +360,20 @@ mod tests {
         let json = serde_json::to_string(&dim).unwrap();
         let back: CostDimension = serde_json::from_str(&json).unwrap();
         assert_eq!(back, dim);
+    }
+
+    #[test]
+    fn warehouse_query_dimension_roundtrip() {
+        let dim = CostDimension::WarehouseQuery {
+            bytes_scanned: 50 * 1024 * 1024 * 1024,
+            estimated_cost_usd: "0.25".to_string(),
+        };
+        let json = serde_json::to_string(&dim).unwrap();
+        let back: CostDimension = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, dim);
+        // Also verify the serde tag carries through.
+        assert!(json.contains("\"dimension\":\"warehouse_query\""));
+        assert!(json.contains("\"bytes_scanned\""));
+        assert!(json.contains("\"estimated_cost_usd\""));
     }
 }

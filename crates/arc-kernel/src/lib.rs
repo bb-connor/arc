@@ -21,15 +21,21 @@
 
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
 
+pub mod approval;
+pub mod approval_channels;
 pub mod authority;
 pub mod budget_store;
 pub mod capability_lineage;
 pub mod checkpoint;
+pub mod compliance_score;
 pub mod cost_attribution;
 pub mod dpop;
 pub mod evidence_export;
+pub mod execution_nonce;
+pub mod memory_provenance;
 pub mod operator_report;
 pub mod payment;
+pub mod post_invocation;
 pub mod receipt_analytics;
 pub mod receipt_query;
 pub mod receipt_store;
@@ -80,10 +86,18 @@ pub(crate) use request_matching::{
 };
 pub use request_matching::{
     capability_matches_prompt_request, capability_matches_request,
-    capability_matches_resource_pattern, capability_matches_resource_request,
-    capability_matches_resource_subscription,
+    capability_matches_request_with_model_metadata, capability_matches_resource_pattern,
+    capability_matches_resource_request, capability_matches_resource_subscription,
 };
 
+pub use approval::{
+    compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
+    ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
+    ApprovalStore, ApprovalStoreError, ApprovalToken, BatchApproval, BatchApprovalStore,
+    ChannelError, ChannelHandle, HitlVerdict, InMemoryApprovalStore, InMemoryBatchApprovalStore,
+    ResolvedApproval, MAX_APPROVAL_TTL_SECS,
+};
+pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 pub use arc_core::credit::{
     CapitalAllocationDecisionArtifact, CapitalAllocationDecisionFinding,
     CapitalAllocationDecisionOutcome, CapitalAllocationDecisionReasonCode,
@@ -261,6 +275,12 @@ pub use checkpoint::{
     verify_checkpoint_signature, CheckpointError, KernelCheckpoint, KernelCheckpointBody,
     ReceiptInclusionProof, CHECKPOINT_SCHEMA,
 };
+pub use compliance_score::{
+    compliance_factor_breakdown, compliance_score, ComplianceFactor, ComplianceFactorBreakdown,
+    ComplianceScore, ComplianceScoreConfig, ComplianceScoreInputs, COMPLIANCE_SCORE_MAX,
+    DEFAULT_ATTESTATION_STALENESS_SECS, WEIGHT_ATTESTATION_FRESHNESS, WEIGHT_DENY_RATE,
+    WEIGHT_POLICY_COVERAGE, WEIGHT_REVOCATION, WEIGHT_VELOCITY_ANOMALY,
+};
 pub use cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
     CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
@@ -275,6 +295,21 @@ pub use evidence_export::{
     EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
     EvidenceUncheckpointedReceipt,
 };
+pub use execution_nonce::{
+    is_supported_execution_nonce_schema, mint_execution_nonce, verify_execution_nonce,
+    ExecutionNonce, ExecutionNonceConfig, ExecutionNonceError, ExecutionNonceStore,
+    InMemoryExecutionNonceStore, NonceBinding, SignedExecutionNonce,
+    DEFAULT_EXECUTION_NONCE_STORE_CAPACITY, DEFAULT_EXECUTION_NONCE_TTL_SECS,
+    EXECUTION_NONCE_SCHEMA,
+};
+pub use memory_provenance::{
+    classify_memory_action, next_entry_id as next_memory_provenance_entry_id,
+    recompute_entry_hash as recompute_memory_provenance_entry_hash, InMemoryMemoryProvenanceStore,
+    MemoryActionKind, MemoryProvenanceAppend, MemoryProvenanceEntry, MemoryProvenanceError,
+    MemoryProvenanceStore, ProvenanceVerification, UnverifiedReason,
+    MEMORY_PROVENANCE_ENTRY_SCHEMA, MEMORY_PROVENANCE_GENESIS_PREV_HASH,
+};
+pub use operator_report::{behavioral_anomaly_score, BehavioralAnomalyScore, EmaBaselineState};
 pub use operator_report::{
     ArcOAuthArtifactBoundary, ArcOAuthAuthorizationDiscoveryMetadata,
     ArcOAuthAuthorizationExampleMapping, ArcOAuthAuthorizationMetadataReport,
@@ -315,6 +350,9 @@ pub use payment::{
     PaymentAuthorization, PaymentAuthorizeRequest, PaymentError, PaymentResult,
     RailSettlementStatus, ReceiptSettlement, X402PaymentAdapter,
 };
+pub use post_invocation::{
+    PipelineOutcome, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+};
 pub use receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
     ReceiptAnalyticsResponse, TimeAnalyticsRow, ToolAnalyticsRow, MAX_ANALYTICS_GROUP_LIMIT,
@@ -346,5 +384,5 @@ pub use kernel::{
     AgentId, ArcKernel, CapabilityId, ChildReceiptLog, Guard, GuardContext, KernelConfig,
     KernelError, PromptProvider, ReceiptLog, ResourceProvider, ServerId, StructuredErrorReport,
     DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_SIZE_BYTES, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DEFAULT_RETENTION_DAYS, EMERGENCY_STOP_DENY_REASON,
 };

@@ -1,0 +1,99 @@
+name: Sidecar Image
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional image tag override (defaults to git ref / SHA)."
+        required: false
+        type: string
+
+concurrency:
+  group: sidecar-image-${{ github.ref }}
+  cancel-in-progress: false
+
+# Workflow-level principle-of-least-privilege default. Consistent with
+# release-binaries.yml and release-pypi.yml. The build-and-push job
+# extends this with `packages: write` + `id-token: write` for ghcr
+# push and OIDC attestation.
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: backbay/arc-sidecar
+
+jobs:
+  build-and-push:
+    name: Build and push multi-arch sidecar image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Intentionally do NOT emit `:latest` on tag pushes. An older
+            # patch release (e.g. v0.1.1) tagged after a newer one
+            # (e.g. v0.2.0) would otherwise overwrite `:latest` back to
+            # the older image since we have no version-ordering check.
+            # Versioned tags (v0.1.1, 0.1, etc.) still ship via the
+            # semver patterns above, so operators can pin to them and
+            # `:latest` only tracks the default branch.
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
+          labels: |
+            org.opencontainers.image.title=arc-sidecar
+            org.opencontainers.image.description=ARC (Provable Agent Capability Transport) sidecar runtime
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.sidecar
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=sidecar
+          cache-to: type=gha,scope=sidecar,mode=max
+
+      - name: Export image digest
+        run: |
+          echo "Pushed image digest: ${{ steps.build.outputs.digest }}"

@@ -1,9 +1,9 @@
 //! DPoP (Demonstration of Proof-of-Possession) for ARC tool invocations.
 //!
-//! A DPoP proof is an Ed25519-signed canonical JSON object that binds a
-//! single tool invocation to the agent's keypair. It prevents stolen-token
-//! replay by requiring the agent to prove possession of the private key
-//! corresponding to `capability.subject` on every invocation.
+//! A DPoP proof is a signed canonical JSON object that binds a single tool
+//! invocation to the agent's keypair. It prevents stolen-token replay by
+//! requiring the agent to prove possession of the private key corresponding
+//! to `capability.subject` on every invocation.
 //!
 //! Proof fields:
 //! - `schema`:        constant `"arc.dpop_proof.v1"`
@@ -13,14 +13,17 @@
 //! - `action_hash`:   SHA-256 hash of the serialized tool arguments
 //! - `nonce`:         caller-chosen random string (replay prevention)
 //! - `issued_at`:     Unix seconds when the proof was created
-//! - `agent_key`:     hex-encoded Ed25519 public key of the signer
+//! - `agent_key`:     hex-encoded public key of the signer (Ed25519 by default;
+//!   `p256:` / `p384:` prefix under the FIPS crypto path)
 //!
 //! Verification steps (in order):
 //! 1. Schema check -- must equal `DPOP_SCHEMA`
 //! 2. Sender constraint -- `agent_key` must equal `capability.subject`
 //! 3. Binding fields -- capability_id, tool_server, tool_name, action_hash all match
 //! 4. Freshness -- `issued_at + proof_ttl_secs >= now` and `issued_at <= now + max_clock_skew_secs`
-//! 5. Signature -- Ed25519 over canonical JSON of the proof body
+//! 5. Signature -- verified through the signing backend negotiated between
+//!    agent and kernel; dispatches off the algorithm carried by `agent_key`
+//!    and the proof's `signature` field
 //! 6. Nonce replay -- nonce must not have been seen within the TTL window
 
 use std::num::NonZeroUsize;
@@ -29,7 +32,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::CapabilityToken;
-use arc_core::crypto::{Keypair, PublicKey, Signature};
+use arc_core::crypto::{
+    sign_canonical_with_backend, Keypair, PublicKey, Signature, SigningBackend,
+};
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -88,7 +93,7 @@ pub struct DpopProof {
 }
 
 impl DpopProof {
-    /// Sign a proof body with the agent's keypair.
+    /// Sign a proof body with the agent's Ed25519 keypair.
     ///
     /// The `keypair` must be the one corresponding to `body.agent_key`.
     /// The signature covers the canonical JSON of the body.
@@ -97,6 +102,21 @@ impl DpopProof {
             KernelError::DpopVerificationFailed(format!("failed to serialize proof body: {e}"))
         })?;
         let signature = keypair.sign(&body_bytes);
+        Ok(DpopProof { body, signature })
+    }
+
+    /// Sign a proof body with an arbitrary [`SigningBackend`].
+    ///
+    /// The backend's public key must equal `body.agent_key`. Use this entry
+    /// point when the agent's signing identity is served by a FIPS backend
+    /// (P-256 / P-384) rather than a historical Ed25519 keypair.
+    pub fn sign_with_backend(
+        body: DpopProofBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<DpopProof, KernelError> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body).map_err(|e| {
+            KernelError::DpopVerificationFailed(format!("failed to sign proof body: {e}"))
+        })?;
         Ok(DpopProof { body, signature })
     }
 }
@@ -299,4 +319,40 @@ pub fn verify_dpop_proof(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod backend_tests {
+    use super::*;
+    use arc_core::crypto::Ed25519Backend;
+
+    #[test]
+    fn ed25519_backend_produces_equivalent_dpop_proof() {
+        // Signing via `DpopProof::sign_with_backend(..., &Ed25519Backend)` must
+        // be verifier-equivalent to the historical `DpopProof::sign(..., &Keypair)`
+        // path. The stored `agent_key.verify(...)` pathway already dispatches
+        // on algorithm tag, so either signing entry point must produce a proof
+        // whose verification succeeds.
+        let kp = Keypair::generate();
+        let backend = Ed25519Backend::new(kp.clone());
+        let body = DpopProofBody {
+            schema: DPOP_SCHEMA.to_string(),
+            capability_id: "cap-1".to_string(),
+            tool_server: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            action_hash: "hash".to_string(),
+            nonce: "nonce-1".to_string(),
+            issued_at: 1_000,
+            agent_key: kp.public_key(),
+        };
+        let proof = DpopProof::sign_with_backend(body.clone(), &backend).unwrap();
+        let bytes = canonical_json_bytes(&proof.body).unwrap();
+        assert!(proof.body.agent_key.verify(&bytes, &proof.signature));
+    }
+
+    // The P-256 / P-384 DPoP signing round-trip is exercised in
+    // `arc-core-types` where the `fips` feature is directly in scope
+    // (see `capability.rs` tests). The DPoP verifier path ultimately calls
+    // `PublicKey::verify`, so algorithm dispatch is fully covered there.
 }

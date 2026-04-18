@@ -32,6 +32,10 @@ fn handle_agent_message(
             match response.verdict {
                 arc_kernel::Verdict::Allow => stats.allowed += 1,
                 arc_kernel::Verdict::Deny => stats.denied += 1,
+                // Phase 3.4: pending approval is a non-terminal
+                // outcome; from the CLI's accounting perspective we
+                // fold it into denied until the human responds.
+                arc_kernel::Verdict::PendingApproval => stats.denied += 1,
             }
 
             tool_response_messages(context.request_id.to_string(), response)
@@ -75,6 +79,8 @@ fn handle_agent_message(
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+                    model_metadata: None,
+                    federated_origin_kernel_id: None,
                 };
 
                 match make_error_receipt(kernel, &request) {
@@ -183,6 +189,17 @@ fn tool_response_messages(
         (arc_kernel::Verdict::Allow, _, None) => ToolCallResult::Ok {
             value: serde_json::Value::Null,
         },
+        // Phase 3.4: map PendingApproval to a policy-denied result so
+        // the existing session driver surfaces it to the caller; the
+        // HTTP `/approvals` surface is the mechanism for resume.
+        (arc_kernel::Verdict::PendingApproval, _, _) => ToolCallResult::Err {
+            error: ToolCallError::PolicyDenied {
+                guard: "approval".to_string(),
+                reason: response
+                    .reason
+                    .unwrap_or_else(|| "tool call requires approval".to_string()),
+            },
+        },
     };
 
     messages.push(KernelMessage::ToolCallResponse {
@@ -284,6 +301,8 @@ fn make_error_receipt(
         policy_hash: "error".to_string(),
         evidence: vec![],
         metadata: None,
+        trust_level: arc_core::TrustLevel::default(),
+        tenant_id: None,
         kernel_key: kp.public_key(),
     };
 
@@ -420,7 +439,8 @@ mod tests {
             },
             kernel: policy.kernel.clone(),
             default_capabilities,
-            guard_pipeline: policy::build_guard_pipeline(&policy.guards),
+            guard_pipeline: policy::build_guard_pipeline(&policy.guards).unwrap(),
+            post_invocation_pipeline: policy::build_post_invocation_pipeline(&policy.guards),
             issuance_policy: None,
             runtime_assurance_policy: None,
         }
@@ -549,6 +569,8 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let response = restarted.evaluate_tool_call_blocking(&request).unwrap();
@@ -747,6 +769,8 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -789,6 +813,8 @@ capabilities:
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

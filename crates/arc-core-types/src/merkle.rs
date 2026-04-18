@@ -10,6 +10,8 @@
 //!
 //! Ported from hush-core's `merkle` module.
 
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as Sha2Digest, Sha256};
 

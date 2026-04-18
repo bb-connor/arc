@@ -32,10 +32,25 @@ from arc_sdk.errors import (
     ArcTimeoutError,
     ArcValidationError,
 )
+from arc_sdk.testing import (
+    MockArcClient,
+    MockVerdict,
+    RecordedCall,
+    allow_all,
+    deny_all,
+    with_policy,
+)
 
 __all__ = [
     # Client
     "ArcClient",
+    # Testing
+    "MockArcClient",
+    "MockVerdict",
+    "RecordedCall",
+    "allow_all",
+    "deny_all",
+    "with_policy",
     # Models -- capabilities
     "CapabilityToken",
     "CapabilityTokenBody",

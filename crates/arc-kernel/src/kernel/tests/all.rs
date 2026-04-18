@@ -9,18 +9,18 @@ use std::thread;
 use arc_core::capability::{
     ArcScope, CallChainContinuationAudience, CallChainContinuationToken,
     CallChainContinuationTokenBody, CapabilityToken, CapabilityTokenBody, Constraint,
-    DelegationLink, DelegationLinkBody, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
-    GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY, GovernedApprovalDecision,
-    GovernedApprovalToken, GovernedApprovalTokenBody, GovernedAutonomyContext,
-    GovernedAutonomyTier, GovernedCallChainContext, GovernedTransactionIntent,
-    GovernedUpstreamCallChainProof, GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation,
-    PromptGrant, ResourceGrant, ToolGrant,
+    DelegationLink, DelegationLinkBody, GovernedApprovalDecision, GovernedApprovalToken,
+    GovernedApprovalTokenBody, GovernedAutonomyContext, GovernedAutonomyTier,
+    GovernedCallChainContext, GovernedTransactionIntent, GovernedUpstreamCallChainProof,
+    GovernedUpstreamCallChainProofBody, MonetaryAmount, Operation, PromptGrant, ResourceGrant,
+    ToolGrant, GOVERNED_CALL_CHAIN_CONTINUATION_CONTEXT_KEY,
+    GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY,
 };
 use arc_core::credit::{
-    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA, CreditBondArtifact,
-    CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites, CreditBondReport,
-    CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
+    CreditBondArtifact, CreditBondDisposition, CreditBondLifecycleState, CreditBondPrerequisites,
+    CreditBondReport, CreditBondSupportBoundary, CreditScorecardBand, CreditScorecardConfidence,
     CreditScorecardSummary, ExposureLedgerQuery, ExposureLedgerSummary, SignedCreditBond,
+    CREDIT_BOND_ARTIFACT_SCHEMA, CREDIT_BOND_REPORT_SCHEMA,
 };
 use arc_core::crypto::{Keypair, PublicKey};
 use arc_core::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
@@ -35,7 +35,7 @@ use arc_core::{
     ResourceContent, ResourceDefinition, ResourceTemplateDefinition,
 };
 use arc_link::{ExchangeRate, PriceOracle, PriceOracleError};
-use rusqlite::{Connection, OptionalExtension, Row, params};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 struct SqliteReceiptStore {
     connection: Connection,
@@ -618,6 +618,8 @@ fn make_request_with_arguments(
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     }
 }
 
@@ -1614,13 +1616,11 @@ fn path_prefix_constraint_is_enforced() {
     );
     let denied_response = kernel.evaluate_tool_call_blocking(&denied).unwrap();
     assert_eq!(denied_response.verdict, Verdict::Deny);
-    assert!(
-        denied_response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("not in capability scope")
-    );
+    assert!(denied_response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("not in capability scope"));
 }
 
 #[test]
@@ -1873,6 +1873,8 @@ fn untrusted_issuer_denied() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -1962,13 +1964,11 @@ fn revoked_ancestor_capability_denies_descendant() {
     let request = make_request("req-1", &child, "read_file", "srv-a");
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains(&parent.id)
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains(&parent.id));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2035,7 +2035,6 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     let path = unique_receipt_db_path("arc-kernel-missing-parent-lineage");
     let mut kernel = ArcKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
     let parent_kp = make_keypair();
     let child_kp = make_keypair();
@@ -2044,6 +2043,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     parent_grant.operations.push(Operation::Delegate);
     let parent_scope = make_scope(vec![parent_grant]);
     let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
@@ -2070,13 +2070,11 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("missing capability snapshot")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("missing capability snapshot"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2125,13 +2123,11 @@ fn delegated_tool_call_without_delegate_operation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("does not authorize delegated tool grant")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2191,13 +2187,11 @@ fn delegated_tool_call_with_scope_escalation_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("does not authorize delegated tool grant")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("does not authorize delegated tool grant"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2253,13 +2247,11 @@ fn delegated_tool_call_with_delegatee_subject_mismatch_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("delegatee")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("delegatee"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2327,13 +2319,11 @@ fn delegated_tool_call_exceeding_configured_max_depth_denies() {
         .evaluate_tool_call_blocking(&make_request("req-max-depth", &child, "read_file", "srv-a"))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("delegation depth 2 exceeds maximum 1")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("delegation depth 2 exceeds maximum 1"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2404,13 +2394,11 @@ fn delegated_tool_call_with_truncated_ancestor_chain_denies() {
         ))
         .unwrap();
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("stored depth")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("stored depth"));
 
     let _ = std::fs::remove_file(path);
 }
@@ -2496,6 +2484,17 @@ fn session_lifecycle_is_hosted_by_kernel() {
 }
 
 #[test]
+fn open_session_assigns_unique_ids_across_kernel_instances() {
+    let kernel_a = ArcKernel::new(make_config());
+    let kernel_b = ArcKernel::new(make_config());
+
+    let session_a = kernel_a.open_session("agent-a".to_string(), Vec::new());
+    let session_b = kernel_b.open_session("agent-b".to_string(), Vec::new());
+
+    assert_ne!(session_a, session_b);
+}
+
+#[test]
 fn web3_evidence_required_activation_rejects_missing_receipt_store() {
     let mut config = make_config();
     config.require_web3_evidence = true;
@@ -2534,11 +2533,9 @@ fn web3_evidence_required_activation_rejects_append_only_receipt_store() {
 
     let error = kernel.activate_session(&session_id).unwrap_err();
     assert!(matches!(error, KernelError::Web3EvidenceUnavailable(_)));
-    assert!(
-        error
-            .to_string()
-            .contains("append-only remote receipt mirrors are unsupported")
-    );
+    assert!(error
+        .to_string()
+        .contains("append-only remote receipt mirrors are unsupported"));
 }
 
 #[test]
@@ -3685,13 +3682,11 @@ fn streamed_tool_byte_limit_truncates_output_and_marks_receipt_incomplete() {
         response.terminal_state,
         OperationTerminalState::Incomplete { .. }
     ));
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .unwrap_or("")
-            .contains("max total bytes")
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .unwrap_or("")
+        .contains("max total bytes"));
 
     let output_stream = tool_call_stream_output(response.output).expect("expected stream output");
     assert_eq!(output_stream.chunk_count(), 1);
@@ -4067,11 +4062,9 @@ fn subscribe_session_resource_requires_subscribe_operation() {
         )
         .unwrap();
 
-    assert!(
-        kernel
-            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-            .unwrap()
-    );
+    assert!(kernel
+        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .unwrap());
 }
 
 #[test]
@@ -4107,11 +4100,9 @@ fn unsubscribe_session_resource_is_idempotent() {
         .unsubscribe_session_resource(&session_id, "repo://docs/roadmap")
         .unwrap();
 
-    assert!(
-        !kernel
-            .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
-            .unwrap()
-    );
+    assert!(!kernel
+        .session_has_resource_subscription(&session_id, "repo://docs/roadmap")
+        .unwrap());
 }
 
 #[test]
@@ -4751,6 +4742,27 @@ fn make_trusted_google_runtime_attestation() -> arc_core::capability::RuntimeAtt
     }
 }
 
+fn make_trusted_nitro_runtime_attestation() -> arc_core::capability::RuntimeAttestationEvidence {
+    let now = current_unix_timestamp();
+    arc_core::capability::RuntimeAttestationEvidence {
+        schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+        verifier: "https://nitro.aws.example/".to_string(),
+        tier: RuntimeAssuranceTier::Attested,
+        issued_at: now.saturating_sub(5),
+        expires_at: now + 300,
+        evidence_sha256: "digest-nitro-attestation".to_string(),
+        runtime_identity: None,
+        workload_identity: None,
+        claims: Some(serde_json::json!({
+            "awsNitro": {
+                "moduleId": "nitro-enclave-1",
+                "digest": "sha384:aws-measurement",
+                "pcrs": { "0": "0123" }
+            }
+        })),
+    }
+}
+
 fn make_attestation_trust_policy() -> arc_core::capability::AttestationTrustPolicy {
     arc_core::capability::AttestationTrustPolicy {
         rules: vec![
@@ -4778,6 +4790,19 @@ fn make_attestation_trust_policy() -> arc_core::capability::AttestationTrustPoli
                     ("hardwareModel".to_string(), "GCP_AMD_SEV".to_string()),
                     ("secureBoot".to_string(), "enabled".to_string()),
                 ]),
+            },
+            arc_core::capability::AttestationTrustRule {
+                name: "aws-nitro".to_string(),
+                schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+                verifier: "https://nitro.aws.example".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AwsNitro),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: Vec::new(),
+                required_assertions: std::collections::BTreeMap::from([(
+                    "moduleId".to_string(),
+                    "nitro-enclave-1".to_string(),
+                )]),
             },
         ],
     }
@@ -4885,9 +4910,7 @@ fn make_governed_call_chain_continuation_token(
     governed_intent_hash: Option<&str>,
 ) -> CallChainContinuationToken {
     let now = current_unix_timestamp();
-    let legacy_upstream_proof =
-        make_governed_upstream_call_chain_proof(signer, subject, call_chain);
-    let mut token = CallChainContinuationToken::sign(
+    CallChainContinuationToken::sign(
         CallChainContinuationTokenBody {
             schema: arc_core::capability::ARC_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
             token_id: "continuation-token-1".to_string(),
@@ -4914,9 +4937,7 @@ fn make_governed_call_chain_continuation_token(
         },
         signer,
     )
-    .unwrap();
-    token.legacy_upstream_proof = Some(legacy_upstream_proof);
-    token
+    .unwrap()
 }
 
 fn attach_governed_call_chain_continuation_token(
@@ -5088,6 +5109,8 @@ fn monetary_denial_exceeds_per_invocation_cap() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     // 5 invocations: 5 * 100 = 500 total -- all should pass.
@@ -5134,6 +5157,8 @@ fn monetary_denial_receipt_contains_financial_metadata() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     // First invocation uses up the entire budget (100 of 100).
@@ -5212,6 +5237,8 @@ fn monetary_guard_denial_releases_budget_and_records_attempted_cost() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let denied_response = kernel
@@ -5284,6 +5311,8 @@ fn monetary_payment_authorization_denial_releases_budget_and_skips_tool_invocati
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5335,6 +5364,8 @@ fn monetary_prepaid_adapter_sets_payment_reference_on_allow_receipt() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5382,6 +5413,8 @@ fn monetary_allow_receipt_contains_financial_metadata() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5439,6 +5472,8 @@ fn monetary_allow_records_budget_hold_and_append_only_events() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5504,6 +5539,8 @@ fn governed_monetary_allow_receipt_contains_approval_metadata() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5576,6 +5613,8 @@ fn governed_monetary_allow_receipt_preserves_metered_billing_quote_context() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5648,16 +5687,16 @@ fn governed_request_rejects_empty_metered_billing_provider() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("metered billing provider must not be empty"))
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("metered billing provider must not be empty")));
 
     let usage = kernel
         .budget_store
@@ -5712,6 +5751,8 @@ fn governed_monetary_allow_receipt_preserves_call_chain_context() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5789,6 +5830,8 @@ fn governed_call_chain_receipt_observes_local_parent_receipt_linkage() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5874,6 +5917,8 @@ fn governed_call_chain_receipt_observes_capability_lineage_subjects() {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -5965,6 +6010,8 @@ fn governed_call_chain_receipt_verifies_signed_upstream_delegator_proof() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6033,6 +6080,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
     let asserted_governed = asserted_response
@@ -6042,10 +6091,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
         .and_then(|metadata| metadata.get("governed_transaction"))
         .expect("asserted receipt should carry governed transaction metadata");
     assert_eq!(asserted_governed["call_chain"]["evidenceClass"], "asserted");
-    assert_eq!(
-        asserted_governed["call_chain"]["evidenceSources"],
-        serde_json::json!([])
-    );
+    assert!(asserted_governed["call_chain"]["evidenceSources"].is_null());
     assert!(asserted_governed["call_chain"]["upstreamProof"].is_null());
 
     let mut observed_kernel = ArcKernel::new(make_config());
@@ -6095,6 +6141,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
     let observed_governed = observed_response
@@ -6186,6 +6234,8 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
             dpop_proof: None,
             governed_intent: Some(verified_intent),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
     let verified_governed = verified_response
@@ -6285,6 +6335,8 @@ fn governed_request_rejects_upstream_call_chain_proof_subject_mismatch() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6363,6 +6415,8 @@ fn governed_request_rejects_call_chain_delegator_subject_that_conflicts_with_cap
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6445,6 +6499,8 @@ fn governed_call_chain_receipt_observes_session_parent_request_lineage() {
                     context: None,
                 }),
                 approval_token: None,
+                model_metadata: None,
+            federated_origin_kernel_id: None,
             },
             &mut client,
         )
@@ -6518,6 +6574,8 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
                     "sessionAnchorHash": parent_anchor.session_anchor_hash.clone(),
                 }
             })),
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: parent_kernel.public_key(),
         },
         &parent_kernel.config.keypair,
@@ -6571,6 +6629,8 @@ fn cross_kernel_continuation_token_verifies_parent_receipt_hash_and_session_anch
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6640,6 +6700,8 @@ fn governed_request_rejects_self_referential_call_chain_parent_request() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6690,16 +6752,16 @@ fn governed_request_rejects_empty_call_chain_chain_id() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_ref()
-            .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty"))
-    );
+    assert!(response
+        .reason
+        .as_ref()
+        .is_some_and(|reason| reason.contains("call_chain.chain_id must not be empty")));
 }
 
 #[test]
@@ -6743,6 +6805,8 @@ fn governed_monetary_denial_without_required_runtime_assurance_releases_budget()
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6813,6 +6877,8 @@ fn governed_request_denies_unverified_attestation_when_runtime_assurance_is_requ
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6865,6 +6931,8 @@ fn governed_monetary_allow_omits_unverified_runtime_assurance_metadata_when_opti
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -6944,6 +7012,8 @@ fn governed_request_denies_conflicting_workload_identity_binding() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7000,6 +7070,8 @@ fn governed_monetary_allow_rebinds_trusted_attestation_to_verified() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7064,6 +7136,8 @@ fn governed_request_denies_untrusted_attestation_when_trust_policy_is_configured
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7120,6 +7194,8 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7134,6 +7210,73 @@ fn governed_monetary_allow_rebinds_google_attestation_to_verified() {
     assert_eq!(
         governed["runtime_assurance"]["verifierFamily"],
         "google_attestation"
+    );
+}
+
+#[test]
+fn governed_monetary_allow_rebinds_nitro_attestation_to_verified() {
+    let mut kernel = ArcKernel::new(make_monetary_config());
+    kernel.set_attestation_trust_policy(make_attestation_trust_policy());
+    let agent_kp = Keypair::generate();
+    kernel.register_tool_server(Box::new(MonetaryCostServer::new("cost-srv", 75, "USD")));
+
+    let grant = with_minimum_runtime_assurance(
+        make_governed_monetary_grant("cost-srv", "compute", 100, 1000, "USD", 50),
+        RuntimeAssuranceTier::Verified,
+    );
+    let cap = kernel
+        .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
+        .unwrap();
+
+    let request_id = "req-governed-assurance-nitro-verified";
+    let mut intent = make_governed_intent(
+        "intent-governed-assurance-nitro-verified",
+        "cost-srv",
+        "compute",
+        "execute governed payout",
+        100,
+        "USD",
+    );
+    intent.runtime_attestation = Some(make_trusted_nitro_runtime_attestation());
+    let approval_token = make_governed_approval_token(
+        &kernel.config.keypair,
+        &agent_kp.public_key(),
+        &intent,
+        request_id,
+    );
+
+    let response = kernel
+        .evaluate_tool_call_blocking(&ToolCallRequest {
+            request_id: request_id.to_string(),
+            capability: cap,
+            tool_name: "compute".to_string(),
+            server_id: "cost-srv".to_string(),
+            agent_id: agent_kp.public_key().to_hex(),
+            arguments: serde_json::json!({ "invoice_id": "inv-1006" }),
+            dpop_proof: None,
+            governed_intent: Some(intent),
+            approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
+        })
+        .unwrap();
+
+    assert_eq!(response.verdict, Verdict::Allow);
+    let governed = response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get("governed_transaction"))
+        .expect("allow receipt should carry governed transaction metadata");
+    assert_eq!(governed["runtime_assurance"]["tier"], "verified");
+    assert_eq!(governed["runtime_assurance"]["verifierFamily"], "aws_nitro");
+    assert_eq!(
+        governed["runtime_assurance"]["verifier"],
+        "https://nitro.aws.example"
+    );
+    assert_eq!(
+        governed["runtime_assurance"]["evidenceSha256"],
+        "digest-nitro-attestation"
     );
 }
 
@@ -7188,16 +7331,16 @@ fn governed_request_denies_delegated_autonomy_without_bond_attachment() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") })
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| { reason.contains("requires a delegation bond attachment") }));
 }
 
 #[test]
@@ -7251,6 +7394,8 @@ fn governed_request_denies_autonomous_tier_with_weak_runtime_assurance() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7329,16 +7474,16 @@ fn governed_request_denies_delegated_autonomy_with_expired_bond() {
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response
-            .reason
-            .as_deref()
-            .is_some_and(|reason| reason.contains("is expired"))
-    );
+    assert!(response
+        .reason
+        .as_deref()
+        .is_some_and(|reason| reason.contains("is expired")));
 }
 
 #[test]
@@ -7409,6 +7554,8 @@ fn governed_request_allows_delegated_autonomy_with_active_bond_and_receipt_metad
             dpop_proof: None,
             governed_intent: Some(intent),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7455,6 +7602,8 @@ fn governed_monetary_denial_without_approval_releases_budget_and_records_intent(
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7541,6 +7690,8 @@ fn governed_monetary_incomplete_receipt_keeps_financial_and_governed_metadata() 
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7640,6 +7791,8 @@ fn governed_x402_prepaid_flow_records_governed_authorization_and_receipt_metadat
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7744,6 +7897,8 @@ fn governed_x402_authorization_failure_denies_before_tool_execution() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7865,6 +8020,8 @@ fn governed_acp_hold_flow_records_commerce_scope_and_payment_metadata() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token.clone()),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -7974,6 +8131,8 @@ fn governed_acp_seller_mismatch_denies_before_payment_or_tool_execution() {
             dpop_proof: None,
             governed_intent: Some(intent.clone()),
             approval_token: Some(approval_token),
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8042,6 +8201,8 @@ fn monetary_allow_receipt_marks_failed_settlement_when_reported_cost_exceeds_cha
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8082,6 +8243,8 @@ fn monetary_server_not_reporting_cost_charges_max_cost_per_invocation() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8122,6 +8285,8 @@ fn monetary_tool_server_error_releases_precharged_budget() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8162,6 +8327,8 @@ fn monetary_full_pipeline_three_invocations_third_denied() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let r1 = kernel
@@ -8214,6 +8381,8 @@ fn multi_grant_budget_remaining_uses_matched_grant_total() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let _ = kernel
@@ -8319,6 +8488,8 @@ async fn async_evaluate_tool_call_supports_shared_kernel_concurrency() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let task_a = {
@@ -8422,6 +8593,8 @@ fn matched_grant_index_populated_in_guard_context() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
     assert_eq!(resp.verdict, Verdict::Allow);
@@ -8488,6 +8661,8 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     // First two invocations allowed.
@@ -8547,6 +8722,8 @@ fn checkpoint_triggers_at_100_receipts() {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+            federated_origin_kernel_id: None,
             })
             .unwrap();
     }
@@ -8596,6 +8773,8 @@ fn inclusion_proof_verifies_against_stored_checkpoint() {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+            federated_origin_kernel_id: None,
             })
             .unwrap();
     }
@@ -8695,6 +8874,8 @@ fn cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units() {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8742,6 +8923,8 @@ fn cross_currency_without_oracle_keeps_provisional_charge_and_marks_failed_settl
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+        federated_origin_kernel_id: None,
         })
         .unwrap();
 
@@ -8869,6 +9052,8 @@ fn dpop_required_grant_allows_when_valid_proof_provided() {
         dpop_proof: Some(proof),
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -8897,6 +9082,8 @@ fn dpop_required_grant_denies_when_no_proof_provided() {
         dpop_proof: None,
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -8940,6 +9127,8 @@ fn dpop_required_grant_denies_when_proof_has_wrong_tool_name() {
         dpop_proof: Some(proof),
         governed_intent: None,
         approval_token: None,
+        model_metadata: None,
+    federated_origin_kernel_id: None,
     };
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -8982,11 +9171,9 @@ fn kernel_error_report_includes_out_of_scope_context() {
     assert_eq!(report.code, "ARC-KERNEL-OUT-OF-SCOPE-TOOL");
     assert_eq!(report.context["tool"], "read_file");
     assert_eq!(report.context["server"], "fs");
-    assert!(
-        report
-            .suggested_fix
-            .contains("Issue a capability that grants this tool")
-    );
+    assert!(report
+        .suggested_fix
+        .contains("Issue a capability that grants this tool"));
 }
 
 #[test]

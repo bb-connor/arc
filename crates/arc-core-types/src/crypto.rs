@@ -1,7 +1,43 @@
-//! Thin wrappers around ed25519-dalek for signing and verifying canonical JSON.
+//! Signing and verification primitives for ARC artifacts.
 //!
-//! Mirrors the `hush-core` signing API but is self-contained within arc-core
-//! so that downstream crates do not need a direct hush-core dependency.
+//! # Purpose and FIPS Posture
+//!
+//! ARC artifacts (capability tokens, receipts, DPoP proofs, governed approval
+//! tokens) are signed with a cryptographic algorithm negotiated between the
+//! kernel operator and its counterparties. The default algorithm is Ed25519
+//! via `ed25519-dalek`, which matches the historical behaviour of every ARC
+//! deployment and every on-wire artifact produced to date. To unblock
+//! enterprise procurement in FIPS-constrained environments, this module also
+//! exposes a [`SigningBackend`] abstraction with pluggable implementations for
+//! NIST P-256 (secp256r1) and P-384 (secp384r1) ECDSA signatures.
+//!
+//! The FIPS backends are gated behind the `fips` Cargo feature and link to
+//! `aws-lc-rs`, a FIPS 140-3 validated module. When the feature is disabled
+//! the only available backend is pure Ed25519, and the crate has no extra
+//! transitive dependencies. When enabled, callers may construct a
+//! [`P256Backend`] or [`P384Backend`] and pass it to any ARC signing helper
+//! that accepts `&dyn SigningBackend`.
+//!
+//! # Backward Compatibility
+//!
+//! Ed25519 artifacts serialize byte-for-byte identically to the historical
+//! format: a 64-character lowercase hex string for the public key and a
+//! 128-character hex string for the signature. FIPS-algorithm artifacts use a
+//! self-describing hex prefix (e.g. `p256:` or `p384:`) so older verifiers
+//! that only understand bare hex recognise that the material is non-Ed25519
+//! and can reject with a clear error rather than misinterpreting bytes.
+//!
+//! # Safety Notes
+//!
+//! - Private key material held by [`Keypair`] is zeroed on drop via
+//!   `ed25519-dalek`'s `ZeroizeOnDrop` implementation.
+//! - FIPS-backend private keys are held by `aws-lc-rs` owned types which zero
+//!   their own key material.
+//! - No `unsafe` code is introduced by this module.
+
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use ed25519_dalek::{
     Signature as DalekSignature, Signer as DalekSigner, SigningKey, Verifier, VerifyingKey,
@@ -12,7 +48,80 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
 
+// ---------------------------------------------------------------------------
+// SigningAlgorithm
+// ---------------------------------------------------------------------------
+
+/// Enumerates the signature algorithms ARC knows how to produce and verify.
+///
+/// `Ed25519` is always available. `P256` and `P384` require the `fips`
+/// Cargo feature on `arc-core-types` and route through `aws-lc-rs`.
+///
+/// This enum serializes as a short lowercase identifier:
+/// `"ed25519"`, `"p256"`, or `"p384"`. When absent from an artifact's
+/// envelope, consumers MUST treat the algorithm as [`SigningAlgorithm::Ed25519`]
+/// for backward compatibility with artifacts produced before this module
+/// existed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SigningAlgorithm {
+    /// Edwards-curve signature on Curve25519. Default, non-FIPS.
+    #[default]
+    Ed25519,
+    /// ECDSA on NIST P-256 / secp256r1 with SHA-256. Requires `fips` feature.
+    P256,
+    /// ECDSA on NIST P-384 / secp384r1 with SHA-384. Requires `fips` feature.
+    P384,
+}
+
+impl SigningAlgorithm {
+    /// Returns true when this algorithm is the default (Ed25519).
+    ///
+    /// Useful for `#[serde(skip_serializing_if)]` helpers that keep Ed25519
+    /// artifacts byte-identical to the historical format.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Ed25519)
+    }
+
+    /// Short lowercase identifier used as the hex prefix for non-Ed25519
+    /// keys and signatures.
+    #[must_use]
+    pub fn prefix(&self) -> &'static str {
+        match self {
+            Self::Ed25519 => "",
+            Self::P256 => "p256",
+            Self::P384 => "p384",
+        }
+    }
+}
+
+/// Returns `true` when `alg` equals the default algorithm. Free function
+/// so it can be referenced from `#[serde(skip_serializing_if = "...")]`.
+#[must_use]
+pub fn is_default_algorithm(alg: &SigningAlgorithm) -> bool {
+    alg.is_default()
+}
+
+/// Returns `true` when the optional algorithm is either absent or equal to the
+/// default (Ed25519). Used by `#[serde(skip_serializing_if)]` on envelope
+/// fields so that legacy Ed25519 artifacts remain byte-identical on the wire.
+#[must_use]
+pub fn is_default_optional_algorithm(alg: &Option<SigningAlgorithm>) -> bool {
+    match alg {
+        None => true,
+        Some(a) => a.is_default(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keypair (Ed25519 only; FIPS backends have their own types)
+// ---------------------------------------------------------------------------
+
 /// Ed25519 keypair for signing.
+///
+/// This is the default ARC signing identity. For FIPS-capable signing, see
+/// [`SigningBackend`] and its implementations.
 #[derive(Clone)]
 pub struct Keypair {
     signing_key: SigningKey,
@@ -49,14 +158,18 @@ impl Keypair {
     #[must_use]
     pub fn public_key(&self) -> PublicKey {
         PublicKey {
-            verifying_key: self.signing_key.verifying_key(),
+            material: PublicKeyMaterial::Ed25519 {
+                verifying_key: self.signing_key.verifying_key(),
+            },
         }
     }
 
     #[must_use]
     pub fn sign(&self, message: &[u8]) -> Signature {
         let sig = self.signing_key.sign(message);
-        Signature { inner: sig }
+        Signature {
+            material: SignatureMaterial::Ed25519 { inner: sig },
+        }
     }
 
     /// Sign a serializable value by converting it to canonical JSON first.
@@ -83,14 +196,61 @@ impl Keypair {
 // ed25519-dalek's SigningKey implements ZeroizeOnDrop, so private key material
 // is automatically zeroed when this struct is dropped.
 
-/// Ed25519 public key for verification.
-#[derive(Clone, Debug, PartialEq, Eq)]
+// ---------------------------------------------------------------------------
+// PublicKey
+// ---------------------------------------------------------------------------
+
+/// Public key for verifying ARC signatures.
+///
+/// Internally this is a sum over the supported [`SigningAlgorithm`]s. The
+/// common case (Ed25519) preserves the historical 32-byte encoding and bare
+/// hex serialization. Non-Ed25519 variants use a self-describing hex prefix
+/// (`p256:<hex>` / `p384:<hex>`) so the wire format unambiguously identifies
+/// the algorithm without a separate envelope field.
+#[derive(Clone, Debug)]
 pub struct PublicKey {
-    verifying_key: VerifyingKey,
+    material: PublicKeyMaterial,
 }
 
+#[derive(Clone, Debug)]
+enum PublicKeyMaterial {
+    Ed25519 {
+        verifying_key: VerifyingKey,
+    },
+    /// Raw uncompressed SEC1 public key bytes (0x04 || X || Y).
+    P256 {
+        encoded_point: Vec<u8>,
+    },
+    /// Raw uncompressed SEC1 public key bytes (0x04 || X || Y).
+    P384 {
+        encoded_point: Vec<u8>,
+    },
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.material, &other.material) {
+            (
+                PublicKeyMaterial::Ed25519 { verifying_key: a },
+                PublicKeyMaterial::Ed25519 { verifying_key: b },
+            ) => a == b,
+            (
+                PublicKeyMaterial::P256 { encoded_point: a },
+                PublicKeyMaterial::P256 { encoded_point: b },
+            ) => a == b,
+            (
+                PublicKeyMaterial::P384 { encoded_point: a },
+                PublicKeyMaterial::P384 { encoded_point: b },
+            ) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for PublicKey {}
+
 impl Serialize for PublicKey {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -99,7 +259,7 @@ impl Serialize for PublicKey {
 }
 
 impl<'de> Deserialize<'de> for PublicKey {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -109,15 +269,76 @@ impl<'de> Deserialize<'de> for PublicKey {
 }
 
 impl PublicKey {
-    /// Create from raw bytes (32 bytes).
+    /// Create from raw bytes (32 bytes). Produces an Ed25519 key.
     pub fn from_bytes(bytes: &[u8; 32]) -> Result<Self> {
         let verifying_key =
             VerifyingKey::from_bytes(bytes).map_err(|e| Error::InvalidPublicKey(e.to_string()))?;
-        Ok(Self { verifying_key })
+        Ok(Self {
+            material: PublicKeyMaterial::Ed25519 { verifying_key },
+        })
+    }
+
+    /// Create a P-256 public key from uncompressed SEC1-encoded bytes
+    /// (65 bytes beginning with `0x04`).
+    ///
+    /// The bytes are validated only for length and leading-byte format; full
+    /// curve-point validation is delegated to the verifier at first use.
+    pub fn from_p256_sec1(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 65 {
+            return Err(Error::InvalidPublicKey(format!(
+                "expected 65-byte uncompressed P-256 SEC1 point, got {} bytes",
+                bytes.len()
+            )));
+        }
+        if bytes[0] != 0x04 {
+            return Err(Error::InvalidPublicKey(
+                "P-256 SEC1 point must start with 0x04 (uncompressed)".to_string(),
+            ));
+        }
+        Ok(Self {
+            material: PublicKeyMaterial::P256 {
+                encoded_point: bytes.to_vec(),
+            },
+        })
+    }
+
+    /// Create a P-384 public key from uncompressed SEC1-encoded bytes
+    /// (97 bytes beginning with `0x04`).
+    pub fn from_p384_sec1(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() != 97 {
+            return Err(Error::InvalidPublicKey(format!(
+                "expected 97-byte uncompressed P-384 SEC1 point, got {} bytes",
+                bytes.len()
+            )));
+        }
+        if bytes[0] != 0x04 {
+            return Err(Error::InvalidPublicKey(
+                "P-384 SEC1 point must start with 0x04 (uncompressed)".to_string(),
+            ));
+        }
+        Ok(Self {
+            material: PublicKeyMaterial::P384 {
+                encoded_point: bytes.to_vec(),
+            },
+        })
     }
 
     /// Create from hex-encoded bytes (with optional `0x` prefix).
+    ///
+    /// The string may carry a `p256:` or `p384:` prefix to select an ECDSA
+    /// key. A bare hex string is interpreted as Ed25519 for backward
+    /// compatibility with existing artifacts.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
+        if let Some(rest) = hex_str.strip_prefix("p256:") {
+            let rest = rest.strip_prefix("0x").unwrap_or(rest);
+            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
+            return Self::from_p256_sec1(&bytes);
+        }
+        if let Some(rest) = hex_str.strip_prefix("p384:") {
+            let rest = rest.strip_prefix("0x").unwrap_or(rest);
+            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
+            return Self::from_p384_sec1(&bytes);
+        }
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
         if bytes.len() != 32 {
@@ -131,10 +352,35 @@ impl PublicKey {
         Self::from_bytes(&arr)
     }
 
+    /// Which algorithm this public key belongs to.
+    #[must_use]
+    pub fn algorithm(&self) -> SigningAlgorithm {
+        match &self.material {
+            PublicKeyMaterial::Ed25519 { .. } => SigningAlgorithm::Ed25519,
+            PublicKeyMaterial::P256 { .. } => SigningAlgorithm::P256,
+            PublicKeyMaterial::P384 { .. } => SigningAlgorithm::P384,
+        }
+    }
+
     /// Verify a signature against a message.
+    ///
+    /// Returns `false` when algorithms differ between key and signature, or
+    /// when the cryptographic check fails. Never panics.
     #[must_use]
     pub fn verify(&self, message: &[u8], signature: &Signature) -> bool {
-        self.verifying_key.verify(message, &signature.inner).is_ok()
+        match (&self.material, &signature.material) {
+            (
+                PublicKeyMaterial::Ed25519 { verifying_key },
+                SignatureMaterial::Ed25519 { inner },
+            ) => verifying_key.verify(message, inner).is_ok(),
+            (PublicKeyMaterial::P256 { encoded_point }, SignatureMaterial::P256 { der }) => {
+                verify_ecdsa_p256(encoded_point, message, der)
+            }
+            (PublicKeyMaterial::P384 { encoded_point }, SignatureMaterial::P384 { der }) => {
+                verify_ecdsa_p384(encoded_point, message, der)
+            }
+            _ => false,
+        }
     }
 
     /// Verify a signature over the canonical JSON form of a serializable value.
@@ -143,25 +389,94 @@ impl PublicKey {
         Ok(self.verify(&bytes, signature))
     }
 
+    /// Hex encoding, with algorithm prefix for non-Ed25519 keys.
+    ///
+    /// Ed25519 keys render as a bare 64-character lowercase hex string,
+    /// byte-identical to the historical format. P-256 keys render as
+    /// `p256:<130-char hex>` (uncompressed SEC1). P-384 keys render as
+    /// `p384:<194-char hex>`.
     #[must_use]
     pub fn to_hex(&self) -> String {
-        hex::encode(self.verifying_key.to_bytes())
+        match &self.material {
+            PublicKeyMaterial::Ed25519 { verifying_key } => hex::encode(verifying_key.to_bytes()),
+            PublicKeyMaterial::P256 { encoded_point } => {
+                format!("p256:{}", hex::encode(encoded_point))
+            }
+            PublicKeyMaterial::P384 { encoded_point } => {
+                format!("p384:{}", hex::encode(encoded_point))
+            }
+        }
     }
 
+    /// Raw 32-byte Ed25519 representation.
+    ///
+    /// This accessor is intentionally Ed25519-only. Non-Ed25519 callers must
+    /// use [`Self::to_hex`] or another algorithm-aware representation instead
+    /// of coercing P-256 / P-384 material into a lossy 32-byte placeholder.
+    ///
+    /// # Panics
+    ///
+    /// Panics when called on a non-Ed25519 key so Ed25519-only consumers fail
+    /// closed instead of silently collapsing distinct keys onto the same bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8; 32] {
-        self.verifying_key.as_bytes()
+        match &self.material {
+            PublicKeyMaterial::Ed25519 { verifying_key } => verifying_key.as_bytes(),
+            PublicKeyMaterial::P256 { .. } | PublicKeyMaterial::P384 { .. } => {
+                panic!(
+                    "PublicKey::as_bytes is only valid for Ed25519 keys; use to_hex() for algorithm-aware encoding"
+                )
+            }
+        }
     }
 }
 
-/// Ed25519 signature (64 bytes).
-#[derive(Clone, Debug, PartialEq, Eq)]
+// ---------------------------------------------------------------------------
+// Signature
+// ---------------------------------------------------------------------------
+
+/// Signature produced by an ARC [`SigningBackend`].
+///
+/// Historically this type wrapped a 64-byte Ed25519 signature. It now carries
+/// an algorithm-tagged payload internally while preserving byte-identical
+/// serialization and construction helpers for the Ed25519 case.
+#[derive(Clone, Debug)]
 pub struct Signature {
-    inner: DalekSignature,
+    material: SignatureMaterial,
 }
 
+#[derive(Clone, Debug)]
+enum SignatureMaterial {
+    Ed25519 {
+        inner: DalekSignature,
+    },
+    /// Raw ASN.1 DER-encoded ECDSA signature.
+    P256 {
+        der: Vec<u8>,
+    },
+    /// Raw ASN.1 DER-encoded ECDSA signature.
+    P384 {
+        der: Vec<u8>,
+    },
+}
+
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        match (&self.material, &other.material) {
+            (SignatureMaterial::Ed25519 { inner: a }, SignatureMaterial::Ed25519 { inner: b }) => {
+                a.to_bytes() == b.to_bytes()
+            }
+            (SignatureMaterial::P256 { der: a }, SignatureMaterial::P256 { der: b }) => a == b,
+            (SignatureMaterial::P384 { der: a }, SignatureMaterial::P384 { der: b }) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Signature {}
+
 impl Serialize for Signature {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -170,7 +485,7 @@ impl Serialize for Signature {
 }
 
 impl<'de> Deserialize<'de> for Signature {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -180,15 +495,48 @@ impl<'de> Deserialize<'de> for Signature {
 }
 
 impl Signature {
-    /// Create from raw bytes (64 bytes).
+    /// Create from raw 64-byte Ed25519 signature bytes.
     pub fn from_bytes(bytes: &[u8; 64]) -> Self {
         Self {
-            inner: DalekSignature::from_bytes(bytes),
+            material: SignatureMaterial::Ed25519 {
+                inner: DalekSignature::from_bytes(bytes),
+            },
+        }
+    }
+
+    /// Create a P-256 ECDSA signature from DER-encoded bytes.
+    pub fn from_p256_der(bytes: &[u8]) -> Self {
+        Self {
+            material: SignatureMaterial::P256 {
+                der: bytes.to_vec(),
+            },
+        }
+    }
+
+    /// Create a P-384 ECDSA signature from DER-encoded bytes.
+    pub fn from_p384_der(bytes: &[u8]) -> Self {
+        Self {
+            material: SignatureMaterial::P384 {
+                der: bytes.to_vec(),
+            },
         }
     }
 
     /// Create from hex-encoded bytes (with optional `0x` prefix).
+    ///
+    /// A bare hex string is interpreted as an Ed25519 signature (64 bytes)
+    /// for backward compatibility. A `p256:` or `p384:` prefix selects ECDSA.
     pub fn from_hex(hex_str: &str) -> Result<Self> {
+        if let Some(rest) = hex_str.strip_prefix("p256:") {
+            let rest = rest.strip_prefix("0x").unwrap_or(rest);
+            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
+            return Ok(Self::from_p256_der(&bytes));
+        }
+        if let Some(rest) = hex_str.strip_prefix("p384:") {
+            let rest = rest.strip_prefix("0x").unwrap_or(rest);
+            let bytes = hex::decode(rest).map_err(|e| Error::InvalidHex(e.to_string()))?;
+            return Ok(Self::from_p384_der(&bytes));
+        }
         let hex_str = hex_str.strip_prefix("0x").unwrap_or(hex_str);
         let bytes = hex::decode(hex_str).map_err(|e| Error::InvalidHex(e.to_string()))?;
         if bytes.len() != 64 {
@@ -202,16 +550,314 @@ impl Signature {
         Ok(Self::from_bytes(&arr))
     }
 
+    /// Hex encoding, with algorithm prefix for non-Ed25519 signatures.
+    ///
+    /// Ed25519 signatures render as a bare 128-character lowercase hex string,
+    /// byte-identical to the historical format.
     #[must_use]
     pub fn to_hex(&self) -> String {
-        hex::encode(self.inner.to_bytes())
+        match &self.material {
+            SignatureMaterial::Ed25519 { inner } => hex::encode(inner.to_bytes()),
+            SignatureMaterial::P256 { der } => format!("p256:{}", hex::encode(der)),
+            SignatureMaterial::P384 { der } => format!("p384:{}", hex::encode(der)),
+        }
     }
 
+    /// Raw 64-byte Ed25519 representation.
+    ///
+    /// Mirrors the historical API. For non-Ed25519 signatures returns an
+    /// all-zero placeholder (such signatures never flow through 64-byte-only
+    /// consumer paths because those paths are Ed25519-specific on-chain
+    /// anchoring layers that never see FIPS artifacts).
     #[must_use]
     pub fn to_bytes(&self) -> [u8; 64] {
-        self.inner.to_bytes()
+        match &self.material {
+            SignatureMaterial::Ed25519 { inner } => inner.to_bytes(),
+            _ => [0u8; 64],
+        }
+    }
+
+    /// Which algorithm produced this signature.
+    #[must_use]
+    pub fn algorithm(&self) -> SigningAlgorithm {
+        match &self.material {
+            SignatureMaterial::Ed25519 { .. } => SigningAlgorithm::Ed25519,
+            SignatureMaterial::P256 { .. } => SigningAlgorithm::P256,
+            SignatureMaterial::P384 { .. } => SigningAlgorithm::P384,
+        }
     }
 }
+
+// ---------------------------------------------------------------------------
+// SigningBackend
+// ---------------------------------------------------------------------------
+
+/// Abstraction over ARC signing algorithms.
+///
+/// Every ARC artifact that requires a signature delegates to a
+/// `SigningBackend` implementation. The default backend is [`Ed25519Backend`],
+/// which wraps the existing [`Keypair`] and preserves byte-identical
+/// serialization. Under the `fips` feature, [`P256Backend`] and
+/// [`P384Backend`] are available and route through `aws-lc-rs`.
+///
+/// Backends are expected to be cheap to clone; implementations should store
+/// private key material behind reference counting or copy-on-sign semantics
+/// as appropriate. The trait is deliberately dyn-compatible so it can be
+/// passed as `&dyn SigningBackend` through artifact signing helpers.
+pub trait SigningBackend: Send + Sync {
+    /// Algorithm this backend produces.
+    fn algorithm(&self) -> SigningAlgorithm;
+
+    /// Public half of this backend's signing identity.
+    fn public_key(&self) -> PublicKey;
+
+    /// Produce a detached signature over `message`.
+    fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
+}
+
+/// Sign the canonical JSON form of `value` with the given backend.
+///
+/// Returns the produced signature and the canonical byte sequence that was
+/// signed (so callers can store or retransmit the exact bytes used). This is
+/// a free function rather than a trait method so [`SigningBackend`] remains
+/// dyn-compatible.
+pub fn sign_canonical_with_backend<T: Serialize>(
+    backend: &dyn SigningBackend,
+    value: &T,
+) -> Result<(Signature, Vec<u8>)> {
+    let bytes = canonical_json_bytes(value)?;
+    let sig = backend.sign_bytes(&bytes)?;
+    Ok((sig, bytes))
+}
+
+/// Ed25519 [`SigningBackend`] wrapping the historical [`Keypair`].
+///
+/// Always available regardless of feature flags.
+#[derive(Clone)]
+pub struct Ed25519Backend {
+    keypair: Keypair,
+}
+
+impl Ed25519Backend {
+    /// Construct from an existing keypair.
+    #[must_use]
+    pub fn new(keypair: Keypair) -> Self {
+        Self { keypair }
+    }
+
+    /// Generate a fresh Ed25519 keypair.
+    #[must_use]
+    pub fn generate() -> Self {
+        Self {
+            keypair: Keypair::generate(),
+        }
+    }
+
+    /// Borrow the underlying keypair.
+    #[must_use]
+    pub fn keypair(&self) -> &Keypair {
+        &self.keypair
+    }
+}
+
+impl SigningBackend for Ed25519Backend {
+    fn algorithm(&self) -> SigningAlgorithm {
+        SigningAlgorithm::Ed25519
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.keypair.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+        Ok(self.keypair.sign(message))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FIPS backends (feature-gated)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "fips")]
+mod fips_backends {
+    use super::{PublicKey, PublicKeyMaterial, Result, Signature, SignatureMaterial};
+    use crate::crypto::{Error, SigningAlgorithm, SigningBackend};
+    use aws_lc_rs::rand::SystemRandom;
+    use aws_lc_rs::signature::{
+        EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
+    };
+
+    /// ECDSA P-256 signing backend (aws-lc-rs, FIPS 140-3 validated).
+    pub struct P256Backend {
+        keypair: EcdsaKeyPair,
+        rng: SystemRandom,
+        public_sec1: Vec<u8>,
+    }
+
+    impl P256Backend {
+        /// Generate a fresh P-256 keypair.
+        pub fn generate() -> Result<Self> {
+            let rng = SystemRandom::new();
+            let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, &rng)
+                .map_err(|e| {
+                    Error::InvalidPublicKey(format!("aws-lc-rs P-256 pkcs8 generation: {e}"))
+                })?;
+            let keypair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8.as_ref())
+                .map_err(|e| Error::InvalidPublicKey(format!("aws-lc-rs P-256 parse: {e}")))?;
+            let public_sec1 = keypair.public_key().as_ref().to_vec();
+            Ok(Self {
+                keypair,
+                rng,
+                public_sec1,
+            })
+        }
+
+        /// Import from PKCS#8 v1 DER-encoded private key bytes.
+        pub fn from_pkcs8(pkcs8: &[u8]) -> Result<Self> {
+            let keypair = EcdsaKeyPair::from_pkcs8(&ECDSA_P256_SHA256_ASN1_SIGNING, pkcs8)
+                .map_err(|e| {
+                    Error::InvalidPublicKey(format!("aws-lc-rs P-256 pkcs8 import: {e}"))
+                })?;
+            let public_sec1 = keypair.public_key().as_ref().to_vec();
+            Ok(Self {
+                keypair,
+                rng: SystemRandom::new(),
+                public_sec1,
+            })
+        }
+    }
+
+    impl SigningBackend for P256Backend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            SigningAlgorithm::P256
+        }
+
+        fn public_key(&self) -> PublicKey {
+            PublicKey {
+                material: PublicKeyMaterial::P256 {
+                    encoded_point: self.public_sec1.clone(),
+                },
+            }
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+            let sig = self
+                .keypair
+                .sign(&self.rng, message)
+                .map_err(|e| Error::InvalidSignature(format!("aws-lc-rs P-256 sign: {e}")))?;
+            Ok(Signature {
+                material: SignatureMaterial::P256 {
+                    der: sig.as_ref().to_vec(),
+                },
+            })
+        }
+    }
+
+    /// ECDSA P-384 signing backend (aws-lc-rs, FIPS 140-3 validated).
+    pub struct P384Backend {
+        keypair: EcdsaKeyPair,
+        rng: SystemRandom,
+        public_sec1: Vec<u8>,
+    }
+
+    impl P384Backend {
+        /// Generate a fresh P-384 keypair.
+        pub fn generate() -> Result<Self> {
+            let rng = SystemRandom::new();
+            let pkcs8 = EcdsaKeyPair::generate_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, &rng)
+                .map_err(|e| {
+                    Error::InvalidPublicKey(format!("aws-lc-rs P-384 pkcs8 generation: {e}"))
+                })?;
+            let keypair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8.as_ref())
+                .map_err(|e| Error::InvalidPublicKey(format!("aws-lc-rs P-384 parse: {e}")))?;
+            let public_sec1 = keypair.public_key().as_ref().to_vec();
+            Ok(Self {
+                keypair,
+                rng,
+                public_sec1,
+            })
+        }
+
+        /// Import from PKCS#8 v1 DER-encoded private key bytes.
+        pub fn from_pkcs8(pkcs8: &[u8]) -> Result<Self> {
+            let keypair = EcdsaKeyPair::from_pkcs8(&ECDSA_P384_SHA384_ASN1_SIGNING, pkcs8)
+                .map_err(|e| {
+                    Error::InvalidPublicKey(format!("aws-lc-rs P-384 pkcs8 import: {e}"))
+                })?;
+            let public_sec1 = keypair.public_key().as_ref().to_vec();
+            Ok(Self {
+                keypair,
+                rng: SystemRandom::new(),
+                public_sec1,
+            })
+        }
+    }
+
+    impl SigningBackend for P384Backend {
+        fn algorithm(&self) -> SigningAlgorithm {
+            SigningAlgorithm::P384
+        }
+
+        fn public_key(&self) -> PublicKey {
+            PublicKey {
+                material: PublicKeyMaterial::P384 {
+                    encoded_point: self.public_sec1.clone(),
+                },
+            }
+        }
+
+        fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
+            let sig = self
+                .keypair
+                .sign(&self.rng, message)
+                .map_err(|e| Error::InvalidSignature(format!("aws-lc-rs P-384 sign: {e}")))?;
+            Ok(Signature {
+                material: SignatureMaterial::P384 {
+                    der: sig.as_ref().to_vec(),
+                },
+            })
+        }
+    }
+}
+
+#[cfg(feature = "fips")]
+pub use fips_backends::{P256Backend, P384Backend};
+
+// ---------------------------------------------------------------------------
+// Verification helpers (always compiled; use aws-lc-rs under fips feature,
+// otherwise return false)
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "fips")]
+fn verify_ecdsa_p256(public_sec1: &[u8], message: &[u8], signature_der: &[u8]) -> bool {
+    use aws_lc_rs::signature::{UnparsedPublicKey, ECDSA_P256_SHA256_ASN1};
+    let verifier = UnparsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, public_sec1);
+    verifier.verify(message, signature_der).is_ok()
+}
+
+#[cfg(not(feature = "fips"))]
+#[allow(clippy::ptr_arg)]
+fn verify_ecdsa_p256(_public_sec1: &[u8], _message: &[u8], _signature_der: &[u8]) -> bool {
+    // Without the `fips` feature we cannot verify ECDSA signatures. Fail-closed.
+    false
+}
+
+#[cfg(feature = "fips")]
+fn verify_ecdsa_p384(public_sec1: &[u8], message: &[u8], signature_der: &[u8]) -> bool {
+    use aws_lc_rs::signature::{UnparsedPublicKey, ECDSA_P384_SHA384_ASN1};
+    let verifier = UnparsedPublicKey::new(&ECDSA_P384_SHA384_ASN1, public_sec1);
+    verifier.verify(message, signature_der).is_ok()
+}
+
+#[cfg(not(feature = "fips"))]
+#[allow(clippy::ptr_arg)]
+fn verify_ecdsa_p384(_public_sec1: &[u8], _message: &[u8], _signature_der: &[u8]) -> bool {
+    false
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /// Compute SHA-256 of the given bytes, returning the hash as lowercase hex.
 #[must_use]
@@ -348,5 +994,96 @@ mod tests {
             sha256_hex(b"hello"),
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         );
+    }
+
+    #[test]
+    fn ed25519_backend_round_trip() {
+        let backend = Ed25519Backend::generate();
+        assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
+        let msg = b"hello arc";
+        let sig = backend.sign_bytes(msg).unwrap();
+        assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
+        assert!(backend.public_key().verify(msg, &sig));
+    }
+
+    #[test]
+    fn ed25519_hex_is_bare_64_chars() {
+        // Backward-compat: Ed25519 keys/signatures must serialize as plain hex
+        // with no prefix, so tokens produced before this phase verify unchanged.
+        let kp = Keypair::generate();
+        let pk_hex = kp.public_key().to_hex();
+        assert_eq!(pk_hex.len(), 64);
+        assert!(!pk_hex.contains(':'));
+        let sig = kp.sign(b"x");
+        let sig_hex = sig.to_hex();
+        assert_eq!(sig_hex.len(), 128);
+        assert!(!sig_hex.contains(':'));
+    }
+
+    #[test]
+    fn algorithm_enum_defaults_to_ed25519() {
+        assert_eq!(SigningAlgorithm::default(), SigningAlgorithm::Ed25519);
+        assert!(SigningAlgorithm::default().is_default());
+    }
+
+    #[test]
+    fn rejects_non_matching_algorithm_pair() {
+        // Pairing a P-256 signature against an Ed25519 key (or vice versa)
+        // must return false rather than panic.
+        let kp = Keypair::generate();
+        let fake_p256_sig = Signature::from_p256_der(&[0x30, 0x02, 0x02, 0x01]);
+        assert!(!kp.public_key().verify(b"x", &fake_p256_sig));
+    }
+
+    #[test]
+    fn non_ed25519_as_bytes_fails_closed() {
+        let p256_generator = PublicKey::from_hex(
+            "p256:046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+        )
+        .unwrap();
+
+        let panic = std::panic::catch_unwind(|| {
+            let _ = p256_generator.as_bytes();
+        });
+        assert!(panic.is_err());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn p256_backend_round_trip() {
+        let backend = P256Backend::generate().unwrap();
+        assert_eq!(backend.algorithm(), SigningAlgorithm::P256);
+        let msg = b"hello fips";
+        let sig = backend.sign_bytes(msg).unwrap();
+        assert_eq!(sig.algorithm(), SigningAlgorithm::P256);
+        assert!(backend.public_key().verify(msg, &sig));
+        // Serde round-trips.
+        let json_pk = serde_json::to_string(&backend.public_key()).unwrap();
+        assert!(json_pk.contains("p256:"));
+        let restored_pk: PublicKey = serde_json::from_str(&json_pk).unwrap();
+        assert_eq!(restored_pk.algorithm(), SigningAlgorithm::P256);
+        let json_sig = serde_json::to_string(&sig).unwrap();
+        assert!(json_sig.contains("p256:"));
+        let restored_sig: Signature = serde_json::from_str(&json_sig).unwrap();
+        assert!(restored_pk.verify(msg, &restored_sig));
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn p384_backend_round_trip() {
+        let backend = P384Backend::generate().unwrap();
+        assert_eq!(backend.algorithm(), SigningAlgorithm::P384);
+        let msg = b"hello fips 384";
+        let sig = backend.sign_bytes(msg).unwrap();
+        assert_eq!(sig.algorithm(), SigningAlgorithm::P384);
+        assert!(backend.public_key().verify(msg, &sig));
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn p256_wrong_message_fails() {
+        let backend = P256Backend::generate().unwrap();
+        let sig = backend.sign_bytes(b"original").unwrap();
+        assert!(!backend.public_key().verify(b"tampered", &sig));
     }
 }

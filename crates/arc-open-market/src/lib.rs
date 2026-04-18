@@ -2,6 +2,13 @@ pub use arc_core_types::{canonical_json_bytes, capability, crypto, receipt};
 pub use arc_governance as governance;
 pub use arc_listing as listing;
 
+pub mod bidding;
+pub use bidding::{
+    accept, bid, AcceptedBid, AskResponse, BidMintContext, BidRequest, BiddingError,
+    RequestedScope, SignedAcceptedBid, SignedAskResponse, SignedBidRequest, ACCEPTED_BID_SCHEMA,
+    ASK_RESPONSE_SCHEMA, BID_REQUEST_SCHEMA,
+};
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::MonetaryAmount;

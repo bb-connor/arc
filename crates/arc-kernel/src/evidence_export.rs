@@ -24,6 +24,12 @@ pub struct EvidenceExportQuery {
     pub since: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub until: Option<u64>,
+    /// Phase 1.5 multi-tenant receipt isolation: restrict the export to
+    /// a single tenant so exported evidence bundles carry the tenant
+    /// tag end-to-end. MUST be derived from the operator's authenticated
+    /// tenant claim; callers MUST NOT let the agent choose this value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
 }
 
 /// Coverage mode for child receipts in an export bundle.
@@ -248,6 +254,7 @@ impl EvidenceExportQuery {
             cursor,
             limit: crate::MAX_QUERY_LIMIT,
             agent_subject: self.agent_subject.clone(),
+            tenant_filter: self.tenant.clone(),
         }
     }
 

@@ -9,6 +9,13 @@ pub(crate) struct FinalizeToolOutputCostContext<'a> {
     pub(crate) cap: &'a CapabilityToken,
 }
 
+struct PostInvocationHandling {
+    output: ToolServerOutput,
+    extra_metadata: Option<serde_json::Value>,
+    blocked_reason: Option<String>,
+    evidence: Vec<arc_core::receipt::GuardEvidence>,
+}
+
 impl ArcKernel {
     /// denial reason is monetary budget exhaustion.
     pub(crate) fn build_monetary_deny_response(
@@ -114,9 +121,11 @@ impl ArcKernel {
                 content_hash: receipt_content.content_hash,
                 metadata,
                 timestamp,
+                trust_level: arc_core::TrustLevel::default(),
+                tenant_id: None,
             })?;
 
-            self.record_arc_receipt(&receipt)?;
+            self.record_arc_receipt_with_federation(request, &receipt)?;
 
             return Ok(ToolCallResponse {
                 request_id: request.request_id.clone(),
@@ -125,6 +134,7 @@ impl ArcKernel {
                 reason: Some(reason.to_string()),
                 terminal_state: OperationTerminalState::Completed,
                 receipt,
+                execution_nonce: None,
             });
         }
 
@@ -152,6 +162,7 @@ impl ArcKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn build_pre_execution_monetary_deny_response_with_metadata(
         &self,
         request: &ToolCallRequest,
@@ -215,9 +226,11 @@ impl ArcKernel {
                 )?,
             ),
             timestamp,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -226,6 +239,7 @@ impl ArcKernel {
             reason: Some(reason.to_string()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -256,13 +270,28 @@ impl ArcKernel {
         matched_grant_index: usize,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        match self.apply_stream_limits(output, elapsed)? {
+        let output = self.apply_stream_limits(output, elapsed)?;
+        let post_invocation =
+            self.apply_post_invocation_pipeline(request, output, extra_metadata)?;
+        let _post_invocation_evidence_scope =
+            scope_post_invocation_guard_evidence(post_invocation.evidence);
+        if let Some(reason) = post_invocation.blocked_reason.as_deref() {
+            return self.build_deny_response_with_metadata(
+                request,
+                reason,
+                timestamp,
+                Some(matched_grant_index),
+                post_invocation.extra_metadata,
+            );
+        }
+
+        match post_invocation.output {
             ToolServerOutput::Value(value) => self.build_allow_response_with_metadata(
                 request,
                 ToolCallOutput::Value(value),
                 timestamp,
                 Some(matched_grant_index),
-                extra_metadata.clone(),
+                post_invocation.extra_metadata,
             ),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => self
                 .build_allow_response_with_metadata(
@@ -270,7 +299,7 @@ impl ArcKernel {
                     ToolCallOutput::Stream(stream),
                     timestamp,
                     Some(matched_grant_index),
-                    extra_metadata.clone(),
+                    post_invocation.extra_metadata,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -279,7 +308,7 @@ impl ArcKernel {
                     &reason,
                     timestamp,
                     Some(matched_grant_index),
-                    extra_metadata,
+                    post_invocation.extra_metadata,
                 ),
         }
     }
@@ -305,6 +334,7 @@ impl ArcKernel {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn finalize_tool_output_with_cost_and_metadata(
         &self,
         request: &ToolCallRequest,
@@ -509,9 +539,27 @@ impl ArcKernel {
             oracle_evidence,
             attempted_cost: None,
         };
+        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
 
         let limited_output = self.apply_stream_limits(output, elapsed)?;
-        let tool_call_output = match &limited_output {
+        let post_invocation = self.apply_post_invocation_pipeline(
+            request,
+            limited_output,
+            merge_metadata_objects(financial_json, extra_metadata.clone()),
+        )?;
+        let _post_invocation_evidence_scope =
+            scope_post_invocation_guard_evidence(post_invocation.evidence);
+        if let Some(reason) = post_invocation.blocked_reason.as_deref() {
+            return self.build_deny_response_with_metadata(
+                request,
+                reason,
+                timestamp,
+                Some(charge.grant_index),
+                post_invocation.extra_metadata,
+            );
+        }
+
+        let tool_call_output = match &post_invocation.output {
             ToolServerOutput::Value(v) => ToolCallOutput::Value(v.clone()),
             ToolServerOutput::Stream(ToolServerStreamResult::Complete(s)) => {
                 ToolCallOutput::Stream(s.clone())
@@ -521,10 +569,7 @@ impl ArcKernel {
             }
         };
 
-        let financial_json = Some(serde_json::json!({ "financial": financial_meta }));
-        let merged_extra_metadata = merge_metadata_objects(financial_json, extra_metadata.clone());
-
-        match limited_output {
+        match post_invocation.output {
             ToolServerOutput::Value(_)
             | ToolServerOutput::Stream(ToolServerStreamResult::Complete(_)) => self
                 .build_allow_response_with_metadata(
@@ -532,7 +577,7 @@ impl ArcKernel {
                     tool_call_output,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata.clone(),
+                    post_invocation.extra_metadata,
                 ),
             ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { reason, .. }) => self
                 .build_incomplete_response_with_output_and_metadata(
@@ -541,8 +586,127 @@ impl ArcKernel {
                     &reason,
                     timestamp,
                     Some(charge.grant_index),
-                    merged_extra_metadata,
+                    post_invocation.extra_metadata,
                 ),
+        }
+    }
+
+    fn apply_post_invocation_pipeline(
+        &self,
+        request: &ToolCallRequest,
+        output: ToolServerOutput,
+        extra_metadata: Option<serde_json::Value>,
+    ) -> Result<PostInvocationHandling, KernelError> {
+        if self.post_invocation_pipeline.is_empty() {
+            return Ok(PostInvocationHandling {
+                output,
+                extra_metadata,
+                blocked_reason: None,
+                evidence: Vec::new(),
+            });
+        }
+
+        let response = self.output_to_post_invocation_value(&output);
+        let outcome = self
+            .post_invocation_pipeline
+            .evaluate_with_evidence(&request.tool_name, &response);
+        let metadata =
+            merge_metadata_objects(extra_metadata, self.post_invocation_metadata(&outcome));
+
+        match outcome.verdict {
+            crate::post_invocation::PostInvocationVerdict::Allow
+            | crate::post_invocation::PostInvocationVerdict::Escalate(_) => {
+                Ok(PostInvocationHandling {
+                    output,
+                    extra_metadata: metadata,
+                    blocked_reason: None,
+                    evidence: outcome.evidence,
+                })
+            }
+            crate::post_invocation::PostInvocationVerdict::Block(reason) => {
+                Ok(PostInvocationHandling {
+                    output,
+                    extra_metadata: metadata,
+                    blocked_reason: Some(reason),
+                    evidence: outcome.evidence,
+                })
+            }
+            crate::post_invocation::PostInvocationVerdict::Redact(redacted) => {
+                Ok(PostInvocationHandling {
+                    output: self.apply_redacted_output(redacted)?,
+                    extra_metadata: metadata,
+                    blocked_reason: None,
+                    evidence: outcome.evidence,
+                })
+            }
+        }
+    }
+
+    fn output_to_post_invocation_value(&self, output: &ToolServerOutput) -> serde_json::Value {
+        match output {
+            ToolServerOutput::Value(value) => serde_json::json!({
+                "kind": "value",
+                "value": value,
+            }),
+            ToolServerOutput::Stream(ToolServerStreamResult::Complete(stream)) => {
+                serde_json::json!({
+                    "kind": "stream",
+                    "stream": {
+                        "complete": true,
+                        "chunks": stream.chunks.iter().map(|chunk| chunk.data.clone()).collect::<Vec<_>>(),
+                    }
+                })
+            }
+            ToolServerOutput::Stream(ToolServerStreamResult::Incomplete { stream, reason }) => {
+                serde_json::json!({
+                    "kind": "stream",
+                    "stream": {
+                        "complete": false,
+                        "reason": reason,
+                        "chunks": stream.chunks.iter().map(|chunk| chunk.data.clone()).collect::<Vec<_>>(),
+                    }
+                })
+            }
+        }
+    }
+
+    fn apply_redacted_output(
+        &self,
+        redacted: serde_json::Value,
+    ) -> Result<ToolServerOutput, KernelError> {
+        parse_redacted_output(redacted)
+    }
+
+    fn post_invocation_metadata(
+        &self,
+        outcome: &crate::post_invocation::PipelineOutcome,
+    ) -> Option<serde_json::Value> {
+        let mut metadata = serde_json::Map::new();
+
+        if matches!(
+            outcome.verdict,
+            crate::post_invocation::PostInvocationVerdict::Redact(_)
+        ) {
+            metadata.insert("sanitized".to_string(), serde_json::Value::Bool(true));
+        }
+        if !outcome.escalations.is_empty() {
+            metadata.insert(
+                "escalations".to_string(),
+                serde_json::Value::Array(
+                    outcome
+                        .escalations
+                        .iter()
+                        .cloned()
+                        .map(serde_json::Value::String)
+                        .collect(),
+                ),
+            );
+        }
+
+        if metadata.is_empty() {
+            None
+        } else {
+            Some(serde_json::json!({ "post_invocation": metadata }))
         }
     }
 
@@ -660,9 +824,11 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -671,6 +837,7 @@ impl ArcKernel {
             reason: Some(reason.to_string()),
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -730,9 +897,11 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -743,6 +912,7 @@ impl ArcKernel {
                 reason: reason.to_string(),
             },
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -822,9 +992,11 @@ impl ArcKernel {
                 receipt_attribution_metadata(cap, matched_grant_index),
             ),
             timestamp,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
@@ -835,6 +1007,7 @@ impl ArcKernel {
                 reason: reason.to_string(),
             },
             receipt,
+            execution_nonce: None,
         })
     }
 
@@ -869,20 +1042,39 @@ impl ArcKernel {
         };
         let receipt_content = receipt_content_for_output(Some(&output), expected_chunks)?;
 
+        // Phase 18.2: classify the call against the memory-provenance
+        // action conventions and, for reads, look up the latest chain
+        // entry BEFORE the receipt is signed so the provenance evidence
+        // rides in the signed metadata. Writes append AFTER signing
+        // (see below) because the chain entry needs the receipt id.
+        let memory_action_kind = crate::memory_provenance::classify_memory_action(
+            &request.tool_name,
+            &request.arguments,
+        );
+        let memory_read_metadata = match memory_action_kind.as_ref() {
+            Some(crate::memory_provenance::MemoryActionKind::Read { store, key }) => {
+                self.resolve_memory_read_provenance_metadata(store, key)
+            }
+            _ => None,
+        };
+
         // Merge extra_metadata (e.g. "financial") into receipt_content.metadata.
         let metadata = merge_metadata_objects(
             merge_metadata_objects(
                 merge_metadata_objects(
-                    receipt_content.metadata,
-                    governed_request_metadata(
-                        request,
-                        self.attestation_trust_policy.as_ref(),
-                        timestamp,
-                    )?,
+                    merge_metadata_objects(
+                        receipt_content.metadata,
+                        governed_request_metadata(
+                            request,
+                            self.attestation_trust_policy.as_ref(),
+                            timestamp,
+                        )?,
+                    ),
+                    extra_metadata,
                 ),
-                extra_metadata,
+                receipt_attribution_metadata(cap, matched_grant_index),
             ),
-            receipt_attribution_metadata(cap, matched_grant_index),
+            memory_read_metadata,
         );
 
         let action = ToolCallAction::from_parameters(request.arguments.clone()).map_err(|e| {
@@ -898,9 +1090,11 @@ impl ArcKernel {
             content_hash: receipt_content.content_hash,
             metadata,
             timestamp,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
         })?;
 
-        self.record_arc_receipt(&receipt)?;
+        self.record_arc_receipt_with_federation(request, &receipt)?;
 
         info!(
             request_id = %request.request_id,
@@ -909,6 +1103,28 @@ impl ArcKernel {
             "tool call allowed"
         );
 
+        // Phase 18.2: for governed writes, append an entry to the
+        // provenance chain once the receipt is signed. A failure here
+        // is fatal (fail-closed): we do not want to acknowledge the
+        // write to the caller while silently dropping provenance.
+        if let Some(crate::memory_provenance::MemoryActionKind::Write { store, key }) =
+            memory_action_kind.as_ref()
+        {
+            self.append_memory_provenance_for_write(
+                store,
+                key,
+                &cap.id,
+                &receipt.id,
+                receipt.timestamp,
+            )?;
+        }
+
+        // Phase 1.1: mint a short-lived, single-use execution nonce bound
+        // to this allow verdict so tool servers can verify the kernel
+        // authorized this exact invocation. Opt-in; when no config is
+        // installed the field remains `None` for backward compatibility.
+        let execution_nonce = self.mint_execution_nonce_for_allow(request, cap, &receipt)?;
+
         Ok(ToolCallResponse {
             request_id: request.request_id.clone(),
             verdict: Verdict::Allow,
@@ -916,7 +1132,121 @@ impl ArcKernel {
             reason: None,
             terminal_state: OperationTerminalState::Completed,
             receipt,
+            execution_nonce,
         })
+    }
+
+    /// Phase 18.2: build receipt metadata describing the provenance
+    /// record that governs the memory read identified by `(store, key)`.
+    ///
+    /// Returns `None` when no provenance store has been installed
+    /// (backward-compatible no-op), and returns an `unverified` metadata
+    /// object when the store is installed but the key has no chain
+    /// entry OR the chain is tampered / unavailable. This is the
+    /// fail-closed signal: the receipt explicitly records that the
+    /// memory read was not backed by a provenance record.
+    fn resolve_memory_read_provenance_metadata(
+        &self,
+        store: &str,
+        key: &str,
+    ) -> Option<serde_json::Value> {
+        let chain = self.memory_provenance_store()?;
+
+        let latest = match chain.latest_for_key(store, key) {
+            Ok(entry) => entry,
+            Err(error) => {
+                warn!(
+                    store = %store,
+                    key = %key,
+                    error = %error,
+                    "memory provenance lookup failed; marking read unverified"
+                );
+                return Some(memory_read_unverified_metadata(
+                    store,
+                    key,
+                    crate::memory_provenance::UnverifiedReason::StoreUnavailable,
+                ));
+            }
+        };
+
+        let Some(entry) = latest else {
+            return Some(memory_read_unverified_metadata(
+                store,
+                key,
+                crate::memory_provenance::UnverifiedReason::NoProvenance,
+            ));
+        };
+
+        let verification = match chain.verify_entry(&entry.entry_id) {
+            Ok(verification) => verification,
+            Err(error) => {
+                warn!(
+                    store = %store,
+                    key = %key,
+                    entry_id = %entry.entry_id,
+                    error = %error,
+                    "memory provenance verification failed; marking read unverified"
+                );
+                return Some(memory_read_unverified_metadata(
+                    store,
+                    key,
+                    crate::memory_provenance::UnverifiedReason::StoreUnavailable,
+                ));
+            }
+        };
+
+        match verification {
+            crate::memory_provenance::ProvenanceVerification::Verified {
+                entry,
+                chain_digest,
+            } => Some(serde_json::json!({
+                "memory_provenance": {
+                    "status": "verified",
+                    "store": entry.store,
+                    "key": entry.key,
+                    "entry_id": entry.entry_id,
+                    "capability_id": entry.capability_id,
+                    "receipt_id": entry.receipt_id,
+                    "written_at": entry.written_at,
+                    "prev_hash": entry.prev_hash,
+                    "hash": entry.hash,
+                    "chain_digest": chain_digest,
+                }
+            })),
+            crate::memory_provenance::ProvenanceVerification::Unverified { reason } => {
+                Some(memory_read_unverified_metadata(store, key, reason))
+            }
+        }
+    }
+
+    /// Phase 18.2: append a provenance entry for a governed memory write
+    /// once the allow receipt is signed. Fails closed on chain-store
+    /// errors.
+    fn append_memory_provenance_for_write(
+        &self,
+        store: &str,
+        key: &str,
+        capability_id: &str,
+        receipt_id: &str,
+        written_at: u64,
+    ) -> Result<(), KernelError> {
+        let Some(chain) = self.memory_provenance_store() else {
+            return Ok(());
+        };
+        chain
+            .append(crate::memory_provenance::MemoryProvenanceAppend {
+                store: store.to_string(),
+                key: key.to_string(),
+                capability_id: capability_id.to_string(),
+                receipt_id: receipt_id.to_string(),
+                written_at,
+            })
+            .map(|_| ())
+            .map_err(|error| {
+                KernelError::Internal(format!(
+                    "memory provenance append failed for store={store} key={key}: {error}"
+                ))
+            })
     }
 
     /// Build and sign a receipt from a `ReceiptParams` descriptor.
@@ -924,6 +1254,20 @@ impl ArcKernel {
         &self,
         params: ReceiptParams<'_>,
     ) -> Result<ArcReceipt, KernelError> {
+        // Phase 1.5 multi-tenant receipt isolation: resolve tenant_id for
+        // this receipt. Precedence:
+        //   1. An explicit override on `ReceiptParams` (currently unused).
+        //   2. The active scoped tenant context set by the evaluate path
+        //      from `session.auth_context().enterprise_identity.tenant_id`.
+        //
+        // Tenant_id is never taken from a caller-provided field on the
+        // request: allowing caller choice would defeat the isolation the
+        // store-level WHERE clause enforces.
+        let tenant_id = params
+            .tenant_id
+            .clone()
+            .or_else(current_scoped_receipt_tenant_id);
+
         let body = ArcReceiptBody {
             id: next_receipt_id("rcpt"),
             timestamp: params.timestamp,
@@ -934,13 +1278,44 @@ impl ArcKernel {
             decision: params.decision,
             content_hash: params.content_hash,
             policy_hash: self.config.policy_hash.clone(),
-            evidence: vec![],
+            evidence: current_post_invocation_guard_evidence(),
             metadata: params.metadata,
+            trust_level: params.trust_level,
+            tenant_id,
             kernel_key: self.config.keypair.public_key(),
         };
 
-        ArcReceipt::sign(body, &self.config.keypair)
-            .map_err(|e| KernelError::ReceiptSigningFailed(e.to_string()))
+        // Phase 14.1: delegate the pure signing step to arc-kernel-core so the
+        // portable TCB stays in one place. The full kernel still owns body
+        // construction (tenant scope resolution, policy_hash injection,
+        // evidence assembly) because those are std/tokio-aware concerns.
+        let backend = arc_core::crypto::Ed25519Backend::new(self.config.keypair.clone());
+        arc_kernel_core::sign_receipt(body, &backend).map_err(|error| {
+            use arc_kernel_core::ReceiptSigningError;
+            let message = match error {
+                ReceiptSigningError::KernelKeyMismatch => {
+                    "kernel signing key does not match receipt body kernel_key".to_string()
+                }
+                ReceiptSigningError::SigningFailed(reason) => reason,
+            };
+            KernelError::ReceiptSigningFailed(message)
+        })
+    }
+
+    /// Phase 20.3: record the receipt AND drive the bilateral co-signing
+    /// hook when the request crosses a federation boundary.
+    ///
+    /// Fail-closed: a co-sign failure aborts the record path so the
+    /// receipt is never persisted without its paired remote signature.
+    /// Non-federated requests (request.federated_origin_kernel_id is
+    /// `None`) behave identically to [`Self::record_arc_receipt`].
+    pub(crate) fn record_arc_receipt_with_federation(
+        &self,
+        request: &crate::runtime::ToolCallRequest,
+        receipt: &ArcReceipt,
+    ) -> Result<(), KernelError> {
+        self.apply_federation_cosign(request, receipt)?;
+        self.record_arc_receipt(receipt)
     }
 
     pub(crate) fn record_arc_receipt(&self, receipt: &ArcReceipt) -> Result<(), KernelError> {
@@ -1006,5 +1381,130 @@ impl ArcKernel {
         self.last_checkpoint_seq
             .store(batch_end_seq, Ordering::SeqCst);
         Ok(())
+    }
+}
+
+/// Phase 18.2 helper: produce the canonical `memory_provenance`
+/// metadata object that signals an unverified read.
+///
+/// Kept as a free function so both the pre-sign metadata resolver and
+/// the fallback paths share a single serialisation shape.
+fn memory_read_unverified_metadata(
+    store: &str,
+    key: &str,
+    reason: crate::memory_provenance::UnverifiedReason,
+) -> serde_json::Value {
+    serde_json::json!({
+        "memory_provenance": {
+            "status": "unverified",
+            "store": store,
+            "key": key,
+            "reason": reason.as_str(),
+        }
+    })
+}
+
+fn parse_redacted_output(redacted: serde_json::Value) -> Result<ToolServerOutput, KernelError> {
+    let envelope = redacted.as_object().ok_or_else(|| {
+        KernelError::Internal(
+            "post-invocation hook returned a non-object output envelope".to_string(),
+        )
+    })?;
+    let kind = envelope
+        .get("kind")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| {
+            KernelError::Internal(
+                "post-invocation hook output envelope is missing kind".to_string(),
+            )
+        })?;
+
+    match kind {
+        "value" => Ok(ToolServerOutput::Value(
+            envelope
+                .get("value")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        )),
+        "stream" => {
+            let stream = envelope
+                .get("stream")
+                .and_then(serde_json::Value::as_object)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook output envelope is missing stream".to_string(),
+                    )
+                })?;
+            let chunks = stream
+                .get("chunks")
+                .and_then(serde_json::Value::as_array)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook stream envelope is missing chunks".to_string(),
+                    )
+                })?
+                .iter()
+                .cloned()
+                .map(|data| ToolCallChunk { data })
+                .collect();
+            let tool_stream = ToolCallStream { chunks };
+            let complete = stream
+                .get("complete")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| {
+                    KernelError::Internal(
+                        "post-invocation hook stream envelope is missing complete".to_string(),
+                    )
+                })?;
+            if complete {
+                Ok(ToolServerOutput::Stream(ToolServerStreamResult::Complete(
+                    tool_stream,
+                )))
+            } else {
+                let reason = stream
+                    .get("reason")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        KernelError::Internal(
+                            "post-invocation hook incomplete stream is missing reason".to_string(),
+                        )
+                    })?;
+                Ok(ToolServerOutput::Stream(
+                    ToolServerStreamResult::Incomplete {
+                        stream: tool_stream,
+                        reason: reason.to_string(),
+                    },
+                ))
+            }
+        }
+        other => Err(KernelError::Internal(format!(
+            "post-invocation hook returned unsupported output kind {other}"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn redacted_stream_requires_complete_flag() {
+        let err = parse_redacted_output(serde_json::json!({
+            "kind": "stream",
+            "stream": {
+                "chunks": []
+            }
+        }))
+        .expect_err("missing complete flag should be rejected");
+
+        match err {
+            KernelError::Internal(message) => {
+                assert!(
+                    message.contains("missing complete"),
+                    "unexpected error message: {message}"
+                );
+            }
+            other => panic!("expected KernelError::Internal, got {other:?}"),
+        }
     }
 }

@@ -1559,13 +1559,7 @@ fn build_underwriting_receipt_evidence(
     let call_chain_receipts = selection
         .receipts
         .iter()
-        .filter(|receipt| {
-            receipt
-                .governed
-                .as_ref()
-                .and_then(|governed| governed.call_chain.as_ref())
-                .is_some()
-        })
+        .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
         .count() as u64;
 
     UnderwritingReceiptEvidence {
@@ -1951,13 +1945,7 @@ fn call_chain_signal_evidence_refs(
     selection
         .receipts
         .iter()
-        .filter(|receipt| {
-            receipt
-                .governed
-                .as_ref()
-                .and_then(|governed| governed.call_chain.as_ref())
-                .is_some()
-        })
+        .filter(|receipt| underwriting_receipt_call_chain(receipt).is_some())
         .map(|receipt| UnderwritingEvidenceReference {
             kind: UnderwritingEvidenceKind::Receipt,
             reference_id: receipt.receipt_id.clone(),
@@ -1966,6 +1954,21 @@ fn call_chain_signal_evidence_refs(
             locator: Some(format!("receipt:{}", receipt.receipt_id)),
         })
         .collect()
+}
+
+fn underwriting_receipt_call_chain(
+    receipt: &arc_kernel::BehavioralFeedReceiptRow,
+) -> Option<&arc_core::capability::GovernedCallChainProvenance> {
+    receipt
+        .governed
+        .as_ref()
+        .and_then(|governed| governed.call_chain.as_ref())
+        .or_else(|| {
+            receipt
+                .governed_transaction_diagnostics
+                .as_ref()
+                .and_then(|diagnostics| diagnostics.asserted_call_chain.as_ref())
+        })
 }
 
 fn load_behavioral_feed_signing_keypair(

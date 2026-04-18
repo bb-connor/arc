@@ -9,6 +9,11 @@ pub struct AgentPassport {
     pub enterprise_identity_provenance: Vec<EnterpriseIdentityProvenance>,
     pub issued_at: String,
     pub valid_until: String,
+    /// Phase 20.1 trust tier synthesized from the operator's compliance
+    /// score and behavioral-anomaly signal. Optional for wire back-compat:
+    /// passports issued before 20.1 omit the field entirely.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trust_tier: Option<TrustTier>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

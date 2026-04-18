@@ -307,7 +307,7 @@ pub use receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
     FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedCommerceReceiptMetadata,
     GovernedTransactionReceiptMetadata, GuardEvidence, MeteredBillingReceiptMetadata,
-    MeteredUsageEvidenceReceiptMetadata, ToolCallAction,
+    MeteredUsageEvidenceReceiptMetadata, ToolCallAction, TrustLevel,
 };
 pub use session::{
     ArcIdentityAssertion, CompleteOperation, CompletionArgument, CompletionReference,

@@ -38,9 +38,29 @@ mod tests {
         std::env::temp_dir().join(format!("{prefix}-{nonce}{suffix}"))
     }
 
+    fn bind_fake_a2a_listener(label: &str) -> Option<TcpListener> {
+        match TcpListener::bind("127.0.0.1:0") {
+            Ok(listener) => Some(listener),
+            Err(err)
+                if matches!(
+                    err.kind(),
+                    std::io::ErrorKind::PermissionDenied
+                        | std::io::ErrorKind::AddrNotAvailable
+                        | std::io::ErrorKind::Unsupported
+                ) =>
+            {
+                eprintln!("skipping {label}: loopback TCP bind unavailable: {err}");
+                None
+            }
+            Err(err) => panic!("bind {label}: {err}"),
+        }
+    }
+
     #[test]
     fn adapter_discovers_jsonrpc_and_invokes_skill() {
-        let server = FakeA2aServer::spawn_jsonrpc();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -81,7 +101,9 @@ mod tests {
 
     #[test]
     fn adapter_generic_request_auth_surfaces_apply_to_discovery_and_invoke() {
-        let server = FakeA2aServer::spawn_http_json();
+        let Some(server) = FakeA2aServer::spawn_http_json() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -119,7 +141,9 @@ mod tests {
 
     #[test]
     fn partner_policy_rejects_wrong_tenant_on_discovery() {
-        let server = FakeA2aServer::spawn_jsonrpc_bearer_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_bearer_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let error = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -139,7 +163,9 @@ mod tests {
     #[test]
     fn task_registry_allows_follow_up_after_restart_and_rejects_unknown_tasks() {
         let registry_path = unique_path("arc-a2a-task-registry", ".json");
-        let server = FakeA2aServer::spawn_jsonrpc_task_follow_up();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_task_follow_up() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -214,7 +240,9 @@ mod tests {
 
     #[test]
     fn adapter_invokes_http_json_binding() {
-        let server = FakeA2aServer::spawn_http_json();
+        let Some(server) = FakeA2aServer::spawn_http_json() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -254,7 +282,9 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_get_task_follow_up() {
-        let server = FakeA2aServer::spawn_jsonrpc_task_follow_up();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_task_follow_up() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -304,7 +334,9 @@ mod tests {
 
     #[test]
     fn adapter_http_json_get_task_follow_up() {
-        let server = FakeA2aServer::spawn_http_json_task_follow_up();
+        let Some(server) = FakeA2aServer::spawn_http_json_task_follow_up() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -719,7 +751,9 @@ mod tests {
 
     #[test]
     fn adapter_invoke_stream_returns_none_without_stream_flag() {
-        let server = FakeA2aServer::spawn_jsonrpc();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -751,7 +785,9 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_streaming_invocation_returns_complete_stream() {
-        let server = FakeA2aServer::spawn_jsonrpc_streaming_complete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_complete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -797,7 +833,9 @@ mod tests {
 
     #[test]
     fn adapter_http_json_streaming_invocation_returns_complete_stream() {
-        let server = FakeA2aServer::spawn_http_json_streaming_complete();
+        let Some(server) = FakeA2aServer::spawn_http_json_streaming_complete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -835,7 +873,9 @@ mod tests {
 
     #[test]
     fn adapter_streaming_closure_without_terminal_state_is_incomplete() {
-        let server = FakeA2aServer::spawn_jsonrpc_streaming_incomplete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_incomplete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -865,7 +905,9 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_subscribe_task_returns_complete_stream() {
-        let server = FakeA2aServer::spawn_jsonrpc_subscribe_complete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_subscribe_complete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -902,7 +944,9 @@ mod tests {
 
     #[test]
     fn adapter_http_json_subscribe_task_returns_complete_stream() {
-        let server = FakeA2aServer::spawn_http_json_subscribe_complete();
+        let Some(server) = FakeA2aServer::spawn_http_json_subscribe_complete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -939,7 +983,9 @@ mod tests {
 
     #[test]
     fn adapter_subscribe_task_closure_without_terminal_state_is_incomplete() {
-        let server = FakeA2aServer::spawn_jsonrpc_subscribe_incomplete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_subscribe_incomplete() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -968,7 +1014,9 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_cancel_task_returns_cancelled_task() {
-        let server = FakeA2aServer::spawn_jsonrpc_cancel_task();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_cancel_task() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1001,7 +1049,9 @@ mod tests {
 
     #[test]
     fn adapter_http_json_cancel_task_returns_cancelled_task() {
-        let server = FakeA2aServer::spawn_http_json_cancel_task();
+        let Some(server) = FakeA2aServer::spawn_http_json_cancel_task() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1034,7 +1084,9 @@ mod tests {
 
     #[test]
     fn adapter_jsonrpc_push_notification_config_crud_roundtrip() {
-        let server = FakeA2aServer::spawn_jsonrpc_push_notification_crud();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_push_notification_crud() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1128,7 +1180,9 @@ mod tests {
 
     #[test]
     fn adapter_http_json_push_notification_config_crud_roundtrip() {
-        let server = FakeA2aServer::spawn_http_json_push_notification_crud();
+        let Some(server) = FakeA2aServer::spawn_http_json_push_notification_crud() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1223,7 +1277,9 @@ mod tests {
 
     #[test]
     fn adapter_rejects_insecure_push_notification_callback_url() {
-        let server = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_push_notification_capability_only() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1252,7 +1308,9 @@ mod tests {
 
     #[test]
     fn adapter_oauth2_client_credentials_fetches_token_and_caches_it() {
-        let server = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1303,7 +1361,9 @@ mod tests {
 
     #[test]
     fn adapter_openid_client_credentials_fetches_discovery_and_token() {
-        let server = FakeA2aServer::spawn_jsonrpc_openid_client_credentials_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_openid_client_credentials_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1339,7 +1399,9 @@ mod tests {
 
     #[test]
     fn adapter_required_bearer_security_without_configured_token_fails_closed() {
-        let server = FakeA2aServer::spawn_jsonrpc_bearer_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_bearer_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(A2aAdapterConfig::new(
             server.base_url(),
@@ -1363,7 +1425,9 @@ mod tests {
 
     #[test]
     fn adapter_http_basic_security_is_negotiated_from_agent_card() {
-        let server = FakeA2aServer::spawn_http_json_basic_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_basic_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1476,7 +1540,9 @@ mod tests {
 
     #[test]
     fn adapter_api_key_header_security_is_negotiated_from_agent_card() {
-        let server = FakeA2aServer::spawn_http_json_api_key_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_api_key_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1508,7 +1574,9 @@ mod tests {
 
     #[test]
     fn adapter_api_key_query_security_is_negotiated_from_agent_card() {
-        let server = FakeA2aServer::spawn_http_json_api_key_query_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_api_key_query_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1540,7 +1608,9 @@ mod tests {
 
     #[test]
     fn adapter_api_key_cookie_security_is_negotiated_from_agent_card() {
-        let server = FakeA2aServer::spawn_http_json_api_key_cookie_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_api_key_cookie_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1653,7 +1723,9 @@ mod tests {
 
     #[test]
     fn adapter_mtls_security_without_configured_identity_fails_closed() {
-        let server = FakeA2aServer::spawn_jsonrpc_mtls_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_mtls_required() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(A2aAdapterConfig::new(
             server.base_url(),
@@ -1678,7 +1750,9 @@ mod tests {
     #[test]
     fn adapter_jsonrpc_mtls_security_uses_client_certificate_for_discovery_and_invoke() {
         ensure_rustls_crypto_provider();
-        let server = FakeMtlsA2aServer::spawn_jsonrpc();
+        let Some(server) = FakeMtlsA2aServer::spawn_jsonrpc() else {
+            return;
+        };
         let manifest_key = Keypair::generate();
         let adapter = A2aAdapter::discover(
             A2aAdapterConfig::new(server.base_url(), manifest_key.public_key().to_hex())
@@ -1714,7 +1788,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_invocation_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -1782,6 +1858,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -1801,7 +1879,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_query_api_key_invocation_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_http_json_api_key_query_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_api_key_query_required() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -1843,6 +1923,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate query-auth A2A tool call");
 
@@ -1861,7 +1943,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_basic_auth_invocation_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_http_json_basic_required();
+        let Some(server) = FakeA2aServer::spawn_http_json_basic_required() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -1903,6 +1987,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate basic-auth A2A tool call");
 
@@ -1925,7 +2011,9 @@ mod tests {
     #[test]
     fn kernel_e2e_a2a_mtls_invocation_produces_allow_receipt() {
         ensure_rustls_crypto_provider();
-        let server = FakeMtlsA2aServer::spawn_jsonrpc();
+        let Some(server) = FakeMtlsA2aServer::spawn_jsonrpc() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -1972,6 +2060,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate mTLS A2A tool call");
 
@@ -1990,7 +2080,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_get_task_follow_up_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_task_follow_up();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_task_follow_up() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2058,6 +2150,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate initial A2A tool call");
         assert_eq!(initial.verdict, Verdict::Allow);
@@ -2084,6 +2178,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate follow-up A2A tool call");
 
@@ -2106,7 +2202,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_cancel_task_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_cancel_task();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_cancel_task() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2150,6 +2248,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate cancel-task A2A tool call");
 
@@ -2167,7 +2267,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_streaming_invocation_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_streaming_complete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_complete() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2209,6 +2311,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate streaming A2A tool call");
 
@@ -2225,7 +2329,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_incomplete_streaming_invocation_produces_incomplete_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_streaming_incomplete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_streaming_incomplete() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2268,6 +2374,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate incomplete streaming A2A tool call");
 
@@ -2286,7 +2394,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_subscribe_task_produces_allow_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_subscribe_complete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_subscribe_complete() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2327,6 +2437,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate subscribe-to-task A2A tool call");
 
@@ -2343,7 +2455,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_a2a_incomplete_subscribe_task_produces_incomplete_receipt() {
-        let server = FakeA2aServer::spawn_jsonrpc_subscribe_incomplete();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_subscribe_incomplete() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2389,6 +2503,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate incomplete subscribe-to-task A2A tool call");
 
@@ -2407,7 +2523,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_missing_required_bearer_security_denies_request() {
-        let server = FakeA2aServer::spawn_jsonrpc_bearer_required();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_bearer_required() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2448,6 +2566,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate A2A tool call");
 
@@ -2463,7 +2583,9 @@ mod tests {
 
     #[test]
     fn kernel_e2e_oauth_client_credentials_allows_request() {
-        let server = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_single_invoke();
+        let Some(server) = FakeA2aServer::spawn_jsonrpc_oauth_client_credentials_single_invoke() else {
+            return;
+        };
         let subject = Keypair::generate();
         let issuer = Keypair::generate();
         let manifest_key = Keypair::generate();
@@ -2505,6 +2627,8 @@ mod tests {
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
+                model_metadata: None,
+                federated_origin_kernel_id: None,
             })
             .expect("evaluate OAuth-backed A2A tool call");
 
@@ -2561,116 +2685,116 @@ mod tests {
     }
 
     impl FakeA2aServer {
-        fn spawn_jsonrpc() -> Self {
+        fn spawn_jsonrpc() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::BlockingMessage)
         }
 
-        fn spawn_jsonrpc_task_follow_up() -> Self {
+        fn spawn_jsonrpc_task_follow_up() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::TaskFollowUp)
         }
 
-        fn spawn_http_json() -> Self {
+        fn spawn_http_json() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::BlockingMessage)
         }
 
-        fn spawn_http_json_task_follow_up() -> Self {
+        fn spawn_http_json_task_follow_up() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::TaskFollowUp)
         }
 
-        fn spawn_jsonrpc_cancel_task() -> Self {
+        fn spawn_jsonrpc_cancel_task() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::CancelTask)
         }
 
-        fn spawn_http_json_cancel_task() -> Self {
+        fn spawn_http_json_cancel_task() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::CancelTask)
         }
 
-        fn spawn_jsonrpc_push_notification_crud() -> Self {
+        fn spawn_jsonrpc_push_notification_crud() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::PushNotificationCrud)
         }
 
-        fn spawn_http_json_push_notification_crud() -> Self {
+        fn spawn_http_json_push_notification_crud() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::PushNotificationCrud)
         }
 
-        fn spawn_jsonrpc_push_notification_capability_only() -> Self {
+        fn spawn_jsonrpc_push_notification_capability_only() -> Option<Self> {
             Self::spawn(
                 TestBinding::JsonRpc,
                 TestScenario::PushNotificationCapabilityOnly,
             )
         }
 
-        fn spawn_jsonrpc_oauth_client_credentials_required() -> Self {
+        fn spawn_jsonrpc_oauth_client_credentials_required() -> Option<Self> {
             Self::spawn(
                 TestBinding::JsonRpc,
                 TestScenario::OAuthClientCredentialsRequired,
             )
         }
 
-        fn spawn_jsonrpc_oauth_client_credentials_single_invoke() -> Self {
+        fn spawn_jsonrpc_oauth_client_credentials_single_invoke() -> Option<Self> {
             Self::spawn(
                 TestBinding::JsonRpc,
                 TestScenario::OAuthClientCredentialsSingleInvoke,
             )
         }
 
-        fn spawn_jsonrpc_openid_client_credentials_required() -> Self {
+        fn spawn_jsonrpc_openid_client_credentials_required() -> Option<Self> {
             Self::spawn(
                 TestBinding::JsonRpc,
                 TestScenario::OpenIdClientCredentialsRequired,
             )
         }
 
-        fn spawn_jsonrpc_streaming_complete() -> Self {
+        fn spawn_jsonrpc_streaming_complete() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::StreamingComplete)
         }
 
-        fn spawn_http_json_streaming_complete() -> Self {
+        fn spawn_http_json_streaming_complete() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::StreamingComplete)
         }
 
-        fn spawn_jsonrpc_streaming_incomplete() -> Self {
+        fn spawn_jsonrpc_streaming_incomplete() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::StreamingIncomplete)
         }
 
-        fn spawn_jsonrpc_subscribe_complete() -> Self {
+        fn spawn_jsonrpc_subscribe_complete() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::SubscribeComplete)
         }
 
-        fn spawn_http_json_subscribe_complete() -> Self {
+        fn spawn_http_json_subscribe_complete() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::SubscribeComplete)
         }
 
-        fn spawn_jsonrpc_subscribe_incomplete() -> Self {
+        fn spawn_jsonrpc_subscribe_incomplete() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::SubscribeIncomplete)
         }
 
-        fn spawn_jsonrpc_bearer_required() -> Self {
+        fn spawn_jsonrpc_bearer_required() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::BearerRequired)
         }
 
-        fn spawn_http_json_basic_required() -> Self {
+        fn spawn_http_json_basic_required() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::BasicRequired)
         }
 
-        fn spawn_http_json_api_key_required() -> Self {
+        fn spawn_http_json_api_key_required() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyRequired)
         }
 
-        fn spawn_http_json_api_key_query_required() -> Self {
+        fn spawn_http_json_api_key_query_required() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyQueryRequired)
         }
 
-        fn spawn_http_json_api_key_cookie_required() -> Self {
+        fn spawn_http_json_api_key_cookie_required() -> Option<Self> {
             Self::spawn(TestBinding::HttpJson, TestScenario::ApiKeyCookieRequired)
         }
 
-        fn spawn_jsonrpc_mtls_required() -> Self {
+        fn spawn_jsonrpc_mtls_required() -> Option<Self> {
             Self::spawn(TestBinding::JsonRpc, TestScenario::MutualTlsRequired)
         }
 
-        fn spawn(binding: TestBinding, scenario: TestScenario) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake A2A listener");
+        fn spawn(binding: TestBinding, scenario: TestScenario) -> Option<Self> {
+            let listener = bind_fake_a2a_listener("fake A2A listener")?;
             let address = listener.local_addr().expect("listener address");
             let base_url = format!("http://{address}");
             let base_url_for_thread = base_url.clone();
@@ -2807,11 +2931,11 @@ mod tests {
             });
 
             ready_rx.recv().expect("server should start");
-            Self {
+            Some(Self {
                 base_url,
                 requests,
                 handle,
-            }
+            })
         }
 
         fn base_url(&self) -> &str {
@@ -2845,10 +2969,10 @@ mod tests {
     }
 
     impl FakeMtlsA2aServer {
-        fn spawn_jsonrpc() -> Self {
+        fn spawn_jsonrpc() -> Option<Self> {
             ensure_rustls_crypto_provider();
             let materials = generate_mtls_test_materials();
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake mTLS A2A listener");
+            let listener = bind_fake_a2a_listener("fake mTLS A2A listener")?;
             let address = listener.local_addr().expect("listener address");
             let base_url = format!("https://localhost:{}", address.port());
             let requests = Arc::new(Mutex::new(Vec::new()));
@@ -2907,14 +3031,14 @@ mod tests {
             });
 
             ready_rx.recv().expect("server should start");
-            Self {
+            Some(Self {
                 base_url,
                 requests,
                 root_ca_pem: materials.root_ca_pem,
                 client_cert_chain_pem: materials.client_cert_chain_pem,
                 client_private_key_pem: materials.client_private_key_pem,
                 handle,
-            }
+            })
         }
 
         fn base_url(&self) -> &str {

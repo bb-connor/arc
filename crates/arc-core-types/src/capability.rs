@@ -4,13 +4,19 @@
 //! ambient authority. The Kernel validates the token on every request and denies
 //! access if any check fails.
 
-use std::collections::BTreeMap;
+use alloc::collections::BTreeMap;
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::canonical::canonical_json_bytes;
-use crate::crypto::{sha256_hex, Keypair, PublicKey, Signature};
+use crate::crypto::{
+    is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend, Keypair, PublicKey,
+    Signature, SigningAlgorithm, SigningBackend,
+};
 use crate::error::{Error, Result};
 use crate::runtime_attestation::{
     derive_runtime_attestation_trust_material, AttestationVerifierFamily,
@@ -18,11 +24,14 @@ use crate::runtime_attestation::{
 };
 use crate::session::SessionAnchorReference;
 
-/// A ARC capability token. Ed25519-signed, scoped, time-bounded.
+/// A ARC capability token. Scoped, time-bounded, cryptographically signed.
 ///
 /// The `signature` field covers the canonical JSON of all other fields.
 /// Verification re-serializes the token (excluding the signature), computes
-/// the canonical form, and checks the Ed25519 signature against `issuer`.
+/// the canonical form, and checks the signature against `issuer` using the
+/// algorithm declared by the `algorithm` field (defaulting to Ed25519 when
+/// absent, which preserves backward compatibility with tokens issued prior
+/// to the introduction of [`SigningAlgorithm`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityToken {
     /// Unique token ID (UUIDv7 recommended, used for revocation).
@@ -40,12 +49,20 @@ pub struct CapabilityToken {
     /// Ordered list of delegation links from the root CA to this token.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub delegation_chain: Vec<DelegationLink>,
-    /// Ed25519 signature over canonical JSON of all fields above.
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
+    /// Signature over canonical JSON of all fields above.
     pub signature: Signature,
 }
 
 /// The body of a capability token, containing every field except the signature.
 /// Used as the signing input.
+///
+/// The declared signing algorithm is not included in the body: the `signature`
+/// type itself is self-describing (Ed25519 / P-256 / P-384) via its hex
+/// encoding, and the `issuer` key encodes its own algorithm. This keeps the
+/// pre-`SigningBackend` Ed25519 body serialization byte-identical.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CapabilityTokenBody {
     pub id: String,
@@ -73,7 +90,11 @@ impl CapabilityToken {
         }
     }
 
-    /// Sign a capability token body with the given keypair.
+    /// Sign a capability token body with the given Ed25519 keypair.
+    ///
+    /// This is the historical signing entry point and produces a
+    /// byte-identical artifact to pre-`SigningBackend` ARC releases: the
+    /// `algorithm` envelope field is omitted from the serialized output.
     pub fn sign(body: CapabilityTokenBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -84,11 +105,43 @@ impl CapabilityToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             delegation_chain: body.delegation_chain,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a capability token body with an arbitrary [`SigningBackend`].
+    ///
+    /// Use this entry point to produce FIPS-algorithm (P-256 / P-384) tokens
+    /// when operating under the `fips` feature. The `body.issuer` field must
+    /// equal `backend.public_key()`; otherwise verification will fail.
+    ///
+    /// The resulting token's `algorithm` envelope field is populated with the
+    /// backend's algorithm. It is informational only -- verification
+    /// dispatches off the `signature` hex prefix, not this field.
+    pub fn sign_with_backend(
+        body: CapabilityTokenBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            issuer: body.issuer,
+            subject: body.subject,
+            scope: body.scope,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            delegation_chain: body.delegation_chain,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
 
     /// Verify the token's signature against its issuer key.
+    ///
+    /// Dispatches off the algorithm carried by `signature` and `issuer`.
+    /// For FIPS algorithms, the `fips` feature must be enabled at the crate
+    /// level or verification returns `Ok(false)`.
     pub fn verify_signature(&self) -> Result<bool> {
         let body = self.body();
         self.issuer.verify_canonical(&body, &self.signature)
@@ -250,34 +303,53 @@ pub struct WorkloadIdentity {
     pub path: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WorkloadIdentityError {
-    #[error("runtime_identity must not be empty when provided")]
+    #[cfg_attr(
+        feature = "std",
+        error("runtime_identity must not be empty when provided")
+    )]
     EmptyRuntimeIdentity,
 
-    #[error("workload identity URI must not be empty")]
+    #[cfg_attr(feature = "std", error("workload identity URI must not be empty"))]
     EmptyUri,
 
-    #[error("unsupported workload identity scheme '{0}'")]
+    #[cfg_attr(feature = "std", error("unsupported workload identity scheme '{0}'"))]
     UnsupportedScheme(String),
 
-    #[error("workload identity URI is malformed: {0}")]
+    #[cfg_attr(feature = "std", error("workload identity URI is malformed: {0}"))]
     MalformedUri(String),
 
-    #[error("SPIFFE workload identity must include a trust domain")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must include a trust domain")
+    )]
     MissingTrustDomain,
 
-    #[error("SPIFFE workload identity must not include userinfo or a port")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must not include userinfo or a port")
+    )]
     InvalidAuthority,
 
-    #[error("SPIFFE workload identity must not include query or fragment")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity must not include query or fragment")
+    )]
     InvalidSuffix,
 
-    #[error("SPIFFE workload identity path '{0}' is invalid")]
+    #[cfg_attr(
+        feature = "std",
+        error("SPIFFE workload identity path '{0}' is invalid")
+    )]
     InvalidPath(String),
 
-    #[error(
-        "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+        )
     )]
     Conflict {
         field: &'static str,
@@ -285,21 +357,67 @@ pub enum WorkloadIdentityError {
         actual: String,
     },
 
-    #[error(
-        "runtime_identity '{0}' is opaque and cannot be reconciled with explicit workload_identity"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime_identity '{0}' is opaque and cannot be reconciled with explicit workload_identity"
+        )
     )]
     OpaqueRuntimeIdentityConflict(String),
 }
 
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for WorkloadIdentityError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::EmptyRuntimeIdentity => {
+                write!(f, "runtime_identity must not be empty when provided")
+            }
+            Self::EmptyUri => write!(f, "workload identity URI must not be empty"),
+            Self::UnsupportedScheme(v) => {
+                write!(f, "unsupported workload identity scheme '{v}'")
+            }
+            Self::MalformedUri(v) => write!(f, "workload identity URI is malformed: {v}"),
+            Self::MissingTrustDomain => {
+                write!(f, "SPIFFE workload identity must include a trust domain")
+            }
+            Self::InvalidAuthority => write!(
+                f,
+                "SPIFFE workload identity must not include userinfo or a port"
+            ),
+            Self::InvalidSuffix => write!(
+                f,
+                "SPIFFE workload identity must not include query or fragment"
+            ),
+            Self::InvalidPath(v) => write!(f, "SPIFFE workload identity path '{v}' is invalid"),
+            Self::Conflict {
+                field,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "explicit workload identity conflicts with runtime_identity for {field}: expected '{expected}', got '{actual}'"
+            ),
+            Self::OpaqueRuntimeIdentityConflict(v) => write!(
+                f,
+                "runtime_identity '{v}' is opaque and cannot be reconciled with explicit workload_identity"
+            ),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for WorkloadIdentityError {}
+
 impl WorkloadIdentity {
-    pub fn parse_spiffe_uri(uri: &str) -> std::result::Result<Self, WorkloadIdentityError> {
+    pub fn parse_spiffe_uri(uri: &str) -> core::result::Result<Self, WorkloadIdentityError> {
         Self::parse_spiffe_uri_with_kind(uri, WorkloadCredentialKind::Uri)
     }
 
     pub fn parse_spiffe_uri_with_kind(
         uri: &str,
         credential_kind: WorkloadCredentialKind,
-    ) -> std::result::Result<Self, WorkloadIdentityError> {
+    ) -> core::result::Result<Self, WorkloadIdentityError> {
         let trimmed = uri.trim();
         if trimmed.is_empty() {
             return Err(WorkloadIdentityError::EmptyUri);
@@ -336,7 +454,7 @@ impl WorkloadIdentity {
         })
     }
 
-    pub fn validate(&self) -> std::result::Result<(), WorkloadIdentityError> {
+    pub fn validate(&self) -> core::result::Result<(), WorkloadIdentityError> {
         let parsed = match self.scheme {
             WorkloadIdentityScheme::Spiffe => {
                 Self::parse_spiffe_uri_with_kind(&self.uri, self.credential_kind)?
@@ -396,7 +514,7 @@ impl RuntimeAttestationEvidence {
 
     pub fn normalized_workload_identity(
         &self,
-    ) -> std::result::Result<Option<WorkloadIdentity>, WorkloadIdentityError> {
+    ) -> core::result::Result<Option<WorkloadIdentity>, WorkloadIdentityError> {
         let explicit = self
             .workload_identity
             .as_ref()
@@ -456,7 +574,7 @@ impl RuntimeAttestationEvidence {
 
     pub fn validate_workload_identity_binding(
         &self,
-    ) -> std::result::Result<(), WorkloadIdentityError> {
+    ) -> core::result::Result<(), WorkloadIdentityError> {
         self.normalized_workload_identity().map(|_| ())
     }
 
@@ -464,7 +582,7 @@ impl RuntimeAttestationEvidence {
         &self,
         policy: Option<&AttestationTrustPolicy>,
         now: u64,
-    ) -> std::result::Result<ResolvedRuntimeAssurance, AttestationTrustError> {
+    ) -> core::result::Result<ResolvedRuntimeAssurance, AttestationTrustError> {
         self.validate_workload_identity_binding()
             .map_err(|error| AttestationTrustError::InvalidWorkloadIdentity(error.to_string()))?;
         if !self.is_valid_at(now) {
@@ -617,13 +735,20 @@ pub struct ResolvedRuntimeAssurance {
     pub matched_rule: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[cfg_attr(feature = "std", derive(thiserror::Error))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttestationTrustError {
-    #[error("runtime attestation workload identity is invalid: {0}")]
+    #[cfg_attr(
+        feature = "std",
+        error("runtime attestation workload identity is invalid: {0}")
+    )]
     InvalidWorkloadIdentity(String),
 
-    #[error(
-        "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+        )
     )]
     StaleEvidence {
         now: u64,
@@ -631,8 +756,11 @@ pub enum AttestationTrustError {
         expires_at: u64,
     },
 
-    #[error(
-        "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+        )
     )]
     EvidenceTooOld {
         rule: String,
@@ -640,22 +768,37 @@ pub enum AttestationTrustError {
         actual_age_seconds: u64,
     },
 
-    #[error("attestation trust rule `{rule}` requires an attestationType claim")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` requires an attestationType claim")
+    )]
     MissingAttestationType { rule: String },
 
-    #[error("attestation trust rule `{rule}` rejected attestation type `{actual}`")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` rejected attestation type `{actual}`")
+    )]
     DisallowedAttestationType { rule: String, actual: String },
 
-    #[error(
-        "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+        )
     )]
     UnsupportedEvidence { schema: String },
 
-    #[error("attestation trust rule `{rule}` requires normalized assertion `{assertion}`")]
+    #[cfg_attr(
+        feature = "std",
+        error("attestation trust rule `{rule}` requires normalized assertion `{assertion}`")
+    )]
     MissingAssertion { rule: String, assertion: String },
 
-    #[error(
-        "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+        )
     )]
     AssertionMismatch {
         rule: String,
@@ -664,11 +807,73 @@ pub enum AttestationTrustError {
         actual: String,
     },
 
-    #[error(
-        "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+    #[cfg_attr(
+        feature = "std",
+        error(
+            "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+        )
     )]
     UntrustedEvidence { verifier: String, schema: String },
 }
+
+#[cfg(not(feature = "std"))]
+impl core::fmt::Display for AttestationTrustError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidWorkloadIdentity(v) => {
+                write!(f, "runtime attestation workload identity is invalid: {v}")
+            }
+            Self::StaleEvidence {
+                now,
+                issued_at,
+                expires_at,
+            } => write!(
+                f,
+                "runtime attestation evidence is stale at {now} (issued_at={issued_at}, expires_at={expires_at})"
+            ),
+            Self::EvidenceTooOld {
+                rule,
+                max_age_seconds,
+                actual_age_seconds,
+            } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected evidence older than {max_age_seconds}s (actual age {actual_age_seconds}s)"
+            ),
+            Self::MissingAttestationType { rule } => write!(
+                f,
+                "attestation trust rule `{rule}` requires an attestationType claim"
+            ),
+            Self::DisallowedAttestationType { rule, actual } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected attestation type `{actual}`"
+            ),
+            Self::UnsupportedEvidence { schema } => write!(
+                f,
+                "runtime attestation schema `{schema}` is not supported by the appraisal-aware trust boundary"
+            ),
+            Self::MissingAssertion { rule, assertion } => write!(
+                f,
+                "attestation trust rule `{rule}` requires normalized assertion `{assertion}`"
+            ),
+            Self::AssertionMismatch {
+                rule,
+                assertion,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "attestation trust rule `{rule}` rejected normalized assertion `{assertion}`: expected `{expected}`, got `{actual}`"
+            ),
+            Self::UntrustedEvidence { verifier, schema } => write!(
+                f,
+                "runtime attestation evidence from verifier `{verifier}` with schema `{schema}` did not match any trusted verifier rule"
+            ),
+        }
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl core::error::Error for AttestationTrustError {}
 
 fn normalized_assertion_string(value: &serde_json::Value) -> Option<String> {
     match value {
@@ -1009,16 +1214,8 @@ impl CallChainContinuationToken {
 
     pub fn verify_signature(&self) -> Result<bool> {
         if let Some(legacy_upstream_proof) = &self.legacy_upstream_proof {
-            return Ok(legacy_upstream_proof.verify_signature()?
-                && legacy_upstream_proof.chain_id == self.chain_id
-                && legacy_upstream_proof.parent_request_id == self.parent_request_id
-                && legacy_upstream_proof.parent_receipt_id == self.parent_receipt_id
-                && legacy_upstream_proof.origin_subject == self.origin_subject
-                && legacy_upstream_proof.delegator_subject == self.delegator_subject
-                && legacy_upstream_proof.signer == self.signer
-                && legacy_upstream_proof.subject == self.subject
-                && legacy_upstream_proof.issued_at == self.issued_at
-                && legacy_upstream_proof.expires_at == self.expires_at);
+            let expected = Self::from_legacy_upstream_proof(legacy_upstream_proof)?;
+            return Ok(legacy_upstream_proof.verify_signature()? && expected == *self);
         }
         let body = self.body();
         self.signer.verify_canonical(&body, &self.signature)
@@ -1293,7 +1490,7 @@ impl From<GovernedCallChainContext> for GovernedCallChainProvenance {
     }
 }
 
-impl std::ops::Deref for GovernedCallChainProvenance {
+impl core::ops::Deref for GovernedCallChainProvenance {
     type Target = GovernedCallChainContext;
 
     fn deref(&self) -> &Self::Target {
@@ -1444,6 +1641,12 @@ pub struct GovernedApprovalToken {
     pub issued_at: u64,
     pub expires_at: u64,
     pub decision: GovernedApprovalDecision,
+    /// Signing algorithm. Absent means Ed25519 for backward compatibility.
+    ///
+    /// Informational: verification dispatches off the algorithm encoded in
+    /// [`GovernedApprovalToken::signature`] and [`GovernedApprovalToken::approver`].
+    #[serde(default, skip_serializing_if = "is_default_optional_algorithm")]
+    pub algorithm: Option<SigningAlgorithm>,
     pub signature: Signature,
 }
 
@@ -1462,6 +1665,7 @@ impl GovernedApprovalToken {
         }
     }
 
+    /// Sign a governed approval token body with the given Ed25519 keypair.
     pub fn sign(body: GovernedApprovalTokenBody, keypair: &Keypair) -> Result<Self> {
         let (signature, _bytes) = keypair.sign_canonical(&body)?;
         Ok(Self {
@@ -1473,6 +1677,29 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
+            algorithm: None,
+            signature,
+        })
+    }
+
+    /// Sign a governed approval token body with an arbitrary [`SigningBackend`].
+    ///
+    /// `body.approver` must equal `backend.public_key()`.
+    pub fn sign_with_backend(
+        body: GovernedApprovalTokenBody,
+        backend: &dyn SigningBackend,
+    ) -> Result<Self> {
+        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        Ok(Self {
+            id: body.id,
+            approver: body.approver,
+            subject: body.subject,
+            governed_intent_hash: body.governed_intent_hash,
+            request_id: body.request_id,
+            issued_at: body.issued_at,
+            expires_at: body.expires_at,
+            decision: body.decision,
+            algorithm: Some(backend.algorithm()),
             signature,
         })
     }
@@ -1675,6 +1902,53 @@ pub enum Operation {
     Delegate,
 }
 
+/// Operation class for data-layer tool calls (SQL, document DB, etc.).
+///
+/// Used by `Constraint::OperationClass` to restrict a grant to read-only,
+/// read-write, or administrative operations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SqlOperationClass {
+    /// SELECT and other read-only statements only.
+    ReadOnly,
+    /// Read and write (INSERT, UPDATE, DELETE) but no schema changes.
+    ReadWrite,
+    /// Schema-altering or privilege-altering operations.
+    Admin,
+}
+
+/// Content review tier for outbound communication constraints.
+///
+/// Used by `Constraint::ContentReviewTier` to indicate the level of
+/// content review that downstream guards should apply.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContentReviewTier {
+    /// No content review required.
+    None,
+    /// Basic heuristic review (e.g. keyword filters).
+    Basic,
+    /// Strict review (e.g. model-based review or human approval).
+    Strict,
+}
+
+/// Safety tier for model-routing constraints.
+///
+/// Used by `Constraint::ModelConstraint` to express a minimum safety
+/// floor for the model executing a tool-bearing agent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelSafetyTier {
+    /// Low assurance: unfiltered or permissive models.
+    Low,
+    /// Standard assurance: baseline safety filters.
+    Standard,
+    /// High assurance: stricter safety filters and evaluations.
+    High,
+    /// Restricted: only models meeting restricted-use criteria.
+    Restricted,
+}
+
 /// A constraint on tool parameters.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value", rename_all = "snake_case")]
@@ -1689,6 +1963,8 @@ pub enum Constraint {
     RegexMatch(String),
     /// String parameter must not exceed this length.
     MaxLength(usize),
+    /// Serialized argument payload must not exceed this many bytes.
+    MaxArgsSize(usize),
     /// Requests must carry a governed transaction intent.
     GovernedIntentRequired,
     /// Requests at or above this threshold require a valid approval token.
@@ -1701,6 +1977,73 @@ pub enum Constraint {
     MinimumAutonomyTier(GovernedAutonomyTier),
     /// Extensibility: arbitrary key-value constraint.
     Custom(String, String),
+
+    // ---- Phase 2.2 additions -----------------------------------------
+    //
+    // The variants below were added per docs/protocols/ADR-TYPE-EVOLUTION.md
+    // section 3 to carry data-layer, communication, financial,
+    // model-routing, and memory-governance policy. They participate in
+    // the existing tagged serde envelope
+    // (`#[serde(tag = "type", content = "value", rename_all = "snake_case")]`).
+    /// Data layer: database tables the grant may reference.
+    ///
+    /// Evaluated against parsed SQL by `arc-data-guards`; the kernel
+    /// records the constraint and leaves enforcement to that guard.
+    TableAllowlist(Vec<String>),
+    /// Data layer: forbidden columns, formatted as `"table.column"`.
+    ///
+    /// Evaluated by `arc-data-guards`; kernel treats it as an advisory
+    /// constraint and does not reject at the request-matching stage.
+    ColumnDenylist(Vec<String>),
+    /// Data layer: maximum number of rows a query may return.
+    ///
+    /// Enforced post-invocation by downstream result-shaping guards.
+    MaxRowsReturned(u64),
+    /// Data layer: operation class the grant authorises.
+    OperationClass(SqlOperationClass),
+    /// Communication: allowed recipient channels or IDs.
+    AudienceAllowlist(Vec<String>),
+    /// Communication: content review tier demanded of downstream guards.
+    ContentReviewTier(ContentReviewTier),
+    /// Financial: maximum transaction amount in USD.
+    ///
+    /// The value is a decimal string (e.g. `"100.00"`) because
+    /// `rust_decimal` is not in the workspace.
+    MaxTransactionAmountUsd(String),
+    /// Financial: whether the grant requires dual approval before execution.
+    RequireDualApproval(bool),
+    /// Model routing: constrain the models this grant may execute under.
+    ModelConstraint {
+        /// Explicit allowlist of model identifiers. Empty means no allowlist.
+        allowed_model_ids: Vec<String>,
+        /// Minimum acceptable model safety tier, if any.
+        min_safety_tier: Option<ModelSafetyTier>,
+    },
+    /// Memory governance: memory stores the grant may write to.
+    MemoryStoreAllowlist(Vec<String>),
+    /// Memory governance: regex patterns that block writes.
+    ///
+    /// Patterns are compiled lazily during kernel evaluation so invalid
+    /// regexes do not break construction or round-trip serialization.
+    MemoryWriteDenyPatterns(Vec<String>),
+}
+
+/// Metadata describing the model executing a tool-bearing agent.
+///
+/// Carried on `ToolCallRequest` so the kernel can evaluate
+/// `Constraint::ModelConstraint` against the calling model's identity
+/// and safety tier.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ModelMetadata {
+    /// Model identifier (e.g. `"claude-opus-4"`, `"gpt-5"`).
+    pub model_id: String,
+    /// Declared safety tier, when available.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety_tier: Option<ModelSafetyTier>,
+    /// Optional provider label (e.g. `"anthropic"`, `"openai"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
 }
 
 /// A link in the delegation chain, recording that `delegator` granted a
@@ -2554,6 +2897,35 @@ mod tests {
     }
 
     #[test]
+    fn continuation_token_rejects_unsigned_bindings_when_using_legacy_proof() {
+        let signer = Keypair::generate();
+        let subject = Keypair::generate();
+        let proof = GovernedUpstreamCallChainProof::sign(
+            GovernedUpstreamCallChainProofBody {
+                signer: signer.public_key(),
+                subject: subject.public_key(),
+                chain_id: "chain-legacy-2".to_string(),
+                parent_request_id: "req-parent-legacy-2".to_string(),
+                parent_receipt_id: Some("rc-parent-legacy-2".to_string()),
+                origin_subject: "origin-subject".to_string(),
+                delegator_subject: "delegator-subject".to_string(),
+                issued_at: 1000,
+                expires_at: 2000,
+            },
+            &signer,
+        )
+        .unwrap();
+        let mut token = CallChainContinuationToken::from_legacy_upstream_proof(&proof).unwrap();
+        token.audience = Some(CallChainContinuationAudience {
+            server_id: "srv-pay".to_string(),
+            tool_name: "charge".to_string(),
+        });
+        token.governed_intent_hash = Some("intent-hash".to_string());
+
+        assert!(!token.verify_signature().unwrap());
+    }
+
+    #[test]
     fn governed_call_chain_provenance_separates_asserted_and_verified_views() {
         let asserted_context = GovernedCallChainContext {
             chain_id: "chain-prov-1".to_string(),
@@ -3170,5 +3542,138 @@ mod tests {
         let json = serde_json::to_string_pretty(&attenuations).unwrap();
         let restored: Vec<Attenuation> = serde_json::from_str(&json).unwrap();
         assert_eq!(attenuations, restored);
+    }
+
+    #[test]
+    fn ed25519_capability_token_is_byte_identical_without_algorithm_field() {
+        // Pre-existing Ed25519 tokens must serialize without any `algorithm`
+        // envelope field, so captured on-disk receipts and capability
+        // artifacts continue to round-trip through the schema validators.
+        let kp = Keypair::generate();
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-compat".to_string(),
+            issuer: kp.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign(body, &kp).unwrap();
+        let json = serde_json::to_value(&token).unwrap();
+        assert!(
+            json.get("algorithm").is_none(),
+            "Ed25519 tokens must omit the `algorithm` envelope field"
+        );
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[test]
+    fn capability_token_backend_signing_with_ed25519_verifies() {
+        let backend = crate::crypto::Ed25519Backend::generate();
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-backend".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(
+            token.algorithm,
+            Some(crate::crypto::SigningAlgorithm::Ed25519)
+        );
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p256_round_trip() {
+        // A capability token signed with P-256 verifies when reconstructed
+        // through the exact same API path the kernel uses
+        // (`verify_signature` -> `PublicKey::verify_canonical`).
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-p256".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
+        assert!(token.verify_signature().unwrap());
+
+        // Round-trip through JSON (the wire format the kernel receives).
+        let wire = serde_json::to_string(&token).unwrap();
+        assert!(wire.contains("\"p256:"));
+        assert!(wire.contains("\"algorithm\":\"p256\""));
+        let restored: CapabilityToken = serde_json::from_str(&wire).unwrap();
+        assert!(restored.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p384_round_trip() {
+        let backend = crate::crypto::P384Backend::generate().expect("p384 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-p384".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P384));
+        assert!(token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn capability_token_p256_tampered_body_fails() {
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = CapabilityTokenBody {
+            id: "cap-tamper".to_string(),
+            issuer: backend.public_key(),
+            subject: subject.public_key(),
+            scope: ArcScope::default(),
+            issued_at: 1000,
+            expires_at: 2000,
+            delegation_chain: vec![],
+        };
+        let mut token = CapabilityToken::sign_with_backend(body, &backend).unwrap();
+        token.id = "cap-tampered".to_string();
+        assert!(!token.verify_signature().unwrap());
+    }
+
+    #[cfg(feature = "fips")]
+    #[test]
+    fn governed_approval_token_p256_verifies() {
+        let backend = crate::crypto::P256Backend::generate().expect("p256 backend");
+        let subject = Keypair::generate();
+        let body = GovernedApprovalTokenBody {
+            id: "approval-p256".to_string(),
+            approver: backend.public_key(),
+            subject: subject.public_key(),
+            governed_intent_hash: "hash-xyz".to_string(),
+            request_id: "req-1".to_string(),
+            issued_at: 1000,
+            expires_at: 2000,
+            decision: GovernedApprovalDecision::Approved,
+        };
+        let token = GovernedApprovalToken::sign_with_backend(body, &backend).unwrap();
+        assert_eq!(token.algorithm, Some(crate::crypto::SigningAlgorithm::P256));
+        assert!(token.verify_signature().unwrap());
     }
 }

@@ -1,0 +1,70 @@
+// Minimal vendored subset of envoy.config.core.v3 messages needed by the
+// ext_authz v3 service definition. Field numbers match the upstream
+// definitions at
+// https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/core/v3/base.proto
+// https://github.com/envoyproxy/envoy/blob/main/api/envoy/config/core/v3/address.proto
+//
+// Only the messages referenced by AttributeContext, CheckRequest, CheckResponse,
+// OkHttpResponse, and DeniedHttpResponse are retained. Other fields are omitted
+// or replaced with opaque placeholders; the ARC adapter does not interpret them.
+
+syntax = "proto3";
+
+package envoy.config.core.v3;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+option java_package = "io.envoyproxy.envoy.config.core.v3";
+option java_outer_classname = "BaseProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/core/v3;corev3";
+
+// Header name/value pair.
+message HeaderValue {
+  // Header name.
+  string key = 1;
+
+  // Header value (UTF-8 encoded when text).
+  string value = 2;
+
+  // Header value as raw bytes. Used when the value is not valid UTF-8.
+  bytes raw_value = 3;
+}
+
+// Header name/value pair plus a list operation.
+message HeaderValueOption {
+  // Behavior of the value when the named header already exists on the request.
+  enum HeaderAppendAction {
+    APPEND_IF_EXISTS_OR_ADD = 0;
+    ADD_IF_ABSENT = 1;
+    OVERWRITE_IF_EXISTS_OR_ADD = 2;
+    OVERWRITE_IF_EXISTS = 3;
+  }
+
+  // Header to append or replace.
+  HeaderValue header = 1;
+
+  // DEPRECATED: use append_action.
+  google.protobuf.BoolValue append = 2;
+
+  HeaderAppendAction append_action = 3;
+
+  // When true, the header is kept if present but not replaced.
+  bool keep_empty_value = 4;
+}
+
+// A collection of metadata namespaces keyed by filter name.
+message Metadata {
+  // Key is the reverse DNS filter name (e.g. "envoy.filters.http.ext_authz").
+  map<string, google.protobuf.Struct> filter_metadata = 1;
+
+  // Per-key typed metadata. Opaque to the ARC adapter.
+  map<string, google.protobuf.Struct> typed_filter_metadata = 2;
+}
+
+// Identifies a specific ControlPlane instance that Envoy is connected to. Opaque
+// to the ARC adapter and reduced to its wire-compatible field numbers.
+message ControlPlane {
+  string identifier = 1;
+}

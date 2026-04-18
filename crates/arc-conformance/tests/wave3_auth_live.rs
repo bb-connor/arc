@@ -17,6 +17,30 @@ fn command_available(program: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn python3_supports_arc_sdk() -> bool {
+    let Ok(output) = Command::new("python3")
+        .arg("-c")
+        .arg("import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')")
+        .output()
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    let version = String::from_utf8_lossy(&output.stdout);
+    let mut parts = version.trim().split('.');
+    let major = parts
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+    let minor = parts
+        .next()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(0);
+    (major, minor) >= (3, 11)
+}
+
 fn ensure_arc_binary(repo_root: &PathBuf) {
     let arc_binary = repo_root.join("target/debug/arc");
     if arc_binary.exists() {
@@ -41,7 +65,7 @@ fn ensure_arc_binary(repo_root: &PathBuf) {
 
 #[test]
 fn wave3_auth_harness_runs_against_live_js_and_python_peers() {
-    if !command_available("node") || !command_available("python3") {
+    if !command_available("node") || !python3_supports_arc_sdk() {
         return;
     }
 

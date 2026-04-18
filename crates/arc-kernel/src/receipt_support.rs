@@ -6,6 +6,7 @@ use arc_core::capability::{
     GovernedCallChainContext, GovernedCallChainEvidenceSource, GovernedCallChainProvenance,
     GovernedProvenanceEvidenceClass, GovernedUpstreamCallChainProof,
 };
+use arc_core::receipt::GuardEvidence;
 use uuid::Uuid;
 
 use crate::evidence_export::EvidenceLineageReferences;
@@ -25,6 +26,10 @@ pub(crate) struct GovernedCallChainReceiptEvidence {
 thread_local! {
     static GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE: RefCell<Option<GovernedCallChainReceiptEvidence>> =
         const { RefCell::new(None) };
+    static GOVERNED_RUNTIME_ATTESTATION_RECORD: RefCell<Option<VerifiedRuntimeAttestationRecord>> =
+        const { RefCell::new(None) };
+    static POST_INVOCATION_GUARD_EVIDENCE: RefCell<Vec<GuardEvidence>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 pub(crate) struct ScopedGovernedCallChainReceiptEvidence {
@@ -49,6 +54,54 @@ pub(crate) fn scope_governed_call_chain_receipt_evidence(
 
 fn current_governed_call_chain_receipt_evidence() -> Option<GovernedCallChainReceiptEvidence> {
     GOVERNED_CALL_CHAIN_RECEIPT_EVIDENCE.with(|slot| slot.borrow().clone())
+}
+
+pub(crate) struct ScopedGovernedRuntimeAttestationRecord {
+    previous: Option<VerifiedRuntimeAttestationRecord>,
+}
+
+impl Drop for ScopedGovernedRuntimeAttestationRecord {
+    fn drop(&mut self) {
+        let previous = self.previous.take();
+        GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| {
+            slot.replace(previous);
+        });
+    }
+}
+
+pub(crate) fn scope_governed_runtime_attestation_receipt_record(
+    record: Option<VerifiedRuntimeAttestationRecord>,
+) -> ScopedGovernedRuntimeAttestationRecord {
+    let previous = GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| slot.replace(record));
+    ScopedGovernedRuntimeAttestationRecord { previous }
+}
+
+fn current_governed_runtime_attestation_record() -> Option<VerifiedRuntimeAttestationRecord> {
+    GOVERNED_RUNTIME_ATTESTATION_RECORD.with(|slot| slot.borrow().clone())
+}
+
+pub(crate) struct ScopedPostInvocationGuardEvidence {
+    previous: Vec<GuardEvidence>,
+}
+
+impl Drop for ScopedPostInvocationGuardEvidence {
+    fn drop(&mut self) {
+        let previous = core::mem::take(&mut self.previous);
+        POST_INVOCATION_GUARD_EVIDENCE.with(|slot| {
+            slot.replace(previous);
+        });
+    }
+}
+
+pub(crate) fn scope_post_invocation_guard_evidence(
+    evidence: Vec<GuardEvidence>,
+) -> ScopedPostInvocationGuardEvidence {
+    let previous = POST_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.replace(evidence));
+    ScopedPostInvocationGuardEvidence { previous }
+}
+
+pub(crate) fn current_post_invocation_guard_evidence() -> Vec<GuardEvidence> {
+    POST_INVOCATION_GUARD_EVIDENCE.with(|slot| slot.borrow().clone())
 }
 
 fn governed_call_chain_provenance(
@@ -264,11 +317,26 @@ pub(super) fn governed_request_metadata(
                 max_billed_units: metered.max_billed_units,
                 usage_evidence: None,
             });
-    let runtime_assurance = governed_runtime_assurance_receipt_metadata(
-        intent.runtime_attestation.as_ref(),
-        attestation_trust_policy,
-        now,
-    );
+    let runtime_assurance = if let Some(verified_runtime_attestation) =
+        current_governed_runtime_attestation_record()
+    {
+        if intent
+            .runtime_attestation
+            .as_ref()
+            .is_some_and(|attestation| verified_runtime_attestation.evidence != *attestation)
+        {
+            return Err(KernelError::ReceiptSigningFailed(
+                "governed request runtime attestation does not match the scoped verified runtime attestation record".to_string(),
+            ));
+        }
+        verified_runtime_assurance_receipt_metadata(&verified_runtime_attestation)
+    } else {
+        governed_runtime_assurance_receipt_metadata(
+            intent.runtime_attestation.as_ref(),
+            attestation_trust_policy,
+            now,
+        )
+    };
     let autonomy = intent
         .autonomy
         .as_ref()
@@ -561,6 +629,41 @@ mod tests {
         }
     }
 
+    fn trusted_nitro_attestation_trust_policy() -> AttestationTrustPolicy {
+        AttestationTrustPolicy {
+            rules: vec![AttestationTrustRule {
+                name: "aws-nitro".to_string(),
+                schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+                verifier: "https://nitro.aws.example".to_string(),
+                effective_tier: RuntimeAssuranceTier::Verified,
+                verifier_family: Some(arc_core::appraisal::AttestationVerifierFamily::AwsNitro),
+                max_evidence_age_seconds: Some(120),
+                allowed_attestation_types: Vec::new(),
+                required_assertions: std::collections::BTreeMap::new(),
+            }],
+        }
+    }
+
+    fn trusted_nitro_runtime_attestation() -> RuntimeAttestationEvidence {
+        RuntimeAttestationEvidence {
+            schema: "arc.runtime-attestation.aws-nitro-attestation.v1".to_string(),
+            verifier: "https://nitro.aws.example/".to_string(),
+            tier: RuntimeAssuranceTier::Attested,
+            issued_at: 100,
+            expires_at: 200,
+            evidence_sha256: sha256_hex(b"trusted-nitro-runtime-attestation"),
+            runtime_identity: None,
+            workload_identity: None,
+            claims: Some(serde_json::json!({
+                "awsNitro": {
+                    "moduleId": "nitro-enclave-1",
+                    "digest": "sha384:aws-measurement",
+                    "pcrs": { "0": "0123" }
+                }
+            })),
+        }
+    }
+
     #[test]
     fn governed_request_metadata_preserves_asserted_call_chain_and_diagnostics() {
         let call_chain = GovernedCallChainContext {
@@ -592,6 +695,8 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 0)
@@ -664,6 +769,8 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -751,6 +858,8 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
         let _scope =
             scope_governed_call_chain_receipt_evidence(Some(GovernedCallChainReceiptEvidence {
@@ -791,7 +900,11 @@ mod tests {
             Some("anchor-verified")
         );
         assert_eq!(provenance.into_inner(), call_chain);
-        assert!(metadata.get("governed_transaction_diagnostics").is_none());
+        assert_eq!(
+            metadata["governed_transaction_diagnostics"]["lineageReferences"]["sessionAnchorId"],
+            serde_json::json!("anchor-verified")
+        );
+        assert!(metadata["governed_transaction_diagnostics"]["assertedCallChain"].is_null());
     }
 
     #[test]
@@ -818,6 +931,8 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata = governed_request_metadata(&request, None, 150)
@@ -857,6 +972,8 @@ mod tests {
                 context: None,
             }),
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let metadata =
@@ -882,6 +999,115 @@ mod tests {
                 .expect("verified workload identity should be present")
                 .trust_domain,
             "arc"
+        );
+    }
+
+    #[test]
+    fn governed_request_metadata_prefers_scoped_nitro_verified_record() {
+        let attestation = trusted_nitro_runtime_attestation();
+        let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+            &attestation,
+            Some(&trusted_nitro_attestation_trust_policy()),
+            150,
+        )
+        .expect("nitro attestation should verify at governed admission");
+        let request = ToolCallRequest {
+            request_id: "req-current-nitro".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-nitro" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-nitro".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: Some(attestation),
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let _scope =
+            scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
+
+        let metadata = governed_request_metadata(&request, None, 150)
+            .expect("metadata should build")
+            .expect("governed metadata should exist");
+        let governed: GovernedTransactionReceiptMetadata =
+            serde_json::from_value(metadata["governed_transaction"].clone())
+                .expect("receipt metadata should deserialize");
+        let runtime_assurance = governed
+            .runtime_assurance
+            .expect("scoped verified runtime assurance should be present");
+
+        assert_eq!(runtime_assurance.tier, RuntimeAssuranceTier::Verified);
+        assert_eq!(
+            runtime_assurance.verifier_family,
+            Some(arc_core::appraisal::AttestationVerifierFamily::AwsNitro)
+        );
+        assert_eq!(runtime_assurance.verifier, "https://nitro.aws.example");
+        assert_eq!(
+            runtime_assurance.evidence_sha256,
+            sha256_hex(b"trusted-nitro-runtime-attestation")
+        );
+    }
+
+    #[test]
+    fn governed_request_metadata_rejects_mismatched_scoped_runtime_attestation_record() {
+        let attestation = trusted_nitro_runtime_attestation();
+        let verified_runtime_attestation = verify_governed_runtime_attestation_record(
+            &attestation,
+            Some(&trusted_nitro_attestation_trust_policy()),
+            150,
+        )
+        .expect("nitro attestation should verify at governed admission");
+        let mut mismatched_attestation = attestation.clone();
+        mismatched_attestation.evidence_sha256 =
+            sha256_hex(b"mismatched-nitro-runtime-attestation");
+        let request = ToolCallRequest {
+            request_id: "req-current-nitro-mismatch".to_string(),
+            capability: test_capability(),
+            tool_name: "charge".to_string(),
+            server_id: "srv-pay".to_string(),
+            agent_id: "agent-1".to_string(),
+            arguments: serde_json::json!({ "invoice_id": "inv-nitro-mismatch" }),
+            dpop_proof: None,
+            governed_intent: Some(GovernedTransactionIntent {
+                id: "intent-nitro-mismatch".to_string(),
+                server_id: "srv-pay".to_string(),
+                tool_name: "charge".to_string(),
+                purpose: "pay supplier".to_string(),
+                max_amount: None,
+                commerce: None,
+                metered_billing: None,
+                runtime_attestation: Some(mismatched_attestation),
+                call_chain: None,
+                autonomy: None,
+                context: None,
+            }),
+            approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
+        };
+        let _scope =
+            scope_governed_runtime_attestation_receipt_record(Some(verified_runtime_attestation));
+
+        let error = governed_request_metadata(&request, None, 150)
+            .expect_err("mismatched scoped runtime attestation should fail closed");
+        assert!(
+            error.to_string().contains(
+                "governed request runtime attestation does not match the scoped verified runtime attestation record"
+            ),
+            "expected mismatch error, got {error}"
         );
     }
 }

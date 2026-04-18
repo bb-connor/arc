@@ -4,6 +4,10 @@
 //! The Agent sends `AgentMessage` variants; the Kernel responds with
 //! `KernelMessage` variants.
 
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use serde::{Deserialize, Serialize};
 
 use crate::capability::CapabilityToken;
@@ -176,6 +180,8 @@ mod tests {
                 details: None,
             }],
             metadata: None,
+            trust_level: crate::receipt::TrustLevel::default(),
+            tenant_id: None,
             kernel_key: kp.public_key(),
         };
         ArcReceipt::sign(body, kp).unwrap()

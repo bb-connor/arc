@@ -17,12 +17,22 @@ echo "==> Lean 4 proof build"
 )
 
 echo "==> Lean 4 placeholder scan"
-if rg -n '\bsorry\b' \
-  "${formal_root}/Arc" \
-  "${formal_root}/Pact" \
-  "${formal_root}/Arc.lean" \
-  "${formal_root}/Pact.lean" \
-  -g '*.lean'; then
+if command -v rg >/dev/null 2>&1; then
+  placeholder_scan=(rg -n '\bsorry\b' \
+    "${formal_root}/Arc" \
+    "${formal_root}/Pact" \
+    "${formal_root}/Arc.lean" \
+    "${formal_root}/Pact.lean" \
+    -g '*.lean')
+else
+  placeholder_scan=(grep -RInw --include '*.lean' 'sorry' \
+    "${formal_root}/Arc" \
+    "${formal_root}/Pact" \
+    "${formal_root}/Arc.lean" \
+    "${formal_root}/Pact.lean")
+fi
+
+if "${placeholder_scan[@]}"; then
   echo "formal proof check failed: found literal sorry in shipped Lean modules" >&2
   exit 1
 fi

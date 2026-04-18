@@ -1,31 +1,44 @@
 //! Reverse proxy server that evaluates requests and forwards to upstream.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::extract::State;
-use axum::http::{Request, StatusCode};
+use axum::extract::{ConnectInfo, Path, Query, State};
+use axum::http::{header::AUTHORIZATION, Request, StatusCode};
+use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{any, get, post};
+use axum::Json;
 use axum::Router;
 use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-use arc_core_types::crypto::Keypair;
-use arc_http_core::{
-    ArcHttpRequest, EvaluateResponse, HealthResponse, HttpMethod, HttpReceipt, SidecarStatus,
-    Verdict, VerifyReceiptResponse,
+use arc_core_types::capability::{
+    ArcScope, CapabilityToken, CapabilityTokenBody, Operation, PromptGrant, ResourceGrant,
+    ToolGrant,
 };
+use arc_core_types::crypto::{Keypair, PublicKey};
+use arc_http_core::{
+    handle_batch_respond, handle_get_approval, handle_list_pending, handle_respond,
+    http_status_metadata_decision, http_status_metadata_final, ApprovalAdmin, ApprovalHandlerError,
+    ArcHttpRequest, AuthMethod, BatchRespondRequest, CallerIdentity, EvaluateResponse,
+    HealthResponse, HttpMethod, HttpReceipt, HttpReceiptBody, PendingQuery, RespondRequest,
+    SidecarStatus, Verdict, VerifyReceiptResponse,
+};
+use arc_kernel::{ApprovalStore, InMemoryApprovalStore};
 use arc_openapi::{ArcExtensions, DefaultPolicy};
+use arc_store_sqlite::SqliteApprovalStore;
 
 use crate::error::ProtectError;
 use crate::evaluator::{RequestEvaluator, RouteEntry};
 use crate::spec_discovery::{discover_spec, load_spec_from_file};
 
 /// Configuration for the protect proxy.
-#[derive(Debug, Clone)]
 pub struct ProtectConfig {
     /// Upstream URL to proxy to.
     pub upstream: String,
@@ -37,6 +50,39 @@ pub struct ProtectConfig {
     pub listen_addr: String,
     /// Optional SQLite path for receipt persistence.
     pub receipt_db: Option<String>,
+    /// Optional bearer token that authorizes remote sidecar control requests.
+    pub sidecar_control_token: Option<String>,
+    /// Optional seed used to keep the sidecar signer stable across restarts.
+    pub signer_seed_hex: Option<String>,
+    /// Explicit capability issuers trusted by the HTTP authority.
+    pub trusted_capability_issuers: Vec<PublicKey>,
+}
+
+impl std::fmt::Debug for ProtectConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ProtectConfig")
+            .field("upstream", &self.upstream)
+            .field(
+                "spec_content",
+                &self.spec_content.as_ref().map(|_| "<inline>"),
+            )
+            .field("spec_path", &self.spec_path)
+            .field("listen_addr", &self.listen_addr)
+            .field("receipt_db", &self.receipt_db)
+            .field(
+                "sidecar_control_token",
+                &self.sidecar_control_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "signer_seed_hex",
+                &self.signer_seed_hex.as_ref().map(|_| "<redacted>"),
+            )
+            .field(
+                "trusted_capability_issuers",
+                &self.trusted_capability_issuers,
+            )
+            .finish()
+    }
 }
 
 /// Stored receipts for inspection and querying.
@@ -58,6 +104,9 @@ impl SqliteReceiptStore {
                 CREATE TABLE IF NOT EXISTS http_receipts (
                     id TEXT PRIMARY KEY,
                     receipt_json TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS revoked_capabilities (
+                    capability_id TEXT PRIMARY KEY
                 );
                 ",
             )
@@ -96,15 +145,47 @@ impl SqliteReceiptStore {
             .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
         Ok(())
     }
+
+    fn load_revoked_capability_ids(&self) -> Result<HashSet<String>, ProtectError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT capability_id FROM revoked_capabilities ORDER BY rowid ASC")
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+
+        let mut capability_ids = HashSet::new();
+        for row in rows {
+            let capability_id =
+                row.map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+            capability_ids.insert(capability_id);
+        }
+        Ok(capability_ids)
+    }
+
+    fn revoke_capability(&mut self, capability_id: &str) -> Result<(), ProtectError> {
+        self.connection
+            .execute(
+                "INSERT OR REPLACE INTO revoked_capabilities (capability_id) VALUES (?1)",
+                params![capability_id],
+            )
+            .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        Ok(())
+    }
 }
 
 /// Shared proxy state.
 struct ProxyState {
     evaluator: RequestEvaluator,
+    signer_keypair: Keypair,
     upstream: String,
     http_client: reqwest::Client,
+    approval_admin: ApprovalAdmin,
     receipt_log: Mutex<ReceiptLog>,
     receipt_store: Option<Mutex<SqliteReceiptStore>>,
+    revoked_capability_ids: Mutex<HashSet<String>>,
+    sidecar_control_token: Option<String>,
 }
 
 /// The protect proxy.
@@ -166,30 +247,60 @@ impl ProtectProxy {
         let routes = Self::build_routes(&spec_content)?;
         let route_count = routes.len();
 
-        let keypair = Keypair::generate();
+        let keypair = match &self.config.signer_seed_hex {
+            Some(seed_hex) => Keypair::from_seed_hex(seed_hex)
+                .map_err(|error| ProtectError::Config(error.to_string()))?,
+            None => Keypair::generate(),
+        };
         let policy_hash = arc_core_types::sha256_hex(spec_content.as_bytes());
 
-        let evaluator = RequestEvaluator::new(routes, keypair, policy_hash);
-
-        let (receipt_log, receipt_store) = if let Some(path) = &self.config.receipt_db {
-            let store = SqliteReceiptStore::open(path)?;
-            let receipts = store.load_receipts()?;
-            (ReceiptLog { receipts }, Some(Mutex::new(store)))
-        } else {
-            (
-                ReceiptLog {
-                    receipts: Vec::new(),
-                },
-                None,
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = &self.config.receipt_db {
+            Arc::new(
+                SqliteApprovalStore::open(path)
+                    .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?,
             )
+        } else {
+            Arc::new(InMemoryApprovalStore::new())
         };
+
+        let evaluator = RequestEvaluator::new_with_approval_store_and_trusted_capability_issuers(
+            routes,
+            keypair.clone(),
+            policy_hash,
+            Arc::clone(&approval_store),
+            self.config.trusted_capability_issuers.clone(),
+        );
+
+        let (receipt_log, receipt_store, revoked_capability_ids) =
+            if let Some(path) = &self.config.receipt_db {
+                let store = SqliteReceiptStore::open(path)?;
+                let receipts = store.load_receipts()?;
+                let revoked_capability_ids = store.load_revoked_capability_ids()?;
+                (
+                    ReceiptLog { receipts },
+                    Some(Mutex::new(store)),
+                    revoked_capability_ids,
+                )
+            } else {
+                (
+                    ReceiptLog {
+                        receipts: Vec::new(),
+                    },
+                    None,
+                    HashSet::new(),
+                )
+            };
 
         let state = Arc::new(ProxyState {
             evaluator,
+            signer_keypair: keypair,
             upstream: self.config.upstream.clone(),
             http_client: reqwest::Client::new(),
+            approval_admin: ApprovalAdmin::new(approval_store),
             receipt_log: Mutex::new(receipt_log),
             receipt_store,
+            revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            sidecar_control_token: self.config.sidecar_control_token.clone(),
         });
 
         let app = build_app(Arc::clone(&state));
@@ -205,7 +316,12 @@ impl ProtectProxy {
             route_count, self.config.upstream, self.config.listen_addr
         );
 
-        axum::serve(listener, app).await.map_err(ProtectError::Io)?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        .map_err(ProtectError::Io)?;
 
         Ok(())
     }
@@ -217,13 +333,105 @@ impl ProtectProxy {
 }
 
 fn build_app(state: Arc<ProxyState>) -> Router {
+    let approval_routes = Router::new()
+        .route("/approvals/pending", get(list_pending_approvals_handler))
+        .route(
+            "/approvals/batch/respond",
+            post(batch_respond_approvals_handler),
+        )
+        .route("/approvals/{id}/respond", post(respond_approval_handler))
+        .route("/approvals/{id}", get(get_approval_handler))
+        .route_layer(middleware::from_fn_with_state(
+            Arc::clone(&state),
+            require_sidecar_control_middleware,
+        ));
+
     Router::new()
         .route("/arc/evaluate", post(sidecar_evaluate_handler))
         .route("/arc/verify", post(sidecar_verify_handler))
         .route("/arc/health", get(sidecar_health_handler))
+        .merge(approval_routes)
+        .route("/v1/capabilities/mint", post(sidecar_mint_handler))
+        .route("/v1/capabilities/release", post(sidecar_release_handler))
+        .route("/v1/receipts", post(sidecar_submit_receipt_handler))
         .route("/{*path}", any(proxy_handler))
         .route("/", any(proxy_handler))
         .with_state(state)
+}
+
+async fn list_pending_approvals_handler(
+    State(state): State<Arc<ProxyState>>,
+    Query(query): Query<PendingQuery>,
+) -> Response {
+    match handle_list_pending(&state.approval_admin, query) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn get_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(approval_id): Path<String>,
+) -> Response {
+    match handle_get_approval(&state.approval_admin, &approval_id) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn respond_approval_handler(
+    State(state): State<Arc<ProxyState>>,
+    Path(approval_id): Path<String>,
+    body: Result<Json<RespondRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid approval response payload: {error}"
+            )));
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_respond(&state.approval_admin, &approval_id, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn batch_respond_approvals_handler(
+    State(state): State<Arc<ProxyState>>,
+    body: Result<Json<BatchRespondRequest>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    let Json(body) = match body {
+        Ok(body) => body,
+        Err(error) => {
+            return approval_error_response(ApprovalHandlerError::BadRequest(format!(
+                "invalid batch approval payload: {error}"
+            )));
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp() as u64;
+    match handle_batch_respond(&state.approval_admin, body, now) {
+        Ok(response) => approval_json(StatusCode::OK, response),
+        Err(error) => approval_error_response(error),
+    }
+}
+
+async fn require_sidecar_control_middleware(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
+        return response;
+    }
+
+    next.run(request).await
 }
 
 /// Axum handler that evaluates the request and proxies to upstream.
@@ -270,6 +478,12 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
         Some(arc_core_types::sha256_hex(&body_bytes))
     };
 
+    if let Some(response) =
+        revoked_proxy_response(&state, method, &path, &query, &headers, body_hash.clone()).await
+    {
+        return response;
+    }
+
     // Evaluate.
     let result =
         match state
@@ -279,7 +493,7 @@ async fn proxy_handler(State(state): State<Arc<ProxyState>>, request: Request<Bo
             Ok(r) => r,
             Err(e) => {
                 warn!("evaluation error: {e}");
-                return (StatusCode::INTERNAL_SERVER_ERROR, "evaluation error").into_response();
+                return evaluation_error_response(&e);
             }
         };
 
@@ -427,6 +641,13 @@ async fn sidecar_evaluate_handler(
         }
     };
 
+    if let Some(response) =
+        revoked_sidecar_evaluate_response(&state, &arc_request, presented_capability.as_deref())
+            .await
+    {
+        return response;
+    }
+
     let result = match state
         .evaluator
         .evaluate_arc_request(arc_request, presented_capability.as_deref())
@@ -434,14 +655,7 @@ async fn sidecar_evaluate_handler(
         Ok(result) => result,
         Err(error) => {
             warn!("sidecar evaluation error: {error}");
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({
-                    "error": "arc_evaluation_failed",
-                    "message": error.to_string(),
-                })),
-            )
-                .into_response();
+            return evaluation_error_response(&error);
         }
     };
 
@@ -463,6 +677,12 @@ async fn sidecar_evaluate_handler(
             verdict: result.verdict,
             receipt: result.receipt,
             evidence: result.evidence,
+            // Phase 1.1: this proxy path does not mint execution nonces
+            // today. When the kernel gets a nonce config, the caller
+            // lifts the nonce out of the kernel's tool-call response and
+            // populates this field; for now it stays `None`, which keeps
+            // the JSON wire shape identical to the pre-1.1 contract.
+            execution_nonce: None,
         }),
     )
         .into_response()
@@ -518,6 +738,324 @@ async fn sidecar_health_handler(State(_state): State<Arc<ProxyState>>) -> Respon
         .into_response()
 }
 
+#[derive(Debug, Deserialize)]
+struct SidecarMintRequest {
+    subject: String,
+    #[serde(default)]
+    scopes: Vec<String>,
+    #[serde(default)]
+    ttl: Option<u64>,
+    #[serde(default)]
+    ttl_seconds: Option<u64>,
+    #[serde(default)]
+    ttl_nanos: Option<u64>,
+    #[serde(default)]
+    job_uid: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarMintResponse {
+    capability: CapabilityToken,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarReleaseRequest {
+    capability_id: String,
+    #[serde(default)]
+    job_uid: String,
+    #[serde(default)]
+    reason: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarReleaseResponse {
+    released: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSubmitReceiptRequest {
+    job_name: String,
+    namespace: String,
+    job_uid: String,
+    #[serde(default)]
+    capability_id: Option<String>,
+    outcome: String,
+    #[serde(default)]
+    started_at: Option<String>,
+    #[serde(default)]
+    completed_at: Option<String>,
+    #[serde(default)]
+    steps: Vec<SidecarSubmitStepReceipt>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SidecarSubmitStepReceipt {
+    pod_name: String,
+    phase: String,
+    payload: String,
+    observed_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SidecarSubmitReceiptResponse {
+    receipt_id: String,
+    accepted: bool,
+}
+
+async fn sidecar_mint_handler(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
+        return response;
+    }
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read capability mint body: {error}");
+            return sidecar_bad_request("failed to read capability mint body").into_response();
+        }
+    };
+
+    let mint_request: SidecarMintRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode capability mint request: {error}");
+            return sidecar_bad_request(&format!("invalid capability mint payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if mint_request.subject.trim().is_empty() {
+        return sidecar_bad_request("subject must not be empty").into_response();
+    }
+
+    let scope = match build_sidecar_scope(&mint_request.scopes) {
+        Ok(scope) => scope,
+        Err(error) => return sidecar_bad_request(&error).into_response(),
+    };
+
+    let issued_at = chrono::Utc::now().timestamp() as u64;
+    let ttl_seconds = ttl_seconds_from_wire(
+        mint_request.ttl_seconds,
+        mint_request.ttl_nanos,
+        mint_request.ttl,
+    );
+    let expires_at = issued_at.saturating_add(ttl_seconds);
+    let subject = derive_sidecar_subject_key(&mint_request.subject, &mint_request.job_uid);
+    let capability_id = match derive_sidecar_capability_id(
+        &mint_request.subject,
+        &mint_request.job_uid,
+        ttl_seconds,
+        &scope,
+    ) {
+        Ok(capability_id) => capability_id,
+        Err(error) => {
+            warn!("failed to derive deterministic capability id: {error}");
+            return internal_json_error_response(
+                "arc_capability_mint_failed",
+                "failed to derive deterministic capability id",
+            );
+        }
+    };
+
+    let capability = match CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: capability_id,
+            issuer: state.signer_keypair.public_key(),
+            subject,
+            scope,
+            issued_at,
+            expires_at,
+            delegation_chain: Vec::new(),
+        },
+        &state.signer_keypair,
+    ) {
+        Ok(capability) => capability,
+        Err(error) => {
+            warn!("failed to sign compatibility capability token: {error}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "error": "arc_capability_mint_failed",
+                    "message": error.to_string(),
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarMintResponse { capability }),
+    )
+        .into_response()
+}
+
+async fn sidecar_release_handler(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
+        return response;
+    }
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read capability release body: {error}");
+            return sidecar_bad_request("failed to read capability release body").into_response();
+        }
+    };
+
+    let release_request: SidecarReleaseRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode capability release request: {error}");
+            return sidecar_bad_request(&format!("invalid capability release payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if release_request.capability_id.trim().is_empty() {
+        return sidecar_bad_request("capability_id must not be empty").into_response();
+    }
+
+    let capability_id = release_request.capability_id.trim().to_string();
+    let Some(store) = &state.receipt_store else {
+        return internal_json_error_response(
+            "arc_capability_release_failed",
+            "persistent receipt_db must be configured for capability release",
+        );
+    };
+    let mut store = store.lock().await;
+    if let Err(error) = store.revoke_capability(&capability_id) {
+        warn!("failed to persist capability revocation: {error}");
+        return internal_json_error_response("arc_capability_release_failed", &error.to_string());
+    }
+    state
+        .revoked_capability_ids
+        .lock()
+        .await
+        .insert(capability_id);
+    let _ = (release_request.job_uid, release_request.reason);
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarReleaseResponse { released: true }),
+    )
+        .into_response()
+}
+
+async fn sidecar_submit_receipt_handler(
+    State(state): State<Arc<ProxyState>>,
+    request: Request<Body>,
+) -> Response {
+    if let Err(response) =
+        require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
+    {
+        return response;
+    }
+    let (_parts, body) = request.into_parts();
+    let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            warn!("failed to read receipt submission body: {error}");
+            return sidecar_bad_request("failed to read receipt submission body").into_response();
+        }
+    };
+
+    let receipt_request: SidecarSubmitReceiptRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(request) => request,
+        Err(error) => {
+            warn!("failed to decode receipt submission payload: {error}");
+            return sidecar_bad_request(&format!("invalid receipt submission payload: {error}"))
+                .into_response();
+        }
+    };
+
+    if receipt_request.job_name.trim().is_empty()
+        || receipt_request.namespace.trim().is_empty()
+        || receipt_request.job_uid.trim().is_empty()
+        || receipt_request.outcome.trim().is_empty()
+    {
+        return sidecar_bad_request("job_name, namespace, job_uid, and outcome are required")
+            .into_response();
+    }
+
+    for step in &receipt_request.steps {
+        if step.pod_name.trim().is_empty()
+            || step.phase.trim().is_empty()
+            || step.payload.trim().is_empty()
+            || step.observed_at.trim().is_empty()
+        {
+            return sidecar_bad_request(
+                "receipt steps must include pod_name, phase, payload, and observed_at",
+            )
+            .into_response();
+        }
+    }
+
+    let caller_identity_hash = match CallerIdentity::anonymous().identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash synthetic receipt caller identity: {error}");
+            return internal_json_error_response("arc_receipt_sign_failed", &error.to_string());
+        }
+    };
+
+    let receipt_id = uuid::Uuid::now_v7().to_string();
+    let capability_id = receipt_request
+        .capability_id
+        .clone()
+        .filter(|value| !value.trim().is_empty());
+    let receipt = match HttpReceipt::sign(
+        HttpReceiptBody {
+            id: receipt_id.clone(),
+            request_id: format!("job-receipt-submission:{}", receipt_request.job_uid),
+            route_pattern: "/v1/receipts".to_string(),
+            method: HttpMethod::Post,
+            caller_identity_hash,
+            session_id: None,
+            verdict: Verdict::Allow,
+            evidence: Vec::new(),
+            response_status: StatusCode::OK.as_u16(),
+            timestamp: chrono::Utc::now().timestamp() as u64,
+            content_hash: arc_core_types::sha256_hex(&body_bytes),
+            policy_hash: manual_receipt_policy_hash("arc_api_protect_sidecar_receipt_submission"),
+            capability_id,
+            metadata: Some(sidecar_submit_receipt_metadata(&receipt_request)),
+            kernel_key: state.signer_keypair.public_key(),
+        },
+        &state.signer_keypair,
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign submitted sidecar receipt: {error}");
+            return internal_json_error_response("arc_receipt_sign_failed", &error.to_string());
+        }
+    };
+
+    if let Err(error) = record_receipt(&state, &receipt).await {
+        warn!("failed to persist submitted sidecar receipt: {error}");
+        return internal_json_error_response("arc_receipt_persistence_failed", &error.to_string());
+    }
+
+    (
+        StatusCode::OK,
+        axum::Json(SidecarSubmitReceiptResponse {
+            receipt_id,
+            accepted: true,
+        }),
+    )
+        .into_response()
+}
+
 fn parse_query_params(raw_query: Option<&str>) -> HashMap<String, String> {
     raw_query
         .map(|query| {
@@ -545,6 +1083,682 @@ fn forwarded_query_string(raw_query: Option<&str>) -> Option<String> {
     }
     let query = serializer.finish();
     (!query.is_empty()).then_some(query)
+}
+
+fn sidecar_bad_request(message: &str) -> (StatusCode, axum::Json<serde_json::Value>) {
+    (
+        StatusCode::BAD_REQUEST,
+        axum::Json(serde_json::json!({
+            "error": "arc_bad_request",
+            "message": message,
+        })),
+    )
+}
+
+#[allow(clippy::result_large_err)]
+fn require_sidecar_control_request(
+    request: &Request<Body>,
+    expected_bearer_token: Option<&str>,
+) -> Result<(), Response> {
+    if let Some(expected_bearer_token) = expected_bearer_token.map(str::trim) {
+        if expected_bearer_token.is_empty() {
+            warn!("rejecting sidecar control request with blank bearer token configuration");
+            return Err(sidecar_control_forbidden_response(true));
+        }
+        if sidecar_control_bearer_token_matches(request, expected_bearer_token) {
+            return Ok(());
+        }
+        if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+            warn!(
+                peer = %peer.0,
+                "rejecting sidecar control request without valid bearer token"
+            );
+        } else {
+            warn!("rejecting sidecar control request without valid bearer token");
+        }
+        return Err(sidecar_control_forbidden_response(true));
+    }
+
+    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        if peer.0.ip().is_loopback() {
+            return Ok(());
+        }
+    }
+
+    if let Some(peer) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        warn!(
+            peer = %peer.0,
+            "rejecting non-loopback sidecar control request without configured bearer token"
+        );
+    } else {
+        warn!("rejecting sidecar control request without peer address");
+    }
+    Err(sidecar_control_forbidden_response(false))
+}
+
+fn sidecar_control_bearer_token_matches(
+    request: &Request<Body>,
+    expected_bearer_token: &str,
+) -> bool {
+    request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| {
+            let (scheme, token) = value.split_once(' ')?;
+            if scheme.eq_ignore_ascii_case("bearer") {
+                Some(token)
+            } else {
+                None
+            }
+        })
+        .is_some_and(|token| token == expected_bearer_token)
+}
+
+fn sidecar_control_forbidden_response(remote_auth_configured: bool) -> Response {
+    let message = if remote_auth_configured {
+        "sidecar control endpoints require a loopback caller or valid bearer token"
+    } else {
+        "sidecar control endpoints require a loopback caller"
+    };
+    (
+        StatusCode::FORBIDDEN,
+        axum::Json(serde_json::json!({
+            "error": "arc_control_forbidden",
+            "message": message,
+        })),
+    )
+        .into_response()
+}
+
+fn ttl_seconds_from_wire(
+    ttl_seconds_wire: Option<u64>,
+    ttl_nanos_wire: Option<u64>,
+    ttl_legacy_wire: Option<u64>,
+) -> u64 {
+    const DEFAULT_TTL_SECONDS: u64 = 3600;
+    const NANOS_PER_SECOND: u64 = 1_000_000_000;
+
+    if let Some(ttl_seconds) = ttl_seconds_wire {
+        return match ttl_seconds {
+            0 => DEFAULT_TTL_SECONDS,
+            ttl_seconds => ttl_seconds,
+        };
+    }
+
+    if let Some(ttl_nanos) = ttl_nanos_wire {
+        return match ttl_nanos {
+            0 => DEFAULT_TTL_SECONDS,
+            ttl_nanos => std::cmp::max(
+                1,
+                ttl_nanos.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
+            ),
+        };
+    }
+
+    match ttl_legacy_wire {
+        Some(0) | None => DEFAULT_TTL_SECONDS,
+        Some(ttl) if ttl < NANOS_PER_SECOND => ttl,
+        Some(ttl) => std::cmp::max(
+            1,
+            ttl.saturating_add(NANOS_PER_SECOND - 1) / NANOS_PER_SECOND,
+        ),
+    }
+}
+
+fn derive_sidecar_subject_key(subject: &str, job_uid: &str) -> arc_core_types::crypto::PublicKey {
+    let mut hasher = Sha256::new();
+    hasher.update(subject.as_bytes());
+    hasher.update([0]);
+    hasher.update(job_uid.as_bytes());
+    let seed: [u8; 32] = hasher.finalize().into();
+    Keypair::from_seed(&seed).public_key()
+}
+
+fn derive_sidecar_capability_id(
+    subject: &str,
+    job_uid: &str,
+    ttl_seconds: u64,
+    scope: &ArcScope,
+) -> Result<String, serde_json::Error> {
+    #[derive(Serialize)]
+    struct SidecarCapabilityIdMaterial<'a> {
+        subject: &'a str,
+        job_uid: &'a str,
+        ttl_seconds: u64,
+        tool_grants: Vec<String>,
+        resource_grants: Vec<String>,
+        prompt_grants: Vec<String>,
+    }
+
+    fn sorted_grant_encodings<T: Serialize>(
+        grants: &[T],
+    ) -> Result<Vec<String>, serde_json::Error> {
+        let mut encodings = grants
+            .iter()
+            .map(serde_json::to_string)
+            .collect::<Result<Vec<_>, _>>()?;
+        encodings.sort_unstable();
+        Ok(encodings)
+    }
+
+    let id_material = SidecarCapabilityIdMaterial {
+        subject,
+        job_uid,
+        ttl_seconds,
+        tool_grants: sorted_grant_encodings(&scope.grants)?,
+        resource_grants: sorted_grant_encodings(&scope.resource_grants)?,
+        prompt_grants: sorted_grant_encodings(&scope.prompt_grants)?,
+    };
+    let encoded = serde_json::to_vec(&id_material)?;
+    Ok(format!("sidecar-{}", arc_core_types::sha256_hex(&encoded)))
+}
+
+fn build_sidecar_scope(scopes: &[String]) -> Result<ArcScope, String> {
+    let mut tool_grants = Vec::new();
+    let mut resource_grants = Vec::new();
+    let mut prompt_grants = Vec::new();
+
+    for scope in scopes {
+        match parse_sidecar_scope(scope)? {
+            SidecarScopeGrant::Tool(grant) => tool_grants.push(grant),
+            SidecarScopeGrant::Resource(grant) => resource_grants.push(grant),
+            SidecarScopeGrant::Prompt(grant) => prompt_grants.push(grant),
+        }
+    }
+
+    Ok(ArcScope {
+        grants: tool_grants,
+        resource_grants,
+        prompt_grants,
+    })
+}
+
+enum SidecarScopeGrant {
+    Tool(ToolGrant),
+    Resource(ResourceGrant),
+    Prompt(PromptGrant),
+}
+
+fn parse_sidecar_scope(raw: &str) -> Result<SidecarScopeGrant, String> {
+    let parts: Vec<&str> = raw
+        .split(':')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .collect();
+
+    if parts.first() == Some(&"tools") && parts.len() >= 2 {
+        return Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: parts[1..].join(":"),
+            operations: vec![Operation::Invoke],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        }));
+    }
+
+    match parts.as_slice() {
+        [tool_name, operation] => Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: "*".to_string(),
+            tool_name: (*tool_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, true)?],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        })),
+        ["tool", server_id, tool_name, operation] => Ok(SidecarScopeGrant::Tool(ToolGrant {
+            server_id: (*server_id).to_string(),
+            tool_name: (*tool_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+            constraints: Vec::new(),
+            max_invocations: None,
+            max_cost_per_invocation: None,
+            max_total_cost: None,
+            dpop_required: None,
+        })),
+        ["resource", uri_pattern, operation] => Ok(SidecarScopeGrant::Resource(ResourceGrant {
+            uri_pattern: (*uri_pattern).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+        })),
+        ["prompt", prompt_name, operation] => Ok(SidecarScopeGrant::Prompt(PromptGrant {
+            prompt_name: (*prompt_name).to_string(),
+            operations: vec![parse_sidecar_operation(operation, false)?],
+        })),
+        _ => Err(format!("unsupported controller scope syntax: {raw}")),
+    }
+}
+
+fn parse_sidecar_operation(raw: &str, shorthand: bool) -> Result<Operation, String> {
+    match raw.to_ascii_lowercase().as_str() {
+        "invoke" | "call" | "exec" | "execute" => Ok(Operation::Invoke),
+        "write" if shorthand => Ok(Operation::Invoke),
+        "read_result" | "result" => Ok(Operation::ReadResult),
+        "read" if shorthand => Ok(Operation::Read),
+        "read" => Ok(Operation::Read),
+        "subscribe" | "watch" => Ok(Operation::Subscribe),
+        "get" => Ok(Operation::Get),
+        "delegate" => Ok(Operation::Delegate),
+        _ => Err(format!("unsupported controller scope operation: {raw}")),
+    }
+}
+
+fn evaluation_error_response(error: &ProtectError) -> Response {
+    match error {
+        ProtectError::PendingApproval {
+            approval_id,
+            kernel_receipt_id,
+        } => {
+            let mut body = serde_json::json!({
+                "error": "arc_approval_required",
+                "message": "request requires human approval before it can proceed",
+                "kernel_receipt_id": kernel_receipt_id,
+            });
+            if let Some(approval_id) = approval_id {
+                body["approval_id"] = serde_json::Value::String(approval_id.clone());
+                body["resume_path"] =
+                    serde_json::Value::String(format!("/approvals/{approval_id}/respond"));
+            }
+            (StatusCode::CONFLICT, axum::Json(body)).into_response()
+        }
+        _ => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "error": "arc_evaluation_failed",
+                "message": error.to_string(),
+            })),
+        )
+            .into_response(),
+    }
+}
+
+fn approval_json<T>(status: StatusCode, response: T) -> Response
+where
+    T: Serialize,
+{
+    (status, Json(response)).into_response()
+}
+
+fn approval_error_response(error: ApprovalHandlerError) -> Response {
+    let status = StatusCode::from_u16(error.status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    (status, Json(error.body())).into_response()
+}
+
+fn internal_json_error_response(error: &str, message: &str) -> Response {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        axum::Json(serde_json::json!({
+            "error": error,
+            "message": message,
+        })),
+    )
+        .into_response()
+}
+
+fn extract_presented_capability_from_maps<'a>(
+    headers: &'a HashMap<String, String>,
+    query: &'a HashMap<String, String>,
+) -> Option<&'a str> {
+    headers
+        .get("x-arc-capability")
+        .or_else(|| headers.get("X-Arc-Capability"))
+        .map(String::as_str)
+        .or_else(|| query.get("arc_capability").map(String::as_str))
+}
+
+fn extract_caller_identity(headers: &HashMap<String, String>) -> CallerIdentity {
+    if let Some(auth) = headers
+        .get("authorization")
+        .or_else(|| headers.get("Authorization"))
+    {
+        if let Some(token) = auth.strip_prefix("Bearer ") {
+            let token_hash = arc_core_types::sha256_hex(token.as_bytes());
+            return CallerIdentity {
+                subject: format!("bearer:{}", &token_hash[..16]),
+                auth_method: AuthMethod::Bearer { token_hash },
+                verified: false,
+                tenant: None,
+                agent_id: None,
+            };
+        }
+    }
+
+    for key_header in &["x-api-key", "X-Api-Key", "X-API-Key"] {
+        if let Some(key_value) = headers.get(*key_header) {
+            let key_hash = arc_core_types::sha256_hex(key_value.as_bytes());
+            return CallerIdentity {
+                subject: format!("apikey:{}", &key_hash[..16]),
+                auth_method: AuthMethod::ApiKey {
+                    key_name: key_header.to_string(),
+                    key_hash,
+                },
+                verified: false,
+                tenant: None,
+                agent_id: None,
+            };
+        }
+    }
+
+    CallerIdentity::anonymous()
+}
+
+fn presented_capability_id(raw_capability: Option<&str>) -> Option<String> {
+    serde_json::from_str::<CapabilityToken>(raw_capability?)
+        .ok()
+        .map(|token| token.id)
+}
+
+async fn find_revoked_capability_id(
+    state: &Arc<ProxyState>,
+    raw_capability: Option<&str>,
+    capability_id_hint: Option<&str>,
+) -> Option<String> {
+    let capability_id = presented_capability_id(raw_capability)
+        .or_else(|| capability_id_hint.map(ToOwned::to_owned))?;
+    let revoked_capability_ids = state.revoked_capability_ids.lock().await;
+    revoked_capability_ids
+        .contains(&capability_id)
+        .then_some(capability_id)
+}
+
+fn revoked_capability_verdict() -> Verdict {
+    Verdict::deny_with_status(
+        "capability token has been revoked",
+        "CapabilityRevocation",
+        403,
+    )
+}
+
+fn manual_receipt_policy_hash(label: &str) -> String {
+    arc_core_types::sha256_hex(label.as_bytes())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_manual_receipt(
+    state: &Arc<ProxyState>,
+    request_id: String,
+    route_pattern: String,
+    method: HttpMethod,
+    caller_identity_hash: String,
+    session_id: Option<String>,
+    verdict: Verdict,
+    response_status: u16,
+    timestamp: u64,
+    content_hash: String,
+    capability_id: Option<String>,
+    metadata: Option<serde_json::Value>,
+    policy_label: &str,
+) -> Result<HttpReceipt, ProtectError> {
+    HttpReceipt::sign(
+        HttpReceiptBody {
+            id: uuid::Uuid::now_v7().to_string(),
+            request_id,
+            route_pattern,
+            method,
+            caller_identity_hash,
+            session_id,
+            verdict,
+            evidence: Vec::new(),
+            response_status,
+            timestamp,
+            content_hash,
+            policy_hash: manual_receipt_policy_hash(policy_label),
+            capability_id,
+            metadata,
+            kernel_key: state.signer_keypair.public_key(),
+        },
+        &state.signer_keypair,
+    )
+    .map_err(|error| ProtectError::ReceiptSign(error.to_string()))
+}
+
+async fn revoked_proxy_response(
+    state: &Arc<ProxyState>,
+    method: HttpMethod,
+    path: &str,
+    query: &HashMap<String, String>,
+    headers: &HashMap<String, String>,
+    body_hash: Option<String>,
+) -> Option<Response> {
+    let capability_id = find_revoked_capability_id(
+        state,
+        extract_presented_capability_from_maps(headers, query),
+        None,
+    )
+    .await?;
+    let caller = extract_caller_identity(headers);
+    let caller_identity_hash = match caller.identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash caller identity for revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    let mut request = ArcHttpRequest::new(
+        uuid::Uuid::now_v7().to_string(),
+        method,
+        path.to_string(),
+        path.to_string(),
+        caller,
+    );
+    request.query = query.clone();
+    request.body_hash = body_hash;
+
+    let content_hash = match request.content_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to compute revocation request content hash: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    let verdict = revoked_capability_verdict();
+    let receipt = match build_manual_receipt(
+        state,
+        request.request_id.clone(),
+        request.route_pattern.clone(),
+        request.method,
+        caller_identity_hash,
+        None,
+        verdict.clone(),
+        StatusCode::FORBIDDEN.as_u16(),
+        request.timestamp,
+        content_hash,
+        Some(capability_id),
+        Some(http_status_metadata_final(None)),
+        "arc_api_protect_revoked_capability",
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    if let Err(error) = record_receipt(state, &receipt).await {
+        warn!("failed to persist revocation receipt: {error}");
+        return Some(internal_json_error_response(
+            "arc_receipt_persistence_failed",
+            &error.to_string(),
+        ));
+    }
+
+    let denied_status =
+        StatusCode::from_u16(verdict_http_status(&verdict)).unwrap_or(StatusCode::FORBIDDEN);
+    let error_body = serde_json::json!({
+        "error": "arc_access_denied",
+        "message": "capability token has been revoked",
+        "receipt_id": receipt.id,
+        "suggestion": "request a fresh capability token before retrying",
+    });
+
+    Some(
+        Response::builder()
+            .status(denied_status)
+            .header("content-type", "application/json")
+            .header("X-Arc-Receipt-Id", &receipt.id)
+            .body(Body::from(
+                serde_json::to_string(&error_body).unwrap_or_default(),
+            ))
+            .unwrap_or_else(|_| denied_status.into_response()),
+    )
+}
+
+async fn revoked_sidecar_evaluate_response(
+    state: &Arc<ProxyState>,
+    request: &ArcHttpRequest,
+    presented_capability: Option<&str>,
+) -> Option<Response> {
+    let capability_id = find_revoked_capability_id(
+        state,
+        presented_capability,
+        request.capability_id.as_deref(),
+    )
+    .await?;
+    let caller_identity_hash = match request.caller.identity_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to hash caller identity for sidecar revocation: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+    let content_hash = match request.content_hash() {
+        Ok(hash) => hash,
+        Err(error) => {
+            warn!("failed to compute sidecar revocation content hash: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+    let route_pattern = if request.route_pattern.is_empty() {
+        request.path.clone()
+    } else {
+        request.route_pattern.clone()
+    };
+    let verdict = revoked_capability_verdict();
+    let receipt = match build_manual_receipt(
+        state,
+        request.request_id.clone(),
+        route_pattern,
+        request.method,
+        caller_identity_hash,
+        request.session_id.clone(),
+        verdict.clone(),
+        StatusCode::FORBIDDEN.as_u16(),
+        request.timestamp,
+        content_hash,
+        Some(capability_id),
+        Some(http_status_metadata_decision()),
+        "arc_api_protect_revoked_capability",
+    ) {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            warn!("failed to sign sidecar revocation receipt: {error}");
+            return Some(internal_json_error_response(
+                "arc_receipt_sign_failed",
+                &error.to_string(),
+            ));
+        }
+    };
+
+    if let Err(error) = record_receipt(state, &receipt).await {
+        warn!("failed to persist sidecar revocation receipt: {error}");
+        return Some(internal_json_error_response(
+            "arc_receipt_persistence_failed",
+            &error.to_string(),
+        ));
+    }
+
+    Some(
+        (
+            StatusCode::OK,
+            axum::Json(EvaluateResponse {
+                verdict,
+                receipt,
+                evidence: Vec::new(),
+                execution_nonce: None,
+            }),
+        )
+            .into_response(),
+    )
+}
+
+fn sidecar_submit_receipt_metadata(
+    receipt_request: &SidecarSubmitReceiptRequest,
+) -> serde_json::Value {
+    let mut metadata = match http_status_metadata_final(None) {
+        serde_json::Value::Object(object) => object,
+        _ => serde_json::Map::new(),
+    };
+    metadata.insert(
+        "submission_kind".to_string(),
+        serde_json::Value::String("job_receipt".to_string()),
+    );
+    metadata.insert(
+        "job_name".to_string(),
+        serde_json::Value::String(receipt_request.job_name.clone()),
+    );
+    metadata.insert(
+        "namespace".to_string(),
+        serde_json::Value::String(receipt_request.namespace.clone()),
+    );
+    metadata.insert(
+        "job_uid".to_string(),
+        serde_json::Value::String(receipt_request.job_uid.clone()),
+    );
+    metadata.insert(
+        "outcome".to_string(),
+        serde_json::Value::String(receipt_request.outcome.clone()),
+    );
+    if let Some(started_at) = &receipt_request.started_at {
+        metadata.insert(
+            "started_at".to_string(),
+            serde_json::Value::String(started_at.clone()),
+        );
+    }
+    if let Some(completed_at) = &receipt_request.completed_at {
+        metadata.insert(
+            "completed_at".to_string(),
+            serde_json::Value::String(completed_at.clone()),
+        );
+    }
+    metadata.insert(
+        "steps".to_string(),
+        serde_json::Value::Array(
+            receipt_request
+                .steps
+                .iter()
+                .map(|step| {
+                    serde_json::json!({
+                        "pod_name": step.pod_name,
+                        "phase": step.phase,
+                        "payload": step.payload,
+                        "observed_at": step.observed_at,
+                    })
+                })
+                .collect(),
+        ),
+    );
+    serde_json::Value::Object(metadata)
 }
 
 fn should_forward_request_header(name: &str) -> bool {
@@ -647,15 +1861,21 @@ async fn finalize_bad_gateway(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arc_core_types::capability::{ArcScope, CapabilityToken, CapabilityTokenBody};
-    use arc_http_core::{
-        http_status_scope, ARC_HTTP_STATUS_SCOPE_DECISION, ARC_HTTP_STATUS_SCOPE_FINAL,
+    use arc_core_types::capability::{
+        ArcScope, CapabilityToken, CapabilityTokenBody, GovernedApprovalDecision,
+        GovernedApprovalToken, GovernedApprovalTokenBody,
     };
+    use arc_http_core::{
+        http_status_scope, RespondResponse, ARC_HTTP_STATUS_SCOPE_DECISION,
+        ARC_HTTP_STATUS_SCOPE_FINAL,
+    };
+    use arc_kernel::{ApprovalOutcome, ApprovalRequest};
     use arc_openapi::PolicyDecision;
     use axum::body::to_bytes;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::thread;
+    use tower::ServiceExt;
 
     const PETSTORE_YAML: &str = r#"
 openapi: "3.0.0"
@@ -711,8 +1931,7 @@ paths:
           description: Deleted
 "#;
 
-    fn valid_capability_token_json(id: &str) -> String {
-        let issuer = Keypair::generate();
+    fn signed_capability_token_json(issuer: &Keypair, id: &str) -> String {
         let now = chrono::Utc::now().timestamp() as u64;
         let token = CapabilityToken::sign(
             CapabilityTokenBody {
@@ -737,8 +1956,25 @@ paths:
     }
 
     impl MockUpstreamServer {
-        fn spawn(status: u16, headers: Vec<(&str, &str)>, body: &str) -> Self {
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind mock upstream listener");
+        fn bind_mock_upstream_listener() -> Option<TcpListener> {
+            match TcpListener::bind("127.0.0.1:0") {
+                Ok(listener) => Some(listener),
+                Err(error) => match error.kind() {
+                    std::io::ErrorKind::PermissionDenied
+                    | std::io::ErrorKind::AddrNotAvailable
+                    | std::io::ErrorKind::Unsupported => {
+                        eprintln!(
+                            "skipping proxy mock-upstream test because loopback bind is unavailable: {error}"
+                        );
+                        None
+                    }
+                    _ => panic!("bind mock upstream listener: {error}"),
+                },
+            }
+        }
+
+        fn spawn(status: u16, headers: Vec<(&str, &str)>, body: &str) -> Option<Self> {
+            let listener = Self::bind_mock_upstream_listener()?;
             let address = listener.local_addr().expect("listener address");
             let requests = Arc::new(std::sync::Mutex::new(Vec::new()));
             let request_log = Arc::clone(&requests);
@@ -753,11 +1989,11 @@ paths:
                 request_log.lock().expect("request log lock").push(request);
                 write_http_response(&mut stream, status, &headers, &body);
             });
-            Self {
+            Some(Self {
                 base_url: format!("http://{}", address),
                 requests,
                 handle,
-            }
+            })
         }
 
         fn base_url(&self) -> String {
@@ -782,35 +2018,101 @@ paths:
         upstream: String,
         receipt_db: Option<&str>,
     ) -> Arc<ProxyState> {
-        let receipt_store = receipt_db.map(|path| {
-            Mutex::new(SqliteReceiptStore::open(path).expect("open sqlite receipt store"))
-        });
+        let keypair = Keypair::generate();
+        let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
+            Arc::new(SqliteApprovalStore::open(path).expect("open sqlite approval store"))
+        } else {
+            Arc::new(InMemoryApprovalStore::new())
+        };
+        let (receipt_store, receipts, revoked_capability_ids) = if let Some(path) = receipt_db {
+            let store = SqliteReceiptStore::open(path).expect("open sqlite receipt store");
+            let receipts = store.load_receipts().expect("load persisted receipts");
+            let revoked_capability_ids = store
+                .load_revoked_capability_ids()
+                .expect("load revoked capability ids");
+            (Some(Mutex::new(store)), receipts, revoked_capability_ids)
+        } else {
+            (None, Vec::new(), HashSet::new())
+        };
+        let evaluator = RequestEvaluator::new_with_approval_store(
+            routes,
+            keypair.clone(),
+            "test-policy".to_string(),
+            Arc::clone(&approval_store),
+        );
         Arc::new(ProxyState {
-            evaluator: RequestEvaluator::new(
-                routes,
-                Keypair::generate(),
-                "test-policy".to_string(),
-            ),
+            evaluator,
+            signer_keypair: keypair,
             upstream,
             http_client: reqwest::Client::new(),
-            receipt_log: Mutex::new(ReceiptLog {
-                receipts: receipt_db
-                    .map(|path| {
-                        SqliteReceiptStore::open(path)
-                            .expect("open sqlite receipt store")
-                            .load_receipts()
-                            .expect("load persisted receipts")
-                    })
-                    .unwrap_or_default(),
-            }),
+            approval_admin: ApprovalAdmin::new(approval_store),
+            receipt_log: Mutex::new(ReceiptLog { receipts }),
             receipt_store,
+            revoked_capability_ids: Mutex::new(revoked_capability_ids),
+            sidecar_control_token: None,
         })
+    }
+
+    fn pending_approval_request(approval_id: &str) -> (ApprovalRequest, Keypair, Keypair) {
+        let request_subject = Keypair::generate();
+        let approver = Keypair::generate();
+        let approval = ApprovalRequest {
+            approval_id: approval_id.to_string(),
+            policy_id: "policy-hitl".to_string(),
+            subject_id: "agent-1".to_string(),
+            capability_id: "cap-1".to_string(),
+            subject_public_key: Some(request_subject.public_key()),
+            tool_server: "srv".to_string(),
+            tool_name: "tool".to_string(),
+            action: "invoke".to_string(),
+            parameter_hash: "hash-1".to_string(),
+            expires_at: 4_000_000_000,
+            callback_hint: None,
+            created_at: 123,
+            summary: "pending approval".to_string(),
+            governed_intent: None,
+            trusted_approvers: vec![approver.public_key()],
+            triggered_by: vec!["force_approval".to_string()],
+        };
+        (approval, request_subject, approver)
+    }
+
+    fn signed_approval_response_token(
+        approval_id: &str,
+        subject: &Keypair,
+        approver: &Keypair,
+        decision: GovernedApprovalDecision,
+    ) -> GovernedApprovalToken {
+        let now = chrono::Utc::now().timestamp() as u64;
+        GovernedApprovalToken::sign(
+            GovernedApprovalTokenBody {
+                id: format!("tok-{approval_id}"),
+                approver: approver.public_key(),
+                subject: subject.public_key(),
+                governed_intent_hash: "hash-1".to_string(),
+                request_id: approval_id.to_string(),
+                issued_at: now.saturating_sub(10),
+                expires_at: now + 600,
+                decision,
+            },
+            approver,
+        )
+        .expect("approval token should sign")
     }
 
     fn temp_receipt_db_path() -> String {
         let mut path = std::env::temp_dir();
         path.push(format!("arc-api-protect-test-{}.db", uuid::Uuid::now_v7()));
         path.to_string_lossy().to_string()
+    }
+
+    fn with_peer_addr(mut request: Request<Body>, peer: SocketAddr) -> Request<Body> {
+        request.extensions_mut().insert(ConnectInfo(peer));
+        request
+    }
+
+    fn with_loopback_peer(request: Request<Body>) -> Request<Body> {
+        with_peer_addr(request, SocketAddr::from(([127, 0, 0, 1], 4100)))
     }
 
     fn read_http_request<R: Read>(stream: &mut R) -> String {
@@ -1021,7 +2323,7 @@ paths:
 
     #[test]
     fn forwarded_query_string_strips_arc_capability() {
-        let token = valid_capability_token_json("cap-query");
+        let token = signed_capability_token_json(&Keypair::generate(), "cap-query");
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("source", "test")
             .append_pair("arc_capability", &token)
@@ -1032,6 +2334,112 @@ paths:
             forwarded_query_string(Some(&query)).as_deref(),
             Some("source=test&mode=full")
         );
+    }
+
+    #[tokio::test]
+    async fn evaluation_error_response_surfaces_pending_approval_state() {
+        let response = evaluation_error_response(&ProtectError::PendingApproval {
+            approval_id: Some("ap-123".to_string()),
+            kernel_receipt_id: "kr-456".to_string(),
+        });
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_approval_required");
+        assert_eq!(json["approval_id"], "ap-123");
+        assert_eq!(json["kernel_receipt_id"], "kr-456");
+        assert_eq!(json["resume_path"], "/approvals/ap-123/respond");
+    }
+
+    #[tokio::test]
+    async fn approval_routes_are_handled_before_proxy_catch_all() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let (approval, subject, approver) = pending_approval_request("ap-route-1");
+        state
+            .approval_admin
+            .store()
+            .store_pending(&approval)
+            .expect("store pending approval");
+
+        let token = signed_approval_response_token(
+            &approval.approval_id,
+            &subject,
+            &approver,
+            GovernedApprovalDecision::Approved,
+        );
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri(format!("/approvals/{}/respond", approval.approval_id))
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&RespondRequest {
+                        outcome: ApprovalOutcome::Approved,
+                        reason: Some("approved".to_string()),
+                        approver: approver.public_key(),
+                        token,
+                    })
+                    .expect("serialize approval response"),
+                ))
+                .expect("request"),
+        );
+
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .expect("approval response");
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: RespondResponse = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json.approval_id, "ap-route-1");
+        assert_eq!(json.outcome, ApprovalOutcome::Approved);
+        assert!(state
+            .approval_admin
+            .store()
+            .get_pending("ap-route-1")
+            .expect("approval lookup")
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn approval_routes_reject_remote_callers_without_control_access() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let request = with_peer_addr(
+            Request::builder()
+                .method("GET")
+                .uri("/approvals/pending")
+                .body(Body::empty())
+                .expect("request"),
+            remote,
+        );
+
+        let response = build_app(Arc::clone(&state))
+            .oneshot(request)
+            .await
+            .expect("approval response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
+    }
+
+    #[test]
+    fn evaluator_and_approval_routes_share_the_same_store() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let evaluator_store = state.evaluator.approval_store();
+
+        assert!(Arc::ptr_eq(&evaluator_store, state.approval_admin.store()));
     }
 
     #[tokio::test]
@@ -1094,11 +2502,13 @@ paths:
 
     #[tokio::test]
     async fn proxy_handler_forwards_allowed_requests_and_end_to_end_headers() {
-        let server = MockUpstreamServer::spawn(
+        let Some(server) = MockUpstreamServer::spawn(
             201,
             vec![("content-type", "application/json"), ("x-upstream", "ok")],
             r#"{"ok":true}"#,
-        );
+        ) else {
+            return;
+        };
         let state = test_state(
             vec![RouteEntry {
                 pattern: "/pets".to_string(),
@@ -1116,7 +2526,10 @@ paths:
             .header("user-agent", "arc-test")
             .header("authorization", "Bearer upstream-token")
             .header("x-request-id", "req-123")
-            .header("x-arc-capability", valid_capability_token_json("cap-proxy"))
+            .header(
+                "x-arc-capability",
+                signed_capability_token_json(&state.signer_keypair, "cap-proxy"),
+            )
             .header("x-custom-app", "secret")
             .header("connection", "keep-alive")
             .body(Body::from(r#"{"name":"fido"}"#))
@@ -1172,8 +2585,11 @@ paths:
 
     #[tokio::test]
     async fn proxy_handler_strips_query_capability_before_forwarding_upstream() {
-        let server =
-            MockUpstreamServer::spawn(200, vec![("content-type", "application/json")], "{}");
+        let Some(server) =
+            MockUpstreamServer::spawn(200, vec![("content-type", "application/json")], "{}")
+        else {
+            return;
+        };
         let state = test_state(
             vec![RouteEntry {
                 pattern: "/pets".to_string(),
@@ -1183,7 +2599,7 @@ paths:
             }],
             server.base_url(),
         );
-        let token = valid_capability_token_json("cap-query");
+        let token = signed_capability_token_json(&state.signer_keypair, "cap-query");
         let query = url::form_urlencoded::Serializer::new(String::new())
             .append_pair("source", "test")
             .append_pair("arc_capability", &token)
@@ -1361,7 +2777,7 @@ paths:
             }],
             "http://127.0.0.1:1".to_string(),
         );
-        let token = valid_capability_token_json("cap-sidecar");
+        let token = signed_capability_token_json(&state.signer_keypair, "cap-sidecar");
         let mut body = ArcHttpRequest::new(
             "req-sidecar-allow".to_string(),
             HttpMethod::Post,
@@ -1442,6 +2858,644 @@ paths:
         let verification: VerifyReceiptResponse =
             serde_json::from_slice(&bytes).expect("decode verify response");
         assert!(verification.valid);
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_returns_canonical_capability_tokens() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+
+        let response = sidecar_mint_handler(State(Arc::clone(&state)), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let mint: SidecarMintResponse =
+            serde_json::from_slice(&bytes).expect("decode mint response");
+
+        assert_eq!(mint.capability.issuer, state.signer_keypair.public_key());
+        assert_eq!(mint.capability.scope.grants.len(), 2);
+        assert_eq!(mint.capability.scope.grants[0].server_id, "*");
+        assert_eq!(mint.capability.scope.grants[0].tool_name, "search");
+        assert!(mint
+            .capability
+            .verify_signature()
+            .expect("capability signature"));
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_reuses_capability_id_for_retry_requests() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request_body = serde_json::to_vec(&serde_json::json!({
+            "subject": "job/default/demo",
+            "scopes": ["tools:search", "tool:server-a:fetch:invoke"],
+            "job_uid": "job-uid-1",
+            "ttl_seconds": 300,
+        }))
+        .expect("serialize mint request");
+
+        let first_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body.clone()))
+                .expect("request"),
+        );
+        let second_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))
+                .expect("request"),
+        );
+
+        let first_response = sidecar_mint_handler(State(Arc::clone(&state)), first_request).await;
+        let second_response = sidecar_mint_handler(State(Arc::clone(&state)), second_request).await;
+        assert_eq!(first_response.status(), StatusCode::OK);
+        assert_eq!(second_response.status(), StatusCode::OK);
+
+        let first_bytes = to_bytes(first_response.into_body(), 1024 * 1024)
+            .await
+            .expect("first response body");
+        let second_bytes = to_bytes(second_response.into_body(), 1024 * 1024)
+            .await
+            .expect("second response body");
+        let first_mint: SidecarMintResponse =
+            serde_json::from_slice(&first_bytes).expect("decode first mint response");
+        let second_mint: SidecarMintResponse =
+            serde_json::from_slice(&second_bytes).expect("decode second mint response");
+
+        assert_eq!(
+            first_mint.capability.body().id,
+            second_mint.capability.body().id
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_mint_changes_capability_id_for_different_scope_requests() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+
+        let search_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+        let fetch_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tool:server-a:fetch:invoke"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+
+        let search_response = sidecar_mint_handler(State(Arc::clone(&state)), search_request).await;
+        let fetch_response = sidecar_mint_handler(State(Arc::clone(&state)), fetch_request).await;
+        assert_eq!(search_response.status(), StatusCode::OK);
+        assert_eq!(fetch_response.status(), StatusCode::OK);
+
+        let search_bytes = to_bytes(search_response.into_body(), 1024 * 1024)
+            .await
+            .expect("search response body");
+        let fetch_bytes = to_bytes(fetch_response.into_body(), 1024 * 1024)
+            .await
+            .expect("fetch response body");
+        let search_mint: SidecarMintResponse =
+            serde_json::from_slice(&search_bytes).expect("decode search mint response");
+        let fetch_mint: SidecarMintResponse =
+            serde_json::from_slice(&fetch_bytes).expect("decode fetch mint response");
+
+        assert_ne!(
+            search_mint.capability.body().id,
+            fetch_mint.capability.body().id
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_submit_receipt_accepts_controller_job_receipts() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "capability_id": "cap-1",
+                        "outcome": "succeeded",
+                        "started_at": "2026-04-17T10:00:00Z",
+                        "completed_at": "2026-04-17T10:05:00Z",
+                        "steps": [{
+                            "pod_name": "demo-pod",
+                            "phase": "Succeeded",
+                            "payload": "{\"ok\":true}",
+                            "observed_at": "2026-04-17T10:05:00Z"
+                        }]
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+        );
+
+        let response = sidecar_submit_receipt_handler(State(state), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let receipt: SidecarSubmitReceiptResponse =
+            serde_json::from_slice(&bytes).expect("decode receipt response");
+        assert!(receipt.accepted);
+        assert!(!receipt.receipt_id.is_empty());
+    }
+
+    #[test]
+    fn ttl_seconds_from_wire_accepts_seconds_and_nanoseconds() {
+        assert_eq!(ttl_seconds_from_wire(None, None, None), 3600);
+        assert_eq!(ttl_seconds_from_wire(Some(3600), None, None), 3600);
+        assert_eq!(ttl_seconds_from_wire(None, Some(500_000_000), None), 1);
+        assert_eq!(ttl_seconds_from_wire(None, None, Some(3600)), 3600);
+        assert_eq!(
+            ttl_seconds_from_wire(None, None, Some(3_600_000_000_000)),
+            3600
+        );
+    }
+
+    #[test]
+    fn parse_sidecar_operation_shorthand_read_preserves_read_scope() {
+        assert_eq!(
+            parse_sidecar_operation("read", true).expect("read shorthand"),
+            Operation::Read
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_release_persists_revocation_and_blocks_reuse() {
+        let receipt_db = temp_receipt_db_path();
+        let state = test_state_with_receipt_db(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+
+        let release_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                        "job_uid": "job-uid-1",
+                        "reason": "completed",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::OK);
+
+        let reloaded = test_state_with_receipt_db(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let request = Request::builder()
+            .method("POST")
+            .uri("/pets")
+            .header(
+                "x-arc-capability",
+                signed_capability_token_json(&reloaded.signer_keypair, "cap-revoked"),
+            )
+            .body(Body::from(r#"{"name":"fido"}"#))
+            .expect("request");
+        let response = proxy_handler(State(Arc::clone(&reloaded)), request).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["message"], "capability token has been revoked");
+
+        let _ = std::fs::remove_file(receipt_db);
+    }
+
+    #[tokio::test]
+    async fn sidecar_release_requires_persistent_receipt_store() {
+        let state = test_state(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+        );
+
+        let release_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                        "job_uid": "job-uid-1",
+                        "reason": "completed",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let bytes = to_bytes(release_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json body");
+        assert_eq!(
+            json["message"],
+            "persistent receipt_db must be configured for capability release"
+        );
+
+        assert!(!state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .contains("cap-revoked"));
+    }
+
+    #[tokio::test]
+    async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
+        let receipt_db = temp_receipt_db_path();
+        let state = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "capability_id": "cap-1",
+                        "outcome": "succeeded",
+                        "started_at": "2026-04-17T10:00:00Z",
+                        "completed_at": "2026-04-17T10:05:00Z",
+                        "steps": [{
+                            "pod_name": "demo-pod",
+                            "phase": "Succeeded",
+                            "payload": "{\"ok\":true}",
+                            "observed_at": "2026-04-17T10:05:00Z"
+                        }]
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+        );
+
+        let response = sidecar_submit_receipt_handler(State(Arc::clone(&state)), request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let submit_response: SidecarSubmitReceiptResponse =
+            serde_json::from_slice(&bytes).expect("decode receipt response");
+
+        let reloaded = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        let log = reloaded.receipt_log.lock().await;
+        let stored = log
+            .receipts
+            .iter()
+            .find(|receipt| receipt.id == submit_response.receipt_id)
+            .expect("stored receipt");
+        assert_eq!(stored.capability_id.as_deref(), Some("cap-1"));
+        assert_eq!(
+            stored.metadata.as_ref().expect("metadata")["job_uid"],
+            "job-uid-1"
+        );
+        assert_eq!(
+            stored.metadata.as_ref().expect("metadata")["steps"][0]["pod_name"],
+            "demo-pod"
+        );
+        assert!(stored.verify_signature().expect("receipt signature"));
+
+        let _ = std::fs::remove_file(receipt_db);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_reject_non_loopback_callers() {
+        let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let release_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::FORBIDDEN);
+
+        let receipt_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "outcome": "succeeded",
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let receipt_response =
+            sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
+        assert_eq!(receipt_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(receipt_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
+        assert_eq!(
+            json["message"],
+            "sidecar control endpoints require a loopback caller"
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
+        let receipt_db = temp_receipt_db_path();
+        let mut state = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::OK);
+
+        let release_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::OK);
+
+        let receipt_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/receipts")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "job_name": "demo",
+                        "namespace": "default",
+                        "job_uid": "job-uid-1",
+                        "outcome": "succeeded",
+                    }))
+                    .expect("serialize receipt request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+        let receipt_response =
+            sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
+        assert_eq!(receipt_response.status(), StatusCode::OK);
+
+        let _ = std::fs::remove_file(receipt_db);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_accept_lowercase_bearer_scheme() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_require_bearer_auth_for_loopback_when_configured() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+
+        let mint_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
+        assert_eq!(
+            json["message"],
+            "sidecar control endpoints require a loopback caller or valid bearer token"
+        );
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_reject_blank_control_token_configuration() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("   ".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "Bearer ")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::FORBIDDEN);
+
+        let body = to_bytes(mint_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&body).expect("json body");
+        assert_eq!(json["error"], "arc_control_forbidden");
     }
 
     #[tokio::test]

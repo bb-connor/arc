@@ -11,9 +11,14 @@
 //! - Strings: minimal escaping (only required characters)
 //! - No whitespace between tokens
 
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+
+use core::cmp::Ordering;
+
 use serde::Serialize;
 use serde_json::Value;
-use std::cmp::Ordering;
 
 use crate::error::{Error, Result};
 
@@ -227,7 +232,7 @@ fn render_decimal(digits: &str, sci_exp: i32) -> String {
         // All digits are before the decimal point; pad with trailing zeros.
         let mut out = String::with_capacity(digits.len() + shift as usize);
         out.push_str(digits);
-        out.extend(std::iter::repeat_n('0', shift as usize));
+        out.extend(core::iter::repeat_n('0', shift as usize));
         return out;
     }
 
@@ -243,7 +248,7 @@ fn render_decimal(digits: &str, sci_exp: i32) -> String {
         let zeros = (-pos) as usize;
         let mut out = String::with_capacity(2 + zeros + digits.len());
         out.push_str("0.");
-        out.extend(std::iter::repeat_n('0', zeros));
+        out.extend(core::iter::repeat_n('0', zeros));
         out.push_str(digits);
         trim_decimal(out)
     }
@@ -486,7 +491,7 @@ mod tests {
     fn rfc8785_section3_number_examples() {
         // Verify individual number renderings.
         assert_eq!(
-            canonicalize_f64(333333333.33333334).unwrap(),
+            canonicalize_f64(333_333_333.333_333_3).unwrap(),
             "333333333.3333333"
         );
         assert_eq!(canonicalize_f64(1e20).unwrap(), "100000000000000000000");
@@ -499,7 +504,7 @@ mod tests {
     fn rfc8785_mixed_document() {
         // A representative document exercising multiple features.
         let value = serde_json::json!({
-            "numbers": [333333333.33333334, 1e30, 4.5, -0.0, 0, 2e-3, 0.000001],
+            "numbers": [333_333_333.333_333_3, 1e30, 4.5, -0.0, 0, 2e-3, 0.000001],
             "string": "\u{20ac}$\u{000f}\u{000a}A'\u{0008}\\\"\\",
             "literals": [null, true, false],
         });

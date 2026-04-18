@@ -5,6 +5,7 @@
 //! write content. This is a critical security guard.
 
 use regex::Regex;
+use thiserror::Error;
 
 use arc_kernel::{GuardContext, KernelError, Verdict};
 
@@ -16,6 +17,12 @@ pub struct SecretPattern {
     pub name: &'static str,
     /// Regex pattern string.
     pub pattern: &'static str,
+}
+
+#[derive(Clone, Debug)]
+pub struct CustomSecretPattern {
+    pub name: String,
+    pub pattern: String,
 }
 
 fn default_patterns() -> Vec<SecretPattern> {
@@ -146,6 +153,8 @@ pub struct SecretLeakConfig {
     pub enabled: bool,
     /// File path patterns to skip (e.g. test fixtures).
     pub skip_paths: Vec<String>,
+    /// Additional operator-defined secret patterns.
+    pub custom_patterns: Vec<CustomSecretPattern>,
 }
 
 impl Default for SecretLeakConfig {
@@ -158,8 +167,25 @@ impl Default for SecretLeakConfig {
                 "**/*_test.*".to_string(),
                 "**/*.test.*".to_string(),
             ],
+            custom_patterns: Vec::new(),
         }
     }
+}
+
+#[derive(Debug, Error)]
+pub enum SecretLeakConfigError {
+    #[error("invalid built-in secret pattern `{name}`: {source}")]
+    InvalidBuiltInPattern {
+        name: String,
+        #[source]
+        source: regex::Error,
+    },
+    #[error("invalid custom secret pattern `{name}`: {source}")]
+    InvalidCustomPattern {
+        name: String,
+        #[source]
+        source: regex::Error,
+    },
 }
 
 /// Guard that detects potential secret exposure in file writes.
@@ -171,19 +197,44 @@ pub struct SecretLeakGuard {
 
 impl SecretLeakGuard {
     pub fn new() -> Self {
-        Self::with_config(SecretLeakConfig::default())
+        match Self::with_config(SecretLeakConfig::default()) {
+            Ok(guard) => guard,
+            Err(error) => panic!("default secret leak config must be valid: {error}"),
+        }
     }
 
-    pub fn with_config(config: SecretLeakConfig) -> Self {
-        let patterns = default_patterns()
+    pub fn with_config(config: SecretLeakConfig) -> Result<Self, SecretLeakConfigError> {
+        let mut patterns: Vec<CompiledPattern> = default_patterns()
             .into_iter()
-            .filter_map(|p| {
-                Regex::new(p.pattern).ok().map(|regex| CompiledPattern {
-                    name: p.name.to_string(),
-                    regex,
-                })
+            .map(|pattern| {
+                Regex::new(pattern.pattern)
+                    .map(|regex| CompiledPattern {
+                        name: pattern.name.to_string(),
+                        regex,
+                    })
+                    .map_err(|source| SecretLeakConfigError::InvalidBuiltInPattern {
+                        name: pattern.name.to_string(),
+                        source,
+                    })
             })
-            .collect();
+            .collect::<Result<_, _>>()?;
+        patterns.extend(
+            config
+                .custom_patterns
+                .iter()
+                .map(|pattern| {
+                    Regex::new(&pattern.pattern)
+                        .map(|regex| CompiledPattern {
+                            name: pattern.name.clone(),
+                            regex,
+                        })
+                        .map_err(|source| SecretLeakConfigError::InvalidCustomPattern {
+                            name: pattern.name.clone(),
+                            source,
+                        })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        );
 
         let skip_paths = config
             .skip_paths
@@ -191,11 +242,11 @@ impl SecretLeakGuard {
             .filter_map(|p| glob::Pattern::new(p).ok())
             .collect();
 
-        Self {
+        Ok(Self {
             enabled: config.enabled,
             patterns,
             skip_paths,
-        }
+        })
     }
 
     /// Scan content for secrets. Returns a list of matches.
@@ -413,6 +464,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -441,6 +494,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx2 = arc_kernel::GuardContext {
@@ -491,6 +546,8 @@ mod tests {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
+            model_metadata: None,
+            federated_origin_kernel_id: None,
         };
 
         let ctx = arc_kernel::GuardContext {
@@ -504,5 +561,24 @@ mod tests {
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
         assert_eq!(result, Verdict::Allow);
+    }
+
+    #[test]
+    fn with_config_rejects_invalid_custom_regex() {
+        let result = SecretLeakGuard::with_config(SecretLeakConfig {
+            enabled: true,
+            skip_paths: Vec::new(),
+            custom_patterns: vec![CustomSecretPattern {
+                name: "broken".to_string(),
+                pattern: "(".to_string(),
+            }],
+        });
+
+        match result {
+            Ok(_) => panic!("invalid custom regex should fail configuration"),
+            Err(error) => {
+                assert!(error.to_string().contains("broken"));
+            }
+        }
     }
 }

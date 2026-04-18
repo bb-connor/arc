@@ -772,7 +772,7 @@ fn cluster_authority_lease_view_locked(
 
 fn cluster_authority_lease_view(state: &TrustServiceState) -> Option<ClusterAuthorityLeaseView> {
     let cluster = state.cluster.as_ref()?;
-    Some(match cluster.lock() {
+    match cluster.lock() {
         Ok(mut guard) => {
             let consensus = compute_cluster_consensus_locked(&mut guard);
             cluster_authority_lease_view_locked(&mut guard, &consensus)
@@ -782,7 +782,7 @@ fn cluster_authority_lease_view(state: &TrustServiceState) -> Option<ClusterAuth
             let consensus = compute_cluster_consensus_locked(&mut guard);
             cluster_authority_lease_view_locked(&mut guard, &consensus)
         }
-    }?)
+    }
 }
 
 fn current_budget_event_authority(
@@ -886,7 +886,8 @@ fn rollback_budget_authorize_exposure(
         payload.hold_id.as_deref(),
         Some(&rollback_event_id),
         authority,
-    )
+    )?;
+    Ok(())
 }
 
 async fn respond_after_budget_write_quorum_commit<T>(
@@ -3379,6 +3380,8 @@ mod cluster_and_reports_tests {
                 policy_hash: "policy-hash".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
+                trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
                 kernel_key: keypair.public_key(),
             },
             &keypair,
@@ -3878,7 +3881,7 @@ mod cluster_and_reports_tests {
         assert_eq!(snapshot.replication.tool_seq, 1);
         assert_eq!(snapshot.replication.child_seq, 1);
         assert_eq!(snapshot.replication.lineage_seq, 1);
-        assert_eq!(snapshot.replication.budget_seq, 1);
+        assert_eq!(snapshot.replication.budget_seq, 2);
         assert_eq!(snapshot.budget_mutation_events.len(), 2);
         assert_eq!(
             snapshot
@@ -3960,7 +3963,7 @@ mod cluster_and_reports_tests {
             peer_budget_cursor(&target_state, "http://node-a")
                 .expect("replicated budget cursor")
                 .seq,
-            1
+            2
         );
         assert_eq!(
             peer_revocation_cursor(&target_state, "http://node-a")

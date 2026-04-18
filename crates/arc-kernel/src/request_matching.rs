@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use arc_core::capability::{ModelMetadata, ModelSafetyTier};
 use regex::Regex;
 
 use super::*;
@@ -201,7 +202,17 @@ pub fn capability_matches_request(
     server_id: &str,
     arguments: &serde_json::Value,
 ) -> Result<bool, KernelError> {
-    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments)?.is_empty())
+    capability_matches_request_with_model_metadata(cap, tool_name, server_id, arguments, None)
+}
+
+pub fn capability_matches_request_with_model_metadata(
+    cap: &CapabilityToken,
+    tool_name: &str,
+    server_id: &str,
+    arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
+) -> Result<bool, KernelError> {
+    Ok(!resolve_matching_grants(cap, tool_name, server_id, arguments, model_metadata)?.is_empty())
 }
 
 pub fn capability_matches_resource_request(
@@ -252,11 +263,12 @@ pub(super) fn resolve_matching_grants<'a>(
     tool_name: &str,
     server_id: &str,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<Vec<MatchingGrant<'a>>, KernelError> {
     let mut matches = Vec::new();
 
     for (index, grant) in cap.scope.grants.iter().enumerate() {
-        if !grant_matches_request(grant, tool_name, server_id, arguments)? {
+        if !grant_matches_request(grant, tool_name, server_id, arguments, model_metadata)? {
             continue;
         }
 
@@ -286,11 +298,12 @@ fn grant_matches_request(
     tool_name: &str,
     server_id: &str,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     Ok(matches_server(&grant.server_id, server_id)
         && matches_name(&grant.tool_name, tool_name)
         && grant.operations.contains(&Operation::Invoke)
-        && constraints_match(&grant.constraints, arguments)?)
+        && constraints_match(&grant.constraints, arguments, model_metadata)?)
 }
 
 fn matches_server(pattern: &str, server_id: &str) -> bool {
@@ -304,9 +317,10 @@ fn matches_name(pattern: &str, name: &str) -> bool {
 fn constraints_match(
     constraints: &[Constraint],
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     for constraint in constraints {
-        if !constraint_matches(constraint, arguments)? {
+        if !constraint_matches(constraint, arguments, model_metadata)? {
             return Ok(false);
         }
     }
@@ -316,6 +330,7 @@ fn constraints_match(
 fn constraint_matches(
     constraint: &Constraint,
     arguments: &serde_json::Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Result<bool, KernelError> {
     let string_leaves = collect_string_leaves(arguments);
 
@@ -329,7 +344,9 @@ fn constraint_matches(
                 .map(|leaf| leaf.value.as_str())
                 .collect();
             Ok(!candidates.is_empty()
-                && candidates.into_iter().all(|path| path.starts_with(prefix)))
+                && candidates
+                    .into_iter()
+                    .all(|path| path_has_prefix(path, prefix)))
         }
         Constraint::DomainExact(expected) => {
             let expected = normalize_domain(expected);
@@ -353,13 +370,366 @@ fn constraint_matches(
             Ok(string_leaves.iter().any(|leaf| regex.is_match(&leaf.value)))
         }
         Constraint::MaxLength(max) => Ok(string_leaves.iter().all(|leaf| leaf.value.len() <= *max)),
+        Constraint::MaxArgsSize(max) => Ok(arguments.to_string().len() <= *max),
         Constraint::GovernedIntentRequired
         | Constraint::RequireApprovalAbove { .. }
         | Constraint::SellerExact(_)
         | Constraint::MinimumRuntimeAssurance(_)
         | Constraint::MinimumAutonomyTier(_) => Ok(true),
         Constraint::Custom(key, expected) => Ok(argument_contains_custom(arguments, key, expected)),
+
+        // Phase 2.2 additions. These constraints either require domain-
+        // specific evaluation (SQL parsing, post-invocation result
+        // inspection, or cross-request HITL state) that lives outside
+        // this argument-matching stage, or they match against
+        // well-known argument keys. Unless a specific check below
+        // rejects the request, the constraint is accepted at this
+        // stage and enforced by a downstream guard.
+        Constraint::TableAllowlist(_)
+        | Constraint::ColumnDenylist(_)
+        | Constraint::MaxRowsReturned(_)
+        | Constraint::OperationClass(_) => Ok(true),
+        Constraint::ContentReviewTier(_)
+        | Constraint::MaxTransactionAmountUsd(_)
+        | Constraint::RequireDualApproval(_) => Ok(false),
+
+        // Phase 2.3: evaluate the model-routing constraint against the
+        // request-supplied `model_metadata`. A grant is admitted only
+        // when the calling model satisfies both the allowlist (if any)
+        // and the minimum safety tier (if set).
+        Constraint::ModelConstraint {
+            allowed_model_ids,
+            min_safety_tier,
+        } => Ok(model_constraint_matches(
+            allowed_model_ids,
+            *min_safety_tier,
+            model_metadata,
+        )),
+
+        Constraint::AudienceAllowlist(allowed) => {
+            Ok(audience_allowlist_matches(arguments, allowed))
+        }
+        Constraint::MemoryStoreAllowlist(allowed) => {
+            Ok(memory_store_allowlist_matches(arguments, allowed))
+        }
+        Constraint::MemoryWriteDenyPatterns(patterns) => {
+            memory_write_deny_patterns_match(arguments, patterns)
+        }
     }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use arc_core::capability::{
+        ArcScope, CapabilityTokenBody, Constraint, ContentReviewTier, Operation, ToolGrant,
+    };
+    use arc_core::crypto::Keypair;
+
+    fn capability_with_constraints(constraints: Vec<Constraint>) -> CapabilityToken {
+        let issuer = Keypair::generate();
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                id: "cap-request-matching".to_string(),
+                issuer: issuer.public_key(),
+                subject: issuer.public_key(),
+                scope: ArcScope {
+                    grants: vec![ToolGrant {
+                        server_id: "srv".to_string(),
+                        tool_name: "tool".to_string(),
+                        operations: vec![Operation::Invoke],
+                        constraints,
+                        max_invocations: None,
+                        max_cost_per_invocation: None,
+                        max_total_cost: None,
+                        dpop_required: None,
+                    }],
+                    ..ArcScope::default()
+                },
+                issued_at: 1,
+                expires_at: u64::MAX,
+                delegation_chain: Vec::new(),
+            },
+            &issuer,
+        )
+        .expect("sign capability")
+    }
+
+    #[test]
+    fn governed_only_constraints_fail_closed_without_specialized_enforcement() {
+        let constraints = [
+            Constraint::ContentReviewTier(ContentReviewTier::Strict),
+            Constraint::MaxTransactionAmountUsd("100.00".to_string()),
+            Constraint::RequireDualApproval(true),
+        ];
+
+        for constraint in constraints {
+            let capability = capability_with_constraints(vec![constraint]);
+            assert!(
+                !capability_matches_request(
+                    &capability,
+                    "tool",
+                    "srv",
+                    &serde_json::json!({"amount_usd": "25.00"}),
+                )
+                .expect("evaluate request match"),
+                "governed-only constraint should deny without its dedicated enforcement path"
+            );
+        }
+    }
+
+    #[test]
+    fn path_prefix_constraint_rejects_traversal_and_sibling_prefixes() {
+        let capability = capability_with_constraints(vec![Constraint::PathPrefix(
+            "/workspace/safe".to_string(),
+        )]);
+
+        assert!(capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safe/report.txt"}),
+        )
+        .expect("allow matching path"),);
+        assert!(!capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safe/../secret.txt"}),
+        )
+        .expect("deny traversal path"),);
+        assert!(!capability_matches_request(
+            &capability,
+            "tool",
+            "srv",
+            &serde_json::json!({"path": "/workspace/safeX/report.txt"}),
+        )
+        .expect("deny sibling prefix"),);
+    }
+
+    #[test]
+    fn audience_allowlist_rejects_non_string_values() {
+        assert!(audience_allowlist_matches(
+            &serde_json::json!({"recipient": "#ops"}),
+            &["#ops".to_string()]
+        ));
+        assert!(!audience_allowlist_matches(
+            &serde_json::json!({"recipient": {"channel": "#ops"}}),
+            &["#ops".to_string()]
+        ));
+        assert!(!audience_allowlist_matches(
+            &serde_json::json!({"recipients": []}),
+            &["#ops".to_string()]
+        ));
+    }
+
+    #[test]
+    fn memory_store_allowlist_rejects_non_string_values() {
+        assert!(memory_store_allowlist_matches(
+            &serde_json::json!({"store": "session-cache"}),
+            &["session-cache".to_string()]
+        ));
+        assert!(!memory_store_allowlist_matches(
+            &serde_json::json!({"store": {"name": "session-cache"}}),
+            &["session-cache".to_string()]
+        ));
+        assert!(!memory_store_allowlist_matches(
+            &serde_json::json!({"store": null}),
+            &["session-cache".to_string()]
+        ));
+    }
+}
+
+/// Evaluate `Constraint::ModelConstraint` against the request-supplied
+/// `model_metadata`.
+///
+/// Denies (returns `false`) when:
+/// - the constraint carries any requirement (non-empty `allowed_model_ids`
+///   or `Some(min_safety_tier)`) and `model_metadata` is absent;
+/// - `allowed_model_ids` is non-empty and the request's `model_id` is
+///   not in the list;
+/// - `min_safety_tier` is `Some` and the request's `safety_tier` is
+///   `None` or strictly below the required tier (the ordering comes
+///   from the `Ord` derive on `ModelSafetyTier`).
+///
+/// A constraint that specifies neither requirement is vacuously
+/// satisfied and returns `true` regardless of whether metadata is
+/// present.
+fn model_constraint_matches(
+    allowed_model_ids: &[String],
+    min_safety_tier: Option<ModelSafetyTier>,
+    model_metadata: Option<&ModelMetadata>,
+) -> bool {
+    let has_allowlist = !allowed_model_ids.is_empty();
+    let has_tier_floor = min_safety_tier.is_some();
+    if !has_allowlist && !has_tier_floor {
+        return true;
+    }
+
+    let Some(metadata) = model_metadata else {
+        return false;
+    };
+
+    if has_allowlist
+        && !allowed_model_ids
+            .iter()
+            .any(|allowed| allowed == &metadata.model_id)
+    {
+        return false;
+    }
+
+    if let Some(required_tier) = min_safety_tier {
+        match metadata.safety_tier {
+            Some(actual) if actual >= required_tier => {}
+            _ => return false,
+        }
+    }
+
+    true
+}
+
+/// Returns true when no recipient-style argument is present, or when
+/// every recipient value the call carries is in the allowlist.
+///
+/// Recognised argument keys: `recipient`, `recipients`, `audience`,
+/// `to`, `channel`, `channels`. Nested objects and arrays are walked.
+fn audience_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
+    let mut observed = ObservedStringValues::default();
+    collect_audience_values(arguments, &mut observed);
+    if observed.invalid {
+        return false;
+    }
+    if !observed.saw_relevant_key {
+        return true;
+    }
+    observed
+        .values
+        .iter()
+        .all(|value| allowed.iter().any(|a| a == value))
+}
+
+fn collect_audience_values(arguments: &serde_json::Value, out: &mut ObservedStringValues) {
+    match arguments {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                if is_audience_key(key) {
+                    let before = out.values.len();
+                    out.saw_relevant_key = true;
+                    if !collect_string_values_strict(value, &mut out.values)
+                        || out.values.len() == before
+                    {
+                        out.invalid = true;
+                    }
+                } else {
+                    collect_audience_values(value, out);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_audience_values(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_audience_key(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "recipient" | "recipients" | "audience" | "to" | "channel" | "channels"
+    )
+}
+
+fn collect_string_values_strict(value: &serde_json::Value, out: &mut Vec<String>) -> bool {
+    match value {
+        serde_json::Value::String(s) => {
+            out.push(s.clone());
+            true
+        }
+        serde_json::Value::Array(values) => {
+            for v in values {
+                if !collect_string_values_strict(v, out) {
+                    return false;
+                }
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+/// Returns true when no `store` argument is present, or when every
+/// `store` value the call carries is in the allowlist.
+fn memory_store_allowlist_matches(arguments: &serde_json::Value, allowed: &[String]) -> bool {
+    let mut observed = ObservedStringValues::default();
+    collect_memory_store_values(arguments, &mut observed);
+    if observed.invalid {
+        return false;
+    }
+    if !observed.saw_relevant_key {
+        return true;
+    }
+    observed
+        .values
+        .iter()
+        .all(|value| allowed.iter().any(|a| a == value))
+}
+
+fn collect_memory_store_values(arguments: &serde_json::Value, out: &mut ObservedStringValues) {
+    match arguments {
+        serde_json::Value::Object(map) => {
+            for (key, value) in map {
+                if is_memory_store_key(key) {
+                    let before = out.values.len();
+                    out.saw_relevant_key = true;
+                    if !collect_string_values_strict(value, &mut out.values)
+                        || out.values.len() == before
+                    {
+                        out.invalid = true;
+                    }
+                } else {
+                    collect_memory_store_values(value, out);
+                }
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for value in values {
+                collect_memory_store_values(value, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn is_memory_store_key(key: &str) -> bool {
+    matches!(
+        key.to_ascii_lowercase().as_str(),
+        "store" | "memory_store" | "collection" | "namespace"
+    )
+}
+
+/// Returns Ok(false) when any string leaf in the arguments matches any
+/// deny pattern. An invalid regex surfaces as `InvalidConstraint`.
+fn memory_write_deny_patterns_match(
+    arguments: &serde_json::Value,
+    patterns: &[String],
+) -> Result<bool, KernelError> {
+    let leaves = collect_string_leaves(arguments);
+    for pattern in patterns {
+        let regex = Regex::new(pattern).map_err(|error| {
+            KernelError::InvalidConstraint(format!(
+                "memory write deny pattern \"{pattern}\" failed to compile: {error}"
+            ))
+        })?;
+        for leaf in &leaves {
+            if regex.is_match(&leaf.value) {
+                return Ok(false);
+            }
+        }
+    }
+    Ok(true)
 }
 
 fn resource_grant_matches_request(grant: &ResourceGrant, uri: &str) -> bool {
@@ -391,10 +761,62 @@ fn matches_pattern(pattern: &str, value: &str) -> bool {
     pattern == value
 }
 
+fn path_has_prefix(candidate: &str, prefix: &str) -> bool {
+    let Some(candidate) = normalize_path(candidate) else {
+        return false;
+    };
+    let Some(prefix) = normalize_path(prefix) else {
+        return false;
+    };
+    if candidate.is_absolute != prefix.is_absolute {
+        return false;
+    }
+    if prefix.segments.len() > candidate.segments.len() {
+        return false;
+    }
+    prefix
+        .segments
+        .iter()
+        .zip(candidate.segments.iter())
+        .all(|(expected, actual)| expected == actual)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct NormalizedPath {
+    is_absolute: bool,
+    segments: Vec<String>,
+}
+
+fn normalize_path(path: &str) -> Option<NormalizedPath> {
+    let is_absolute = path.starts_with('/') || path.starts_with('\\');
+    let mut segments = Vec::new();
+    for segment in path.split(['/', '\\']) {
+        if segment.is_empty() || segment == "." {
+            continue;
+        }
+        if segment == ".." {
+            segments.pop()?;
+            continue;
+        }
+        segments.push(segment.to_string());
+    }
+    Some(NormalizedPath {
+        is_absolute,
+        segments,
+    })
+}
+
 #[derive(Clone)]
 struct StringLeaf {
     key: Option<String>,
     value: String,
+}
+
+#[derive(Default)]
+struct ObservedStringValues {
+    values: Vec<String>,
+    saw_relevant_key: bool,
+    invalid: bool,
 }
 
 fn collect_string_leaves(arguments: &serde_json::Value) -> Vec<StringLeaf> {

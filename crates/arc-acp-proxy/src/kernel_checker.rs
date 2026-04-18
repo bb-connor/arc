@@ -255,6 +255,7 @@ impl CapabilityChecker for KernelCapabilityChecker {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
+            model_metadata: None,
                 },
             )
             .map_err(|error| CapabilityCheckError::Internal(error.to_string()))?;
@@ -277,6 +278,14 @@ impl CapabilityChecker for KernelCapabilityChecker {
                 reason: response
                     .reason
                     .unwrap_or_else(|| "kernel denied ACP operation".to_string()),
+            }),
+            KernelVerdict::PendingApproval => Ok(AcpVerdict {
+                allowed: false,
+                capability_id,
+                receipt_id,
+                reason: response
+                    .reason
+                    .unwrap_or_else(|| "ACP operation requires approval".to_string()),
             }),
         }
     }

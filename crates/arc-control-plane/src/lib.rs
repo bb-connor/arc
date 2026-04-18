@@ -221,6 +221,7 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
         identity,
         kernel: kernel_policy,
         guard_pipeline,
+        post_invocation_pipeline,
         runtime_assurance_policy,
         ..
     } = loaded_policy;
@@ -248,6 +249,14 @@ pub fn build_kernel(loaded_policy: policy::LoadedPolicy, kernel_kp: &Keypair) ->
             "registering guard pipeline"
         );
         kernel.add_guard(Box::new(guard_pipeline));
+    }
+
+    if !post_invocation_pipeline.is_empty() {
+        tracing::info!(
+            hook_count = post_invocation_pipeline.len(),
+            "registering post-invocation pipeline"
+        );
+        kernel.set_post_invocation_pipeline(post_invocation_pipeline);
     }
 
     if let Some(attestation_trust_policy) =
@@ -497,6 +506,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use arc_guards::PostInvocationPipeline;
 
     fn make_kernel(require_web3_evidence: bool) -> ArcKernel {
         ArcKernel::new(KernelConfig {
@@ -596,5 +606,30 @@ mod tests {
             .expect("io source string")
             .contains("missing file"));
         assert!(report.suggested_fix.contains("Check file paths"));
+    }
+
+    #[test]
+    fn build_kernel_registers_post_invocation_pipeline() {
+        let keypair = Keypair::generate();
+        let loaded_policy = policy::LoadedPolicy {
+            format: policy::PolicyFormat::ArcYaml,
+            identity: policy::PolicyIdentity {
+                source_hash: "source".to_string(),
+                runtime_hash: "runtime".to_string(),
+            },
+            kernel: policy::KernelPolicyConfig::default(),
+            default_capabilities: Vec::new(),
+            guard_pipeline: arc_guards::GuardPipeline::new(),
+            post_invocation_pipeline: {
+                let mut pipeline = PostInvocationPipeline::new();
+                pipeline.add(Box::new(arc_guards::SanitizerHook::new()));
+                pipeline
+            },
+            issuance_policy: None,
+            runtime_assurance_policy: None,
+        };
+
+        let kernel = build_kernel(loaded_policy, &keypair);
+        assert_eq!(kernel.post_invocation_hook_count(), 1);
     }
 }

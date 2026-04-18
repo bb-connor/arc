@@ -265,18 +265,49 @@ enum GuardCommands {
         #[arg(long, default_value = "guards")]
         target_dir: PathBuf,
     },
+
+    /// Sign a .wasm guard binary and write a `.wasm.sig` sidecar (Phase 1.3).
+    Sign {
+        /// Path to the `.wasm` file to sign.
+        wasm: PathBuf,
+        /// Path to a file containing a hex-encoded 32-byte Ed25519 signing seed.
+        #[arg(long)]
+        key: PathBuf,
+        /// Module name to embed in the signed envelope (matches `guard-manifest.yaml`).
+        #[arg(long)]
+        name: String,
+        /// Module version to embed in the signed envelope.
+        #[arg(long)]
+        version: String,
+    },
+
+    /// Verify the `.wasm.sig` sidecar for a .wasm guard binary (exits 0 on success).
+    Verify {
+        /// Path to the `.wasm` file to verify.
+        wasm: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
 enum McpCommands {
     /// Wrap an MCP server subprocess and expose a secured MCP edge over stdio.
     Serve {
-        /// Path to the policy YAML file.
+        /// Path to the policy YAML file. Mutually exclusive with `--preset`.
+        #[arg(long, conflicts_with = "preset")]
+        policy: Option<PathBuf>,
+
+        /// Bundled policy preset to use instead of `--policy`.
+        ///
+        /// Available presets:
+        /// * `code-agent` -- zero-config policy for coding agents
+        ///   (Claude Code, Cursor, MCP filesystem/git/shell servers).
+        ///   Allows safe file reads, denies `.env` / `.git/**` /
+        ///   `.ssh/**` writes, denies `git push --force`.
         #[arg(long)]
-        policy: PathBuf,
+        preset: Option<String>,
 
         /// Server ID to assign to the wrapped MCP server inside ARC.
-        #[arg(long)]
+        #[arg(long, default_value = "mcp")]
         server_id: String,
 
         /// Human-readable name for the wrapped MCP server.
@@ -2221,6 +2252,33 @@ enum DidCommands {
 
 #[derive(Subcommand)]
 enum PassportCommands {
+    /// Synthesize a trust-tier-enriched Agent Passport for a named agent.
+    ///
+    /// Computes the agent's compliance score (Phase 19.1) and behavioral
+    /// anomaly (Phase 19.2), collapses them into a `TrustTier`, and emits
+    /// a minimal passport JSON document with that tier populated.
+    Generate {
+        /// Agent identifier (DID or opaque subject) to stamp on the passport.
+        #[arg(long)]
+        agent: String,
+        /// Optional output path for the passport JSON. When omitted, the
+        /// passport is printed to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Compliance score override (0..=1000). Defaults to 1000 when
+        /// omitted so that a freshly provisioned agent surfaces as
+        /// `Premier` rather than `Unverified`.
+        #[arg(long)]
+        compliance_score: Option<u32>,
+        /// When set, treats the agent as having an active behavioral
+        /// anomaly and caps the synthesized tier below `Premier`.
+        #[arg(long, default_value_t = false)]
+        behavioral_anomaly: bool,
+        /// Passport validity period in days.
+        #[arg(long, default_value_t = 30)]
+        validity_days: u32,
+    },
+
     /// Create a single-issuer Agent Passport from local receipt and lineage data.
     Create {
         /// Subject Ed25519 public key in hex.

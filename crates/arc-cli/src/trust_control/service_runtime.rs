@@ -3349,10 +3349,10 @@ impl RemoteBudgetStore {
         total_cost_exposed: Option<u64>,
         total_cost_realized_spend: Option<u64>,
     ) {
-        let mut cached_usage = self
-            .cached_usage
-            .lock()
-            .expect("remote budget usage cache poisoned");
+        let mut cached_usage = match self.cached_usage.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         let key = (capability_id.to_string(), grant_index as u32);
         let updated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -3397,18 +3397,19 @@ impl RemoteBudgetStore {
     }
 
     fn cached_usage(&self, capability_id: &str, grant_index: usize) -> Option<BudgetUsageRecord> {
-        self.cached_usage
-            .lock()
-            .expect("remote budget usage cache poisoned")
+        match self.cached_usage.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
             .get(&(capability_id.to_string(), grant_index as u32))
             .cloned()
     }
 
     fn replace_cached_usages(&self, capability_id: Option<&str>, usages: &[BudgetUsageRecord]) {
-        let mut cached_usage = self
-            .cached_usage
-            .lock()
-            .expect("remote budget usage cache poisoned");
+        let mut cached_usage = match self.cached_usage.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         if let Some(capability_id) = capability_id {
             cached_usage

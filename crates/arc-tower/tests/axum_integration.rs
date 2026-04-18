@@ -16,8 +16,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 use tower_layer::Layer;
 
-fn valid_capability_token_json(id: &str) -> String {
-    let issuer = Keypair::generate();
+fn valid_capability_token_json(id: &str, issuer: &Keypair) -> String {
     let now = chrono::Utc::now().timestamp() as u64;
     let token = CapabilityToken::sign(
         CapabilityTokenBody {
@@ -216,14 +215,17 @@ async fn axum_post_denied_without_capability() {
 #[tokio::test]
 async fn axum_post_allowed_with_capability() {
     let keypair = Keypair::generate();
-    let app = build_app(keypair);
+    let app = build_app(keypair.clone());
     let payload = r#"{"name":"Rex"}"#;
 
     let req = Request::builder()
         .method("POST")
         .uri("/pets")
         .header("content-type", "application/json")
-        .header("x-arc-capability", valid_capability_token_json("cap-axum"))
+        .header(
+            "x-arc-capability",
+            valid_capability_token_json("cap-axum", &keypair),
+        )
         .body(Body::from(payload))
         .unwrap_or_else(|e| panic!("build request failed: {e}"));
 

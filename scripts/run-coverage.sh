@@ -48,6 +48,7 @@ tarpaulin_args=(
   --exclude arc-conformance
   --exclude arc-control-plane
   --exclude arc-web3-bindings
+  --exclude arc-wasm-guards
 )
 
 if [[ "${TARPAULIN_SKIP_CLEAN:-false}" == "true" ]]; then

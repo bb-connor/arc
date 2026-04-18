@@ -15,6 +15,7 @@
 //! - [`conditions`] -- Conditional rule activation
 //! - [`detection`] -- Regex-based content detectors
 //! - [`receipt`] -- Decision receipts with timing and hashing
+//! - [`rulesets`] -- Built-in HushSpec rulesets embedded at compile time
 
 pub mod compiler;
 pub mod conditions;
@@ -24,6 +25,7 @@ pub mod merge;
 pub mod models;
 pub mod receipt;
 pub mod resolve;
+pub mod rulesets;
 pub mod validate;
 pub mod version;
 
@@ -39,6 +41,9 @@ pub use merge::merge;
 pub use models::{HushSpec, OriginMatch};
 pub use receipt::{evaluate_audited, AuditConfig, DecisionReceipt};
 pub use resolve::{resolve_from_path, resolve_with_loader, LoadedSpec, ResolveError};
+pub use rulesets::{
+    builtin_yaml, list_builtin_names, load_builtin, RulesetError, BUILTIN_RULESETS,
+};
 pub use validate::{validate, ValidationError, ValidationResult};
 pub use version::HUSHSPEC_VERSION;
 

@@ -5,6 +5,10 @@ mod tests {
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use serde_json::{json, Value};
 
+    fn did_from_public_key(public_key: arc_core::PublicKey) -> DidArc {
+        DidArc::from_public_key(public_key).expect("ed25519 key")
+    }
+
     fn sample_scorecard(subject_key: &str) -> LocalReputationScorecard {
         LocalReputationScorecard {
             subject_key: subject_key.to_string(),
@@ -114,7 +118,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport")
     }
 
@@ -189,7 +193,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let holder_did = DidArc::from_public_key(holder.public_key());
+        let holder_did = did_from_public_key(holder.public_key());
         let passport =
             build_agent_passport(&holder_did.to_string(), vec![credential]).expect("passport");
         let policy = create_signed_passport_verifier_policy(
@@ -236,7 +240,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let holder_did = DidArc::from_public_key(holder.public_key());
+        let holder_did = did_from_public_key(holder.public_key());
         let mut passport =
             build_agent_passport(&holder_did.to_string(), vec![credential]).expect("passport");
         passport.schema = LEGACY_PASSPORT_SCHEMA.to_string();
@@ -331,7 +335,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let did = DidArc::from_public_key(
+        let did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
 
@@ -417,7 +421,7 @@ mod tests {
     fn cross_issuer_portfolio_requires_explicit_migration_for_subject_rebinding() {
         let imported_passport = sample_passport(6, 1);
         let target_subject =
-            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+            did_from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
         let issuer = imported_passport.credentials[0].unsigned.issuer.clone();
         let portfolio = CrossIssuerPortfolio {
             schema: CROSS_ISSUER_PORTFOLIO_SCHEMA.to_string(),
@@ -468,7 +472,7 @@ mod tests {
         let migrated_passport = sample_passport(5, 1);
         let old_subject = migrated_passport.subject.clone();
         let target_subject =
-            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+            did_from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
         let issuer = migrated_passport.credentials[0].unsigned.issuer.clone();
         let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
         let migration = create_signed_cross_issuer_migration(
@@ -535,7 +539,7 @@ mod tests {
         let migrated_passport = sample_passport(5, 1);
         let old_subject = migrated_passport.subject.clone();
         let target_subject =
-            DidArc::from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
+            did_from_public_key(Keypair::from_seed(&[8u8; 32]).public_key()).to_string();
         let issuer = migrated_passport.credentials[0].unsigned.issuer.clone();
         let passport_id = passport_artifact_id(&migrated_passport).expect("passport id");
         let migration_a = create_signed_cross_issuer_migration(
@@ -643,7 +647,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -686,7 +690,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -719,7 +723,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let mut passport =
@@ -746,7 +750,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -791,7 +795,7 @@ mod tests {
             1_900_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -835,7 +839,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport = build_agent_passport(&subject_did.to_string(), vec![credential.clone()])
@@ -866,7 +870,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -913,7 +917,7 @@ mod tests {
             1_720_000_000,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport =
@@ -986,7 +990,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("strong credential");
-        let subject_did = DidArc::from_public_key(
+        let subject_did = did_from_public_key(
             arc_core::PublicKey::from_hex(&subject).expect("subject public key"),
         );
         let passport = build_agent_passport(
@@ -1024,7 +1028,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport = build_agent_passport(&subject_did.to_string(), vec![credential.clone()])
             .expect("passport");
         let challenge = create_passport_presentation_challenge(
@@ -1084,7 +1088,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let challenge = create_passport_presentation_challenge(
@@ -1119,7 +1123,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let challenge = create_passport_presentation_challenge(
@@ -1160,7 +1164,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let challenge = create_passport_presentation_challenge(
@@ -1198,7 +1202,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport = build_agent_passport(&subject_did.to_string(), vec![credential.clone()])
             .expect("passport");
         let challenge = create_passport_presentation_challenge(
@@ -1253,7 +1257,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
 
@@ -1340,7 +1344,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let passport_id = passport_artifact_id(&passport).expect("passport id");
@@ -1508,7 +1512,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let passport_id = passport_artifact_id(&passport).expect("passport id");
@@ -1570,7 +1574,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let passport_id = passport_artifact_id(&passport).expect("passport id");
@@ -1625,7 +1629,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let envelope = issue_arc_passport_sd_jwt_vc(
@@ -1673,7 +1677,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let envelope = issue_arc_passport_sd_jwt_vc(
@@ -1710,7 +1714,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let envelope = issue_arc_passport_sd_jwt_vc(
@@ -1760,7 +1764,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let envelope = issue_arc_passport_sd_jwt_vc(
@@ -1791,7 +1795,7 @@ mod tests {
             1_710_086_400,
         )
         .expect("credential");
-        let subject_did = DidArc::from_public_key(subject.public_key());
+        let subject_did = did_from_public_key(subject.public_key());
         let passport =
             build_agent_passport(&subject_did.to_string(), vec![credential]).expect("passport");
         let envelope = issue_arc_passport_sd_jwt_vc(
@@ -1936,8 +1940,8 @@ mod tests {
         let issuer = Keypair::from_seed(&[4u8; 32]);
         let invalid_record = PassportLifecycleRecord {
             passport_id: "sha256:test".to_string(),
-            subject: DidArc::from_public_key(subject.public_key()).to_string(),
-            issuers: vec![DidArc::from_public_key(issuer.public_key()).to_string()],
+            subject: did_from_public_key(subject.public_key()).to_string(),
+            issuers: vec![did_from_public_key(issuer.public_key()).to_string()],
             issuer_count: 1,
             published_at: 1_710_000_000,
             updated_at: 1_710_000_000,
