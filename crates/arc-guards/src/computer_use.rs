@@ -348,6 +348,7 @@ fn extract_host(url: &str) -> Option<String> {
     let rest = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
+        .or_else(|| url.strip_prefix("//"))
         .unwrap_or(url);
     let host_with_port = rest.split('/').next().unwrap_or(rest);
     let host = host_with_port
@@ -388,8 +389,26 @@ mod tests {
             extract_host("example.com:443/y"),
             Some("example.com".into())
         );
+        assert_eq!(
+            extract_host("//169.254.169.254/latest"),
+            Some("169.254.169.254".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
+    }
+
+    #[test]
+    fn check_navigation_blocks_scheme_relative_urls() {
+        let guard = ComputerUseGuard::with_config(ComputerUseConfig {
+            mode: EnforcementMode::FailClosed,
+            blocked_domains: vec!["169.254.169.254".into()],
+            ..ComputerUseConfig::default()
+        });
+
+        assert_eq!(
+            guard.check_navigation("//169.254.169.254/latest"),
+            Verdict::Deny
+        );
     }
 
     #[test]

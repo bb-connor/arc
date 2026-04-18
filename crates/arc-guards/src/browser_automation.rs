@@ -353,6 +353,7 @@ fn extract_host(url: &str) -> Option<String> {
     let rest = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))
+        .or_else(|| url.strip_prefix("//"))
         .unwrap_or(url);
     let host_with_port = rest.split('/').next().unwrap_or(rest);
     let host = host_with_port
@@ -412,6 +413,10 @@ mod tests {
             extract_host("https://example.com/x"),
             Some("example.com".into())
         );
+        assert_eq!(
+            extract_host("//blocked.example/path"),
+            Some("blocked.example".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
     }
@@ -440,5 +445,19 @@ mod tests {
         assert!(is_selector_like("[data-id=1]"));
         assert!(!is_selector_like("https://example.com/x"));
         assert!(!is_selector_like("//example.com"));
+    }
+
+    #[test]
+    fn check_navigation_blocks_scheme_relative_urls() {
+        let guard = BrowserAutomationGuard::with_config(BrowserAutomationConfig {
+            blocked_domains: vec!["blocked.example".into()],
+            ..BrowserAutomationConfig::default()
+        })
+        .expect("default browser automation config should compile");
+
+        assert_eq!(
+            guard.check_navigation(Some("//blocked.example/path")),
+            Verdict::Deny
+        );
     }
 }
