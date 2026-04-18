@@ -156,6 +156,16 @@ func failedJob(base *batchv1.Job) *batchv1.Job {
 	return j
 }
 
+func jobWithSuccessCriteriaMet(base *batchv1.Job) *batchv1.Job {
+	j := base.DeepCopy()
+	j.Status.Conditions = []batchv1.JobCondition{
+		{Type: batchv1.JobSuccessCriteriaMet, Status: corev1.ConditionTrue},
+	}
+	now := metav1.NewTime(time.Now().UTC())
+	j.Status.StartTime = &now
+	return j
+}
+
 func reconcileUntilStable(t *testing.T, r *JobReconciler, key types.NamespacedName) {
 	t.Helper()
 	// Reconcile a bounded number of times, exiting as soon as we get an empty
@@ -332,6 +342,45 @@ func TestReconcile_FailedJob_ReleasesAndEmitsReceipt(t *testing.T) {
 	}
 }
 
+func TestReconcile_JobSuccessCriteriaMet_WaitsForJobComplete(t *testing.T) {
+	arc := &stubArcClient{}
+	job := jobWithSuccessCriteriaMet(governedJob())
+	job.Annotations[AnnotationCapabilityID] = "cap-pending-success"
+	job.Spec.Template.Annotations = map[string]string{AnnotationCapabilityToken: "token-cap-pending-success"}
+	job.Annotations[AnnotationCapabilityExpiresAt] = time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	job.Finalizers = []string{FinalizerName}
+
+	r, c := buildReconciler(t, arc, job)
+	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+	if err != nil {
+		t.Fatalf("reconcile returned error: %v", err)
+	}
+	if res.Requeue || res.RequeueAfter > 0 {
+		t.Fatalf("did not expect requeue for non-terminal success criteria: %#v", res)
+	}
+
+	var got batchv1.Job
+	if err := c.Get(context.Background(), key, &got); err != nil {
+		t.Fatalf("get job: %v", err)
+	}
+	if !containsFinalizer(&got, FinalizerName) {
+		t.Fatalf("expected finalizer to remain until JobComplete")
+	}
+	if got.Annotations[AnnotationReleased] != "" {
+		t.Fatalf("did not expect released annotation before JobComplete")
+	}
+	if got.Annotations[AnnotationReceiptID] != "" {
+		t.Fatalf("did not expect receipt annotation before JobComplete")
+	}
+
+	_, release, receipt := arc.counts()
+	if release != 0 || receipt != 0 {
+		t.Fatalf("expected no release or receipt submission before JobComplete, got release=%d receipt=%d", release, receipt)
+	}
+}
+
 // Test (d): Jobs without the governed label are ignored entirely.
 func TestReconcile_UngovernedJob_Ignored(t *testing.T) {
 	arc := &stubArcClient{}
@@ -397,6 +446,45 @@ func TestReconcile_SidecarUnreachable_Requeues(t *testing.T) {
 	if got.Annotations[AnnotationCapabilityID] != "" {
 		t.Fatalf("expected no capability annotation after unreachable sidecar, got %q",
 			got.Annotations[AnnotationCapabilityID])
+	}
+}
+
+func TestReconcile_DeleteReleaseLogicalError_KeepsFinalizer(t *testing.T) {
+	arc := &stubArcClient{releaseErr: fmt.Errorf("arc: http://sidecar/v1/capabilities/release returned 400: bad request")}
+	job := governedJob()
+	job.Annotations[AnnotationCapabilityID] = "cap-delete"
+	job.Finalizers = []string{FinalizerName}
+	now := metav1.NewTime(time.Now().UTC())
+	job.DeletionTimestamp = &now
+
+	r, c := buildReconciler(t, arc, job)
+	key := types.NamespacedName{Namespace: job.Namespace, Name: job.Name}
+
+	res, err := r.Reconcile(context.Background(), ctrl.Request{NamespacedName: key})
+	if err != nil {
+		t.Fatalf("reconcile returned error: %v", err)
+	}
+	if res.RequeueAfter == 0 && !res.Requeue {
+		t.Fatalf("expected requeue after logical release failure, got %#v", res)
+	}
+
+	var got batchv1.Job
+	if err := c.Get(context.Background(), key, &got); err != nil {
+		t.Fatalf("get job: %v", err)
+	}
+	if !containsFinalizer(&got, FinalizerName) {
+		t.Fatalf("expected finalizer to remain after logical delete release failure")
+	}
+	if got.Annotations[AnnotationReleased] != "" {
+		t.Fatalf("did not expect released annotation after failed delete release")
+	}
+
+	_, release, receipt := arc.counts()
+	if release != 1 {
+		t.Fatalf("expected 1 release attempt, got %d", release)
+	}
+	if receipt != 0 {
+		t.Fatalf("expected no receipt submission on delete path, got %d", receipt)
 	}
 }
 

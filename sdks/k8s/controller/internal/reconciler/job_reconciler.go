@@ -421,7 +421,8 @@ func (r *JobReconciler) handleDeletion(ctx context.Context, logger logr.Logger, 
 				return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 			}
 			r.event(job, corev1.EventTypeWarning, "ArcReleaseFailed", err.Error())
-			logger.Error(err, "release on delete failed; dropping finalizer to unblock deletion")
+			logger.Error(err, "release on delete failed; keeping finalizer and requeueing")
+			return ctrl.Result{RequeueAfter: r.backoffFor(job.UID, retryPhaseRelease)}, nil
 		}
 	}
 
@@ -526,7 +527,7 @@ func jobTerminalPhase(job *batchv1.Job) (string, bool) {
 			continue
 		}
 		switch c.Type {
-		case batchv1.JobComplete, batchv1.JobSuccessCriteriaMet:
+		case batchv1.JobComplete:
 			return "succeeded", true
 		case batchv1.JobFailed:
 			return "failed", true
