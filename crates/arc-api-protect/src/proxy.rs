@@ -1085,7 +1085,14 @@ fn sidecar_control_bearer_token_matches(
         .headers()
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
+        .and_then(|value| {
+            let (scheme, token) = value.split_once(' ')?;
+            if scheme.eq_ignore_ascii_case("bearer") {
+                Some(token)
+            } else {
+                None
+            }
+        })
         .is_some_and(|token| token == expected_bearer_token)
 }
 
@@ -3074,6 +3081,36 @@ paths:
         let receipt_response =
             sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
         assert_eq!(receipt_response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn sidecar_control_endpoints_accept_lowercase_bearer_scheme() {
+        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        Arc::get_mut(&mut state)
+            .expect("exclusive state")
+            .sidecar_control_token = Some("cluster-control-token".to_string());
+        let remote = SocketAddr::from(([10, 1, 2, 3], 5200));
+
+        let mint_request = with_peer_addr(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/mint")
+                .header("content-type", "application/json")
+                .header("authorization", "bearer cluster-control-token")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "subject": "job/default/demo",
+                        "scopes": ["tools:search"],
+                        "job_uid": "job-uid-1",
+                    }))
+                    .expect("serialize mint request"),
+                ))
+                .expect("request"),
+            remote,
+        );
+
+        let mint_response = sidecar_mint_handler(State(Arc::clone(&state)), mint_request).await;
+        assert_eq!(mint_response.status(), StatusCode::OK);
     }
 
     #[tokio::test]

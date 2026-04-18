@@ -220,6 +220,38 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mapfile -t local_file_deps < <(
+            node -e '
+              const fs = require("fs");
+              const path = require("path");
+              const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+              const seen = new Set();
+              for (const block of ["dependencies", "devDependencies", "optionalDependencies"]) {
+                const deps = pkg[block] ?? {};
+                for (const spec of Object.values(deps)) {
+                  if (typeof spec !== "string" || !spec.startsWith("file:")) continue;
+                  const dir = path.resolve(spec.slice("file:".length));
+                  if (seen.has(dir)) continue;
+                  seen.add(dir);
+                  console.log(dir);
+                }
+              }
+            '
+          )
+          for dep_dir in "${local_file_deps[@]}"; do
+            [[ -n "$dep_dir" ]] || continue
+            echo "Bootstrapping local file dependency $dep_dir"
+            pushd "$dep_dir" >/dev/null
+            if [[ -f package-lock.json ]]; then
+              npm ci
+            else
+              npm install
+            fi
+            if node -e 'const pkg = require("./package.json"); process.exit(pkg.scripts?.build ? 0 : 1)'; then
+              npm run build
+            fi
+            popd >/dev/null
+          done
           if [[ -f package-lock.json ]]; then
             npm ci
           else
