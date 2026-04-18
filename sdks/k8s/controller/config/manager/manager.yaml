@@ -57,7 +57,6 @@ spec:
                 secretKeyRef:
                   name: arc-sidecar-control
                   key: token
-                  optional: true
           ports:
             - name: metrics
               containerPort: 8080

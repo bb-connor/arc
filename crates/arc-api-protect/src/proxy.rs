@@ -927,15 +927,16 @@ async fn sidecar_release_handler(
     }
 
     let capability_id = release_request.capability_id.trim().to_string();
-    if let Some(store) = &state.receipt_store {
-        let mut store = store.lock().await;
-        if let Err(error) = store.revoke_capability(&capability_id) {
-            warn!("failed to persist capability revocation: {error}");
-            return internal_json_error_response(
-                "arc_capability_release_failed",
-                &error.to_string(),
-            );
-        }
+    let Some(store) = &state.receipt_store else {
+        return internal_json_error_response(
+            "arc_capability_release_failed",
+            "persistent receipt_db must be configured for capability release",
+        );
+    };
+    let mut store = store.lock().await;
+    if let Err(error) = store.revoke_capability(&capability_id) {
+        warn!("failed to persist capability revocation: {error}");
+        return internal_json_error_response("arc_capability_release_failed", &error.to_string());
     }
     state
         .revoked_capability_ids
@@ -3130,6 +3131,53 @@ paths:
     }
 
     #[tokio::test]
+    async fn sidecar_release_requires_persistent_receipt_store() {
+        let state = test_state(
+            vec![RouteEntry {
+                pattern: "/pets".to_string(),
+                method: HttpMethod::Post,
+                operation_id: Some("createPet".to_string()),
+                policy: PolicyDecision::DenyByDefault,
+            }],
+            "http://127.0.0.1:1".to_string(),
+        );
+
+        let release_request = with_loopback_peer(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/capabilities/release")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::to_vec(&serde_json::json!({
+                        "capability_id": "cap-revoked",
+                        "job_uid": "job-uid-1",
+                        "reason": "completed",
+                    }))
+                    .expect("serialize release request"),
+                ))
+                .expect("request"),
+        );
+        let release_response =
+            sidecar_release_handler(State(Arc::clone(&state)), release_request).await;
+        assert_eq!(release_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+        let bytes = to_bytes(release_response.into_body(), 1024 * 1024)
+            .await
+            .expect("response body");
+        let json: serde_json::Value = serde_json::from_slice(&bytes).expect("json body");
+        assert_eq!(
+            json["message"],
+            "persistent receipt_db must be configured for capability release"
+        );
+
+        assert!(!state
+            .revoked_capability_ids
+            .lock()
+            .await
+            .contains("cap-revoked"));
+    }
+
+    #[tokio::test]
     async fn sidecar_submit_receipt_persists_submitted_job_receipt() {
         let receipt_db = temp_receipt_db_path();
         let state = test_state_with_receipt_db(
@@ -3272,7 +3320,12 @@ paths:
 
     #[tokio::test]
     async fn sidecar_control_endpoints_allow_authenticated_non_loopback_callers() {
-        let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+        let receipt_db = temp_receipt_db_path();
+        let mut state = test_state_with_receipt_db(
+            Vec::new(),
+            "http://127.0.0.1:1".to_string(),
+            Some(&receipt_db),
+        );
         Arc::get_mut(&mut state)
             .expect("exclusive state")
             .sidecar_control_token = Some("cluster-control-token".to_string());
@@ -3338,6 +3391,8 @@ paths:
         let receipt_response =
             sidecar_submit_receipt_handler(State(Arc::clone(&state)), receipt_request).await;
         assert_eq!(receipt_response.status(), StatusCode::OK);
+
+        let _ = std::fs::remove_file(receipt_db);
     }
 
     #[tokio::test]
