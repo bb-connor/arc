@@ -410,6 +410,29 @@ impl ClaimReceiptLogProjectionRow {
             _ => 2,
         }
     }
+
+    fn matches_projection_or_legacy_enrichment(&self, expected: &Self) -> bool {
+        self.receipt_id == expected.receipt_id
+            && self.receipt_kind == expected.receipt_kind
+            && self.source_seq == expected.source_seq
+            && self.timestamp == expected.timestamp
+            && self.capability_id == expected.capability_id
+            && self.session_id == expected.session_id
+            && self.parent_request_id == expected.parent_request_id
+            && self.request_id == expected.request_id
+            && self.tool_server == expected.tool_server
+            && self.tool_name == expected.tool_name
+            && self.raw_json == expected.raw_json
+            && legacy_optional_enrichment_matches(&self.subject_key, &expected.subject_key)
+            && legacy_optional_enrichment_matches(&self.issuer_key, &expected.issuer_key)
+    }
+}
+
+fn legacy_optional_enrichment_matches(
+    existing: &Option<String>,
+    expected: &Option<String>,
+) -> bool {
+    existing == expected || (existing.is_none() && expected.is_some())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1083,7 +1106,7 @@ pub(crate) fn backfill_claim_receipt_log_entries(
                 row.receipt_id, row.receipt_kind
             )));
         };
-        if existing != *row {
+        if !existing.matches_projection_or_legacy_enrichment(row) {
             return Err(ReceiptStoreError::Conflict(format!(
                 "claim receipt log entry `{}` diverges from persisted {} source row",
                 row.receipt_id, row.receipt_kind

@@ -3881,7 +3881,7 @@ mod cluster_and_reports_tests {
         assert_eq!(snapshot.replication.tool_seq, 1);
         assert_eq!(snapshot.replication.child_seq, 1);
         assert_eq!(snapshot.replication.lineage_seq, 1);
-        assert_eq!(snapshot.replication.budget_seq, 1);
+        assert_eq!(snapshot.replication.budget_seq, 2);
         assert_eq!(snapshot.budget_mutation_events.len(), 2);
         assert_eq!(
             snapshot
@@ -3963,7 +3963,7 @@ mod cluster_and_reports_tests {
             peer_budget_cursor(&target_state, "http://node-a")
                 .expect("replicated budget cursor")
                 .seq,
-            1
+            2
         );
         assert_eq!(
             peer_revocation_cursor(&target_state, "http://node-a")

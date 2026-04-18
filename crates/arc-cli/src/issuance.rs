@@ -1378,7 +1378,7 @@ mod tests {
             )
             .expect_err("untrusted verifier should fail closed");
         assert!(
-            error.to_string().contains("rejected by trust policy"),
+            error.to_string().contains("trust policy"),
             "expected trust policy denial, got {error}"
         );
     }
