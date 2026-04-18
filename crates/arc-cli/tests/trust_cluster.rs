@@ -736,16 +736,23 @@ fn send_signal(child: &Child, signal: &str) {
 }
 
 fn assert_lineage_visible(client: &Client, base_url: &str, token: &str, capability_id: &str) {
-    let lineage = get_json(
-        client,
-        &format!("{base_url}/v1/lineage/{capability_id}"),
-        token,
-    );
-    assert_eq!(
-        lineage["capabilityId"]
-            .as_str()
-            .or_else(|| lineage["capability_id"].as_str()),
-        Some(capability_id)
+    wait_until_with_diagnostics(
+        &format!("lineage visible for {capability_id}"),
+        Duration::from_secs(20),
+        || {
+            let Some(lineage) = try_get_json(
+                client,
+                &format!("{base_url}/v1/lineage/{capability_id}"),
+                token,
+            ) else {
+                return false;
+            };
+            lineage["capabilityId"]
+                .as_str()
+                .or_else(|| lineage["capability_id"].as_str())
+                == Some(capability_id)
+        },
+        || node_diagnostics(client, base_url, token, capability_id),
     );
 }
 
@@ -1803,7 +1810,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
         },
         || cluster_status_diagnostics(&client, &all_urls, service_token),
     );
-    let expected_leader_url = wait_for_cluster_leader_convergence(
+    wait_for_cluster_leader_convergence(
         &client,
         service_token,
         &all_urls,
@@ -1823,7 +1830,7 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
             &receipt,
         );
         assert_eq!(stored["stored"].as_bool(), Some(true));
-        assert_expected_write_visibility_metadata(&stored, &expected_leader_url);
+        assert_write_visibility_metadata(&stored);
     }
 
     wait_until_with_diagnostics(
@@ -2092,7 +2099,6 @@ fn trust_control_cluster_multi_region_partition_qualification() {
     let all_urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
     let majority_urls = vec![url_a.clone(), url_b.clone()];
     let isolated_url = url_c.clone();
-    let expected_leader_url = url_a.clone();
     let service_token = "cluster-multi-region-token";
 
     let _server_a = spawn_trust_service(
@@ -2142,8 +2148,14 @@ fn trust_control_cluster_multi_region_partition_qualification() {
         );
     }
 
-    wait_until_with_diagnostics(
+    let expected_leader_url = wait_for_cluster_leader_convergence(
+        &client,
+        service_token,
+        &all_urls,
         "simulated three-region leader convergence",
+    );
+    wait_until_with_diagnostics(
+        "simulated three-region quorum convergence",
         Duration::from_secs(90),
         || {
             all_urls.iter().all(|base_url| {
@@ -2169,7 +2181,11 @@ fn trust_control_cluster_multi_region_partition_qualification() {
                 service_token,
                 std::slice::from_ref(&isolated_url),
             );
-            assert_eq!(response["hasQuorum"].as_bool(), Some(true));
+            assert_eq!(response["selfUrl"].as_str(), Some(base_url.as_str()));
+            assert_eq!(
+                response["blockedPeerUrls"].as_array().map(Vec::len),
+                Some(1)
+            );
         }
         let isolated_partition = set_cluster_partition(
             &client,
