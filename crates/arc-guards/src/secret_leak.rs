@@ -5,6 +5,7 @@
 //! write content. This is a critical security guard.
 
 use regex::Regex;
+use thiserror::Error;
 
 use arc_kernel::{GuardContext, KernelError, Verdict};
 
@@ -171,6 +172,22 @@ impl Default for SecretLeakConfig {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum SecretLeakConfigError {
+    #[error("invalid built-in secret pattern `{name}`: {source}")]
+    InvalidBuiltInPattern {
+        name: String,
+        #[source]
+        source: regex::Error,
+    },
+    #[error("invalid custom secret pattern `{name}`: {source}")]
+    InvalidCustomPattern {
+        name: String,
+        #[source]
+        source: regex::Error,
+    },
+}
+
 /// Guard that detects potential secret exposure in file writes.
 pub struct SecretLeakGuard {
     enabled: bool,
@@ -180,27 +197,44 @@ pub struct SecretLeakGuard {
 
 impl SecretLeakGuard {
     pub fn new() -> Self {
-        Self::with_config(SecretLeakConfig::default())
+        match Self::with_config(SecretLeakConfig::default()) {
+            Ok(guard) => guard,
+            Err(error) => panic!("default secret leak config must be valid: {error}"),
+        }
     }
 
-    pub fn with_config(config: SecretLeakConfig) -> Self {
+    pub fn with_config(config: SecretLeakConfig) -> Result<Self, SecretLeakConfigError> {
         let mut patterns: Vec<CompiledPattern> = default_patterns()
             .into_iter()
-            .filter_map(|p| {
-                Regex::new(p.pattern).ok().map(|regex| CompiledPattern {
-                    name: p.name.to_string(),
-                    regex,
-                })
+            .map(|pattern| {
+                Regex::new(pattern.pattern)
+                    .map(|regex| CompiledPattern {
+                        name: pattern.name.to_string(),
+                        regex,
+                    })
+                    .map_err(|source| SecretLeakConfigError::InvalidBuiltInPattern {
+                        name: pattern.name.to_string(),
+                        source,
+                    })
             })
-            .collect();
-        patterns.extend(config.custom_patterns.iter().filter_map(|pattern| {
-            Regex::new(&pattern.pattern)
-                .ok()
-                .map(|regex| CompiledPattern {
-                    name: pattern.name.clone(),
-                    regex,
+            .collect::<Result<_, _>>()?;
+        patterns.extend(
+            config
+                .custom_patterns
+                .iter()
+                .map(|pattern| {
+                    Regex::new(&pattern.pattern)
+                        .map(|regex| CompiledPattern {
+                            name: pattern.name.clone(),
+                            regex,
+                        })
+                        .map_err(|source| SecretLeakConfigError::InvalidCustomPattern {
+                            name: pattern.name.clone(),
+                            source,
+                        })
                 })
-        }));
+                .collect::<Result<Vec<_>, _>>()?,
+        );
 
         let skip_paths = config
             .skip_paths
@@ -208,11 +242,11 @@ impl SecretLeakGuard {
             .filter_map(|p| glob::Pattern::new(p).ok())
             .collect();
 
-        Self {
+        Ok(Self {
             enabled: config.enabled,
             patterns,
             skip_paths,
-        }
+        })
     }
 
     /// Scan content for secrets. Returns a list of matches.
@@ -527,5 +561,24 @@ mod tests {
 
         let result = guard.evaluate(&ctx).expect("evaluate should not error");
         assert_eq!(result, Verdict::Allow);
+    }
+
+    #[test]
+    fn with_config_rejects_invalid_custom_regex() {
+        let result = SecretLeakGuard::with_config(SecretLeakConfig {
+            enabled: true,
+            skip_paths: Vec::new(),
+            custom_patterns: vec![CustomSecretPattern {
+                name: "broken".to_string(),
+                pattern: "(".to_string(),
+            }],
+        });
+
+        match result {
+            Ok(_) => panic!("invalid custom regex should fail configuration"),
+            Err(error) => {
+                assert!(error.to_string().contains("broken"));
+            }
+        }
     }
 }

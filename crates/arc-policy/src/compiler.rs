@@ -223,7 +223,10 @@ fn compile_rule_guards(
                 skip_paths: sp.skip_paths.clone(),
                 custom_patterns: compile_custom_secret_patterns(sp),
             };
-            builder.add(SecretLeakGuard::with_config(config));
+            builder.add(
+                SecretLeakGuard::with_config(config)
+                    .map_err(|error| CompileError::Invalid(error.to_string()))?,
+            );
             builder.add(ResponseSanitizationGuard::with_additional_patterns(
                 compile_response_patterns(sp)?,
                 SensitivityLevel::High,
