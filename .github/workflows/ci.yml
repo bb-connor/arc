@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
+  ARC_CI_RUSTFLAGS: "-D warnings -C link-arg=-Wl,--threads=1"
 
 jobs:
   check:
@@ -46,7 +46,7 @@ jobs:
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
-          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
 
       - name: SDK parity contract lane
@@ -69,7 +69,7 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "1"
           CARGO_TARGET_DIR: ${{ runner.temp }}/arc-msrv-target
-          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C debuginfo=0"
+          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: |
           cargo build --workspace
           cargo test --workspace --exclude arc-conformance --exclude arc-wasm-guards
@@ -112,7 +112,7 @@ jobs:
           TARPAULIN_LOCAL_LLVM_PROFILE_FILE: ${{ runner.temp }}/arc-tarpaulin-target/build_rs_cov-%p-%m.profraw
           CARGO_BUILD_JOBS: "1"
           CARGO_INCREMENTAL: "0"
-          RUSTFLAGS: "-D warnings -C debuginfo=0 -C link-arg=-Wl,--threads=1"
+          RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/run-coverage.sh
 
       - name: Upload coverage artifacts
