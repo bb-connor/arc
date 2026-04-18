@@ -408,6 +408,47 @@ fn post_json(client: &Client, url: &str, token: &str, body: &Value) -> Value {
     );
 }
 
+fn post_json_eventually_ok_with_diagnostics<D>(
+    client: &Client,
+    url: &str,
+    token: &str,
+    body: &Value,
+    label: &str,
+    timeout: Duration,
+    diagnostics: D,
+) -> Value
+where
+    D: Fn() -> Value,
+{
+    let deadline = Instant::now() + timeout;
+    let mut last_error = None;
+    while Instant::now() < deadline {
+        match client
+            .post(url)
+            .header(AUTHORIZATION, bearer(token))
+            .json(body)
+            .send()
+        {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    return response.json().expect("decode json");
+                }
+                let response_body = response.text().unwrap_or_default();
+                last_error = Some(format!("{status} body={response_body}"));
+            }
+            Err(error) => last_error = Some(error.to_string()),
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+    let diagnostics = diagnostics();
+    panic!(
+        "POST {url} did not eventually succeed for `{label}`: {}\n{}",
+        last_error.unwrap_or_else(|| "unknown error".to_string()),
+        serde_json::to_string_pretty(&diagnostics).expect("serialize timeout diagnostics")
+    );
+}
+
 fn wait_for_leader_convergence(
     client: &Client,
     service_token: &str,
@@ -1140,7 +1181,7 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
     assert_budget_invocation_count(&client, &follower_url, service_token, "cap-shared", 0, 3);
     assert_budget_totals(&client, &leader_url, service_token, "cap-shared", 0, 0, 0);
 
-    let authorized_budget = post_json(
+    let authorized_budget = post_json_eventually_ok_with_diagnostics(
         &client,
         &format!("{follower_url}/v1/budgets/authorize-exposure"),
         service_token,
@@ -1154,6 +1195,17 @@ fn run_trust_control_cluster_proving_scenario(run_index: usize, run_total: usize
             "holdId": "cap-shared-hold-1",
             "eventId": "cap-shared-hold-1:authorize"
         }),
+        "shared budget authorize exposure reaches quorum",
+        Duration::from_secs(30),
+        || {
+            cluster_timeout_diagnostics(
+                &client,
+                &leader_url,
+                &follower_url,
+                service_token,
+                "cap-shared",
+            )
+        },
     );
     assert_eq!(authorized_budget["allowed"].as_bool(), Some(true));
     assert_eq!(authorized_budget["invocationCount"].as_u64(), Some(4));
@@ -1939,7 +1991,7 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
         || cluster_status_diagnostics(&client, &warm_urls, service_token),
     );
 
-    let authorize = post_json(
+    let authorize = post_json_eventually_ok_with_diagnostics(
         &client,
         &format!("{url_b}/v1/budgets/authorize-exposure"),
         service_token,
@@ -1953,6 +2005,9 @@ fn trust_control_cluster_snapshot_replays_holds_and_mutation_events() {
             "holdId": "cap-snapshot-hold-1",
             "eventId": "cap-snapshot-hold-1:authorize"
         }),
+        "snapshot hold authorization reaches quorum",
+        Duration::from_secs(30),
+        || cluster_status_diagnostics(&client, &warm_urls, service_token),
     );
     assert_eq!(authorize["allowed"].as_bool(), Some(true));
     assert_expected_write_visibility_metadata(&authorize, &warm_leader_url);
