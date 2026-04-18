@@ -429,7 +429,7 @@ fn parse_host_port(url: &str) -> Option<(String, u16)> {
         (url, 443, false)
     };
 
-    let host_with_port = rest.split('/').next().unwrap_or(rest);
+    let host_with_port = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     let host_without_userinfo = host_with_port
         .rsplit_once('@')
         .map(|(_, host)| host)
@@ -533,6 +533,23 @@ mod tests {
         assert!(
             matches!(ipv6_action, ToolAction::NetworkEgress(ref h, 443) if h == "fd00:ec2::254")
         );
+    }
+
+    #[test]
+    fn extract_network_strips_query_and_fragment_from_authority() {
+        let query_args = serde_json::json!({"url": "https://metadata.google.internal?x=1"});
+        let query_action = extract_action("http_request", &query_args);
+        assert!(matches!(
+            query_action,
+            ToolAction::NetworkEgress(ref h, 443) if h == "metadata.google.internal"
+        ));
+
+        let fragment_args = serde_json::json!({"url": "https://metadata.google.internal#anchor"});
+        let fragment_action = extract_action("fetch", &fragment_args);
+        assert!(matches!(
+            fragment_action,
+            ToolAction::NetworkEgress(ref h, 443) if h == "metadata.google.internal"
+        ));
     }
 
     #[test]

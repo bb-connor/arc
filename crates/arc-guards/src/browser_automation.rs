@@ -359,7 +359,7 @@ fn extract_host(url: &str) -> Option<String> {
     } else {
         url
     };
-    let host_with_port = rest.split('/').next().unwrap_or(rest);
+    let host_with_port = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     let host_without_userinfo = host_with_port
         .rsplit_once('@')
         .map(|(_, host)| host)
@@ -445,6 +445,14 @@ mod tests {
             extract_host("//blocked.example/path"),
             Some("blocked.example".into())
         );
+        assert_eq!(
+            extract_host("https://blocked.example?redir=1"),
+            Some("blocked.example".into())
+        );
+        assert_eq!(
+            extract_host("https://blocked.example#anchor"),
+            Some("blocked.example".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
     }
@@ -527,6 +535,24 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation(Some("HTTPS://blocked.example/path")),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_query_and_fragment_only_urls() {
+        let guard = BrowserAutomationGuard::with_config(BrowserAutomationConfig {
+            blocked_domains: vec!["blocked.example".into()],
+            ..BrowserAutomationConfig::default()
+        })
+        .expect("default browser automation config should compile");
+
+        assert_eq!(
+            guard.check_navigation(Some("https://blocked.example?redir=1")),
+            Verdict::Deny
+        );
+        assert_eq!(
+            guard.check_navigation(Some("https://blocked.example#anchor")),
             Verdict::Deny
         );
     }

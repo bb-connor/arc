@@ -354,7 +354,7 @@ fn extract_host(url: &str) -> Option<String> {
     } else {
         url
     };
-    let host_with_port = rest.split('/').next().unwrap_or(rest);
+    let host_with_port = rest.split(['/', '?', '#']).next().unwrap_or(rest);
     let host_without_userinfo = host_with_port
         .rsplit_once('@')
         .map(|(_, host)| host)
@@ -421,6 +421,14 @@ mod tests {
             extract_host("//169.254.169.254/latest"),
             Some("169.254.169.254".into())
         );
+        assert_eq!(
+            extract_host("https://blocked.example?redir=1"),
+            Some("blocked.example".into())
+        );
+        assert_eq!(
+            extract_host("https://blocked.example#anchor"),
+            Some("blocked.example".into())
+        );
         assert_eq!(extract_host("#submit"), None);
         assert_eq!(extract_host("data:text/plain,hi"), None);
     }
@@ -463,6 +471,24 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation("https://[fd00:ec2::254]/latest"),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_query_and_fragment_only_urls() {
+        let guard = ComputerUseGuard::with_config(ComputerUseConfig {
+            mode: EnforcementMode::FailClosed,
+            blocked_domains: vec!["blocked.example".into()],
+            ..ComputerUseConfig::default()
+        });
+
+        assert_eq!(
+            guard.check_navigation("https://blocked.example?redir=1"),
+            Verdict::Deny
+        );
+        assert_eq!(
+            guard.check_navigation("https://blocked.example#anchor"),
             Verdict::Deny
         );
     }
