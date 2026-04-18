@@ -55,7 +55,8 @@ fn federated_request_produces_dual_signed_receipt_verifiable_by_both_orgs() {
     // Pin Org A as a trusted peer on Org B's side. Use wall-clock now so
     // the freshness window stays open when the kernel's post-sign hook
     // queries `current_unix_timestamp()` during evaluation.
-    let trust = KernelTrustExchange::new(tool_host_kernel_id, kernel.config.keypair.clone());
+    let trust = KernelTrustExchange::new(tool_host_kernel_id, kernel.config.keypair.clone())
+        .with_trusted_peer(origin_kernel_id, origin_kp.public_key());
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

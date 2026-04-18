@@ -553,24 +553,6 @@ pub fn build_checkpoint_transparency(
 
     publications.sort_by_key(|publication| publication.checkpoint_seq);
 
-    let mut witnesses = Vec::new();
-    let mut consistency_proofs = Vec::new();
-    for checkpoint in checkpoints {
-        let Some(previous_checkpoint_sha256) =
-            checkpoint.body.previous_checkpoint_sha256.as_deref()
-        else {
-            continue;
-        };
-        if let Some(previous) = by_digest.get(previous_checkpoint_sha256) {
-            witnesses.push(build_checkpoint_witness(previous, checkpoint)?);
-            if checkpoint_log_id(previous) == checkpoint_log_id(checkpoint) {
-                consistency_proofs.push(build_checkpoint_consistency_proof(previous, checkpoint)?);
-            }
-        }
-    }
-    witnesses.sort_by_key(|witness| (witness.witness_checkpoint_seq, witness.checkpoint_seq));
-    consistency_proofs.sort_by_key(|proof| (proof.to_checkpoint_seq, proof.from_checkpoint_seq));
-
     let mut equivocations = Vec::new();
     for (index, checkpoint) in checkpoints.iter().enumerate() {
         for conflicting in checkpoints.iter().skip(index + 1) {
@@ -581,6 +563,40 @@ pub fn build_checkpoint_transparency(
     }
     equivocations.sort();
     equivocations.dedup();
+    let equivocated_digests = equivocations
+        .iter()
+        .flat_map(|equivocation| {
+            [
+                equivocation.first_checkpoint_sha256.clone(),
+                equivocation.second_checkpoint_sha256.clone(),
+            ]
+        })
+        .collect::<BTreeSet<_>>();
+
+    let mut witnesses = Vec::new();
+    let mut consistency_proofs = Vec::new();
+    for checkpoint in checkpoints {
+        let Some(previous_checkpoint_sha256) =
+            checkpoint.body.previous_checkpoint_sha256.as_deref()
+        else {
+            continue;
+        };
+        if let Some(previous) = by_digest.get(previous_checkpoint_sha256) {
+            let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body)?;
+            if let Err(error) = validate_checkpoint_predecessor(previous, checkpoint) {
+                if equivocated_digests.contains(&checkpoint_sha256) {
+                    continue;
+                }
+                return Err(error);
+            }
+            witnesses.push(build_checkpoint_witness(previous, checkpoint)?);
+            if checkpoint_log_id(previous) == checkpoint_log_id(checkpoint) {
+                consistency_proofs.push(build_checkpoint_consistency_proof(previous, checkpoint)?);
+            }
+        }
+    }
+    witnesses.sort_by_key(|witness| (witness.witness_checkpoint_seq, witness.checkpoint_seq));
+    consistency_proofs.sort_by_key(|proof| (proof.to_checkpoint_seq, proof.from_checkpoint_seq));
 
     Ok(CheckpointTransparencySummary {
         publications,

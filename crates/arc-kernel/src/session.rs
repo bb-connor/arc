@@ -629,6 +629,11 @@ impl Session {
         if let Some(parent_request_id) = &context.parent_request_id {
             self.validate_parent_request_lineage(&context.request_id, parent_request_id)?;
         }
+        if self.inflight.get(&context.request_id).is_some() {
+            return Err(SessionError::DuplicateInflightRequest {
+                request_id: context.request_id.clone(),
+            });
+        }
         if self.request_lineage.contains_key(&context.request_id) {
             return Err(SessionError::DuplicateRequestLineage {
                 request_id: context.request_id.clone(),

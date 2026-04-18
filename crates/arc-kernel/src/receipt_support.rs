@@ -900,7 +900,11 @@ mod tests {
             Some("anchor-verified")
         );
         assert_eq!(provenance.into_inner(), call_chain);
-        assert!(metadata.get("governed_transaction_diagnostics").is_none());
+        assert_eq!(
+            metadata["governed_transaction_diagnostics"]["lineageReferences"]["sessionAnchorId"],
+            serde_json::json!("anchor-verified")
+        );
+        assert!(metadata["governed_transaction_diagnostics"]["assertedCallChain"].is_null());
     }
 
     #[test]

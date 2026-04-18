@@ -2035,7 +2035,6 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     let path = unique_receipt_db_path("arc-kernel-missing-parent-lineage");
     let mut kernel = ArcKernel::new(make_config());
     kernel.register_tool_server(Box::new(EchoServer::new("srv-a", vec!["read_file"])));
-    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
     let parent_kp = make_keypair();
     let child_kp = make_keypair();
@@ -2044,6 +2043,7 @@ fn delegated_tool_call_without_parent_snapshot_denies() {
     parent_grant.operations.push(Operation::Delegate);
     let parent_scope = make_scope(vec![parent_grant]);
     let parent = make_capability(&kernel, &parent_kp, parent_scope.clone(), 300);
+    kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path).unwrap()));
 
     let child_scope = make_scope(vec![make_grant("srv-a", "read_file")]);
     let link = make_delegation_link(&parent.id, &parent_kp, &child_kp, current_unix_timestamp());
@@ -4910,9 +4910,7 @@ fn make_governed_call_chain_continuation_token(
     governed_intent_hash: Option<&str>,
 ) -> CallChainContinuationToken {
     let now = current_unix_timestamp();
-    let legacy_upstream_proof =
-        make_governed_upstream_call_chain_proof(signer, subject, call_chain);
-    let mut token = CallChainContinuationToken::sign(
+    CallChainContinuationToken::sign(
         CallChainContinuationTokenBody {
             schema: arc_core::capability::ARC_CALL_CHAIN_CONTINUATION_SCHEMA.to_string(),
             token_id: "continuation-token-1".to_string(),
@@ -4939,9 +4937,7 @@ fn make_governed_call_chain_continuation_token(
         },
         signer,
     )
-    .unwrap();
-    token.legacy_upstream_proof = Some(legacy_upstream_proof);
-    token
+    .unwrap()
 }
 
 fn attach_governed_call_chain_continuation_token(
@@ -6095,10 +6091,7 @@ fn governed_call_chain_receipt_follows_asserted_observed_verified_execution_orde
         .and_then(|metadata| metadata.get("governed_transaction"))
         .expect("asserted receipt should carry governed transaction metadata");
     assert_eq!(asserted_governed["call_chain"]["evidenceClass"], "asserted");
-    assert_eq!(
-        asserted_governed["call_chain"]["evidenceSources"],
-        serde_json::json!([])
-    );
+    assert!(asserted_governed["call_chain"]["evidenceSources"].is_null());
     assert!(asserted_governed["call_chain"]["upstreamProof"].is_null());
 
     let mut observed_kernel = ArcKernel::new(make_config());
