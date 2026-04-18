@@ -185,7 +185,7 @@ fn envoy_status_code(code: u16) -> i32 {
         405 => EnvoyStatusCode::MethodNotAllowed,
         409 => EnvoyStatusCode::Conflict,
         410 => EnvoyStatusCode::Gone,
-        418 => EnvoyStatusCode::ImUsed, // closest sentinel; real Envoy maps this verbatim
+        418 => EnvoyStatusCode::Forbidden,
         422 => EnvoyStatusCode::UnprocessableEntity,
         423 => EnvoyStatusCode::Locked,
         424 => EnvoyStatusCode::FailedDependency,
@@ -277,6 +277,7 @@ mod tests {
     fn envoy_status_code_falls_back_to_forbidden() {
         assert_eq!(envoy_status_code(999), EnvoyStatusCode::Forbidden as i32);
         assert_eq!(envoy_status_code(403), EnvoyStatusCode::Forbidden as i32);
+        assert_eq!(envoy_status_code(418), EnvoyStatusCode::Forbidden as i32);
         assert_eq!(
             envoy_status_code(429),
             EnvoyStatusCode::TooManyRequests as i32
