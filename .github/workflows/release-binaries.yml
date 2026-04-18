@@ -156,7 +156,12 @@ jobs:
           if (Test-Path LICENSE) { Copy-Item LICENSE "dist/$stage/" }
           Compress-Archive -Path "dist/$stage/*" -DestinationPath "dist/$stage.zip"
           $hash = (Get-FileHash "dist/$stage.zip" -Algorithm SHA256).Hash.ToLower()
-          "$hash  $stage.zip" | Out-File -Encoding ascii "dist/$stage.zip.sha256"
+          $checksumLine = "$hash  $stage.zip`n"
+          [System.IO.File]::WriteAllText(
+            "dist/$stage.zip.sha256",
+            $checksumLine,
+            [System.Text.Encoding]::ASCII
+          )
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -226,9 +231,10 @@ jobs:
           # `fail_on_unmatched_files: true`, so missing per-archive files
           # would fail every release.
           find artifacts -type f -name "*.sha256" -exec cp {} release/ \;
+          find release -type f -name "*.sha256" -exec perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' {} +
           # Concatenate the per-archive .sha256 files into the combined
           # SHA256SUMS for `shasum -a 256 -c`.
-          find artifacts -type f -name "*.sha256" -exec cat {} + | sort > release/SHA256SUMS
+          find release -type f -name "*.sha256" -exec cat {} + | sort > release/SHA256SUMS
           (cd release && ls -la)
 
       - name: Render Homebrew formula

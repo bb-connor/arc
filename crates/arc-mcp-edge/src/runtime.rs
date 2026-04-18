@@ -4,7 +4,7 @@ use std::sync::{mpsc, Arc};
 use std::time::Duration;
 
 use crate::{AdapterError, McpTransport};
-use arc_core::capability::{CapabilityToken, Operation};
+use arc_core::capability::{CapabilityToken, ModelMetadata, Operation};
 use arc_core::receipt::Decision;
 use arc_core::session::{
     CompleteOperation, CompletionArgument, CompletionReference, CreateElicitationOperation,
@@ -95,6 +95,7 @@ pub struct BridgeMcpToolCallRequest {
     pub tool_name: String,
     pub arguments: Value,
     pub agent_id: String,
+    pub model_metadata: Option<ModelMetadata>,
     pub route_selection_metadata: Option<Value>,
     pub peer_supports_arc_tool_streaming: bool,
 }
@@ -131,6 +132,7 @@ impl TargetProtocolExecutor for McpTargetExecutor {
                 tool_name: request.execution.target_tool_name.clone(),
                 arguments: request.execution.arguments.clone(),
                 agent_id: request.execution.agent_id.clone(),
+                model_metadata: request.execution.model_metadata.clone(),
                 route_selection_metadata: Some(route_selection_metadata(request.route_selection)?),
                 peer_supports_arc_tool_streaming: self.peer_supports_arc_tool_streaming,
             },
@@ -174,7 +176,7 @@ pub fn execute_bridge_mcp_tool_call(
                 dpop_proof: None,
                 governed_intent: None,
                 approval_token: None,
-                model_metadata: None,
+                model_metadata: request.model_metadata,
                 federated_origin_kernel_id: None,
             },
             request.route_selection_metadata,

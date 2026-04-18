@@ -1,6 +1,9 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 use super::*;
-use arc_core::capability::{ArcScope, Operation, PromptGrant, ResourceGrant, ToolGrant};
+use arc_core::capability::{
+    ArcScope, Constraint, ModelMetadata, ModelSafetyTier, Operation, PromptGrant, ResourceGrant,
+    ToolGrant,
+};
 use arc_core::crypto::Keypair;
 use arc_core::{
     CompletionResult, PromptArgument, PromptDefinition, PromptMessage, PromptResult,
@@ -502,6 +505,32 @@ fn issue_capabilities_with_resource_grants(
         .unwrap()]
 }
 
+fn issue_model_constrained_capability(kernel: &ArcKernel, agent: &Keypair) -> CapabilityToken {
+    kernel
+        .issue_capability(
+            &agent.public_key(),
+            ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "read_file".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![Constraint::ModelConstraint {
+                        allowed_model_ids: vec!["gpt-5".to_string()],
+                        min_safety_tier: Some(ModelSafetyTier::High),
+                    }],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            300,
+        )
+        .unwrap()
+}
+
 fn sample_manifest() -> ToolManifest {
     ToolManifest {
         schema: "arc.manifest.v1".into(),
@@ -607,6 +636,35 @@ fn make_edge_with_config(page_size: usize, logging_enabled: bool) -> ArcMcpEdge 
         vec![sample_manifest()],
     )
     .unwrap()
+}
+
+#[test]
+fn execute_bridge_mcp_tool_call_preserves_model_metadata() {
+    let (kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    let capability = issue_model_constrained_capability(&kernel, &agent);
+
+    let bridge = execute_bridge_mcp_tool_call(
+        &kernel,
+        BridgeMcpToolCallRequest {
+            request_id: "mcp-model-1".to_string(),
+            capability,
+            server_id: "srv".to_string(),
+            tool_name: "read_file".to_string(),
+            arguments: json!({"path":"/tmp/demo.txt"}),
+            agent_id: agent.public_key().to_hex(),
+            model_metadata: Some(ModelMetadata {
+                model_id: "gpt-5".to_string(),
+                safety_tier: Some(ModelSafetyTier::High),
+                provider: Some("openai".to_string()),
+            }),
+            route_selection_metadata: None,
+            peer_supports_arc_tool_streaming: false,
+        },
+    )
+    .unwrap();
+
+    assert!(matches!(bridge.response.verdict, Verdict::Allow));
 }
 
 fn make_streaming_edge(page_size: usize) -> ArcMcpEdge {
