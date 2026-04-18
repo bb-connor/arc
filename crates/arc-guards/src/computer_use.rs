@@ -351,10 +351,14 @@ fn extract_host(url: &str) -> Option<String> {
         .or_else(|| url.strip_prefix("//"))
         .unwrap_or(url);
     let host_with_port = rest.split('/').next().unwrap_or(rest);
-    let host = host_with_port
+    let host_without_userinfo = host_with_port
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(host_with_port);
+    let host = host_without_userinfo
         .rsplit_once(':')
         .map(|(h, _)| h)
-        .unwrap_or(host_with_port)
+        .unwrap_or(host_without_userinfo)
         .trim_matches(|c: char| c == '/' || c == '.');
     if host.is_empty() {
         return None;
@@ -379,6 +383,10 @@ mod tests {
     fn extract_host_handles_common_urls() {
         assert_eq!(
             extract_host("https://example.com/x"),
+            Some("example.com".into())
+        );
+        assert_eq!(
+            extract_host("https://user:pass@example.com:8443/x"),
             Some("example.com".into())
         );
         assert_eq!(
@@ -407,6 +415,20 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation("//169.254.169.254/latest"),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_urls_with_userinfo() {
+        let guard = ComputerUseGuard::with_config(ComputerUseConfig {
+            mode: EnforcementMode::FailClosed,
+            blocked_domains: vec!["blocked.example".into()],
+            ..ComputerUseConfig::default()
+        });
+
+        assert_eq!(
+            guard.check_navigation("https://user@blocked.example/path"),
             Verdict::Deny
         );
     }

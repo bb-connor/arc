@@ -356,10 +356,14 @@ fn extract_host(url: &str) -> Option<String> {
         .or_else(|| url.strip_prefix("//"))
         .unwrap_or(url);
     let host_with_port = rest.split('/').next().unwrap_or(rest);
-    let host = host_with_port
+    let host_without_userinfo = host_with_port
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(host_with_port);
+    let host = host_without_userinfo
         .rsplit_once(':')
         .map(|(h, _)| h)
-        .unwrap_or(host_with_port)
+        .unwrap_or(host_without_userinfo)
         .trim_matches(|c: char| c == '/' || c == '.');
     if host.is_empty() {
         return None;
@@ -414,6 +418,10 @@ mod tests {
             Some("example.com".into())
         );
         assert_eq!(
+            extract_host("https://user:pass@blocked.example:8443/path"),
+            Some("blocked.example".into())
+        );
+        assert_eq!(
             extract_host("//blocked.example/path"),
             Some("blocked.example".into())
         );
@@ -457,6 +465,20 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation(Some("//blocked.example/path")),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_urls_with_userinfo() {
+        let guard = BrowserAutomationGuard::with_config(BrowserAutomationConfig {
+            blocked_domains: vec!["blocked.example".into()],
+            ..BrowserAutomationConfig::default()
+        })
+        .expect("default browser automation config should compile");
+
+        assert_eq!(
+            guard.check_navigation(Some("https://user@blocked.example/path")),
             Verdict::Deny
         );
     }
