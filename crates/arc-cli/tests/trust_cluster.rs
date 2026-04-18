@@ -434,6 +434,43 @@ fn wait_for_leader_convergence(
     );
 }
 
+fn wait_for_cluster_leader_convergence(
+    client: &Client,
+    service_token: &str,
+    urls: &[String],
+    label: &str,
+) -> String {
+    let mut converged_leader = None;
+    wait_until_with_diagnostics(
+        label,
+        Duration::from_secs(90),
+        || {
+            let mut observed = None::<String>;
+            for base_url in urls {
+                let Some(health) =
+                    try_get_json(client, &format!("{base_url}/health"), service_token)
+                else {
+                    return false;
+                };
+                let Some(current_leader) = health.get("leaderUrl").and_then(Value::as_str) else {
+                    return false;
+                };
+                if let Some(expected_leader) = observed.as_deref() {
+                    if expected_leader != current_leader {
+                        return false;
+                    }
+                } else {
+                    observed = Some(current_leader.to_string());
+                }
+            }
+            converged_leader = observed;
+            converged_leader.is_some()
+        },
+        || cluster_status_diagnostics(client, urls, service_token),
+    );
+    converged_leader.expect("converged leader url")
+}
+
 fn sample_receipt(id: &str, capability_id: &str) -> ArcReceipt {
     let keypair = Keypair::generate();
     ArcReceipt::sign(
@@ -1643,8 +1680,6 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
     let warm_urls = vec![url_a.clone(), url_b.clone()];
     let all_urls = vec![url_a.clone(), url_b.clone(), url_c.clone()];
     let service_token = "cluster-snapshot-token";
-    let expected_leader_url = url_a.clone();
-
     let _server_a = spawn_trust_service(
         addr_a,
         service_token,
@@ -1681,6 +1716,12 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
         );
     }
 
+    let expected_leader_url = wait_for_cluster_leader_convergence(
+        &client,
+        service_token,
+        &warm_urls,
+        "two-node leader convergence with third node absent",
+    );
     wait_until_with_diagnostics(
         "two-node quorum convergence with third node absent",
         Duration::from_secs(90),
@@ -1750,7 +1791,6 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
                 return false;
             };
             tool_receipt_count(&client, &url_c, service_token) == 10
-                && status["leaderUrl"].as_str() == Some(expected_leader_url.as_str())
                 && status["hasQuorum"].as_bool() == Some(true)
                 && status["peers"]
                     .as_array()
@@ -1762,6 +1802,12 @@ fn trust_control_cluster_late_joiner_catches_up_from_snapshot_and_compacts() {
                     })
         },
         || cluster_status_diagnostics(&client, &all_urls, service_token),
+    );
+    let expected_leader_url = wait_for_cluster_leader_convergence(
+        &client,
+        service_token,
+        &all_urls,
+        "three-node leader convergence after late joiner catch-up",
     );
 
     for index in 10..20 {
