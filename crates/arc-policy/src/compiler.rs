@@ -250,7 +250,10 @@ fn compile_rule_guards(
                 require_balance: pi.require_balance,
                 max_imbalance_ratio: pi.max_imbalance_ratio,
             };
-            builder.add(PatchIntegrityGuard::with_config(config));
+            builder.add(
+                PatchIntegrityGuard::with_config(config)
+                    .map_err(|error| CompileError::Invalid(error.to_string()))?,
+            );
         }
     }
 
@@ -706,6 +709,31 @@ rules:
             error
                 .to_string()
                 .contains("invalid egress allowlist pattern"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn compile_patch_integrity_rejects_invalid_regex() {
+        let spec = HushSpec::parse(
+            r#"
+hushspec: "0.1.0"
+rules:
+  patch_integrity:
+    enabled: true
+    forbidden_patterns: ["["]
+"#,
+        )
+        .unwrap();
+
+        let error = match compile_policy(&spec) {
+            Ok(_) => panic!("invalid patch integrity regex should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid patch integrity forbidden pattern"),
             "unexpected error: {error}"
         );
     }

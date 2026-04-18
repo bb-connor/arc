@@ -871,16 +871,19 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
 
     if let Some(patch_integrity) = &config.patch_integrity {
         if patch_integrity.enabled {
-            pipeline.add(Box::new(PatchIntegrityGuard::with_config(
-                arc_guards::patch_integrity::PatchIntegrityConfig {
-                    enabled: true,
-                    max_additions: patch_integrity.max_additions,
-                    max_deletions: patch_integrity.max_deletions,
-                    forbidden_patterns: patch_integrity.forbidden_patterns.clone(),
-                    require_balance: patch_integrity.require_balance,
-                    max_imbalance_ratio: patch_integrity.max_imbalance_ratio,
-                },
-            )));
+            pipeline.add(Box::new(
+                PatchIntegrityGuard::with_config(
+                    arc_guards::patch_integrity::PatchIntegrityConfig {
+                        enabled: true,
+                        max_additions: patch_integrity.max_additions,
+                        max_deletions: patch_integrity.max_deletions,
+                        forbidden_patterns: patch_integrity.forbidden_patterns.clone(),
+                        require_balance: patch_integrity.require_balance,
+                        max_imbalance_ratio: patch_integrity.max_imbalance_ratio,
+                    },
+                )
+                .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+            ));
         }
     }
 
@@ -1329,6 +1332,31 @@ guards:
             error
                 .to_string()
                 .contains("invalid egress allowlist pattern"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn build_pipeline_rejects_invalid_patch_patterns() {
+        let policy = parse_policy(
+            r#"
+guards:
+  patch_integrity:
+    enabled: true
+    forbidden_patterns:
+      - "["
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("invalid patch integrity patterns should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("invalid patch integrity forbidden pattern"),
             "unexpected error: {error}"
         );
     }

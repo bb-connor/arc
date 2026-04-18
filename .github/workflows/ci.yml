@@ -28,6 +28,31 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.elan
+          key: ${{ runner.os }}-elan-${{ hashFiles('formal/lean4/Pact/lean-toolchain') }}
+
+      - name: Prime Lean 4 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          for attempt in 1 2 3 4 5; do
+            if "$HOME/.elan/bin/elan" toolchain install "$toolchain"; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+          (
+            cd formal/lean4/Pact
+            "$HOME/.elan/bin/lake" --version
+          )
 
       - uses: actions/setup-node@v4
         with:
