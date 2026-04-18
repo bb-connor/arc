@@ -29,6 +29,7 @@ Search and replace the following before applying:
 | `ghcr.io/backbay/arc-sidecar:latest` | ARC sidecar image you have built and pushed |
 | `PROJECT_ID`, `REGION` | GCP project and region (Cloud Run) |
 | `ACCOUNT_ID` | AWS account ID (ECS) |
+| `EFS_FILESYSTEM_ID` | ECS EFS volume containing `/arc-config/kernel.yaml` and `/arc-config/spec/openapi.yaml` |
 | Key Vault / Secret Manager ARNs | Pre-created secret references |
 
 ## Required secrets
@@ -53,8 +54,11 @@ the sidecar is healthy:
 
 - **Cloud Run** -- `run.googleapis.com/container-dependencies` annotation plus
   sidecar `startupProbe` on `:9090/arc/health`.
-- **ECS Fargate** -- `dependsOn: [{ containerName: "arc-sidecar", condition: "HEALTHY" }]`
-  on the app, combined with a `healthCheck` block on the sidecar.
+- **ECS Fargate** -- the app waits for the sidecar process to start, and the
+  sidecar uses the mounted `/etc/arc/spec/openapi.yaml` plus its own
+  `healthCheck` on `:9090/arc/health`. This avoids a startup deadlock where
+  spec auto-discovery would need the app healthy before the sidecar could
+  report healthy.
 - **Azure Container Apps** -- sidecar `startupProbe` plus `readinessProbe` on
   `:9090/arc/health`; the app's own `startupProbe` ensures it does not report
   healthy until it can reach the sidecar.

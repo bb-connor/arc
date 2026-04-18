@@ -25,7 +25,7 @@
         { "name": "ARC_SIDECAR_HEALTH_URL", "value": "http://localhost:9090/arc/health" }
       ],
       "dependsOn": [
-        { "containerName": "arc-sidecar", "condition": "HEALTHY" }
+        { "containerName": "arc-sidecar", "condition": "START" }
       ],
       "restartPolicy": {
         "enabled": true,
@@ -56,6 +56,8 @@
         "protect",
         "--upstream",
         "http://127.0.0.1:8080",
+        "--spec",
+        "/etc/arc/spec/openapi.yaml",
         "--listen",
         "0.0.0.0:9090"
       ],
@@ -77,8 +79,15 @@
           "valueFrom": "arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:arc/capability-authority-url"
         }
       ],
+      "mountPoints": [
+        {
+          "sourceVolume": "arc-config",
+          "containerPath": "/etc/arc",
+          "readOnly": true
+        }
+      ],
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget -q -O - http://localhost:9090/arc/health >/dev/null 2>&1"],
+        "command": ["CMD", "/usr/bin/curl", "-fsS", "http://localhost:9090/arc/health"],
         "interval": 10,
         "timeout": 5,
         "retries": 3,
@@ -100,6 +109,19 @@
       },
       "readonlyRootFilesystem": true,
       "user": "65532:65532"
+    }
+  ],
+  "volumes": [
+    {
+      "name": "arc-config",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "EFS_FILESYSTEM_ID",
+        "rootDirectory": "/arc-config",
+        "transitEncryption": "ENABLED",
+        "authorizationConfig": {
+          "iam": "ENABLED"
+        }
+      }
     }
   ]
 }

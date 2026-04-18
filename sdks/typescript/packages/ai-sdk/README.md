@@ -39,7 +39,7 @@ const searchTool = arcTool({
   scope: {
     toolServer: "web-tools",
     toolName: "search",
-    capabilityId: "cap-agent-001",
+    capabilityToken: process.env.ARC_CAPABILITY_TOKEN!,
   },
 });
 
@@ -101,14 +101,19 @@ const progressiveTool = arcTool({
 | `parameters`      | `ZodSchema`                           | Input schema (AI SDK v3/v4 shape).                                      |
 | `inputSchema`     | `ZodSchema`                           | Input schema (AI SDK v5 shape).                                         |
 | `execute`         | `(params, options?) => T`             | Underlying tool implementation; called when ARC allows the call.        |
-| `scope`           | `ArcToolScope`                        | ARC evaluation binding (`toolServer`, `toolName`, `capabilityId`, ...). |
+| `scope`           | `ArcToolScope`                        | ARC evaluation binding (`toolServer`, `toolName`, `capabilityToken`, ...). |
 | `client`          | `ArcClient`                           | Optional shared client.                                                 |
 | `clientOptions`   | `ArcClientOptions`                    | Inline client options (`sidecarUrl`, `timeoutMs`, `fetch`, `debug`).    |
 | `onSidecarError`  | `"deny"` \| `"allow"`                 | Default `"deny"` -- throw on transport failure.                         |
 | `debug`           | `(message, data?) => void`            | Optional debug hook; the wrapper never writes to stdout.                |
+| `resolveCapabilityToken` | `(capabilityId) => token`       | Optional resolver when `scope.capabilityId` is only an indirection key. |
 
 Returns a tool object with the same structural shape as the input so it
 drops directly into `streamText({ tools: { ... } })`.
+
+`scope.capabilityId` is only a request hint. ARC deny-by-default sidecar
+evaluation still requires a signed capability token to be presented via
+`scope.capabilityToken` or `resolveCapabilityToken`.
 
 ### `ArcToolError`
 

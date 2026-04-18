@@ -107,6 +107,12 @@ function sidecarAllowEvaluateResponse(id = "r-allow"): Record<string, unknown> {
   };
 }
 
+const CAPABILITY_TOKEN = JSON.stringify({
+  id: "cap-1",
+  issuer: "issuer-placeholder",
+  subject: "subject-placeholder",
+});
+
 // -- arcTool: basic shape --------------------------------------------------
 
 describe("arcTool: shape and type preservation", () => {
@@ -174,7 +180,12 @@ describe("arcTool: allow path invokes underlying execute", () => {
     const wrapped = arcTool({
       parameters: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
-      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      scope: {
+        toolServer: "math",
+        toolName: "double",
+        capabilityId: "cap-1",
+        capabilityToken: CAPABILITY_TOKEN,
+      },
       clientOptions: { fetch },
     });
 
@@ -205,6 +216,7 @@ describe("arcTool: allow path invokes underlying execute", () => {
       capability_id: "cap-1",
       arguments: { n: 21 },
     });
+    expect(calls[0]!.headers["x-arc-capability"]).toBe(CAPABILITY_TOKEN);
   });
 
   it("forwards capability token in X-Arc-Capability header when provided", async () => {
@@ -253,7 +265,12 @@ describe("arcTool: allow path invokes underlying execute", () => {
     const wrapped = arcTool({
       parameters: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
-      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      scope: {
+        toolServer: "math",
+        toolName: "double",
+        capabilityId: "cap-1",
+        capabilityToken: CAPABILITY_TOKEN,
+      },
       clientOptions: { fetch },
     });
 
@@ -266,7 +283,12 @@ describe("arcTool: allow path invokes underlying execute", () => {
     const wrapped = arcTool({
       parameters: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
-      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      scope: {
+        toolServer: "math",
+        toolName: "double",
+        capabilityId: "cap-1",
+        capabilityToken: CAPABILITY_TOKEN,
+      },
       clientOptions: { fetch },
     });
 
@@ -295,6 +317,38 @@ describe("arcTool: allow path invokes underlying execute", () => {
     });
     expect(capturedOpts).toMatchObject({ toolCallId: "call-1" });
     expect((capturedOpts as { abortSignal?: AbortSignal }).abortSignal).toBe(controller.signal);
+  });
+
+  it("resolves a capability token when only capabilityId is configured", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const wrapped = arcTool({
+      parameters: z.object({ n: z.number() }),
+      execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
+      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      resolveCapabilityToken: async (capabilityId) =>
+        capabilityId === "cap-1" ? CAPABILITY_TOKEN : undefined,
+      clientOptions: { fetch },
+    });
+
+    const result = await wrapped.execute!({ n: 21 });
+    expect(result).toEqual({ doubled: 42 });
+    expect(calls[0]!.headers["x-arc-capability"]).toBe(CAPABILITY_TOKEN);
+  });
+
+  it("fails fast when capabilityId is configured without a presented token", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const wrapped = arcTool({
+      parameters: z.object({ n: z.number() }),
+      execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
+      scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
+      clientOptions: { fetch },
+    });
+
+    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+      name: "ArcToolError",
+      verdict: "incomplete",
+    });
+    expect(calls).toHaveLength(0);
   });
 });
 

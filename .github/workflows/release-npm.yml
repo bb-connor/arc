@@ -273,8 +273,6 @@ jobs:
       - name: Rewrite `file:` workspace deps to semver for publish
         working-directory: ${{ matrix.package }}
         shell: bash
-        env:
-          WORKSPACE_ROOT: sdks/typescript/packages
         run: |
           set -euo pipefail
           # npm consumers cannot resolve `file:../<sibling>` paths from a
@@ -284,8 +282,6 @@ jobs:
           node -e '
             const fs = require("fs");
             const path = require("path");
-            const root = process.env.GITHUB_WORKSPACE;
-            const wsDir = path.join(root, process.env.WORKSPACE_ROOT);
             const pkgPath = path.resolve("./package.json");
             const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
             let mutated = false;

@@ -31,6 +31,7 @@ export {
   arcTool,
   type ArcToolOptions,
   type ArcToolScope,
+  type CapabilityTokenResolver,
   type ToolLike,
   type ToolExecuteOptions,
 } from "./arc-tool.js";

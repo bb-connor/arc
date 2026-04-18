@@ -88,6 +88,15 @@ export interface ArcToolScope {
 }
 
 /**
+ * Optional hook that resolves a raw capability token for a configured
+ * capability ID. This is the only safe way to keep `capabilityId` as the
+ * declarative scope handle while still presenting a signed token to the
+ * sidecar.
+ */
+export type CapabilityTokenResolver =
+  (capabilityId: string) => string | Promise<string | undefined> | undefined;
+
+/**
  * Options accepted by `arcTool`. Mirrors the Vercel AI SDK `tool()` shape
  * (`description`, `parameters`/`inputSchema`, `execute`) and adds ARC
  * binding fields under `scope`.
@@ -114,6 +123,12 @@ export interface ArcToolOptions<PARAMS, RESULT> extends ToolLike<PARAMS, RESULT>
    * writes to stdout/stderr on its own.
    */
   debug?: ((message: string, data?: unknown) => void) | undefined;
+  /**
+   * Optional hook used when `scope.capabilityId` is configured without an
+   * inline `scope.capabilityToken`. The resolver must return the full raw
+   * capability token JSON that should be presented to the sidecar.
+   */
+  resolveCapabilityToken?: CapabilityTokenResolver | undefined;
 }
 
 /** Lazily cached shared client for callers that provide only `clientOptions`. */
@@ -159,6 +174,7 @@ export function arcTool<PARAMS, RESULT>(
     clientOptions: _clientOptions,
     onSidecarError,
     debug: _debug,
+    resolveCapabilityToken,
     execute: originalExecute,
     ...rest
   } = options;
@@ -172,8 +188,22 @@ export function arcTool<PARAMS, RESULT>(
     let receipt;
     try {
       const clientArgs: { capabilityToken?: string | undefined } = {};
-      if (scope.capabilityToken != null) {
-        clientArgs.capabilityToken = scope.capabilityToken;
+      let capabilityToken = scope.capabilityToken;
+      if (capabilityToken == null
+        && scope.capabilityId != null
+        && resolveCapabilityToken != null) {
+        capabilityToken = await resolveCapabilityToken(scope.capabilityId);
+      }
+      if (capabilityToken == null && scope.capabilityId != null) {
+        throw new ArcToolError({
+          verdict: "incomplete",
+          guard: "",
+          reason:
+            "scope.capabilityId is only a hint; provide scope.capabilityToken or resolveCapabilityToken so arcTool can present a signed capability token",
+        });
+      }
+      if (capabilityToken != null) {
+        clientArgs.capabilityToken = capabilityToken;
       }
       const request: Parameters<ArcClient["evaluateToolCall"]>[0] = {
         tool_server: scope.toolServer,
