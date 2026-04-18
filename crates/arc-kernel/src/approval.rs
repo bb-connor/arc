@@ -751,6 +751,15 @@ pub fn resume_with_decision(
     {
         Some(p) => p,
         None => {
+            if let Some(resolution) = store
+                .get_resolution(&decision.approval_id)
+                .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?
+            {
+                return Err(KernelError::ApprovalRejected(format!(
+                    "already resolved: {} ({:?})",
+                    resolution.approval_id, resolution.outcome
+                )));
+            }
             return Err(KernelError::ApprovalRejected(format!(
                 "unknown approval id: {}",
                 decision.approval_id
@@ -1241,6 +1250,42 @@ mod tests {
         let err = resume_with_decision(&store, &decision, 51).unwrap_err();
         match err {
             KernelError::ApprovalRejected(_) => {}
+            other => panic!("expected ApprovalRejected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resume_flow_duplicate_resolution_reports_already_resolved() {
+        let store = InMemoryApprovalStore::new();
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let mut req = make_request("a-2b", "h-2b");
+        req.subject_public_key = Some(subject.public_key());
+        req.trusted_approvers = vec![approver.public_key()];
+        store.store_pending(&req).unwrap();
+
+        let token = make_token(
+            &approver,
+            &subject,
+            "a-2b",
+            "h-2b",
+            GovernedApprovalDecision::Approved,
+        );
+        let decision = ApprovalDecision {
+            approval_id: "a-2b".into(),
+            outcome: ApprovalOutcome::Approved,
+            reason: None,
+            approver: approver.public_key(),
+            token,
+            received_at: 50,
+        };
+
+        resume_with_decision(&store, &decision, 50).unwrap();
+        let err = resume_with_decision(&store, &decision, 51).unwrap_err();
+        match err {
+            KernelError::ApprovalRejected(reason) => {
+                assert!(reason.contains("already resolved"), "{reason}");
+            }
             other => panic!("expected ApprovalRejected, got {other:?}"),
         }
     }

@@ -355,15 +355,28 @@ fn derive_body_binding(http: &ProtoHttpRequest) -> (Option<String>, u64) {
 /// a single dot so `/resource/` and `/resource` produce the same identity.
 fn derive_tool_identity(method: &str, path: &str) -> String {
     let method = method.to_ascii_lowercase();
-    let segments: Vec<&str> = path
+    let segments: Vec<String> = path
         .split('/')
         .filter(|segment| !segment.is_empty())
+        .map(escape_tool_identity_segment)
         .collect();
     if segments.is_empty() {
         format!("http.{method}")
     } else {
         format!("http.{method}.{}", segments.join("."))
     }
+}
+
+fn escape_tool_identity_segment(segment: &str) -> String {
+    let mut escaped = String::with_capacity(segment.len());
+    for byte in segment.bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'~') {
+            escaped.push(char::from(byte));
+        } else {
+            escaped.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    escaped
 }
 
 /// Prefer the `x-request-id` header (Envoy always populates it for
@@ -464,6 +477,18 @@ mod tests {
         let check = mk_check("GET", "/v1/agents/42/tools", &[], "", None);
         let call = check_request_to_tool_call(&check).unwrap();
         assert_eq!(call.tool, "http.get.v1.agents.42.tools");
+    }
+
+    #[test]
+    fn translate_dotted_path_segment_is_escaped() {
+        let dotted = mk_check("GET", "/admin.list", &[], "", None);
+        let slash_delimited = mk_check("GET", "/admin/list", &[], "", None);
+        let dotted_call = check_request_to_tool_call(&dotted).unwrap();
+        let slash_delimited_call = check_request_to_tool_call(&slash_delimited).unwrap();
+
+        assert_eq!(dotted_call.tool, "http.get.admin%2Elist");
+        assert_eq!(slash_delimited_call.tool, "http.get.admin.list");
+        assert_ne!(dotted_call.tool, slash_delimited_call.tool);
     }
 
     #[test]
