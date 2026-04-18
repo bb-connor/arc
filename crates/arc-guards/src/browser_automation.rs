@@ -360,11 +360,19 @@ fn extract_host(url: &str) -> Option<String> {
         .rsplit_once('@')
         .map(|(_, host)| host)
         .unwrap_or(host_with_port);
-    let host = host_without_userinfo
-        .rsplit_once(':')
-        .map(|(h, _)| h)
-        .unwrap_or(host_without_userinfo)
-        .trim_matches(|c: char| c == '/' || c == '.');
+    let host = if let Some(bracketed) = host_without_userinfo.strip_prefix('[') {
+        let (host, remainder) = bracketed.split_once(']')?;
+        if !remainder.is_empty() && !remainder.starts_with(':') {
+            return None;
+        }
+        host
+    } else {
+        host_without_userinfo
+            .rsplit_once(':')
+            .map(|(h, _)| h)
+            .unwrap_or(host_without_userinfo)
+    }
+    .trim_matches(|c: char| c == '/' || c == '.');
     if host.is_empty() {
         return None;
     }
@@ -420,6 +428,10 @@ mod tests {
         assert_eq!(
             extract_host("https://user:pass@blocked.example:8443/path"),
             Some("blocked.example".into())
+        );
+        assert_eq!(
+            extract_host("https://user@[fd00:ec2::254]:8443/path"),
+            Some("fd00:ec2::254".into())
         );
         assert_eq!(
             extract_host("//blocked.example/path"),
@@ -479,6 +491,20 @@ mod tests {
 
         assert_eq!(
             guard.check_navigation(Some("https://user@blocked.example/path")),
+            Verdict::Deny
+        );
+    }
+
+    #[test]
+    fn check_navigation_blocks_bracketed_ipv6_hosts() {
+        let guard = BrowserAutomationGuard::with_config(BrowserAutomationConfig {
+            blocked_domains: vec!["fd00:ec2::254".into()],
+            ..BrowserAutomationConfig::default()
+        })
+        .expect("default browser automation config should compile");
+
+        assert_eq!(
+            guard.check_navigation(Some("https://[fd00:ec2::254]/latest")),
             Verdict::Deny
         );
     }
