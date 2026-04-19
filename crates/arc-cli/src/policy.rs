@@ -1481,11 +1481,7 @@ fn compile_wildcard_tool_constraints(
     if let Some(max_args_size) = tool_access.max_args_size {
         constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
     }
-    if tool_access
-        .require_confirmation
-        .iter()
-        .any(|pattern| pattern == "*")
-    {
+    if confirmation_overlap("*", &tool_access.require_confirmation) {
         constraints
             .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
@@ -2129,7 +2125,10 @@ guards:
         assert_eq!(capabilities[0].scope.grants[0].tool_name, "*");
         assert_eq!(
             capabilities[0].scope.grants[0].constraints,
-            vec![arc_core::capability::Constraint::MaxArgsSize(2048)]
+            vec![
+                arc_core::capability::Constraint::MaxArgsSize(2048),
+                arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 },
+            ]
         );
     }
 
