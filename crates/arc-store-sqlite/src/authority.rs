@@ -230,7 +230,9 @@ impl SqliteCapabilityAuthority {
         let current = Self::read_cluster_fence_from_connection(&connection)?;
         let next_leader = leader_url.map(ToOwned::to_owned);
         let should_update = election_term > current.election_term
-            || (election_term == current.election_term && next_leader != current.leader_url);
+            || (election_term == current.election_term
+                && current.leader_url.is_none()
+                && next_leader.is_some());
         if should_update {
             Self::write_cluster_fence_to_connection(&connection, next_leader, election_term)?;
         }
@@ -707,5 +709,22 @@ mod tests {
 
         let _ = fs::remove_file(source_path);
         let _ = fs::remove_file(follower_path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_same_term_snapshot_does_not_clear_fenced_leader() {
+        let path = unique_db_path("arc-authority-fence");
+        let authority = SqliteCapabilityAuthority::open(&path).unwrap();
+
+        assert!(authority
+            .seed_cluster_fence(Some("http://leader-a"), 7)
+            .unwrap());
+        assert!(!authority.seed_cluster_fence(None, 7).unwrap());
+
+        let fence = authority.cluster_fence().unwrap();
+        assert_eq!(fence.election_term, 7);
+        assert_eq!(fence.leader_url.as_deref(), Some("http://leader-a"));
+
+        let _ = fs::remove_file(path);
     }
 }

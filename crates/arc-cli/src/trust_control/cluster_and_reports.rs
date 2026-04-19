@@ -1650,7 +1650,9 @@ fn seed_cluster_authority_from_snapshot(
     }
     let should_seed = |guard: &ClusterRuntimeState| {
         snapshot_term > guard.election_term
-            || (snapshot_term == guard.election_term && snapshot_leader != guard.last_leader_url)
+            || (snapshot_term == guard.election_term
+                && guard.last_leader_url.is_none()
+                && snapshot_leader.is_some())
     };
 
     match cluster.lock() {
