@@ -3066,6 +3066,53 @@ fn serve_stdio_requests_roots_after_initialized_and_updates_session() {
 }
 
 #[test]
+fn restore_ready_session_requests_roots_and_updates_session() {
+    let mut edge = make_edge(10);
+    let session_id = SessionId::new("sess-restored-roots");
+    edge.restore_ready_session(
+        session_id.clone(),
+        PeerCapabilities {
+            supports_roots: true,
+            roots_list_changed: false,
+            ..PeerCapabilities::default()
+        },
+    )
+    .unwrap();
+
+    let (client_tx, client_rx) = mpsc::channel();
+    client_tx
+        .send(ClientInbound::Message(json!({
+            "jsonrpc": "2.0",
+            "id": "edge-client-1",
+            "result": {
+                "roots": [{
+                    "uri": "file:///workspace/restored",
+                    "name": "Restored"
+                }]
+            }
+        })))
+        .unwrap();
+    drop(client_tx);
+
+    let mut output = Vec::new();
+    edge.process_pending_actions_with_channel(&client_rx, &mut output)
+        .unwrap();
+
+    let lines = String::from_utf8(output).unwrap();
+    let messages = lines
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0]["method"], "roots/list");
+
+    let session = edge.kernel.session(&session_id).unwrap();
+    assert_eq!(session.roots().len(), 1);
+    assert_eq!(session.roots()[0].uri, "file:///workspace/restored");
+    assert_eq!(session.roots()[0].name.as_deref(), Some("Restored"));
+}
+
+#[test]
 fn serve_stdio_refreshes_roots_after_list_changed_notification() {
     let mut edge = make_edge(10);
     let input = concat!(

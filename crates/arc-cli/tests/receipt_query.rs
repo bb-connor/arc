@@ -13577,6 +13577,28 @@ fn test_liability_claim_workflow_surfaces_inner() {
         String::from_utf8(adjudication_output.stdout).expect("adjudication CLI json");
     assert!(adjudication_json.contains("\"adjudicationId\""));
 
+    let governed_receipt_id = "rc-liability-claims-payout-1";
+    {
+        let mut store = SqliteReceiptStore::open(&receipt_db_path).expect("reopen receipt store");
+        store
+            .append_arc_receipt(&make_governed_authorization_receipt_with_options(
+                governed_receipt_id,
+                "cap-liability-claims-payout-1",
+                subject_key,
+                issuer_key,
+                "ledger",
+                "transfer",
+                unix_now_secs().saturating_sub(30),
+                SettlementStatus::Settled,
+                "USD",
+                18_000,
+                "USD",
+                false,
+                false,
+            ))
+            .expect("append settled payout governed receipt");
+    }
+
     let capital_instruction_input_path = dir.join("liability-payout-capital-instruction.json");
     std::fs::write(
         &capital_instruction_input_path,
@@ -13590,6 +13612,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
             },
             "sourceKind": "facility_commitment",
             "action": "transfer_funds",
+            "governedReceiptId": governed_receipt_id,
             "amount": { "units": 18000, "currency": "USD" },
             "authorityChain": [
                 {

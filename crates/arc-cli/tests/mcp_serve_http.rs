@@ -3115,12 +3115,8 @@ fn mcp_serve_http_isolates_multiple_sessions() {
         token,
         shared_owner_capabilities.clone(),
     );
-    let (session_b, protocol_b) = initialize_session_with_capabilities(
-        &client,
-        &base_url,
-        token,
-        shared_owner_capabilities,
-    );
+    let (session_b, protocol_b) =
+        initialize_session_with_capabilities(&client, &base_url, token, shared_owner_capabilities);
     assert_ne!(session_a, session_b);
 
     let session_a_task = post_json(

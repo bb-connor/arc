@@ -661,8 +661,15 @@ impl ArcMcpEdge {
                 ))
             })?;
         self.state = EdgeState::Ready {
-            session_id: restored_session_id,
+            session_id: restored_session_id.clone(),
         };
+        if self
+            .kernel
+            .session(&restored_session_id)
+            .is_some_and(|session| session.peer_capabilities().supports_roots)
+        {
+            self.queue_roots_refresh(restored_session_id, "restore");
+        }
         Ok(())
     }
 
