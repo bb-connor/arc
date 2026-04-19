@@ -924,6 +924,7 @@ fn make_governed_financial_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1010,6 +1011,7 @@ fn make_governed_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1171,6 +1173,7 @@ fn make_governed_authorization_receipt_with_runtime_profile(
                 },
             )),
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1290,6 +1293,7 @@ fn make_credit_history_receipt(
             }),
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1370,6 +1374,7 @@ fn make_governed_authorization_receipt_without_runtime_assurance(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1456,6 +1461,7 @@ fn make_underwriting_simulation_receipt(
             }),
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1537,6 +1543,7 @@ fn make_governed_x402_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -1622,6 +1629,7 @@ fn make_governed_acp_receipt(
             runtime_assurance: None,
             call_chain: None,
             autonomy: None,
+            economic_authorization: None,
         }
     });
     ArcReceipt::sign(
@@ -4495,6 +4503,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
                         runtime_assurance: None,
                         call_chain: None,
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
@@ -4789,6 +4798,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
                         }),
                         call_chain: None,
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),
@@ -4923,6 +4933,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                             },
                         )),
                         autonomy: None,
+                        economic_authorization: None,
                     }
                 })),
                 trust_level: arc_core::TrustLevel::default(),

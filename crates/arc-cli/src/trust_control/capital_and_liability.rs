@@ -599,7 +599,8 @@ fn build_capital_execution_instruction_artifact_from_store(
     request: &CapitalExecutionInstructionRequest,
 ) -> Result<CapitalExecutionInstructionArtifact, TrustHttpError> {
     let issued_at = unix_timestamp_now();
-    validate_capital_execution_instruction_request(request, issued_at)?;
+    let transfer_governed_receipt_id =
+        validate_capital_execution_instruction_request(request, issued_at)?;
 
     let capital_book = build_capital_book_report_from_store(receipt_store, &request.query)?;
     let source = capital_book
@@ -638,9 +639,10 @@ fn build_capital_execution_instruction_artifact_from_store(
 
     let transfer_receipt_binding = match request.action {
         CapitalExecutionInstructionAction::TransferFunds => {
-            let governed_receipt_id = request.governed_receipt_id.clone().ok_or_else(|| {
-                TrustHttpError::bad_request(
-                    "transfer_funds instructions require governedReceiptId so settlement provenance stays receipt-scoped",
+            let governed_receipt_id = transfer_governed_receipt_id.clone().ok_or_else(|| {
+                TrustHttpError::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "validated transfer_funds instruction lost governedReceiptId".to_string(),
                 )
             })?;
             let matching_events = capital_book
@@ -672,14 +674,7 @@ fn build_capital_execution_instruction_artifact_from_store(
             }
             Some((governed_receipt_id, matching_events[0]))
         }
-        _ => {
-            if request.governed_receipt_id.is_some() {
-                return Err(TrustHttpError::bad_request(
-                    "governedReceiptId is only valid for transfer_funds instructions",
-                ));
-            }
-            None
-        }
+        _ => None,
     };
 
     let amount = match request.action {
@@ -875,19 +870,19 @@ fn build_capital_execution_instruction_artifact_from_store(
 fn validate_capital_execution_instruction_request(
     request: &CapitalExecutionInstructionRequest,
     issued_at: u64,
-) -> Result<(), TrustHttpError> {
+) -> Result<Option<String>, TrustHttpError> {
     request
         .query
         .validate()
         .map_err(TrustHttpError::bad_request)?;
-    match request.action {
-        CapitalExecutionInstructionAction::TransferFunds
-            if request.governed_receipt_id.is_none() =>
-        {
-            return Err(TrustHttpError::bad_request(
-                "transfer_funds instructions require governedReceiptId",
-            ));
-        }
+    let transfer_governed_receipt_id = match request.action {
+        CapitalExecutionInstructionAction::TransferFunds => Some(
+            request.governed_receipt_id.clone().ok_or_else(|| {
+                TrustHttpError::bad_request(
+                    "transfer_funds instructions require governedReceiptId so settlement provenance stays receipt-scoped",
+                )
+            })?,
+        ),
         CapitalExecutionInstructionAction::LockReserve
         | CapitalExecutionInstructionAction::HoldReserve
         | CapitalExecutionInstructionAction::ReleaseReserve
@@ -898,14 +893,15 @@ fn validate_capital_execution_instruction_request(
                 "governedReceiptId is only valid for transfer_funds instructions",
             ));
         }
-        _ => {}
-    }
+        _ => None,
+    };
     validate_capital_execution_envelope(
         &request.authority_chain,
         &request.execution_window,
         &request.rail,
         issued_at,
-    )
+    )?;
+    Ok(transfer_governed_receipt_id)
 }
 
 fn validate_capital_execution_envelope(

@@ -30,9 +30,8 @@ use arc_core::capability::{
 };
 use arc_guards::{
     ContentReviewConfig, ContentReviewGuard, EgressAllowlistGuard, ForbiddenPathGuard,
-    GuardPipeline, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard, PostInvocationPipeline,
-    ResponseSanitizationGuard, SanitizationAction, SanitizerHook, SecretLeakGuard,
-    SensitivityLevel, ShellCommandGuard, InternalNetworkGuard,
+    GuardPipeline, InternalNetworkGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
+    PostInvocationPipeline, SanitizerHook, SecretLeakGuard, ShellCommandGuard,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1017,10 +1016,6 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     Err(error) => panic!("invalid secret leak guard config: {error}"),
                 };
             pipeline.add(Box::new(guard));
-            pipeline.add(Box::new(ResponseSanitizationGuard::new(
-                SensitivityLevel::High,
-                SanitizationAction::Redact,
-            )));
         }
     }
 
@@ -1083,13 +1078,17 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
 fn build_azure_content_safety_guard(
     config: &AzureContentSafetyPolicyConfig,
 ) -> Result<ScopedAsyncGuard<AzureContentSafetyGuard>, PolicyError> {
-    validate_required_secret("cloud_guardrails.azure_content_safety.api_key", &config.api_key)?;
+    validate_required_secret(
+        "cloud_guardrails.azure_content_safety.api_key",
+        &config.api_key,
+    )?;
     validate_http_url(
         "cloud_guardrails.azure_content_safety.endpoint",
         &config.endpoint,
     )?;
 
-    let mut guard_config = AzureContentSafetyConfig::new(config.api_key.clone(), config.endpoint.clone());
+    let mut guard_config =
+        AzureContentSafetyConfig::new(config.api_key.clone(), config.endpoint.clone());
     if let Some(api_version) = &config.api_version {
         if api_version.trim().is_empty() {
             return Err(PolicyError::Invalid(
@@ -1169,8 +1168,7 @@ fn build_safe_browsing_guard(
             .any(|threat_type| threat_type.trim().is_empty())
         {
             return Err(PolicyError::Invalid(
-                "threat_intel.safe_browsing.threat_types cannot contain empty values"
-                    .to_string(),
+                "threat_intel.safe_browsing.threat_types cannot contain empty values".to_string(),
             ));
         }
         guard_config.threat_types = config.threat_types.clone();
@@ -1178,8 +1176,7 @@ fn build_safe_browsing_guard(
     if let Some(timeout_seconds) = config.timeout_seconds {
         if timeout_seconds == 0 {
             return Err(PolicyError::Invalid(
-                "threat_intel.safe_browsing.timeout_seconds must be greater than 0"
-                    .to_string(),
+                "threat_intel.safe_browsing.timeout_seconds must be greater than 0".to_string(),
             ));
         }
         guard_config.timeout = Duration::from_secs(timeout_seconds);
@@ -1487,15 +1484,17 @@ fn tool_access_can_safely_widen_to_wildcard(tool_access: &ToolAccessConfig) -> b
         && tool_access.max_args_size.is_none()
 }
 
-fn compile_tool_constraints(tool_access: &ToolAccessConfig, tool_pattern: &str) -> Vec<arc_core::capability::Constraint> {
+fn compile_tool_constraints(
+    tool_access: &ToolAccessConfig,
+    tool_pattern: &str,
+) -> Vec<arc_core::capability::Constraint> {
     let mut constraints = Vec::new();
     if let Some(max_args_size) = tool_access.max_args_size {
         constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
     }
     if confirmation_overlap(tool_pattern, &tool_access.require_confirmation) {
-        constraints.push(arc_core::capability::Constraint::RequireApprovalAbove {
-            threshold_units: 0,
-        });
+        constraints
+            .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
     constraints
 }
@@ -1787,7 +1786,7 @@ kernel:
     fn build_pipeline_from_full_guard_policy() {
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 9);
+        assert_eq!(pipeline.len(), 8);
     }
 
     #[test]
@@ -2470,9 +2469,15 @@ capabilities:
         let hushspec = load_policy(&fixture_path("hushspec-guard-heavy.yaml")).unwrap();
 
         assert_eq!(arc_pipeline.len(), hushspec.guard_pipeline.len());
-        assert_eq!(arc_post_invocation.len(), hushspec.post_invocation_pipeline.len());
+        assert_eq!(
+            arc_post_invocation.len(),
+            hushspec.post_invocation_pipeline.len()
+        );
         assert_eq!(arc_capabilities.len(), hushspec.default_capabilities.len());
-        assert_eq!(arc_capabilities[0].ttl, hushspec.default_capabilities[0].ttl);
+        assert_eq!(
+            arc_capabilities[0].ttl,
+            hushspec.default_capabilities[0].ttl
+        );
         assert_eq!(
             serde_json::to_value(&arc_capabilities[0].scope.grants).unwrap(),
             serde_json::to_value(&hushspec.default_capabilities[0].scope.grants).unwrap()

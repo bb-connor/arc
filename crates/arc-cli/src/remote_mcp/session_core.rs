@@ -1591,7 +1591,11 @@ fn fan_out_shared_upstream_notifications(
         return;
     };
     subscribers.retain(|subscriber| subscriber.strong_count() > 0);
-    let _ = notifications;
+    // Shared hosted-owner mode multiplexes one upstream subprocess across many
+    // sessions. Unattributed upstream notifications cannot be routed safely, so
+    // ARC fails closed here until the wrapped notification surface carries
+    // session ownership metadata.
+    drop(notifications);
 }
 
 #[derive(Debug, Default, Deserialize)]

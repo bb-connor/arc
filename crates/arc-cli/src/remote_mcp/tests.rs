@@ -1018,7 +1018,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_upstream_notification_fanout_copies_notifications_to_live_subscribers() {
+    fn shared_upstream_notification_fanout_drops_unscoped_notifications_and_prunes_dead_queues() {
         let subscribers = Arc::new(StdMutex::new(Vec::new()));
         let queue_a = Arc::new(StdMutex::new(VecDeque::new()));
         let queue_b = Arc::new(StdMutex::new(VecDeque::new()));
@@ -1040,16 +1040,8 @@ mod tests {
 
         let queue_a = queue_a.lock().unwrap();
         let queue_b = queue_b.lock().unwrap();
-        assert_eq!(queue_a.len(), 2);
-        assert_eq!(queue_b.len(), 2);
-        assert_eq!(
-            queue_a[0]["method"].as_str(),
-            Some("notifications/resources/list_changed")
-        );
-        assert_eq!(
-            queue_b[1]["method"].as_str(),
-            Some("notifications/tools/list_changed")
-        );
+        assert!(queue_a.is_empty());
+        assert!(queue_b.is_empty());
         drop(queue_a);
         drop(queue_b);
 
