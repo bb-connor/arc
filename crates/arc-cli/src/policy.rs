@@ -983,10 +983,9 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     .map_err(|error| PolicyError::Invalid(error.to_string()))?,
                 ));
             }
+            pipeline.add(Box::new(InternalNetworkGuard::new()));
         }
     }
-
-    pipeline.add(Box::new(InternalNetworkGuard::new()));
 
     if let Some(tool_access) = &config.tool_access {
         if tool_access.enabled {
@@ -1911,7 +1910,7 @@ guards:
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         let post_invocation = build_post_invocation_pipeline(&policy.guards);
-        assert_eq!(pipeline.len(), 4);
+        assert_eq!(pipeline.len(), 3);
         assert_eq!(post_invocation.len(), 1);
     }
 
@@ -1930,7 +1929,7 @@ guards:
         .unwrap();
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 2);
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]
@@ -1955,7 +1954,7 @@ guards:
         .unwrap();
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 3);
+        assert_eq!(pipeline.len(), 2);
     }
 
     #[test]
@@ -2300,7 +2299,7 @@ capabilities:
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 1);
+        assert_eq!(pipeline.len(), 0);
     }
 
     #[test]
@@ -2333,7 +2332,34 @@ guards:
 "#;
         let policy = parse_policy(yaml).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 1);
+        assert_eq!(pipeline.len(), 0);
+    }
+
+    #[test]
+    fn internal_network_guard_only_materializes_with_egress_policy() {
+        let without_egress = parse_policy(
+            r#"
+guards:
+  shell_command:
+    enabled: true
+"#,
+        )
+        .unwrap();
+        let without_egress_pipeline = build_guard_pipeline(&without_egress.guards).unwrap();
+        assert_eq!(without_egress_pipeline.len(), 1);
+
+        let with_egress = parse_policy(
+            r#"
+guards:
+  egress_allowlist:
+    enabled: true
+    allowed_domains:
+      - "*.openai.com"
+"#,
+        )
+        .unwrap();
+        let with_egress_pipeline = build_guard_pipeline(&with_egress.guards).unwrap();
+        assert_eq!(with_egress_pipeline.len(), 2);
     }
 
     #[test]
@@ -2351,7 +2377,7 @@ guards:
 "#;
         let policy = parse_policy(yaml).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 2);
+        assert_eq!(pipeline.len(), 1);
 
         let kp = arc_core::crypto::Keypair::generate();
         let scope = ArcScope::default();
