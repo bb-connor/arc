@@ -11493,8 +11493,25 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+fn run_large_stack_test(name: &str, test_fn: fn()) {
+    std::thread::Builder::new()
+        .name(name.to_string())
+        .stack_size(16 * 1024 * 1024)
+        .spawn(test_fn)
+        .expect("spawn large-stack test thread")
+        .join()
+        .expect("join large-stack test thread");
+}
+
 #[test]
 fn test_liability_market_quote_and_bind_workflow_surfaces() {
+    run_large_stack_test(
+        "test_liability_market_quote_and_bind_workflow_surfaces",
+        test_liability_market_quote_and_bind_workflow_surfaces_inner,
+    );
+}
+
+fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
     let dir = unique_dir("arc-liability-market-workflow");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -11803,6 +11820,13 @@ fn test_liability_market_quote_and_bind_workflow_surfaces() {
 
 #[test]
 fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
+    run_large_stack_test(
+        "test_liability_market_pricing_authority_and_auto_bind_surfaces",
+        test_liability_market_pricing_authority_and_auto_bind_surfaces_inner,
+    );
+}
+
+fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
     let dir = unique_dir("arc-liability-market-auto-bind");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -12213,6 +12237,13 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces() {
 
 #[test]
 fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes() {
+    run_large_stack_test(
+        "test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes",
+        test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes_inner,
+    );
+}
+
+fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_quotes_inner() {
     let dir = unique_dir("arc-liability-market-auto-bind-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -12668,6 +12699,13 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
 
 #[test]
 fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch() {
+    run_large_stack_test(
+        "test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch",
+        test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch_inner,
+    );
+}
+
+fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mismatch_inner() {
     let dir = unique_dir("arc-liability-market-negative");
     std::fs::create_dir_all(&dir).expect("create temp dir");
     let receipt_db_path = dir.join("receipts.sqlite3");
@@ -13078,13 +13116,10 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
 
 #[test]
 fn test_liability_claim_workflow_surfaces() {
-    std::thread::Builder::new()
-        .name("test_liability_claim_workflow_surfaces".to_string())
-        .stack_size(16 * 1024 * 1024)
-        .spawn(test_liability_claim_workflow_surfaces_inner)
-        .expect("spawn liability claim workflow test thread")
-        .join()
-        .expect("join liability claim workflow test thread");
+    run_large_stack_test(
+        "test_liability_claim_workflow_surfaces",
+        test_liability_claim_workflow_surfaces_inner,
+    );
 }
 
 fn test_liability_claim_workflow_surfaces_inner() {
