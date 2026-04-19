@@ -215,7 +215,7 @@ mod tests {
     }
 
     #[test]
-    fn remote_session_new_refreshes_ready_lifecycle_on_restore() {
+    fn remote_session_new_preserves_ready_lifecycle_on_restore() {
         let (input_tx, _input_rx) = mpsc::channel::<Value>();
         let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
         let retained_notification_events =
@@ -261,13 +261,8 @@ mod tests {
         let lifecycle = session.lifecycle_snapshot();
         assert_eq!(lifecycle.state, RemoteSessionState::Ready);
         assert_eq!(lifecycle.created_at, 11);
-        assert!(lifecycle.last_seen_at >= 12);
-        assert_eq!(
-            lifecycle.idle_expires_at,
-            lifecycle
-                .last_seen_at
-                .saturating_add(lifecycle_policy.idle_expiry_millis)
-        );
+        assert_eq!(lifecycle.last_seen_at, 12);
+        assert_eq!(lifecycle.idle_expires_at, 13);
         assert_eq!(lifecycle.drain_deadline_at, None);
     }
 
