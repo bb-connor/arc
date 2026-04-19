@@ -499,7 +499,7 @@ for line in sys.stdin:
     path
 }
 
-fn write_policy_with_tools(dir: &Path, tools: &[&str]) -> PathBuf {
+fn write_policy_with_tools_and_ttl(dir: &Path, tools: &[&str], ttl: u64) -> PathBuf {
     let mut policy = r#"
 kernel:
   max_capability_ttl: 3600
@@ -512,13 +512,17 @@ capabilities:
     .to_string();
     for tool in tools {
         policy.push_str(&format!(
-            "      - server: wrapped-http-mock\n        tool: {tool}\n        operations: [invoke]\n        ttl: 300\n"
+            "      - server: wrapped-http-mock\n        tool: {tool}\n        operations: [invoke]\n        ttl: {ttl}\n"
         ));
     }
 
     let path = dir.join("http-policy.yaml");
     fs::write(&path, policy).expect("write HTTP policy");
     path
+}
+
+fn write_policy_with_tools(dir: &Path, tools: &[&str]) -> PathBuf {
+    write_policy_with_tools_and_ttl(dir, tools, 300)
 }
 
 fn write_policy(dir: &Path) -> PathBuf {
@@ -2943,6 +2947,78 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
         Some("echo_json")
     );
     assert_eq!(denied_tool_call["result"]["isError"], true);
+}
+
+#[test]
+fn mcp_serve_http_restores_sessions_with_fresh_capabilities_after_ttl_expiry() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy_with_tools_and_ttl(&dir, &["echo_json"], 1);
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        initialize_session(&client, &base_url, token)
+    };
+
+    thread::sleep(Duration::from_secs(2));
+
+    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        &dir,
+        &policy_path,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+        "ARC",
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let restored_response = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 88,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_json",
+                "arguments": {"message": "restored session should refresh capabilities"}
+            }
+        }),
+    );
+    assert_eq!(restored_response.status(), reqwest::StatusCode::OK);
+    let (tool_call, notifications) = read_sse_until_response(restored_response, json!(88), |_| {});
+    assert!(notifications.is_empty());
+    assert_ne!(tool_call["result"]["isError"], true);
 }
 
 #[test]

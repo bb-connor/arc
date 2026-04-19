@@ -6,7 +6,7 @@ use std::path::{Path as FsPath, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Mutex as StdMutex, Weak};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::CapabilityToken;
@@ -2556,7 +2556,12 @@ impl RemoteSessionFactory {
 
         let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
         let issued_capabilities = match record.policy_fingerprint.as_deref() {
-            Some(stored) if stored == policy_fingerprint => record.issued_capabilities.clone(),
+            Some(stored)
+                if stored == policy_fingerprint
+                    && stored_capabilities_are_current(&record.issued_capabilities) =>
+            {
+                record.issued_capabilities.clone()
+            }
             _ => issue_default_capabilities(&kernel, &agent_public_key, &default_capabilities)?,
         };
         let session_capabilities = issued_capabilities
@@ -2886,6 +2891,15 @@ fn load_terminal_session_records(
     }
 
     Ok(records)
+}
+
+fn stored_capabilities_are_current(capabilities: &[CapabilityToken]) -> bool {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_secs());
+    capabilities
+        .iter()
+        .all(|capability| capability.expires_at > now)
 }
 
 fn persist_terminal_session_record(

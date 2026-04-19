@@ -6,12 +6,12 @@
 //!
 //! # Guard coverage
 //!
-//! The compiler materializes 13 distinct guard types from a HushSpec
+//! The compiler materializes 12 distinct guard types from a HushSpec
 //! document. The first seven are driven directly by the `rules` section; the
-//! remaining six are driven either by the `extensions.detection`
+//! remaining five are driven either by the `extensions.detection`
 //! sub-section or by auxiliary semantics layered on top of existing rule
-//! blocks (SSRF protection on egress, output sanitization on secret
-//! patterns, per-agent velocity from origin budgets).
+//! blocks (SSRF protection on egress, per-agent velocity from origin
+//! budgets).
 //!
 //! | # | Guard | Triggered by |
 //! |---|----------------------------|----------------------------------------|
@@ -26,14 +26,13 @@
 //! | 9 | `JailbreakGuard`           | `extensions.detection.jailbreak` |
 //! |10 | `SpiderSenseGuard`         | `extensions.detection.threat_intel` |
 //! |11 | `InternalNetworkGuard`     | `rules.egress` (SSRF companion) |
-//! |12 | `ResponseSanitizationGuard`| `rules.secret_patterns` (output path) |
-//! |13 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
+//! |12 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
 
 use std::fs;
 
 use crate::models::{
     DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
-    SecretPatternsRule, Severity, ThreatIntelDetection, ToolAccessRule,
+    SecretPatternsRule, ThreatIntelDetection, ToolAccessRule,
 };
 
 use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
@@ -42,15 +41,12 @@ use arc_guards::{
     jailbreak::{DetectorConfig as JailbreakDetectorConfig, JailbreakGuardConfig},
     post_invocation::SanitizerHook,
     prompt_injection::PromptInjectionConfig,
-    response_sanitization::{
-        build_pattern, OutputSanitizerConfig, SanitizationAction, SensitivePattern,
-        SensitivityLevel,
-    },
+    response_sanitization::OutputSanitizerConfig,
     secret_leak::CustomSecretPattern,
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
-    PatternDb, PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard,
-    SecretLeakGuard, ShellCommandGuard, SpiderSenseConfig, SpiderSenseGuard,
+    PatternDb, PostInvocationPipeline, PromptInjectionGuard, SecretLeakGuard, ShellCommandGuard,
+    SpiderSenseConfig, SpiderSenseGuard,
 };
 
 /// Errors that can occur during policy compilation.
@@ -132,7 +128,7 @@ impl PipelineBuilder {
 }
 
 // ---------------------------------------------------------------------------
-// Rule-driven guards (1-7 + InternalNetworkGuard + ResponseSanitizationGuard)
+// Rule-driven guards (1-7 + InternalNetworkGuard)
 // ---------------------------------------------------------------------------
 
 fn compile_rule_guards(
@@ -212,13 +208,10 @@ fn compile_rule_guards(
     }
 
     // 5. secret_patterns -> SecretLeakGuard
-    // 11. secret_patterns -> ResponseSanitizationGuard
     //
     // SecretLeakGuard handles the write path (detect secrets in outbound
-    // file writes) while ResponseSanitizationGuard handles the read path
-    // (redact PII/PHI/secrets in tool results before the agent sees them).
-    // Both are activated by the same HushSpec rule so operators need
-    // configure only one block to cover both directions.
+    // file writes) while the post-invocation SanitizerHook handles the read
+    // path (redact secrets in tool results before the agent sees them).
     if let Some(sp) = &rules.secret_patterns {
         if sp.enabled {
             let config = arc_guards::secret_leak::SecretLeakConfig {
@@ -230,11 +223,6 @@ fn compile_rule_guards(
                 SecretLeakGuard::with_config(config)
                     .map_err(|error| CompileError::Invalid(error.to_string()))?,
             );
-            builder.add(ResponseSanitizationGuard::with_additional_patterns(
-                compile_response_patterns(sp)?,
-                SensitivityLevel::High,
-                SanitizationAction::Redact,
-            ));
             post_invocation.add(Box::new(
                 SanitizerHook::with_config(compile_output_sanitizer_config(sp))
                     .map_err(|error| CompileError::Invalid(error.to_string()))?,
@@ -543,28 +531,6 @@ fn compile_custom_secret_patterns(rule: &SecretPatternsRule) -> Vec<CustomSecret
         .collect()
 }
 
-fn compile_response_patterns(
-    rule: &SecretPatternsRule,
-) -> Result<Vec<SensitivePattern>, CompileError> {
-    rule.patterns
-        .iter()
-        .map(|pattern| {
-            build_pattern(
-                &pattern.name,
-                &pattern.pattern,
-                severity_to_sensitivity(pattern.severity),
-                "[SECRET REDACTED]",
-            )
-            .ok_or_else(|| {
-                CompileError::Invalid(format!(
-                    "secret_patterns.patterns.{} failed to compile as a response sanitizer regex",
-                    pattern.name
-                ))
-            })
-        })
-        .collect()
-}
-
 fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizerConfig {
     let mut config = OutputSanitizerConfig::default();
     config.denylist.patterns = rule
@@ -573,13 +539,6 @@ fn compile_output_sanitizer_config(rule: &SecretPatternsRule) -> OutputSanitizer
         .map(|pattern| pattern.pattern.clone())
         .collect();
     config
-}
-
-fn severity_to_sensitivity(severity: Severity) -> SensitivityLevel {
-    match severity {
-        Severity::Critical | Severity::Error => SensitivityLevel::High,
-        Severity::Warn => SensitivityLevel::Medium,
-    }
 }
 
 fn tool_access_can_safely_widen_to_wildcard(rule: &ToolAccessRule) -> bool {
@@ -808,7 +767,7 @@ rules:
     }
 
     #[test]
-    fn compile_secret_patterns_adds_response_sanitization() {
+    fn compile_secret_patterns_use_post_invocation_sanitizer_only() {
         let spec = HushSpec::parse(
             r#"
 hushspec: "0.1.0"
@@ -823,15 +782,9 @@ rules:
         )
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
-        assert_eq!(compiled.guards.len(), 2);
+        assert_eq!(compiled.guards.len(), 1);
         assert_eq!(compiled.post_invocation.len(), 1);
-        assert_eq!(
-            compiled.guard_names,
-            vec![
-                "secret-leak".to_string(),
-                "response-sanitization".to_string()
-            ]
-        );
+        assert_eq!(compiled.guard_names, vec!["secret-leak".to_string()]);
         let outcome = compiled.post_invocation.evaluate_with_evidence(
             "read_file",
             &serde_json::json!({
@@ -923,7 +876,7 @@ extensions:
     }
 
     #[test]
-    fn compile_all_13_guard_types() {
+    fn compile_all_12_guard_types() {
         let pattern_db = write_temp_threat_intel_pattern_db();
         let spec = HushSpec::parse(&format!(
             r#"
@@ -985,7 +938,6 @@ extensions:
             "internal-network",
             "mcp-tool",
             "secret-leak",
-            "response-sanitization",
             "patch-integrity",
             "path-allowlist",
             "prompt-injection",
@@ -1001,9 +953,9 @@ extensions:
 
         assert_eq!(
             actual, expected,
-            "all 13 guard types should compile; got {actual:?}"
+            "all 12 guard types should compile; got {actual:?}"
         );
-        assert_eq!(compiled.guards.len(), 13);
+        assert_eq!(compiled.guards.len(), 12);
 
         let _ = std::fs::remove_file(pattern_db);
     }
