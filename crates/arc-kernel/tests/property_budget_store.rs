@@ -32,9 +32,16 @@ struct BudgetModel {
     invocation_count: u32,
     committed_cost_units: u64,
     seq: u64,
+    next_seq: u64,
 }
 
 impl BudgetModel {
+    fn allocate_event_seq(&mut self) -> u64 {
+        let event_seq = self.next_seq.saturating_add(1);
+        self.next_seq = event_seq;
+        event_seq
+    }
+
     fn try_charge_cost(
         &mut self,
         cost_units: u64,
@@ -44,33 +51,33 @@ impl BudgetModel {
     ) -> Result<bool, &'static str> {
         if let Some(max) = max_invocations {
             if self.invocation_count >= max {
+                self.allocate_event_seq();
                 return Ok(false);
             }
         }
 
         if let Some(max) = max_cost_per_invocation {
             if cost_units > max {
+                self.allocate_event_seq();
                 return Ok(false);
             }
         }
 
-        let new_total = if let Some(max_total) = max_total_cost {
-            let total = self
-                .committed_cost_units
-                .checked_add(cost_units)
-                .ok_or("overflow")?;
-            if total > max_total {
+        let new_total = self
+            .committed_cost_units
+            .checked_add(cost_units)
+            .ok_or("overflow")?;
+        if let Some(max_total) = max_total_cost {
+            if new_total > max_total {
+                self.allocate_event_seq();
                 return Ok(false);
             }
-            total
-        } else {
-            self.committed_cost_units.saturating_add(cost_units)
-        };
+        }
 
         self.invocation_count = self.invocation_count.saturating_add(1);
         self.committed_cost_units = new_total;
         self.present = true;
-        self.seq = self.seq.saturating_add(1);
+        self.seq = self.allocate_event_seq();
         Ok(true)
     }
 
@@ -87,7 +94,7 @@ impl BudgetModel {
 
         self.invocation_count -= 1;
         self.committed_cost_units -= cost_units;
-        self.seq = self.seq.saturating_add(1);
+        self.seq = self.allocate_event_seq();
         Ok(())
     }
 
@@ -100,7 +107,7 @@ impl BudgetModel {
         }
 
         self.committed_cost_units -= cost_units;
-        self.seq = self.seq.saturating_add(1);
+        self.seq = self.allocate_event_seq();
         Ok(())
     }
 }

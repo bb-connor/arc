@@ -84,6 +84,14 @@ fn workspace_root() -> PathBuf {
         .to_path_buf()
 }
 
+fn build_test_client() -> Client {
+    Client::builder()
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(120))
+        .build()
+        .expect("build reqwest client")
+}
+
 fn unix_now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -1716,7 +1724,7 @@ fn setup_with_receipts(prefix: &str) -> TestSetup {
     }
 
     let service_token = "test-secret-token".to_string();
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let mut startup_error = None;
     let mut started = None;
     for _ in 0..3 {
@@ -1870,7 +1878,7 @@ fn test_receipt_query_surfaces_governed_transaction_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -1955,7 +1963,7 @@ fn test_receipt_query_surfaces_x402_payment_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2034,7 +2042,7 @@ fn test_receipt_query_surfaces_acp_payment_metadata() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2118,7 +2126,7 @@ fn receipt_query_surfaces_financial_hold_lineage_and_guarantee_level() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build reqwest client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service_result(&client, &base_url, &mut service)
         .expect("wait for trust service");
@@ -2364,7 +2372,7 @@ fn test_lineage_get_capability_snapshot() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2437,7 +2445,7 @@ fn test_lineage_get_delegation_chain() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2596,7 +2604,7 @@ fn test_agent_subject_filter_via_http() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2705,7 +2713,7 @@ fn test_agent_receipts_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -2864,7 +2872,7 @@ fn test_cost_attribution_report_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3075,7 +3083,7 @@ fn test_operator_report_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3253,7 +3261,7 @@ fn test_settlement_reconciliation_report_and_action_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3436,7 +3444,7 @@ fn test_metered_billing_reconciliation_report_and_action_endpoint() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -3766,7 +3774,7 @@ fn test_authorization_context_report_and_cli() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4073,7 +4081,7 @@ fn authorization_context_report_does_not_mark_asserted_call_chain_as_sender_boun
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4172,7 +4180,7 @@ fn test_authorization_metadata_and_review_pack_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4494,7 +4502,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4559,7 +4567,7 @@ fn test_authorization_context_report_rejects_missing_sender_binding_material() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4653,7 +4661,7 @@ fn test_authorization_context_report_rejects_missing_issuer_binding_material() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4786,7 +4794,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -4918,7 +4926,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5165,7 +5173,7 @@ fn test_shared_evidence_reporting_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5403,7 +5411,7 @@ fn test_behavioral_feed_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5579,7 +5587,7 @@ extensions:
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5761,7 +5769,7 @@ extensions:
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -5976,7 +5984,7 @@ fn test_runtime_attestation_appraisal_result_qualification_covers_mixed_provider
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6377,7 +6385,7 @@ fn test_exposure_ledger_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6523,7 +6531,7 @@ fn test_exposure_ledger_requires_anchor() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6590,7 +6598,7 @@ fn test_exposure_ledger_rejects_contradictory_currency_row() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6701,7 +6709,7 @@ fn test_credit_scorecard_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6823,7 +6831,7 @@ fn test_credit_scorecard_requires_agent_subject() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6867,7 +6875,7 @@ fn test_credit_scorecard_requires_matching_history() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -6937,7 +6945,7 @@ fn test_credit_facility_report_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7106,7 +7114,7 @@ fn test_credit_issue_endpoints_require_service_auth() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7185,7 +7193,7 @@ fn test_credit_issue_endpoints_require_receipt_db_configuration() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7257,7 +7265,7 @@ fn test_trust_control_report_endpoints_require_service_auth() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7298,7 +7306,7 @@ fn test_trust_control_report_endpoints_require_receipt_db_configuration() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7415,7 +7423,7 @@ fn test_credit_facility_report_denies_missing_prerequisites() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7525,7 +7533,7 @@ fn test_credit_facility_report_manual_review_for_mixed_currency_book() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7624,7 +7632,7 @@ fn test_credit_facility_report_manual_review_for_mixed_runtime_assurance_provena
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7781,7 +7789,7 @@ fn test_credit_backtest_report_surfaces_drift_and_failure_modes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -7903,7 +7911,7 @@ fn test_credit_bond_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8157,7 +8165,7 @@ fn test_credit_bond_report_hold_and_release_semantics() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8312,7 +8320,7 @@ fn test_credit_bond_report_impairs_and_fails_closed_on_mixed_currency() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8452,7 +8460,7 @@ fn test_credit_loss_lifecycle_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -8691,7 +8699,7 @@ fn test_credit_loss_lifecycle_recovery_write_off_and_release_fail_closed() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9065,7 +9073,7 @@ fn test_credit_loss_lifecycle_reserve_slash_requires_valid_execution_metadata() 
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9377,7 +9385,7 @@ fn test_credit_bonded_execution_simulation_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9657,7 +9665,7 @@ fn test_provider_risk_package_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -9845,7 +9853,7 @@ fn test_capital_book_report_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10175,7 +10183,7 @@ fn test_capital_book_report_rejects_mixed_currency_and_missing_counterparty() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10273,7 +10281,7 @@ fn test_capital_instruction_issue_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10507,7 +10515,7 @@ fn test_capital_instruction_issue_rejects_stale_authority_and_mismatch() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10735,7 +10743,7 @@ fn test_capital_allocation_issue_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -10983,7 +10991,7 @@ fn test_capital_allocation_issue_fail_closed_and_boundary_outcomes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11257,7 +11265,7 @@ fn test_liability_provider_registry_issue_list_and_resolve_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11554,7 +11562,7 @@ fn test_liability_market_quote_and_bind_workflow_surfaces_inner() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -11870,7 +11878,7 @@ fn test_liability_market_pricing_authority_and_auto_bind_surfaces_inner() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -12288,7 +12296,7 @@ fn test_liability_market_auto_bind_rejects_stale_provider_and_out_of_envelope_qu
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -12748,7 +12756,7 @@ fn test_liability_market_rejects_stale_provider_expired_quote_and_placement_mism
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -13166,7 +13174,7 @@ fn test_liability_claim_workflow_surfaces_inner() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14029,7 +14037,7 @@ fn test_liability_claim_rejects_oversized_claims_and_invalid_disputes() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14417,7 +14425,7 @@ fn test_underwriting_policy_input_export_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14581,7 +14589,7 @@ fn test_underwriting_decision_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14800,7 +14808,7 @@ fn test_underwriting_decision_links_failed_settlement_evidence() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -14891,7 +14899,7 @@ fn test_underwriting_simulation_report_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15006,7 +15014,7 @@ fn test_underwriting_decision_issue_and_list_surfaces() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15210,7 +15218,7 @@ fn test_underwriting_decision_issue_with_mixed_currency_exposure_withholds_premi
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15303,7 +15311,7 @@ fn test_underwriting_decision_list_partitions_premium_totals_by_currency() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15397,7 +15405,7 @@ fn test_underwriting_appeal_and_supersession_lifecycle() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
@@ -15578,7 +15586,7 @@ fn test_underwriting_rejected_appeal_cannot_link_replacement_decision() {
         &authority_db_path,
         &budget_db_path,
     );
-    let client = Client::builder().build().expect("build client");
+    let client = build_test_client();
     let base_url = format!("http://{listen}");
     wait_for_trust_service(&client, &base_url);
 
