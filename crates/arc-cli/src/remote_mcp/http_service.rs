@@ -66,7 +66,17 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     )?);
     let factory = Arc::new(RemoteSessionFactory::new(config.clone()));
     if let Some(path) = config.session_db_path.as_deref() {
-        for record in load_active_session_records(path)? {
+        let loaded_records = load_active_session_records(path)?;
+        for session_id in loaded_records.invalid_session_ids {
+            if let Err(delete_error) = delete_active_session_record(path, &session_id) {
+                warn!(
+                    session_id = %session_id,
+                    error = %delete_error,
+                    "failed to delete malformed persisted MCP session record"
+                );
+            }
+        }
+        for record in loaded_records.records {
             match factory.restore_session(&record) {
                 Ok(session) => sessions.insert_active(session).await,
                 Err(error) => {

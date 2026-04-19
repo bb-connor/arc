@@ -985,9 +985,7 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
         }
     }
 
-    if config.egress_allowlist.as_ref().is_none_or(|eg| eg.enabled) {
-        pipeline.add(Box::new(InternalNetworkGuard::new()));
-    }
+    pipeline.add(Box::new(InternalNetworkGuard::new()));
 
     if let Some(tool_access) = &config.tool_access {
         if tool_access.enabled {
@@ -1877,7 +1875,7 @@ guards:
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
         let post_invocation = build_post_invocation_pipeline(&policy.guards);
-        assert_eq!(pipeline.len(), 3);
+        assert_eq!(pipeline.len(), 4);
         assert_eq!(post_invocation.len(), 1);
     }
 
@@ -1896,7 +1894,7 @@ guards:
         .unwrap();
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 1);
+        assert_eq!(pipeline.len(), 2);
     }
 
     #[test]
@@ -1921,7 +1919,7 @@ guards:
         .unwrap();
 
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 2);
+        assert_eq!(pipeline.len(), 3);
     }
 
     #[test]
@@ -2204,7 +2202,7 @@ guards:
 "#;
         let policy = parse_policy(yaml).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 0);
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]
@@ -2222,7 +2220,7 @@ guards:
 "#;
         let policy = parse_policy(yaml).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 1);
+        assert_eq!(pipeline.len(), 2);
 
         let kp = arc_core::crypto::Keypair::generate();
         let scope = ArcScope::default();

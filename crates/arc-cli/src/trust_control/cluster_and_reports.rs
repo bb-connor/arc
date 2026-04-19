@@ -1612,9 +1612,7 @@ fn apply_cluster_snapshot(
             .revocation_cursor
             .clone()
             .map(revocation_cursor_from_view);
-        if let Some(cursor) = budget_cursor {
-            peer.budget_cursor = Some(cursor);
-        }
+        peer.budget_cursor = budget_cursor.clone();
         peer.snapshot_applied_count = peer.snapshot_applied_count.saturating_add(1);
         peer.last_snapshot_at = Some(generated_at);
         peer.delta_records_since_snapshot = 0;
@@ -4496,6 +4494,17 @@ mod cluster_and_reports_tests {
                 .is_empty());
         }
 
+        update_peer_budget_cursor(
+            &target_state,
+            "http://node-a",
+            BudgetCursor {
+                seq: 99,
+                updated_at: 1_717_171_718,
+                capability_id: "stale-capability".to_string(),
+                grant_index: 7,
+            },
+        );
+
         let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
         assert_eq!(snapshot.replication.budget_seq, 0);
         assert_eq!(snapshot.budgets.len(), 1);
@@ -4521,6 +4530,12 @@ mod cluster_and_reports_tests {
             .list_mutation_events(10, Some("cap-usage-only"), Some(0))
             .expect("list replicated mutation events")
             .is_empty());
+        drop(target_store);
+
+        assert!(
+            peer_budget_cursor(&target_state, "http://node-a").is_none(),
+            "usage-only snapshots should clear any stale mutation cursor"
+        );
     }
 
     #[test]

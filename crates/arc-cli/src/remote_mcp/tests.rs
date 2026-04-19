@@ -156,6 +156,57 @@ mod tests {
     }
 
     #[test]
+    fn load_active_session_records_skips_malformed_rows() {
+        let path = std::env::temp_dir().join(format!(
+            "arc-remote-active-{}-{}.sqlite3",
+            std::process::id(),
+            session_now_millis()
+        ));
+        let valid_record = RemoteSessionResumeRecord {
+            session_id: "session-valid".to_string(),
+            agent_id: "agent-valid".to_string(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-valid",
+                "token-fingerprint",
+                None,
+            ),
+            auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle: RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 10,
+                last_seen_at: 11,
+                idle_expires_at: 12,
+                drain_deadline_at: None,
+            },
+            protocol_version: Some("2025-06-18".to_string()),
+            peer_capabilities: PeerCapabilities::default(),
+            initialize_params: json!({}),
+            issued_capabilities: Vec::new(),
+        };
+        persist_active_session_record(&path, &valid_record).expect("persist valid session row");
+
+        let conn = open_session_state_db(&path).expect("open session state db");
+        conn.execute(
+            &format!(
+                "INSERT OR REPLACE INTO {table} (session_id, updated_at, record_json)
+                 VALUES (?1, ?2, ?3)",
+                table = SESSION_ACTIVE_TABLE,
+            ),
+            params!["session-bad", session_now_millis() as i64, "{not json"],
+        )
+        .expect("insert malformed session row");
+        drop(conn);
+
+        let loaded = load_active_session_records(&path).expect("load active session records");
+        assert_eq!(loaded.records.len(), 1);
+        assert_eq!(loaded.records[0].session_id, "session-valid");
+        assert_eq!(loaded.invalid_session_ids, vec!["session-bad".to_string()]);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn arc_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         let metadata =
             build_arc_oauth_authorization_profile_metadata().expect("build ARC auth profile");

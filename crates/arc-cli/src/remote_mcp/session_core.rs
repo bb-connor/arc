@@ -1534,8 +1534,9 @@ fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<St
         }
     };
 
-    let encoded = canonical_json_bytes(&fingerprint)
-        .map_err(|error| CliError::Other(format!("serialize auth contract fingerprint: {error}")))?;
+    let encoded = canonical_json_bytes(&fingerprint).map_err(|error| {
+        CliError::Other(format!("serialize auth contract fingerprint: {error}"))
+    })?;
     Ok(sha256_hex(&encoded))
 }
 
@@ -2764,6 +2765,11 @@ impl RemoteSessionLedger {
 const SESSION_ACTIVE_TABLE: &str = "remote_active_sessions";
 const SESSION_TOMBSTONE_TABLE: &str = "remote_session_tombstones";
 
+struct LoadedActiveSessionRecords {
+    records: Vec<RemoteSessionResumeRecord>,
+    invalid_session_ids: Vec<String>,
+}
+
 fn open_session_state_db(path: &FsPath) -> Result<Connection, CliError> {
     let conn = Connection::open(path)?;
     conn.execute_batch(&format!(
@@ -2783,22 +2789,44 @@ fn open_session_state_db(path: &FsPath) -> Result<Connection, CliError> {
     Ok(conn)
 }
 
-fn load_active_session_records(path: &FsPath) -> Result<Vec<RemoteSessionResumeRecord>, CliError> {
+fn load_active_session_records(path: &FsPath) -> Result<LoadedActiveSessionRecords, CliError> {
     let conn = open_session_state_db(path)?;
     let mut stmt = conn.prepare(&format!(
-        "SELECT record_json FROM {table}",
+        "SELECT session_id, record_json FROM {table}",
         table = SESSION_ACTIVE_TABLE,
     ))?;
     let mut rows = stmt.query([])?;
     let mut records = Vec::new();
+    let mut invalid_session_ids = Vec::new();
 
     while let Some(row) = rows.next()? {
-        let record_json: String = row.get(0)?;
-        let record: RemoteSessionResumeRecord = serde_json::from_str(&record_json)?;
-        records.push(record);
+        let session_id: String = row.get(0)?;
+        let record_json: String = row.get(1)?;
+        match serde_json::from_str::<RemoteSessionResumeRecord>(&record_json) {
+            Ok(record) if record.session_id == session_id => records.push(record),
+            Ok(record) => {
+                warn!(
+                    session_id = %session_id,
+                    record_session_id = %record.session_id,
+                    "dropping persisted MCP session row whose primary key does not match the stored session payload"
+                );
+                invalid_session_ids.push(session_id);
+            }
+            Err(error) => {
+                warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "dropping malformed persisted MCP session row"
+                );
+                invalid_session_ids.push(session_id);
+            }
+        }
     }
 
-    Ok(records)
+    Ok(LoadedActiveSessionRecords {
+        records,
+        invalid_session_ids,
+    })
 }
 
 fn load_terminal_session_records(
