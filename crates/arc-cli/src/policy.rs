@@ -1504,6 +1504,19 @@ fn synthesize_tool_access_scope(
         }));
     }
 
+    if let Some(unrepresentable_allow_pattern) = tool_access.allow.iter().find(|allow_pattern| {
+        allow_pattern.contains('*')
+            && confirmation_overlap(allow_pattern, &tool_access.require_confirmation)
+            && !tool_access
+                .require_confirmation
+                .iter()
+                .any(|pattern| pattern == "*" || pattern == *allow_pattern)
+    }) {
+        return Err(PolicyError::Invalid(format!(
+            "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '{unrepresentable_allow_pattern}'; use an exact matching confirmation pattern or '*'"
+        )));
+    }
+
     Ok(Some(ArcScope {
         grants: tool_access
             .allow
@@ -2251,6 +2264,59 @@ guards:
                 arc_core::capability::Constraint::MaxArgsSize(2048),
                 arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 },
             ]
+        );
+    }
+
+    #[test]
+    fn yaml_tool_access_explicit_wildcard_allow_with_scoped_confirmation_is_rejected() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - "*"
+    require_confirmation:
+      - git_push
+"#,
+        )
+        .unwrap();
+
+        let error = build_runtime_default_capabilities(&policy)
+            .expect_err("scoped confirmation cannot narrow an explicit wildcard allow grant");
+        assert!(error.to_string().contains(
+            "guards.tool_access.require_confirmation cannot narrow wildcard allow pattern '*'"
+        ));
+    }
+
+    #[test]
+    fn yaml_tool_access_matching_wildcard_confirmation_preserves_explicit_wildcard_allow() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - git_*
+    require_confirmation:
+      - git_*
+"#,
+        )
+        .unwrap();
+
+        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        assert_eq!(capabilities.len(), 1);
+        assert_eq!(capabilities[0].scope.grants.len(), 1);
+        assert_eq!(capabilities[0].scope.grants[0].tool_name, "git_*");
+        assert_eq!(
+            capabilities[0].scope.grants[0].constraints,
+            vec![arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 }]
         );
     }
 
