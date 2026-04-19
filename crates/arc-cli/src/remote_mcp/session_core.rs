@@ -1718,10 +1718,19 @@ fn fan_out_shared_upstream_notifications(
     };
     subscribers.retain(|subscriber| subscriber.strong_count() > 0);
     // Shared hosted-owner mode multiplexes one upstream subprocess across many
-    // sessions. Unattributed upstream notifications cannot be routed safely, so
-    // ARC fails closed here until the wrapped notification surface carries
-    // session ownership metadata.
-    drop(notifications);
+    // sessions. Each session-local ArcMcpEdge still applies its own resource
+    // subscription and elicitation filtering before surfacing client-visible
+    // notifications, so the shared tap can safely replay raw upstream
+    // notifications into every live session queue.
+    for subscriber in subscribers.iter() {
+        let Some(queue) = subscriber.upgrade() else {
+            continue;
+        };
+        let Ok(mut queue) = queue.lock() else {
+            continue;
+        };
+        queue.extend(notifications.iter().cloned());
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]

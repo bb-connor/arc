@@ -317,6 +317,14 @@ for line in sys.stdin:
         })
         continue
 
+    if method == "resources/subscribe" or method == "resources/unsubscribe":
+        respond({
+            "jsonrpc": "2.0",
+            "id": message["id"],
+            "result": {}
+        })
+        continue
+
     if method == "tools/call":
         tool_name = message["params"]["name"]
         arguments = message["params"].get("arguments", {})
@@ -3091,8 +3099,28 @@ fn mcp_serve_http_isolates_multiple_sessions() {
     let base_url = format!("http://{listen}");
     wait_for_server(&client, &base_url);
 
-    let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
-    let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+    let shared_owner_capabilities = json!({
+        "sampling": {
+            "includeContext": true,
+            "tools": {}
+        },
+        "resources": {
+            "subscribe": true,
+            "listChanged": true
+        }
+    });
+    let (session_a, protocol_a) = initialize_session_with_capabilities(
+        &client,
+        &base_url,
+        token,
+        shared_owner_capabilities.clone(),
+    );
+    let (session_b, protocol_b) = initialize_session_with_capabilities(
+        &client,
+        &base_url,
+        token,
+        shared_owner_capabilities,
+    );
     assert_ne!(session_a, session_b);
 
     let session_a_task = post_json(
@@ -3805,7 +3833,7 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
 }
 
 #[test]
-fn mcp_serve_http_shared_hosted_owner_does_not_fan_out_unscoped_notifications() {
+fn mcp_serve_http_shared_hosted_owner_broadcasts_global_notifications() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
     let listen = reserve_listen_addr();
@@ -3821,6 +3849,26 @@ fn mcp_serve_http_shared_hosted_owner_does_not_fan_out_unscoped_notifications() 
 
     let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
     let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+    let get_stream_a = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_a,
+        Some(&protocol_a),
+        None,
+    );
+    assert_eq!(get_stream_a.status(), reqwest::StatusCode::OK);
+    let mut get_reader_a = BufReader::new(get_stream_a);
+    let get_stream_b = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_b,
+        Some(&protocol_b),
+        None,
+    );
+    assert_eq!(get_stream_b.status(), reqwest::StatusCode::OK);
+    let mut get_reader_b = BufReader::new(get_stream_b);
 
     let emit_late = post_json(
         &client,
@@ -3845,26 +3893,34 @@ fn mcp_serve_http_shared_hosted_owner_does_not_fan_out_unscoped_notifications() 
     assert!(post_messages.is_empty());
     assert!(terminal.get("error").is_none());
 
-    thread::sleep(Duration::from_millis(250));
+    let mut saw_a_notification = false;
+    let mut saw_b_notification = false;
+    for _ in 0..5 {
+        let event_a = read_next_sse_event(&mut get_reader_a).expect("shared owner stream A event");
+        if let Some(message) = event_a.message.as_ref() {
+            if message["method"] == "notifications/resources/list_changed" {
+                saw_a_notification = true;
+                break;
+            }
+        }
+    }
+    for _ in 0..5 {
+        let event_b = read_next_sse_event(&mut get_reader_b).expect("shared owner stream B event");
+        if let Some(message) = event_b.message.as_ref() {
+            if message["method"] == "notifications/resources/list_changed" {
+                saw_b_notification = true;
+                break;
+            }
+        }
+    }
 
-    let probe = post_json(
-        &client,
-        &base_url,
-        token,
-        Some(&session_b),
-        Some(&protocol_b),
-        &json!({
-            "jsonrpc": "2.0",
-            "id": 61,
-            "method": "tools/list",
-            "params": {}
-        }),
-    );
-    let (probe, leaked_notifications) = read_sse_until_response(probe, json!(61), |_| {});
-    assert!(probe.get("error").is_none());
     assert!(
-        leaked_notifications.is_empty(),
-        "shared hosted owner must not fan out unattributed upstream notifications across sessions: {leaked_notifications:?}"
+        saw_a_notification,
+        "expected the originating shared-owner session to receive the late global resources/list_changed notification"
+    );
+    assert!(
+        saw_b_notification,
+        "expected every shared-owner session stream to receive the late global resources/list_changed notification"
     );
 }
 

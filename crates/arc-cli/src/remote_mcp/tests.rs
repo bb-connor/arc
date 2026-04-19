@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_hosted_owner_notification_fanout_is_fail_closed() {
+    fn shared_hosted_owner_notification_fanout_replays_to_all_live_taps() {
         let subscriber_a = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
         let subscriber_b = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
         let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
@@ -151,8 +151,15 @@ mod tests {
             })],
         );
 
-        assert!(subscriber_a.lock().expect("lock subscriber a").is_empty());
-        assert!(subscriber_b.lock().expect("lock subscriber b").is_empty());
+        let subscriber_a = subscriber_a.lock().expect("lock subscriber a");
+        let subscriber_b = subscriber_b.lock().expect("lock subscriber b");
+        assert_eq!(subscriber_a.len(), 1);
+        assert_eq!(subscriber_b.len(), 1);
+        assert_eq!(
+            subscriber_a[0]["method"].as_str(),
+            Some("notifications/resources/list_changed")
+        );
+        assert_eq!(subscriber_a.as_slices(), subscriber_b.as_slices());
     }
 
     #[test]
@@ -1127,7 +1134,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_upstream_notification_fanout_drops_unscoped_notifications_and_prunes_dead_queues() {
+    fn shared_upstream_notification_fanout_copies_notifications_and_prunes_dead_queues() {
         let subscribers = Arc::new(StdMutex::new(Vec::new()));
         let queue_a = Arc::new(StdMutex::new(VecDeque::new()));
         let queue_b = Arc::new(StdMutex::new(VecDeque::new()));
@@ -1149,8 +1156,17 @@ mod tests {
 
         let queue_a = queue_a.lock().unwrap();
         let queue_b = queue_b.lock().unwrap();
-        assert!(queue_a.is_empty());
-        assert!(queue_b.is_empty());
+        assert_eq!(queue_a.len(), 2);
+        assert_eq!(queue_b.len(), 2);
+        assert_eq!(
+            queue_a[0]["method"].as_str(),
+            Some("notifications/resources/list_changed")
+        );
+        assert_eq!(
+            queue_a[1]["method"].as_str(),
+            Some("notifications/tools/list_changed")
+        );
+        assert_eq!(queue_a.as_slices(), queue_b.as_slices());
         drop(queue_a);
         drop(queue_b);
 
