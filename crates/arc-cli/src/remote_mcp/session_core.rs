@@ -1852,7 +1852,7 @@ struct TokenRequestForm {
 impl RemoteSession {
     fn new(init: RemoteSessionInit) -> Self {
         let now = session_now_millis();
-        let lifecycle_snapshot =
+        let mut lifecycle_snapshot =
             init.lifecycle_snapshot
                 .unwrap_or(RemoteSessionLifecycleSnapshot {
                     state: RemoteSessionState::Initializing,
@@ -1861,6 +1861,12 @@ impl RemoteSession {
                     idle_expires_at: now,
                     drain_deadline_at: None,
                 });
+        if lifecycle_snapshot.state == RemoteSessionState::Ready {
+            lifecycle_snapshot.last_seen_at = now;
+            lifecycle_snapshot.idle_expires_at =
+                now.saturating_add(init.lifecycle_policy.idle_expiry_millis);
+            lifecycle_snapshot.drain_deadline_at = None;
+        }
         Self {
             session_id: init.session_id,
             agent_id: init.agent_id,

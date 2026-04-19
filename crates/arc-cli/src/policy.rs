@@ -1521,7 +1521,17 @@ fn tool_patterns_overlap(left: &str, right: &str) -> bool {
     }
     let left_prefix = literal_prefix(left);
     let right_prefix = literal_prefix(right);
-    left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix)
+    if !left_prefix.is_empty()
+        && !right_prefix.is_empty()
+        && (left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix))
+    {
+        return true;
+    }
+    let left_suffix = literal_suffix(left);
+    let right_suffix = literal_suffix(right);
+    !left_suffix.is_empty()
+        && !right_suffix.is_empty()
+        && (left_suffix.ends_with(&right_suffix) || right_suffix.ends_with(&left_suffix))
 }
 
 fn contains_wildcards(pattern: &str) -> bool {
@@ -1532,6 +1542,17 @@ fn literal_prefix(pattern: &str) -> String {
     pattern
         .chars()
         .take_while(|ch| *ch != '*' && *ch != '?')
+        .collect()
+}
+
+fn literal_suffix(pattern: &str) -> String {
+    pattern
+        .chars()
+        .rev()
+        .take_while(|ch| *ch != '*' && *ch != '?')
+        .collect::<String>()
+        .chars()
+        .rev()
         .collect()
 }
 
@@ -2130,6 +2151,12 @@ guards:
                 arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 },
             ]
         );
+    }
+
+    #[test]
+    fn wildcard_overlap_does_not_treat_empty_prefix_patterns_as_match_all() {
+        assert!(!tool_patterns_overlap("read_file", "*_write"));
+        assert!(!tool_patterns_overlap("*_write", "git_push"));
     }
 
     #[test]

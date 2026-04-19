@@ -208,6 +208,63 @@ mod tests {
     }
 
     #[test]
+    fn remote_session_new_refreshes_ready_lifecycle_on_restore() {
+        let (input_tx, _input_rx) = mpsc::channel::<Value>();
+        let (event_tx, _) = broadcast::channel::<RemoteSessionEvent>(8);
+        let retained_notification_events =
+            Arc::new(StdMutex::new(VecDeque::<RetainedRemoteSessionEvent>::new()));
+        let next_event_id = Arc::new(AtomicU64::new(0));
+        let lifecycle_policy = SessionLifecyclePolicy {
+            idle_expiry_millis: 5_000,
+            drain_grace_millis: 1_000,
+            reaper_interval_millis: 100,
+            tombstone_retention_millis: 10_000,
+        };
+        let session = RemoteSession::new(RemoteSessionInit {
+            session_id: "session-restore".to_string(),
+            agent_id: "agent-restore".to_string(),
+            capabilities: Vec::new(),
+            issued_capabilities: Vec::new(),
+            auth_context: SessionAuthContext::streamable_http_static_bearer(
+                "agent-restore",
+                "restore-token",
+                None,
+            ),
+            auth_mode_fingerprint: "auth-contract-v1".to_string(),
+            policy_fingerprint: "policy-contract-v1".to_string(),
+            hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
+            lifecycle_policy: lifecycle_policy.clone(),
+            protocol_version: None,
+            peer_capabilities: None,
+            initialize_params: None,
+            lifecycle_snapshot: Some(RemoteSessionLifecycleSnapshot {
+                state: RemoteSessionState::Ready,
+                created_at: 11,
+                last_seen_at: 12,
+                idle_expires_at: 13,
+                drain_deadline_at: Some(14),
+            }),
+            input_tx,
+            event_tx,
+            retained_notification_events,
+            next_event_id,
+            session_db_path: None,
+        });
+
+        let lifecycle = session.lifecycle_snapshot();
+        assert_eq!(lifecycle.state, RemoteSessionState::Ready);
+        assert_eq!(lifecycle.created_at, 11);
+        assert!(lifecycle.last_seen_at >= 12);
+        assert_eq!(
+            lifecycle.idle_expires_at,
+            lifecycle
+                .last_seen_at
+                .saturating_add(lifecycle_policy.idle_expiry_millis)
+        );
+        assert_eq!(lifecycle.drain_deadline_at, None);
+    }
+
+    #[test]
     fn arc_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         let metadata =
             build_arc_oauth_authorization_profile_metadata().expect("build ARC auth profile");
