@@ -91,6 +91,10 @@ fn unix_now_secs() -> u64 {
         .as_secs()
 }
 
+fn tool_action(parameters: serde_json::Value) -> ToolCallAction {
+    ToolCallAction::from_parameters(parameters).expect("hash tool action parameters")
+}
+
 fn sample_google_runtime_attestation() -> RuntimeAttestationEvidence {
     let now = unix_now_secs();
     RuntimeAttestationEvidence {
@@ -584,10 +588,7 @@ fn make_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: tool_action(serde_json::json!({})),
             decision,
             content_hash: "content-hash".to_string(),
             policy_hash: "policy-hash".to_string(),
@@ -681,10 +682,7 @@ fn make_financial_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({})),
             decision,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -760,10 +758,7 @@ fn make_financial_receipt_with_budget_authority(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "budget-lineage" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "budget-lineage" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -850,10 +845,7 @@ fn make_financial_receipt_with_settlement_status(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "reconcile-me" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "reconcile-me" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -934,10 +926,7 @@ fn make_governed_financial_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "insured-feed" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "insured-feed" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1021,10 +1010,7 @@ fn make_governed_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1183,10 +1169,7 @@ fn make_governed_authorization_receipt_with_runtime_profile(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-auth-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-auth-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1303,10 +1286,7 @@ fn make_credit_history_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": format!("inv-{id}") }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": format!("inv-{id}") })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1384,10 +1364,7 @@ fn make_governed_authorization_receipt_without_runtime_assurance(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "invoice_id": "inv-facility-1001" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "invoice_id": "inv-facility-1001" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1471,10 +1448,7 @@ fn make_underwriting_simulation_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "simulation": true }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "simulation": true })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1553,10 +1527,7 @@ fn make_governed_x402_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "dataset-pro" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "dataset-pro" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -1639,10 +1610,7 @@ fn make_governed_acp_receipt(
             capability_id: capability_id.to_string(),
             tool_server: tool_server.to_string(),
             tool_name: tool_name.to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "sku": "merchant-result-pro" }),
-                parameter_hash: format!("param-{id}"),
-            },
+            action: tool_action(serde_json::json!({ "sku": "merchant-result-pro" })),
             decision: Decision::Allow,
             content_hash: format!("content-{id}"),
             policy_hash: "policy-hash".to_string(),
@@ -4468,10 +4436,7 @@ fn test_authorization_context_report_rejects_invalid_arc_oauth_profile_projectio
                 capability_id: "cap-auth-invalid".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "invoice_id": "inv-invalid-1" }),
-                    parameter_hash: "param-invalid".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "invoice_id": "inv-invalid-1" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid".to_string(),
                 policy_hash: "policy-invalid".to_string(),
@@ -4754,10 +4719,7 @@ fn test_authorization_context_report_rejects_incomplete_runtime_assurance_projec
                 capability_id: "cap-auth-invalid-assurance".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "cmd": "echo auth" }),
-                    parameter_hash: "param-invalid-assurance".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "cmd": "echo auth" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid-assurance".to_string(),
                 policy_hash: "policy-invalid-assurance".to_string(),
@@ -4890,10 +4852,7 @@ fn test_authorization_context_report_rejects_invalid_delegated_call_chain_projec
                 capability_id: "cap-auth-invalid-call-chain".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({ "cmd": "echo delegated" }),
-                    parameter_hash: "param-invalid-call-chain".to_string(),
-                },
+                action: tool_action(serde_json::json!({ "cmd": "echo delegated" })),
                 decision: Decision::Allow,
                 content_hash: "content-invalid-call-chain".to_string(),
                 policy_hash: "policy-invalid-call-chain".to_string(),
