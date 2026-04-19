@@ -225,6 +225,8 @@ struct RemoteSessionResumeRecord {
     session_id: String,
     agent_id: String,
     auth_context: SessionAuthContext,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth_mode_fingerprint: Option<String>,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle: RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
@@ -448,6 +450,7 @@ struct RemoteSession {
     capabilities: Vec<RemoteSessionCapability>,
     issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
+    auth_mode_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
@@ -469,6 +472,7 @@ struct RemoteSessionInit {
     capabilities: Vec<RemoteSessionCapability>,
     issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
+    auth_mode_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: Option<String>,
@@ -1440,6 +1444,101 @@ fn derive_federated_agent_keypair(
     Ok(Keypair::from_seed(&seed))
 }
 
+#[derive(Serialize)]
+struct RemoteAuthContractFingerprint {
+    mode: &'static str,
+    issuer: Option<String>,
+    audience: Option<String>,
+    required_scopes: Vec<String>,
+    provider_profile: String,
+    static_token_fingerprint: Option<String>,
+    verification_key_identity: Option<String>,
+    discovery_url: Option<String>,
+    introspection_url: Option<String>,
+    enterprise_provider_registry_hash: Option<String>,
+}
+
+fn enterprise_provider_registry_hash(path: Option<&FsPath>) -> Result<Option<String>, CliError> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let bytes = std::fs::read(path)?;
+    Ok(Some(sha256_hex(&bytes)))
+}
+
+fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<String, CliError> {
+    let provider_profile = config
+        .auth_jwt_provider_profile
+        .unwrap_or(JwtProviderProfile::Generic);
+    let enterprise_provider_registry_hash =
+        enterprise_provider_registry_hash(config.enterprise_providers_file.as_deref())?;
+    let fingerprint = if let Some(token) = config.auth_token.as_deref() {
+        RemoteAuthContractFingerprint {
+            mode: "static_bearer",
+            issuer: None,
+            audience: None,
+            required_scopes: Vec::new(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: Some(sha256_hex(token.as_bytes())),
+            verification_key_identity: None,
+            discovery_url: None,
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    } else if let Some(seed_path) = config.auth_server_seed_path.as_deref() {
+        let verification_key_identity = authority_public_key_from_seed_file(seed_path)?
+            .map(|public_key| public_key.to_hex())
+            .ok_or_else(|| {
+                CliError::Other(format!(
+                    "auth server seed file `{}` did not yield a public key",
+                    seed_path.display()
+                ))
+            })?;
+        RemoteAuthContractFingerprint {
+            mode: "jwt_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: Some(verification_key_identity),
+            discovery_url: None,
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    } else if let Some(introspection_url) = config.auth_introspection_url.as_deref() {
+        RemoteAuthContractFingerprint {
+            mode: "introspection_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: None,
+            discovery_url: config.auth_jwt_discovery_url.clone(),
+            introspection_url: Some(introspection_url.to_string()),
+            enterprise_provider_registry_hash,
+        }
+    } else {
+        RemoteAuthContractFingerprint {
+            mode: "jwt_bearer",
+            issuer: config.auth_jwt_issuer.clone(),
+            audience: config.auth_jwt_audience.clone(),
+            required_scopes: config.auth_scopes.clone(),
+            provider_profile: format!("{provider_profile:?}"),
+            static_token_fingerprint: None,
+            verification_key_identity: config.auth_jwt_public_key.clone(),
+            discovery_url: config.auth_jwt_discovery_url.clone(),
+            introspection_url: None,
+            enterprise_provider_registry_hash,
+        }
+    };
+
+    let encoded = canonical_json_bytes(&fingerprint)
+        .map_err(|error| CliError::Other(format!("serialize auth contract fingerprint: {error}")))?;
+    Ok(sha256_hex(&encoded))
+}
+
 fn derive_session_agent_keypair(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
@@ -1742,6 +1841,7 @@ impl RemoteSession {
             capabilities: init.capabilities,
             issued_capabilities: init.issued_capabilities,
             auth_context: init.auth_context,
+            auth_mode_fingerprint: init.auth_mode_fingerprint,
             hosted_isolation: init.hosted_isolation,
             lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(init.protocol_version),
@@ -1897,6 +1997,7 @@ impl RemoteSession {
             session_id: self.session_id.clone(),
             agent_id: self.agent_id.clone(),
             auth_context: self.auth_context.clone(),
+            auth_mode_fingerprint: Some(self.auth_mode_fingerprint.clone()),
             hosted_isolation: self.hosted_isolation,
             lifecycle,
             protocol_version,
@@ -2196,6 +2297,7 @@ impl RemoteSessionFactory {
         auth_context: SessionAuthContext,
     ) -> Result<Arc<RemoteSession>, CliError> {
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
@@ -2315,6 +2417,7 @@ impl RemoteSessionFactory {
             capabilities: session_capabilities,
             issued_capabilities: capabilities,
             auth_context: session_auth_context,
+            auth_mode_fingerprint,
             hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: None,
@@ -2342,6 +2445,24 @@ impl RemoteSessionFactory {
         }
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        match record.auth_mode_fingerprint.as_deref() {
+            Some(stored) if stored == auth_mode_fingerprint => {}
+            Some(_) => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} was created under different serve-http auth settings",
+                    record.session_id
+                )));
+            }
+            None => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} predates auth contract fingerprinting and must be re-initialized",
+                    record.session_id
+                )));
+            }
+        }
+
+        let default_capabilities = loaded_policy.default_capabilities.clone();
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -2397,8 +2518,10 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let session_capabilities = record
-            .issued_capabilities
+        let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
+        let issued_capabilities =
+            issue_default_capabilities(&kernel, &agent_public_key, &default_capabilities)?;
+        let session_capabilities = issued_capabilities
             .iter()
             .map(|capability| RemoteSessionCapability {
                 id: capability.id.clone(),
@@ -2422,7 +2545,7 @@ impl RemoteSessionFactory {
             },
             kernel,
             record.agent_id.clone(),
-            record.issued_capabilities.clone(),
+            issued_capabilities.clone(),
             vec![manifest],
         )?;
         edge.set_session_auth_context(record.auth_context.clone());
@@ -2454,8 +2577,9 @@ impl RemoteSessionFactory {
             session_id: record.session_id.clone(),
             agent_id: record.agent_id.clone(),
             capabilities: session_capabilities,
-            issued_capabilities: record.issued_capabilities.clone(),
+            issued_capabilities,
             auth_context: record.auth_context.clone(),
+            auth_mode_fingerprint,
             hosted_isolation: record.hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: record.protocol_version.clone(),

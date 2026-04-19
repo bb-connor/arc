@@ -93,12 +93,12 @@ pub fn settlement_completion_flow_row_id(receipt_id: &str) -> Result<String, Set
             "completion-flow binding requires a non-empty receipt id".to_string(),
         ));
     }
-    Ok(format!("{SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX}{trimmed}"))
+    Ok(format!(
+        "{SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX}{trimmed}"
+    ))
 }
 
-pub fn settlement_completion_flow_receipt_id<'a>(
-    row_id: &'a str,
-) -> Result<&'a str, SettlementError> {
+pub fn settlement_completion_flow_receipt_id(row_id: &str) -> Result<&str, SettlementError> {
     row_id
         .strip_prefix(SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX)
         .filter(|receipt_id| !receipt_id.trim().is_empty())

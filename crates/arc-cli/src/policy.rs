@@ -982,8 +982,11 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     .map_err(|error| PolicyError::Invalid(error.to_string()))?,
                 ));
             }
-            pipeline.add(Box::new(InternalNetworkGuard::new()));
         }
+    }
+
+    if config.egress_allowlist.as_ref().is_none_or(|eg| eg.enabled) {
+        pipeline.add(Box::new(InternalNetworkGuard::new()));
     }
 
     if let Some(tool_access) = &config.tool_access {
@@ -1439,23 +1442,19 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
 
     if tool_access.allow.is_empty() && tool_access.default_action == ToolAccessDefaultAction::Allow
     {
-        return if tool_access_can_safely_widen_to_wildcard(tool_access) {
-            Some(ArcScope {
-                grants: vec![ToolGrant {
-                    server_id: "*".to_string(),
-                    tool_name: "*".to_string(),
-                    operations: vec![Operation::Invoke],
-                    constraints: vec![],
-                    max_invocations: None,
-                    max_cost_per_invocation: None,
-                    max_total_cost: None,
-                    dpop_required: None,
-                }],
-                ..ArcScope::default()
-            })
-        } else {
-            Some(ArcScope::default())
-        };
+        return Some(ArcScope {
+            grants: vec![ToolGrant {
+                server_id: "*".to_string(),
+                tool_name: "*".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: compile_wildcard_tool_constraints(tool_access),
+                max_invocations: None,
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: None,
+            }],
+            ..ArcScope::default()
+        });
     }
 
     Some(ArcScope {
@@ -1477,11 +1476,22 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
     })
 }
 
-fn tool_access_can_safely_widen_to_wildcard(tool_access: &ToolAccessConfig) -> bool {
-    tool_access.allow.is_empty()
-        && tool_access.block.is_empty()
-        && tool_access.require_confirmation.is_empty()
-        && tool_access.max_args_size.is_none()
+fn compile_wildcard_tool_constraints(
+    tool_access: &ToolAccessConfig,
+) -> Vec<arc_core::capability::Constraint> {
+    let mut constraints = Vec::new();
+    if let Some(max_args_size) = tool_access.max_args_size {
+        constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
+    }
+    if tool_access
+        .require_confirmation
+        .iter()
+        .any(|pattern| pattern == "*")
+    {
+        constraints
+            .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
+    }
+    constraints
 }
 
 fn compile_tool_constraints(
@@ -2097,7 +2107,7 @@ guards:
     }
 
     #[test]
-    fn yaml_tool_access_default_allow_with_security_overrides_fails_closed() {
+    fn yaml_tool_access_default_allow_with_security_overrides_preserves_wildcard_capability() {
         let policy = parse_policy(
             r#"
 kernel:
@@ -2116,7 +2126,13 @@ guards:
         .unwrap();
 
         let capabilities = build_runtime_default_capabilities(&policy).unwrap();
-        assert!(capabilities.is_empty());
+        assert_eq!(capabilities.len(), 1);
+        assert_eq!(capabilities[0].scope.grants.len(), 1);
+        assert_eq!(capabilities[0].scope.grants[0].tool_name, "*");
+        assert_eq!(
+            capabilities[0].scope.grants[0].constraints,
+            vec![arc_core::capability::Constraint::MaxArgsSize(2048)]
+        );
     }
 
     #[test]
@@ -2155,7 +2171,7 @@ capabilities:
         assert!(!policy.kernel.allow_sampling_tool_use);
         assert!(!policy.kernel.allow_elicitation);
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 0);
+        assert_eq!(pipeline.len(), 1);
     }
 
     #[test]

@@ -317,7 +317,7 @@ mod tests {
     use super::*;
     use arc_core_types::capability::{
         ArcScope, CapabilityToken, CapabilityTokenBody, Constraint, ModelMetadata, ModelSafetyTier,
-        Operation, ToolGrant,
+        Operation, ProvenanceEvidenceClass, ToolGrant,
     };
     use arc_http_core::{
         http_status_scope, ARC_DECISION_RECEIPT_ID_KEY, ARC_HTTP_STATUS_SCOPE_DECISION,
@@ -488,7 +488,7 @@ mod tests {
             model_id: "gpt-5".to_string(),
             safety_tier: Some(ModelSafetyTier::Standard),
             provider: Some("openai".to_string()),
-            provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
+            provenance_class: ProvenanceEvidenceClass::Asserted,
         });
         request.body_hash = Some("tool-body".to_string());
         request.body_length = 1;

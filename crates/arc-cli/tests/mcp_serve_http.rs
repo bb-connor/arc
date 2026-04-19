@@ -499,8 +499,8 @@ for line in sys.stdin:
     path
 }
 
-fn write_policy(dir: &Path) -> PathBuf {
-    let policy = r#"
+fn write_policy_with_tools(dir: &Path, tools: &[&str]) -> PathBuf {
+    let mut policy = r#"
 kernel:
   max_capability_ttl: 3600
   delegation_depth_limit: 5
@@ -508,39 +508,32 @@ kernel:
 capabilities:
   default:
     tools:
-      - server: wrapped-http-mock
-        tool: echo_json
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: sampled_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: slow_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: slow_cancelable_echo
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: emit_fixture_notifications
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: emit_late_fixture_notifications
-        operations: [invoke]
-        ttl: 300
-      - server: wrapped-http-mock
-        tool: drop_stream_mid_call
-        operations: [invoke]
-        ttl: 300
-"#;
+        "#
+    .to_string();
+    for tool in tools {
+        policy.push_str(&format!(
+            "      - server: wrapped-http-mock\n        tool: {tool}\n        operations: [invoke]\n        ttl: 300\n"
+        ));
+    }
 
     let path = dir.join("http-policy.yaml");
     fs::write(&path, policy).expect("write HTTP policy");
     path
+}
+
+fn write_policy(dir: &Path) -> PathBuf {
+    write_policy_with_tools(
+        dir,
+        &[
+            "echo_json",
+            "sampled_echo",
+            "slow_echo",
+            "slow_cancelable_echo",
+            "emit_fixture_notifications",
+            "emit_late_fixture_notifications",
+            "drop_stream_mid_call",
+        ],
+    )
 }
 
 fn spawn_http_server(dir: &Path, listen: SocketAddr, token: &str) -> ServerGuard {
@@ -600,6 +593,30 @@ fn spawn_http_server_with_session_lifecycle_env_prefix(
     env_prefix: &str,
 ) -> ServerGuard {
     let policy_path = write_policy(dir);
+    spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        dir,
+        &policy_path,
+        listen,
+        token,
+        session_db_path,
+        idle_expiry_millis,
+        drain_grace_millis,
+        reaper_interval_millis,
+        env_prefix,
+    )
+}
+
+fn spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+    dir: &Path,
+    policy_path: &Path,
+    listen: SocketAddr,
+    token: &str,
+    session_db_path: Option<&Path>,
+    idle_expiry_millis: Option<u64>,
+    drain_grace_millis: Option<u64>,
+    reaper_interval_millis: Option<u64>,
+    env_prefix: &str,
+) -> ServerGuard {
     let script_path = write_mock_server_script(dir);
     let receipt_db_path = dir.join("remote-receipts.sqlite3");
     let revocation_db_path = dir.join("remote-revocations.sqlite3");
@@ -658,6 +675,68 @@ fn spawn_http_server_with_session_lifecycle_env_prefix(
         .stderr(Stdio::piped())
         .spawn()
         .expect("spawn arc mcp serve-http");
+
+    ServerGuard { child }
+}
+
+fn spawn_http_server_with_policy_path_and_jwt_auth(
+    dir: &Path,
+    policy_path: &Path,
+    listen: SocketAddr,
+    jwt_public_key_hex: &str,
+    issuer: &str,
+    audience: &str,
+    admin_token: &str,
+    session_db_path: Option<&Path>,
+) -> ServerGuard {
+    let script_path = write_mock_server_script(dir);
+    let receipt_db_path = dir.join("remote-receipts.sqlite3");
+    let revocation_db_path = dir.join("remote-revocations.sqlite3");
+    let authority_seed_path = dir.join("remote-authority.seed");
+
+    let mut command = Command::new(env!("CARGO_BIN_EXE_arc"));
+    command.args([
+        "--receipt-db",
+        receipt_db_path.to_str().expect("receipt db path"),
+        "--revocation-db",
+        revocation_db_path.to_str().expect("revocation db path"),
+        "--authority-seed-file",
+        authority_seed_path.to_str().expect("authority seed path"),
+    ]);
+    if let Some(path) = session_db_path {
+        command.args(["--session-db", path.to_str().expect("session db path")]);
+    }
+    let child = command
+        .args([
+            "mcp",
+            "serve-http",
+            "--policy",
+            policy_path.to_str().expect("policy path"),
+            "--server-id",
+            "wrapped-http-mock",
+            "--server-name",
+            "Wrapped HTTP Mock",
+            "--listen",
+            &listen.to_string(),
+            "--auth-jwt-public-key",
+            jwt_public_key_hex,
+            "--auth-jwt-issuer",
+            issuer,
+            "--auth-jwt-audience",
+            audience,
+            "--auth-scope",
+            "mcp:invoke",
+            "--admin-token",
+            admin_token,
+            "--",
+            "python3",
+            script_path.to_str().expect("script path"),
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn arc mcp serve-http with jwt auth");
 
     ServerGuard { child }
 }
@@ -2777,6 +2856,137 @@ fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls(
         None,
     );
     assert_eq!(resumed_get.status(), reqwest::StatusCode::OK);
+}
+
+#[test]
+fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy_with_tools(&dir, &["echo_json", "sampled_echo"]);
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        initialize_session(&client, &base_url, token)
+    };
+
+    let policy_path = write_policy_with_tools(&dir, &["sampled_echo"]);
+    let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+        &dir,
+        &policy_path,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+        "ARC",
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+
+    let denied_response = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 77,
+            "method": "tools/call",
+            "params": {
+                "name": "echo_json",
+                "arguments": {"message": "should now be denied"}
+            }
+        }),
+    );
+    assert_eq!(denied_response.status(), reqwest::StatusCode::OK);
+    let (denied_tool_call, denied_notifications) =
+        read_sse_until_response(denied_response, json!(77), |_| {});
+    assert!(denied_notifications.is_empty());
+    assert_eq!(denied_tool_call["result"]["isError"], true);
+}
+
+#[test]
+fn mcp_serve_http_drops_restored_sessions_when_auth_mode_changes() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+    let policy_path = write_policy(&dir);
+
+    let session_id = {
+        let _server = spawn_http_server_with_policy_path_and_session_lifecycle_env_prefix(
+            &dir,
+            &policy_path,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+            "ARC",
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+        let (session_id, _) = initialize_session(&client, &base_url, token);
+        session_id
+    };
+
+    let auth_kp = Keypair::generate();
+    let issuer = "https://issuer.example/restore-auth-mode";
+    let audience = "arc-restore-auth-mode";
+    let admin_token = "admin-token";
+    let _server = spawn_http_server_with_policy_path_and_jwt_auth(
+        &dir,
+        &policy_path,
+        listen,
+        &auth_kp.public_key().to_hex(),
+        issuer,
+        audience,
+        admin_token,
+        Some(&session_db_path),
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, admin_token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::NOT_FOUND);
 }
 
 #[test]
