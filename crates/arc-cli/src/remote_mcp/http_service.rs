@@ -67,8 +67,25 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
     let factory = Arc::new(RemoteSessionFactory::new(config.clone()));
     if let Some(path) = config.session_db_path.as_deref() {
         for record in load_active_session_records(path)? {
-            let session = factory.restore_session(&record)?;
-            sessions.insert_active(session).await;
+            match factory.restore_session(&record) {
+                Ok(session) => sessions.insert_active(session).await,
+                Err(error) => {
+                    warn!(
+                        session_id = %record.session_id,
+                        error = %error,
+                        "dropping persisted MCP session record that could not be restored"
+                    );
+                    if let Err(delete_error) =
+                        delete_active_session_record(path, &record.session_id)
+                    {
+                        warn!(
+                            session_id = %record.session_id,
+                            error = %delete_error,
+                            "failed to delete unrestorable MCP session record"
+                        );
+                    }
+                }
+            }
         }
     }
     sessions.cleanup_due_sessions().await;
