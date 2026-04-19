@@ -227,6 +227,8 @@ struct RemoteSessionResumeRecord {
     auth_context: SessionAuthContext,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     auth_mode_fingerprint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    policy_fingerprint: Option<String>,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle: RemoteSessionLifecycleSnapshot,
     protocol_version: Option<String>,
@@ -451,6 +453,7 @@ struct RemoteSession {
     issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
+    policy_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: StdMutex<Option<String>>,
@@ -473,6 +476,7 @@ struct RemoteSessionInit {
     issued_capabilities: Vec<CapabilityToken>,
     auth_context: SessionAuthContext,
     auth_mode_fingerprint: String,
+    policy_fingerprint: String,
     hosted_isolation: RemoteHostedIsolationMode,
     lifecycle_policy: SessionLifecyclePolicy,
     protocol_version: Option<String>,
@@ -1540,6 +1544,27 @@ fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<St
     Ok(sha256_hex(&encoded))
 }
 
+fn fingerprint_remote_policy_contract(
+    loaded_policy: &crate::policy::LoadedPolicy,
+) -> Result<String, CliError> {
+    let fingerprint = json!({
+        "format": loaded_policy.format_name(),
+        "identity": {
+            "source_hash": loaded_policy.identity.source_hash,
+            "runtime_hash": loaded_policy.identity.runtime_hash,
+        },
+        "default_capabilities": loaded_policy.default_capabilities,
+        "issuance_policy": loaded_policy.issuance_policy,
+        "runtime_assurance_policy": loaded_policy.runtime_assurance_policy,
+    });
+    let encoded = canonical_json_bytes(&fingerprint).map_err(|error| {
+        CliError::Other(format!(
+            "serialize resumable policy contract fingerprint: {error}"
+        ))
+    })?;
+    Ok(sha256_hex(&encoded))
+}
+
 fn derive_session_agent_keypair(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
@@ -1843,6 +1868,7 @@ impl RemoteSession {
             issued_capabilities: init.issued_capabilities,
             auth_context: init.auth_context,
             auth_mode_fingerprint: init.auth_mode_fingerprint,
+            policy_fingerprint: init.policy_fingerprint,
             hosted_isolation: init.hosted_isolation,
             lifecycle_policy: init.lifecycle_policy,
             protocol_version: StdMutex::new(init.protocol_version),
@@ -1999,6 +2025,7 @@ impl RemoteSession {
             agent_id: self.agent_id.clone(),
             auth_context: self.auth_context.clone(),
             auth_mode_fingerprint: Some(self.auth_mode_fingerprint.clone()),
+            policy_fingerprint: Some(self.policy_fingerprint.clone()),
             hosted_isolation: self.hosted_isolation,
             lifecycle,
             protocol_version,
@@ -2299,6 +2326,7 @@ impl RemoteSessionFactory {
     ) -> Result<Arc<RemoteSession>, CliError> {
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
@@ -2419,6 +2447,7 @@ impl RemoteSessionFactory {
             issued_capabilities: capabilities,
             auth_context: session_auth_context,
             auth_mode_fingerprint,
+            policy_fingerprint,
             hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: None,
@@ -2447,6 +2476,7 @@ impl RemoteSessionFactory {
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
+        let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             Some(_) => {
@@ -2458,6 +2488,21 @@ impl RemoteSessionFactory {
             None => {
                 return Err(CliError::Other(format!(
                     "stored MCP session {} predates auth contract fingerprinting and must be re-initialized",
+                    record.session_id
+                )));
+            }
+        }
+        match record.policy_fingerprint.as_deref() {
+            Some(stored) if stored == policy_fingerprint => {}
+            Some(_) => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} was created under different capability policy settings",
+                    record.session_id
+                )));
+            }
+            None => {
+                return Err(CliError::Other(format!(
+                    "stored MCP session {} predates policy fingerprinting and must be re-initialized",
                     record.session_id
                 )));
             }
@@ -2578,6 +2623,7 @@ impl RemoteSessionFactory {
             issued_capabilities,
             auth_context: record.auth_context.clone(),
             auth_mode_fingerprint,
+            policy_fingerprint,
             hosted_isolation: record.hosted_isolation,
             lifecycle_policy: self.lifecycle_policy.clone(),
             protocol_version: record.protocol_version.clone(),

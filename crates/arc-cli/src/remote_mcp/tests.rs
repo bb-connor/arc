@@ -171,6 +171,7 @@ mod tests {
                 None,
             ),
             auth_mode_fingerprint: Some("auth-contract-v1".to_string()),
+            policy_fingerprint: Some("policy-contract-v1".to_string()),
             hosted_isolation: RemoteHostedIsolationMode::DedicatedPerSession,
             lifecycle: RemoteSessionLifecycleSnapshot {
                 state: RemoteSessionState::Ready,
