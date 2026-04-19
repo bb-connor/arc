@@ -3,7 +3,7 @@
 //! Reads a ARC policy file and produces a configured `GuardPipeline` plus
 //! initial capability definitions for the agent.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -1222,12 +1222,16 @@ where
         )));
     }
 
-    let mut circuit = CircuitBreakerConfig::default();
-    circuit.failure_threshold = config.circuit_failure_threshold;
+    let circuit = CircuitBreakerConfig {
+        failure_threshold: config.circuit_failure_threshold,
+        ..CircuitBreakerConfig::default()
+    };
 
-    let mut retry = RetryConfig::default();
-    retry.max_retries = config.retry_max_retries;
-    retry.strategy = BackoffStrategy::Exponential;
+    let retry = RetryConfig {
+        max_retries: config.retry_max_retries,
+        strategy: BackoffStrategy::Exponential,
+        ..RetryConfig::default()
+    };
 
     Ok(builder
         .circuit(circuit)
@@ -1513,85 +1517,50 @@ fn tool_patterns_overlap(left: &str, right: &str) -> bool {
     if left == "*" || right == "*" {
         return true;
     }
-    if !contains_wildcards(left) && !contains_wildcards(right) {
-        return left == right;
+    let mut memo = HashMap::new();
+    pattern_suffixes_overlap(left.as_bytes(), 0, right.as_bytes(), 0, &mut memo)
+}
+
+fn pattern_suffixes_overlap(
+    left: &[u8],
+    left_index: usize,
+    right: &[u8],
+    right_index: usize,
+    memo: &mut HashMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(result) = memo.get(&(left_index, right_index)) {
+        return *result;
     }
-    if glob_matches(left, right) || glob_matches(right, left) {
-        return true;
-    }
-    let left_prefix = literal_prefix(left);
-    let right_prefix = literal_prefix(right);
-    if !left_prefix.is_empty()
-        && !right_prefix.is_empty()
-        && (left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix))
-    {
-        return true;
-    }
-    let left_suffix = literal_suffix(left);
-    let right_suffix = literal_suffix(right);
-    !left_suffix.is_empty()
-        && !right_suffix.is_empty()
-        && (left_suffix.ends_with(&right_suffix) || right_suffix.ends_with(&left_suffix))
-}
-
-fn contains_wildcards(pattern: &str) -> bool {
-    pattern.contains('*') || pattern.contains('?')
-}
-
-fn literal_prefix(pattern: &str) -> String {
-    pattern
-        .chars()
-        .take_while(|ch| *ch != '*' && *ch != '?')
-        .collect()
-}
-
-fn literal_suffix(pattern: &str) -> String {
-    pattern
-        .chars()
-        .rev()
-        .take_while(|ch| *ch != '*' && *ch != '?')
-        .collect::<String>()
-        .chars()
-        .rev()
-        .collect()
-}
-
-fn glob_matches(pattern: &str, target: &str) -> bool {
-    let pattern = pattern.as_bytes();
-    let target = target.as_bytes();
-    let mut pattern_index = 0usize;
-    let mut target_index = 0usize;
-    let mut star_index: Option<usize> = None;
-    let mut match_index = 0usize;
-
-    while target_index < target.len() {
-        if pattern_index < pattern.len()
-            && (pattern[pattern_index] == b'?' || pattern[pattern_index] == target[target_index])
-        {
-            pattern_index += 1;
-            target_index += 1;
-            continue;
+    let result = if left_index == left.len() {
+        pattern_suffix_can_match_empty(right, right_index)
+    } else if right_index == right.len() {
+        pattern_suffix_can_match_empty(left, left_index)
+    } else {
+        match (left[left_index], right[right_index]) {
+            (b'*', _) => {
+                pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
+                    || pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
+            }
+            (_, b'*') => {
+                pattern_suffixes_overlap(left, left_index, right, right_index + 1, memo)
+                    || pattern_suffixes_overlap(left, left_index + 1, right, right_index, memo)
+            }
+            (left_byte, right_byte) => {
+                pattern_bytes_compatible(left_byte, right_byte)
+                    && pattern_suffixes_overlap(left, left_index + 1, right, right_index + 1, memo)
+            }
         }
-        if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-            star_index = Some(pattern_index);
-            pattern_index += 1;
-            match_index = target_index;
-            continue;
-        }
-        if let Some(star) = star_index {
-            pattern_index = star + 1;
-            match_index += 1;
-            target_index = match_index;
-            continue;
-        }
-        return false;
-    }
+    };
+    memo.insert((left_index, right_index), result);
+    result
+}
 
-    while pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
-        pattern_index += 1;
-    }
+fn pattern_suffix_can_match_empty(pattern: &[u8], index: usize) -> bool {
+    pattern[index..].iter().all(|byte| *byte == b'*')
+}
 
-    pattern_index == pattern.len()
+fn pattern_bytes_compatible(left: u8, right: u8) -> bool {
+    left == right || left == b'?' || right == b'?'
 }
 
 fn parse_operations(operations: &[String]) -> Result<Vec<Operation>, PolicyError> {
@@ -2157,6 +2126,9 @@ guards:
     fn wildcard_overlap_does_not_treat_empty_prefix_patterns_as_match_all() {
         assert!(!tool_patterns_overlap("read_file", "*_write"));
         assert!(!tool_patterns_overlap("*_write", "git_push"));
+        assert!(!tool_patterns_overlap("*_read", "*_write"));
+        assert!(!tool_patterns_overlap("bb*", "?a"));
+        assert!(tool_patterns_overlap("read_*", "*_read"));
     }
 
     #[test]

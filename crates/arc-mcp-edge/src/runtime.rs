@@ -1163,10 +1163,7 @@ impl ArcMcpEdge {
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
-        let model_metadata = match parse_request_model_metadata(id, params) {
-            Ok(model_metadata) => model_metadata,
-            Err(response) => return Err(response),
-        };
+        let model_metadata = parse_request_model_metadata(id, params)?;
 
         let Some(&tool_index) = self.tool_index.get(tool_name) else {
             return Err(jsonrpc_error(

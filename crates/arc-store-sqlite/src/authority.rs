@@ -211,6 +211,11 @@ impl SqliteCapabilityAuthority {
         self.read_current_keypair()
     }
 
+    pub fn local_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        Self::read_keypair_from_connection(&connection)
+    }
+
     pub fn cluster_fence(&self) -> Result<AuthorityClusterFence, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
         Self::read_cluster_fence_from_connection(&connection)
