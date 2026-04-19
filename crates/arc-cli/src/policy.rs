@@ -4,6 +4,7 @@
 //! initial capability definitions for the agent.
 
 use std::collections::{BTreeMap, HashMap};
+use std::net::IpAddr;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -1263,10 +1264,31 @@ fn validate_https_url(field: &str, value: &str) -> Result<(), PolicyError> {
     validate_http_url(field, value)?;
     let parsed = Url::parse(value)
         .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
-    if parsed.scheme() != "https" {
-        return Err(PolicyError::Invalid(format!("{field} must use https")));
+    if parsed.scheme() == "https" || is_localhost_http_url(&parsed) {
+        return Ok(());
     }
-    Ok(())
+    Err(PolicyError::Invalid(format!(
+        "{field} must use https or localhost-only http"
+    )))
+}
+
+fn is_localhost_http_url(parsed: &Url) -> bool {
+    if parsed.scheme() != "http" {
+        return false;
+    }
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    if host
+        .parse::<IpAddr>()
+        .is_ok_and(|address| address.is_loopback())
+    {
+        return true;
+    }
+    host.to_ascii_lowercase().ends_with(".localhost")
 }
 
 fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
@@ -1992,9 +2014,34 @@ guards:
         assert!(
             error
                 .to_string()
-                .contains("cloud_guardrails.azure_content_safety.endpoint must use https"),
+                .contains(
+                    "cloud_guardrails.azure_content_safety.endpoint must use https or localhost-only http"
+                ),
             "unexpected error: {error}"
         );
+    }
+
+    #[test]
+    fn build_pipeline_allows_localhost_http_external_guard_urls() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "http://127.0.0.1:8080"
+      api_key: "azure-key"
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+      base_url: "http://localhost:9000/v4"
+"#,
+        )
+        .unwrap();
+
+        build_guard_pipeline(&policy.guards)
+            .expect("localhost-only http endpoints should remain allowed for local testing");
     }
 
     #[test]

@@ -251,7 +251,9 @@ impl SqliteBudgetStore {
             raise_budget_replication_seq_floor(&transaction, usage_seq)?;
         }
 
-        if let Some(existing) = Self::load_mutation_event(&transaction, &record.event_id)? {
+        let duplicate_event = if let Some(existing) =
+            Self::load_mutation_event(&transaction, &record.event_id)?
+        {
             if existing != *record {
                 transaction.rollback()?;
                 return Err(BudgetStoreError::Invariant(format!(
@@ -259,6 +261,7 @@ impl SqliteBudgetStore {
                     record.event_id
                 )));
             }
+            true
         } else {
             transaction.execute(
                 r#"
@@ -308,6 +311,12 @@ impl SqliteBudgetStore {
                     record.authority.as_ref().map(|value| value.lease_epoch as i64),
                 ],
             )?;
+            false
+        };
+
+        if duplicate_event {
+            transaction.commit()?;
+            return Ok(());
         }
 
         Self::apply_imported_hold_state(&transaction, record)?;
@@ -3411,6 +3420,70 @@ mod tests {
             .find(|record| record.event_id == event_id)
             .expect("replacement authorize event");
         assert_eq!(authorize.authority.as_ref(), Some(&changed));
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn import_mutation_record_keeps_duplicate_release_events_idempotent_sqlite() {
+        let path = unique_db_path("arc-budget-import-release-idempotent");
+        let mut store = SqliteBudgetStore::open(&path).unwrap();
+        let hold_id = "hold-cap-import-0";
+        let authorize_event_id = "hold-cap-import-0:authorize";
+        let release_event_id = "hold-cap-import-0:release";
+
+        assert!(store
+            .try_charge_cost_with_ids(
+                "cap-import",
+                0,
+                Some(10),
+                100,
+                Some(200),
+                Some(1000),
+                Some(hold_id),
+                Some(authorize_event_id),
+            )
+            .unwrap());
+        store
+            .reduce_charge_cost_with_ids(
+                "cap-import",
+                0,
+                100,
+                Some(hold_id),
+                Some(release_event_id),
+            )
+            .unwrap();
+
+        let release_record = store
+            .list_mutation_events(10, Some("cap-import"), Some(0))
+            .unwrap()
+            .into_iter()
+            .find(|record| record.event_id == release_event_id)
+            .expect("release event record");
+
+        store.import_mutation_record(&release_record).unwrap();
+
+        let usage = store.get_usage("cap-import", 0).unwrap().unwrap();
+        assert_eq!(usage.invocation_count, 1);
+        assert_usage_totals(&usage, 0, 0);
+
+        let transaction = store
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .unwrap();
+        let hold = SqliteBudgetStore::load_hold(&transaction, hold_id)
+            .unwrap()
+            .expect("released hold state");
+        assert_eq!(hold.remaining_exposure_units, 0);
+        assert_eq!(hold.disposition, HoldDisposition::Released);
+        drop(transaction);
+
+        let events = store
+            .list_mutation_events(10, Some("cap-import"), Some(0))
+            .unwrap();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].event_id, authorize_event_id);
+        assert_eq!(events[1].event_id, release_event_id);
 
         let _ = fs::remove_file(path);
     }
