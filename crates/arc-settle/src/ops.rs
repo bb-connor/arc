@@ -483,17 +483,14 @@ mod tests {
             row_id,
             format!("{SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX}{}", "rcpt-1")
         );
-        ensure_settlement_completion_flow_binding(&row_id, "rcpt-1")
-            .expect("matching binding");
+        ensure_settlement_completion_flow_binding(&row_id, "rcpt-1").expect("matching binding");
     }
 
     #[test]
     fn completion_flow_binding_rejects_mismatch() {
-        let error = ensure_settlement_completion_flow_binding(
-            "economic-completion-flow:rcpt-1",
-            "rcpt-2",
-        )
-        .expect_err("binding mismatch should fail");
+        let error =
+            ensure_settlement_completion_flow_binding("economic-completion-flow:rcpt-1", "rcpt-2")
+                .expect_err("binding mismatch should fail");
         assert!(error.to_string().contains("resolved receipt"));
     }
 }

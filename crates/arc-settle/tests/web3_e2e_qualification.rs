@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use arc_anchor::{
-    EvmAnchorTarget, build_anchor_inclusion_proof_from_evidence_bundle, build_chain_anchor_record,
-    confirm_root_publication, prepare_root_publication, publish_root,
+    build_anchor_inclusion_proof_from_evidence_bundle, build_chain_anchor_record,
+    confirm_root_publication, prepare_root_publication, publish_root, EvmAnchorTarget,
 };
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::MonetaryAmount;
@@ -27,9 +27,9 @@ use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, Decision, SignedExportEnvelope, ToolCallAction,
 };
 use arc_core::web3::{
-    ARC_LINK_ORACLE_AUTHORITY, AnchorInclusionProof, OracleConversionEvidence,
-    SignedWeb3IdentityBinding, Web3IdentityBindingCertificate, Web3KeyBindingPurpose,
-    Web3SettlementLifecycleState, Web3SettlementPath,
+    AnchorInclusionProof, OracleConversionEvidence, SignedWeb3IdentityBinding,
+    Web3IdentityBindingCertificate, Web3KeyBindingPurpose, Web3SettlementLifecycleState,
+    Web3SettlementPath, ARC_LINK_ORACLE_AUTHORITY,
 };
 use arc_kernel::checkpoint::{build_checkpoint, build_inclusion_proof};
 use arc_kernel::evidence_export::{
@@ -39,16 +39,16 @@ use arc_kernel::evidence_export::{
 use arc_link::config::{OracleBackendKind, PairConfig, PriceOracleConfig};
 use arc_link::{ArcLinkOracle, ExchangeRate, OracleBackend, OracleFuture, PriceOracleError};
 use arc_settle::{
-    BondLockRequest, DualSignReleaseInput, EscrowDispatchRequest, ExecutionProjectionInput,
-    LocalDevnetDeployment, SettlementFinalityStatus, SettlementRecoveryAction, confirm_transaction,
-    estimate_call_gas, finalize_bond_lock, finalize_escrow_dispatch, inspect_finality_for_receipt,
-    observe_bond, prepare_bond_expiry, prepare_bond_impair, prepare_bond_lock,
-    prepare_dual_sign_release, prepare_erc20_approval, prepare_escrow_refund,
-    prepare_web3_escrow_dispatch, project_escrow_execution_receipt, submit_call,
+    confirm_transaction, estimate_call_gas, finalize_bond_lock, finalize_escrow_dispatch,
+    inspect_finality_for_receipt, observe_bond, prepare_bond_expiry, prepare_bond_impair,
+    prepare_bond_lock, prepare_dual_sign_release, prepare_erc20_approval, prepare_escrow_refund,
+    prepare_web3_escrow_dispatch, project_escrow_execution_receipt, submit_call, BondLockRequest,
+    DualSignReleaseInput, EscrowDispatchRequest, ExecutionProjectionInput, LocalDevnetDeployment,
+    SettlementFinalityStatus, SettlementRecoveryAction,
 };
 use reqwest::Client;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 const OPERATOR_PRIVATE_KEY: &str =
     "0x1000000000000000000000000000000000000000000000000000000000000002";
@@ -615,8 +615,8 @@ async fn publish_anchor_proof(
 }
 
 #[tokio::test]
-async fn web3_partner_qualification_emits_integrated_recovery_bundle()
--> Result<(), Box<dyn std::error::Error>> {
+async fn web3_partner_qualification_emits_integrated_recovery_bundle(
+) -> Result<(), Box<dyn std::error::Error>> {
     if !runtime_devnet_prereqs_available() {
         eprintln!(
             "skipping web3 runtime-devnet qualification test because node-based prerequisites are unavailable"

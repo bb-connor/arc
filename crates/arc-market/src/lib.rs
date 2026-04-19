@@ -5,10 +5,10 @@ pub use arc_underwriting as underwriting;
 
 pub mod insurance_flow;
 pub use insurance_flow::{
-    BoundPolicy, ClaimDecision, ClaimDenialReason, ClaimEvidence, ClaimSettlement,
+    quote_and_bind, BoundPolicy, ClaimDecision, ClaimDenialReason, ClaimEvidence, ClaimSettlement,
     ClaimSettlementRequest, ClaimSettlementSink, CoverageLimit, InsuranceFlowError, PolicyStatus,
     PremiumSource, ReceiptEvidenceSource, ReceiptFingerprint, ResolvedReceiptEvidence,
-    StaticPremiumSource, quote_and_bind,
+    StaticPremiumSource,
 };
 
 use std::collections::BTreeSet;

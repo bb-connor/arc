@@ -2,8 +2,8 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use alloy_primitives::{Address, B256, FixedBytes, U256, keccak256};
-use alloy_sol_types::{SolCall, sol};
+use alloy_primitives::{keccak256, Address, FixedBytes, B256, U256};
+use alloy_sol_types::{sol, SolCall};
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::MonetaryAmount;
 use arc_core::credit::{
@@ -14,23 +14,23 @@ use arc_core::hashing::Hash;
 use arc_core::merkle::leaf_hash;
 use arc_core::receipt::ArcReceipt;
 use arc_core::web3::{
-    ARC_WEB3_SETTLEMENT_DISPATCH_SCHEMA, ARC_WEB3_SETTLEMENT_RECEIPT_SCHEMA, AnchorInclusionProof,
+    validate_web3_settlement_dispatch, validate_web3_settlement_execution_receipt,
+    verify_anchor_inclusion_proof, verify_web3_identity_binding, AnchorInclusionProof,
     SignedWeb3IdentityBinding, Web3KeyBindingPurpose, Web3SettlementDispatchArtifact,
     Web3SettlementExecutionReceiptArtifact, Web3SettlementLifecycleState, Web3SettlementPath,
-    Web3SettlementSupportBoundary, validate_web3_settlement_dispatch,
-    validate_web3_settlement_execution_receipt, verify_anchor_inclusion_proof,
-    verify_web3_identity_binding,
+    Web3SettlementSupportBoundary, ARC_WEB3_SETTLEMENT_DISPATCH_SCHEMA,
+    ARC_WEB3_SETTLEMENT_RECEIPT_SCHEMA,
 };
 use arc_web3_bindings::{ArcMerkleProof, IArcBondVault, IArcEscrow};
 use reqwest::Client;
 use secp256k1::ecdsa::RecoverableSignature;
 use secp256k1::{Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::{
-    SettlementChainConfig, SettlementCommitment, SettlementError,
-    ops::ensure_settlement_completion_flow_binding,
+    ops::ensure_settlement_completion_flow_binding, SettlementChainConfig, SettlementCommitment,
+    SettlementError,
 };
 
 sol! {
@@ -1628,11 +1628,11 @@ mod tests {
     use arc_core::crypto::Keypair;
     use arc_core::hashing::sha256_hex;
     use arc_core::receipt::{ArcReceiptBody, Decision, SignedExportEnvelope, ToolCallAction};
-    use arc_core::web3::{ARC_KEY_BINDING_CERTIFICATE_SCHEMA, Web3IdentityBindingCertificate};
+    use arc_core::web3::{Web3IdentityBindingCertificate, ARC_KEY_BINDING_CERTIFICATE_SCHEMA};
     use arc_core::web3::{Web3SettlementDispatchArtifact, Web3SettlementLifecycleState};
-    use secp256k1::PublicKey as SecpPublicKey;
     use secp256k1::ecdsa::RecoveryId;
-    use serde_json::{Value, json};
+    use secp256k1::PublicKey as SecpPublicKey;
+    use serde_json::{json, Value};
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::{Arc, Mutex};
@@ -2611,11 +2611,9 @@ mod tests {
         let binding_error = prepare_web3_escrow_dispatch(&config, &valid_request, &binding)
             .await
             .expect_err("binding without settle purpose should fail");
-        assert!(
-            binding_error
-                .to_string()
-                .contains("binding does not include Settle purpose")
-        );
+        assert!(binding_error
+            .to_string()
+            .contains("binding does not include Settle purpose"));
 
         let mismatch_request = EscrowDispatchRequest {
             capital_instruction: sample_capital_instruction(
@@ -2784,11 +2782,9 @@ mod tests {
             &sample_primary_proof(),
         )
         .expect_err("mismatched shares should fail");
-        assert!(
-            share_error
-                .to_string()
-                .contains("slash shares must sum to slash_amount")
-        );
+        assert!(share_error
+            .to_string()
+            .contains("slash shares must sum to slash_amount"));
 
         let finalize_error = finalize_escrow_dispatch(
             &PreparedEscrowCreate {
@@ -2816,11 +2812,9 @@ mod tests {
             },
         )
         .expect_err("failed receipt should fail closed");
-        assert!(
-            finalize_error
-                .to_string()
-                .contains("failed before escrow identity could be finalized")
-        );
+        assert!(finalize_error
+            .to_string()
+            .contains("failed before escrow identity could be finalized"));
     }
 
     #[test]

@@ -1463,8 +1463,7 @@ impl SqliteReceiptStore {
                 failed_settlement_receipts = failed_settlement_receipts.saturating_add(1);
             }
             if settlement.action_required {
-                settlement_actionable_receipts =
-                    settlement_actionable_receipts.saturating_add(1);
+                settlement_actionable_receipts = settlement_actionable_receipts.saturating_add(1);
             }
 
             let metering = if economic_authorization.metering.is_some() {
@@ -1560,27 +1559,29 @@ impl SqliteReceiptStore {
             return Err(ReceiptStoreError::Conflict(message));
         }
 
-        let economic_receipts = self.query_economic_receipt_projection_report(&OperatorReportQuery {
-            capability_id: normalized.capability_id.clone(),
-            agent_subject: normalized.agent_subject.clone(),
-            tool_server: normalized.tool_server.clone(),
-            tool_name: normalized.tool_name.clone(),
-            since: normalized.since,
-            until: normalized.until,
-            economic_limit: normalized.receipt_limit,
-            ..OperatorReportQuery::default()
-        })?;
-        let underwriting_decisions = self.query_underwriting_decisions(&UnderwritingDecisionQuery {
-            decision_id: None,
-            capability_id: normalized.capability_id.clone(),
-            agent_subject: normalized.agent_subject.clone(),
-            tool_server: normalized.tool_server.clone(),
-            tool_name: normalized.tool_name.clone(),
-            outcome: None,
-            lifecycle_state: None,
-            appeal_status: None,
-            limit: normalized.decision_limit,
-        })?;
+        let economic_receipts =
+            self.query_economic_receipt_projection_report(&OperatorReportQuery {
+                capability_id: normalized.capability_id.clone(),
+                agent_subject: normalized.agent_subject.clone(),
+                tool_server: normalized.tool_server.clone(),
+                tool_name: normalized.tool_name.clone(),
+                since: normalized.since,
+                until: normalized.until,
+                economic_limit: normalized.receipt_limit,
+                ..OperatorReportQuery::default()
+            })?;
+        let underwriting_decisions =
+            self.query_underwriting_decisions(&UnderwritingDecisionQuery {
+                decision_id: None,
+                capability_id: normalized.capability_id.clone(),
+                agent_subject: normalized.agent_subject.clone(),
+                tool_server: normalized.tool_server.clone(),
+                tool_name: normalized.tool_name.clone(),
+                outcome: None,
+                lifecycle_state: None,
+                appeal_status: None,
+                limit: normalized.decision_limit,
+            })?;
         let credit_facilities = self.query_credit_facilities(&CreditFacilityListQuery {
             facility_id: None,
             capability_id: normalized.capability_id.clone(),
@@ -1632,12 +1633,8 @@ impl SqliteReceiptStore {
                 returned_credit_facilities: credit_facilities.summary.returned_facilities,
                 matching_credit_bonds: credit_bonds.summary.matching_bonds,
                 returned_credit_bonds: credit_bonds.summary.returned_bonds,
-                pending_settlement_receipts: economic_receipts
-                    .summary
-                    .pending_settlement_receipts,
-                failed_settlement_receipts: economic_receipts
-                    .summary
-                    .failed_settlement_receipts,
+                pending_settlement_receipts: economic_receipts.summary.pending_settlement_receipts,
+                failed_settlement_receipts: economic_receipts.summary.failed_settlement_receipts,
                 metering_actionable_receipts: economic_receipts
                     .summary
                     .metering_actionable_receipts,
@@ -1649,8 +1646,7 @@ impl SqliteReceiptStore {
                     .map(|row| row.facility.body.facility_id.clone()),
                 latest_credit_facility_disposition: latest_credit_facility
                     .map(|row| row.facility.body.report.disposition),
-                latest_credit_bond_id: latest_credit_bond
-                    .map(|row| row.bond.body.bond_id.clone()),
+                latest_credit_bond_id: latest_credit_bond.map(|row| row.bond.body.bond_id.clone()),
                 latest_credit_bond_disposition: latest_credit_bond
                     .map(|row| row.bond.body.report.disposition),
             },

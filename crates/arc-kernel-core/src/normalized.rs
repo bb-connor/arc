@@ -14,10 +14,10 @@ use arc_core_types::capability::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::Verdict;
 use crate::capability_verify::VerifiedCapability;
 use crate::evaluate::EvaluationVerdict;
 use crate::guard::PortableToolCallRequest;
+use crate::Verdict;
 
 /// Errors raised while projecting runtime objects into the normalized
 /// proof-facing surface.
@@ -190,21 +190,22 @@ impl NormalizedScope {
     /// Mirrors `ArcScope::is_subset_of` over the normalized proof-facing AST.
     #[must_use]
     pub fn is_subset_of(&self, parent: &Self) -> bool {
-        self.grants
-            .iter()
-            .all(|grant| parent.grants.iter().any(|candidate| grant.is_subset_of(candidate)))
-            && self.resource_grants.iter().all(|grant| {
-                parent
-                    .resource_grants
-                    .iter()
-                    .any(|candidate| grant.is_subset_of(candidate))
-            })
-            && self.prompt_grants.iter().all(|grant| {
-                parent
-                    .prompt_grants
-                    .iter()
-                    .any(|candidate| grant.is_subset_of(candidate))
-            })
+        self.grants.iter().all(|grant| {
+            parent
+                .grants
+                .iter()
+                .any(|candidate| grant.is_subset_of(candidate))
+        }) && self.resource_grants.iter().all(|grant| {
+            parent
+                .resource_grants
+                .iter()
+                .any(|candidate| grant.is_subset_of(candidate))
+        }) && self.prompt_grants.iter().all(|grant| {
+            parent
+                .prompt_grants
+                .iter()
+                .any(|candidate| grant.is_subset_of(candidate))
+        })
     }
 }
 
@@ -458,9 +459,11 @@ impl TryFrom<&Constraint> for NormalizedConstraint {
             Constraint::MaxLength(value) => Ok(Self::MaxLength(*value)),
             Constraint::MaxArgsSize(value) => Ok(Self::MaxArgsSize(*value)),
             Constraint::GovernedIntentRequired => Ok(Self::GovernedIntentRequired),
-            Constraint::RequireApprovalAbove { threshold_units } => Ok(Self::RequireApprovalAbove {
-                threshold_units: *threshold_units,
-            }),
+            Constraint::RequireApprovalAbove { threshold_units } => {
+                Ok(Self::RequireApprovalAbove {
+                    threshold_units: *threshold_units,
+                })
+            }
             Constraint::SellerExact(value) => Ok(Self::SellerExact(value.clone())),
             Constraint::MinimumRuntimeAssurance(tier) => {
                 Ok(Self::MinimumRuntimeAssurance((*tier).into()))

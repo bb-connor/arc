@@ -20,8 +20,7 @@ use crate::crypto::sha256_hex;
 use crate::receipt::SignedExportEnvelope;
 
 pub const UNDERWRITING_POLICY_INPUT_SCHEMA: &str = "arc.underwriting.policy-input.v1";
-pub const UNDERWRITING_COMPLIANCE_EVIDENCE_SCHEMA: &str =
-    "arc.underwriting.compliance-evidence.v1";
+pub const UNDERWRITING_COMPLIANCE_EVIDENCE_SCHEMA: &str = "arc.underwriting.compliance-evidence.v1";
 pub const UNDERWRITING_RISK_TAXONOMY_VERSION: &str = "arc.underwriting.taxonomy.v1";
 pub const UNDERWRITING_DECISION_POLICY_SCHEMA: &str = "arc.underwriting.decision-policy.v1";
 pub const UNDERWRITING_DECISION_POLICY_VERSION: &str =

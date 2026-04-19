@@ -242,11 +242,7 @@ impl<'a> PostInvocationHook for QueryResultHook<'a> {
         "query-result"
     }
 
-    fn inspect(
-        &self,
-        ctx: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict {
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
         let scope = ctx.scope.unwrap_or(&self.scope);
         let redacted =
             self.guard
@@ -271,11 +267,7 @@ impl PostInvocationHook for OwnedQueryResultHook {
         "query-result"
     }
 
-    fn inspect(
-        &self,
-        ctx: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict {
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
         let scope = ctx.scope.unwrap_or(&self.scope);
         let redacted =
             self.guard

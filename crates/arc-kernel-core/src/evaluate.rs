@@ -38,12 +38,12 @@ use alloc::vec::Vec;
 use arc_core_types::capability::CapabilityToken;
 use arc_core_types::crypto::PublicKey;
 
-use crate::Verdict;
-use crate::capability_verify::{CapabilityError, VerifiedCapability, verify_capability};
+use crate::capability_verify::{verify_capability, CapabilityError, VerifiedCapability};
 use crate::clock::Clock;
 use crate::guard::{Guard, GuardContext, PortableToolCallRequest};
 use crate::normalized::{NormalizationError, NormalizedEvaluationVerdict};
-use crate::scope::{MatchedGrant, resolve_matching_grants};
+use crate::scope::{resolve_matching_grants, MatchedGrant};
+use crate::Verdict;
 
 /// Inputs to [`evaluate`]. Grouped into a struct so the call site stays
 /// tidy and future fields (e.g. a policy-digest override) can be added

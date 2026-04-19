@@ -2259,12 +2259,6 @@ async fn forward_authority_post_to_leader<B: Serialize>(
                 if next_leader == self_url {
                     return Ok(None);
                 }
-                if next_leader == leader_url {
-                    return Err(plain_http_error(
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        &format!("failed to forward authority write to leader: {error}"),
-                    ));
-                }
                 let Some(next_authority_lease) = cluster_authority_lease_view(state) else {
                     return Err(plain_http_error(
                         StatusCode::SERVICE_UNAVAILABLE,
@@ -2275,6 +2269,12 @@ async fn forward_authority_post_to_leader<B: Serialize>(
                     return Err(plain_http_error(
                         StatusCode::SERVICE_UNAVAILABLE,
                         "cluster authority lease expired before authority write forwarding",
+                    ));
+                }
+                if next_leader == leader_url && next_authority_lease.term == authority_term {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &format!("failed to forward authority write to leader: {error}"),
                     ));
                 }
                 leader_url = next_leader;

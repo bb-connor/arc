@@ -31,9 +31,7 @@ pub(crate) fn sqlite_bool(value: bool) -> i64 {
     }
 }
 
-pub(crate) fn ensure_arc_receipt_verified(
-    receipt: &ArcReceipt,
-) -> Result<(), ReceiptStoreError> {
+pub(crate) fn ensure_arc_receipt_verified(receipt: &ArcReceipt) -> Result<(), ReceiptStoreError> {
     ensure_arc_receipt_verified_with_context(receipt, "tool receipt", None)
 }
 
@@ -64,19 +62,18 @@ pub(crate) fn ensure_arc_receipt_verified_with_context(
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
-    let signature_valid = receipt
-        .verify_signature()
-        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    let signature_valid = receipt.verify_signature().map_err(|error| {
+        ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
+    })?;
     if !signature_valid {
         return Err(ReceiptStoreError::Conflict(format!(
             "{context} has invalid signature",
         )));
     }
 
-    let parameter_hash_valid = receipt
-        .action
-        .verify_hash()
-        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    let parameter_hash_valid = receipt.action.verify_hash().map_err(|error| {
+        ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
+    })?;
     if !parameter_hash_valid {
         return Err(ReceiptStoreError::Conflict(format!(
             "{context} has mismatched action parameter hash",
@@ -92,9 +89,9 @@ pub(crate) fn ensure_child_receipt_verified_with_context(
     seq: Option<u64>,
 ) -> Result<(), ReceiptStoreError> {
     let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
-    let signature_valid = receipt
-        .verify_signature()
-        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    let signature_valid = receipt.verify_signature().map_err(|error| {
+        ReceiptStoreError::Conflict(format!("{context} verification failed: {error}"))
+    })?;
     if !signature_valid {
         return Err(ReceiptStoreError::Conflict(format!(
             "{context} has invalid signature",
@@ -3990,11 +3987,8 @@ fn ensure_receipt_lineage_statement_for_receipt_id_tx(
     let Some((seq, raw_json)) = row else {
         return Ok(());
     };
-    let receipt = decode_verified_arc_receipt(
-        &raw_json,
-        "persisted tool receipt",
-        Some(seq.max(0) as u64),
-    )?;
+    let receipt =
+        decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq.max(0) as u64))?;
     let Some(governed) = extract_governed_transaction_metadata(&receipt) else {
         refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
         return Ok(());
@@ -4103,7 +4097,9 @@ pub(crate) fn backfill_provenance_lineage_tables(
             "SELECT seq, raw_json FROM arc_child_receipts ORDER BY timestamp ASC, seq ASC",
         )?;
         let rows = statement
-            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?
+            .query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
             .collect::<Result<Vec<_>, _>>()?;
         rows
     };

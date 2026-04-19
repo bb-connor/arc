@@ -67,10 +67,9 @@ pub use clock::{Clock, FixedClock};
 pub use evaluate::{evaluate, EvaluateInput, EvaluationVerdict, KernelCoreError};
 pub use guard::{Guard, GuardContext, PortableToolCallRequest};
 pub use normalized::{
-    NormalizationError, NormalizedCapability, NormalizedConstraint,
-    NormalizedEvaluationVerdict, NormalizedMonetaryAmount, NormalizedOperation,
-    NormalizedPromptGrant, NormalizedRequest, NormalizedResourceGrant,
-    NormalizedRuntimeAssuranceTier, NormalizedScope, NormalizedToolGrant,
+    NormalizationError, NormalizedCapability, NormalizedConstraint, NormalizedEvaluationVerdict,
+    NormalizedMonetaryAmount, NormalizedOperation, NormalizedPromptGrant, NormalizedRequest,
+    NormalizedResourceGrant, NormalizedRuntimeAssuranceTier, NormalizedScope, NormalizedToolGrant,
     NormalizedVerdict, NormalizedVerifiedCapability,
 };
 pub use passport_verify::{

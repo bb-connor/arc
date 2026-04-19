@@ -34,13 +34,12 @@ use arc_kernel::operator_report::{
     GovernedAuthorizationDetail, GovernedAuthorizationMeteredBillingDetail,
     GovernedAuthorizationTransactionContext, MeteredBillingEvidenceRecord,
     MeteredBillingReconciliationReport, MeteredBillingReconciliationRow,
-    MeteredBillingReconciliationState, MeteredBillingReconciliationSummary,
-    OperatorReportQuery, SettlementReconciliationReport, SettlementReconciliationRow,
-    SettlementReconciliationState, SettlementReconciliationSummary, SharedEvidenceQuery,
-    SharedEvidenceReferenceReport, SharedEvidenceReferenceRow, SharedEvidenceReferenceSummary,
-    ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
-    ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA, ARC_OAUTH_AUTHORIZATION_METADATA_SCHEMA,
-    ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE,
+    MeteredBillingReconciliationState, MeteredBillingReconciliationSummary, OperatorReportQuery,
+    SettlementReconciliationReport, SettlementReconciliationRow, SettlementReconciliationState,
+    SettlementReconciliationSummary, SharedEvidenceQuery, SharedEvidenceReferenceReport,
+    SharedEvidenceReferenceRow, SharedEvidenceReferenceSummary,
+    ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE, ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA,
+    ARC_OAUTH_AUTHORIZATION_METADATA_SCHEMA, ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE,
     ARC_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA, ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
     ARC_OAUTH_SENDER_PROOF_ARC_DPOP, ECONOMIC_COMPLETION_FLOW_SCHEMA,
 };
@@ -56,8 +55,7 @@ use arc_kernel::{
     CreditFacilityLifecycleState, CreditFacilityListQuery, CreditFacilityListReport,
     CreditFacilityListSummary, CreditFacilityRow, CreditLossLifecycleEventKind,
     CreditLossLifecycleListQuery, CreditLossLifecycleListReport, CreditLossLifecycleListSummary,
-    CreditLossLifecycleRow, EvidenceChildReceiptScope, EvidenceExportQuery,
-    ExposureLedgerQuery,
+    CreditLossLifecycleRow, EvidenceChildReceiptScope, EvidenceExportQuery, ExposureLedgerQuery,
     FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityAutoBindDisposition,
     LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
     LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
@@ -122,8 +120,8 @@ mod tests;
 #[path = "receipt_store/underwriting_credit.rs"]
 mod underwriting_credit;
 
-pub(crate) use support::{decode_verified_arc_receipt, decode_verified_child_receipt};
 use support::*;
+pub(crate) use support::{decode_verified_arc_receipt, decode_verified_child_receipt};
 
 impl SqliteReceiptStore {
     pub(crate) fn connection(&self) -> Result<SqliteStoreConnection, ReceiptStoreError> {

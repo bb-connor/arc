@@ -621,10 +621,7 @@ impl SqliteReceiptStore {
             let seq = seq.max(0) as u64;
             let receipt =
                 decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
-            receipts.push(StoredToolReceipt {
-                seq,
-                receipt,
-            });
+            receipts.push(StoredToolReceipt { seq, receipt });
         }
 
         // Execute count query (same filters, no cursor, no limit).

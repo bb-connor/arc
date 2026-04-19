@@ -1,7 +1,7 @@
 //! Post-invocation hook pipeline executed after a tool returns output.
 
-use arc_core::{AgentId, ArcScope, ServerId};
 use arc_core::receipt::GuardEvidence;
+use arc_core::{AgentId, ArcScope, ServerId};
 use serde_json::Value;
 
 use crate::runtime::ToolCallRequest;
@@ -56,11 +56,7 @@ impl<'a> PostInvocationContext<'a> {
 pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
 
-    fn inspect(
-        &self,
-        ctx: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict;
+    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
 
     fn take_evidence(&self) -> Option<GuardEvidence> {
         None

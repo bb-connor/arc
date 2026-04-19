@@ -1686,7 +1686,10 @@ fn trust_control_cluster_internal_status_requires_signed_node_identity() {
 
     let status = try_internal_cluster_status(&client, &url_a, service_token)
         .expect("allowlisted signed peer request should succeed");
-    assert_eq!(status["leaderUrl"].as_str(), Some(expected_leader_url.as_str()));
+    assert_eq!(
+        status["leaderUrl"].as_str(),
+        Some(expected_leader_url.as_str())
+    );
 }
 
 #[test]
@@ -2310,8 +2313,7 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
             let Ok(store) = SqliteBudgetStore::open(&follower_budget_db) else {
                 return false;
             };
-            let Ok(events) = store
-                .list_mutation_events(10, Some("cap-denied-cluster"), Some(0))
+            let Ok(events) = store.list_mutation_events(10, Some("cap-denied-cluster"), Some(0))
             else {
                 return false;
             };
@@ -2343,12 +2345,10 @@ fn trust_control_cluster_replicates_denied_budget_events_without_usage_rows() {
         assert_eq!(events[0].allowed, Some(false));
         assert_eq!(events[0].usage_seq, None);
         assert!(events[0].event_seq >= 1);
-        assert!(
-            store
-                .list_usages_after(10, Some(0))
-                .expect("list denied budget usages")
-                .is_empty()
-        );
+        assert!(store
+            .list_usages_after(10, Some(0))
+            .expect("list denied budget usages")
+            .is_empty());
     }
 }
 

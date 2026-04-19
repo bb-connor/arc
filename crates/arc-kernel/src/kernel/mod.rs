@@ -1465,7 +1465,11 @@ impl ArcKernel {
     ) -> Option<arc_federation::FederationPeer> {
         let map = self.federation_peers.read().ok()?;
         let peer = map.get(remote_kernel_id)?.clone();
-        if peer.is_fresh(now) { Some(peer) } else { None }
+        if peer.is_fresh(now) {
+            Some(peer)
+        } else {
+            None
+        }
     }
 
     /// Phase 20.3: snapshot the currently-pinned federation peer set.
@@ -1627,7 +1631,11 @@ impl ArcKernel {
             return None;
         }
         let since = self.emergency_stopped_since.load(Ordering::SeqCst);
-        if since == 0 { None } else { Some(since) }
+        if since == 0 {
+            None
+        } else {
+            Some(since)
+        }
     }
 
     /// Return the operator-supplied reason for the current emergency stop,

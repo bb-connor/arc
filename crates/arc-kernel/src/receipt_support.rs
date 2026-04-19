@@ -290,13 +290,19 @@ fn governed_economic_authorization_metadata(
         return Ok(None);
     };
 
-    let approved_max = intent.max_amount.clone().unwrap_or(arc_core::capability::MonetaryAmount {
-        units: financial.budget_total,
-        currency: financial.currency.clone(),
+    let approved_max = intent
+        .max_amount
+        .clone()
+        .unwrap_or(arc_core::capability::MonetaryAmount {
+            units: financial.budget_total,
+            currency: financial.currency.clone(),
+        });
+    let hold_amount_units = financial.attempted_cost.or_else(|| {
+        financial
+            .payment_reference
+            .as_ref()
+            .map(|_| financial.cost_charged)
     });
-    let hold_amount_units = financial
-        .attempted_cost
-        .or_else(|| financial.payment_reference.as_ref().map(|_| financial.cost_charged));
     let settlement_cap_units = financial.attempted_cost.unwrap_or(financial.cost_charged);
     let commerce = intent.commerce.as_ref();
     let metered = intent.metered_billing.as_ref();
@@ -305,11 +311,13 @@ fn governed_economic_authorization_metadata(
         .map(|metered| {
             canonical_json_bytes(&metered.quote)
                 .map(|quote_bytes| arc_core::sha256_hex(&quote_bytes))
-                .map(|quote_hash| arc_core::receipt::EconomicPricingBasisReceiptMetadata {
-                    quote_hash: Some(quote_hash),
-                    tariff_hash: None,
-                    quote_expiry: metered.quote.expires_at,
-                })
+                .map(
+                    |quote_hash| arc_core::receipt::EconomicPricingBasisReceiptMetadata {
+                        quote_hash: Some(quote_hash),
+                        tariff_hash: None,
+                        quote_expiry: metered.quote.expires_at,
+                    },
+                )
                 .map_err(|error| {
                     KernelError::ReceiptSigningFailed(format!(
                         "failed to canonicalize metered billing quote for receipt metadata: {error}"
@@ -328,12 +336,14 @@ fn governed_economic_authorization_metadata(
                 "max_billed_units": metered.max_billed_units,
             }))
             .map(|profile_bytes| arc_core::sha256_hex(&profile_bytes))
-            .map(|meter_profile_hash| arc_core::receipt::EconomicMeteringReceiptMetadata {
-                provider: metered.quote.provider.clone(),
-                meter_profile_hash,
-                max_billable_units: metered.max_billed_units,
-                billing_unit: Some(metered.quote.billing_unit.clone()),
-            })
+            .map(
+                |meter_profile_hash| arc_core::receipt::EconomicMeteringReceiptMetadata {
+                    provider: metered.quote.provider.clone(),
+                    meter_profile_hash,
+                    max_billable_units: metered.max_billed_units,
+                    billing_unit: Some(metered.quote.billing_unit.clone()),
+                },
+            )
             .map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!(
                     "failed to canonicalize metering profile for receipt metadata: {error}"
@@ -360,79 +370,81 @@ fn governed_economic_authorization_metadata(
         arc_core::receipt::EconomicAuthorizationMode::BudgetOnly
     };
 
-    Ok(Some(arc_core::receipt::EconomicAuthorizationReceiptMetadata {
-        version: arc_core::receipt::EconomicAuthorizationReceiptMetadataVersion::V1,
-        economic_mode,
-        payer: arc_core::receipt::EconomicPayerReceiptMetadata {
-            party_id: request.agent_id.clone(),
-            funding_source_ref: commerce
-                .map(|commerce| commerce.shared_payment_token_id.clone())
-                .or_else(|| financial.payment_reference.clone())
-                .unwrap_or_else(|| request.capability.id.clone()),
-            custody_provider: None,
-            obligor_ref: None,
-        },
-        merchant: arc_core::receipt::EconomicMerchantReceiptMetadata {
-            merchant_id: commerce
-                .map(|commerce| commerce.seller.clone())
-                .unwrap_or_else(|| request.server_id.clone()),
-            merchant_of_record: None,
-            order_ref: Some(request.request_id.clone()),
-        },
-        payee: arc_core::receipt::EconomicPayeeReceiptMetadata {
-            beneficiary_id: request.server_id.clone(),
-            settlement_destination_ref: financial
-                .payment_reference
-                .clone()
-                .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone()))
-                .unwrap_or_else(|| request.server_id.clone()),
-        },
-        rail: arc_core::receipt::EconomicRailReceiptMetadata {
-            kind: if commerce.is_some() {
-                "shared_payment_token".to_string()
-            } else if metered.is_some() {
-                "metered_billing".to_string()
-            } else if financial.payment_reference.is_some() {
-                "payment_adapter".to_string()
-            } else {
-                "kernel_budget".to_string()
+    Ok(Some(
+        arc_core::receipt::EconomicAuthorizationReceiptMetadata {
+            version: arc_core::receipt::EconomicAuthorizationReceiptMetadataVersion::V1,
+            economic_mode,
+            payer: arc_core::receipt::EconomicPayerReceiptMetadata {
+                party_id: request.agent_id.clone(),
+                funding_source_ref: commerce
+                    .map(|commerce| commerce.shared_payment_token_id.clone())
+                    .or_else(|| financial.payment_reference.clone())
+                    .unwrap_or_else(|| request.capability.id.clone()),
+                custody_provider: None,
+                obligor_ref: None,
             },
-            asset: financial.currency.clone(),
-            network: None,
-            facilitator: metered.map(|metered| metered.quote.provider.clone()),
-            contract_or_account_ref: financial
-                .payment_reference
-                .clone()
-                .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone())),
-        },
-        amount_bounds: arc_core::receipt::EconomicAmountBoundsReceiptMetadata {
-            approved_max,
-            hold_amount: hold_amount_units.map(|units| arc_core::capability::MonetaryAmount {
-                units,
+            merchant: arc_core::receipt::EconomicMerchantReceiptMetadata {
+                merchant_id: commerce
+                    .map(|commerce| commerce.seller.clone())
+                    .unwrap_or_else(|| request.server_id.clone()),
+                merchant_of_record: None,
+                order_ref: Some(request.request_id.clone()),
+            },
+            payee: arc_core::receipt::EconomicPayeeReceiptMetadata {
+                beneficiary_id: request.server_id.clone(),
+                settlement_destination_ref: financial
+                    .payment_reference
+                    .clone()
+                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone()))
+                    .unwrap_or_else(|| request.server_id.clone()),
+            },
+            rail: arc_core::receipt::EconomicRailReceiptMetadata {
+                kind: if commerce.is_some() {
+                    "shared_payment_token".to_string()
+                } else if metered.is_some() {
+                    "metered_billing".to_string()
+                } else if financial.payment_reference.is_some() {
+                    "payment_adapter".to_string()
+                } else {
+                    "kernel_budget".to_string()
+                },
+                asset: financial.currency.clone(),
+                network: None,
+                facilitator: metered.map(|metered| metered.quote.provider.clone()),
+                contract_or_account_ref: financial
+                    .payment_reference
+                    .clone()
+                    .or_else(|| commerce.map(|commerce| commerce.shared_payment_token_id.clone())),
+            },
+            amount_bounds: arc_core::receipt::EconomicAmountBoundsReceiptMetadata {
+                approved_max,
+                hold_amount: hold_amount_units.map(|units| arc_core::capability::MonetaryAmount {
+                    units,
+                    currency: financial.currency.clone(),
+                }),
+                settlement_cap: arc_core::capability::MonetaryAmount {
+                    units: settlement_cap_units,
+                    currency: financial.currency.clone(),
+                },
+            },
+            pricing_basis,
+            metering,
+            liability_refs: None,
+            budget: arc_core::receipt::EconomicBudgetReceiptMetadata {
+                grant_index: financial.grant_index,
+                cost_charged: financial.cost_charged,
                 currency: financial.currency.clone(),
-            }),
-            settlement_cap: arc_core::capability::MonetaryAmount {
-                units: settlement_cap_units,
-                currency: financial.currency.clone(),
+                budget_remaining: financial.budget_remaining,
+                budget_total: financial.budget_total,
+                delegation_depth: financial.delegation_depth,
+                root_budget_holder: financial.root_budget_holder.clone(),
+                attempted_cost: financial.attempted_cost,
+            },
+            settlement: arc_core::receipt::EconomicSettlementReceiptMetadata {
+                settlement_status: financial.settlement_status.clone(),
             },
         },
-        pricing_basis,
-        metering,
-        liability_refs: None,
-        budget: arc_core::receipt::EconomicBudgetReceiptMetadata {
-            grant_index: financial.grant_index,
-            cost_charged: financial.cost_charged,
-            currency: financial.currency.clone(),
-            budget_remaining: financial.budget_remaining,
-            budget_total: financial.budget_total,
-            delegation_depth: financial.delegation_depth,
-            root_budget_holder: financial.root_budget_holder.clone(),
-            attempted_cost: financial.attempted_cost,
-        },
-        settlement: arc_core::receipt::EconomicSettlementReceiptMetadata {
-            settlement_status: financial.settlement_status.clone(),
-        },
-    }))
+    ))
 }
 
 fn inject_governed_economic_authorization_metadata(
@@ -1426,8 +1438,14 @@ mod tests {
         assert_eq!(economic.budget.currency, "USD");
         assert_eq!(economic.budget.cost_charged, 230);
         assert_eq!(economic.rail.kind, "shared_payment_token");
-        assert_eq!(economic.rail.contract_or_account_ref.as_deref(), Some("payref-1"));
-        assert_eq!(economic.settlement.settlement_status, SettlementStatus::Pending);
+        assert_eq!(
+            economic.rail.contract_or_account_ref.as_deref(),
+            Some("payref-1")
+        );
+        assert_eq!(
+            economic.settlement.settlement_status,
+            SettlementStatus::Pending
+        );
         assert_eq!(
             economic
                 .metering

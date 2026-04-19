@@ -16,13 +16,13 @@ use serde::{Deserialize, Serialize};
 use crate::canonical::canonical_json_bytes;
 use crate::capability::MonetaryAmount;
 use crate::credit::{
-    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CapitalExecutionInstructionAction,
-    CapitalExecutionRailKind, CapitalExecutionReconciledState, CreditBondLifecycleState,
-    SignedCapitalExecutionInstruction, SignedCreditBond,
+    CapitalExecutionInstructionAction, CapitalExecutionRailKind, CapitalExecutionReconciledState,
+    CreditBondLifecycleState, SignedCapitalExecutionInstruction, SignedCreditBond,
+    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
 };
 use crate::crypto::{PublicKey, Signature};
 use crate::hashing::Hash;
-use crate::merkle::{MerkleProof, leaf_hash};
+use crate::merkle::{leaf_hash, MerkleProof};
 use crate::receipt::{ArcReceipt, SignedExportEnvelope};
 
 pub const ARC_KEY_BINDING_CERTIFICATE_SCHEMA: &str = "arc.key-binding-certificate.v1";
@@ -1492,14 +1492,14 @@ mod tests {
     use super::*;
     use crate::capability::MonetaryAmount;
     use crate::credit::{
-        CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CapitalBookEvidenceKind,
-        CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookSourceKind,
-        CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
+        CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
+        CapitalBookSourceKind, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
         CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
         CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionRole,
         CapitalExecutionWindow, SignedCapitalExecutionInstruction,
+        CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
     };
-    use crate::crypto::{Keypair, sha256_hex};
+    use crate::crypto::{sha256_hex, Keypair};
     use crate::merkle::MerkleTree;
     use crate::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
 

@@ -2483,6 +2483,7 @@ impl RemoteSessionFactory {
         let loaded_policy = load_policy(&self.config.policy_path)?;
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
+        let default_capabilities = loaded_policy.default_capabilities.clone();
         match record.auth_mode_fingerprint.as_deref() {
             Some(stored) if stored == auth_mode_fingerprint => {}
             Some(_) => {
@@ -2494,21 +2495,6 @@ impl RemoteSessionFactory {
             None => {
                 return Err(CliError::Other(format!(
                     "stored MCP session {} predates auth contract fingerprinting and must be re-initialized",
-                    record.session_id
-                )));
-            }
-        }
-        match record.policy_fingerprint.as_deref() {
-            Some(stored) if stored == policy_fingerprint => {}
-            Some(_) => {
-                return Err(CliError::Other(format!(
-                    "stored MCP session {} was created under different capability policy settings",
-                    record.session_id
-                )));
-            }
-            None => {
-                return Err(CliError::Other(format!(
-                    "stored MCP session {} predates policy fingerprinting and must be re-initialized",
                     record.session_id
                 )));
             }
@@ -2568,8 +2554,11 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let _agent_public_key = PublicKey::from_hex(&record.agent_id)?;
-        let issued_capabilities = record.issued_capabilities.clone();
+        let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
+        let issued_capabilities = match record.policy_fingerprint.as_deref() {
+            Some(stored) if stored == policy_fingerprint => record.issued_capabilities.clone(),
+            _ => issue_default_capabilities(&kernel, &agent_public_key, &default_capabilities)?,
+        };
         let session_capabilities = issued_capabilities
             .iter()
             .map(|capability| RemoteSessionCapability {

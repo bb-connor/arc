@@ -336,8 +336,7 @@ fn validate_detection(
                 }
                 None if threat_intel.enabled.unwrap_or(true) => {
                     errors.push(ValidationError::Custom(
-                        "detection.threat_intel.pattern_db is required when enabled"
-                            .to_string(),
+                        "detection.threat_intel.pattern_db is required when enabled".to_string(),
                     ));
                 }
                 _ => {}

@@ -401,7 +401,9 @@ fn threat_intel_guard_from(
     }
 
     SpiderSenseGuard::new(pattern_db, config).map_err(|error| {
-        CompileError::Invalid(format!("invalid detection.threat_intel configuration: {error}"))
+        CompileError::Invalid(format!(
+            "invalid detection.threat_intel configuration: {error}"
+        ))
     })
 }
 

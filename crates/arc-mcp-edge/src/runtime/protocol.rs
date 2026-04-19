@@ -695,18 +695,17 @@ pub(super) fn parse_request_model_metadata(
         return Ok(None);
     };
 
-    let metadata: ModelMetadata =
-        serde_json::from_value(model_metadata.clone()).map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "modelMetadata must be an object with model_id and optional safety_tier/provider",
-            )
-        })?;
+    let metadata: ModelMetadata = serde_json::from_value(model_metadata.clone()).map_err(|_| {
+        jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "modelMetadata must be an object with model_id and optional safety_tier/provider",
+        )
+    })?;
 
-    Ok(Some(
-        metadata.with_provenance_class(arc_core::capability::ProvenanceEvidenceClass::Asserted),
-    ))
+    Ok(Some(metadata.with_provenance_class(
+        arc_core::capability::ProvenanceEvidenceClass::Asserted,
+    )))
 }
 
 pub(super) fn parse_progress_token(

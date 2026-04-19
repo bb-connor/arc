@@ -1,22 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-use arc_credit::{
-    CreditBondDisposition, CreditBondListReport, CreditFacilityDisposition,
-    CreditFacilityListReport, ExposureLedgerQuery,
-};
 use arc_core::appraisal::AttestationVerifierFamily;
 use arc_core::capability::{
     GovernedCallChainProvenance, MeteredSettlementMode, MonetaryAmount, RuntimeAssuranceTier,
 };
 use arc_core::receipt::{
     ArcReceipt, Decision, EconomicAuthorizationReceiptMetadata,
-    FinancialBudgetAuthorityReceiptMetadata,
-    GovernedTransactionReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, SettlementStatus,
-    SignedExportEnvelope,
+    FinancialBudgetAuthorityReceiptMetadata, GovernedTransactionReceiptMetadata,
+    MeteredUsageEvidenceReceiptMetadata, SettlementStatus, SignedExportEnvelope,
 };
 use arc_core::session::ArcIdentityAssertion;
 use arc_core::{
     ArcGovernedAuthorizationBinding, ArcPortableClaimCatalog, ArcPortableIdentityBinding,
+};
+use arc_credit::{
+    CreditBondDisposition, CreditBondListReport, CreditFacilityDisposition,
+    CreditFacilityListReport, ExposureLedgerQuery,
 };
 use arc_underwriting::{UnderwritingDecisionListReport, UnderwritingDecisionOutcome};
 
@@ -1557,7 +1556,10 @@ mod tests {
             ..OperatorReportQuery::default()
         };
 
-        assert_eq!(query.economic_limit_or_default(), MAX_ECONOMIC_RECEIPT_LIMIT);
+        assert_eq!(
+            query.economic_limit_or_default(),
+            MAX_ECONOMIC_RECEIPT_LIMIT
+        );
     }
 
     #[test]

@@ -107,11 +107,7 @@ impl PostInvocationHook for SanitizerHook {
         &self.hook_name
     }
 
-    fn inspect(
-        &self,
-        _ctx: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict {
+    fn inspect(&self, _ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
         let sanitized = self.sanitizer.sanitize_value(response);
         if !sanitized.was_redacted {
             // Clear any stale evidence from a previous run.

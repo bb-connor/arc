@@ -9,8 +9,8 @@ use crate::capability::{GovernedAutonomyTier, MonetaryAmount, RuntimeAssuranceTi
 use crate::receipt::{Decision, SettlementStatus, SignedExportEnvelope};
 use crate::underwriting::{
     UnderwritingCertificationState, UnderwritingComplianceEvidence,
-    UnderwritingDecisionLifecycleState, UnderwritingDecisionOutcome,
-    UnderwritingReviewState, UnderwritingRiskClass,
+    UnderwritingDecisionLifecycleState, UnderwritingDecisionOutcome, UnderwritingReviewState,
+    UnderwritingRiskClass,
 };
 
 pub const EXPOSURE_LEDGER_SCHEMA: &str = "arc.credit.exposure-ledger.v1";

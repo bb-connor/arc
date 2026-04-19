@@ -64,12 +64,12 @@ impl<E: ExternalGuard> ScopedAsyncGuard<E> {
                 tokio::runtime::RuntimeFlavor::MultiThread => {
                     Ok(tokio::task::block_in_place(|| handle.block_on(future)))
                 }
-                tokio::runtime::RuntimeFlavor::CurrentThread => Err(KernelError::GuardDenied(
-                    format!(
+                tokio::runtime::RuntimeFlavor::CurrentThread => {
+                    Err(KernelError::GuardDenied(format!(
                         "external guard {} requires a multithreaded Tokio runtime",
                         self.name()
-                    ),
-                )),
+                    )))
+                }
                 flavor => Err(KernelError::GuardDenied(format!(
                     "external guard {} cannot run on Tokio runtime flavor {flavor:?}",
                     self.name()

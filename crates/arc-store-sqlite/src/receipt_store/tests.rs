@@ -28,10 +28,10 @@ use arc_core::session::{
 };
 use arc_kernel::checkpoint::build_checkpoint_publication;
 use arc_kernel::{
-    AnalyticsTimeBucket, BehavioralFeedQuery, EvidenceExportQuery, MeteredBillingEvidenceRecord,
+    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof, AnalyticsTimeBucket,
+    BehavioralFeedQuery, EvidenceExportQuery, MeteredBillingEvidenceRecord,
     MeteredBillingReconciliationState, OperatorReportQuery, ReceiptAnalyticsQuery,
-    SettlementReconciliationState, build_checkpoint, build_checkpoint_with_previous,
-    build_inclusion_proof,
+    SettlementReconciliationState,
 };
 
 use super::*;
@@ -1203,11 +1203,9 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
     second.body.previous_checkpoint_sha256 = Some("not-the-real-digest".to_string());
     second.signature = kp.sign(&arc_core::canonical_json_bytes(&second.body).unwrap());
     let error = ReceiptStore::store_checkpoint(&mut store, &second).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("does not match predecessor digest")
-    );
+    assert!(error
+        .to_string()
+        .contains("does not match predecessor digest"));
 
     let _ = fs::remove_file(path);
 }
@@ -1224,11 +1222,9 @@ fn store_checkpoint_rejects_conflicting_rewrite() {
     let conflicting =
         build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"changed".to_vec()], &kp).unwrap();
     let error = ReceiptStore::store_checkpoint(&mut store, &conflicting).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("already exists with different content")
-    );
+    assert!(error
+        .to_string()
+        .contains("already exists with different content"));
 
     let _ = fs::remove_file(path);
 }
@@ -2313,26 +2309,22 @@ fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_
             .map(|evidence| evidence.usage_evidence.observed_units),
         Some(120)
     );
-    assert!(
-        row.metering
-            .as_ref()
-            .is_some_and(|metering| metering.exceeds_quoted_units)
-    );
-    assert!(
-        row.metering
-            .as_ref()
-            .is_some_and(|metering| metering.exceeds_max_billed_units)
-    );
-    assert!(
-        row.metering
-            .as_ref()
-            .is_some_and(|metering| metering.exceeds_quoted_cost)
-    );
-    assert!(
-        row.metering
-            .as_ref()
-            .is_some_and(|metering| metering.financial_mismatch)
-    );
+    assert!(row
+        .metering
+        .as_ref()
+        .is_some_and(|metering| metering.exceeds_quoted_units));
+    assert!(row
+        .metering
+        .as_ref()
+        .is_some_and(|metering| metering.exceeds_max_billed_units));
+    assert!(row
+        .metering
+        .as_ref()
+        .is_some_and(|metering| metering.exceeds_quoted_cost));
+    assert!(row
+        .metering
+        .as_ref()
+        .is_some_and(|metering| metering.financial_mismatch));
     assert_eq!(
         row.metering
             .as_ref()
@@ -2738,12 +2730,10 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
         report.child_receipt_scope,
         crate::EvidenceChildReceiptScope::OmittedNoJoinPath
     );
-    assert!(
-        report
-            .export_scope_note
-            .as_deref()
-            .is_some_and(|note| note.contains("tool filters narrow the operator report only"))
-    );
+    assert!(report
+        .export_scope_note
+        .as_deref()
+        .is_some_and(|note| note.contains("tool filters narrow the operator report only")));
 
     let _ = fs::remove_file(path);
 }

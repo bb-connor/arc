@@ -601,7 +601,11 @@ pub fn spec_grant_to_normalized(g: &SpecToolGrant) -> NormalizedToolGrant {
         server_id: g.server_id.clone(),
         tool_name: g.tool_name.clone(),
         operations: g.operations.iter().map(spec_op_to_normalized).collect(),
-        constraints: g.constraints.iter().map(spec_constraint_to_normalized).collect(),
+        constraints: g
+            .constraints
+            .iter()
+            .map(spec_constraint_to_normalized)
+            .collect(),
         max_invocations: g.max_invocations,
         max_cost_per_invocation: g.max_cost_per_invocation.as_ref().map(|amount| {
             NormalizedMonetaryAmount {
@@ -609,10 +613,13 @@ pub fn spec_grant_to_normalized(g: &SpecToolGrant) -> NormalizedToolGrant {
                 currency: amount.currency.clone(),
             }
         }),
-        max_total_cost: g.max_total_cost.as_ref().map(|amount| NormalizedMonetaryAmount {
-            units: amount.units,
-            currency: amount.currency.clone(),
-        }),
+        max_total_cost: g
+            .max_total_cost
+            .as_ref()
+            .map(|amount| NormalizedMonetaryAmount {
+                units: amount.units,
+                currency: amount.currency.clone(),
+            }),
         dpop_required: g.dpop_required,
     }
 }

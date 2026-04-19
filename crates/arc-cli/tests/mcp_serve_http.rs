@@ -508,7 +508,7 @@ kernel:
 capabilities:
   default:
     tools:
-        "#
+"#
     .to_string();
     for tool in tools {
         policy.push_str(&format!(
@@ -2929,7 +2929,19 @@ fn mcp_serve_http_ready_sessions_reissue_capabilities_after_policy_tightening() 
     assert_eq!(denied_response.status(), reqwest::StatusCode::OK);
     let (denied_tool_call, denied_notifications) =
         read_sse_until_response(denied_response, json!(77), |_| {});
-    assert!(denied_notifications.is_empty());
+    assert_eq!(denied_notifications.len(), 1);
+    assert_eq!(
+        denied_notifications[0]["method"].as_str(),
+        Some("notifications/message")
+    );
+    assert_eq!(
+        denied_notifications[0]["params"]["data"]["event"].as_str(),
+        Some("tool_denied")
+    );
+    assert_eq!(
+        denied_notifications[0]["params"]["data"]["tool"].as_str(),
+        Some("echo_json")
+    );
     assert_eq!(denied_tool_call["result"]["isError"], true);
 }
 
