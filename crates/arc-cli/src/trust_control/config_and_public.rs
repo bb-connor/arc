@@ -1715,6 +1715,7 @@ fn build_scim_deprovision_receipt(
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 mod config_and_public_tests {
     use super::*;
+    use arc_credentials::verify_signed_public_issuer_discovery;
     use std::path::PathBuf;
 
     fn base_config() -> TrustServiceConfig {

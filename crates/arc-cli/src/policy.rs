@@ -1083,7 +1083,7 @@ fn build_azure_content_safety_guard(
         "cloud_guardrails.azure_content_safety.api_key",
         &config.api_key,
     )?;
-    validate_http_url(
+    validate_https_url(
         "cloud_guardrails.azure_content_safety.endpoint",
         &config.endpoint,
     )?;
@@ -1139,7 +1139,7 @@ fn build_safe_browsing_guard(
 ) -> Result<ScopedAsyncGuard<SafeBrowsingGuard>, PolicyError> {
     validate_required_secret("threat_intel.safe_browsing.api_key", &config.api_key)?;
     if let Some(base_url) = &config.base_url {
-        validate_http_url("threat_intel.safe_browsing.base_url", base_url)?;
+        validate_https_url("threat_intel.safe_browsing.base_url", base_url)?;
     }
 
     let mut guard_config = SafeBrowsingConfig::new(config.api_key.clone());
@@ -1259,6 +1259,16 @@ fn validate_http_url(field: &str, value: &str) -> Result<(), PolicyError> {
     }
 }
 
+fn validate_https_url(field: &str, value: &str) -> Result<(), PolicyError> {
+    validate_http_url(field, value)?;
+    let parsed = Url::parse(value)
+        .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
+    if parsed.scheme() != "https" {
+        return Err(PolicyError::Invalid(format!("{field} must use https")));
+    }
+    Ok(())
+}
+
 fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
     match category.trim().to_ascii_lowercase().as_str() {
         "hate" => Ok(AzureCategory::Hate),
@@ -1303,7 +1313,7 @@ pub fn build_runtime_default_capabilities(
         .as_ref()
         .is_some_and(|default| !default.tools.is_empty());
     if !has_explicit_tool_caps {
-        if let Some(scope) = synthesize_tool_access_scope(&policy.guards) {
+        if let Some(scope) = synthesize_tool_access_scope(&policy.guards)? {
             grants_by_ttl
                 .entry(policy.kernel.max_capability_ttl)
                 .or_default()
@@ -1431,20 +1441,34 @@ fn build_default_capabilities_from_scope(scope: &ArcScope, ttl: u64) -> Vec<Defa
     }
 }
 
-fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> {
-    let tool_access = config.tool_access.as_ref()?;
+fn synthesize_tool_access_scope(
+    config: &GuardPolicyConfig,
+) -> Result<Option<ArcScope>, PolicyError> {
+    let Some(tool_access) = config.tool_access.as_ref() else {
+        return Ok(None);
+    };
     if !tool_access.enabled {
-        return None;
+        return Ok(None);
     }
 
     if tool_access.allow.is_empty() && tool_access.default_action == ToolAccessDefaultAction::Block
     {
-        return None;
+        return Ok(None);
     }
 
     if tool_access.allow.is_empty() && tool_access.default_action == ToolAccessDefaultAction::Allow
     {
-        return Some(ArcScope {
+        if !tool_access.require_confirmation.is_empty()
+            && !tool_access
+                .require_confirmation
+                .iter()
+                .any(|pattern| pattern == "*")
+        {
+            return Err(PolicyError::Invalid(
+                "guards.tool_access.require_confirmation with default_action=allow requires either explicit allow entries or a wildcard '*' confirmation pattern".to_string(),
+            ));
+        }
+        return Ok(Some(ArcScope {
             grants: vec![ToolGrant {
                 server_id: "*".to_string(),
                 tool_name: "*".to_string(),
@@ -1456,10 +1480,10 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
                 dpop_required: None,
             }],
             ..ArcScope::default()
-        });
+        }));
     }
 
-    Some(ArcScope {
+    Ok(Some(ArcScope {
         grants: tool_access
             .allow
             .iter()
@@ -1475,7 +1499,7 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
             })
             .collect(),
         ..ArcScope::default()
-    })
+    }))
 }
 
 fn compile_wildcard_tool_constraints(
@@ -1485,7 +1509,11 @@ fn compile_wildcard_tool_constraints(
     if let Some(max_args_size) = tool_access.max_args_size {
         constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
     }
-    if confirmation_overlap("*", &tool_access.require_confirmation) {
+    if tool_access
+        .require_confirmation
+        .iter()
+        .any(|pattern| pattern == "*")
+    {
         constraints
             .push(arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 });
     }
@@ -1939,6 +1967,37 @@ guards:
     }
 
     #[test]
+    fn build_pipeline_rejects_insecure_external_guard_urls() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "http://example.cognitiveservices.azure.com"
+      api_key: "azure-key"
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+      base_url: "http://safebrowsing.googleapis.com/v4"
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("insecure external guard config should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("cloud_guardrails.azure_content_safety.endpoint must use https"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn query_result_policy_pipeline_redacts_wrapped_value_output() {
         let policy = parse_policy(
             r#"
@@ -2091,7 +2150,7 @@ guards:
     }
 
     #[test]
-    fn yaml_tool_access_default_allow_with_security_overrides_preserves_wildcard_capability() {
+    fn yaml_tool_access_default_allow_with_scoped_confirmation_is_rejected() {
         let policy = parse_policy(
             r#"
 kernel:
@@ -2105,6 +2164,33 @@ guards:
     max_args_size: 2048
     require_confirmation:
       - git_push
+"#,
+        )
+        .unwrap();
+
+        let error = build_runtime_default_capabilities(&policy).expect_err(
+            "scoped confirmation cannot be represented by a synthesized wildcard grant",
+        );
+        assert!(error.to_string().contains(
+            "guards.tool_access.require_confirmation with default_action=allow requires either explicit allow entries or a wildcard '*' confirmation pattern"
+        ));
+    }
+
+    #[test]
+    fn yaml_tool_access_default_allow_with_wildcard_confirmation_preserves_wildcard_capability() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: allow
+    block:
+      - shell_exec
+    max_args_size: 2048
+    require_confirmation:
+      - "*"
 "#,
         )
         .unwrap();

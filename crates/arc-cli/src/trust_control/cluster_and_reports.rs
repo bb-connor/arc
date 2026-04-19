@@ -1604,7 +1604,7 @@ fn apply_cluster_snapshot(
         }
     }
 
-    seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref());
+    seed_cluster_authority_from_snapshot(state, election_term, authority_lease.as_ref())?;
 
     update_peer_state(state, peer_url, |peer| {
         peer.tool_seq = replication.tool_seq;
@@ -1628,23 +1628,25 @@ fn seed_cluster_authority_from_snapshot(
     state: &TrustServiceState,
     snapshot_election_term: u64,
     authority_lease: Option<&ClusterAuthorityLeaseView>,
-) {
+) -> Result<(), CliError> {
     let Some(cluster) = state.cluster.as_ref() else {
-        return;
+        return Ok(());
     };
 
     let snapshot_term = authority_lease
         .map(|lease| lease.term)
         .unwrap_or(snapshot_election_term);
     if snapshot_term == 0 {
-        return;
+        return Ok(());
     }
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
     if let Some(path) = state.config.authority_db_path.as_deref() {
-        if let Ok(authority) = SqliteCapabilityAuthority::open(path) {
-            let _ = authority.seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term);
-        }
+        let authority = SqliteCapabilityAuthority::open(path)
+            .map_err(|error| CliError::Other(error.to_string()))?;
+        authority
+            .seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term)
+            .map_err(|error| CliError::Other(error.to_string()))?;
     }
     let should_seed = |guard: &ClusterRuntimeState| {
         snapshot_term > guard.election_term
@@ -1670,6 +1672,7 @@ fn seed_cluster_authority_from_snapshot(
             }
         }
     }
+    Ok(())
 }
 
 fn collect_revocation_views(
@@ -4650,5 +4653,41 @@ mod cluster_and_reports_tests {
         assert_eq!(guard.last_leader_url.as_deref(), Some("http://node-z"));
 
         let _ = std::fs::remove_file(authority_db_path);
+    }
+
+    #[test]
+    fn apply_cluster_snapshot_fails_when_authority_fence_persistence_fails() {
+        let authority_db_path = unique_temp_path("cluster-authority-fence-dir", "d");
+        std::fs::create_dir_all(&authority_db_path).expect("create authority directory");
+
+        let source_state =
+            state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let target_state = state_with_cluster(
+            "http://node-b",
+            &["http://node-a"],
+            Some(authority_db_path.clone()),
+            None,
+            None,
+        );
+
+        for state in [&source_state, &target_state] {
+            let cluster = state.cluster.as_ref().expect("cluster state");
+            let mut guard = cluster.lock().expect("cluster guard");
+            for peer in guard.peers.values_mut() {
+                peer.health = PeerHealth::Healthy;
+                peer.last_contact_at = Some(unix_timestamp_now());
+            }
+        }
+
+        let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
+        let error = apply_cluster_snapshot(&target_state, "http://node-a", snapshot)
+            .expect_err("snapshot apply should fail when authority fence persistence fails");
+        let error_text = error.to_string();
+        assert!(
+            error_text.contains("directory") || error_text.contains("open database file"),
+            "unexpected error: {error_text}"
+        );
+
+        let _ = std::fs::remove_dir_all(authority_db_path);
     }
 }
