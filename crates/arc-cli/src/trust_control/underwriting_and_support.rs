@@ -2043,11 +2043,50 @@ fn load_behavioral_feed_signing_keypair(
                 .to_string(),
         )),
         (Some(path), None) => load_or_create_authority_keypair(path),
-        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.current_keypair()?),
+        (None, Some(path)) => Ok(SqliteCapabilityAuthority::open(path)?.local_keypair()?),
         (None, None) => Err(CliError::Other(
             "behavioral feed export requires --authority-seed-file or --authority-db so the export can be signed"
                 .to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_path(prefix: &str, extension: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("{prefix}-{nonce}.{extension}"))
+    }
+
+    #[test]
+    fn behavioral_feed_signer_uses_local_db_seed_after_replica_snapshot() {
+        let source_path = unique_temp_path("arc-behavioral-feed-source", "sqlite");
+        let follower_path = unique_temp_path("arc-behavioral-feed-follower", "sqlite");
+        let source = SqliteCapabilityAuthority::open(&source_path).expect("open source authority");
+        let follower =
+            SqliteCapabilityAuthority::open(&follower_path).expect("open follower authority");
+        let follower_local_key = follower.local_keypair().expect("read follower seed");
+
+        source.rotate().expect("rotate source authority");
+        let snapshot = source.snapshot().expect("snapshot source authority");
+        assert!(follower
+            .apply_snapshot(&snapshot)
+            .expect("apply source snapshot"));
+        assert!(follower.current_keypair().is_err());
+
+        let signing_key = load_behavioral_feed_signing_keypair(None, Some(&follower_path))
+            .expect("resolve behavioral feed signer");
+        assert_eq!(signing_key.public_key(), follower_local_key.public_key());
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(follower_path);
     }
 }
 
