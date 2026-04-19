@@ -34,6 +34,32 @@ toolchain from `src/arc_kernel_mobile.udl`.
   the Android NDK (r25+) with a `cargo-ndk` wrapper or hand-rolled
   linker config pointing at the NDK-supplied clang.
 
+## One-command qualification
+
+Run the repo-local qualification lane from the workspace root:
+
+```bash
+./scripts/qualify-mobile-kernel.sh
+```
+
+It records four lane results under
+`target/release-qualification/mobile-kernel/`:
+
+- `host_ffi`: Rust-side JSON-in / JSON-out roundtrip tests
+- `ios_device`: `aarch64-apple-ios` static library build
+- `ios_sim`: `aarch64-apple-ios-sim` static library build when the target
+  is installed
+- `android_arm64`: `aarch64-linux-android` shared-library build when a
+  real NDK toolchain is provisioned through `cargo-ndk`
+
+Status values are explicit:
+
+- `pass`: the lane ran on this host and succeeded
+- `environment_dependent`: the host is missing the required SDK, target, or
+  NDK tooling, so the script records that honestly instead of pretending the
+  lane was qualified
+- `fail`: the host had the required prerequisites and the lane still failed
+
 ## Generating the Swift bindings
 
 ```bash
@@ -125,20 +151,16 @@ three halves:
    receipt log. The receipt's signature remains verifiable
    regardless of sync timing.
 
-## Build verification on this host
+## Qualification artifacts
 
-At commit time, the following target triples have been verified on
-the host that produced this commit:
+`./scripts/qualify-mobile-kernel.sh` emits:
 
-- `aarch64-apple-darwin` (native `cargo build`): clean.
-- `aarch64-apple-ios`: clean (`rustup target add aarch64-apple-ios`
-  then the normal `cargo build --target aarch64-apple-ios`).
-- `aarch64-linux-android`: Rust compilation itself is clean, but the
-  final `cdylib` link step fails on a macOS host because the default
-  `cc` driver (Xcode's `ld`) rejects `--version-script=...` and
-  similar Android-specific linker flags. Use `cargo-ndk` with a real
-  Android NDK installation (see step 1 above) on a CI host that has
-  the NDK provisioned.
+- `target/release-qualification/mobile-kernel/report.md`
+- `target/release-qualification/mobile-kernel/summary.json`
+- one `*.log` file per lane
+
+That output is the authoritative host-local record of which mobile lanes are
+currently qualified versus environment-dependent.
 
 ## UniFFI bindgen invocation verification
 

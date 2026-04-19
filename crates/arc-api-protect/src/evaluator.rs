@@ -488,6 +488,7 @@ mod tests {
             model_id: "gpt-5".to_string(),
             safety_tier: Some(ModelSafetyTier::Standard),
             provider: Some("openai".to_string()),
+            provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
         });
         request.body_hash = Some("tool-body".to_string());
         request.body_length = 1;

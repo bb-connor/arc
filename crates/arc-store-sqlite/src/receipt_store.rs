@@ -27,18 +27,22 @@ use arc_kernel::operator_report::{
     AuthorizationContextSummary, BehavioralFeedGovernedActionSummary,
     BehavioralFeedMeteredBillingRow, BehavioralFeedMeteredBillingSummary, BehavioralFeedQuery,
     BehavioralFeedReceiptRow, BehavioralFeedReceiptSelection, BehavioralFeedSettlementSummary,
-    ComplianceReport, GovernedAuthorizationCommerceDetail, GovernedAuthorizationDetail,
-    GovernedAuthorizationMeteredBillingDetail, GovernedAuthorizationTransactionContext,
-    MeteredBillingEvidenceRecord, MeteredBillingReconciliationReport,
-    MeteredBillingReconciliationRow, MeteredBillingReconciliationState,
-    MeteredBillingReconciliationSummary, OperatorReportQuery, SettlementReconciliationReport,
-    SettlementReconciliationRow, SettlementReconciliationState, SettlementReconciliationSummary,
-    SharedEvidenceQuery, SharedEvidenceReferenceReport, SharedEvidenceReferenceRow,
-    SharedEvidenceReferenceSummary, ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
+    ComplianceReport, EconomicCompletionFlowReport, EconomicCompletionFlowSummary,
+    EconomicReceiptMeteringProjection, EconomicReceiptProjectionReport,
+    EconomicReceiptProjectionRow, EconomicReceiptProjectionSummary,
+    EconomicReceiptSettlementProjection, GovernedAuthorizationCommerceDetail,
+    GovernedAuthorizationDetail, GovernedAuthorizationMeteredBillingDetail,
+    GovernedAuthorizationTransactionContext, MeteredBillingEvidenceRecord,
+    MeteredBillingReconciliationReport, MeteredBillingReconciliationRow,
+    MeteredBillingReconciliationState, MeteredBillingReconciliationSummary,
+    OperatorReportQuery, SettlementReconciliationReport, SettlementReconciliationRow,
+    SettlementReconciliationState, SettlementReconciliationSummary, SharedEvidenceQuery,
+    SharedEvidenceReferenceReport, SharedEvidenceReferenceRow, SharedEvidenceReferenceSummary,
+    ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
     ARC_OAUTH_AUTHORIZATION_CONTEXT_REPORT_SCHEMA, ARC_OAUTH_AUTHORIZATION_METADATA_SCHEMA,
     ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE,
     ARC_OAUTH_AUTHORIZATION_REVIEW_PACK_SCHEMA, ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    ARC_OAUTH_SENDER_PROOF_ARC_DPOP,
+    ARC_OAUTH_SENDER_PROOF_ARC_DPOP, ECONOMIC_COMPLETION_FLOW_SCHEMA,
 };
 use arc_kernel::receipt_analytics::{
     AgentAnalyticsRow, AnalyticsTimeBucket, ReceiptAnalyticsMetrics, ReceiptAnalyticsQuery,
@@ -53,6 +57,7 @@ use arc_kernel::{
     CreditFacilityListSummary, CreditFacilityRow, CreditLossLifecycleEventKind,
     CreditLossLifecycleListQuery, CreditLossLifecycleListReport, CreditLossLifecycleListSummary,
     CreditLossLifecycleRow, EvidenceChildReceiptScope, EvidenceExportQuery,
+    ExposureLedgerQuery,
     FederatedEvidenceShareImport, FederatedEvidenceShareSummary, LiabilityAutoBindDisposition,
     LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
     LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
@@ -86,9 +91,9 @@ pub struct SqliteReceiptStore {
     pub(crate) pool: Pool<SqliteConnectionManager>,
     /// Phase 1.5 multi-tenant receipt isolation: when true, tenant-
     /// scoped queries exclude the pre-multitenant NULL-tagged set. When
-    /// false (the default), queries with `tenant_filter = Some(id)`
-    /// return rows where `tenant_id = id OR tenant_id IS NULL`, which
-    /// keeps legacy (pre-1.5) receipts visible during the transition.
+    /// false, queries with `tenant_filter = Some(id)` return rows where
+    /// `tenant_id = id OR tenant_id IS NULL`, which keeps legacy
+    /// (pre-1.5) receipts visible during explicit compatibility mode.
     pub(crate) strict_tenant_isolation: std::sync::atomic::AtomicBool,
 }
 
@@ -117,6 +122,7 @@ mod tests;
 #[path = "receipt_store/underwriting_credit.rs"]
 mod underwriting_credit;
 
+pub(crate) use support::{decode_verified_arc_receipt, decode_verified_child_receipt};
 use support::*;
 
 impl SqliteReceiptStore {
@@ -133,10 +139,10 @@ impl SqliteReceiptStore {
     /// ONLY rows whose `tenant_id = id`. Legacy pre-1.5 receipts with
     /// `tenant_id IS NULL` are excluded.
     ///
-    /// When `strict = false` (the default), the same query also
-    /// includes rows where `tenant_id IS NULL` -- the pre-multitenant
-    /// "public" fallback set -- so legacy receipts remain visible
-    /// during the transition window.
+    /// When `strict = false`, the same query also includes rows where
+    /// `tenant_id IS NULL` -- the pre-multitenant "public" fallback
+    /// set -- so legacy receipts remain visible during an explicit
+    /// compatibility window.
     ///
     /// A `tenant_filter = None` admin / compat query always returns
     /// every row regardless of this setting.

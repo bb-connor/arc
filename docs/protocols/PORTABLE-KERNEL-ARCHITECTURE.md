@@ -164,12 +164,12 @@ Cloudflare Workers. The `wasi` feature routes to the WASI random API.
 
 | Target triple | Environment | Priority | Status |
 |---|---|---|---|
-| `wasm32-unknown-unknown` | Browser, Cloudflare Workers, Deno Deploy | P0 | Blocked on extraction |
-| `wasm32-wasip1` | Wasmtime, WasmEdge, Deno (WASI mode) | P0 | Blocked on extraction |
+| `wasm32-unknown-unknown` | Browser, Cloudflare Workers, Deno Deploy | P0 | Core build proven in repo; browser qualification still pending |
+| `wasm32-wasip1` | Wasmtime, WasmEdge, Deno (WASI mode) | P0 | Planned next proof after the current browser-target build gate |
 | `x86_64-unknown-linux-gnu` | Server (current default) | P0 | Working today |
 | `aarch64-apple-darwin` | macOS (current dev) | P0 | Working today |
-| `aarch64-apple-ios` | iOS via UniFFI/C FFI | P1 | Blocked on extraction + FFI bindings |
-| `aarch64-linux-android` | Android via UniFFI/C FFI | P1 | Blocked on extraction + FFI bindings |
+| `aarch64-apple-ios` | iOS via UniFFI/C FFI | P1 | Host FFI tests and device staticlib build are scripted in repo |
+| `aarch64-linux-android` | Android via UniFFI/C FFI | P1 | Host FFI tests are scripted; real shared-lib qualification requires a provisioned NDK host |
 | `x86_64-pc-windows-msvc` | Windows desktop | P2 | Likely works, untested |
 | `thumbv7em-none-eabihf` | Cortex-M embedded (no_std) | P3 (stretch) | Requires full no_std, no alloc fallback |
 
@@ -326,6 +326,17 @@ let kernel = try KernelCore(config: config)
 let verdict = try kernel.evaluate(requestJson: toolCallJson)
 ```
 
+Repo-local qualification commands for the mobile adapter:
+
+```bash
+cargo test -p arc-kernel-mobile --test ffi_roundtrip
+./scripts/qualify-mobile-kernel.sh
+```
+
+The qualification script records each lane as `pass`, `fail`, or
+`environment_dependent` so iOS and Android support claims stay tied to
+actual toolchain availability on the qualifying host.
+
 ### 4.5 Desktop (Current Model)
 
 No changes required. The existing `arc-kernel` crate continues to work as a
@@ -470,12 +481,22 @@ crates/
       lib.rs          # ArcKernel wraps KernelCore, adds IO
 ```
 
-Verify:
-1. `cargo build -p arc-kernel-core --target wasm32-unknown-unknown` succeeds.
-2. `cargo test -p arc-kernel-core` passes (all existing unit tests for pure
-   logic move here).
-3. `cargo test -p arc-kernel` passes (integration tests stay here).
-4. `cargo build --workspace` still succeeds.
+Current in-repo proof command:
+
+```bash
+./scripts/check-portable-kernel.sh
+```
+
+It proves both:
+
+1. `cargo build -p arc-kernel-core --no-default-features`
+2. `cargo build -p arc-kernel-core --target wasm32-unknown-unknown --no-default-features`
+
+Broader qualification still layers on top of that:
+
+3. `cargo test -p arc-kernel-core`
+4. `cargo test -p arc-kernel`
+5. `cargo build --workspace`
 
 Estimated scope: 3-5 days.
 
@@ -499,7 +520,9 @@ Estimated scope: 1-2 weeks per adapter.
 
 Add cross-compilation targets to CI. Enforce binary size limits per target.
 Publish `arc-kernel-wasm` to npm. Publish `arc-kernel-mobile` UniFFI bindings
-to CocoaPods/Maven.
+to CocoaPods/Maven. The repo-local qualification entry points are now
+`./scripts/check-portable-kernel.sh`, `./scripts/qualify-portable-browser.sh`,
+and `./scripts/qualify-mobile-kernel.sh`.
 
 ### Dependency Graph After Extraction
 

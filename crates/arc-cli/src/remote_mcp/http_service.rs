@@ -64,11 +64,18 @@ async fn serve_http_async(config: RemoteServeHttpConfig) -> Result<(), CliError>
         SessionLifecyclePolicy::from_env(),
         config.session_db_path.clone(),
     )?);
+    let factory = Arc::new(RemoteSessionFactory::new(config.clone()));
+    if let Some(path) = config.session_db_path.as_deref() {
+        for record in load_active_session_records(path)? {
+            let session = factory.restore_session(&record)?;
+            sessions.insert_active(session).await;
+        }
+    }
     sessions.cleanup_due_sessions().await;
 
     let state = RemoteAppState {
         sessions,
-        factory: Arc::new(RemoteSessionFactory::new(config.clone())),
+        factory,
         auth_mode: Arc::new(auth_mode),
         enterprise_provider_registry,
         admin_token,
@@ -231,7 +238,10 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
         }
         let Some(stream_lock) = stream_lock else {
-            return StatusCode::ACCEPTED.into_response();
+            return response_with_mode(
+                StatusCode::ACCEPTED.into_response(),
+                "post_notification_accepted",
+            );
         };
 
         let buffered_events = match collect_session_events_until_idle(&session, &mut event_rx).await
@@ -247,10 +257,18 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
             .collect::<Vec<_>>();
         if buffered_events.is_empty() {
             drop(stream_lock);
-            return StatusCode::ACCEPTED.into_response();
+            return response_with_mode(
+                StatusCode::ACCEPTED.into_response(),
+                "post_notification_accepted",
+            );
         }
 
-        return sse_response_from_buffered_events(session.clone(), buffered_events, stream_lock);
+        return sse_response_from_buffered_events(
+            session.clone(),
+            buffered_events,
+            stream_lock,
+            "post_notification_sse",
+        );
     }
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
@@ -308,7 +326,7 @@ async fn handle_post(State(state): State<RemoteAppState>, request: Request) -> R
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), "post_request_sse")
 }
 
 async fn handle_initialize_post(
@@ -333,6 +351,8 @@ async fn handle_initialize_post(
     };
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
+    let initialize_params = message.get("params").cloned().unwrap_or_else(|| json!({}));
+    let peer_capabilities = parse_remote_session_peer_capabilities(&initialize_params);
     let mut event_rx = session.subscribe();
     if let Err(error) = session.send(message) {
         return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
@@ -352,6 +372,8 @@ async fn handle_initialize_post(
                             .and_then(|result| result.get("protocolVersion"))
                             .and_then(Value::as_str)
                             .map(ToOwned::to_owned),
+                        initialize_params.clone(),
+                        peer_capabilities.clone(),
                     );
                 }
                 buffered_events.push(event);
@@ -364,6 +386,7 @@ async fn handle_initialize_post(
                         &session,
                         buffered_events,
                         is_success.then_some(session.session_id.as_str()),
+                        "initialize_sse",
                     );
                 }
             }
@@ -388,6 +411,7 @@ fn sse_response_from_events(
     session: &RemoteSession,
     buffered_events: Vec<RemoteSessionEvent>,
     session_header: Option<&str>,
+    response_mode: &'static str,
 ) -> Response {
     let priming_event_id = session.next_stream_event_id();
     let stream = stream! {
@@ -412,13 +436,14 @@ fn sse_response_from_events(
                 .insert(HeaderName::from_static(MCP_SESSION_ID_HEADER), value);
         }
     }
-    response
+    response_with_mode(response, response_mode)
 }
 
 fn sse_response_from_buffered_events(
     session: Arc<RemoteSession>,
     buffered_events: Vec<RemoteSessionEvent>,
     stream_lock: tokio::sync::OwnedMutexGuard<()>,
+    response_mode: &'static str,
 ) -> Response {
     let priming_event_id = session.next_stream_event_id();
     let stream = stream! {
@@ -436,7 +461,7 @@ fn sse_response_from_buffered_events(
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), response_mode)
 }
 
 async fn collect_session_events_until_idle(
@@ -574,7 +599,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
             }
         };
 
-        return Sse::new(stream).into_response();
+        return response_with_mode(Sse::new(stream).into_response(), "get_sse_live");
     };
 
     let (mut delivered_through, replay_events) =
@@ -617,7 +642,7 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         }
     };
 
-    Sse::new(stream).into_response()
+    response_with_mode(Sse::new(stream).into_response(), "get_sse_replay")
 }
 
 async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>) -> Response {
@@ -797,6 +822,73 @@ fn parse_session_event_id(event_id: &str, expected_session_id: &str) -> Result<u
     }
     seq.parse::<u64>()
         .map_err(|_| "invalid Last-Event-ID sequence for MCP session".to_string())
+}
+
+fn response_with_mode(mut response: Response, response_mode: &'static str) -> Response {
+    response.headers_mut().insert(
+        HeaderName::from_static(ARC_RESPONSE_MODE_HEADER),
+        HeaderValue::from_static(response_mode),
+    );
+    response
+}
+
+fn restored_kernel_session_id(session_id: &str) -> SessionId {
+    let fingerprint = sha256_hex(session_id.as_bytes());
+    SessionId::new(format!("sess-restore-{}", &fingerprint[..16]))
+}
+
+fn parse_remote_session_peer_capabilities(params: &Value) -> PeerCapabilities {
+    let experimental = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("experimental"));
+    let resources = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("resources"));
+    let roots = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("roots"));
+    let sampling = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("sampling"));
+    let elicitation = params
+        .get("capabilities")
+        .and_then(|capabilities| capabilities.get("elicitation"));
+    let elicitation_form = elicitation.is_some_and(|value| {
+        value.as_object().is_some_and(|object| object.is_empty()) || value.get("form").is_some()
+    });
+    let elicitation_url = elicitation
+        .is_some_and(|value| value.get("url").is_some() || value.get("openUrl").is_some());
+
+    PeerCapabilities {
+        supports_progress: true,
+        supports_cancellation: true,
+        supports_subscriptions: resources
+            .and_then(|value| value.get("subscribe"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_arc_tool_streaming: experimental
+            .and_then(|value| {
+                value
+                    .get(ARC_TOOL_STREAMING_CAPABILITY_KEY)
+                    .or_else(|| value.get(LEGACY_PACT_TOOL_STREAMING_CAPABILITY_KEY))
+            })
+            .and_then(|value| value.get("toolCallChunkNotifications"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_roots: roots.is_some(),
+        roots_list_changed: roots
+            .and_then(|value| value.get("listChanged"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        supports_sampling: sampling.is_some(),
+        sampling_context: sampling
+            .and_then(|value| value.get("includeContext"))
+            .is_some(),
+        sampling_tools: sampling.and_then(|value| value.get("tools")).is_some(),
+        supports_elicitation: elicitation.is_some(),
+        elicitation_form,
+        elicitation_url,
+    }
 }
 
 fn should_emit_post_stream_event(
@@ -1944,4 +2036,3 @@ fn validate_sender_constraint_runtime(
     }
     Ok(())
 }
-

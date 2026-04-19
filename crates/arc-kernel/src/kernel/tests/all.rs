@@ -2574,6 +2574,7 @@ fn session_operation_tool_call_tracks_and_clears_inflight() {
         server_id: "srv-a".to_string(),
         tool_name: "read_file".to_string(),
         arguments: serde_json::json!({"path": "/app/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -3039,6 +3040,7 @@ fn tool_call_nested_flow_bridge_roundtrips_sampling() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3133,6 +3135,7 @@ fn kernel_persists_child_receipts_to_sqlite_store() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3230,6 +3233,7 @@ fn tool_call_nested_flow_bridge_roundtrips_elicitation() {
         server_id: "nested".to_string(),
         tool_name: "elicit_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3311,6 +3315,7 @@ fn tool_call_nested_flow_bridge_updates_session_roots() {
         server_id: "nested".to_string(),
         tool_name: "roots_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3386,6 +3391,7 @@ fn tool_call_nested_flow_bridge_propagates_parent_cancellation() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3480,6 +3486,7 @@ fn tool_call_nested_flow_bridge_propagates_child_cancellation() {
         server_id: "nested".to_string(),
         tool_name: "sample_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel
@@ -3558,6 +3565,7 @@ fn session_tool_call_records_incomplete_terminal_state() {
         server_id: "broken".to_string(),
         tool_name: "drop_stream".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     });
 
     let response = session_tool_call(
@@ -3797,6 +3805,7 @@ fn tool_call_nested_flow_bridge_filters_resource_notifications_to_session_subscr
         server_id: "nested".to_string(),
         tool_name: "notify_resources_via_client".to_string(),
         arguments: serde_json::json!({}),
+        model_metadata: None,
     };
 
     let response = kernel

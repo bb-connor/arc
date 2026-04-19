@@ -233,6 +233,7 @@ fn normalize_agent_message(
                 server_id: server_id.clone(),
                 tool_name: tool.clone(),
                 arguments: params.clone(),
+                model_metadata: None,
             }),
         ),
         AgentMessage::ListCapabilities => (
@@ -337,6 +338,35 @@ impl arc_kernel::ToolServerConnection for StubToolServer {
 }
 
 #[cfg(test)]
+struct StubSqlResultToolServer {
+    id: String,
+}
+
+#[cfg(test)]
+impl arc_kernel::ToolServerConnection for StubSqlResultToolServer {
+    fn server_id(&self) -> &str {
+        &self.id
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["sql".to_string()]
+    }
+
+    fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn arc_kernel::NestedFlowBridge>,
+    ) -> Result<serde_json::Value, arc_kernel::KernelError> {
+        Ok(serde_json::json!({
+            "rows": [
+                {"email": "alice@example.com", "id": 1}
+            ]
+        }))
+    }
+}
+
+#[cfg(test)]
 struct StubStreamingToolServer {
     id: String,
     incomplete: bool,
@@ -425,8 +455,10 @@ fn print_summary(stats: &SessionStats, exit_code: Option<i32>, json_output: bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
+    use wiremock::matchers::{header, method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn load_test_policy_runtime(policy: &policy::ArcPolicy) -> policy::LoadedPolicy {
         let default_capabilities = policy::build_runtime_default_capabilities(policy).unwrap();
@@ -1097,6 +1129,108 @@ capabilities:
     }
 
     #[test]
+    fn hushspec_threat_intel_compiles_into_runtime_guard_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let pattern_db_path = dir.path().join("pattern-db.json");
+        fs::write(
+            &pattern_db_path,
+            r#"
+[
+  {
+    "id": "known-prompt-injection",
+    "category": "prompt_injection",
+    "stage": "perception",
+    "label": "Known malicious prompt embedding",
+    "embedding": [1.0, 0.0, 0.0]
+  }
+]
+"#,
+        )
+        .unwrap();
+
+        let policy_path = dir.path().join("hushspec-threat-intel.yaml");
+        fs::write(
+            &policy_path,
+            format!(
+                r#"
+hushspec: "0.1.0"
+rules:
+  tool_access:
+    enabled: true
+    default: block
+    allow:
+      - read_file
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
+"#,
+                pattern_db_path.display()
+            ),
+        )
+        .unwrap();
+
+        let loaded_policy = policy::load_policy(&policy_path).unwrap();
+        let default_capabilities = loaded_policy.default_capabilities.clone();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(loaded_policy, &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "read_file",
+            "*",
+            &serde_json::json!({
+                "path": "/workspace/README.md",
+                "embedding": [1.0, 0.0, 0.0]
+            }),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-threat-intel".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "read_file".to_string(),
+            params: serde_json::json!({
+                "path": "/workspace/README.md",
+                "embedding": [1.0, 0.0, 0.0]
+            }),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => {
+                assert!(matches!(result, ToolCallResult::Err { .. }));
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 0);
+        assert_eq!(stats.denied, 1);
+    }
+
+    #[test]
     fn yaml_tool_access_drives_tool_access_via_session_runtime_path() {
         let policy = policy::parse_policy(
             r#"
@@ -1341,5 +1475,392 @@ capabilities:
             }
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn arc_yaml_sql_query_guard_drives_session_runtime_path() {
+        let policy = policy::parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - sql
+  sql_query:
+    operation_allowlist: [select]
+    table_allowlist: [orders]
+"#,
+        )
+        .unwrap();
+        let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "sql",
+            "*",
+            &serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"}),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-sql-guard".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "sql".to_string(),
+            params: serde_json::json!({"database": "postgres", "query": "DELETE FROM orders"}),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => {
+                assert!(matches!(result, ToolCallResult::Err { .. }));
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 0);
+        assert_eq!(stats.denied, 1);
+    }
+
+    #[test]
+    fn arc_yaml_query_result_guard_redacts_runtime_output() {
+        let policy = policy::parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - sql
+  query_result:
+    redact_pii_patterns:
+      - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+"#,
+        )
+        .unwrap();
+        let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubSqlResultToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "sql",
+            "*",
+            &serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"}),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-query-result".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "sql".to_string(),
+            params: serde_json::json!({"database": "postgres", "query": "SELECT email FROM orders"}),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => match result {
+                ToolCallResult::Ok { value } => {
+                    assert_eq!(value["rows"][0]["email"], "[REDACTED]");
+                    assert_eq!(value["rows"][0]["id"], 1);
+                }
+                other => panic!("unexpected result: {other:?}"),
+            },
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 1);
+        assert_eq!(stats.denied, 0);
+    }
+
+    #[test]
+    fn arc_yaml_content_review_guard_drives_session_runtime_path() {
+        let policy = policy::parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - slack_send_message
+  content_review:
+    enabled: true
+    default_rules:
+      banned_words:
+        - "classified"
+"#,
+        )
+        .unwrap();
+        let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "slack_send_message",
+            "*",
+            &serde_json::json!({"text": "classified incident details"}),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-content-review".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "slack_send_message".to_string(),
+            params: serde_json::json!({"text": "classified incident details"}),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => {
+                assert!(matches!(result, ToolCallResult::Err { .. }));
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 0);
+        assert_eq!(stats.denied, 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn arc_yaml_azure_content_safety_guard_drives_session_runtime_path() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/contentsafety/text:analyze"))
+            .and(query_param("api-version", "2023-10-01"))
+            .and(header("Ocp-Apim-Subscription-Key", "azure-key"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "categoriesAnalysis": [
+                    {"category": "Violence", "severity": 6}
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let policy = policy::parse_policy(&format!(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - slack_send_message
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "{endpoint}"
+      api_key: "azure-key"
+      severity_threshold: 4
+      tool_patterns:
+        - slack_*
+"#,
+            endpoint = server.uri()
+        ))
+        .unwrap();
+        let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "slack_send_message",
+            "*",
+            &serde_json::json!({"text": "violent escalation details"}),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-azure-content-safety".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "slack_send_message".to_string(),
+            params: serde_json::json!({"text": "violent escalation details"}),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => {
+                assert!(matches!(result, ToolCallResult::Err { .. }));
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 0);
+        assert_eq!(stats.denied, 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn arc_yaml_safe_browsing_guard_drives_session_runtime_path() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/threatMatches:find"))
+            .and(query_param("key", "sb-key"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "matches": [
+                    {
+                        "threatType": "MALWARE",
+                        "platformType": "ANY_PLATFORM",
+                        "threatEntryType": "URL",
+                        "threat": {"url": "https://malicious.example/bad"}
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let policy = policy::parse_policy(&format!(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - fetch_url
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+      base_url: "{base_url}"
+      tool_patterns:
+        - fetch_url
+"#,
+            base_url = server.uri()
+        ))
+        .unwrap();
+        let default_capabilities = policy::build_runtime_default_capabilities(&policy).unwrap();
+
+        let kp = Keypair::generate();
+        let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+        kernel.register_tool_server(Box::new(StubToolServer {
+            id: "*".to_string(),
+        }));
+
+        let agent_kp = Keypair::generate();
+        let caps =
+            issue_default_capabilities(&kernel, &agent_kp.public_key(), &default_capabilities)
+                .unwrap();
+        let agent_id = agent_kp.public_key().to_hex();
+        let session_id = open_ready_session(&mut kernel, &agent_id, caps.clone());
+
+        let cap = select_capability_for_request(
+            &caps,
+            "fetch_url",
+            "*",
+            &serde_json::json!({"url": "https://malicious.example/bad"}),
+        )
+        .unwrap();
+
+        let message = AgentMessage::ToolCallRequest {
+            id: "req-safe-browsing".to_string(),
+            capability_token: Box::new(cap),
+            server_id: "*".to_string(),
+            tool: "fetch_url".to_string(),
+            params: serde_json::json!({"url": "https://malicious.example/bad"}),
+        };
+
+        let mut stats = SessionStats::default();
+        let response = only_message(handle_agent_message(
+            &mut kernel,
+            &message,
+            &session_id,
+            &agent_id,
+            &mut stats,
+        ));
+
+        match response {
+            KernelMessage::ToolCallResponse { result, .. } => {
+                assert!(matches!(result, ToolCallResult::Err { .. }));
+            }
+            _ => panic!("wrong variant"),
+        }
+        assert_eq!(stats.allowed, 0);
+        assert_eq!(stats.denied, 1);
     }
 }

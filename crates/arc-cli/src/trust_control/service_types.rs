@@ -131,6 +131,7 @@ use arc_kernel::{
     ExposureLedgerCurrencyPosition, ExposureLedgerDecisionEntry, ExposureLedgerEvidenceKind,
     ExposureLedgerEvidenceReference, ExposureLedgerQuery, ExposureLedgerReceiptEntry,
     ExposureLedgerReport, ExposureLedgerSummary, ExposureLedgerSupportBoundary,
+    EconomicCompletionFlowReport, EconomicReceiptProjectionReport,
     LiabilityAutoBindDecisionArtifact, LiabilityAutoBindDisposition,
     LiabilityBoundCoverageArtifact, LiabilityClaimAdjudicationArtifact,
     LiabilityClaimAdjudicationOutcome, LiabilityClaimDisputeArtifact, LiabilityClaimEvidenceKind,
@@ -341,6 +342,12 @@ const INTERNAL_TOOL_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/tools/del
 const INTERNAL_CHILD_RECEIPTS_DELTA_PATH: &str = "/v1/internal/receipts/children/delta";
 const INTERNAL_BUDGETS_DELTA_PATH: &str = "/v1/internal/budgets/delta";
 const INTERNAL_LINEAGE_DELTA_PATH: &str = "/v1/internal/lineage/delta";
+const CLUSTER_NODE_ID_HEADER: &str = "x-arc-cluster-node-id";
+const CLUSTER_AUTH_ISSUED_AT_HEADER: &str = "x-arc-cluster-auth-issued-at";
+const CLUSTER_AUTH_SIGNATURE_HEADER: &str = "x-arc-cluster-auth-signature";
+const CLUSTER_AUTH_TERM_HEADER: &str = "x-arc-cluster-auth-term";
+const CLUSTER_AUTH_SCHEME: &str = "arc.cluster.peer.v1";
+const CLUSTER_AUTH_MAX_SKEW_SECS: i64 = 60;
 const RECEIPT_QUERY_PATH: &str = "/v1/receipts/query";
 const RECEIPT_ANALYTICS_PATH: &str = "/v1/receipts/analytics";
 const EVIDENCE_EXPORT_PATH: &str = "/v1/evidence/export";
@@ -398,6 +405,8 @@ const SETTLEMENT_REPORT_PATH: &str = "/v1/reports/settlements";
 const SETTLEMENT_RECONCILE_PATH: &str = "/v1/settlements/reconcile";
 const METERED_BILLING_REPORT_PATH: &str = "/v1/reports/metered-billing";
 const METERED_BILLING_RECONCILE_PATH: &str = "/v1/metered-billing/reconcile";
+const ECONOMIC_RECEIPT_REPORT_PATH: &str = "/v1/reports/economic-receipts";
+const ECONOMIC_COMPLETION_FLOW_REPORT_PATH: &str = "/v1/reports/economic-completion-flow";
 const AUTHORIZATION_CONTEXT_REPORT_PATH: &str = "/v1/reports/authorization-context";
 const AUTHORIZATION_PROFILE_METADATA_PATH: &str = "/v1/reports/authorization-profile-metadata";
 const AUTHORIZATION_REVIEW_PACK_PATH: &str = "/v1/reports/authorization-review-pack";
@@ -465,6 +474,12 @@ pub struct TrustControlClient {
     preferred_index: Arc<Mutex<usize>>,
     token: Arc<str>,
     http: Agent,
+    cluster_peer_auth: Option<ClusterPeerClientAuth>,
+}
+
+#[derive(Clone)]
+struct ClusterPeerClientAuth {
+    node_id: Arc<str>,
 }
 
 struct RemoteCapabilityAuthority {
@@ -1219,6 +1234,8 @@ pub struct CapitalExecutionInstructionRequest {
     pub source_kind: CapitalBookSourceKind,
     pub action: CapitalExecutionInstructionAction,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_receipt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub amount: Option<MonetaryAmount>,
     pub authority_chain: Vec<CapitalExecutionAuthorityStep>,
     pub execution_window: CapitalExecutionWindow,
@@ -1860,6 +1877,7 @@ struct BudgetMutationEventView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     allowed: Option<bool>,
     recorded_at: i64,
+    event_seq: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     usage_seq: Option<u64>,
     exposure_units: u64,
@@ -1880,7 +1898,6 @@ struct BudgetMutationEventView {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct AuthoritySnapshotView {
-    seed_hex: String,
     public_key_hex: String,
     generation: u64,
     rotated_at: u64,

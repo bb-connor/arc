@@ -35,6 +35,7 @@ impl BudgetUsageRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BudgetMutationKind {
+    IncrementInvocation,
     AuthorizeExposure,
     ReverseExposure,
     ReleaseExposure,
@@ -44,6 +45,7 @@ pub enum BudgetMutationKind {
 impl BudgetMutationKind {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::IncrementInvocation => "increment_invocation",
             Self::AuthorizeExposure => "authorize_exposure",
             Self::ReverseExposure => "reverse_exposure",
             Self::ReleaseExposure => "release_exposure",
@@ -53,6 +55,7 @@ impl BudgetMutationKind {
 
     pub fn parse(value: &str) -> Option<Self> {
         match value {
+            "increment_invocation" => Some(Self::IncrementInvocation),
             "authorize_exposure" => Some(Self::AuthorizeExposure),
             "reverse_exposure" => Some(Self::ReverseExposure),
             "release_exposure" => Some(Self::ReleaseExposure),
@@ -78,6 +81,7 @@ pub struct BudgetMutationRecord {
     pub kind: BudgetMutationKind,
     pub allowed: Option<bool>,
     pub recorded_at: i64,
+    pub event_seq: u64,
     pub usage_seq: Option<u64>,
     pub exposure_units: u64,
     pub realized_spend_units: u64,
@@ -681,6 +685,11 @@ struct BudgetHoldState {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum BudgetMutationRequest {
+    Increment {
+        capability_id: String,
+        grant_index: usize,
+        max_invocations: Option<u32>,
+    },
     Authorize {
         capability_id: String,
         grant_index: usize,
@@ -813,14 +822,6 @@ impl InMemoryBudgetStore {
                 "budget hold `{hold_id}` requires authority lease metadata"
             ))),
             (Some(current), Some(requested)) => {
-                if requested.lease_epoch < current.lease_epoch {
-                    return Err(BudgetStoreError::Invariant(format!(
-                        "budget hold `{hold_id}` authority lease epoch regressed"
-                    )));
-                }
-                if requested.lease_epoch > current.lease_epoch {
-                    return Ok(Some(requested.clone()));
-                }
                 if current.authority_id != requested.authority_id {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget hold `{hold_id}` authority_id does not match the open lease"
@@ -829,6 +830,16 @@ impl InMemoryBudgetStore {
                 if requested.lease_id != current.lease_id {
                     return Err(BudgetStoreError::Invariant(format!(
                         "budget hold `{hold_id}` lease_id does not match the open lease epoch"
+                    )));
+                }
+                if requested.lease_epoch < current.lease_epoch {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget hold `{hold_id}` authority lease epoch regressed"
+                    )));
+                }
+                if requested.lease_epoch > current.lease_epoch {
+                    return Err(BudgetStoreError::Invariant(format!(
+                        "budget hold `{hold_id}` authority lease epoch advanced beyond the open lease"
                     )));
                 }
                 Ok(Some(requested.clone()))
@@ -869,22 +880,62 @@ impl BudgetStore for InMemoryBudgetStore {
         grant_index: usize,
         max_invocations: Option<u32>,
     ) -> Result<bool, BudgetStoreError> {
+        let request = BudgetMutationRequest::Increment {
+            capability_id: capability_id.to_string(),
+            grant_index,
+            max_invocations,
+        };
         let key = (capability_id.to_string(), grant_index);
-        let next_seq = self.next_seq.saturating_add(1);
-        self.next_seq = next_seq;
-        let entry = self
+        let current = self
             .counts
-            .entry(key)
-            .or_insert_with(|| Self::default_usage_record(capability_id, grant_index));
-        if let Some(max) = max_invocations {
-            if entry.invocation_count >= max {
-                return Ok(false);
-            }
-        }
-        entry.invocation_count = entry.invocation_count.saturating_add(1);
-        entry.updated_at = unix_now();
-        entry.seq = next_seq;
-        Ok(true)
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| Self::default_usage_record(capability_id, grant_index));
+        let allowed = max_invocations.is_none_or(|max| current.invocation_count < max);
+        let recorded_at = unix_now();
+        let event_seq = self.next_seq.saturating_add(1);
+        self.next_seq = event_seq;
+        let usage_seq = if allowed {
+            let entry = self
+                .counts
+                .entry(key)
+                .or_insert_with(|| Self::default_usage_record(capability_id, grant_index));
+            entry.invocation_count = current.invocation_count.saturating_add(1);
+            entry.updated_at = recorded_at;
+            entry.seq = event_seq;
+            Some(event_seq)
+        } else {
+            None
+        };
+        self.append_mutation(
+            None,
+            request,
+            BudgetMutationRecord {
+                event_id: String::new(),
+                hold_id: None,
+                capability_id: capability_id.to_string(),
+                grant_index: grant_index as u32,
+                kind: BudgetMutationKind::IncrementInvocation,
+                allowed: Some(allowed),
+                recorded_at,
+                event_seq,
+                usage_seq,
+                exposure_units: 0,
+                realized_spend_units: 0,
+                max_invocations,
+                max_cost_per_invocation: None,
+                max_total_cost_units: None,
+                invocation_count_after: if allowed {
+                    current.invocation_count.saturating_add(1)
+                } else {
+                    current.invocation_count
+                },
+                total_cost_exposed_after: current.total_cost_exposed,
+                total_cost_realized_spend_after: current.total_cost_realized_spend,
+                authority: None,
+            },
+        );
+        Ok(allowed)
     }
 
     fn try_charge_cost(
@@ -993,6 +1044,7 @@ impl BudgetStore for InMemoryBudgetStore {
 
         let recorded_at = unix_now();
         let (invocation_count_after, total_cost_exposed_after, total_cost_realized_spend_after);
+        let event_seq;
         let mut usage_seq = None;
 
         if allowed {
@@ -1011,8 +1063,8 @@ impl BudgetStore for InMemoryBudgetStore {
                         "total_cost_exposed + cost_units overflowed u64".to_string(),
                     )
                 })?;
-            let next_seq = self.next_seq.saturating_add(1);
-            self.next_seq = next_seq;
+            event_seq = self.next_seq.saturating_add(1);
+            self.next_seq = event_seq;
             let entry = self
                 .counts
                 .entry(key)
@@ -1020,7 +1072,7 @@ impl BudgetStore for InMemoryBudgetStore {
             entry.invocation_count = current.invocation_count.saturating_add(1);
             entry.total_cost_exposed = new_total_cost_exposed;
             entry.updated_at = recorded_at;
-            entry.seq = next_seq;
+            entry.seq = event_seq;
             if let Some(hold_id) = hold_id {
                 self.holds.insert(
                     hold_id.to_string(),
@@ -1038,8 +1090,10 @@ impl BudgetStore for InMemoryBudgetStore {
             invocation_count_after = entry.invocation_count;
             total_cost_exposed_after = entry.total_cost_exposed;
             total_cost_realized_spend_after = entry.total_cost_realized_spend;
-            usage_seq = Some(entry.seq);
+            usage_seq = Some(event_seq);
         } else {
+            event_seq = self.next_seq.saturating_add(1);
+            self.next_seq = event_seq;
             invocation_count_after = current.invocation_count;
             total_cost_exposed_after = current.total_cost_exposed;
             total_cost_realized_spend_after = current.total_cost_realized_spend;
@@ -1056,6 +1110,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 kind: BudgetMutationKind::AuthorizeExposure,
                 allowed: Some(allowed),
                 recorded_at,
+                event_seq,
                 usage_seq,
                 exposure_units: cost_units,
                 realized_spend_units: 0,
@@ -1181,6 +1236,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 kind: BudgetMutationKind::ReverseExposure,
                 allowed: None,
                 recorded_at: unix_now(),
+                event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: cost_units,
                 realized_spend_units: 0,
@@ -1303,6 +1359,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 kind: BudgetMutationKind::ReleaseExposure,
                 allowed: None,
                 recorded_at: unix_now(),
+                event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: cost_units,
                 realized_spend_units: 0,
@@ -1455,6 +1512,7 @@ impl BudgetStore for InMemoryBudgetStore {
                 kind: BudgetMutationKind::ReconcileSpend,
                 allowed: None,
                 recorded_at: unix_now(),
+                event_seq: seq,
                 usage_seq: Some(seq),
                 exposure_units: exposed_cost_units,
                 realized_spend_units: realized_cost_units,

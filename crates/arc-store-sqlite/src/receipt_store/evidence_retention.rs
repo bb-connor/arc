@@ -1,7 +1,8 @@
 use super::support::{
-    checkpoint_error_to_receipt_store, ensure_checkpoint_transparency_guards,
-    load_claim_tree_canonical_bytes_range, load_persisted_checkpoint_row,
-    parse_persisted_checkpoint_row, verify_checkpoint_chain_integrity,
+    checkpoint_error_to_receipt_store, ensure_arc_receipt_verified,
+    ensure_checkpoint_transparency_guards, load_claim_tree_canonical_bytes_range,
+    load_persisted_checkpoint_row, parse_persisted_checkpoint_row,
+    verify_checkpoint_chain_integrity,
 };
 use super::*;
 
@@ -10,6 +11,7 @@ impl SqliteReceiptStore {
         &self,
         receipt: &ArcReceipt,
     ) -> Result<u64, ReceiptStoreError> {
+        ensure_arc_receipt_verified(receipt)?;
         let raw_json = serde_json::to_string(receipt)?;
         let attribution = extract_receipt_attribution(receipt);
         let mut connection = self.connection()?;
@@ -456,12 +458,12 @@ impl SqliteReceiptStore {
         // WHERE fragment. Three modes:
         //
         //   * `tenant_filter = None`           -> "1=1" (admin/compat).
-        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=false
-        //     (default) -> `tenant_id = ?X OR tenant_id IS NULL` so
-        //     legacy pre-1.5 receipts stay visible during the
-        //     transition.
         //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=true
         //     -> `tenant_id = ?X` (legacy rows hidden).
+        //   * `tenant_filter = Some(id)` w/ strict_tenant_isolation=false
+        //     -> `tenant_id = ?X OR tenant_id IS NULL` so legacy
+        //     pre-1.5 receipts stay visible during explicit
+        //     compatibility mode.
         //
         // Bound parameter ?12 carries the tenant string when present.
         // When `tenant_filter = None`, `?12 IS NULL` makes the fragment
@@ -616,9 +618,11 @@ impl SqliteReceiptStore {
         let mut receipts = Vec::new();
         for row in rows {
             let (seq, raw_json) = row?;
-            let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
+            let seq = seq.max(0) as u64;
+            let receipt =
+                decode_verified_arc_receipt(&raw_json, "persisted tool receipt", Some(seq))?;
             receipts.push(StoredToolReceipt {
-                seq: seq.max(0) as u64,
+                seq,
                 receipt,
             });
         }

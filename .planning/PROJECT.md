@@ -23,16 +23,15 @@ security, regulatory compliance, and portable trust.
 (completed locally 2026-04-15; pending archival)
 **Latest archived milestone:** v3.14 Universal Fabric and Kernel Convergence
 (completed locally and archived locally 2026-04-14)
-**Most recent implemented milestone:** v3.18 Bounded ARC Ship Readiness Closure
-(completed locally 2026-04-15; pending archival)
-**Active milestone:** v3.18 Bounded ARC Ship Readiness Closure
-(complete locally 2026-04-15; pending archival)
+**Most recent implemented milestone:** Post-v3.18 ARC Closure Program
+(completed locally 2026-04-19; tracker fully green through the final release-truth sync gate)
+**Active milestone:** none; `v3.18` remains the latest ship lane and is complete locally pending archival
 **Parallel milestone:** v4.0 WASM Guard Runtime Completion (phases 373-376)
 **Deferred milestone:** v2.71 Web3 Live Activation (pending external Base
 Sepolia credentials, reviewed live-chain artifacts, and OTS tooling)
 **Planned milestones:** v3.0 through v3.18 (Universal Security Kernel era)
 **Planned milestones:** v4.0 through v4.2 (WASM Guard Plugin Ecosystem)
-**Next GSD action:** `$gsd-complete-milestone`
+**Next GSD action:** `$gsd-complete-milestone` for `v3.18`, then stage hosted release observation on the bounded candidate
 
 ## Current Milestone: v3.18 Bounded ARC Ship Readiness Closure
 
@@ -58,7 +57,11 @@ market-position properties.
 `v3.18` is now the latest completed milestone and closes the Track A P0
 bounded-ship blockers by making bounded ARC the only ship-facing release
 boundary. The retained repo-local decision from `v3.17` still stands: ARC is
-comptroller-capable software, not yet a proved market position.
+comptroller-capable software, not yet a proved market position. The
+post-`v3.18` closure tracker also completed locally on 2026-04-19: portable
+browser qualification, CI and release gating, frozen runtime-semantics docs,
+and the final release-truth sync gate are all green in
+`.planning/POST_V3_18_EXECUTION_TRACKER.md`.
 
 ## v4.x WASM Guard Plugin Ecosystem
 
@@ -81,12 +84,12 @@ landscape, long-range roadmap, HushSpec/ClawdStrike integration, v1 decisions)
 Kernel Convergence` are complete and archived locally. `v3.15 Universal
 Protocol Fabric Realization`, `v3.16 Universal Control-Plane Thesis`,
 `v3.17 Comptroller Market Position Proof`, and `v3.18 Bounded ARC Ship
-Readiness Closure` are complete locally and pending archival. Their combined
-result is that ARC can now honestly claim a bounded ship-ready ARC release on
-repo-local evidence while keeping the stronger control-plane and
-comptroller-capable claims explicitly secondary. `v4.0` remains a parallel
-strategic bet, while `v2.83` remains older prior-lane debt rather than an
-archived milestone.
+Readiness Closure` are complete locally and pending archival. The follow-on
+post-`v3.18` closure tracker is also complete locally. Their combined result is
+that ARC can now honestly claim a bounded ship-ready ARC release on repo-local
+evidence while keeping the stronger control-plane and comptroller-capable
+claims explicitly secondary. `v4.0` remains a parallel strategic bet, while
+`v2.83` remains older prior-lane debt rather than an archived milestone.
 
 ## v3.x Universal Security Kernel Era
 
@@ -1403,4 +1406,4 @@ Key regulatory milestones achieved:
 | Workload identity bridges follow portable and economic interop | Concrete verifier integrations should bind into already-stabilized policy, credential, and economic semantics | Completed in v2.12 |
 
 ---
-*Last updated: 2026-04-14 after completing phase 392 and starting phase 393 ledger/narrative reconciliation*
+*Last updated: 2026-04-19 after completing the post-v3.18 closure tracker and final release-truth sync gate*

@@ -70,11 +70,29 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - name: Install portable qualification dependencies
+        run: |
+          cargo install wasm-pack --locked
+          sudo apt-get update
+          if ! sudo apt-get install -y chromium-driver chromium; then
+            sudo apt-get install -y chromium-driver chromium-browser
+          fi
+
       - name: Workspace CI lane
         env:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.ARC_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/ci-workspace.sh
+
+      - name: Portable browser qualification
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: ./scripts/qualify-portable-browser.sh
+
+      - name: Portable mobile qualification
+        env:
+          CARGO_BUILD_JOBS: "1"
+        run: ./scripts/qualify-mobile-kernel.sh
 
       - name: SDK parity contract lane
         env:

@@ -34,7 +34,7 @@ impl SessionState {
 }
 
 /// Feature flags negotiated with the peer at session establishment.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PeerCapabilities {
     pub supports_progress: bool,
     pub supports_cancellation: bool,

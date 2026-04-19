@@ -2,7 +2,7 @@ use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use arc_kernel::budget_store::BudgetEventAuthority;
-use arc_kernel::{AuthoritySnapshot, BudgetStore, RevocationRecord};
+use arc_kernel::{BudgetStore, RevocationRecord};
 use arc_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteRevocationStore};
 
 fn unique_db_path(prefix: &str) -> std::path::PathBuf {
@@ -33,6 +33,10 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
     let replica_path = unique_db_path("arc-authority-replica");
     let primary = SqliteCapabilityAuthority::open(&primary_path).expect("open primary authority");
     let replica = SqliteCapabilityAuthority::open(&replica_path).expect("open replica authority");
+    let primary_local_key_before = primary
+        .current_keypair()
+        .expect("read primary local signing key")
+        .public_key();
 
     let rotated = replica.rotate().expect("rotate replica authority");
     let snapshot = replica.snapshot().expect("snapshot replica authority");
@@ -42,8 +46,16 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
     let status = primary.status().expect("read primary status");
 
     assert!(replaced);
+    assert_eq!(snapshot.public_key_hex, rotated.public_key.to_hex());
     assert_eq!(status.generation, rotated.generation);
     assert_eq!(status.public_key.to_hex(), snapshot.public_key_hex);
+    assert_eq!(
+        primary
+            .current_keypair()
+            .expect("read primary local signing key after snapshot")
+            .public_key(),
+        primary_local_key_before
+    );
     assert!(status
         .trusted_public_keys
         .iter()
@@ -54,16 +66,16 @@ fn sqlite_capability_authority_rotates_and_applies_newer_snapshot() {
 }
 
 #[test]
-fn sqlite_capability_authority_rejects_snapshot_with_mismatched_public_key() {
+fn sqlite_capability_authority_rejects_snapshot_with_invalid_public_key() {
     let path = unique_db_path("arc-authority-invalid-snapshot");
     let authority = SqliteCapabilityAuthority::open(&path).expect("open authority");
-    let mut snapshot: AuthoritySnapshot = authority.snapshot().expect("snapshot authority");
+    let mut snapshot = authority.snapshot().expect("snapshot authority");
     snapshot.public_key_hex = "deadbeef".to_string();
 
     let error = authority
         .apply_snapshot(&snapshot)
-        .expect_err("mismatched public key should fail closed");
-    assert!(error.to_string().contains("public key does not match seed"));
+        .expect_err("invalid public key should fail closed");
+    assert!(error.to_string().contains("invalid public key"));
 
     cleanup_sqlite_files(&path);
 }
@@ -155,7 +167,7 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
     let authorize_event_id = "hold-cap-lease-0:authorize";
     let release_event_id = "hold-cap-lease-0:release";
     let initial = authority("budget-primary", "lease-7", 7);
-    let advanced = authority("budget-primary", "lease-8", 8);
+    let advanced = authority("budget-primary", "lease-7", 8);
 
     {
         let mut store = SqliteBudgetStore::open(&path).expect("open budget store");
@@ -196,7 +208,7 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
             .to_string()
             .contains("requires authority lease metadata"));
 
-        store
+        let advanced_error = store
             .reduce_charge_cost_with_ids_and_authority(
                 "cap-lease",
                 0,
@@ -205,7 +217,21 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
                 Some(release_event_id),
                 Some(&advanced),
             )
-            .expect("release hold with advanced lease metadata");
+            .expect_err("advanced lease metadata should fail closed");
+        assert!(advanced_error
+            .to_string()
+            .contains("advanced beyond the open lease"));
+
+        store
+            .reduce_charge_cost_with_ids_and_authority(
+                "cap-lease",
+                0,
+                25,
+                Some(hold_id),
+                Some(release_event_id),
+                Some(&initial),
+            )
+            .expect("release hold with matching lease metadata");
 
         let usage = store
             .get_usage("cap-lease", 0)
@@ -219,7 +245,7 @@ fn sqlite_budget_hold_authority_metadata_persists_across_reopen() {
             .list_mutation_events(10, Some("cap-lease"), Some(0))
             .expect("reload events after release");
         assert_eq!(events.len(), 2);
-        assert_eq!(events[1].authority.as_ref(), Some(&advanced));
+        assert_eq!(events[1].authority.as_ref(), Some(&initial));
     }
 
     cleanup_sqlite_files(&path);

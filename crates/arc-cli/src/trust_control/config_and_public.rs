@@ -1354,8 +1354,7 @@ fn build_oid4vp_request_for_service(
 
 fn resolve_oid4vp_verifier_signing_key(config: &TrustServiceConfig) -> Result<Keypair, CliError> {
     if let Some(path) = config.authority_db_path.as_deref() {
-        let snapshot = SqliteCapabilityAuthority::open(path)?.snapshot()?;
-        return Ok(Keypair::from_seed_hex(&snapshot.seed_hex)?);
+        return Ok(SqliteCapabilityAuthority::open(path)?.current_keypair()?);
     }
     let path = config.authority_seed_path.as_deref().ok_or_else(|| {
         CliError::Other(

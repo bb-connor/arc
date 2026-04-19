@@ -25,9 +25,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/backbay-labs/arc/tree/main/packages/sdk/arc-py"
-Repository = "https://github.com/backbay-labs/arc"
-Issues = "https://github.com/backbay-labs/arc/issues"
+Documentation = "https://github.com/bb-connor/arc/tree/main/packages/sdk/arc-py"
+Repository = "https://github.com/bb-connor/arc"
+Issues = "https://github.com/bb-connor/arc/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

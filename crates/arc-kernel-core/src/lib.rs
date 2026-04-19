@@ -35,18 +35,16 @@
 //! # `no_std` status
 //!
 //! The crate is `#![no_std]` with `extern crate alloc;`. At the source level
-//! we never name `std::*`. Today `arc-core-types` still uses the `std`
-//! prelude in a handful of spots, so transitively this crate still pulls in
-//! the standard library when compiled for a std target. Moving
-//! `arc-core-types` to `no_std` is a separate roadmap story (Phase 14.0
-//! prerequisite); once that lands, arc-kernel-core will cross-compile to
-//! `wasm32-unknown-unknown` unchanged.
+//! we never name `std::*`, and the portable proof for this phase is now
+//! scripted in `scripts/check-portable-kernel.sh`.
 //!
-//! Until then, `cargo build --target wasm32-unknown-unknown -p arc-kernel-core`
-//! will fail at the `arc-core-types` dependency (see `getrandom` WASM support
-//! note in `docs/protocols/PORTABLE-KERNEL-ARCHITECTURE.md` section 2.4).
-//! Proof-of-portability for this phase is: `cargo build -p arc-kernel-core`
-//! compiles cleanly with zero `std::` imports in the crate source.
+//! That proof runs both:
+//! - `cargo build -p arc-kernel-core --no-default-features`
+//! - `cargo build -p arc-kernel-core --target wasm32-unknown-unknown --no-default-features`
+//!
+//! Later portability work still has to qualify the browser and mobile adapter
+//! crates end to end, but `arc-kernel-core` itself now cross-builds cleanly
+//! for the host and `wasm32-unknown-unknown` targets with `--no-default-features`.
 
 #![no_std]
 #![cfg_attr(test, allow(clippy::expect_used, clippy::unwrap_used))]
@@ -58,6 +56,7 @@ pub mod capability_verify;
 pub mod clock;
 pub mod evaluate;
 pub mod guard;
+pub mod normalized;
 pub mod passport_verify;
 pub mod receipts;
 pub mod rng;
@@ -67,6 +66,13 @@ pub use capability_verify::{verify_capability, CapabilityError, VerifiedCapabili
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{evaluate, EvaluateInput, EvaluationVerdict, KernelCoreError};
 pub use guard::{Guard, GuardContext, PortableToolCallRequest};
+pub use normalized::{
+    NormalizationError, NormalizedCapability, NormalizedConstraint,
+    NormalizedEvaluationVerdict, NormalizedMonetaryAmount, NormalizedOperation,
+    NormalizedPromptGrant, NormalizedRequest, NormalizedResourceGrant,
+    NormalizedRuntimeAssuranceTier, NormalizedScope, NormalizedToolGrant,
+    NormalizedVerdict, NormalizedVerifiedCapability,
+};
 pub use passport_verify::{
     verify_parsed_passport, verify_passport, PortablePassportBody, PortablePassportEnvelope,
     VerifiedPassport, VerifyError, PORTABLE_PASSPORT_SCHEMA,

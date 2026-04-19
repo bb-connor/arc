@@ -62,9 +62,15 @@ pub use plan::{
 };
 pub use receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
-    FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedAutonomyReceiptMetadata,
-    GovernedCommerceReceiptMetadata, GovernedTransactionReceiptMetadata, GuardEvidence,
-    MeteredBillingReceiptMetadata, MeteredUsageEvidenceReceiptMetadata, ReceiptAttributionMetadata,
+    EconomicAmountBoundsReceiptMetadata, EconomicAuthorizationMode,
+    EconomicAuthorizationReceiptMetadata, EconomicAuthorizationReceiptMetadataVersion,
+    EconomicBudgetReceiptMetadata, EconomicLiabilityReceiptMetadata,
+    EconomicMerchantReceiptMetadata, EconomicMeteringReceiptMetadata, EconomicPayeeReceiptMetadata,
+    EconomicPayerReceiptMetadata, EconomicPricingBasisReceiptMetadata, EconomicRailReceiptMetadata,
+    EconomicSettlementReceiptMetadata, FinancialReceiptMetadata, GovernedApprovalReceiptMetadata,
+    GovernedAutonomyReceiptMetadata, GovernedCommerceReceiptMetadata,
+    GovernedTransactionReceiptMetadata, GuardEvidence, MeteredBillingReceiptMetadata,
+    MeteredUsageEvidenceReceiptMetadata, ReceiptAttributionMetadata,
     RuntimeAssuranceReceiptMetadata, SettlementStatus, SignedExportEnvelope, ToolCallAction,
     TrustLevel,
 };

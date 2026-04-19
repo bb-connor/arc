@@ -31,6 +31,129 @@ pub(crate) fn sqlite_bool(value: bool) -> i64 {
     }
 }
 
+pub(crate) fn ensure_arc_receipt_verified(
+    receipt: &ArcReceipt,
+) -> Result<(), ReceiptStoreError> {
+    ensure_arc_receipt_verified_with_context(receipt, "tool receipt", None)
+}
+
+pub(crate) fn ensure_child_receipt_verified(
+    receipt: &ChildRequestReceipt,
+) -> Result<(), ReceiptStoreError> {
+    ensure_child_receipt_verified_with_context(receipt, "child receipt", None)
+}
+
+fn format_receipt_context(
+    receipt_kind: &str,
+    receipt_id: Option<&str>,
+    seq: Option<u64>,
+) -> String {
+    let mut context = receipt_kind.to_string();
+    if let Some(seq) = seq {
+        context.push_str(&format!(" seq {seq}"));
+    }
+    if let Some(receipt_id) = receipt_id {
+        context.push_str(&format!(" receipt {receipt_id}"));
+    }
+    context
+}
+
+pub(crate) fn ensure_arc_receipt_verified_with_context(
+    receipt: &ArcReceipt,
+    receipt_kind: &str,
+    seq: Option<u64>,
+) -> Result<(), ReceiptStoreError> {
+    let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
+    let signature_valid = receipt
+        .verify_signature()
+        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    if !signature_valid {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "{context} has invalid signature",
+        )));
+    }
+
+    let parameter_hash_valid = receipt
+        .action
+        .verify_hash()
+        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    if !parameter_hash_valid {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "{context} has mismatched action parameter hash",
+        )));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn ensure_child_receipt_verified_with_context(
+    receipt: &ChildRequestReceipt,
+    receipt_kind: &str,
+    seq: Option<u64>,
+) -> Result<(), ReceiptStoreError> {
+    let context = format_receipt_context(receipt_kind, Some(receipt.id.as_str()), seq);
+    let signature_valid = receipt
+        .verify_signature()
+        .map_err(|error| ReceiptStoreError::Conflict(format!("{context} verification failed: {error}")))?;
+    if !signature_valid {
+        return Err(ReceiptStoreError::Conflict(format!(
+            "{context} has invalid signature",
+        )));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn decode_verified_arc_receipt(
+    raw_json: &str,
+    receipt_kind: &str,
+    seq: Option<u64>,
+) -> Result<ArcReceipt, ReceiptStoreError> {
+    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "{} failed to decode: {error}",
+            format_receipt_context(receipt_kind, None, seq)
+        ))
+    })?;
+    let receipt_id = value
+        .get("id")
+        .and_then(|field| field.as_str())
+        .map(str::to_string);
+    let receipt: ArcReceipt = serde_json::from_value(value).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "{} failed to decode: {error}",
+            format_receipt_context(receipt_kind, receipt_id.as_deref(), seq)
+        ))
+    })?;
+    ensure_arc_receipt_verified_with_context(&receipt, receipt_kind, seq)?;
+    Ok(receipt)
+}
+
+pub(crate) fn decode_verified_child_receipt(
+    raw_json: &str,
+    receipt_kind: &str,
+    seq: Option<u64>,
+) -> Result<ChildRequestReceipt, ReceiptStoreError> {
+    let value: serde_json::Value = serde_json::from_str(raw_json).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "{} failed to decode: {error}",
+            format_receipt_context(receipt_kind, None, seq)
+        ))
+    })?;
+    let receipt_id = value
+        .get("id")
+        .and_then(|field| field.as_str())
+        .map(str::to_string);
+    let receipt: ChildRequestReceipt = serde_json::from_value(value).map_err(|error| {
+        ReceiptStoreError::Conflict(format!(
+            "{} failed to decode: {error}",
+            format_receipt_context(receipt_kind, receipt_id.as_deref(), seq)
+        ))
+    })?;
+    ensure_child_receipt_verified_with_context(&receipt, receipt_kind, seq)?;
+    Ok(receipt)
+}
+
 const CHECKPOINT_TRANSPARENCY_GUARDS_SQL: &str = r#"
 CREATE TRIGGER IF NOT EXISTS kernel_checkpoints_reject_update
 BEFORE UPDATE ON kernel_checkpoints
@@ -691,15 +814,21 @@ fn load_claim_receipt_log_receipt_ids(
 fn canonical_bytes_from_claim_log_row(
     receipt_kind: &str,
     raw_json: &str,
+    entry_seq: u64,
 ) -> Result<Vec<u8>, ReceiptStoreError> {
     match receipt_kind {
         "tool_receipt" => {
-            let receipt: ArcReceipt = serde_json::from_str(raw_json)?;
+            let receipt =
+                decode_verified_arc_receipt(raw_json, "claim-log tool receipt", Some(entry_seq))?;
             arc_core::canonical::canonical_json_bytes(&receipt)
                 .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
         }
         "child_receipt" => {
-            let receipt: ChildRequestReceipt = serde_json::from_str(raw_json)?;
+            let receipt = decode_verified_child_receipt(
+                raw_json,
+                "claim-log child receipt",
+                Some(entry_seq),
+            )?;
             arc_core::canonical::canonical_json_bytes(&receipt)
                 .map_err(|error| ReceiptStoreError::Canonical(error.to_string()))
         }
@@ -738,9 +867,10 @@ pub(crate) fn load_claim_tree_canonical_bytes_range(
     let mut result = Vec::new();
     for row in rows {
         let (entry_seq, receipt_kind, raw_json) = row?;
+        let entry_seq = sqlite_u64(entry_seq, "claim tree entry_seq")?;
         result.push((
-            sqlite_u64(entry_seq, "claim tree entry_seq")?,
-            canonical_bytes_from_claim_log_row(&receipt_kind, &raw_json)?,
+            entry_seq,
+            canonical_bytes_from_claim_log_row(&receipt_kind, &raw_json, entry_seq)?,
         ));
     }
     Ok(result)
@@ -2122,6 +2252,13 @@ pub(crate) fn extract_governed_transaction_metadata(
         .and_then(|metadata| metadata.get("governed_transaction"))
         .cloned()
         .and_then(|value| serde_json::from_value::<GovernedTransactionReceiptMetadata>(value).ok())
+}
+
+pub(crate) fn extract_economic_authorization_metadata(
+    receipt: &ArcReceipt,
+) -> Option<arc_core::receipt::EconomicAuthorizationReceiptMetadata> {
+    extract_governed_transaction_metadata(receipt)
+        .and_then(|governed| governed.economic_authorization)
 }
 
 pub(crate) fn authorization_details_from_governed_metadata(
@@ -3843,17 +3980,21 @@ fn ensure_receipt_lineage_statement_for_receipt_id_tx(
         return Ok(());
     }
 
-    let raw_json = tx
+    let row = tx
         .query_row(
-            "SELECT raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
+            "SELECT seq, raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
             params![receipt_id],
-            |row| row.get::<_, String>(0),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
         .optional()?;
-    let Some(raw_json) = raw_json else {
+    let Some((seq, raw_json)) = row else {
         return Ok(());
     };
-    let receipt: ArcReceipt = serde_json::from_str(&raw_json)?;
+    let receipt = decode_verified_arc_receipt(
+        &raw_json,
+        "persisted tool receipt",
+        Some(seq.max(0) as u64),
+    )?;
     let Some(governed) = extract_governed_transaction_metadata(&receipt) else {
         refresh_receipt_lineage_rows_for_parent_receipt_tx(tx, receipt_id)?;
         return Ok(());
@@ -3958,15 +4099,20 @@ pub(crate) fn backfill_provenance_lineage_tables(
     let tx = connection.transaction()?;
 
     let child_rows = {
-        let mut statement =
-            tx.prepare("SELECT raw_json FROM arc_child_receipts ORDER BY timestamp ASC, seq ASC")?;
+        let mut statement = tx.prepare(
+            "SELECT seq, raw_json FROM arc_child_receipts ORDER BY timestamp ASC, seq ASC",
+        )?;
         let rows = statement
-            .query_map([], |row| row.get::<_, String>(0))?
+            .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?
             .collect::<Result<Vec<_>, _>>()?;
         rows
     };
-    for raw_json in child_rows {
-        let receipt: ChildRequestReceipt = serde_json::from_str(&raw_json)?;
+    for (seq, raw_json) in child_rows {
+        let receipt = decode_verified_child_receipt(
+            &raw_json,
+            "persisted child receipt",
+            Some(seq.max(0) as u64),
+        )?;
         persist_request_lineage_tx(
             &tx,
             receipt.session_id.as_str(),
@@ -4121,6 +4267,7 @@ impl SqliteReceiptStore {
         &self,
         receipt: &ChildRequestReceipt,
     ) -> Result<(), ReceiptStoreError> {
+        ensure_child_receipt_verified(receipt)?;
         let raw_json = serde_json::to_string(receipt)?;
         let mut connection = self.connection()?;
         let tx = connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;

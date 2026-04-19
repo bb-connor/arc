@@ -207,6 +207,19 @@ length-prefixed transport:
 
 Hosted initialization, session replay, and lifecycle expectations are defined
 normatively in [WIRE_PROTOCOL.md](WIRE_PROTOCOL.md).
+The shipped hosted contract is now fixed enough that guides and examples should
+describe it literally:
+
+- `initialize` is a `POST /mcp` request, not a GET bootstrap.
+- successful initialize returns an SSE response plus `MCP-Session-Id`.
+- clients send `notifications/initialized` before relying on ready-state
+  methods such as `tools/list` or `tools/call`.
+- `GET /mcp` is the live-and-replay notification stream, with `Last-Event-ID`
+  as the replay cursor.
+- shared-owner hosted deployments may reuse one upstream subprocess, but task
+  handles and late notifications remain scoped to the originating session.
+- caller-supplied model metadata is preserved on the request path, but its
+  provenance enters ARC as `asserted` until a trusted subsystem upgrades it.
 
 ### 4.4 Identity
 
@@ -408,6 +421,29 @@ ongoing proof work, but standalone proof modules that are not root-imported or
 still contain `sorry` are not part of the shipped release gate or launch
 claims.
 
+### 5.5 Verified Core Boundary
+
+The current bounded verified-core contract is defined in
+`formal/proof-manifest.toml`.
+
+That manifest names the Rust symbols inside the present proof-facing boundary:
+
+- `arc_kernel_core::capability_verify::{verify_capability, verify_capability_with_trusted}`
+- `arc_kernel_core::scope::{resolve_matching_grants, resolve_capability_grants}`
+- `arc_kernel_core::evaluate::evaluate`
+- `arc_kernel_core::receipts::sign_receipt`
+
+It also names the two shell entrypoints that may claim direct use of that pure
+core today:
+
+- `arc_kernel::ArcKernel::evaluate_portable_verdict`
+- `arc_kernel::ArcKernel::build_and_sign_receipt`
+
+Anything outside that manifest is outside the current bounded proof boundary,
+including revocation-store queries, budget mutation, DPoP, governed approvals,
+tool dispatch, receipt persistence, clustered control-plane behavior, and
+external settlement rails.
+
 ## 6. Receipt Contract
 
 The shipped receipt envelope is `ArcReceipt` from
@@ -465,6 +501,15 @@ include:
 - subject and issuer attribution
 - streamed-output chunk metadata
 - portable-trust and federation provenance
+
+Governed receipt metadata now also admits a versioned
+`economic_authorization` envelope with `version`, `economic_mode`, `payer`,
+`merchant`, `payee`, `rail`, `amount_bounds`, `pricing_basis?`,
+`metering?`, `liability_refs?`, `budget`, and `settlement`. The envelope keeps
+budget, meter, rail, and settlement truth in separate typed sub-blocks and is
+additive only: the legacy `financial`, `commerce`, `metered_billing`,
+`approval`, `runtime_assurance`, `call_chain`, and `autonomy` fields remain
+intact for backward compatibility.
 
 Governed transaction receipts use a `governed_transaction` metadata block with
 the canonical intent identifiers plus optional approval evidence. The current
@@ -716,6 +761,8 @@ Core operator and cluster surfaces include:
 - `/v1/reports/exposure-ledger`
 - `/v1/reports/credit-scorecard`
 - `/v1/reports/settlements`
+- `/v1/reports/economic-receipts`
+- `/v1/reports/economic-completion-flow`
 - `/v1/reports/authorization-context`
 - `/v1/reports/authorization-profile-metadata`
 - `/v1/reports/authorization-review-pack`
@@ -755,6 +802,11 @@ sidecar reconciliation state keyed by `receipt_id`.
 `/v1/reports/metered-billing` and `/v1/metered-billing/reconcile` apply the
 same pattern to post-execution metered-cost evidence for governed
 non-payment-rail tools.
+`/v1/reports/economic-receipts` projects one receipt-scoped economic envelope
+alongside mutable settlement and metering reconciliation state, while
+`/v1/reports/economic-completion-flow` bundles that receipt truth with the
+persisted underwriting, credit-facility, and credit-bond surfaces over one
+shared bounded query.
 `/v1/reports/authorization-context` exports a standards-legible projection of
 governed receipts into:
 
@@ -1295,6 +1347,24 @@ Mixed or contradictory row truth fails closed: if ARC cannot represent one
 receipt row truthfully inside one currency position, it rejects the report
 instead of fabricating a blended exposure row.
 
+`GET /v1/reports/economic-completion-flow` is ARC's deterministic operator
+bundle for reviewing one canonical `metering -> underwriting -> credit ->
+settlement` path over persisted local artifacts. It returns:
+
+- one normalized bounded query over receipt-side economic activity and
+  decision-side underwriting or credit state
+- one receipt-scoped economic projection report carrying signed economic
+  authorization truth plus mutable settlement and metering reconciliation
+- persisted underwriting decisions, credit facilities, and credit bonds over
+  that same filter surface
+- one summary that surfaces the latest underwriting, facility, and bond stage
+  ARC can name truthfully without rewriting any underlying signed artifact
+
+This bundle is intentionally narrower than finalized settlement provenance.
+It shows one deterministic local completion view over persisted artifacts, but
+it does not yet claim that every settlement row is bound to exactly one
+completion-flow row. That stricter provenance claim remains downstream work.
+
 `GET /v1/reports/credit-scorecard` is ARC's signed, subject-scoped credit
 posture surface built from that same exposure ledger plus the canonical local
 reputation inspection. It returns:
@@ -1443,6 +1513,9 @@ instruction artifact carrying:
 - one subject-scoped capital-book query and one resolved live source
 - one typed action `lock_reserve`, `hold_reserve`, `release_reserve`,
   `transfer_funds`, or `cancel_instruction`
+- for `transfer_funds`, one governed receipt id plus one derived
+  completion-flow row id so downstream settlement stays bound to exactly one
+  receipt-scoped economic flow
 - one explicit authority chain with role, principal, approval time, and
   expiry for each approving or executing actor
 - one explicit execution window plus one custody-neutral rail descriptor
@@ -1461,6 +1534,10 @@ This surface is also intentionally conservative. It fails closed when:
   named custody-provider execution step
 - the intended amount is zero, overstates the available live source amount, or
   mixes currency with the selected capital source
+- a `transfer_funds` instruction omits `governedReceiptId`, omits its derived
+  completion-flow row id, resolves to zero or multiple disburse events on the
+  selected source, or asks for an amount that does not match that one disburse
+  event exactly
 - observed external execution falls outside the execution window or does not
   match the intended amount exactly
 

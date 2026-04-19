@@ -96,7 +96,7 @@ ENV ARC_HOME=/var/lib/arc \
 LABEL org.opencontainers.image.title="arc-sidecar" \
       org.opencontainers.image.description="ARC sidecar runtime (capability kernel)" \
       org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/backbay/arc"
+      org.opencontainers.image.source="https://github.com/bb-connor/arc"
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/arc"]
 # No sensible zero-argument default — `arc run` and `arc mcp serve-http`

@@ -2,6 +2,18 @@
 
 This guide closes the gap between the current wrapped-MCP path and the first supported native ARC authoring path.
 
+## Supported coding-agent start
+
+The supported path for coding agents today is:
+
+1. start from [`examples/policies/canonical-hushspec.yaml`](/Users/connor/Medica/backbay/standalone/arc/examples/policies/canonical-hushspec.yaml)
+2. wrap the existing MCP server with `arc mcp serve --policy ./policy.yaml`
+3. prove one deny, one allow, and one receipt with
+   [`docs/guides/MIGRATING-FROM-MCP.md`](/Users/connor/Medica/backbay/standalone/arc/docs/guides/MIGRATING-FROM-MCP.md)
+
+Do that first. Native authoring is the next supported step after the wrapped
+path is already behaving correctly.
+
 ## Canonical policy path
 
 For new policy authoring, use HushSpec.
@@ -10,7 +22,8 @@ For new policy authoring, use HushSpec.
 - `examples/policies/hushspec-guard-heavy.yaml` exercises the full shipped guard surface.
 - the legacy PACT YAML format remains supported as a compatibility input for existing operators and tests, but it is no longer the recommended authoring path for new work
 
-Both inputs compile into the same runtime policy materialization inside `arc-cli`. The difference is product guidance, not an execution split.
+Both inputs compile into the same runtime policy materialization inside `arc-cli`.
+The difference is product guidance, not an execution split.
 
 ## Migration path: wrapped MCP to native ARC
 
@@ -39,6 +52,13 @@ The builder creates one service value that:
 - can emit late `ToolServerEvent`s through an internal queue
 
 Advanced users can still drop to the lower-level kernel traits directly for custom streaming, resource templates, or transport-specific behavior.
+
+When you expose a native service through an ARC edge, the runtime contract does
+not change:
+
+- stdio and hosted edges still require `initialize` followed by `notifications/initialized`
+- hosted HTTP uses `POST /mcp` for requests and `GET /mcp` plus `Last-Event-ID` for live notification replay
+- caller-supplied `_meta.modelMetadata` enters the runtime as asserted provenance unless a trusted subsystem upgrades it later
 
 ## Example
 

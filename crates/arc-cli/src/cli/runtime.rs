@@ -287,6 +287,7 @@ fn cmd_check(
         server_id: server.to_string(),
         tool_name: tool.to_string(),
         arguments: params.clone(),
+        model_metadata: None,
     });
 
     let response = match kernel.evaluate_session_operation(&context, &operation)? {

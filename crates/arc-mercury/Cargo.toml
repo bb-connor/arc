@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 default-run = "mercury"
 autobins = false
+publish = false
 
 [[bin]]
 name = "mercury"

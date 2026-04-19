@@ -15,8 +15,8 @@ Support directories such as [`_shared/`](./_shared/), [`policies/`](./policies/)
 | [`langchain/`](./langchain/) | Ecosystem client | Python ARC SDK, hosted HTTP edge, trust receipt lookup | LangChain `StructuredTool` execution while ARC remains in the enforcement path | [`README.md`](./langchain/README.md) |
 | [`hello-trust-control/`](./hello-trust-control/) | Control-plane adjunct | Trust capability issuance, status, revocation, `arc check`, `arc evidence verify` | Direct trust-plane lifecycle plus offline receipt verification without an app surface | [`smoke.sh`](./hello-trust-control/smoke.sh) |
 | [`hello-receipt-verify/`](./hello-receipt-verify/) | Control-plane adjunct | Offline evidence verification, receipt lineage inspection, tamper detection | Verify a captured evidence package locally and prove that tampering fails | [`smoke.sh`](./hello-receipt-verify/smoke.sh) |
-| [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) | HTTP sidecar | `arc api protect` with OpenAPI, sidecar receipts, capability-gated side effects | Governing a plain upstream app directly from an OpenAPI spec, with no framework SDK in the app | [`smoke.sh`](./hello-openapi-sidecar/smoke.sh) |
-| [`hello-fastapi/`](./hello-fastapi/) | HTTP framework | `arc-asgi`, `arc-fastapi` | FastAPI-native ARC interception and receipt-bearing request handling | [`smoke.sh`](./hello-fastapi/smoke.sh) |
+| [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) | HTTP sidecar | `arc api protect` with OpenAPI, sidecar receipts, capability-gated side effects | Governing a plain upstream app directly from an OpenAPI spec, with no framework SDK in the app. Recommended first web-backend path. | [`smoke.sh`](./hello-openapi-sidecar/smoke.sh) |
+| [`hello-fastapi/`](./hello-fastapi/) | HTTP framework | `arc-asgi`, `arc-fastapi` | FastAPI-native ARC interception and receipt-bearing request handling. Recommended second web-backend path after the sidecar example. | [`smoke.sh`](./hello-fastapi/smoke.sh) |
 | [`hello-django/`](./hello-django/) | HTTP framework | `arc-django` | Django middleware-style ARC governance on safe and side-effect routes | [`smoke.sh`](./hello-django/smoke.sh) |
 | [`hello-fastify/`](./hello-fastify/) | HTTP framework | `@arc-protocol/fastify` | Fastify plugin-based ARC governance with receipt-bearing routes | [`smoke.sh`](./hello-fastify/smoke.sh) |
 | [`hello-elysia/`](./hello-elysia/) | HTTP framework | `@arc-protocol/elysia` | Elysia integration with ARC request governance and sidecar-backed receipts | [`smoke.sh`](./hello-elysia/smoke.sh) |
@@ -33,9 +33,10 @@ Support directories such as [`_shared/`](./_shared/), [`policies/`](./policies/)
 ## Suggested Learning Order
 
 1. [`hello-openapi-sidecar/`](./hello-openapi-sidecar/) to understand the sidecar model directly.
-2. One HTTP framework hello that matches your stack.
-3. [`hello-trust-control/`](./hello-trust-control/) and [`hello-receipt-verify/`](./hello-receipt-verify/) for the control-plane and evidence model.
-4. [`hello-mcp/`](./hello-mcp/), [`hello-a2a/`](./hello-a2a/), or [`hello-acp/`](./hello-acp/) for protocol-native surfaces.
-5. [`hello-tool/`](./hello-tool/) when you want to move from wrapped adapters to a native ARC service.
-6. [`agent-commerce-network/`](./agent-commerce-network/) when you want the full real-world composition.
-7. [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/) when you want the full recursive delegation and cross-org “internet of agents” composition.
+2. [`hello-fastapi/`](./hello-fastapi/) for the first framework-native follow-on.
+3. One additional HTTP framework hello that matches your stack.
+4. [`hello-trust-control/`](./hello-trust-control/) and [`hello-receipt-verify/`](./hello-receipt-verify/) for the control-plane and evidence model.
+5. [`hello-mcp/`](./hello-mcp/), [`hello-a2a/`](./hello-a2a/), or [`hello-acp/`](./hello-acp/) for protocol-native surfaces.
+6. [`hello-tool/`](./hello-tool/) when you want to move from wrapped adapters to a native ARC service.
+7. [`agent-commerce-network/`](./agent-commerce-network/) when you want the full real-world composition.
+8. [`internet-of-agents-incident-network/`](./internet-of-agents-incident-network/) when you want the full recursive delegation and cross-org “internet of agents” composition.

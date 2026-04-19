@@ -20,6 +20,8 @@
       "subjectKey": "subject-1",
       "sourceId": "capital-source:facility:facility-1",
       "sourceKind": "facility_commitment",
+      "governedReceiptId": "rcpt-web3-1",
+      "completionFlowRowId": "economic-completion-flow:rcpt-web3-1",
       "action": "transfer_funds",
       "ownerRole": "operator_treasury",
       "counterpartyRole": "agent_counterparty",

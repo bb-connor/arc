@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "type": "module",
   "description": "TypeScript SDK for the ARC (Attested Rights Channel) protocol",
+  "keywords": ["arc", "mcp", "receipts", "capabilities", "agent-governance"],
+  "homepage": "https://github.com/bb-connor/arc/tree/main/packages/sdk/arc-ts",
+  "bugs": {
+    "url": "https://github.com/bb-connor/arc/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bb-connor/arc.git",
+    "directory": "packages/sdk/arc-ts"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -24,6 +34,9 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22"
   },

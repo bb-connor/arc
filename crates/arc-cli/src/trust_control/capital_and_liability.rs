@@ -636,6 +636,52 @@ fn build_capital_execution_instruction_artifact_from_store(
         _ => {}
     }
 
+    let transfer_receipt_binding = match request.action {
+        CapitalExecutionInstructionAction::TransferFunds => {
+            let governed_receipt_id = request.governed_receipt_id.clone().ok_or_else(|| {
+                TrustHttpError::bad_request(
+                    "transfer_funds instructions require governedReceiptId so settlement provenance stays receipt-scoped",
+                )
+            })?;
+            let matching_events = capital_book
+                .events
+                .iter()
+                .filter(|event| {
+                    event.source_id == source.source_id
+                        && event.kind == CapitalBookEventKind::Disburse
+                        && event.receipt_id.as_deref() == Some(governed_receipt_id.as_str())
+                })
+                .collect::<Vec<_>>();
+            if matching_events.is_empty() {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "transfer_funds governed receipt `{}` does not resolve to one disburse event on source `{}`",
+                        governed_receipt_id, source.source_id
+                    ),
+                ));
+            }
+            if matching_events.len() > 1 {
+                return Err(TrustHttpError::new(
+                    StatusCode::CONFLICT,
+                    format!(
+                        "transfer_funds governed receipt `{}` matched multiple disburse events on source `{}`",
+                        governed_receipt_id, source.source_id
+                    ),
+                ));
+            }
+            Some((governed_receipt_id, matching_events[0]))
+        }
+        _ => {
+            if request.governed_receipt_id.is_some() {
+                return Err(TrustHttpError::bad_request(
+                    "governedReceiptId is only valid for transfer_funds instructions",
+                ));
+            }
+            None
+        }
+    };
+
     let amount = match request.action {
         CapitalExecutionInstructionAction::CancelInstruction => {
             if request.amount.is_some() {
@@ -684,6 +730,17 @@ fn build_capital_execution_instruction_artifact_from_store(
                         amount.units, available_amount.units
                     ),
                 ));
+            }
+            if let Some((governed_receipt_id, disburse_event)) = transfer_receipt_binding.as_ref() {
+                if amount != disburse_event.amount {
+                    return Err(TrustHttpError::new(
+                        StatusCode::CONFLICT,
+                        format!(
+                            "transfer_funds amount for governed receipt `{}` must match the settled disburse event amount exactly",
+                            governed_receipt_id
+                        ),
+                    ));
+                }
             }
             Some(amount)
         }
@@ -763,6 +820,7 @@ fn build_capital_execution_instruction_artifact_from_store(
         &capital_book.subject_key,
         &source.source_id,
         request.source_kind,
+        &request.governed_receipt_id,
         request.action,
         &amount,
         &request.authority_chain,
@@ -790,6 +848,12 @@ fn build_capital_execution_instruction_artifact_from_store(
         subject_key: capital_book.subject_key,
         source_id: source.source_id.clone(),
         source_kind: source.kind,
+        governed_receipt_id: transfer_receipt_binding
+            .as_ref()
+            .map(|(governed_receipt_id, _)| governed_receipt_id.clone()),
+        completion_flow_row_id: transfer_receipt_binding
+            .as_ref()
+            .map(|(governed_receipt_id, _)| economic_completion_flow_row_id(governed_receipt_id)),
         action: request.action,
         owner_role,
         counterparty_role,
@@ -816,6 +880,26 @@ fn validate_capital_execution_instruction_request(
         .query
         .validate()
         .map_err(TrustHttpError::bad_request)?;
+    match request.action {
+        CapitalExecutionInstructionAction::TransferFunds
+            if request.governed_receipt_id.is_none() =>
+        {
+            return Err(TrustHttpError::bad_request(
+                "transfer_funds instructions require governedReceiptId",
+            ));
+        }
+        CapitalExecutionInstructionAction::LockReserve
+        | CapitalExecutionInstructionAction::HoldReserve
+        | CapitalExecutionInstructionAction::ReleaseReserve
+        | CapitalExecutionInstructionAction::CancelInstruction
+            if request.governed_receipt_id.is_some() =>
+        {
+            return Err(TrustHttpError::bad_request(
+                "governedReceiptId is only valid for transfer_funds instructions",
+            ));
+        }
+        _ => {}
+    }
     validate_capital_execution_envelope(
         &request.authority_chain,
         &request.execution_window,
@@ -1022,6 +1106,10 @@ fn capital_instruction_available_amount(
         )
     })?;
     Ok(amount)
+}
+
+fn economic_completion_flow_row_id(receipt_id: &str) -> String {
+    format!("economic-completion-flow:{receipt_id}")
 }
 
 fn capital_execution_role_from_book_role(role: CapitalBookRole) -> CapitalExecutionRole {

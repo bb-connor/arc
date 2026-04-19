@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::{
     GovernedAutonomyTier, GovernedCallChainContext, GovernedCallChainProvenance,
-    MeteredBillingQuote, MeteredSettlementMode, MonetaryAmount, ProvenanceEvidenceClass,
-    RuntimeAssuranceTier, WorkloadIdentity,
+    MeteredBillingQuote, MeteredSettlementMode, ModelMetadata, ModelSafetyTier, MonetaryAmount,
+    ProvenanceEvidenceClass, RuntimeAssuranceTier, WorkloadIdentity,
 };
 use crate::crypto::{
     canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
@@ -64,6 +64,29 @@ impl TrustLevel {
 
 fn is_default_trust_level(level: &TrustLevel) -> bool {
     matches!(level, TrustLevel::Mediated)
+}
+
+/// Explicit model-routing context attached to a receipt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct ModelMetadataReceiptMetadata {
+    pub model_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub safety_tier: Option<ModelSafetyTier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    pub provenance_class: ProvenanceEvidenceClass,
+}
+
+impl From<&ModelMetadata> for ModelMetadataReceiptMetadata {
+    fn from(value: &ModelMetadata) -> Self {
+        Self {
+            model_id: value.model_id.clone(),
+            safety_tier: value.safety_tier,
+            provider: value.provider.clone(),
+            provenance_class: value.provenance_class,
+        }
+    }
 }
 
 /// A ARC receipt. Signed proof that a tool call was evaluated by the Kernel.
@@ -820,6 +843,160 @@ pub enum SettlementStatus {
     Failed,
 }
 
+/// Version tag for the typed economic authorization envelope.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EconomicAuthorizationReceiptMetadataVersion {
+    V1,
+}
+
+/// Economic mode captured by the typed envelope.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EconomicAuthorizationMode {
+    BudgetOnly,
+    PrepaidFixed,
+    HoldCapture,
+    MeteredHoldCapture,
+    ExternalDispatch,
+}
+
+/// Payer binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicPayerReceiptMetadata {
+    pub party_id: String,
+    pub funding_source_ref: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custody_provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obligor_ref: Option<String>,
+}
+
+/// Merchant binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicMerchantReceiptMetadata {
+    pub merchant_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merchant_of_record: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order_ref: Option<String>,
+}
+
+/// Payee binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicPayeeReceiptMetadata {
+    pub beneficiary_id: String,
+    pub settlement_destination_ref: String,
+}
+
+/// Rail binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicRailReceiptMetadata {
+    pub kind: String,
+    pub asset: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub network: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub facilitator: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contract_or_account_ref: Option<String>,
+}
+
+/// Explicit amount bounds preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicAmountBoundsReceiptMetadata {
+    pub approved_max: MonetaryAmount,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_amount: Option<MonetaryAmount>,
+    pub settlement_cap: MonetaryAmount,
+}
+
+/// Quote and tariff binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicPricingBasisReceiptMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tariff_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quote_expiry: Option<u64>,
+}
+
+/// Meter binding preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicMeteringReceiptMetadata {
+    pub provider: String,
+    pub meter_profile_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_billable_units: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub billing_unit: Option<String>,
+}
+
+/// Budget truth preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicBudgetReceiptMetadata {
+    pub grant_index: u32,
+    pub cost_charged: u64,
+    pub currency: String,
+    pub budget_remaining: u64,
+    pub budget_total: u64,
+    pub delegation_depth: u32,
+    pub root_budget_holder: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempted_cost: Option<u64>,
+}
+
+/// Settlement truth preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicSettlementReceiptMetadata {
+    pub settlement_status: SettlementStatus,
+}
+
+/// Optional liability references preserved on the economic envelope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicLiabilityReceiptMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bond_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indemnity_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dispute_policy_ref: Option<String>,
+}
+
+/// Versioned typed economic envelope for governed receipts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct EconomicAuthorizationReceiptMetadata {
+    pub version: EconomicAuthorizationReceiptMetadataVersion,
+    pub economic_mode: EconomicAuthorizationMode,
+    pub payer: EconomicPayerReceiptMetadata,
+    pub merchant: EconomicMerchantReceiptMetadata,
+    pub payee: EconomicPayeeReceiptMetadata,
+    pub rail: EconomicRailReceiptMetadata,
+    pub amount_bounds: EconomicAmountBoundsReceiptMetadata,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pricing_basis: Option<EconomicPricingBasisReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metering: Option<EconomicMeteringReceiptMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub liability_refs: Option<EconomicLiabilityReceiptMetadata>,
+    pub budget: EconomicBudgetReceiptMetadata,
+    pub settlement: EconomicSettlementReceiptMetadata,
+}
+
 /// Approval evidence attached to a governed-transaction receipt block.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GovernedApprovalReceiptMetadata {
@@ -936,6 +1113,10 @@ pub struct GovernedTransactionReceiptMetadata {
     /// Optional autonomy tier and delegation-bond attachment bound through the governed intent hash.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autonomy: Option<GovernedAutonomyReceiptMetadata>,
+    /// Optional versioned economic envelope that keeps budget, meter, rail,
+    /// and settlement truth separate from the legacy receipt fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub economic_authorization: Option<EconomicAuthorizationReceiptMetadata>,
 }
 
 impl GovernedTransactionReceiptMetadata {
@@ -1099,6 +1280,79 @@ mod tests {
                 "outcome": "result"
             })),
             kernel_key: kp.public_key(),
+        }
+    }
+
+    fn make_economic_authorization_receipt_metadata() -> EconomicAuthorizationReceiptMetadata {
+        EconomicAuthorizationReceiptMetadata {
+            version: EconomicAuthorizationReceiptMetadataVersion::V1,
+            economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
+            payer: EconomicPayerReceiptMetadata {
+                party_id: "payer-001".to_string(),
+                funding_source_ref: "wallet-001".to_string(),
+                custody_provider: Some("custody.arc".to_string()),
+                obligor_ref: Some("obligor-001".to_string()),
+            },
+            merchant: EconomicMerchantReceiptMetadata {
+                merchant_id: "merchant-001".to_string(),
+                merchant_of_record: Some("merchant-of-record-001".to_string()),
+                order_ref: Some("order-001".to_string()),
+            },
+            payee: EconomicPayeeReceiptMetadata {
+                beneficiary_id: "beneficiary-001".to_string(),
+                settlement_destination_ref: "acct-settle-001".to_string(),
+            },
+            rail: EconomicRailReceiptMetadata {
+                kind: "card".to_string(),
+                asset: "USD".to_string(),
+                network: Some("visa".to_string()),
+                facilitator: Some("stripe".to_string()),
+                contract_or_account_ref: Some("acct_1".to_string()),
+            },
+            amount_bounds: EconomicAmountBoundsReceiptMetadata {
+                approved_max: MonetaryAmount {
+                    units: 500,
+                    currency: "USD".to_string(),
+                },
+                hold_amount: Some(MonetaryAmount {
+                    units: 400,
+                    currency: "USD".to_string(),
+                }),
+                settlement_cap: MonetaryAmount {
+                    units: 450,
+                    currency: "USD".to_string(),
+                },
+            },
+            pricing_basis: Some(EconomicPricingBasisReceiptMetadata {
+                quote_hash: Some("quote-hash-001".to_string()),
+                tariff_hash: Some("tariff-hash-001".to_string()),
+                quote_expiry: Some(1_710_000_600),
+            }),
+            metering: Some(EconomicMeteringReceiptMetadata {
+                provider: "meter.arc".to_string(),
+                meter_profile_hash: "meter-profile-hash-001".to_string(),
+                max_billable_units: Some(12),
+                billing_unit: Some("1k_tokens".to_string()),
+            }),
+            liability_refs: Some(EconomicLiabilityReceiptMetadata {
+                bond_id: Some("bond-001".to_string()),
+                policy_id: Some("policy-001".to_string()),
+                indemnity_ref: None,
+                dispute_policy_ref: Some("dispute-policy-001".to_string()),
+            }),
+            budget: EconomicBudgetReceiptMetadata {
+                grant_index: 3,
+                cost_charged: 250,
+                currency: "USD".to_string(),
+                budget_remaining: 750,
+                budget_total: 1000,
+                delegation_depth: 2,
+                root_budget_holder: "agent-root-001".to_string(),
+                attempted_cost: None,
+            },
+            settlement: EconomicSettlementReceiptMetadata {
+                settlement_status: SettlementStatus::Pending,
+            },
         }
     }
 
@@ -1538,6 +1792,7 @@ mod tests {
     fn governed_transaction_receipt_metadata_serde_roundtrip() {
         let proof_signer = Keypair::generate();
         let proof_subject = Keypair::generate();
+        let economic_authorization = make_economic_authorization_receipt_metadata();
         let metadata = GovernedTransactionReceiptMetadata {
             intent_id: "intent-1".to_string(),
             intent_hash: "intent-hash".to_string(),
@@ -1624,6 +1879,7 @@ mod tests {
                 tier: GovernedAutonomyTier::Delegated,
                 delegation_bond_id: Some("bond-1".to_string()),
             }),
+            economic_authorization: Some(economic_authorization.clone()),
         };
 
         let json = serde_json::to_string(&serde_json::json!({
@@ -1634,6 +1890,23 @@ mod tests {
         let restored: GovernedTransactionReceiptMetadata =
             serde_json::from_value(value["governed_transaction"].clone()).unwrap();
         assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn economic_authorization_receipt_metadata_serde_roundtrip() {
+        let metadata = make_economic_authorization_receipt_metadata();
+        let json = serde_json::to_value(&metadata).unwrap();
+        let restored: EconomicAuthorizationReceiptMetadata = serde_json::from_value(json).unwrap();
+
+        assert_eq!(restored, metadata);
+        assert_eq!(
+            restored.version,
+            EconomicAuthorizationReceiptMetadataVersion::V1
+        );
+        assert_eq!(
+            restored.settlement.settlement_status,
+            SettlementStatus::Pending
+        );
     }
 
     #[test]
@@ -1700,6 +1973,7 @@ mod tests {
                     .with_asserted_context(asserted_context.clone()),
             ),
             autonomy: None,
+            economic_authorization: None,
         };
 
         assert_eq!(metadata.asserted_call_chain(), Some(&asserted_context));

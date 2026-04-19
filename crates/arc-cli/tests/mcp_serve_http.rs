@@ -2695,6 +2695,91 @@ fn mcp_serve_http_terminal_tombstones_survive_restart_and_block_reuse() {
 }
 
 #[test]
+fn mcp_serve_http_ready_sessions_survive_restart_and_resume_authenticated_calls() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let session_db_path = dir.join("remote-session-state.sqlite3");
+
+    let (session_id, protocol_version) = {
+        let _server = spawn_http_server_with_session_lifecycle_tuning(
+            &dir,
+            listen,
+            token,
+            Some(&session_db_path),
+            Some(5_000),
+            Some(5_000),
+            Some(50),
+        );
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("build reqwest client");
+        let base_url = format!("http://{listen}");
+        wait_for_server(&client, &base_url);
+
+        let (session_id, protocol_version) = initialize_session(&client, &base_url, token);
+        let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+        assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+        let trust_status: Value = trust_status.json().expect("ready trust json");
+        assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
+        (session_id, protocol_version)
+    };
+
+    let _server = spawn_http_server_with_session_lifecycle_tuning(
+        &dir,
+        listen,
+        token,
+        Some(&session_db_path),
+        Some(5_000),
+        Some(5_000),
+        Some(50),
+    );
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let trust_status = get_admin_session_trust(&client, &base_url, token, &session_id);
+    assert_eq!(trust_status.status(), reqwest::StatusCode::OK);
+    let trust_status: Value = trust_status.json().expect("restored trust json");
+    assert_eq!(trust_status["lifecycle"]["state"].as_str(), Some("ready"));
+
+    let resumed_post = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 12,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(resumed_post.status(), reqwest::StatusCode::OK);
+    let (resumed_tools, notifications) = read_sse_until_response(resumed_post, json!(12), |_| {});
+    assert!(notifications.is_empty());
+    assert!(resumed_tools["result"]["tools"]
+        .as_array()
+        .is_some_and(|tools| !tools.is_empty()));
+
+    let resumed_get = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        None,
+    );
+    assert_eq!(resumed_get.status(), reqwest::StatusCode::OK);
+}
+
+#[test]
 fn mcp_serve_http_isolates_multiple_sessions() {
     let dir = unique_test_dir();
     fs::create_dir_all(&dir).expect("create temp dir");
@@ -3419,6 +3504,70 @@ fn mcp_serve_http_shared_hosted_owner_reuses_one_upstream_subprocess_and_keeps_s
             && message["params"]["status"].as_str() == Some("completed")
     }));
     assert!(task_result.get("error").is_none());
+}
+
+#[test]
+fn mcp_serve_http_shared_hosted_owner_does_not_fan_out_unscoped_notifications() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let startup_marker_path = dir.join("upstream-startups.log");
+    let _server = spawn_http_server_with_shared_owner(&dir, listen, token, &startup_marker_path);
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let (session_a, protocol_a) = initialize_session(&client, &base_url, token);
+    let (session_b, protocol_b) = initialize_session(&client, &base_url, token);
+
+    let emit_late = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_a),
+        Some(&protocol_a),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 60,
+            "method": "tools/call",
+            "params": {
+                "name": "emit_late_fixture_notifications",
+                "arguments": {
+                    "count": 1,
+                    "delayMs": 150
+                }
+            }
+        }),
+    );
+    let (terminal, post_messages) = read_sse_until_response(emit_late, json!(60), |_| {});
+    assert!(post_messages.is_empty());
+    assert!(terminal.get("error").is_none());
+
+    thread::sleep(Duration::from_millis(250));
+
+    let probe = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_b),
+        Some(&protocol_b),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 61,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    let (probe, leaked_notifications) = read_sse_until_response(probe, json!(61), |_| {});
+    assert!(probe.get("error").is_none());
+    assert!(
+        leaked_notifications.is_empty(),
+        "shared hosted owner must not fan out unattributed upstream notifications across sessions: {leaked_notifications:?}"
+    );
 }
 
 #[test]
@@ -5512,6 +5661,124 @@ fn mcp_serve_http_requires_both_accept_types_and_json_content_type() {
         bad_content_type.status(),
         reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE
     );
+}
+
+#[test]
+fn mcp_serve_http_sets_explicit_response_mode_headers() {
+    let dir = unique_test_dir();
+    fs::create_dir_all(&dir).expect("create temp dir");
+    let listen = reserve_listen_addr();
+    let token = "test-token";
+    let _server = spawn_http_server(&dir, listen, token);
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("build reqwest client");
+    let base_url = format!("http://{listen}");
+    wait_for_server(&client, &base_url);
+
+    let initialize = post_raw(
+        &client,
+        &base_url,
+        Some(token),
+        None,
+        "application/json, text/event-stream",
+        "application/json",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {
+                    "name": "integration-test",
+                    "version": "0.1.0"
+                }
+            }
+        }),
+    );
+    assert_eq!(
+        initialize
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("initialize_sse")
+    );
+    let session_id = initialize
+        .headers()
+        .get("MCP-Session-Id")
+        .expect("session id header")
+        .to_str()
+        .expect("session id string")
+        .to_string();
+    let (initialize, init_messages) = read_sse_until_response(initialize, json!(1), |_| {});
+    assert!(init_messages.is_empty());
+    let protocol_version = initialize["result"]["protocolVersion"]
+        .as_str()
+        .expect("protocol version")
+        .to_string();
+
+    let initialized = post_notification(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized"
+        }),
+    );
+    assert_eq!(
+        initialized
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("post_notification_accepted")
+    );
+    assert_eq!(initialized.status(), reqwest::StatusCode::ACCEPTED);
+
+    let tools_list = post_json(
+        &client,
+        &base_url,
+        token,
+        Some(&session_id),
+        Some(&protocol_version),
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/list",
+            "params": {}
+        }),
+    );
+    assert_eq!(
+        tools_list
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("post_request_sse")
+    );
+    let (tools_list, notifications) = read_sse_until_response(tools_list, json!(2), |_| {});
+    assert!(notifications.is_empty());
+    assert!(tools_list["result"]["tools"].is_array());
+
+    let get_stream = get_session_stream(
+        &client,
+        &base_url,
+        token,
+        &session_id,
+        Some(&protocol_version),
+        None,
+    );
+    assert_eq!(
+        get_stream
+            .headers()
+            .get("x-arc-mcp-response-mode")
+            .and_then(|value| value.to_str().ok()),
+        Some("get_sse_live")
+    );
+    assert_eq!(get_stream.status(), reqwest::StatusCode::OK);
 }
 
 #[test]

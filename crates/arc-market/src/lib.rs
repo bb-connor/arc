@@ -5,10 +5,10 @@ pub use arc_underwriting as underwriting;
 
 pub mod insurance_flow;
 pub use insurance_flow::{
-    quote_and_bind, BoundPolicy, ClaimDecision, ClaimDenialReason, ClaimEvidence, ClaimSettlement,
+    BoundPolicy, ClaimDecision, ClaimDenialReason, ClaimEvidence, ClaimSettlement,
     ClaimSettlementRequest, ClaimSettlementSink, CoverageLimit, InsuranceFlowError, PolicyStatus,
     PremiumSource, ReceiptEvidenceSource, ReceiptFingerprint, ResolvedReceiptEvidence,
-    StaticPremiumSource,
+    StaticPremiumSource, quote_and_bind,
 };
 
 use std::collections::BTreeSet;
@@ -723,12 +723,17 @@ impl LiabilityPricingAuthorityArtifact {
         })? {
             return Err("pricing authority facility signature verification failed".to_string());
         }
-        if !self.underwriting_decision.verify_signature().map_err(|error| {
-            format!("pricing authority underwriting decision signature verification failed: {error}")
-        })? {
+        if !self
+            .underwriting_decision
+            .verify_signature()
+            .map_err(|error| {
+                format!(
+                    "pricing authority underwriting decision signature verification failed: {error}"
+                )
+            })?
+        {
             return Err(
-                "pricing authority underwriting decision signature verification failed"
-                    .to_string(),
+                "pricing authority underwriting decision signature verification failed".to_string(),
             );
         }
         if !self.capital_book.verify_signature().map_err(|error| {
@@ -2575,6 +2580,7 @@ mod tests {
                     }),
                     findings: Vec::new(),
                 },
+                compliance_score: None,
                 latest_facility: Some(crate::credit::CreditProviderFacilitySnapshot {
                     facility_id: "cfd-1".to_string(),
                     issued_at: 3,
@@ -2810,6 +2816,7 @@ mod tests {
                     crate::appraisal::AttestationVerifierFamily::EnterpriseVerifier,
                 ],
             }),
+            compliance_score: None,
             signals: Vec::new(),
         }
     }
@@ -3170,6 +3177,8 @@ mod tests {
             subject_key: "subject-1".to_string(),
             source_id: "facility-source-1".to_string(),
             source_kind: crate::credit::CapitalBookSourceKind::FacilityCommitment,
+            governed_receipt_id: Some("rc-1".to_string()),
+            completion_flow_row_id: Some("economic-completion-flow:rc-1".to_string()),
             action: crate::credit::CapitalExecutionInstructionAction::TransferFunds,
             owner_role: crate::credit::CapitalExecutionRole::FacilityProvider,
             counterparty_role: crate::credit::CapitalExecutionRole::AgentCounterparty,

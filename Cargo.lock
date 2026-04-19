@@ -878,7 +878,9 @@ dependencies = [
  "arc-core",
  "arc-credentials",
  "arc-credit",
+ "arc-data-guards",
  "arc-did",
+ "arc-external-guards",
  "arc-federation",
  "arc-guards",
  "arc-hosted-mcp",
@@ -922,6 +924,7 @@ dependencies = [
  "ureq",
  "url",
  "wasmparser 0.221.3",
+ "wiremock",
 ]
 
 [[package]]
@@ -956,7 +959,9 @@ dependencies = [
  "arc-conformance",
  "arc-core",
  "arc-credentials",
+ "arc-data-guards",
  "arc-did",
+ "arc-external-guards",
  "arc-guards",
  "arc-kernel",
  "arc-link",
@@ -1187,6 +1192,7 @@ name = "arc-formal-diff-tests"
 version = "0.1.0"
 dependencies = [
  "arc-core-types",
+ "arc-kernel-core",
  "proptest",
  "serde_json",
 ]

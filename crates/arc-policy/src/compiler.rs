@@ -6,9 +6,9 @@
 //!
 //! # Guard coverage
 //!
-//! The compiler materializes 12 distinct guard types from a HushSpec
+//! The compiler materializes 13 distinct guard types from a HushSpec
 //! document. The first seven are driven directly by the `rules` section; the
-//! remaining five are driven either by the `extensions.detection`
+//! remaining six are driven either by the `extensions.detection`
 //! sub-section or by auxiliary semantics layered on top of existing rule
 //! blocks (SSRF protection on egress, output sanitization on secret
 //! patterns, per-agent velocity from origin budgets).
@@ -24,13 +24,16 @@
 //! | 7 | `PathAllowlistGuard`       | `rules.path_allowlist` |
 //! | 8 | `PromptInjectionGuard`     | `extensions.detection.prompt_injection`|
 //! | 9 | `JailbreakGuard`           | `extensions.detection.jailbreak` |
-//! |10 | `InternalNetworkGuard`     | `rules.egress` (SSRF companion) |
-//! |11 | `ResponseSanitizationGuard`| `rules.secret_patterns` (output path) |
-//! |12 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
+//! |10 | `SpiderSenseGuard`         | `extensions.detection.threat_intel` |
+//! |11 | `InternalNetworkGuard`     | `rules.egress` (SSRF companion) |
+//! |12 | `ResponseSanitizationGuard`| `rules.secret_patterns` (output path) |
+//! |13 | `AgentVelocityGuard`       | `extensions.origins.profiles[].budgets` |
+
+use std::fs;
 
 use crate::models::{
     DefaultAction, DetectionLevel, HushSpec, JailbreakDetection, PromptInjectionDetection,
-    SecretPatternsRule, Severity, ToolAccessRule,
+    SecretPatternsRule, Severity, ThreatIntelDetection, ToolAccessRule,
 };
 
 use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
@@ -46,8 +49,8 @@ use arc_guards::{
     secret_leak::CustomSecretPattern,
     AgentVelocityGuard, EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline,
     InternalNetworkGuard, JailbreakGuard, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard,
-    PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard, SecretLeakGuard,
-    ShellCommandGuard,
+    PatternDb, PostInvocationPipeline, PromptInjectionGuard, ResponseSanitizationGuard,
+    SecretLeakGuard, ShellCommandGuard, SpiderSenseConfig, SpiderSenseGuard,
 };
 
 /// Errors that can occur during policy compilation.
@@ -274,7 +277,7 @@ fn compile_rule_guards(
 }
 
 // ---------------------------------------------------------------------------
-// Detection-extension guards (8, 9)
+// Detection-extension guards (8, 9, 10)
 // ---------------------------------------------------------------------------
 
 fn compile_detection_guards(
@@ -301,6 +304,13 @@ fn compile_detection_guards(
     if let Some(jb) = &detection.jailbreak {
         if jb.enabled.unwrap_or(true) {
             builder.add(JailbreakGuard::with_config(jailbreak_config_from(jb)?));
+        }
+    }
+
+    // 10. detection.threat_intel -> SpiderSenseGuard
+    if let Some(threat_intel) = &detection.threat_intel {
+        if threat_intel.enabled.unwrap_or(true) {
+            builder.add(threat_intel_guard_from(threat_intel)?);
         }
     }
 
@@ -360,6 +370,39 @@ fn jailbreak_config_from(jb: &JailbreakDetection) -> Result<JailbreakGuardConfig
 
     config.detector = detector;
     Ok(config)
+}
+
+fn threat_intel_guard_from(
+    threat_intel: &ThreatIntelDetection,
+) -> Result<SpiderSenseGuard, CompileError> {
+    let pattern_db_path = threat_intel.pattern_db.as_deref().ok_or_else(|| {
+        CompileError::Invalid(
+            "detection.threat_intel.pattern_db is required when enabled".to_string(),
+        )
+    })?;
+
+    let pattern_db_json = fs::read_to_string(pattern_db_path).map_err(|error| {
+        CompileError::Invalid(format!(
+            "failed to read detection.threat_intel.pattern_db '{pattern_db_path}': {error}"
+        ))
+    })?;
+    let pattern_db = PatternDb::from_json(&pattern_db_json).map_err(|error| {
+        CompileError::Invalid(format!(
+            "invalid detection.threat_intel.pattern_db '{pattern_db_path}': {error}"
+        ))
+    })?;
+
+    let mut config = SpiderSenseConfig::default();
+    if let Some(similarity_threshold) = threat_intel.similarity_threshold {
+        config.similarity_threshold = similarity_threshold;
+    }
+    if let Some(top_k) = threat_intel.top_k {
+        config.top_k = top_k;
+    }
+
+    SpiderSenseGuard::new(pattern_db, config).map_err(|error| {
+        CompileError::Invalid(format!("invalid detection.threat_intel configuration: {error}"))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -628,6 +671,30 @@ fn glob_matches(pattern: &str, target: &str) -> bool {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+
+    fn sample_threat_intel_pattern_db() -> &'static str {
+        r#"
+[
+  {
+    "id": "known-prompt-injection",
+    "category": "prompt_injection",
+    "stage": "perception",
+    "label": "Known malicious prompt embedding",
+    "embedding": [1.0, 0.0, 0.0]
+  }
+]
+"#
+    }
+
+    fn write_temp_threat_intel_pattern_db() -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "arc-policy-threat-intel-{}.json",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::write(&path, sample_threat_intel_pattern_db()).unwrap();
+        path
+    }
 
     #[test]
     fn compile_empty_policy() {
@@ -812,6 +879,30 @@ extensions:
     }
 
     #[test]
+    fn compile_detection_threat_intel_adds_guard() {
+        let pattern_db = write_temp_threat_intel_pattern_db();
+        let spec = HushSpec::parse(&format!(
+            r#"
+hushspec: "0.1.0"
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
+"#,
+            pattern_db.display()
+        ))
+        .unwrap();
+
+        let compiled = compile_policy(&spec).unwrap();
+        assert_eq!(compiled.guard_names, vec!["spider-sense".to_string()]);
+
+        let _ = std::fs::remove_file(pattern_db);
+    }
+
+    #[test]
     fn compile_origin_budget_adds_agent_velocity() {
         let spec = HushSpec::parse(
             r#"
@@ -830,8 +921,9 @@ extensions:
     }
 
     #[test]
-    fn compile_all_12_guard_types() {
-        let spec = HushSpec::parse(
+    fn compile_all_13_guard_types() {
+        let pattern_db = write_temp_threat_intel_pattern_db();
+        let spec = HushSpec::parse(&format!(
             r#"
 hushspec: "0.1.0"
 rules:
@@ -856,7 +948,7 @@ rules:
     enabled: true
     patterns:
       - name: aws
-        pattern: "AKIA[0-9A-Z]{16}"
+        pattern: "AKIA[0-9A-Z]{{16}}"
         severity: critical
   patch_integrity:
     enabled: true
@@ -868,13 +960,19 @@ extensions:
     jailbreak:
       enabled: true
       block_threshold: 70
+    threat_intel:
+      enabled: true
+      pattern_db: "{}"
+      similarity_threshold: 0.8
+      top_k: 1
   origins:
     profiles:
       - id: default
         budgets:
           tool_calls: 1000
 "#,
-        )
+            pattern_db.display()
+        ))
         .unwrap();
         let compiled = compile_policy(&spec).unwrap();
 
@@ -890,6 +988,7 @@ extensions:
             "path-allowlist",
             "prompt-injection",
             "jailbreak",
+            "spider-sense",
             "agent-velocity",
         ]
         .into_iter()
@@ -900,9 +999,11 @@ extensions:
 
         assert_eq!(
             actual, expected,
-            "all 12 guard types should compile; got {actual:?}"
+            "all 13 guard types should compile; got {actual:?}"
         );
-        assert_eq!(compiled.guards.len(), 12);
+        assert_eq!(compiled.guards.len(), 13);
+
+        let _ = std::fs::remove_file(pattern_db);
     }
 
     #[test]

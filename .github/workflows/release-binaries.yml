@@ -242,6 +242,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.version.outputs.version }}"
+          repo="${{ github.repository }}"
           formula_src="Homebrew/arc.rb.tmpl"
           formula_out="release/arc.rb"
           if [[ ! -f "$formula_src" ]]; then
@@ -276,6 +277,7 @@ jobs:
               -e "s|__ARC_SHA256_DARWIN_AMD64__|${x86_mac}|" \
               -e "s|__ARC_SHA256_LINUX_ARM64__|${arm_lin}|" \
               -e "s|__ARC_SHA256_LINUX_AMD64__|${x86_lin}|" \
+              -e "s|__ARC_GITHUB_REPO__|${repo}|" \
               -e "s|__ARC_VERSION__|${version}|" \
               "$formula_src" > "$formula_out"
           echo "updated formula at ${formula_out}:"
@@ -294,9 +296,9 @@ jobs:
             echo "### Install"
             echo
             echo '```bash'
-            echo "curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb"
+            echo "curl -fsSL -o /tmp/arc.rb https://github.com/${{ github.repository }}/releases/latest/download/arc.rb"
             echo "brew install --formula /tmp/arc.rb"
-            echo "docker pull ghcr.io/backbay/arc-sidecar:${{ steps.version.outputs.version }}"
+            echo "docker pull ghcr.io/${{ github.repository_owner }}/arc-sidecar:${{ steps.version.outputs.version }}"
             echo '```'
             echo
             echo "### Verify"

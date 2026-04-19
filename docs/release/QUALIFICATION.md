@@ -149,6 +149,7 @@ Release-qualification lane:
 
 ```bash
 ./scripts/qualify-bounded-arc.sh
+./scripts/qualify-trust-control.sh
 ./scripts/qualify-release.sh
 ```
 
@@ -163,12 +164,21 @@ Focused stronger claim-gates:
 Focused release-component lanes:
 
 ```bash
+./scripts/qualify-trust-control.sh
 ./scripts/check-release-inputs.sh
 ./scripts/check-dashboard-release.sh
 ./scripts/check-arc-ts-release.sh
 ./scripts/check-arc-py-release.sh
 ./scripts/check-arc-go-release.sh
 cargo test -p arc-formal-diff-tests
+```
+
+Portable-kernel qualification lanes:
+
+```bash
+./scripts/check-portable-kernel.sh
+./scripts/qualify-portable-browser.sh
+./scripts/qualify-mobile-kernel.sh
 ```
 
 Targeted endgame market-discipline lanes currently used in local qualification:
@@ -236,7 +246,11 @@ done
 The hosted workflow uses
 [`.github/workflows/release-qualification.yml`](../../.github/workflows/release-qualification.yml)
 and the same `./scripts/qualify-release.sh` entrypoint. The general CI workflow
-uses [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml).
+uses [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). Those hosted
+lanes now install Lean 4 plus the browser toolchain, run
+`./scripts/check-portable-kernel.sh` in the fast CI path, and execute the
+browser/mobile portable qualification scripts before release artifacts are
+staged.
 
 ## Qualification Artifacts
 
@@ -258,6 +272,18 @@ proof at:
 
 - `target/release-qualification/logs/trust-cluster-repeat-run.log`
 
+The trust-control qualification script writes authoritative trust-control
+evidence under:
+
+- `target/release-qualification/trust-control/qualification-report.md`
+- `target/release-qualification/trust-control/logs/node-identity.log`
+- `target/release-qualification/trust-control/logs/quorum-heal.log`
+- `target/release-qualification/trust-control/logs/stale-leader-fencing.log`
+- `target/release-qualification/trust-control/logs/denied-event-replication.log`
+- `target/release-qualification/trust-control/logs/replay-and-failover.log`
+- `target/release-qualification/trust-control/logs/duplicate-event-rejection.log`
+- `target/release-qualification/trust-control/logs/stale-lease-rejection.log`
+
 The same artifacts can be fed into `ARC Certify` to produce a signed pass/fail
 attestation for a selected tool server or release candidate. See
 [ARC_CERTIFY_GUIDE.md](../ARC_CERTIFY_GUIDE.md).
@@ -277,8 +303,9 @@ The current launch package also consumes the same evidence set through
 | The TypeScript SDK can be built, packed, and consumed as a package | `packages/sdk/arc-ts/package.json`, packed tarball, and consumer smoke install | `./scripts/check-arc-ts-release.sh` |
 | The Python SDK wheel and sdist are reproducible and install cleanly | `packages/sdk/arc-py/pyproject.toml`, built wheel/sdist, and clean venv smoke installs | `./scripts/check-arc-py-release.sh` |
 | The Go SDK module qualifies as a module release and consumer dependency | `packages/sdk/arc-go/go.mod`, `go install ./cmd/conformance-peer`, and consumer-module smoke build | `./scripts/check-arc-go-release.sh` |
+| The browser wasm bindings remain buildable and exercisable end to end in a headless browser, with emitted artifact-size and evaluate-latency outputs | `scripts/qualify-portable-browser.sh`, `crates/arc-kernel-browser/tests/wasm_bindings.rs`, and `crates/arc-kernel-browser/pkg/arc_kernel_browser_bg.wasm` | `./scripts/qualify-portable-browser.sh` |
 | Executable scope-attenuation semantics stay aligned with the current shipped runtime surface | `formal/diff-tests/` reference model and differential properties | `cargo test -p arc-formal-diff-tests` |
-| Clustered trust-control remains a bounded leader-local control-plane flow rather than a consensus system | `crates/arc-cli/tests/trust_cluster.rs` repeat-run qualification plus normal workspace coverage | `cargo test -p arc-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture` |
+| Clustered trust-control remains a bounded leader-local control-plane flow with signed peer identity, stale-leader fencing, replay-safe repair, deny-event replication, and fail-closed duplicate-event or stale-lease handling rather than a consensus system | `scripts/qualify-trust-control.sh`, `crates/arc-cli/tests/trust_cluster.rs`, and targeted `arc-store-sqlite` authority-event regressions | `./scripts/qualify-trust-control.sh` |
 | The insurer-facing behavioral feed remains signed, filterable, and anchored to canonical trust data | `crates/arc-cli/tests/receipt_query.rs` behavioral-feed endpoint/CLI regression | `cargo test -p arc-cli --test receipt_query test_behavioral_feed_export_surfaces -- --exact` |
 | OID4VCI-compatible ARC passport issuance remains replay-safe, fail-closed, remotely usable through public metadata, and now exposes bounded projected `application/dc+sd-jwt` and `jwt_vc_json` passport lanes without widening ARC-native presentation semantics | `crates/arc-credentials/src/oid4vci.rs`, `crates/arc-credentials/src/portable_sd_jwt.rs`, and `crates/arc-credentials/src/portable_jwt_vc.rs` unit coverage plus `crates/arc-cli/tests/passport.rs` local and remote issuance or lifecycle regressions | `cargo test -p arc-credentials oid4vci -- --nocapture && cargo test -p arc-credentials portable_sd_jwt -- --nocapture && cargo test -p arc-credentials portable_jwt_vc_json -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_local_with_published_status_attaches_portable_lifecycle_reference -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_remote_requires_published_status_and_exposes_public_resolution -- --nocapture && cargo test -p arc-cli --test passport passport_portable_sd_jwt_metadata_and_issuance_roundtrip -- --nocapture && cargo test -p arc-cli --test passport passport_portable_jwt_vc_json_metadata_and_issuance_roundtrip -- --nocapture && cargo test -p arc-cli --test passport passport_portable_sd_jwt_status_reference_projects_active_superseded_and_revoked_states -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_metadata_rejects_public_status_distribution_without_cache_ttl -- --nocapture && cargo test -p arc-cli --test passport passport_portable_lifecycle_stale_state_fails_closed_on_offer_and_public_resolution -- --nocapture && cargo test -p arc-cli --test passport passport_portable_metadata_endpoints_require_signing_key_configuration -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_rejects_mixed_portable_profile_request -- --nocapture && cargo test -p arc-cli --test passport passport_issuance_local_portable_offer_requires_signing_seed -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vci -- --nocapture` |
 | ARC now ships one narrow verifier-side OID4VP bridge with signed `request_uri` requests, one transport-neutral wallet exchange descriptor and canonical transaction state, one optional verifier-scoped identity assertion continuity lane, same-device and cross-device launch artifacts, verifier metadata, trusted-key `JWKS`, and fail-closed `direct_post.jwt` verification over the projected passport lane | `crates/arc-core/src/session.rs`, `crates/arc-credentials/src/oid4vp.rs` unit coverage plus `crates/arc-cli/tests/passport.rs` verifier transport, wallet-exchange state, identity-assertion continuity, CLI holder adapter, and rotation regressions | `cargo test -p arc-core arc_identity_assertion -- --nocapture && cargo test -p arc-credentials oid4vp -- --nocapture && cargo test -p arc-credentials wallet_exchange_validation_rejects_contradictory_state -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_request_uri_and_direct_post_roundtrip_is_replay_safe -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_cli_holder_adapter_supports_same_device_and_cross_device_launches -- --nocapture && cargo test -p arc-cli --test passport passport_oid4vp_public_verifier_metadata_and_rotation_preserve_active_request_truth -- --nocapture` |

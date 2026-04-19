@@ -73,6 +73,8 @@ pub use solana::{
     SolanaSettlementRequest, SOLANA_ED25519_PROGRAM_ID,
 };
 
+pub const SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX: &str = "economic-completion-flow:";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct SettlementCommitment {
@@ -82,6 +84,29 @@ pub struct SettlementCommitment {
     pub receipt_reference: String,
     pub operator_identity: String,
     pub settlement_amount: MonetaryAmount,
+}
+
+pub fn settlement_completion_flow_row_id(receipt_id: &str) -> Result<String, SettlementError> {
+    let trimmed = receipt_id.trim();
+    if trimmed.is_empty() {
+        return Err(SettlementError::InvalidInput(
+            "completion-flow binding requires a non-empty receipt id".to_string(),
+        ));
+    }
+    Ok(format!("{SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX}{trimmed}"))
+}
+
+pub fn settlement_completion_flow_receipt_id<'a>(
+    row_id: &'a str,
+) -> Result<&'a str, SettlementError> {
+    row_id
+        .strip_prefix(SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX)
+        .filter(|receipt_id| !receipt_id.trim().is_empty())
+        .ok_or_else(|| {
+            SettlementError::InvalidInput(format!(
+                "completion-flow row id `{row_id}` does not carry the expected prefix"
+            ))
+        })
 }
 
 #[derive(Debug, thiserror::Error)]

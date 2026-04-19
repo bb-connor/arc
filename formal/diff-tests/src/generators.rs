@@ -4,6 +4,11 @@
 
 use proptest::prelude::*;
 
+use arc_kernel_core::normalized::{
+    NormalizedConstraint, NormalizedMonetaryAmount, NormalizedOperation, NormalizedPromptGrant,
+    NormalizedResourceGrant, NormalizedRuntimeAssuranceTier, NormalizedScope, NormalizedToolGrant,
+};
+
 use crate::spec::{
     SpecArcScope, SpecConstraint, SpecMonetaryAmount, SpecOperation, SpecPromptGrant,
     SpecResourceGrant, SpecRuntimeAssuranceTier, SpecToolGrant,
@@ -161,6 +166,7 @@ pub fn arb_spec_constraint() -> impl Strategy<Value = SpecConstraint> {
         (0usize..DOMAINS.len()).prop_map(|i| SpecConstraint::DomainExact(pool_domain(i))),
         (0usize..DOMAINS.len()).prop_map(|i| SpecConstraint::DomainGlob(pool_domain(i))),
         (1usize..4096).prop_map(SpecConstraint::MaxLength),
+        (1usize..16_384).prop_map(SpecConstraint::MaxArgsSize),
         Just(SpecConstraint::GovernedIntentRequired),
         (1u64..10_000)
             .prop_map(|threshold_units| SpecConstraint::RequireApprovalAbove { threshold_units }),
@@ -393,6 +399,7 @@ pub fn arb_impl_constraint() -> impl Strategy<Value = arc_core::capability::Cons
         (0usize..DOMAINS.len())
             .prop_map(|i| arc_core::capability::Constraint::DomainGlob(pool_domain(i))),
         (1usize..4096).prop_map(arc_core::capability::Constraint::MaxLength),
+        (1usize..16_384).prop_map(arc_core::capability::Constraint::MaxArgsSize),
         Just(arc_core::capability::Constraint::GovernedIntentRequired),
         (1u64..10_000).prop_map(|threshold_units| {
             arc_core::capability::Constraint::RequireApprovalAbove { threshold_units }
@@ -498,6 +505,7 @@ fn spec_constraint_to_impl(c: &SpecConstraint) -> arc_core::capability::Constrai
         SpecConstraint::DomainGlob(s) => arc_core::capability::Constraint::DomainGlob(s.clone()),
         SpecConstraint::RegexMatch(s) => arc_core::capability::Constraint::RegexMatch(s.clone()),
         SpecConstraint::MaxLength(n) => arc_core::capability::Constraint::MaxLength(*n),
+        SpecConstraint::MaxArgsSize(n) => arc_core::capability::Constraint::MaxArgsSize(*n),
         SpecConstraint::GovernedIntentRequired => {
             arc_core::capability::Constraint::GovernedIntentRequired
         }
@@ -527,6 +535,44 @@ fn spec_constraint_to_impl(c: &SpecConstraint) -> arc_core::capability::Constrai
     }
 }
 
+fn spec_op_to_normalized(op: &SpecOperation) -> NormalizedOperation {
+    match op {
+        SpecOperation::Invoke => NormalizedOperation::Invoke,
+        SpecOperation::ReadResult => NormalizedOperation::ReadResult,
+        SpecOperation::Read => NormalizedOperation::Read,
+        SpecOperation::Subscribe => NormalizedOperation::Subscribe,
+        SpecOperation::Get => NormalizedOperation::Get,
+        SpecOperation::Delegate => NormalizedOperation::Delegate,
+    }
+}
+
+fn spec_constraint_to_normalized(c: &SpecConstraint) -> NormalizedConstraint {
+    match c {
+        SpecConstraint::PathPrefix(s) => NormalizedConstraint::PathPrefix(s.clone()),
+        SpecConstraint::DomainExact(s) => NormalizedConstraint::DomainExact(s.clone()),
+        SpecConstraint::DomainGlob(s) => NormalizedConstraint::DomainGlob(s.clone()),
+        SpecConstraint::RegexMatch(s) => NormalizedConstraint::RegexMatch(s.clone()),
+        SpecConstraint::MaxLength(n) => NormalizedConstraint::MaxLength(*n),
+        SpecConstraint::MaxArgsSize(n) => NormalizedConstraint::MaxArgsSize(*n),
+        SpecConstraint::GovernedIntentRequired => NormalizedConstraint::GovernedIntentRequired,
+        SpecConstraint::RequireApprovalAbove { threshold_units } => {
+            NormalizedConstraint::RequireApprovalAbove {
+                threshold_units: *threshold_units,
+            }
+        }
+        SpecConstraint::SellerExact(s) => NormalizedConstraint::SellerExact(s.clone()),
+        SpecConstraint::MinimumRuntimeAssurance(tier) => {
+            NormalizedConstraint::MinimumRuntimeAssurance(match tier {
+                SpecRuntimeAssuranceTier::None => NormalizedRuntimeAssuranceTier::None,
+                SpecRuntimeAssuranceTier::Basic => NormalizedRuntimeAssuranceTier::Basic,
+                SpecRuntimeAssuranceTier::Attested => NormalizedRuntimeAssuranceTier::Attested,
+                SpecRuntimeAssuranceTier::Verified => NormalizedRuntimeAssuranceTier::Verified,
+            })
+        }
+        SpecConstraint::Custom(k, v) => NormalizedConstraint::Custom(k.clone(), v.clone()),
+    }
+}
+
 fn spec_grant_to_impl(g: &SpecToolGrant) -> arc_core::capability::ToolGrant {
     arc_core::capability::ToolGrant {
         server_id: g.server_id.clone(),
@@ -550,6 +596,27 @@ fn spec_grant_to_impl(g: &SpecToolGrant) -> arc_core::capability::ToolGrant {
     }
 }
 
+pub fn spec_grant_to_normalized(g: &SpecToolGrant) -> NormalizedToolGrant {
+    NormalizedToolGrant {
+        server_id: g.server_id.clone(),
+        tool_name: g.tool_name.clone(),
+        operations: g.operations.iter().map(spec_op_to_normalized).collect(),
+        constraints: g.constraints.iter().map(spec_constraint_to_normalized).collect(),
+        max_invocations: g.max_invocations,
+        max_cost_per_invocation: g.max_cost_per_invocation.as_ref().map(|amount| {
+            NormalizedMonetaryAmount {
+                units: amount.units,
+                currency: amount.currency.clone(),
+            }
+        }),
+        max_total_cost: g.max_total_cost.as_ref().map(|amount| NormalizedMonetaryAmount {
+            units: amount.units,
+            currency: amount.currency.clone(),
+        }),
+        dpop_required: g.dpop_required,
+    }
+}
+
 fn spec_resource_grant_to_impl(g: &SpecResourceGrant) -> arc_core::capability::ResourceGrant {
     arc_core::capability::ResourceGrant {
         uri_pattern: g.uri_pattern.clone(),
@@ -557,10 +624,24 @@ fn spec_resource_grant_to_impl(g: &SpecResourceGrant) -> arc_core::capability::R
     }
 }
 
+pub fn spec_resource_grant_to_normalized(g: &SpecResourceGrant) -> NormalizedResourceGrant {
+    NormalizedResourceGrant {
+        uri_pattern: g.uri_pattern.clone(),
+        operations: g.operations.iter().map(spec_op_to_normalized).collect(),
+    }
+}
+
 fn spec_prompt_grant_to_impl(g: &SpecPromptGrant) -> arc_core::capability::PromptGrant {
     arc_core::capability::PromptGrant {
         prompt_name: g.prompt_name.clone(),
         operations: g.operations.iter().map(spec_op_to_impl).collect(),
+    }
+}
+
+pub fn spec_prompt_grant_to_normalized(g: &SpecPromptGrant) -> NormalizedPromptGrant {
+    NormalizedPromptGrant {
+        prompt_name: g.prompt_name.clone(),
+        operations: g.operations.iter().map(spec_op_to_normalized).collect(),
     }
 }
 
@@ -580,11 +661,37 @@ fn spec_scope_to_impl(s: &SpecArcScope) -> arc_core::capability::ArcScope {
     }
 }
 
+pub fn spec_scope_to_normalized(s: &SpecArcScope) -> NormalizedScope {
+    NormalizedScope {
+        grants: s.grants.iter().map(spec_grant_to_normalized).collect(),
+        resource_grants: s
+            .resource_grants
+            .iter()
+            .map(spec_resource_grant_to_normalized)
+            .collect(),
+        prompt_grants: s
+            .prompt_grants
+            .iter()
+            .map(spec_prompt_grant_to_normalized)
+            .collect(),
+    }
+}
+
 /// Generate paired (spec, impl) scopes from the same random seed.
 pub fn arb_paired_scope() -> impl Strategy<Value = (SpecArcScope, arc_core::capability::ArcScope)> {
     arb_spec_scope().prop_map(|spec| {
         let impl_scope = spec_scope_to_impl(&spec);
         (spec, impl_scope)
+    })
+}
+
+/// Generate paired (spec, normalized) scopes by normalizing production structs.
+pub fn arb_paired_normalized_scope() -> impl Strategy<Value = (SpecArcScope, NormalizedScope)> {
+    arb_spec_scope().prop_map(|spec| {
+        let impl_scope = spec_scope_to_impl(&spec);
+        let normalized =
+            NormalizedScope::try_from(&impl_scope).expect("supported spec surface normalizes");
+        (spec, normalized)
     })
 }
 
@@ -602,12 +709,40 @@ pub fn arb_paired_scope_pair() -> impl Strategy<
     })
 }
 
+/// Generate paired (spec, normalized) scope pairs for subset testing.
+pub fn arb_paired_normalized_scope_pair() -> impl Strategy<
+    Value = (
+        (SpecArcScope, NormalizedScope),
+        (SpecArcScope, NormalizedScope),
+    ),
+> {
+    (arb_spec_scope(), arb_spec_scope()).prop_map(|(spec_a, spec_b)| {
+        let impl_a = spec_scope_to_impl(&spec_a);
+        let impl_b = spec_scope_to_impl(&spec_b);
+        let normalized_a =
+            NormalizedScope::try_from(&impl_a).expect("supported spec surface normalizes");
+        let normalized_b =
+            NormalizedScope::try_from(&impl_b).expect("supported spec surface normalizes");
+        ((spec_a, normalized_a), (spec_b, normalized_b))
+    })
+}
+
 /// Generate paired (spec, impl) tool grants from the same seed.
 pub fn arb_paired_grant() -> impl Strategy<Value = (SpecToolGrant, arc_core::capability::ToolGrant)>
 {
     arb_spec_tool_grant().prop_map(|spec| {
         let impl_grant = spec_grant_to_impl(&spec);
         (spec, impl_grant)
+    })
+}
+
+pub fn arb_paired_normalized_grant() -> impl Strategy<Value = (SpecToolGrant, NormalizedToolGrant)>
+{
+    arb_spec_tool_grant().prop_map(|spec| {
+        let impl_grant = spec_grant_to_impl(&spec);
+        let normalized =
+            NormalizedToolGrant::try_from(&impl_grant).expect("supported spec surface normalizes");
+        (spec, normalized)
     })
 }
 
@@ -645,10 +780,28 @@ pub fn arb_paired_resource_grant(
     })
 }
 
+pub fn arb_paired_normalized_resource_grant(
+) -> impl Strategy<Value = (SpecResourceGrant, NormalizedResourceGrant)> {
+    arb_spec_resource_grant().prop_map(|spec| {
+        let impl_grant = spec_resource_grant_to_impl(&spec);
+        let normalized = NormalizedResourceGrant::from(&impl_grant);
+        (spec, normalized)
+    })
+}
+
 pub fn arb_paired_prompt_grant(
 ) -> impl Strategy<Value = (SpecPromptGrant, arc_core::capability::PromptGrant)> {
     arb_spec_prompt_grant().prop_map(|spec| {
         let impl_grant = spec_prompt_grant_to_impl(&spec);
         (spec, impl_grant)
+    })
+}
+
+pub fn arb_paired_normalized_prompt_grant(
+) -> impl Strategy<Value = (SpecPromptGrant, NormalizedPromptGrant)> {
+    arb_spec_prompt_grant().prop_map(|spec| {
+        let impl_grant = spec_prompt_grant_to_impl(&spec);
+        let normalized = NormalizedPromptGrant::from(&impl_grant);
+        (spec, normalized)
     })
 }

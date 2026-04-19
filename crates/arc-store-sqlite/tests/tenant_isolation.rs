@@ -6,12 +6,12 @@
 //!   Tenant A writes 5 receipts, tenant B writes 3, and an operator's
 //!   pre-migration session writes 2 legacy untagged rows. The store
 //!   must:
-//!     * return 5 + 2 (= 7) rows for `tenant_filter = Some("tenant-A")`
-//!       in the default compat mode (tenant's own receipts plus the
-//!       legacy public set);
-//!     * return 3 + 2 (= 5) rows for `tenant_filter = Some("tenant-B")`;
-//!     * return 5 (and 3) rows respectively under strict isolation,
-//!       dropping the legacy fallback set;
+//!     * return 5 rows for `tenant_filter = Some("tenant-A")` by
+//!       default under strict isolation;
+//!     * return 3 rows for `tenant_filter = Some("tenant-B")` by
+//!       default under strict isolation;
+//!     * return 5 + 2 (= 7) and 3 + 2 (= 5) rows respectively only when
+//!       explicit compatibility mode is enabled;
 //!     * return all 10 rows for `tenant_filter = None` (admin / compat).
 //!
 //! The tenant_id is derived from the receipt body -- the store does not
@@ -50,10 +50,8 @@ fn signed_receipt(id: &str, capability_id: &str, tenant: Option<&str>) -> ArcRec
             capability_id: capability_id.to_string(),
             tool_server: "srv".to_string(),
             tool_name: "ping".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "h".to_string(),
-            },
+            action: ToolCallAction::from_parameters(serde_json::json!({}))
+                .expect("tool action hash"),
             decision: Decision::Allow,
             content_hash: "c".to_string(),
             policy_hash: "p".to_string(),
@@ -80,6 +78,10 @@ fn basic_query(tenant: Option<String>) -> ReceiptQuery {
 fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
     let path = unique_db_path("tenant-isolation");
     let store = SqliteReceiptStore::open(&path).expect("open store");
+    assert!(
+        store.strict_tenant_isolation_enabled(),
+        "strict tenant isolation must be enabled by default"
+    );
 
     // 5 receipts for tenant A.
     for i in 0..5 {
@@ -116,17 +118,45 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
             .expect("append legacy receipt");
     }
 
-    // Default compat mode: tenant A sees its own rows plus the NULL
-    // fallback set.
+    // Default strict mode: tenant A only sees its own rows.
     let a_page = store
         .query_receipts(&basic_query(Some("tenant-A".to_string())))
         .expect("query tenant-A");
     assert_eq!(
-        a_page.total_count, 7,
-        "tenant A compat-mode visibility must include own 5 + 2 legacy NULL rows"
+        a_page.total_count, 5,
+        "tenant A default visibility must exclude legacy NULL rows"
     );
-    assert_eq!(a_page.receipts.len(), 7);
+    assert_eq!(a_page.receipts.len(), 5);
     for stored in &a_page.receipts {
+        assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-A"));
+    }
+
+    // Tenant B sees only its own rows by default.
+    let b_page = store
+        .query_receipts(&basic_query(Some("tenant-B".to_string())))
+        .expect("query tenant-B");
+    assert_eq!(b_page.total_count, 3);
+    assert_eq!(b_page.receipts.len(), 3);
+    for stored in &b_page.receipts {
+        assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-B"));
+    }
+
+    // Explicit compatibility mode re-enables the NULL fallback set.
+    store.with_strict_tenant_isolation(false);
+    assert!(
+        !store.strict_tenant_isolation_enabled(),
+        "compatibility mode must be opt-in"
+    );
+
+    let a_compat = store
+        .query_receipts(&basic_query(Some("tenant-A".to_string())))
+        .expect("query tenant-A compat");
+    assert_eq!(
+        a_compat.total_count, 7,
+        "compat mode must include legacy NULL rows in tenant-A view"
+    );
+    assert_eq!(a_compat.receipts.len(), 7);
+    for stored in &a_compat.receipts {
         let tid = stored.receipt.tenant_id.as_deref();
         assert!(
             tid == Some("tenant-A") || tid.is_none(),
@@ -134,42 +164,16 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
         );
     }
 
-    // Tenant B sees own 3 + 2 legacy.
-    let b_page = store
+    let b_compat = store
         .query_receipts(&basic_query(Some("tenant-B".to_string())))
-        .expect("query tenant-B");
-    assert_eq!(b_page.total_count, 5);
-    assert_eq!(b_page.receipts.len(), 5);
-    for stored in &b_page.receipts {
+        .expect("query tenant-B compat");
+    assert_eq!(b_compat.total_count, 5);
+    for stored in &b_compat.receipts {
         let tid = stored.receipt.tenant_id.as_deref();
         assert!(
             tid == Some("tenant-B") || tid.is_none(),
             "tenant B compat query must not leak tenant A rows; saw {tid:?}"
         );
-    }
-
-    // Strict isolation mode excludes the NULL fallback set.
-    store.with_strict_tenant_isolation(true);
-    assert!(store.strict_tenant_isolation_enabled());
-
-    let a_strict = store
-        .query_receipts(&basic_query(Some("tenant-A".to_string())))
-        .expect("query tenant-A strict");
-    assert_eq!(
-        a_strict.total_count, 5,
-        "strict mode must drop legacy NULL rows from tenant-A view"
-    );
-    assert_eq!(a_strict.receipts.len(), 5);
-    for stored in &a_strict.receipts {
-        assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-A"));
-    }
-
-    let b_strict = store
-        .query_receipts(&basic_query(Some("tenant-B".to_string())))
-        .expect("query tenant-B strict");
-    assert_eq!(b_strict.total_count, 3);
-    for stored in &b_strict.receipts {
-        assert_eq!(stored.receipt.tenant_id.as_deref(), Some("tenant-B"));
     }
 
     // Admin / compat mode: tenant_filter = None returns everything,
@@ -180,14 +184,14 @@ fn tenant_scoped_queries_respect_and_leak_only_legacy_null_rows() {
     assert_eq!(admin.total_count, 10);
     assert_eq!(admin.receipts.len(), 10);
 
-    store.with_strict_tenant_isolation(false);
+    store.with_strict_tenant_isolation(true);
 
-    // Flip strict off again: tenant-scoped queries recover the legacy
-    // fallback set.
-    let a_compat_again = store
+    // Flip strict back on: tenant-scoped queries drop the legacy
+    // fallback set again.
+    let a_strict_again = store
         .query_receipts(&basic_query(Some("tenant-A".to_string())))
-        .expect("query tenant-A again");
-    assert_eq!(a_compat_again.total_count, 7);
+        .expect("query tenant-A strict again");
+    assert_eq!(a_strict_again.total_count, 5);
 
     cleanup(&path);
 }

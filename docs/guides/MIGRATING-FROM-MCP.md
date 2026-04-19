@@ -29,8 +29,9 @@ If you'd rather stay inside Python and skip the CLI, jump to
 Use the release binary or build from source:
 
 ```bash
-# Homebrew
-brew install backbay-industries/arc/arc
+# Homebrew release asset
+curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
+brew install --formula /tmp/arc.rb
 
 # Or, from a local checkout
 cargo install --path crates/arc-cli
@@ -43,11 +44,7 @@ You should see something like:
 arc 0.1.0
 ```
 
-If you're in the Backbay monorepo, `CARGO_TARGET_DIR=target/wave3d-code
-cargo build -p arc-cli` produces `target/wave3d-code/debug/arc` you can
-symlink onto your `PATH`.
-
-## Step 2: Bootstrap a project (optional)
+## Step 2: Bootstrap or copy the supported starter policy
 
 If this is a fresh project, scaffold one with `arc init`:
 
@@ -57,18 +54,28 @@ cd my-arc-project
 ```
 
 That creates a runnable `policy.yaml`, a sample tool server, and a
-demo driver so you can sanity-check your install. Skip this step if
-you already have a project tree.
+demo driver so you can sanity-check your install.
 
-## Step 3: Wrap your MCP server with `arc mcp serve --preset code-agent`
+If you already have a project tree, copy the supported coding-agent
+starter instead:
 
-This is the core of the migration. The ARC CLI spawns your MCP server
+```bash
+cp examples/policies/canonical-hushspec.yaml ./policy.yaml
+```
+
+That file is the canonical HushSpec starting point for coding-agent
+stacks: safe file access is allowed, obvious secret paths are denied,
+destructive shell commands are blocked, and receipts are on by default.
+
+## Step 3: Wrap your MCP server with `arc mcp serve --policy`
+
+This is the canonical supported path. The ARC CLI spawns your MCP server
 as a subprocess, mediates every tool call through the kernel, and
 re-exposes a compatible MCP edge over stdio:
 
 ```bash
 arc mcp serve \
-  --preset code-agent \
+  --policy ./policy.yaml \
   --server-id fs \
   -- npx -y @modelcontextprotocol/server-filesystem .
 ```
@@ -77,7 +84,7 @@ What the flags mean:
 
 | Flag | Purpose |
 |------|---------|
-| `--preset code-agent` | Bundled zero-config policy: allows safe file reads, denies `.env`, `.git/**`, `.ssh/**`, `git push --force`. |
+| `--policy ./policy.yaml` | File-backed HushSpec starter you can edit in-repo while keeping the wrapped MCP flow unchanged. |
 | `--server-id fs` | ARC's internal id for the wrapped server. Used in receipts. Any short string works. |
 | `--` | Everything after this is the literal command ARC runs as the MCP subprocess. |
 
@@ -91,17 +98,31 @@ INFO arc::cli initialized MCP edge session capability_count=N wrapped_command="n
 Point your MCP client at this process exactly the way you would point
 it at the upstream MCP server -- it speaks the same protocol.
 
-## Step 4: Verify that dangerous operations are denied
+If you want the zero-config fallback instead, `arc mcp serve --preset code-agent`
+still exists and ships a bundled policy with the same intent.
 
-Run `arc check` against a YAML copy of the preset to confirm the
-policy is live. The preset ships byte-identical with the Python
-`arc-code-agent` package, so one easy way to grab it is:
+### Hosted HTTP variant: `arc mcp serve-http`
+
+If you expose the same stack over HTTP instead of stdio, keep the session
+contract literal:
+
+- send `initialize` to `POST /mcp` without `MCP-Session-Id`
+- wait for the SSE initialize response and capture `MCP-Session-Id`
+- send `notifications/initialized` on `POST /mcp` before `tools/list` or `tools/call`
+- use `GET /mcp` for live notifications and replay, with `Last-Event-ID` as the replay cursor
+- expect late notifications and task handles to stay scoped to the session that created them, even when a shared hosted owner reuses one upstream subprocess
+
+If your client sends `_meta.modelMetadata` or `_meta.arcModelMetadata`, ARC
+preserves that data on the request and receipt path, but the incoming
+provenance is treated as `asserted` until a trusted subsystem upgrades it.
+
+## Step 4: Prove one deny, one allow, and one receipt
+
+Run `arc check` against the same file-backed starter policy to confirm the
+kernel path is live:
 
 ```bash
-python -c 'from arc_code_agent import DEFAULT_POLICY_YAML; print(DEFAULT_POLICY_YAML)' \
-  > /tmp/code-agent.yaml
-
-arc check --policy /tmp/code-agent.yaml \
+arc check --policy ./policy.yaml \
   --server fs --tool write_file \
   --params '{"path":"/workspace/project/.env","content":"BAD=1"}'
 ```
@@ -118,12 +139,12 @@ policy:     0b4a2ef9...
 source:     9f1e73c6...
 ```
 
-A safe read is the reverse:
+A safe command is the reverse:
 
 ```bash
 arc check --policy ./policy.yaml \
-  --server fs --tool read_file \
-  --params '{"path":"README.md"}'
+  --server shell --tool run_command \
+  --params '{"command":"pwd"}'
 # verdict: ALLOW, exit 0
 ```
 
@@ -131,7 +152,7 @@ End-to-end through your MCP client:
 
 | Operation | Expected outcome |
 |-----------|------------------|
-| `read_file("README.md")` | Allow. Receipt emitted. |
+| `run_command("pwd")` | Allow. Receipt emitted. |
 | `read_file(".env")` | Deny. `forbidden_path`. |
 | `read_file(".git/config")` | Deny. `forbidden_path`. |
 | `write_file("src/main.py", ...)` | Allow. Receipt emitted. |
@@ -148,11 +169,10 @@ directly.
 Once the baseline deny list is in place:
 
 1. **Author a custom policy.** The preset is a starting point. Copy
-   it to your repo and edit to taste:
+   the starter HushSpec to your repo and edit to taste:
 
    ```bash
-   python -c 'from arc_code_agent import DEFAULT_POLICY_YAML; print(DEFAULT_POLICY_YAML)' \
-     > ./policy.yaml
+   cp examples/policies/canonical-hushspec.yaml ./policy.yaml
    # edit policy.yaml, then:
    arc mcp serve --policy ./policy.yaml --server-id fs -- npx -y @modelcontextprotocol/server-filesystem .
    ```
@@ -206,8 +226,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-The Python package uses the **same YAML** the CLI preset embeds, so
-the two surfaces enforce identical rules.
+The Python package enforces the same coding-agent policy intent as the
+CLI starter path, but the supported default operator workflow remains the
+file-backed HushSpec plus `arc mcp serve`.
 
 ## Servers other than filesystem
 

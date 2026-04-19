@@ -135,6 +135,27 @@ mod tests {
     }
 
     #[test]
+    fn shared_hosted_owner_notification_fanout_is_fail_closed() {
+        let subscriber_a = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let subscriber_b = Arc::new(StdMutex::new(VecDeque::<Value>::new()));
+        let subscribers: NotificationSubscriberList = Arc::new(StdMutex::new(vec![
+            Arc::downgrade(&subscriber_a),
+            Arc::downgrade(&subscriber_b),
+        ]));
+
+        fan_out_shared_upstream_notifications(
+            &subscribers,
+            vec![json!({
+                "jsonrpc": "2.0",
+                "method": "notifications/resources/list_changed"
+            })],
+        );
+
+        assert!(subscriber_a.lock().expect("lock subscriber a").is_empty());
+        assert!(subscriber_b.lock().expect("lock subscriber b").is_empty());
+    }
+
+    #[test]
     fn arc_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         let metadata =
             build_arc_oauth_authorization_profile_metadata().expect("build ARC auth profile");

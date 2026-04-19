@@ -54,7 +54,9 @@
         Built with
         <code>wasm-pack build --target web --release crates/arc-kernel-browser</code>.
         Serve this page plus the <code>pkg/</code> directory through any static
-        file server and open the console to inspect verdict timings.
+        file server and open the console to inspect verdict timings. The
+        automated repo qualification lane is
+        <code>./scripts/qualify-portable-browser.sh</code>.
       </p>
       <button id="load">Load WASM</button>
       <pre id="load-output">(not loaded)</pre>

@@ -4,6 +4,29 @@ use super::*;
 
 static GLOBAL_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+fn bump_session_counter_from_id(session_id: &SessionId) {
+    let Some(number) = session_id
+        .as_str()
+        .strip_prefix("sess-")
+        .and_then(|value| value.parse::<u64>().ok())
+    else {
+        return;
+    };
+
+    let mut current = GLOBAL_SESSION_COUNTER.load(Ordering::SeqCst);
+    while current < number {
+        match GLOBAL_SESSION_COUNTER.compare_exchange(
+            current,
+            number,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        ) {
+            Ok(_) => break,
+            Err(observed) => current = observed,
+        }
+    }
+}
+
 impl ArcKernel {
     pub fn open_session(
         &self,
@@ -12,6 +35,17 @@ impl ArcKernel {
     ) -> SessionId {
         let session_number = GLOBAL_SESSION_COUNTER.fetch_add(1, Ordering::SeqCst) + 1;
         let session_id = SessionId::new(format!("sess-{}", session_number));
+
+        self.open_session_with_id(session_id, agent_id, issued_capabilities)
+    }
+
+    pub fn open_session_with_id(
+        &self,
+        session_id: SessionId,
+        agent_id: AgentId,
+        issued_capabilities: Vec<CapabilityToken>,
+    ) -> SessionId {
+        bump_session_counter_from_id(&session_id);
 
         info!(session_id = %session_id, agent_id = %agent_id, "opening session");
         let session_snapshot = self
@@ -548,7 +582,7 @@ impl ArcKernel {
             dpop_proof: None,
             governed_intent: None,
             approval_token: None,
-            model_metadata: None,
+            model_metadata: operation.model_metadata.clone(),
             federated_origin_kernel_id: None,
         };
 
@@ -628,7 +662,7 @@ impl ArcKernel {
                     dpop_proof: None,
                     governed_intent: None,
                     approval_token: None,
-                    model_metadata: None,
+                    model_metadata: tool_call.model_metadata.clone(),
                     federated_origin_kernel_id: None,
                 };
                 let session_roots =

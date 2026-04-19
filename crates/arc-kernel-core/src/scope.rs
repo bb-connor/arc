@@ -14,6 +14,11 @@
 //! `arc_kernel::capability_matches_request` -- the public API in the
 //! orchestration shell is unchanged. This function is the pure-compute
 //! kernel the portable adapters will consume directly.
+//!
+//! Verified-core boundary note:
+//! `formal/proof-manifest.toml` includes the portable matcher because it is
+//! the fail-closed subset of scope evaluation that never reaches into stores,
+//! regex engines, runtime-attestation records, or governed-transaction state.
 
 use alloc::format;
 use alloc::string::{String, ToString};

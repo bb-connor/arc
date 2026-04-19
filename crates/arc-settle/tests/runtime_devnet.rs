@@ -3,8 +3,8 @@ use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use arc_anchor::{
-    build_anchor_inclusion_proof_from_evidence_bundle, build_chain_anchor_record,
-    confirm_root_publication, prepare_root_publication, publish_root, EvmAnchorTarget,
+    EvmAnchorTarget, build_anchor_inclusion_proof_from_evidence_bundle, build_chain_anchor_record,
+    confirm_root_publication, prepare_root_publication, publish_root,
 };
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::MonetaryAmount;
@@ -30,14 +30,14 @@ use arc_kernel::evidence_export::{
     EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
 };
 use arc_settle::{
-    confirm_transaction, estimate_call_gas, finalize_escrow_dispatch, inspect_finality,
-    prepare_dual_sign_release, prepare_erc20_approval, prepare_escrow_refund,
+    DualSignReleaseInput, EscrowDispatchRequest, EscrowExecutionAmount, LocalDevnetDeployment,
+    SettlementFinalityStatus, confirm_transaction, estimate_call_gas, finalize_escrow_dispatch,
+    inspect_finality, prepare_dual_sign_release, prepare_erc20_approval, prepare_escrow_refund,
     prepare_merkle_release, prepare_web3_escrow_dispatch, project_escrow_execution_receipt,
-    read_escrow_snapshot, static_validate_call, submit_call, DualSignReleaseInput,
-    EscrowDispatchRequest, EscrowExecutionAmount, LocalDevnetDeployment, SettlementFinalityStatus,
+    read_escrow_snapshot, static_validate_call, submit_call,
 };
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 const OPERATOR_PRIVATE_KEY: &str =
     "0x1000000000000000000000000000000000000000000000000000000000000002";
@@ -216,6 +216,10 @@ fn sample_capital_instruction(
             subject_key: "subject-1".to_string(),
             source_id: "capital-source:facility:facility-1".to_string(),
             source_kind: CapitalBookSourceKind::FacilityCommitment,
+            governed_receipt_id: Some(format!("governed-{instruction_id}")),
+            completion_flow_row_id: Some(format!(
+                "economic-completion-flow:governed-{instruction_id}"
+            )),
             action: arc_core::credit::CapitalExecutionInstructionAction::TransferFunds,
             owner_role: CapitalExecutionRole::OperatorTreasury,
             counterparty_role: CapitalExecutionRole::AgentCounterparty,
@@ -305,8 +309,8 @@ fn sample_receipt(
 }
 
 #[tokio::test]
-async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_replay(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_replay()
+-> Result<(), Box<dyn std::error::Error>> {
     if !runtime_devnet_prereqs_available() {
         eprintln!(
             "skipping runtime devnet integration test because node-based prerequisites are unavailable"
@@ -440,8 +444,8 @@ async fn runtime_devnet_keeps_escrow_identity_stable_under_interleaving_and_repl
 }
 
 #[tokio::test]
-async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn runtime_devnet_executes_merkle_refund_and_dual_sign_paths()
+-> Result<(), Box<dyn std::error::Error>> {
     if !runtime_devnet_prereqs_available() {
         eprintln!(
             "skipping runtime devnet integration test because node-based prerequisites are unavailable"

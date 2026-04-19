@@ -29,6 +29,23 @@ jobs:
       - name: Install MSRV toolchain
         run: rustup toolchain install 1.93.0 --profile minimal
 
+      - name: Install Lean 4 toolchain
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          echo "ELAN_HOME=$HOME/.elan" >> "$GITHUB_ENV"
+
+      - name: Prime Lean 4 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          toolchain="$(tr -d '\r\n' < formal/lean4/Pact/lean-toolchain)"
+          "$HOME/.elan/bin/elan" toolchain install "$toolchain"
+          (
+            cd formal/lean4/Pact
+            "$HOME/.elan/bin/lake" --version
+          )
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -48,6 +65,14 @@ jobs:
           go-version: "1.23.0"
 
       - uses: Swatinem/rust-cache@v2
+
+      - name: Install portable qualification dependencies
+        run: |
+          cargo install wasm-pack --locked
+          sudo apt-get update
+          if ! sudo apt-get install -y chromium-driver chromium; then
+            sudo apt-get install -y chromium-driver chromium-browser
+          fi
 
       - name: SDK parity contract lane
         run: ./scripts/check-sdk-parity.sh

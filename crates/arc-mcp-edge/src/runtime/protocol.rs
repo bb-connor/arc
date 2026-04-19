@@ -674,6 +674,41 @@ pub(super) fn build_operation_context(
     Ok(context)
 }
 
+pub(super) fn parse_request_model_metadata(
+    id: &Value,
+    params: &Value,
+) -> Result<Option<ModelMetadata>, Value> {
+    let Some(meta) = params.get("_meta") else {
+        return Ok(None);
+    };
+    let Some(meta) = meta.as_object() else {
+        return Err(jsonrpc_error(
+            id.clone(),
+            JSONRPC_INVALID_PARAMS,
+            "_meta must be an object",
+        ));
+    };
+    let Some(model_metadata) = meta
+        .get("modelMetadata")
+        .or_else(|| meta.get("arcModelMetadata"))
+    else {
+        return Ok(None);
+    };
+
+    let metadata: ModelMetadata =
+        serde_json::from_value(model_metadata.clone()).map_err(|_| {
+            jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                "modelMetadata must be an object with model_id and optional safety_tier/provider",
+            )
+        })?;
+
+    Ok(Some(
+        metadata.with_provenance_class(arc_core::capability::ProvenanceEvidenceClass::Asserted),
+    ))
+}
+
 pub(super) fn parse_progress_token(
     id: &Value,
     params: &Value,
@@ -1020,12 +1055,19 @@ pub(super) fn select_capability_for_request(
     tool_name: &str,
     server_id: &str,
     arguments: &Value,
+    model_metadata: Option<&ModelMetadata>,
 ) -> Option<CapabilityToken> {
     capabilities
         .iter()
         .find(|capability| {
-            arc_kernel::capability_matches_request(capability, tool_name, server_id, arguments)
-                .unwrap_or(false)
+            arc_kernel::capability_matches_request_with_model_metadata(
+                capability,
+                tool_name,
+                server_id,
+                arguments,
+                model_metadata,
+            )
+            .unwrap_or(false)
         })
         .cloned()
 }

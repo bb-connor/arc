@@ -463,6 +463,14 @@ async fn serve_async(config: TrustServiceConfig) -> Result<(), CliError> {
             post(handle_record_metered_billing_reconciliation),
         )
         .route(
+            ECONOMIC_RECEIPT_REPORT_PATH,
+            get(handle_economic_receipt_report),
+        )
+        .route(
+            ECONOMIC_COMPLETION_FLOW_REPORT_PATH,
+            get(handle_economic_completion_flow_report),
+        )
+        .route(
             AUTHORIZATION_CONTEXT_REPORT_PATH,
             get(handle_authorization_context_report),
         )
@@ -564,6 +572,28 @@ pub fn build_client(
     control_url: &str,
     control_token: &str,
 ) -> Result<TrustControlClient, CliError> {
+    build_client_with_cluster_peer(control_url, control_token, None)
+}
+
+fn build_cluster_peer_client(
+    control_url: &str,
+    control_token: &str,
+    node_id: &str,
+) -> Result<TrustControlClient, CliError> {
+    build_client_with_cluster_peer(
+        control_url,
+        control_token,
+        Some(ClusterPeerClientAuth {
+            node_id: Arc::<str>::from(normalize_cluster_url(node_id)?),
+        }),
+    )
+}
+
+fn build_client_with_cluster_peer(
+    control_url: &str,
+    control_token: &str,
+    cluster_peer_auth: Option<ClusterPeerClientAuth>,
+) -> Result<TrustControlClient, CliError> {
     let endpoints = control_url
         .split(',')
         .map(str::trim)
@@ -581,6 +611,7 @@ pub fn build_client(
         preferred_index: Arc::new(Mutex::new(0)),
         token: Arc::<str>::from(control_token.to_string()),
         http,
+        cluster_peer_auth,
     })
 }
 
@@ -2314,44 +2345,69 @@ impl TrustControlClient {
     }
 
     fn cluster_status(&self) -> Result<ClusterStatusResponse, CliError> {
-        self.get_json(INTERNAL_CLUSTER_STATUS_PATH)
+        self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }
 
     fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
-        self.get_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH)
+        self.get_internal_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH, None)
     }
 
     fn cluster_snapshot(&self) -> Result<ClusterStateSnapshotResponse, CliError> {
-        self.get_json(INTERNAL_CLUSTER_SNAPSHOT_PATH)
+        self.get_internal_json(INTERNAL_CLUSTER_SNAPSHOT_PATH, None)
     }
 
     fn revocation_deltas(
         &self,
         query: &RevocationDeltaQuery,
     ) -> Result<RevocationDeltaResponse, CliError> {
-        self.get_json_with_query(INTERNAL_REVOCATIONS_DELTA_PATH, query)
+        self.get_internal_json_with_query(INTERNAL_REVOCATIONS_DELTA_PATH, query, None)
     }
 
     fn tool_receipt_deltas(
         &self,
         query: &ReceiptDeltaQuery,
     ) -> Result<ReceiptDeltaResponse, CliError> {
-        self.get_json_with_query(INTERNAL_TOOL_RECEIPTS_DELTA_PATH, query)
+        self.get_internal_json_with_query(INTERNAL_TOOL_RECEIPTS_DELTA_PATH, query, None)
     }
 
     fn child_receipt_deltas(
         &self,
         query: &ReceiptDeltaQuery,
     ) -> Result<ReceiptDeltaResponse, CliError> {
-        self.get_json_with_query(INTERNAL_CHILD_RECEIPTS_DELTA_PATH, query)
+        self.get_internal_json_with_query(INTERNAL_CHILD_RECEIPTS_DELTA_PATH, query, None)
     }
 
     fn lineage_deltas(&self, query: &ReceiptDeltaQuery) -> Result<LineageDeltaResponse, CliError> {
-        self.get_json_with_query(INTERNAL_LINEAGE_DELTA_PATH, query)
+        self.get_internal_json_with_query(INTERNAL_LINEAGE_DELTA_PATH, query, None)
     }
 
     fn budget_deltas(&self, query: &BudgetDeltaQuery) -> Result<BudgetDeltaResponse, CliError> {
-        self.get_json_with_query(INTERNAL_BUDGETS_DELTA_PATH, query)
+        self.get_internal_json_with_query(INTERNAL_BUDGETS_DELTA_PATH, query, None)
+    }
+
+    fn get_internal_json<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        term: Option<u64>,
+    ) -> Result<T, CliError> {
+        self.request_internal_get_json(path, path, term)
+    }
+
+    fn get_internal_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        query: &Q,
+        term: Option<u64>,
+    ) -> Result<T, CliError> {
+        let encoded_query = serde_urlencoded::to_string(query).map_err(|error| {
+            CliError::Other(format!("failed to encode trust control query: {error}"))
+        })?;
+        let url = if encoded_query.is_empty() {
+            path.to_string()
+        } else {
+            format!("{path}?{encoded_query}")
+        };
+        self.request_internal_get_json(&url, path, term)
     }
 
     fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
@@ -2417,6 +2473,20 @@ impl TrustControlClient {
             },
             path,
         )
+    }
+
+    fn post_internal_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        body: &B,
+        term: Option<u64>,
+    ) -> Result<T, CliError> {
+        let json = serde_json::to_value(body).map_err(|error| {
+            CliError::Other(format!(
+                "failed to serialize trust control request: {error}"
+            ))
+        })?;
+        self.request_internal_post_json(path, json, term)
     }
 
     fn public_post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
@@ -2496,6 +2566,152 @@ impl TrustControlClient {
             },
             path,
         )
+    }
+
+    fn request_internal_get_json<T>(
+        &self,
+        request_path: &str,
+        auth_endpoint: &str,
+        term: Option<u64>,
+    ) -> Result<T, CliError>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let endpoint_order = self.endpoint_order();
+        let mut last_error = None;
+        for index in endpoint_order {
+            let url = format!("{}{}", self.endpoints[index], request_path);
+            let request = if self.cluster_peer_auth.is_some() {
+                self.build_internal_get_request(&self.http, &url, auth_endpoint, term)?
+            } else {
+                self.http
+                    .get(&url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
+            };
+            match request.call() {
+                Ok(response) => {
+                    self.mark_preferred(index);
+                    return serde_json::from_reader(response.into_reader()).map_err(|error| {
+                        CliError::Other(format!(
+                            "failed to decode trust control service response body: {error}"
+                        ))
+                    });
+                }
+                Err(ureq::Error::Status(_, response)) => {
+                    last_error = Some(response.into_string().unwrap_or_default());
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    last_error = Some(format!("trust control service transport failed: {error}"));
+                }
+            }
+        }
+        Err(CliError::Other(last_error.unwrap_or_else(|| {
+            "trust control service request failed".to_string()
+        })))
+    }
+
+    fn request_internal_post_json<T>(
+        &self,
+        path: &str,
+        body: Value,
+        term: Option<u64>,
+    ) -> Result<T, CliError>
+    where
+        T: for<'de> Deserialize<'de>,
+    {
+        let endpoint_order = self.endpoint_order();
+        let mut last_error = None;
+        for index in endpoint_order {
+            let url = format!("{}{}", self.endpoints[index], path);
+            let request = if self.cluster_peer_auth.is_some() {
+                self.build_internal_post_request(&self.http, &url, path, term)?
+            } else {
+                self.http
+                    .post(&url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
+            };
+            match request.send_json(body.clone()) {
+                Ok(response) => {
+                    self.mark_preferred(index);
+                    return serde_json::from_reader(response.into_reader()).map_err(|error| {
+                        CliError::Other(format!(
+                            "failed to decode trust control service response body: {error}"
+                        ))
+                    });
+                }
+                Err(ureq::Error::Status(_, response)) => {
+                    last_error = Some(response.into_string().unwrap_or_default());
+                }
+                Err(ureq::Error::Transport(error)) => {
+                    last_error = Some(format!("trust control service transport failed: {error}"));
+                }
+            }
+        }
+        Err(CliError::Other(last_error.unwrap_or_else(|| {
+            "trust control service request failed".to_string()
+        })))
+    }
+
+    fn build_internal_get_request(
+        &self,
+        client: &Agent,
+        url: &str,
+        endpoint: &str,
+        term: Option<u64>,
+    ) -> Result<ureq::Request, CliError> {
+        let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
+            return Ok(client
+                .get(url)
+                .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
+        };
+        let issued_at = unix_timestamp_now() as i64;
+        let signature = cluster_peer_auth_signature(
+            &self.token,
+            cluster_peer_auth.node_id.as_ref(),
+            endpoint,
+            issued_at,
+            term,
+        )?;
+        let mut request = client
+            .get(url)
+            .set(CLUSTER_NODE_ID_HEADER, cluster_peer_auth.node_id.as_ref())
+            .set(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
+            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signature);
+        if let Some(term) = term {
+            request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
+        }
+        Ok(request)
+    }
+
+    fn build_internal_post_request(
+        &self,
+        client: &Agent,
+        url: &str,
+        endpoint: &str,
+        term: Option<u64>,
+    ) -> Result<ureq::Request, CliError> {
+        let Some(cluster_peer_auth) = self.cluster_peer_auth.as_ref() else {
+            return Ok(client
+                .post(url)
+                .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token)));
+        };
+        let issued_at = unix_timestamp_now() as i64;
+        let signature = cluster_peer_auth_signature(
+            &self.token,
+            cluster_peer_auth.node_id.as_ref(),
+            endpoint,
+            issued_at,
+            term,
+        )?;
+        let mut request = client
+            .post(url)
+            .set(CLUSTER_NODE_ID_HEADER, cluster_peer_auth.node_id.as_ref())
+            .set(CLUSTER_AUTH_ISSUED_AT_HEADER, &issued_at.to_string())
+            .set(CLUSTER_AUTH_SIGNATURE_HEADER, &signature);
+        if let Some(term) = term {
+            request = request.set(CLUSTER_AUTH_TERM_HEADER, &term.to_string());
+        }
+        Ok(request)
     }
 
     fn request_json<T, F>(&self, request: F, path: &str) -> Result<T, CliError>
@@ -4009,6 +4225,7 @@ mod service_runtime_tests {
             settlement_limit: Some(24),
             metered_limit: Some(25),
             authorization_limit: Some(26),
+            economic_limit: Some(27),
         };
         let _ = client.operator_report(&operator_query);
         let _ = client.metered_billing_report(&operator_query);

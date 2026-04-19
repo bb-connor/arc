@@ -6,25 +6,32 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::{
     ArcScope, CapabilityToken, CapabilityTokenBody, GovernedCallChainContext,
-    GovernedCallChainProvenance, GovernedProvenanceEvidenceClass, MonetaryAmount, Operation,
-    ToolGrant,
+    GovernedCallChainProvenance, GovernedProvenanceEvidenceClass, MeteredBillingQuote,
+    MeteredSettlementMode, MonetaryAmount, Operation, ToolGrant,
 };
 use arc_core::crypto::Keypair;
 use arc_core::merkle::MerkleTree;
 use arc_core::receipt::{
     ArcReceipt, ArcReceiptBody, ChildRequestReceipt, ChildRequestReceiptBody, Decision,
-    FinancialReceiptMetadata, GovernedApprovalReceiptMetadata, GovernedTransactionReceiptMetadata,
-    ReceiptAttributionMetadata, ReceiptLineageEndpoints, ReceiptLineageRelationKind,
-    ReceiptLineageStatement, ReceiptLineageStatementBody, SettlementStatus, SignedExportEnvelope,
-    ToolCallAction,
+    EconomicAmountBoundsReceiptMetadata, EconomicAuthorizationMode,
+    EconomicAuthorizationReceiptMetadata, EconomicAuthorizationReceiptMetadataVersion,
+    EconomicBudgetReceiptMetadata, EconomicMerchantReceiptMetadata,
+    EconomicMeteringReceiptMetadata, EconomicPayeeReceiptMetadata, EconomicPayerReceiptMetadata,
+    EconomicPricingBasisReceiptMetadata, EconomicRailReceiptMetadata,
+    EconomicSettlementReceiptMetadata, FinancialReceiptMetadata, GovernedApprovalReceiptMetadata,
+    GovernedTransactionReceiptMetadata, MeteredBillingReceiptMetadata, ReceiptAttributionMetadata,
+    ReceiptLineageEndpoints, ReceiptLineageRelationKind, ReceiptLineageStatement,
+    ReceiptLineageStatementBody, SettlementStatus, SignedExportEnvelope, ToolCallAction,
 };
 use arc_core::session::{
     OperationKind, OperationTerminalState, RequestId, SessionAnchorReference, SessionId,
 };
 use arc_kernel::checkpoint::build_checkpoint_publication;
 use arc_kernel::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof, AnalyticsTimeBucket,
-    OperatorReportQuery, ReceiptAnalyticsQuery,
+    AnalyticsTimeBucket, BehavioralFeedQuery, EvidenceExportQuery, MeteredBillingEvidenceRecord,
+    MeteredBillingReconciliationState, OperatorReportQuery, ReceiptAnalyticsQuery,
+    SettlementReconciliationState, build_checkpoint, build_checkpoint_with_previous,
+    build_inclusion_proof,
 };
 
 use super::*;
@@ -46,10 +53,7 @@ fn sample_receipt() -> ArcReceipt {
             capability_id: "cap-1".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({})),
             decision: Decision::Allow,
             content_hash: "content-1".to_string(),
             policy_hash: "policy-1".to_string(),
@@ -62,6 +66,10 @@ fn sample_receipt() -> ArcReceipt {
         &keypair,
     )
     .unwrap()
+}
+
+fn valid_tool_action(parameters: serde_json::Value) -> ToolCallAction {
+    ToolCallAction::from_parameters(parameters).unwrap()
 }
 
 fn sample_child_receipt() -> ChildRequestReceipt {
@@ -154,10 +162,7 @@ fn sample_receipt_with_id_and_timestamp(id: &str, timestamp: u64) -> ArcReceipt 
             capability_id: "cap-1".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({}),
-                parameter_hash: "abc123".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({})),
             decision: Decision::Allow,
             content_hash: "content-1".to_string(),
             policy_hash: "policy-1".to_string(),
@@ -306,6 +311,57 @@ fn load_claim_log_identity(
             },
         )
         .unwrap()
+}
+
+fn tamper_persisted_tool_receipt(
+    store: &SqliteReceiptStore,
+    receipt_id: &str,
+    mutate: impl FnOnce(&mut ArcReceipt),
+) {
+    let connection = store.connection().unwrap();
+    let raw_json = connection
+        .query_row(
+            "SELECT raw_json FROM arc_tool_receipts WHERE receipt_id = ?1",
+            rusqlite::params![receipt_id],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap();
+    let mut receipt: ArcReceipt = serde_json::from_str(&raw_json).unwrap();
+    mutate(&mut receipt);
+    let tampered = serde_json::to_string(&receipt).unwrap();
+    connection
+        .execute(
+            "UPDATE arc_tool_receipts SET raw_json = ?1 WHERE receipt_id = ?2",
+            rusqlite::params![tampered, receipt_id],
+        )
+        .unwrap();
+}
+
+fn tamper_claim_log_tool_receipt(
+    store: &SqliteReceiptStore,
+    receipt_id: &str,
+    mutate: impl FnOnce(&mut ArcReceipt),
+) {
+    let connection = store.connection().unwrap();
+    connection
+        .execute_batch("DROP TRIGGER IF EXISTS claim_receipt_log_entries_reject_update;")
+        .unwrap();
+    let raw_json = connection
+        .query_row(
+            "SELECT raw_json FROM claim_receipt_log_entries WHERE receipt_id = ?1 AND receipt_kind = 'tool_receipt'",
+            rusqlite::params![receipt_id],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap();
+    let mut receipt: ArcReceipt = serde_json::from_str(&raw_json).unwrap();
+    mutate(&mut receipt);
+    let tampered = serde_json::to_string(&receipt).unwrap();
+    connection
+        .execute(
+            "UPDATE claim_receipt_log_entries SET raw_json = ?1 WHERE receipt_id = ?2 AND receipt_kind = 'tool_receipt'",
+            rusqlite::params![tampered, receipt_id],
+        )
+        .unwrap();
 }
 
 fn load_checkpoint_tree_head_rows(
@@ -644,6 +700,141 @@ fn append_arc_receipt_returning_seq_returns_seq() {
 }
 
 #[test]
+fn append_arc_receipt_rejects_invalid_signature() {
+    let path = unique_db_path("arc-receipts-invalid-signature");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let mut receipt = sample_receipt_with_id("rcpt-invalid-signature");
+    receipt.tool_name = "sh".to_string();
+
+    let error = store.append_arc_receipt(&receipt).unwrap_err();
+    assert!(matches!(
+        error,
+        arc_kernel::ReceiptStoreError::Conflict(message)
+            if message.contains("invalid signature")
+    ));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn append_arc_receipt_rejects_mismatched_parameter_hash() {
+    let path = unique_db_path("arc-receipts-invalid-parameter-hash");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let keypair = Keypair::generate();
+    let receipt = ArcReceipt::sign(
+        ArcReceiptBody {
+            id: "rcpt-invalid-parameter-hash".to_string(),
+            timestamp: 1,
+            capability_id: "cap-1".to_string(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action: ToolCallAction {
+                parameters: serde_json::json!({ "cmd": "echo changed" }),
+                parameter_hash: "bad-parameter-hash".to_string(),
+            },
+            decision: Decision::Allow,
+            content_hash: "content-1".to_string(),
+            policy_hash: "policy-1".to_string(),
+            evidence: Vec::new(),
+            metadata: None,
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: keypair.public_key(),
+        },
+        &keypair,
+    )
+    .unwrap();
+
+    let error = store.append_arc_receipt(&receipt).unwrap_err();
+    assert!(matches!(
+        error,
+        arc_kernel::ReceiptStoreError::Conflict(message)
+            if message.contains("mismatched action parameter hash")
+    ));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn append_child_receipt_rejects_invalid_signature() {
+    let path = unique_db_path("arc-child-receipts-invalid-signature");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let mut receipt = sample_child_receipt_with_id_and_timestamp("child-invalid-signature", 2);
+    receipt.outcome_hash = "outcome-mutated".to_string();
+
+    let error = store.append_child_receipt(&receipt).unwrap_err();
+    assert!(matches!(
+        error,
+        arc_kernel::ReceiptStoreError::Conflict(message)
+            if message.contains("child-invalid-signature")
+                && message.contains("has invalid signature")
+    ));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn evidence_export_rejects_tampered_persisted_tool_receipt() {
+    let path = unique_db_path("arc-evidence-export-tamper");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let receipt = sample_receipt_with_id("tampered-export-receipt");
+    store.append_arc_receipt(&receipt).unwrap();
+    tamper_persisted_tool_receipt(&store, &receipt.id, |receipt| {
+        receipt.tool_name = "sh".to_string();
+    });
+
+    let error = store
+        .build_evidence_export_bundle(&EvidenceExportQuery::default())
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("persisted tool receipt seq"));
+    assert!(message.contains("tampered-export-receipt"));
+    assert!(message.contains("invalid signature"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn behavioral_feed_report_rejects_tampered_persisted_tool_receipt() {
+    let path = unique_db_path("arc-behavioral-feed-tamper");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let receipt = sample_receipt_with_id("tampered-report-receipt");
+    store.append_arc_receipt(&receipt).unwrap();
+    tamper_persisted_tool_receipt(&store, &receipt.id, |receipt| {
+        receipt.tool_name = "sh".to_string();
+    });
+
+    let error = store
+        .query_behavioral_feed_receipts(&BehavioralFeedQuery::default())
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("persisted tool receipt seq"));
+    assert!(message.contains("tampered-report-receipt"));
+    assert!(message.contains("invalid signature"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn claim_log_replay_rejects_tampered_persisted_tool_receipt() {
+    let path = unique_db_path("arc-claim-log-tamper");
+    let store = SqliteReceiptStore::open(&path).unwrap();
+    let receipt = sample_receipt_with_id("tampered-claim-log-receipt");
+    let seq = store.append_arc_receipt_returning_seq(&receipt).unwrap();
+    tamper_claim_log_tool_receipt(&store, &receipt.id, |receipt| {
+        receipt.tool_name = "sh".to_string();
+    });
+
+    let error = store.receipts_canonical_bytes_range(seq, seq).unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("claim-log tool receipt seq"));
+    assert!(message.contains("tampered-claim-log-receipt"));
+    assert!(message.contains("invalid signature"));
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn claim_log_projection_uses_capability_lineage_when_receipt_lacks_attribution() {
     let path = unique_db_path("arc-claim-log-lineage-projection");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
@@ -687,10 +878,7 @@ fn claim_log_projection_uses_capability_lineage_when_receipt_lacks_attribution()
             capability_id: capability.id.clone(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo projection" }),
-                parameter_hash: "param-claim-log-lineage".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo projection" })),
             decision: Decision::Allow,
             content_hash: "content-claim-log-lineage".to_string(),
             policy_hash: "policy-claim-log-lineage".to_string(),
@@ -1015,9 +1203,11 @@ fn store_checkpoint_rejects_wrong_predecessor_digest() {
     second.body.previous_checkpoint_sha256 = Some("not-the-real-digest".to_string());
     second.signature = kp.sign(&arc_core::canonical_json_bytes(&second.body).unwrap());
     let error = ReceiptStore::store_checkpoint(&mut store, &second).unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("does not match predecessor digest"));
+    assert!(
+        error
+            .to_string()
+            .contains("does not match predecessor digest")
+    );
 
     let _ = fs::remove_file(path);
 }
@@ -1034,9 +1224,11 @@ fn store_checkpoint_rejects_conflicting_rewrite() {
     let conflicting =
         build_checkpoint(1, 1, 2, &[b"one".to_vec(), b"changed".to_vec()], &kp).unwrap();
     let error = ReceiptStore::store_checkpoint(&mut store, &conflicting).unwrap_err();
-    assert!(error
-        .to_string()
-        .contains("already exists with different content"));
+    assert!(
+        error
+            .to_string()
+            .contains("already exists with different content")
+    );
 
     let _ = fs::remove_file(path);
 }
@@ -1565,10 +1757,7 @@ fn receipt_analytics_groups_by_agent_tool_and_time() {
                 capability_id: format!("cap-{subject_key}"),
                 tool_server: tool_server.to_string(),
                 tool_name: tool_name.to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: "abc123".to_string(),
-                },
+                action: valid_tool_action(serde_json::json!({})),
                 decision,
                 content_hash: format!("content-{id}"),
                 policy_hash: "policy-analytics".to_string(),
@@ -1758,10 +1947,7 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
                 capability_id: capability_id.to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: format!("param-{id}"),
-                },
+                action: valid_tool_action(serde_json::json!({})),
                 decision,
                 content_hash: format!("content-{id}"),
                 policy_hash: "policy-cost".to_string(),
@@ -1876,6 +2062,537 @@ fn cost_attribution_report_aggregates_matching_corpus_and_limits_detail_rows() {
 }
 
 #[test]
+fn economic_receipt_projection_report_joins_signed_envelope_with_reconciliation_state() {
+    let path = unique_db_path("arc-receipts-economic-projection");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let issuer_kp = Keypair::generate();
+    let subject_kp = Keypair::generate();
+    let receipt_kp = Keypair::generate();
+    let subject_hex = subject_kp.public_key().to_hex();
+    let issuer_hex = issuer_kp.public_key().to_hex();
+
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-economic".to_string(),
+            issuer: issuer_kp.public_key(),
+            subject: subject_kp.public_key(),
+            scope: ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "model".to_string(),
+                    tool_name: "infer".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: Vec::new(),
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            },
+            issued_at: 1_000,
+            expires_at: 9_000,
+            delegation_chain: Vec::new(),
+        },
+        &issuer_kp,
+    )
+    .unwrap();
+    store.record_capability_snapshot(&capability, None).unwrap();
+
+    let quote = MeteredBillingQuote {
+        quote_id: "quote-economic-1".to_string(),
+        provider: "meterco".to_string(),
+        billing_unit: "tokens".to_string(),
+        quoted_units: 100,
+        quoted_cost: MonetaryAmount {
+            units: 400,
+            currency: "USD".to_string(),
+        },
+        issued_at: 1_900,
+        expires_at: Some(3_600),
+    };
+    let receipt = ArcReceipt::sign(
+        ArcReceiptBody {
+            id: "rcpt-economic-1".to_string(),
+            timestamp: 2_000,
+            capability_id: capability.id.clone(),
+            tool_server: "model".to_string(),
+            tool_name: "infer".to_string(),
+            action: valid_tool_action(serde_json::json!({ "prompt": "hello" })),
+            decision: Decision::Allow,
+            content_hash: "content-economic-1".to_string(),
+            policy_hash: "policy-economic-1".to_string(),
+            evidence: Vec::new(),
+            metadata: Some(serde_json::json!({
+                "attribution": ReceiptAttributionMetadata {
+                    subject_key: subject_hex.clone(),
+                    issuer_key: issuer_hex,
+                    delegation_depth: 0,
+                    grant_index: Some(0),
+                },
+                "financial": FinancialReceiptMetadata {
+                    grant_index: 0,
+                    cost_charged: 400,
+                    currency: "USD".to_string(),
+                    budget_remaining: 600,
+                    budget_total: 1_000,
+                    delegation_depth: 0,
+                    root_budget_holder: subject_hex.clone(),
+                    payment_reference: Some("payref-economic-1".to_string()),
+                    settlement_status: SettlementStatus::Pending,
+                    cost_breakdown: None,
+                    oracle_evidence: None,
+                    attempted_cost: Some(450),
+                },
+                "governed_transaction": GovernedTransactionReceiptMetadata {
+                    intent_id: "intent-economic-1".to_string(),
+                    intent_hash: "intent-hash-economic-1".to_string(),
+                    purpose: "metered inference".to_string(),
+                    server_id: "model".to_string(),
+                    tool_name: "infer".to_string(),
+                    max_amount: Some(MonetaryAmount {
+                        units: 500,
+                        currency: "USD".to_string(),
+                    }),
+                    commerce: None,
+                    metered_billing: Some(MeteredBillingReceiptMetadata {
+                        settlement_mode: MeteredSettlementMode::HoldCapture,
+                        quote: quote.clone(),
+                        max_billed_units: Some(110),
+                        usage_evidence: None,
+                    }),
+                    approval: Some(GovernedApprovalReceiptMetadata {
+                        token_id: "approval-economic-1".to_string(),
+                        approver_key: subject_hex.clone(),
+                        approved: true,
+                    }),
+                    runtime_assurance: None,
+                    call_chain: None,
+                    autonomy: None,
+                    economic_authorization: Some(EconomicAuthorizationReceiptMetadata {
+                        version: EconomicAuthorizationReceiptMetadataVersion::V1,
+                        economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
+                        payer: EconomicPayerReceiptMetadata {
+                            party_id: "agent-economic".to_string(),
+                            funding_source_ref: "payref-economic-1".to_string(),
+                            custody_provider: None,
+                            obligor_ref: None,
+                        },
+                        merchant: EconomicMerchantReceiptMetadata {
+                            merchant_id: "model".to_string(),
+                            merchant_of_record: None,
+                            order_ref: Some("req-economic-1".to_string()),
+                        },
+                        payee: EconomicPayeeReceiptMetadata {
+                            beneficiary_id: "model".to_string(),
+                            settlement_destination_ref: "payref-economic-1".to_string(),
+                        },
+                        rail: EconomicRailReceiptMetadata {
+                            kind: "metered_billing".to_string(),
+                            asset: "USD".to_string(),
+                            network: None,
+                            facilitator: Some("meterco".to_string()),
+                            contract_or_account_ref: Some("payref-economic-1".to_string()),
+                        },
+                        amount_bounds: EconomicAmountBoundsReceiptMetadata {
+                            approved_max: MonetaryAmount {
+                                units: 500,
+                                currency: "USD".to_string(),
+                            },
+                            hold_amount: Some(MonetaryAmount {
+                                units: 450,
+                                currency: "USD".to_string(),
+                            }),
+                            settlement_cap: MonetaryAmount {
+                                units: 450,
+                                currency: "USD".to_string(),
+                            },
+                        },
+                        pricing_basis: Some(EconomicPricingBasisReceiptMetadata {
+                            quote_hash: Some("quote-hash-economic-1".to_string()),
+                            tariff_hash: None,
+                            quote_expiry: quote.expires_at,
+                        }),
+                        metering: Some(EconomicMeteringReceiptMetadata {
+                            provider: "meterco".to_string(),
+                            meter_profile_hash: "meter-profile-economic-1".to_string(),
+                            max_billable_units: Some(110),
+                            billing_unit: Some("tokens".to_string()),
+                        }),
+                        liability_refs: None,
+                        budget: EconomicBudgetReceiptMetadata {
+                            grant_index: 0,
+                            cost_charged: 400,
+                            currency: "USD".to_string(),
+                            budget_remaining: 600,
+                            budget_total: 1_000,
+                            delegation_depth: 0,
+                            root_budget_holder: subject_hex.clone(),
+                            attempted_cost: Some(450),
+                        },
+                        settlement: EconomicSettlementReceiptMetadata {
+                            settlement_status: SettlementStatus::Pending,
+                        },
+                    }),
+                }
+            })),
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: receipt_kp.public_key(),
+        },
+        &receipt_kp,
+    )
+    .unwrap();
+    let receipt_id = receipt.id.clone();
+    store.append_arc_receipt(&receipt).unwrap();
+    store
+        .upsert_settlement_reconciliation(
+            &receipt_id,
+            SettlementReconciliationState::Open,
+            Some("capture pending"),
+        )
+        .unwrap();
+    store
+        .upsert_metered_billing_reconciliation(
+            &receipt_id,
+            &MeteredBillingEvidenceRecord {
+                usage_evidence: arc_core::receipt::MeteredUsageEvidenceReceiptMetadata {
+                    evidence_kind: "provider-export".to_string(),
+                    evidence_id: "usage-economic-1".to_string(),
+                    observed_units: 120,
+                    evidence_sha256: Some("usage-sha-economic-1".to_string()),
+                },
+                billed_cost: MonetaryAmount {
+                    units: 450,
+                    currency: "USD".to_string(),
+                },
+                recorded_at: 2_010,
+            },
+            MeteredBillingReconciliationState::Open,
+            Some("meter overrun"),
+        )
+        .unwrap();
+
+    let report = store
+        .query_economic_receipt_projection_report(&OperatorReportQuery {
+            capability_id: Some("cap-economic".to_string()),
+            economic_limit: Some(10),
+            ..OperatorReportQuery::default()
+        })
+        .unwrap();
+
+    assert_eq!(report.summary.matching_receipts, 1);
+    assert_eq!(report.summary.returned_receipts, 1);
+    assert_eq!(report.summary.metered_receipts, 1);
+    assert_eq!(report.summary.pending_settlement_receipts, 1);
+    assert_eq!(report.summary.failed_settlement_receipts, 0);
+    assert_eq!(report.summary.settlement_actionable_receipts, 1);
+    assert_eq!(report.summary.metering_actionable_receipts, 1);
+    assert_eq!(report.summary.metering_evidence_missing_receipts, 0);
+    assert_eq!(report.summary.metering_financial_mismatch_receipts, 1);
+    assert!(!report.summary.truncated);
+
+    assert_eq!(report.receipts.len(), 1);
+    let row = &report.receipts[0];
+    assert_eq!(row.receipt_id, receipt_id);
+    assert_eq!(row.subject_key.as_deref(), Some(subject_hex.as_str()));
+    assert_eq!(
+        row.economic_authorization.economic_mode,
+        EconomicAuthorizationMode::MeteredHoldCapture
+    );
+    assert_eq!(
+        row.economic_authorization.rail.facilitator.as_deref(),
+        Some("meterco")
+    );
+    assert_eq!(row.settlement.settlement_status, SettlementStatus::Pending);
+    assert!(row.settlement.action_required);
+    assert_eq!(row.settlement.note.as_deref(), Some("capture pending"));
+    assert_eq!(
+        row.metering
+            .as_ref()
+            .and_then(|metering| metering.evidence.as_ref())
+            .map(|evidence| evidence.usage_evidence.observed_units),
+        Some(120)
+    );
+    assert!(
+        row.metering
+            .as_ref()
+            .is_some_and(|metering| metering.exceeds_quoted_units)
+    );
+    assert!(
+        row.metering
+            .as_ref()
+            .is_some_and(|metering| metering.exceeds_max_billed_units)
+    );
+    assert!(
+        row.metering
+            .as_ref()
+            .is_some_and(|metering| metering.exceeds_quoted_cost)
+    );
+    assert!(
+        row.metering
+            .as_ref()
+            .is_some_and(|metering| metering.financial_mismatch)
+    );
+    assert_eq!(
+        row.metering
+            .as_ref()
+            .and_then(|metering| metering.note.as_deref()),
+        Some("meter overrun")
+    );
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn economic_completion_flow_report_bundles_receipts_underwriting_and_credit_artifacts() {
+    let path = unique_db_path("arc-receipts-economic-flow");
+    let mut store = SqliteReceiptStore::open(&path).unwrap();
+    let receipt_kp = Keypair::generate();
+    let subject_key = "subject-flow";
+    let capability_id = format!("cap-{subject_key}");
+    let quote = MeteredBillingQuote {
+        quote_id: "quote-flow-1".to_string(),
+        provider: "meterco".to_string(),
+        billing_unit: "tokens".to_string(),
+        quoted_units: 100,
+        quoted_cost: MonetaryAmount {
+            units: 400,
+            currency: "USD".to_string(),
+        },
+        issued_at: 1_900,
+        expires_at: Some(3_600),
+    };
+    let receipt = ArcReceipt::sign(
+        ArcReceiptBody {
+            id: "rcpt-flow-1".to_string(),
+            timestamp: 2_000,
+            capability_id: capability_id.clone(),
+            tool_server: "shell".to_string(),
+            tool_name: "bash".to_string(),
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo flow" })),
+            decision: Decision::Allow,
+            content_hash: "content-flow-1".to_string(),
+            policy_hash: "policy-flow-1".to_string(),
+            evidence: Vec::new(),
+            metadata: Some(serde_json::json!({
+                "attribution": ReceiptAttributionMetadata {
+                    subject_key: subject_key.to_string(),
+                    issuer_key: "issuer-flow".to_string(),
+                    delegation_depth: 0,
+                    grant_index: Some(0),
+                },
+                "financial": FinancialReceiptMetadata {
+                    grant_index: 0,
+                    cost_charged: 400,
+                    currency: "USD".to_string(),
+                    budget_remaining: 600,
+                    budget_total: 1_000,
+                    delegation_depth: 0,
+                    root_budget_holder: subject_key.to_string(),
+                    payment_reference: Some("payref-flow-1".to_string()),
+                    settlement_status: SettlementStatus::Pending,
+                    cost_breakdown: None,
+                    oracle_evidence: None,
+                    attempted_cost: Some(450),
+                },
+                "governed_transaction": GovernedTransactionReceiptMetadata {
+                    intent_id: "intent-flow-1".to_string(),
+                    intent_hash: "intent-hash-flow-1".to_string(),
+                    purpose: "metered flow".to_string(),
+                    server_id: "shell".to_string(),
+                    tool_name: "bash".to_string(),
+                    max_amount: Some(MonetaryAmount {
+                        units: 500,
+                        currency: "USD".to_string(),
+                    }),
+                    commerce: None,
+                    metered_billing: Some(MeteredBillingReceiptMetadata {
+                        settlement_mode: MeteredSettlementMode::HoldCapture,
+                        quote: quote.clone(),
+                        max_billed_units: Some(110),
+                        usage_evidence: None,
+                    }),
+                    approval: None,
+                    runtime_assurance: None,
+                    call_chain: None,
+                    autonomy: None,
+                    economic_authorization: Some(EconomicAuthorizationReceiptMetadata {
+                        version: EconomicAuthorizationReceiptMetadataVersion::V1,
+                        economic_mode: EconomicAuthorizationMode::MeteredHoldCapture,
+                        payer: EconomicPayerReceiptMetadata {
+                            party_id: subject_key.to_string(),
+                            funding_source_ref: "payref-flow-1".to_string(),
+                            custody_provider: None,
+                            obligor_ref: None,
+                        },
+                        merchant: EconomicMerchantReceiptMetadata {
+                            merchant_id: "shell".to_string(),
+                            merchant_of_record: None,
+                            order_ref: Some("req-flow-1".to_string()),
+                        },
+                        payee: EconomicPayeeReceiptMetadata {
+                            beneficiary_id: "shell".to_string(),
+                            settlement_destination_ref: "payref-flow-1".to_string(),
+                        },
+                        rail: EconomicRailReceiptMetadata {
+                            kind: "metered_billing".to_string(),
+                            asset: "USD".to_string(),
+                            network: None,
+                            facilitator: Some("meterco".to_string()),
+                            contract_or_account_ref: Some("payref-flow-1".to_string()),
+                        },
+                        amount_bounds: EconomicAmountBoundsReceiptMetadata {
+                            approved_max: MonetaryAmount {
+                                units: 500,
+                                currency: "USD".to_string(),
+                            },
+                            hold_amount: Some(MonetaryAmount {
+                                units: 450,
+                                currency: "USD".to_string(),
+                            }),
+                            settlement_cap: MonetaryAmount {
+                                units: 450,
+                                currency: "USD".to_string(),
+                            },
+                        },
+                        pricing_basis: Some(EconomicPricingBasisReceiptMetadata {
+                            quote_hash: Some("quote-hash-flow-1".to_string()),
+                            tariff_hash: None,
+                            quote_expiry: quote.expires_at,
+                        }),
+                        metering: Some(EconomicMeteringReceiptMetadata {
+                            provider: "meterco".to_string(),
+                            meter_profile_hash: "meter-profile-flow-1".to_string(),
+                            max_billable_units: Some(110),
+                            billing_unit: Some("tokens".to_string()),
+                        }),
+                        liability_refs: None,
+                        budget: EconomicBudgetReceiptMetadata {
+                            grant_index: 0,
+                            cost_charged: 400,
+                            currency: "USD".to_string(),
+                            budget_remaining: 600,
+                            budget_total: 1_000,
+                            delegation_depth: 0,
+                            root_budget_holder: subject_key.to_string(),
+                            attempted_cost: Some(450),
+                        },
+                        settlement: EconomicSettlementReceiptMetadata {
+                            settlement_status: SettlementStatus::Pending,
+                        },
+                    }),
+                }
+            })),
+            trust_level: arc_core::TrustLevel::default(),
+            tenant_id: None,
+            kernel_key: receipt_kp.public_key(),
+        },
+        &receipt_kp,
+    )
+    .unwrap();
+    let receipt_id = receipt.id.clone();
+    store.append_arc_receipt(&receipt).unwrap();
+    store
+        .upsert_settlement_reconciliation(
+            &receipt_id,
+            SettlementReconciliationState::Open,
+            Some("awaiting capture"),
+        )
+        .unwrap();
+    store
+        .upsert_metered_billing_reconciliation(
+            &receipt_id,
+            &MeteredBillingEvidenceRecord {
+                usage_evidence: arc_core::receipt::MeteredUsageEvidenceReceiptMetadata {
+                    evidence_kind: "provider-export".to_string(),
+                    evidence_id: "usage-flow-1".to_string(),
+                    observed_units: 120,
+                    evidence_sha256: Some("usage-sha-flow-1".to_string()),
+                },
+                billed_cost: MonetaryAmount {
+                    units: 450,
+                    currency: "USD".to_string(),
+                },
+                recorded_at: 2_010,
+            },
+            MeteredBillingReconciliationState::Open,
+            Some("meter overrun"),
+        )
+        .unwrap();
+
+    store
+        .record_underwriting_decision(&sample_underwriting_decision(subject_key))
+        .unwrap();
+    store
+        .record_credit_facility(&sample_credit_facility(subject_key))
+        .unwrap();
+    store
+        .record_credit_bond(&signed_credit_bond_fixture(
+            subject_key,
+            "cfd-1",
+            "cbd-1",
+            1_700_000_200,
+            1_700_086_600,
+            arc_kernel::CreditBondDisposition::Hold,
+            arc_kernel::CreditBondLifecycleState::Active,
+            None,
+        ))
+        .unwrap();
+
+    let report = store
+        .query_economic_completion_flow_report(&arc_kernel::ExposureLedgerQuery {
+            agent_subject: Some(subject_key.to_string()),
+            receipt_limit: Some(10),
+            decision_limit: Some(10),
+            ..arc_kernel::ExposureLedgerQuery::default()
+        })
+        .unwrap();
+
+    assert_eq!(report.schema, arc_kernel::ECONOMIC_COMPLETION_FLOW_SCHEMA);
+    assert_eq!(report.summary.matching_receipts, 1);
+    assert_eq!(report.summary.returned_receipts, 1);
+    assert_eq!(report.summary.matching_underwriting_decisions, 1);
+    assert_eq!(report.summary.returned_underwriting_decisions, 1);
+    assert_eq!(report.summary.matching_credit_facilities, 1);
+    assert_eq!(report.summary.returned_credit_facilities, 1);
+    assert_eq!(report.summary.matching_credit_bonds, 1);
+    assert_eq!(report.summary.returned_credit_bonds, 1);
+    assert_eq!(report.summary.pending_settlement_receipts, 1);
+    assert_eq!(report.summary.failed_settlement_receipts, 0);
+    assert_eq!(report.summary.metering_actionable_receipts, 1);
+    assert_eq!(
+        report.summary.latest_underwriting_decision_id.as_deref(),
+        Some("uwd-1")
+    );
+    assert_eq!(
+        report.summary.latest_underwriting_outcome,
+        Some(arc_kernel::UnderwritingDecisionOutcome::Approve)
+    );
+    assert_eq!(
+        report.summary.latest_credit_facility_id.as_deref(),
+        Some("cfd-1")
+    );
+    assert_eq!(
+        report.summary.latest_credit_facility_disposition,
+        Some(arc_kernel::CreditFacilityDisposition::Grant)
+    );
+    assert_eq!(
+        report.summary.latest_credit_bond_id.as_deref(),
+        Some("cbd-1")
+    );
+    assert_eq!(
+        report.summary.latest_credit_bond_disposition,
+        Some(arc_kernel::CreditBondDisposition::Hold)
+    );
+    assert_eq!(report.economic_receipts.receipts.len(), 1);
+    assert_eq!(report.underwriting_decisions.decisions.len(), 1);
+    assert_eq!(report.credit_facilities.facilities.len(), 1);
+    assert_eq!(report.credit_bonds.bonds.len(), 1);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn compliance_report_counts_proof_and_lineage_coverage() {
     let path = unique_db_path("arc-receipts-compliance");
     let mut store = SqliteReceiptStore::open(&path).unwrap();
@@ -1954,10 +2671,7 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
                 capability_id: "cap-compliance".to_string(),
                 tool_server: "shell".to_string(),
                 tool_name: "bash".to_string(),
-                action: ToolCallAction {
-                    parameters: serde_json::json!({}),
-                    parameter_hash: format!("param-{id}"),
-                },
+                action: valid_tool_action(serde_json::json!({})),
                 decision,
                 content_hash: format!("content-{id}"),
                 policy_hash: "policy-compliance".to_string(),
@@ -2024,10 +2738,12 @@ fn compliance_report_counts_proof_and_lineage_coverage() {
         report.child_receipt_scope,
         crate::EvidenceChildReceiptScope::OmittedNoJoinPath
     );
-    assert!(report
-        .export_scope_note
-        .as_deref()
-        .is_some_and(|note| note.contains("tool filters narrow the operator report only")));
+    assert!(
+        report
+            .export_scope_note
+            .as_deref()
+            .is_some_and(|note| note.contains("tool filters narrow the operator report only"))
+    );
 
     let _ = fs::remove_file(path);
 }
@@ -2076,10 +2792,7 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
             capability_id: capability.id.clone(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo delegated" }),
-                parameter_hash: "param-auth-asserted".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo delegated" })),
             decision: Decision::Allow,
             content_hash: "content-auth-asserted".to_string(),
             policy_hash: "policy-auth-asserted".to_string(),
@@ -2133,6 +2846,7 @@ fn receipt_store_authorization_context_report_does_not_mark_asserted_call_chain_
                         },
                     )),
                     autonomy: None,
+                    economic_authorization: None,
                 }
             })),
             trust_level: arc_core::TrustLevel::default(),
@@ -2219,10 +2933,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
             capability_id: capability.id.clone(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo parent" }),
-                parameter_hash: "param-parent-lineage".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo parent" })),
             decision: Decision::Allow,
             content_hash: "content-parent-lineage".to_string(),
             policy_hash: "policy-lineage".to_string(),
@@ -2244,10 +2955,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
             capability_id: capability.id.clone(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo child" }),
-                parameter_hash: "param-child-lineage".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo child" })),
             decision: Decision::Allow,
             content_hash: "content-child-lineage".to_string(),
             policy_hash: "policy-lineage".to_string(),
@@ -2287,6 +2995,7 @@ fn receipt_lineage_verification_backfills_from_governed_call_chain_metadata() {
                         },
                     )),
                     autonomy: None,
+                    economic_authorization: None,
                 }
             })),
             trust_level: arc_core::TrustLevel::default(),
@@ -2488,10 +3197,7 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
             capability_id: "cap-lineage".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo parent" }),
-                parameter_hash: "param-lineage-parent".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo parent" })),
             decision: Decision::Allow,
             content_hash: "content-lineage-parent".to_string(),
             policy_hash: "policy-lineage-parent".to_string(),
@@ -2513,10 +3219,7 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
             capability_id: "cap-lineage".to_string(),
             tool_server: "shell".to_string(),
             tool_name: "bash".to_string(),
-            action: ToolCallAction {
-                parameters: serde_json::json!({ "cmd": "echo child" }),
-                parameter_hash: "param-lineage-child".to_string(),
-            },
+            action: valid_tool_action(serde_json::json!({ "cmd": "echo child" })),
             decision: Decision::Allow,
             content_hash: "content-lineage-child".to_string(),
             policy_hash: "policy-lineage-child".to_string(),
@@ -2543,6 +3246,7 @@ fn receipt_lineage_statement_links_parent_and_child_receipts() {
                         })
                     ),
                     autonomy: None,
+                    economic_authorization: None,
                 }
             })),
             trust_level: arc_core::TrustLevel::default(),
@@ -2795,6 +3499,7 @@ fn sample_risk_package(subject_key: &str) -> arc_kernel::SignedCreditProviderRis
                 }),
                 findings: Vec::new(),
             },
+            compliance_score: None,
             latest_facility: Some(arc_kernel::CreditProviderFacilitySnapshot {
                 facility_id: "cfd-1".to_string(),
                 issued_at: 3,
@@ -2982,6 +3687,7 @@ fn sample_underwriting_input(subject_key: &str) -> arc_kernel::UnderwritingPolic
                 arc_core::AttestationVerifierFamily::EnterpriseVerifier,
             ],
         }),
+        compliance_score: None,
         signals: Vec::new(),
     }
 }
@@ -3743,6 +4449,8 @@ fn signed_capital_execution_instruction_fixture(
         subject_key: subject_key.to_string(),
         source_id: "facility-source-claim".to_string(),
         source_kind: arc_kernel::CapitalBookSourceKind::FacilityCommitment,
+        governed_receipt_id: Some("rc-claim-1".to_string()),
+        completion_flow_row_id: Some("economic-completion-flow:rc-claim-1".to_string()),
         action: arc_kernel::CapitalExecutionInstructionAction::TransferFunds,
         owner_role: arc_kernel::CapitalExecutionRole::OperatorTreasury,
         counterparty_role: arc_kernel::CapitalExecutionRole::AgentCounterparty,

@@ -38,8 +38,8 @@ use serde::{Deserialize, Serialize};
 
 use arc_core_types::canonical::canonical_json_bytes;
 use arc_core_types::capability::MonetaryAmount;
-use arc_core_types::crypto::{sha256_hex, PublicKey, Signature};
-use arc_underwriting::{price_premium, LookbackWindow, PremiumInputs, PremiumQuote};
+use arc_core_types::crypto::{PublicKey, Signature, sha256_hex};
+use arc_underwriting::{LookbackWindow, PremiumInputs, PremiumQuote, price_premium};
 
 /// Lane identifier used for insurance-flow settlement commitments. Matches
 /// the `lane_kind` convention used elsewhere in the arc-settle stack.

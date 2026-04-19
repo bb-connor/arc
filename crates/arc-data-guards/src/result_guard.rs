@@ -12,27 +12,30 @@
 //!    config (`redact_pii_patterns`) and replace matches with a
 //!    deterministic redaction marker.
 //!
-//! # Integration surface and the kernel gap
+//! # Integration surface
 //!
 //! `arc-guards` ships a [`PostInvocationHook`] trait and a
 //! [`PostInvocationPipeline`] that threads pre-invocation guards' output
-//! into a chain of response inspectors.  `arc-kernel` itself does not
-//! yet accept a `PostInvocationPipeline` on its main invocation path:
-//! the kernel's `Guard` trait runs pre-invocation only.  We therefore
-//! implement this guard in three shapes:
+//! into a chain of response inspectors.  `arc-kernel` now threads a
+//! post-invocation context that includes the matched grant, but this
+//! guard still exposes standalone transform helpers so callers can wire
+//! it into bespoke pipelines or test harnesses. We therefore implement
+//! this guard in three shapes:
 //!
-//! - [`QueryResultGuard::redact_result`] -- a standalone transform
-//!   function over a mutable [`serde_json::Value`] that callers (kernel
-//!   integrations, test harnesses, pipeline wrappers) can wire in
-//!   wherever post-invocation shaping is already happening.
+//! - [`QueryResultGuard::redact_result`] and
+//!   [`QueryResultGuard::redact_result_for_request`] -- standalone
+//!   transforms over a mutable [`serde_json::Value`] that callers
+//!   (kernel integrations, test harnesses, pipeline wrappers) can wire
+//!   in wherever post-invocation shaping is already happening.
 //! - An implementation of [`PostInvocationHook`] for the guard struct so
-//!   it plugs straight into `arc_guards::post_invocation::PostInvocationPipeline`
-//!   the moment the kernel grows a post-invocation entrypoint.
+//!   it plugs straight into
+//!   `arc_guards::post_invocation::PostInvocationPipeline` and consumes
+//!   the matched-grant context when the kernel provides it.
 //! - An [`arc_kernel::Guard`] impl that never denies -- the guard is
 //!   post-invocation, not pre-invocation; installing it pre-invocation
 //!   is a no-op.  This keeps the guard installable via
-//!   `GuardPipeline::add` without changing any guard ordering while we
-//!   wait for the kernel's post-invocation surface.
+//!   `GuardPipeline::add` without forcing callers to branch on two
+//!   guard registries.
 //!
 //! # Fail-closed rules
 //!
@@ -55,7 +58,9 @@ use serde_json::Value;
 use tracing::warn;
 
 use arc_core::capability::{ArcScope, Constraint};
-use arc_guards::post_invocation::{PostInvocationHook, PostInvocationVerdict};
+use arc_guards::post_invocation::{
+    PostInvocationContext, PostInvocationHook, PostInvocationVerdict,
+};
 use arc_kernel::{GuardContext, KernelError, Verdict};
 
 /// Default redaction marker written in place of denied columns.
@@ -155,8 +160,20 @@ impl QueryResultGuard {
     ///   recognised shape are redacted fail-closed instead of passing
     ///   through unchanged.
     pub fn redact_result(&self, scope: &ArcScope, value: &mut Value) {
-        let max_rows = scope_min_max_rows(scope);
-        let denied = scope_column_denylist(scope);
+        self.redact_result_for_request(scope, None, value);
+    }
+
+    /// Redact the response in place using either the matched grant or
+    /// the full scope when no grant index is available.
+    pub fn redact_result_for_request(
+        &self,
+        scope: &ArcScope,
+        matched_grant_index: Option<usize>,
+        value: &mut Value,
+    ) {
+        let constraints = constraints_for_request(scope, matched_grant_index);
+        let max_rows = min_max_rows(&constraints);
+        let denied = column_denylist(&constraints);
         let requires_row_shape = max_rows.is_some() || !denied.is_empty();
 
         // Apply the row-level transforms first.
@@ -183,9 +200,14 @@ impl QueryResultGuard {
     }
 
     /// Non-mutating convenience wrapper used by [`PostInvocationHook`].
-    fn redact_result_cloned(&self, scope: &ArcScope, value: &Value) -> Value {
+    fn redact_result_cloned_for_request(
+        &self,
+        scope: &ArcScope,
+        matched_grant_index: Option<usize>,
+        value: &Value,
+    ) -> Value {
         let mut out = value.clone();
-        self.redact_result(scope, &mut out);
+        self.redact_result_for_request(scope, matched_grant_index, &mut out);
         out
     }
 }
@@ -194,13 +216,18 @@ impl QueryResultGuard {
 impl QueryResultGuard {
     /// Build a [`PostInvocationHook`] adapter bound to an [`ArcScope`].
     ///
-    /// The kernel does not currently expose a post-invocation pipeline
-    /// that carries a scope, so callers construct a fresh adapter per
-    /// call after they have already authorised the request.  The adapter
-    /// owns a clone of the scope; it's cheap and keeps the hook trait
-    /// object stateless.
+    /// Callers that already have a concrete scope can still construct a
+    /// fresh adapter per request. When the kernel provides a scope via
+    /// [`PostInvocationContext`], the hook prefers that context over the
+    /// fallback scope stored here.
     pub fn as_hook(&self, scope: ArcScope) -> QueryResultHook<'_> {
         QueryResultHook { guard: self, scope }
+    }
+
+    /// Build an owned [`PostInvocationHook`] adapter for runtime
+    /// pipelines that need a `'static` hook object.
+    pub fn into_owned_hook(self, scope: ArcScope) -> OwnedQueryResultHook {
+        OwnedQueryResultHook { guard: self, scope }
     }
 }
 
@@ -215,8 +242,44 @@ impl<'a> PostInvocationHook for QueryResultHook<'a> {
         "query-result"
     }
 
-    fn inspect(&self, _tool_name: &str, response: &Value) -> PostInvocationVerdict {
-        let redacted = self.guard.redact_result_cloned(&self.scope, response);
+    fn inspect(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationVerdict {
+        let scope = ctx.scope.unwrap_or(&self.scope);
+        let redacted =
+            self.guard
+                .redact_result_cloned_for_request(scope, ctx.matched_grant_index, response);
+        if redacted == *response {
+            PostInvocationVerdict::Allow
+        } else {
+            PostInvocationVerdict::Redact(redacted)
+        }
+    }
+}
+
+/// Owned `PostInvocationHook` adapter around a [`QueryResultGuard`] +
+/// fallback scope.
+pub struct OwnedQueryResultHook {
+    guard: QueryResultGuard,
+    scope: ArcScope,
+}
+
+impl PostInvocationHook for OwnedQueryResultHook {
+    fn name(&self) -> &str {
+        "query-result"
+    }
+
+    fn inspect(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationVerdict {
+        let scope = ctx.scope.unwrap_or(&self.scope);
+        let redacted =
+            self.guard
+                .redact_result_cloned_for_request(scope, ctx.matched_grant_index, response);
         if redacted == *response {
             PostInvocationVerdict::Allow
         } else {
@@ -243,26 +306,45 @@ impl arc_kernel::Guard for QueryResultGuard {
 // Scope helpers
 // ---------------------------------------------------------------------------
 
-fn scope_min_max_rows(scope: &ArcScope) -> Option<u64> {
+fn constraints_for_request(
+    scope: &ArcScope,
+    matched_grant_index: Option<usize>,
+) -> Vec<&Constraint> {
+    if let Some(index) = matched_grant_index {
+        if let Some(grant) = scope.grants.get(index) {
+            return grant.constraints.iter().collect();
+        }
+        warn!(
+            target: "arc.data-guards.result",
+            matched_grant_index = index,
+            grant_count = scope.grants.len(),
+            "matched grant index missing from scope, falling back to full scope"
+        );
+    }
+
+    scope
+        .grants
+        .iter()
+        .flat_map(|grant| grant.constraints.iter())
+        .collect()
+}
+
+fn min_max_rows(constraints: &[&Constraint]) -> Option<u64> {
     let mut min: Option<u64> = None;
-    for grant in &scope.grants {
-        for c in &grant.constraints {
-            if let Constraint::MaxRowsReturned(n) = c {
-                min = Some(min.map_or(*n, |m| m.min(*n)));
-            }
+    for constraint in constraints {
+        if let Constraint::MaxRowsReturned(n) = constraint {
+            min = Some(min.map_or(*n, |m| m.min(*n)));
         }
     }
     min
 }
 
-fn scope_column_denylist(scope: &ArcScope) -> Vec<String> {
+fn column_denylist(constraints: &[&Constraint]) -> Vec<String> {
     let mut out = Vec::new();
-    for grant in &scope.grants {
-        for c in &grant.constraints {
-            if let Constraint::ColumnDenylist(list) = c {
-                for entry in list {
-                    out.push(entry.to_ascii_lowercase());
-                }
+    for constraint in constraints {
+        if let Constraint::ColumnDenylist(list) = constraint {
+            for entry in list {
+                out.push(entry.to_ascii_lowercase());
             }
         }
     }
@@ -273,6 +355,17 @@ fn locate_rows_array_mut<'a>(
     value: &'a mut Value,
     rows_keys: &[String],
 ) -> Option<&'a mut Vec<Value>> {
+    let is_value_envelope = value
+        .as_object()
+        .and_then(|object| object.get("kind"))
+        .and_then(Value::as_str)
+        == Some("value");
+    let value = if is_value_envelope {
+        value.get_mut("value")?
+    } else {
+        value
+    };
+
     if value.is_array() {
         return value.as_array_mut();
     }
@@ -604,7 +697,8 @@ mod tests {
         let scope = scope(vec![Constraint::MaxRowsReturned(1)]);
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}, {"id": 2}]});
-        match hook.inspect("sql", &value) {
+        let context = PostInvocationContext::synthetic("sql");
+        match hook.inspect(&context, &value) {
             PostInvocationVerdict::Redact(v) => {
                 assert_eq!(v["rows"].as_array().unwrap().len(), 1);
             }
@@ -618,7 +712,8 @@ mod tests {
         let scope = scope(vec![]);
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}]});
-        match hook.inspect("sql", &value) {
+        let context = PostInvocationContext::synthetic("sql");
+        match hook.inspect(&context, &value) {
             PostInvocationVerdict::Allow => {}
             other => panic!("expected Allow, got {other:?}"),
         }
@@ -652,6 +747,39 @@ mod tests {
         });
         g.redact_result(&scope_multi, &mut value);
         assert_eq!(value["rows"].as_array().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn matched_grant_constraints_override_other_grants() {
+        let guard = QueryResultGuard::new(QueryResultGuardConfig::default());
+        let scope_multi = ArcScope {
+            grants: vec![
+                grant(vec![
+                    Constraint::MaxRowsReturned(1),
+                    Constraint::ColumnDenylist(vec!["email".into()]),
+                ]),
+                grant(vec![
+                    Constraint::MaxRowsReturned(5),
+                    Constraint::ColumnDenylist(vec!["ssn".into()]),
+                ]),
+            ],
+            ..Default::default()
+        };
+        let mut value = serde_json::json!({
+            "rows": [
+                {"id": 1, "email": "a@b.com", "ssn": "123-45-6789"},
+                {"id": 2, "email": "c@d.com", "ssn": "987-65-4321"}
+            ]
+        });
+
+        guard.redact_result_for_request(&scope_multi, Some(1), &mut value);
+
+        let rows = value["rows"].as_array().unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0]["ssn"], "[REDACTED]");
+        assert_eq!(rows[1]["ssn"], "[REDACTED]");
+        assert_ne!(rows[0]["email"], "[REDACTED]");
+        assert_ne!(rows[1]["email"], "[REDACTED]");
     }
 
     #[test]

@@ -2,7 +2,9 @@ async fn handle_internal_cluster_status(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_STATUS_PATH)
+    {
         return response;
     }
 
@@ -96,7 +98,9 @@ async fn handle_internal_cluster_snapshot(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_SNAPSHOT_PATH)
+    {
         return response;
     }
     if state.cluster.is_none() {
@@ -116,7 +120,9 @@ async fn handle_internal_cluster_partition(
     headers: HeaderMap,
     Json(payload): Json<ClusterPartitionRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_PARTITION_PATH)
+    {
         return response;
     }
     let Some(cluster) = state.cluster.as_ref() else {
@@ -204,7 +210,9 @@ async fn handle_internal_authority_snapshot(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_AUTHORITY_SNAPSHOT_PATH)
+    {
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
@@ -234,7 +242,9 @@ async fn handle_internal_revocations_delta(
     Query(query): Query<RevocationDeltaQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_REVOCATIONS_DELTA_PATH)
+    {
         return response;
     }
     let store = match open_revocation_store(&state.config) {
@@ -268,7 +278,11 @@ async fn handle_internal_tool_receipts_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_cluster_peer_auth(
+        &headers,
+        &state.config,
+        INTERNAL_TOOL_RECEIPTS_DELTA_PATH,
+    ) {
         return response;
     }
     let store = match open_receipt_store(&state.config) {
@@ -297,7 +311,11 @@ async fn handle_internal_child_receipts_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_cluster_peer_auth(
+        &headers,
+        &state.config,
+        INTERNAL_CHILD_RECEIPTS_DELTA_PATH,
+    ) {
         return response;
     }
     let store = match open_receipt_store(&state.config) {
@@ -326,45 +344,34 @@ async fn handle_internal_budgets_delta(
     Query(query): Query<BudgetDeltaQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_BUDGETS_DELTA_PATH)
+    {
         return response;
     }
     let store = match open_budget_store(&state.config) {
         Ok(store) => store,
         Err(response) => return response,
     };
-    let records = match store.list_usages_after(list_limit(query.limit), query.after_seq) {
-        Ok(records) => records,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
-    };
-    let after_seq = query.after_seq.unwrap_or(0);
-    let max_seq_in_batch = records.iter().map(|usage| usage.seq).max();
-    let mutation_events = if let Some(max_seq_in_batch) = max_seq_in_batch {
-        match collect_budget_mutation_event_views_for_seq_range(&store, after_seq, max_seq_in_batch)
-        {
+    let mutation_events =
+        match collect_budget_mutation_event_views_after_seq(&store, query.after_seq.unwrap_or(0), list_limit(query.limit)) {
             Ok(events) => events,
             Err(error) => {
                 return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             }
-        }
-    } else {
+        };
+    let records = if mutation_events.is_empty() {
         Vec::new()
+    } else {
+        match collect_budget_projection_views_for_events(&store, &mutation_events) {
+            Ok(records) => records,
+            Err(error) => {
+                return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+            }
+        }
     };
     Json(BudgetDeltaResponse {
-        records: records
-            .into_iter()
-            .map(|usage| BudgetUsageView {
-                capability_id: usage.capability_id,
-                grant_index: usage.grant_index,
-                invocation_count: usage.invocation_count,
-                total_cost_exposed: usage.total_cost_exposed,
-                total_cost_realized_spend: usage.total_cost_realized_spend,
-                updated_at: usage.updated_at,
-                seq: Some(usage.seq),
-            })
-            .collect(),
+        records,
         mutation_events,
     })
     .into_response()
@@ -375,7 +382,9 @@ async fn handle_internal_lineage_delta(
     Query(query): Query<ReceiptDeltaQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_LINEAGE_DELTA_PATH)
+    {
         return response;
     }
     let store = match open_receipt_store(&state.config) {
@@ -435,7 +444,10 @@ fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(), CliError> 
     if peer_is_partitioned(state, peer_url) {
         return Ok(());
     }
-    let client = build_client(peer_url, &state.config.service_token)?;
+    let Some(self_url) = cluster_self_url(state) else {
+        return Ok(());
+    };
+    let client = build_cluster_peer_client(peer_url, &state.config.service_token, &self_url)?;
     if let Err(error) = client.cluster_status() {
         update_peer_failure(state, peer_url, error.to_string());
         return Err(error);
@@ -615,35 +627,14 @@ fn sync_peer_budgets(
             after_seq: cursor.as_ref().map(|value| value.seq),
             limit: Some(MAX_LIST_LIMIT),
         })?;
-        if response.records.is_empty() {
+        if response.mutation_events.is_empty() {
             break;
         }
+        let mut last_cursor = None;
         for event in &response.mutation_events {
             replay_budget_mutation_event(&mut store, event)?;
-        }
-        let mut last_cursor = None;
-        for record in response.records {
-            let seq = record.seq.ok_or_else(|| {
-                CliError::Other(
-                    "trust control budget delta response missing monotonic seq".to_string(),
-                )
-            })?;
-            store.upsert_usage(&BudgetUsageRecord {
-                capability_id: record.capability_id.clone(),
-                grant_index: record.grant_index,
-                invocation_count: record.invocation_count,
-                updated_at: record.updated_at,
-                seq,
-                total_cost_exposed: record.total_cost_exposed,
-                total_cost_realized_spend: record.total_cost_realized_spend,
-            })?;
             applied = applied.saturating_add(1);
-            last_cursor = Some(BudgetCursor {
-                seq,
-                updated_at: record.updated_at,
-                capability_id: record.capability_id,
-                grant_index: record.grant_index,
-            });
+            last_cursor = Some(budget_cursor_from_event(event));
         }
         if let Some(cursor) = last_cursor {
             update_peer_budget_cursor(state, peer_url, cursor);
@@ -715,11 +706,19 @@ fn build_cluster_state(
     if peers.is_empty() {
         return Ok(None);
     }
+    let mut persisted_term = 0u64;
+    let mut persisted_leader_url = None;
+    if let Some(path) = config.authority_db_path.as_deref() {
+        let authority = SqliteCapabilityAuthority::open(path)?;
+        let fence = authority.cluster_fence()?;
+        persisted_term = fence.election_term;
+        persisted_leader_url = fence.leader_url;
+    }
     Ok(Some(Arc::new(Mutex::new(ClusterRuntimeState {
         self_url,
         peers,
-        election_term: 0,
-        last_leader_url: None,
+        election_term: persisted_term,
+        last_leader_url: persisted_leader_url,
         term_started_at: None,
         lease_expires_at: None,
         lease_ttl_ms: authority_lease_ttl(config.cluster_sync_interval).as_millis() as u64,
@@ -1257,7 +1256,6 @@ where
 
 fn authority_snapshot_view(snapshot: AuthoritySnapshot) -> AuthoritySnapshotView {
     AuthoritySnapshotView {
-        seed_hex: snapshot.seed_hex,
         public_key_hex: snapshot.public_key_hex,
         generation: snapshot.generation,
         rotated_at: snapshot.rotated_at,
@@ -1291,7 +1289,6 @@ fn budget_cursor_view(cursor: BudgetCursor) -> BudgetCursorView {
 
 fn authority_snapshot_from_view(view: AuthoritySnapshotView) -> AuthoritySnapshot {
     AuthoritySnapshot {
-        seed_hex: view.seed_hex,
         public_key_hex: view.public_key_hex,
         generation: view.generation,
         rotated_at: view.rotated_at,
@@ -1511,10 +1508,9 @@ fn build_cluster_state_snapshot(
         tool_seq: tool_receipts.last().map(|record| record.seq).unwrap_or(0),
         child_seq: child_receipts.last().map(|record| record.seq).unwrap_or(0),
         lineage_seq: lineage.last().map(|record| record.seq).unwrap_or(0),
-        budget_seq: budgets
-            .iter()
-            .filter_map(|usage| usage.seq)
-            .max()
+        budget_seq: budget_mutation_events
+            .last()
+            .map(|event| event.event_seq)
             .unwrap_or(0),
         revocation_cursor: revocations.last().map(|record| RevocationCursorView {
             revoked_at: record.revoked_at,
@@ -1555,7 +1551,7 @@ fn apply_cluster_snapshot(
         tool_receipts,
         child_receipts,
         lineage,
-        budgets,
+        budgets: _budgets,
         budget_mutation_events,
     } = snapshot;
 
@@ -1598,30 +1594,7 @@ fn apply_cluster_snapshot(
         let mut store = SqliteBudgetStore::open(path)?;
         for event in &budget_mutation_events {
             replay_budget_mutation_event(&mut store, event)?;
-        }
-        for usage in &budgets {
-            let seq = usage.seq.unwrap_or(0);
-            store.upsert_usage(&BudgetUsageRecord {
-                capability_id: usage.capability_id.clone(),
-                grant_index: usage.grant_index,
-                invocation_count: usage.invocation_count,
-                updated_at: usage.updated_at,
-                seq,
-                total_cost_exposed: usage.total_cost_exposed,
-                total_cost_realized_spend: usage.total_cost_realized_spend,
-            })?;
-            let should_replace = budget_cursor
-                .as_ref()
-                .map(|cursor: &BudgetCursor| seq > cursor.seq)
-                .unwrap_or(true);
-            if should_replace {
-                budget_cursor = Some(BudgetCursor {
-                    seq,
-                    updated_at: usage.updated_at,
-                    capability_id: usage.capability_id.clone(),
-                    grant_index: usage.grant_index,
-                });
-            }
+            budget_cursor = Some(budget_cursor_from_event(event));
         }
     }
 
@@ -1664,6 +1637,11 @@ fn seed_cluster_authority_from_snapshot(
     }
 
     let snapshot_leader = authority_lease.map(|lease| lease.leader_url.clone());
+    if let Some(path) = state.config.authority_db_path.as_deref() {
+        if let Ok(authority) = SqliteCapabilityAuthority::open(path) {
+            let _ = authority.seed_cluster_fence(snapshot_leader.as_deref(), snapshot_term);
+        }
+    }
     let should_seed = |guard: &ClusterRuntimeState| {
         snapshot_term > guard.election_term
             || (snapshot_term == guard.election_term && snapshot_leader != guard.last_leader_url)
@@ -1804,21 +1782,41 @@ fn collect_budget_mutation_event_views(
         .collect())
 }
 
-fn collect_budget_mutation_event_views_for_seq_range(
+fn collect_budget_mutation_event_views_after_seq(
     store: &SqliteBudgetStore,
     after_seq: u64,
-    max_seq_in_batch: u64,
+    limit: usize,
 ) -> Result<Vec<BudgetMutationEventView>, CliError> {
     Ok(store
-        .list_mutation_events(i64::MAX as usize, None, None)?
+        .list_mutation_events_after_seq(limit, after_seq)?
         .into_iter()
-        .filter(|record| {
-            record
-                .usage_seq
-                .is_some_and(|usage_seq| usage_seq > after_seq && usage_seq <= max_seq_in_batch)
-        })
         .map(budget_mutation_event_view)
         .collect())
+}
+
+fn collect_budget_projection_views_for_events(
+    store: &SqliteBudgetStore,
+    events: &[BudgetMutationEventView],
+) -> Result<Vec<BudgetUsageView>, CliError> {
+    let mut latest = BTreeMap::<(String, u32), BudgetUsageView>::new();
+    for event in events {
+        let Some(usage) = store.get_usage(&event.capability_id, event.grant_index as usize)? else {
+            continue;
+        };
+        latest.insert(
+            (usage.capability_id.clone(), usage.grant_index),
+            BudgetUsageView {
+                capability_id: usage.capability_id,
+                grant_index: usage.grant_index,
+                invocation_count: usage.invocation_count,
+                total_cost_exposed: usage.total_cost_exposed,
+                total_cost_realized_spend: usage.total_cost_realized_spend,
+                updated_at: usage.updated_at,
+                seq: Some(usage.seq),
+            },
+        );
+    }
+    Ok(latest.into_values().collect())
 }
 
 fn budget_mutation_event_view(record: BudgetMutationRecord) -> BudgetMutationEventView {
@@ -1830,6 +1828,7 @@ fn budget_mutation_event_view(record: BudgetMutationRecord) -> BudgetMutationEve
         kind: record.kind.as_str().to_string(),
         allowed: record.allowed,
         recorded_at: record.recorded_at,
+        event_seq: record.event_seq,
         usage_seq: record.usage_seq,
         exposure_units: record.exposure_units,
         realized_spend_units: record.realized_spend_units,
@@ -1846,6 +1845,15 @@ fn budget_mutation_event_view(record: BudgetMutationRecord) -> BudgetMutationEve
                 lease_id: authority.lease_id,
                 lease_epoch: authority.lease_epoch,
             }),
+    }
+}
+
+fn budget_cursor_from_event(event: &BudgetMutationEventView) -> BudgetCursor {
+    BudgetCursor {
+        seq: event.event_seq,
+        updated_at: event.recorded_at,
+        capability_id: event.capability_id.clone(),
+        grant_index: event.grant_index,
     }
 }
 
@@ -1876,6 +1884,35 @@ fn replay_budget_mutation_event(
     })?;
 
     match kind {
+        BudgetMutationKind::IncrementInvocation => {
+            let allowed = event.allowed.ok_or_else(|| {
+                CliError::Other(format!(
+                    "missing `allowed` value for budget increment event `{}`",
+                    event.event_id
+                ))
+            })?;
+            let replayed = if allowed {
+                store.try_increment_with_event_id(
+                    &event.capability_id,
+                    grant_index,
+                    event.max_invocations,
+                    Some(event.event_id.as_str()),
+                )?
+            } else {
+                store.try_increment_with_event_id(
+                    &event.capability_id,
+                    grant_index,
+                    event.max_invocations.or(Some(event.invocation_count_after)),
+                    Some(event.event_id.as_str()),
+                )?
+            };
+            if replayed != allowed {
+                return Err(CliError::Other(format!(
+                    "budget increment event `{}` replayed with allowed={replayed} instead of {allowed}",
+                    event.event_id
+                )));
+            }
+        }
         BudgetMutationKind::AuthorizeExposure => {
             let allowed = event.allowed.ok_or_else(|| {
                 CliError::Other(format!(
@@ -2101,6 +2138,90 @@ async fn forward_post_to_leader<B: Serialize>(
     ))
 }
 
+async fn forward_authority_post_to_leader<B: Serialize>(
+    state: &TrustServiceState,
+    path: &str,
+    body: &B,
+) -> Result<Option<Response>, Response> {
+    let Some(self_url) = cluster_self_url(state) else {
+        return Ok(None);
+    };
+    let Some(consensus) = cluster_consensus_view(state) else {
+        return Ok(None);
+    };
+    if !consensus.has_quorum {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster quorum is unavailable for authority writes",
+        ));
+    }
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease is unavailable for authority writes",
+        ));
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before authority write forwarding",
+        ));
+    }
+    let Some(mut leader_url) = consensus.leader_url else {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster leader is unavailable for authority writes",
+        ));
+    };
+    if leader_url == self_url {
+        return Ok(None);
+    }
+
+    for _ in 0..2 {
+        let client =
+            build_cluster_peer_client(&leader_url, &state.config.service_token, &self_url)
+                .map_err(|error| {
+                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+                })?;
+        match client.post_internal_json::<_, Value>(path, body, Some(authority_lease.term)) {
+            Ok(value) => return Ok(Some(Json(value).into_response())),
+            Err(error) => {
+                update_peer_failure(state, &leader_url, error.to_string());
+                let Some(next_consensus) = cluster_consensus_view(state) else {
+                    return Ok(None);
+                };
+                if !next_consensus.has_quorum {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster quorum is unavailable for authority writes",
+                    ));
+                }
+                let Some(next_leader) = next_consensus.leader_url else {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster leader is unavailable for authority writes",
+                    ));
+                };
+                if next_leader == self_url {
+                    return Ok(None);
+                }
+                if next_leader == leader_url {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &format!("failed to forward authority write to leader: {error}"),
+                    ));
+                }
+                leader_url = next_leader;
+            }
+        }
+    }
+
+    Err(plain_http_error(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "failed to forward authority write to cluster leader",
+    ))
+}
+
 async fn forward_scim_post_to_leader<B: Serialize>(
     state: &TrustServiceState,
     path: &str,
@@ -2258,6 +2379,174 @@ fn bearer_token_from_headers(headers: &HeaderMap) -> Result<String, Response> {
         HeaderValue::from_static("Bearer realm=\"arc-passport-issuance\""),
     );
     Err(response)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ClusterPeerAuthContext {
+    node_id: String,
+    issued_at: i64,
+    term: Option<u64>,
+}
+
+fn cluster_peer_auth_signature(
+    service_token: &str,
+    node_id: &str,
+    endpoint: &str,
+    issued_at: i64,
+    term: Option<u64>,
+) -> Result<String, CliError> {
+    let payload = canonical_json_bytes(&json!({
+        "scheme": CLUSTER_AUTH_SCHEME,
+        "serviceToken": service_token,
+        "nodeId": node_id,
+        "endpoint": endpoint,
+        "issuedAt": issued_at,
+        "term": term,
+    }))
+    .map_err(|error| CliError::Other(format!("failed to encode cluster peer auth payload: {error}")))?;
+    Ok(sha256_hex(&payload))
+}
+
+fn validate_cluster_peer_auth(
+    headers: &HeaderMap,
+    config: &TrustServiceConfig,
+    endpoint: &str,
+) -> Result<ClusterPeerAuthContext, Response> {
+    let node_id = headers
+        .get(CLUSTER_NODE_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| normalize_cluster_url(value).ok())
+        .ok_or_else(cluster_peer_auth_error)?;
+    let issued_at = headers
+        .get(CLUSTER_AUTH_ISSUED_AT_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.parse::<i64>().ok())
+        .ok_or_else(cluster_peer_auth_error)?;
+    let signature = headers
+        .get(CLUSTER_AUTH_SIGNATURE_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(cluster_peer_auth_error)?;
+    let term = headers
+        .get(CLUSTER_AUTH_TERM_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| {
+            value.parse::<u64>().map_err(|_| {
+                plain_http_error(
+                    StatusCode::UNAUTHORIZED,
+                    "invalid cluster peer term header",
+                )
+            })
+        })
+        .transpose()?;
+    let allowlisted = config
+        .peer_urls
+        .iter()
+        .filter_map(|peer_url| normalize_cluster_url(peer_url).ok())
+        .any(|peer_url| peer_url == node_id);
+    if !allowlisted {
+        return Err(plain_http_error(
+            StatusCode::FORBIDDEN,
+            "cluster peer is not in the configured allowlist",
+        ));
+    }
+    let now = unix_timestamp_now() as i64;
+    if (now - issued_at).abs() > CLUSTER_AUTH_MAX_SKEW_SECS {
+        return Err(plain_http_error(
+            StatusCode::UNAUTHORIZED,
+            "cluster peer auth timestamp is outside the allowed skew window",
+        ));
+    }
+    let expected = cluster_peer_auth_signature(
+        &config.service_token,
+        &node_id,
+        endpoint,
+        issued_at,
+        term,
+    )
+    .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
+    if signature != expected {
+        return Err(cluster_peer_auth_error());
+    }
+    Ok(ClusterPeerAuthContext {
+        node_id,
+        issued_at,
+        term,
+    })
+}
+
+fn cluster_peer_auth_error() -> Response {
+    let mut response = plain_http_error(
+        StatusCode::UNAUTHORIZED,
+        "missing or invalid cluster peer authentication",
+    );
+    response
+        .headers_mut()
+        .insert(WWW_AUTHENTICATE, HeaderValue::from_static(CLUSTER_AUTH_SCHEME));
+    response
+}
+
+fn validate_authority_mutation_auth(
+    headers: &HeaderMap,
+    state: &TrustServiceState,
+    endpoint: &str,
+) -> Result<Option<ClusterPeerAuthContext>, Response> {
+    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
+        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
+    if has_cluster_peer_headers {
+        let peer = validate_cluster_peer_auth(headers, &state.config, endpoint)?;
+        let Some(term) = peer.term else {
+            return Err(plain_http_error(
+                StatusCode::UNAUTHORIZED,
+                "cluster authority mutation is missing the forwarded term",
+            ));
+        };
+        let Some(authority_lease) = cluster_authority_lease_view(state) else {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "cluster authority lease is unavailable for authority mutation",
+            ));
+        };
+        if !authority_lease.lease_valid {
+            return Err(plain_http_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "cluster authority lease expired before authority mutation",
+            ));
+        }
+        if term != authority_lease.term {
+            return Err(plain_http_error(
+                StatusCode::CONFLICT,
+                "cluster authority mutation term does not match the current lease",
+            ));
+        }
+        return Ok(Some(peer));
+    }
+    validate_service_auth(headers, &state.config.service_token)?;
+    Ok(None)
+}
+
+fn enforce_authority_mutation_fence(
+    state: &TrustServiceState,
+) -> Result<Option<ClusterAuthorityLeaseView>, Response> {
+    let Some(authority_lease) = cluster_authority_lease_view(state) else {
+        return Ok(None);
+    };
+    if !authority_lease.lease_valid {
+        return Err(plain_http_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            "cluster authority lease expired before authority mutation",
+        ));
+    }
+    if let Some(path) = state.config.authority_db_path.as_deref() {
+        SqliteCapabilityAuthority::open(path)
+            .and_then(|authority| {
+                authority.enforce_cluster_fence(&authority_lease.leader_url, authority_lease.term)
+            })
+            .map_err(|error| plain_http_error(StatusCode::CONFLICT, &error.to_string()))?;
+    }
+    Ok(Some(authority_lease))
 }
 
 fn validate_service_auth(headers: &HeaderMap, service_token: &str) -> Result<(), Response> {
@@ -2677,6 +2966,20 @@ pub fn build_signed_exposure_ledger_report(
     let report = build_exposure_ledger_report(&receipt_store, query).map_err(CliError::from)?;
     let keypair = load_behavioral_feed_signing_keypair(authority_seed_path, authority_db_path)?;
     SignedExposureLedgerReport::sign(report, &keypair).map_err(Into::into)
+}
+
+fn build_economic_completion_flow_report(
+    receipt_store: &SqliteReceiptStore,
+    query: &ExposureLedgerQuery,
+) -> Result<EconomicCompletionFlowReport, TrustHttpError> {
+    let normalized_query = query.normalized();
+    if let Err(message) = normalized_query.validate() {
+        return Err(TrustHttpError::bad_request(message));
+    }
+
+    receipt_store
+        .query_economic_completion_flow_report(&normalized_query)
+        .map_err(trust_http_error_from_receipt_store)
 }
 
 fn build_exposure_ledger_report(
@@ -3769,6 +4072,49 @@ mod cluster_and_reports_tests {
             Some("Bearer")
         );
 
+        let cluster_state = state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
+        let issued_at = unix_timestamp_now() as i64;
+        let signature = cluster_peer_auth_signature(
+            &cluster_state.config.service_token,
+            "http://node-b",
+            INTERNAL_CLUSTER_STATUS_PATH,
+            issued_at,
+            None,
+        )
+        .expect("cluster peer signature");
+        headers.clear();
+        headers.insert(
+            CLUSTER_NODE_ID_HEADER,
+            HeaderValue::from_static("http://node-b"),
+        );
+        headers.insert(
+            CLUSTER_AUTH_ISSUED_AT_HEADER,
+            HeaderValue::from_str(&issued_at.to_string()).expect("issued-at header"),
+        );
+        headers.insert(
+            CLUSTER_AUTH_SIGNATURE_HEADER,
+            HeaderValue::from_str(&signature).expect("signature header"),
+        );
+        let peer = validate_cluster_peer_auth(
+            &headers,
+            &cluster_state.config,
+            INTERNAL_CLUSTER_STATUS_PATH,
+        )
+        .expect("validate allowlisted cluster peer");
+        assert_eq!(peer.node_id, "http://node-b");
+
+        headers.insert(
+            CLUSTER_AUTH_SIGNATURE_HEADER,
+            HeaderValue::from_static("deadbeef"),
+        );
+        let invalid_peer = validate_cluster_peer_auth(
+            &headers,
+            &cluster_state.config,
+            INTERNAL_CLUSTER_STATUS_PATH,
+        )
+        .expect_err("invalid cluster peer signature should fail");
+        assert_eq!(invalid_peer.status(), StatusCode::UNAUTHORIZED);
+
         let mut request = MeteredBillingReconciliationUpdateRequest {
             receipt_id: "receipt-1".to_string(),
             adapter_kind: "usage-adapter".to_string(),
@@ -3984,6 +4330,101 @@ mod cluster_and_reports_tests {
     }
 
     #[test]
+    fn cluster_snapshot_round_trip_preserves_denied_budget_events_without_usage_rows() {
+        let source_budget_db = unique_temp_path("cluster-source-denied-budgets", "sqlite3");
+        let target_budget_db = unique_temp_path("cluster-target-denied-budgets", "sqlite3");
+
+        let source_state = state_with_cluster(
+            "http://node-a",
+            &["http://node-b"],
+            None,
+            None,
+            Some(source_budget_db.clone()),
+        );
+        let target_state = state_with_cluster(
+            "http://node-b",
+            &["http://node-a"],
+            None,
+            None,
+            Some(target_budget_db.clone()),
+        );
+
+        {
+            let mut budget_store =
+                SqliteBudgetStore::open(&source_budget_db).expect("open source budget db");
+            let allowed = budget_store
+                .try_charge_cost_with_ids(
+                    "cap-denied-only",
+                    0,
+                    Some(1),
+                    25,
+                    Some(50),
+                    Some(10),
+                    Some("cap-denied-only-hold-1"),
+                    Some("cap-denied-only-hold-1:authorize"),
+                )
+                .expect("record denied budget mutation");
+            assert!(!allowed);
+            assert!(
+                budget_store
+                    .list_usages_after(MAX_LIST_LIMIT, None)
+                    .expect("list source usages")
+                    .is_empty()
+            );
+            let delta = collect_budget_mutation_event_views_after_seq(&budget_store, 0, MAX_LIST_LIMIT)
+                .expect("collect denied event delta");
+            assert_eq!(delta.len(), 1);
+            assert_eq!(delta[0].event_seq, 1);
+            assert_eq!(delta[0].allowed, Some(false));
+            assert_eq!(delta[0].usage_seq, None);
+            assert!(
+                collect_budget_mutation_event_views_after_seq(&budget_store, 1, MAX_LIST_LIMIT)
+                    .expect("collect empty denied event delta")
+                    .is_empty()
+            );
+        }
+
+        let snapshot = build_cluster_state_snapshot(&source_state).expect("build cluster snapshot");
+        assert_eq!(snapshot.replication.budget_seq, 1);
+        assert!(snapshot.budgets.is_empty());
+        assert_eq!(snapshot.budget_mutation_events.len(), 1);
+        assert_eq!(
+            snapshot.budget_mutation_events[0].event_id,
+            "cap-denied-only-hold-1:authorize"
+        );
+        assert_eq!(snapshot.budget_mutation_events[0].event_seq, 1);
+        assert_eq!(snapshot.budget_mutation_events[0].allowed, Some(false));
+        assert_eq!(snapshot.budget_mutation_events[0].usage_seq, None);
+
+        apply_cluster_snapshot(&target_state, "http://node-a", snapshot)
+            .expect("apply cluster snapshot");
+
+        let target_store = SqliteBudgetStore::open(&target_budget_db).expect("open target budget db");
+        assert!(
+            target_store
+                .list_usages_after(MAX_LIST_LIMIT, None)
+                .expect("list target usages")
+                .is_empty()
+        );
+        let mutation_events = target_store
+            .list_mutation_events(10, Some("cap-denied-only"), Some(0))
+            .expect("list replicated denied events");
+        assert_eq!(mutation_events.len(), 1);
+        assert_eq!(mutation_events[0].event_id, "cap-denied-only-hold-1:authorize");
+        assert_eq!(mutation_events[0].event_seq, 1);
+        assert_eq!(mutation_events[0].allowed, Some(false));
+        assert_eq!(mutation_events[0].usage_seq, None);
+        drop(target_store);
+
+        assert_eq!(
+            peer_budget_cursor(&target_state, "http://node-a")
+                .expect("replicated denied budget cursor")
+                .seq,
+            1
+        );
+    }
+
+    #[test]
     fn apply_cluster_snapshot_seeds_authority_term_for_late_joiner_budget_writes() {
         let source_state =
             state_with_cluster("http://node-a", &["http://node-b"], None, None, None);
@@ -4036,5 +4477,29 @@ mod cluster_and_reports_tests {
         let seeded_lease = cluster_authority_lease_view(&target_state).expect("seeded lease");
         assert_eq!(seeded_lease.authority_id, "http://node-0");
         assert_eq!(seeded_lease.lease_epoch, 2);
+    }
+
+    #[test]
+    fn build_cluster_state_seeds_persisted_authority_fence_term() {
+        let authority_db_path = unique_temp_path("cluster-authority-fence", "sqlite3");
+        let authority = SqliteCapabilityAuthority::open(&authority_db_path)
+            .expect("open authority db");
+        authority
+            .seed_cluster_fence(Some("http://node-z"), 7)
+            .expect("seed persisted authority fence");
+
+        let mut config = base_config();
+        config.advertise_url = Some("http://node-a".to_string());
+        config.peer_urls = vec!["http://node-b".to_string()];
+        config.authority_db_path = Some(authority_db_path.clone());
+
+        let cluster = build_cluster_state(&config, config.listen)
+            .expect("build cluster with persisted authority fence")
+            .expect("cluster enabled");
+        let guard = cluster.lock().expect("cluster guard");
+        assert_eq!(guard.election_term, 7);
+        assert_eq!(guard.last_leader_url.as_deref(), Some("http://node-z"));
+
+        let _ = std::fs::remove_file(authority_db_path);
     }
 }

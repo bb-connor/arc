@@ -350,6 +350,7 @@ fn filesystem_tool_session_roots_allow_in_root_path() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/workspace/project/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = kernel
@@ -407,6 +408,7 @@ fn filesystem_tool_session_roots_deny_out_of_root_path() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/etc/passwd"}),
+        model_metadata: None,
     });
 
     let response = kernel
@@ -455,6 +457,7 @@ fn filesystem_tool_session_roots_fail_closed_when_missing() {
         server_id: "srv".to_string(),
         tool_name: "filesystem".to_string(),
         arguments: serde_json::json!({"path": "/workspace/project/src/main.rs"}),
+        model_metadata: None,
     });
 
     let response = kernel

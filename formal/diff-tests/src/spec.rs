@@ -38,6 +38,7 @@ pub enum SpecConstraint {
     DomainGlob(String),
     RegexMatch(String),
     MaxLength(usize),
+    MaxArgsSize(usize),
     GovernedIntentRequired,
     RequireApprovalAbove { threshold_units: u64 },
     SellerExact(String),

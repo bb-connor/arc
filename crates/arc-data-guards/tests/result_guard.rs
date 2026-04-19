@@ -19,7 +19,7 @@
 use arc_core::capability::{ArcScope, Constraint, Operation, ToolGrant};
 use arc_data_guards::{QueryResultGuard, QueryResultGuardConfig};
 use arc_guards::post_invocation::{
-    PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
 };
 
 fn grant(constraints: Vec<Constraint>) -> ToolGrant {
@@ -210,7 +210,11 @@ impl PostInvocationHook for OwnedHook {
         "query-result"
     }
 
-    fn inspect(&self, _tool: &str, response: &serde_json::Value) -> PostInvocationVerdict {
+    fn inspect(
+        &self,
+        _ctx: &PostInvocationContext<'_>,
+        response: &serde_json::Value,
+    ) -> PostInvocationVerdict {
         let mut redacted = response.clone();
         self.guard.redact_result(&self.scope, &mut redacted);
         if redacted == *response {

@@ -74,7 +74,21 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.93"
 license = "Apache-2.0"
-repository = "https://github.com/backbay-labs/arc"
+repository = "https://github.com/bb-connor/arc"
+
+[workspace.metadata.arc]
+rust_public_entrypoints = [
+    "arc-cli",
+    "arc-control-plane",
+    "arc-core",
+    "arc-guards",
+    "arc-hosted-mcp",
+    "arc-kernel",
+    "arc-manifest",
+    "arc-mcp-adapter",
+    "arc-mcp-edge",
+    "arc-policy",
+]
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

@@ -18,7 +18,7 @@ Container images are published for `linux/amd64` and `linux/arm64`.
 ## Install via Homebrew
 
 ```bash
-curl -fsSL -o /tmp/arc.rb https://github.com/backbay/arc/releases/latest/download/arc.rb
+curl -fsSL -o /tmp/arc.rb https://github.com/bb-connor/arc/releases/latest/download/arc.rb
 brew install --formula /tmp/arc.rb
 arc --version
 ```
@@ -31,20 +31,21 @@ See [`docs/install/homebrew.md`](./homebrew.md) for details.
 
 ```bash
 # Pull the latest published image
-docker pull ghcr.io/backbay/arc-sidecar:latest
+docker pull ghcr.io/bb-connor/arc-sidecar:latest
 
 # Pin to a specific version
-docker pull ghcr.io/backbay/arc-sidecar:0.1.0
+docker pull ghcr.io/bb-connor/arc-sidecar:0.1.0
 
-# Run the default sidecar entrypoint
-docker run --rm -p 8939:8939 ghcr.io/backbay/arc-sidecar:latest
+# Run the published image
+docker run --rm ghcr.io/bb-connor/arc-sidecar:latest --help
 ```
 
 The image:
 
 - is built from `Dockerfile.sidecar` (Alpine base, non-root user `arc`, UID
   `10001`);
-- runs `arc run` as its default command;
+- defaults to `arc --help`; operators override the command with `run`,
+  `mcp serve-http`, or another real subcommand at deploy time;
 - uses `tini` as PID 1 for correct signal handling;
 - stores sidecar state under `/var/lib/arc` (mount a volume to persist it).
 
@@ -61,7 +62,7 @@ case "$OS" in
 esac
 
 ARCHIVE="arc-${VERSION}-${TRIPLE}.tar.gz"
-BASE="https://github.com/backbay/arc/releases/download/v${VERSION}"
+BASE="https://github.com/bb-connor/arc/releases/download/v${VERSION}"
 
 curl -fsSL "${BASE}/${ARCHIVE}"        -o "${ARCHIVE}"
 curl -fsSL "${BASE}/${ARCHIVE}.sha256" -o "${ARCHIVE}.sha256"
@@ -85,7 +86,7 @@ Verify a downloaded archive with:
 shasum -a 256 -c arc-0.1.0-aarch64-apple-darwin.tar.gz.sha256
 
 # All archives at once
-curl -fsSL https://github.com/backbay/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL https://github.com/bb-connor/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
 ```
 
@@ -94,7 +95,7 @@ Container image provenance is attested by the build workflow
 workflow logged:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/backbay/arc-sidecar:0.1.0
+docker buildx imagetools inspect ghcr.io/bb-connor/arc-sidecar:0.1.0
 ```
 
 ## Troubleshooting
@@ -102,9 +103,10 @@ docker buildx imagetools inspect ghcr.io/backbay/arc-sidecar:0.1.0
 - **`brew install` fails with `SHA256 mismatch`**: the tap formula was
   published before the release workflow replaced the placeholder checksums.
   Re-run `brew update` and retry.
-- **`docker run` exits immediately with code 64**: `arc run` requires
-  configuration (a policy path and capability authority). Mount a config
-  directory into `/etc/arc` and re-run.
+- **`docker run` exits immediately with code 64**: you overrode the image with
+  `run`, `mcp serve-http`, or another subcommand that still needs policy and
+  authority configuration. Mount config into `/etc/arc` and retry with the full
+  command line.
 - **Linux binary reports `GLIBC_2.XX not found`**: the published
   `linux-gnu` builds target a recent glibc. Use the Docker image instead,
   or build from source.
@@ -114,5 +116,5 @@ docker buildx imagetools inspect ghcr.io/backbay/arc-sidecar:0.1.0
 | Asset                                          | Built by                                              |
 | ---------------------------------------------- | ----------------------------------------------------- |
 | GitHub Release archives + `SHA256SUMS`         | `.github/workflows/release-binaries.yml`              |
-| `ghcr.io/backbay/arc-sidecar` container image  | `.github/workflows/sidecar-image.yml`                 |
+| `ghcr.io/bb-connor/arc-sidecar` container image | `.github/workflows/sidecar-image.yml`                 |
 | Homebrew formula template                      | `Homebrew/arc.rb.tmpl` rendered into release asset `arc.rb` |

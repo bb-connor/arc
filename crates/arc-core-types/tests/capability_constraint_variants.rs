@@ -10,7 +10,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use arc_core_types::capability::{
-    Constraint, ContentReviewTier, ModelMetadata, ModelSafetyTier, SqlOperationClass,
+    Constraint, ContentReviewTier, ModelMetadata, ModelSafetyTier, ProvenanceEvidenceClass,
+    SqlOperationClass,
 };
 use serde_json::{json, Value};
 
@@ -192,6 +193,7 @@ fn model_metadata_roundtrips_full() {
         model_id: "claude-opus-4".to_string(),
         safety_tier: Some(ModelSafetyTier::High),
         provider: Some("anthropic".to_string()),
+        provenance_class: ProvenanceEvidenceClass::Verified,
     };
     let value = serde_json::to_value(&metadata).expect("metadata serializes");
     assert_eq!(
@@ -200,6 +202,7 @@ fn model_metadata_roundtrips_full() {
             "model_id": "claude-opus-4",
             "safety_tier": "high",
             "provider": "anthropic",
+            "provenance_class": "verified",
         })
     );
     let round: ModelMetadata = serde_json::from_value(value).expect("metadata deserializes");
@@ -212,6 +215,7 @@ fn model_metadata_omits_absent_optional_fields() {
         model_id: "small-uncensored".to_string(),
         safety_tier: None,
         provider: None,
+        provenance_class: ProvenanceEvidenceClass::Asserted,
     };
     let value = serde_json::to_value(&metadata).expect("metadata serializes");
     assert_eq!(value, json!({"model_id": "small-uncensored"}));
@@ -227,6 +231,7 @@ fn model_metadata_accepts_legacy_payload_without_optional_fields() {
     assert_eq!(metadata.model_id, "gpt-5");
     assert!(metadata.safety_tier.is_none());
     assert!(metadata.provider.is_none());
+    assert_eq!(metadata.provenance_class, ProvenanceEvidenceClass::Asserted);
 }
 
 /// Existing variants must still decode from their on-wire form after

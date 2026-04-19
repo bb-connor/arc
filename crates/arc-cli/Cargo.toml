@@ -8,6 +8,8 @@ license.workspace = true
 repository.workspace = true
 default-run = "arc"
 autobins = false
+readme = "README.md"
+publish = false
 
 [[bin]]
 name = "arc"
@@ -20,7 +22,9 @@ arc-control-plane = { package = "arc-control-plane", path = "../arc-control-plan
 arc-acp-proxy = { package = "arc-acp-proxy", path = "../arc-acp-proxy" }
 arc-core = { package = "arc-core", path = "../arc-core" }
 arc-credentials = { package = "arc-credentials", path = "../arc-credentials" }
+arc-data-guards = { package = "arc-data-guards", path = "../arc-data-guards" }
 arc-did = { package = "arc-did", path = "../arc-did" }
+arc-external-guards = { package = "arc-external-guards", path = "../arc-external-guards" }
 arc-federation = { package = "arc-federation", path = "../arc-federation" }
 arc-hosted-mcp = { package = "arc-hosted-mcp", path = "../arc-hosted-mcp" }
 arc-kernel = { package = "arc-kernel", path = "../arc-kernel" }
@@ -69,6 +73,7 @@ arc-open-market = { package = "arc-open-market", path = "../arc-open-market" }
 arc-underwriting = { package = "arc-underwriting", path = "../arc-underwriting" }
 rand_core = { workspace = true }
 tempfile = "3"
+wiremock = "0.6"
 
 [features]
 siem = ["arc-siem"]

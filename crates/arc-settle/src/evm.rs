@@ -2,8 +2,8 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
-use alloy_primitives::{keccak256, Address, FixedBytes, B256, U256};
-use alloy_sol_types::{sol, SolCall};
+use alloy_primitives::{Address, B256, FixedBytes, U256, keccak256};
+use alloy_sol_types::{SolCall, sol};
 use arc_core::canonical::canonical_json_bytes;
 use arc_core::capability::MonetaryAmount;
 use arc_core::credit::{
@@ -14,21 +14,24 @@ use arc_core::hashing::Hash;
 use arc_core::merkle::leaf_hash;
 use arc_core::receipt::ArcReceipt;
 use arc_core::web3::{
-    validate_web3_settlement_dispatch, validate_web3_settlement_execution_receipt,
-    verify_anchor_inclusion_proof, verify_web3_identity_binding, AnchorInclusionProof,
+    ARC_WEB3_SETTLEMENT_DISPATCH_SCHEMA, ARC_WEB3_SETTLEMENT_RECEIPT_SCHEMA, AnchorInclusionProof,
     SignedWeb3IdentityBinding, Web3KeyBindingPurpose, Web3SettlementDispatchArtifact,
     Web3SettlementExecutionReceiptArtifact, Web3SettlementLifecycleState, Web3SettlementPath,
-    Web3SettlementSupportBoundary, ARC_WEB3_SETTLEMENT_DISPATCH_SCHEMA,
-    ARC_WEB3_SETTLEMENT_RECEIPT_SCHEMA,
+    Web3SettlementSupportBoundary, validate_web3_settlement_dispatch,
+    validate_web3_settlement_execution_receipt, verify_anchor_inclusion_proof,
+    verify_web3_identity_binding,
 };
 use arc_web3_bindings::{ArcMerkleProof, IArcBondVault, IArcEscrow};
 use reqwest::Client;
 use secp256k1::ecdsa::RecoverableSignature;
 use secp256k1::{Message, Secp256k1, SecretKey};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
-use crate::{SettlementChainConfig, SettlementCommitment, SettlementError};
+use crate::{
+    SettlementChainConfig, SettlementCommitment, SettlementError,
+    ops::ensure_settlement_completion_flow_binding,
+};
 
 sol! {
     interface IERC20ApproveOnly {
@@ -1220,6 +1223,31 @@ fn ensure_instruction_ready(
             "capital instruction amount is required".to_string(),
         ));
     }
+    let governed_receipt_id = instruction
+        .body
+        .governed_receipt_id
+        .as_deref()
+        .ok_or_else(|| {
+            SettlementError::InvalidDispatch(
+                "capital instruction governed_receipt_id is required".to_string(),
+            )
+        })?;
+    if governed_receipt_id.trim().is_empty() {
+        return Err(SettlementError::InvalidDispatch(
+            "capital instruction governed_receipt_id cannot be empty".to_string(),
+        ));
+    }
+    let completion_flow_row_id = instruction
+        .body
+        .completion_flow_row_id
+        .as_deref()
+        .ok_or_else(|| {
+            SettlementError::InvalidDispatch(
+                "capital instruction completion_flow_row_id is required".to_string(),
+            )
+        })?;
+    ensure_settlement_completion_flow_binding(completion_flow_row_id, governed_receipt_id)
+        .map_err(|error| SettlementError::InvalidDispatch(error.to_string()))?;
     if !instruction
         .body
         .support_boundary
@@ -1600,11 +1628,11 @@ mod tests {
     use arc_core::crypto::Keypair;
     use arc_core::hashing::sha256_hex;
     use arc_core::receipt::{ArcReceiptBody, Decision, SignedExportEnvelope, ToolCallAction};
-    use arc_core::web3::{Web3IdentityBindingCertificate, ARC_KEY_BINDING_CERTIFICATE_SCHEMA};
+    use arc_core::web3::{ARC_KEY_BINDING_CERTIFICATE_SCHEMA, Web3IdentityBindingCertificate};
     use arc_core::web3::{Web3SettlementDispatchArtifact, Web3SettlementLifecycleState};
-    use secp256k1::ecdsa::RecoveryId;
     use secp256k1::PublicKey as SecpPublicKey;
-    use serde_json::{json, Value};
+    use secp256k1::ecdsa::RecoveryId;
+    use serde_json::{Value, json};
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::{Arc, Mutex};
@@ -1750,6 +1778,10 @@ mod tests {
                 subject_key: "subject-1".to_string(),
                 source_id: "capital-source:facility:facility-1".to_string(),
                 source_kind: CapitalBookSourceKind::FacilityCommitment,
+                governed_receipt_id: Some(format!("governed-{instruction_id}")),
+                completion_flow_row_id: Some(format!(
+                    "economic-completion-flow:governed-{instruction_id}"
+                )),
                 action: CapitalExecutionInstructionAction::TransferFunds,
                 owner_role: CapitalExecutionRole::OperatorTreasury,
                 counterparty_role: CapitalExecutionRole::AgentCounterparty,
@@ -2579,9 +2611,11 @@ mod tests {
         let binding_error = prepare_web3_escrow_dispatch(&config, &valid_request, &binding)
             .await
             .expect_err("binding without settle purpose should fail");
-        assert!(binding_error
-            .to_string()
-            .contains("binding does not include Settle purpose"));
+        assert!(
+            binding_error
+                .to_string()
+                .contains("binding does not include Settle purpose")
+        );
 
         let mismatch_request = EscrowDispatchRequest {
             capital_instruction: sample_capital_instruction(
@@ -2590,7 +2624,7 @@ mod tests {
                 "cei-unit-3",
                 150,
             ),
-            ..valid_request
+            ..valid_request.clone()
         };
         let binding = sample_binding_for_config(&config);
         let instruction_error = prepare_web3_escrow_dispatch(&config, &mismatch_request, &binding)
@@ -2599,6 +2633,16 @@ mod tests {
         assert!(instruction_error.to_string().contains(
             "beneficiary address must match capital instruction destination_account_ref"
         ));
+
+        let mut provenance_request = valid_request;
+        provenance_request
+            .capital_instruction
+            .body
+            .completion_flow_row_id = Some("economic-completion-flow:other-receipt".to_string());
+        let provenance_error = prepare_web3_escrow_dispatch(&config, &provenance_request, &binding)
+            .await
+            .expect_err("mismatched completion-flow provenance should fail");
+        drop(provenance_error);
     }
 
     #[test]
@@ -2740,9 +2784,11 @@ mod tests {
             &sample_primary_proof(),
         )
         .expect_err("mismatched shares should fail");
-        assert!(share_error
-            .to_string()
-            .contains("slash shares must sum to slash_amount"));
+        assert!(
+            share_error
+                .to_string()
+                .contains("slash shares must sum to slash_amount")
+        );
 
         let finalize_error = finalize_escrow_dispatch(
             &PreparedEscrowCreate {
@@ -2770,9 +2816,11 @@ mod tests {
             },
         )
         .expect_err("failed receipt should fail closed");
-        assert!(finalize_error
-            .to_string()
-            .contains("failed before escrow identity could be finalized"));
+        assert!(
+            finalize_error
+                .to_string()
+                .contains("failed before escrow identity could be finalized")
+        );
     }
 
     #[test]

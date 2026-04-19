@@ -328,6 +328,20 @@ fn validate_detection(
         }
 
         if let Some(threat_intel) = &detection.threat_intel {
+            match threat_intel.pattern_db.as_deref() {
+                Some(pattern_db) if pattern_db.trim().is_empty() => {
+                    errors.push(ValidationError::Custom(
+                        "detection.threat_intel.pattern_db must not be empty".to_string(),
+                    ));
+                }
+                None if threat_intel.enabled.unwrap_or(true) => {
+                    errors.push(ValidationError::Custom(
+                        "detection.threat_intel.pattern_db is required when enabled"
+                            .to_string(),
+                    ));
+                }
+                _ => {}
+            }
             if let Some(similarity_threshold) = threat_intel.similarity_threshold {
                 if !(0.0..=1.0).contains(&similarity_threshold) {
                     errors.push(ValidationError::Custom(
@@ -747,6 +761,27 @@ extensions:
         assert_warning_contains(
             &result,
             "detection.jailbreak: block_threshold is lower than warn_threshold",
+        );
+    }
+
+    #[test]
+    fn detection_validation_requires_threat_intel_pattern_db_when_enabled() {
+        let spec: HushSpec = serde_yml::from_str(
+            r#"
+hushspec: "0.1.0"
+name: detection-validation
+extensions:
+  detection:
+    threat_intel:
+      enabled: true
+"#,
+        )
+        .expect("parse policy");
+
+        let result = validate(&spec);
+        assert_error_contains(
+            &result,
+            "detection.threat_intel.pattern_db is required when enabled",
         );
     }
 

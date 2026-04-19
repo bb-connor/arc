@@ -17,6 +17,13 @@ pub struct SqliteCapabilityAuthority {
     cached_trusted_public_keys: Mutex<Vec<PublicKey>>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthorityClusterFence {
+    pub leader_url: Option<String>,
+    pub election_term: u64,
+    pub updated_at: u64,
+}
+
 impl SqliteCapabilityAuthority {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError> {
         let path = path.as_ref().to_path_buf();
@@ -28,11 +35,15 @@ impl SqliteCapabilityAuthority {
         let connection = Self::open_connection(&path)?;
         connection.execute(
             r#"
-            INSERT INTO authority_state (singleton_id, seed_hex, generation, rotated_at)
-            VALUES (1, ?1, 1, ?2)
+            INSERT INTO authority_state (singleton_id, seed_hex, public_key_hex, generation, rotated_at)
+            VALUES (1, ?1, ?2, 1, ?3)
             ON CONFLICT(singleton_id) DO NOTHING
             "#,
-            params![bootstrap.seed_hex(), unix_now() as i64],
+            params![
+                bootstrap.seed_hex(),
+                bootstrap.public_key().to_hex(),
+                unix_now() as i64
+            ],
         )?;
         let current_public_key = connection
             .query_row(
@@ -46,6 +57,14 @@ impl SqliteCapabilityAuthority {
             )
             .map(|seed_hex| Keypair::from_seed_hex(seed_hex.trim()))
             .map_err(AuthorityStoreError::from)??;
+        connection.execute(
+            r#"
+            UPDATE authority_state
+            SET public_key_hex = COALESCE(NULLIF(public_key_hex, ''), ?1)
+            WHERE singleton_id = 1
+            "#,
+            params![current_public_key.public_key().to_hex()],
+        )?;
         connection.execute(
             r#"
             INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
@@ -72,21 +91,22 @@ impl SqliteCapabilityAuthority {
 
     pub fn rotate(&self) -> Result<AuthorityStatus, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
-        let (_, generation, _) = Self::read_keypair_from_connection(&connection)?;
+        let status_before = Self::read_status_from_connection(&connection)?;
         let keypair = Keypair::generate();
         let rotated_at = unix_now();
-        let next_generation = generation.saturating_add(1);
+        let next_generation = status_before.generation.saturating_add(1);
 
         connection.execute(
             r#"
             UPDATE authority_state
-            SET seed_hex = ?1, generation = ?2, rotated_at = ?3
+            SET seed_hex = ?1, public_key_hex = ?2, generation = ?3, rotated_at = ?4
             WHERE singleton_id = 1
             "#,
             params![
                 keypair.seed_hex(),
+                keypair.public_key().to_hex(),
                 next_generation as i64,
-                rotated_at as i64
+                rotated_at as i64,
             ],
         )?;
         connection.execute(
@@ -110,12 +130,11 @@ impl SqliteCapabilityAuthority {
 
     pub fn snapshot(&self) -> Result<AuthoritySnapshot, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
-        let (keypair, generation, rotated_at) = Self::read_keypair_from_connection(&connection)?;
+        let status = Self::read_status_from_connection(&connection)?;
         Ok(AuthoritySnapshot {
-            seed_hex: keypair.seed_hex(),
-            public_key_hex: keypair.public_key().to_hex(),
-            generation,
-            rotated_at,
+            public_key_hex: status.public_key.to_hex(),
+            generation: status.generation,
+            rotated_at: status.rotated_at,
             trusted_keys: Self::read_trusted_key_snapshots(&connection)?,
         })
     }
@@ -126,15 +145,23 @@ impl SqliteCapabilityAuthority {
     ) -> Result<bool, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
         let local_snapshot = self.snapshot()?;
-        let remote_keypair = Keypair::from_seed_hex(snapshot.seed_hex.trim())?;
-        if remote_keypair.public_key().to_hex() != snapshot.public_key_hex {
-            return Err(AuthorityStoreError::Core(
-                arc_core::error::Error::InvalidPublicKey(
-                    "authority snapshot public key does not match seed".to_string(),
-                ),
-            ));
-        }
+        let remote_public_key = PublicKey::from_hex(snapshot.public_key_hex.trim())?;
 
+        // Cluster snapshots replicate verification history, not signing custody.
+        connection.execute(
+            r#"
+            INSERT INTO authority_trusted_keys (public_key_hex, generation, activated_at)
+            VALUES (?1, ?2, ?3)
+            ON CONFLICT(public_key_hex) DO UPDATE SET
+                generation = MAX(generation, excluded.generation),
+                activated_at = MIN(activated_at, excluded.activated_at)
+            "#,
+            params![
+                remote_public_key.to_hex(),
+                snapshot.generation as i64,
+                snapshot.rotated_at as i64
+            ],
+        )?;
         for trusted_key in &snapshot.trusted_keys {
             connection.execute(
                 r#"
@@ -163,13 +190,13 @@ impl SqliteCapabilityAuthority {
             connection.execute(
                 r#"
                 UPDATE authority_state
-                SET seed_hex = ?1, generation = ?2, rotated_at = ?3
+                SET public_key_hex = ?1, generation = ?2, rotated_at = ?3
                 WHERE singleton_id = 1
                 "#,
                 params![
-                    snapshot.seed_hex,
+                    remote_public_key.to_hex(),
                     snapshot.generation as i64,
-                    snapshot.rotated_at as i64
+                    snapshot.rotated_at as i64,
                 ],
             )?;
         }
@@ -178,6 +205,62 @@ impl SqliteCapabilityAuthority {
         self.update_cached_public_key(status.public_key);
         self.update_cached_trusted_public_keys(status.trusted_public_keys);
         Ok(should_replace)
+    }
+
+    pub fn current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
+        self.read_current_keypair()
+    }
+
+    pub fn cluster_fence(&self) -> Result<AuthorityClusterFence, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        Self::read_cluster_fence_from_connection(&connection)
+    }
+
+    pub fn seed_cluster_fence(
+        &self,
+        leader_url: Option<&str>,
+        election_term: u64,
+    ) -> Result<bool, AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let current = Self::read_cluster_fence_from_connection(&connection)?;
+        let next_leader = leader_url.map(ToOwned::to_owned);
+        let should_update = election_term > current.election_term
+            || (election_term == current.election_term && next_leader != current.leader_url);
+        if should_update {
+            Self::write_cluster_fence_to_connection(&connection, next_leader, election_term)?;
+        }
+        Ok(should_update)
+    }
+
+    pub fn enforce_cluster_fence(
+        &self,
+        leader_url: &str,
+        election_term: u64,
+    ) -> Result<(), AuthorityStoreError> {
+        let connection = Self::open_connection(&self.path)?;
+        let current = Self::read_cluster_fence_from_connection(&connection)?;
+        if election_term < current.election_term {
+            return Err(AuthorityStoreError::Fence(format!(
+                "stale authority term `{election_term}` is below persisted term `{}`",
+                current.election_term
+            )));
+        }
+        if election_term == current.election_term
+            && current
+                .leader_url
+                .as_deref()
+                .is_some_and(|current_leader| current_leader != leader_url)
+        {
+            return Err(AuthorityStoreError::Fence(format!(
+                "authority term `{election_term}` is already fenced to leader `{}`",
+                current.leader_url.unwrap_or_default()
+            )));
+        }
+        Self::write_cluster_fence_to_connection(
+            &connection,
+            Some(leader_url.to_string()),
+            election_term,
+        )
     }
 
     fn open_connection(path: &Path) -> Result<Connection, AuthorityStoreError> {
@@ -191,6 +274,7 @@ impl SqliteCapabilityAuthority {
             CREATE TABLE IF NOT EXISTS authority_state (
                 singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
                 seed_hex TEXT NOT NULL,
+                public_key_hex TEXT,
                 generation INTEGER NOT NULL,
                 rotated_at INTEGER NOT NULL
             );
@@ -200,17 +284,35 @@ impl SqliteCapabilityAuthority {
                 generation INTEGER NOT NULL,
                 activated_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS authority_cluster_fence (
+                singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                leader_url TEXT,
+                election_term INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            );
+
+            INSERT INTO authority_cluster_fence (singleton_id, leader_url, election_term, updated_at)
+            VALUES (1, NULL, 0, 0)
+            ON CONFLICT(singleton_id) DO NOTHING;
             "#,
         )?;
+        if !Self::table_has_column(&connection, "authority_state", "public_key_hex")? {
+            connection.execute(
+                "ALTER TABLE authority_state ADD COLUMN public_key_hex TEXT",
+                [],
+            )?;
+        }
         Ok(connection)
     }
 
     fn read_status_from_connection(
         connection: &Connection,
     ) -> Result<AuthorityStatus, AuthorityStoreError> {
-        let (keypair, generation, rotated_at) = Self::read_keypair_from_connection(connection)?;
+        let (public_key, generation, rotated_at) =
+            Self::read_public_state_from_connection(connection)?;
         Ok(AuthorityStatus {
-            public_key: keypair.public_key(),
+            public_key,
             generation,
             rotated_at,
             trusted_public_keys: Self::read_trusted_public_keys(connection)?,
@@ -219,10 +321,25 @@ impl SqliteCapabilityAuthority {
 
     fn read_keypair_from_connection(
         connection: &Connection,
-    ) -> Result<(Keypair, u64, u64), AuthorityStoreError> {
-        let (seed_hex, generation, rotated_at) = connection.query_row(
+    ) -> Result<Keypair, AuthorityStoreError> {
+        let seed_hex = connection.query_row(
             r#"
-            SELECT seed_hex, generation, rotated_at
+            SELECT seed_hex
+            FROM authority_state
+            WHERE singleton_id = 1
+            "#,
+            [],
+            |row| row.get::<_, String>(0),
+        )?;
+        Keypair::from_seed_hex(seed_hex.trim()).map_err(Into::into)
+    }
+
+    fn read_public_state_from_connection(
+        connection: &Connection,
+    ) -> Result<(PublicKey, u64, u64), AuthorityStoreError> {
+        let (seed_hex, public_key_hex, generation, rotated_at) = connection.query_row(
+            r#"
+            SELECT seed_hex, public_key_hex, generation, rotated_at
             FROM authority_state
             WHERE singleton_id = 1
             "#,
@@ -230,13 +347,22 @@ impl SqliteCapabilityAuthority {
             |row| {
                 Ok((
                     row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)?,
+                    row.get::<_, Option<String>>(1)?,
                     row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
                 ))
             },
         )?;
+        let public_key = match public_key_hex
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            Some(public_key_hex) => PublicKey::from_hex(public_key_hex)?,
+            None => Keypair::from_seed_hex(seed_hex.trim())?.public_key(),
+        };
         Ok((
-            Keypair::from_seed_hex(seed_hex.trim())?,
+            public_key,
             generation.max(0) as u64,
             rotated_at.max(0) as u64,
         ))
@@ -244,9 +370,25 @@ impl SqliteCapabilityAuthority {
 
     fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
-        let (keypair, _, _) = Self::read_keypair_from_connection(&connection)?;
+        let keypair = Self::read_keypair_from_connection(&connection)?;
         self.update_cached_public_key(keypair.public_key());
         Ok(keypair)
+    }
+
+    fn table_has_column(
+        connection: &Connection,
+        table: &str,
+        column: &str,
+    ) -> Result<bool, AuthorityStoreError> {
+        let pragma = format!("PRAGMA table_info({table})");
+        let mut statement = connection.prepare(&pragma)?;
+        let mut rows = statement.query([])?;
+        while let Some(row) = rows.next()? {
+            if row.get::<_, String>(1)? == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     fn update_cached_public_key(&self, public_key: PublicKey) {
@@ -313,6 +455,47 @@ impl SqliteCapabilityAuthority {
             })
         })?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    }
+
+    fn read_cluster_fence_from_connection(
+        connection: &Connection,
+    ) -> Result<AuthorityClusterFence, AuthorityStoreError> {
+        let (leader_url, election_term, updated_at) = connection.query_row(
+            r#"
+            SELECT leader_url, election_term, updated_at
+            FROM authority_cluster_fence
+            WHERE singleton_id = 1
+            "#,
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )?;
+        Ok(AuthorityClusterFence {
+            leader_url,
+            election_term: election_term.max(0) as u64,
+            updated_at: updated_at.max(0) as u64,
+        })
+    }
+
+    fn write_cluster_fence_to_connection(
+        connection: &Connection,
+        leader_url: Option<String>,
+        election_term: u64,
+    ) -> Result<(), AuthorityStoreError> {
+        connection.execute(
+            r#"
+            UPDATE authority_cluster_fence
+            SET leader_url = ?1, election_term = ?2, updated_at = ?3
+            WHERE singleton_id = 1
+            "#,
+            params![leader_url, election_term as i64, unix_now() as i64],
+        )?;
+        Ok(())
     }
 }
 
@@ -483,5 +666,30 @@ mod tests {
         assert!(second.verify_signature().unwrap());
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_capability_authority_snapshot_updates_public_view_without_copying_seed() {
+        let source_path = unique_db_path("arc-authority-source");
+        let follower_path = unique_db_path("arc-authority-follower");
+        let source = SqliteCapabilityAuthority::open(&source_path).unwrap();
+        let follower = SqliteCapabilityAuthority::open(&follower_path).unwrap();
+
+        let follower_local_key = follower.current_keypair().unwrap().public_key();
+        let rotated = source.rotate().unwrap();
+        let snapshot = source.snapshot().unwrap();
+
+        assert!(follower.apply_snapshot(&snapshot).unwrap());
+
+        let follower_status = follower.status().unwrap();
+        assert_eq!(follower_status.public_key, rotated.public_key);
+        assert_eq!(follower_status.generation, rotated.generation);
+        assert_eq!(
+            follower.current_keypair().unwrap().public_key(),
+            follower_local_key
+        );
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(follower_path);
     }
 }

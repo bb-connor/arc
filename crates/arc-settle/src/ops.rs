@@ -1,7 +1,10 @@
 use arc_core::web3::{ARC_SETTLE_CONTROL_STATE_SCHEMA, ARC_SETTLE_CONTROL_TRACE_SCHEMA};
 use serde::{Deserialize, Serialize};
 
-use crate::{SettlementError, SettlementFinalityStatus, SettlementRecoveryAction};
+use crate::{
+    settlement_completion_flow_receipt_id, SettlementError, SettlementFinalityStatus,
+    SettlementRecoveryAction,
+};
 
 pub const ARC_SETTLE_RUNTIME_REPORT_SCHEMA: &str = "arc.settle-runtime-report.v1";
 
@@ -361,15 +364,32 @@ pub fn ensure_settlement_operation_allowed(
     )))
 }
 
+pub fn ensure_settlement_completion_flow_binding(
+    row_id: &str,
+    receipt_id: &str,
+) -> Result<(), SettlementError> {
+    let resolved_receipt_id = settlement_completion_flow_receipt_id(row_id)?;
+    if resolved_receipt_id != receipt_id {
+        return Err(SettlementError::InvalidBinding(format!(
+            "completion-flow row `{row_id}` resolved receipt `{resolved_receipt_id}` but settlement receipt is `{receipt_id}`"
+        )));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        classify_settlement_lane, ensure_settlement_operation_allowed, SettlementControlState,
-        SettlementEmergencyControls, SettlementEmergencyMode, SettlementIndexerCursor,
-        SettlementIndexerCursorInput, SettlementIndexerStatus, SettlementOperationKind,
-        SettlementRuntimeReport, SettlementRuntimeStatus, ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
+        classify_settlement_lane, ensure_settlement_completion_flow_binding,
+        ensure_settlement_operation_allowed, SettlementControlState, SettlementEmergencyControls,
+        SettlementEmergencyMode, SettlementIndexerCursor, SettlementIndexerCursorInput,
+        SettlementIndexerStatus, SettlementOperationKind, SettlementRuntimeReport,
+        SettlementRuntimeStatus, ARC_SETTLE_RUNTIME_REPORT_SCHEMA,
     };
-    use crate::SettlementFinalityStatus;
+    use crate::{
+        settlement_completion_flow_row_id, SettlementFinalityStatus,
+        SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX,
+    };
 
     #[test]
     fn indexer_cursor_classifies_lagging() {
@@ -454,5 +474,26 @@ mod tests {
             state.history[1].after.reason.as_deref(),
             Some("refund-first recovery")
         );
+    }
+
+    #[test]
+    fn completion_flow_binding_round_trips() {
+        let row_id = settlement_completion_flow_row_id("rcpt-1").expect("row id");
+        assert_eq!(
+            row_id,
+            format!("{SETTLEMENT_COMPLETION_FLOW_ROW_ID_PREFIX}{}", "rcpt-1")
+        );
+        ensure_settlement_completion_flow_binding(&row_id, "rcpt-1")
+            .expect("matching binding");
+    }
+
+    #[test]
+    fn completion_flow_binding_rejects_mismatch() {
+        let error = ensure_settlement_completion_flow_binding(
+            "economic-completion-flow:rcpt-1",
+            "rcpt-2",
+        )
+        .expect_err("binding mismatch should fail");
+        assert!(error.to_string().contains("resolved receipt"));
     }
 }

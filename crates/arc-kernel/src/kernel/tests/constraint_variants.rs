@@ -199,6 +199,7 @@ fn kernel_allows_tool_call_when_model_is_in_allowlist() {
         model_id: "claude-opus-4".to_string(),
         safety_tier: Some(arc_core::capability::ModelSafetyTier::High),
         provider: Some("anthropic".to_string()),
+        provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
     });
 
     assert_eq!(
@@ -246,6 +247,7 @@ fn kernel_denies_tool_call_when_model_is_not_in_allowlist() {
         model_id: "small-uncensored".to_string(),
         safety_tier: Some(arc_core::capability::ModelSafetyTier::Low),
         provider: None,
+        provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
     });
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();
@@ -298,6 +300,7 @@ fn kernel_denies_tool_call_when_model_safety_tier_is_below_minimum() {
         model_id: "small-uncensored".to_string(),
         safety_tier: Some(arc_core::capability::ModelSafetyTier::Low),
         provider: None,
+        provenance_class: arc_core::capability::ProvenanceEvidenceClass::Asserted,
     });
 
     let response = kernel.evaluate_tool_call_blocking(&request).unwrap();

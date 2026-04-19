@@ -5,20 +5,34 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
 
+use arc_data_guards::{
+    QueryResultGuard, QueryResultGuardConfig, SqlGuardConfig, SqlQueryGuard, VectorDbGuard,
+    VectorGuardConfig, WarehouseCostGuard, WarehouseCostGuardConfig,
+};
+use arc_external_guards::{
+    external::{BackoffStrategy, CircuitBreakerConfig, RetryConfig},
+    AsyncGuardAdapter, AzureCategory, AzureContentSafetyConfig, AzureContentSafetyGuard,
+    SafeBrowsingConfig, SafeBrowsingGuard, ScopedAsyncGuard,
+};
 use arc_reputation::{
     ReputationConfig as LocalReputationConfig, ReputationWeights as LocalReputationWeights,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use url::Url;
 
 use arc_core::capability::{
     ArcScope, AttestationTrustPolicy, AttestationTrustRule, MonetaryAmount, Operation, PromptGrant,
     ResourceGrant, RuntimeAssuranceTier, ToolGrant,
 };
 use arc_guards::{
-    EgressAllowlistGuard, ForbiddenPathGuard, GuardPipeline, McpToolGuard, PatchIntegrityGuard,
-    PathAllowlistGuard, PostInvocationPipeline, SanitizerHook, SecretLeakGuard, ShellCommandGuard,
+    ContentReviewConfig, ContentReviewGuard, EgressAllowlistGuard, ForbiddenPathGuard,
+    GuardPipeline, McpToolGuard, PatchIntegrityGuard, PathAllowlistGuard, PostInvocationPipeline,
+    ResponseSanitizationGuard, SanitizationAction, SanitizerHook, SecretLeakGuard,
+    SensitivityLevel, ShellCommandGuard, InternalNetworkGuard,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +254,138 @@ pub struct GuardPolicyConfig {
     /// Patch integrity guard configuration.
     #[serde(default)]
     pub patch_integrity: Option<PatchIntegrityConfig>,
+
+    /// SQL query guard configuration.
+    #[serde(default)]
+    pub sql_query: Option<SqlGuardConfig>,
+
+    /// Vector database guard configuration.
+    #[serde(default)]
+    pub vector_db: Option<VectorGuardConfig>,
+
+    /// Warehouse cost guard configuration.
+    #[serde(default)]
+    pub warehouse_cost: Option<WarehouseCostGuardConfig>,
+
+    /// Query-result post-invocation guard configuration.
+    #[serde(default)]
+    pub query_result: Option<QueryResultGuardConfig>,
+
+    /// Outbound content-review guard configuration.
+    #[serde(default)]
+    pub content_review: Option<ContentReviewConfig>,
+
+    /// Cloud guardrail adapters backed by external providers.
+    #[serde(default)]
+    pub cloud_guardrails: Option<CloudGuardrailsPolicyConfig>,
+
+    /// Threat-intel adapters backed by external providers.
+    #[serde(default)]
+    pub threat_intel: Option<ThreatIntelPolicyConfig>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CloudGuardrailsPolicyConfig {
+    #[serde(default)]
+    pub azure_content_safety: Option<AzureContentSafetyPolicyConfig>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ThreatIntelPolicyConfig {
+    #[serde(default)]
+    pub safe_browsing: Option<SafeBrowsingPolicyConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExternalAdapterPolicyConfig {
+    #[serde(default = "default_external_cache_ttl_seconds")]
+    pub cache_ttl_seconds: u64,
+    #[serde(default = "default_external_rate_per_second")]
+    pub rate_per_second: f64,
+    #[serde(default = "default_external_rate_burst")]
+    pub rate_burst: u32,
+    #[serde(default = "default_external_circuit_failure_threshold")]
+    pub circuit_failure_threshold: u32,
+    #[serde(default = "default_external_retry_max_retries")]
+    pub retry_max_retries: u32,
+}
+
+impl Default for ExternalAdapterPolicyConfig {
+    fn default() -> Self {
+        Self {
+            cache_ttl_seconds: default_external_cache_ttl_seconds(),
+            rate_per_second: default_external_rate_per_second(),
+            rate_burst: default_external_rate_burst(),
+            circuit_failure_threshold: default_external_circuit_failure_threshold(),
+            retry_max_retries: default_external_retry_max_retries(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AzureContentSafetyPolicyConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub endpoint: String,
+    pub api_key: String,
+    #[serde(default)]
+    pub api_version: Option<String>,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default)]
+    pub severity_threshold: Option<u32>,
+    #[serde(default)]
+    pub categories: Vec<String>,
+    #[serde(default)]
+    pub tool_patterns: Vec<String>,
+    #[serde(default)]
+    pub adapter: ExternalAdapterPolicyConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SafeBrowsingPolicyConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub api_key: String,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub client_version: Option<String>,
+    #[serde(default)]
+    pub threat_types: Vec<String>,
+    #[serde(default)]
+    pub timeout_seconds: Option<u64>,
+    #[serde(default)]
+    pub tool_patterns: Vec<String>,
+    #[serde(default)]
+    pub adapter: ExternalAdapterPolicyConfig,
+}
+
+fn default_external_cache_ttl_seconds() -> u64 {
+    60
+}
+
+fn default_external_rate_per_second() -> f64 {
+    20.0
+}
+
+fn default_external_rate_burst() -> u32 {
+    20
+}
+
+fn default_external_circuit_failure_threshold() -> u32 {
+    5
+}
+
+fn default_external_retry_max_retries() -> u32 {
+    3
 }
 
 /// Configuration for the forbidden-path guard.
@@ -346,6 +492,10 @@ pub struct ToolAccessConfig {
     /// Maximum serialized argument size in bytes.
     #[serde(default)]
     pub max_args_size: Option<usize>,
+
+    /// Tool patterns that must be elevated to approval-gated capabilities.
+    #[serde(default)]
+    pub require_confirmation: Vec<String>,
 }
 
 /// Configuration for the secret leak guard.
@@ -833,6 +983,7 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     .map_err(|error| PolicyError::Invalid(error.to_string()))?,
                 ));
             }
+            pipeline.add(Box::new(InternalNetworkGuard::new()));
         }
     }
 
@@ -866,6 +1017,10 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
                     Err(error) => panic!("invalid secret leak guard config: {error}"),
                 };
             pipeline.add(Box::new(guard));
+            pipeline.add(Box::new(ResponseSanitizationGuard::new(
+                SensitivityLevel::High,
+                SanitizationAction::Redact,
+            )));
         }
     }
 
@@ -887,12 +1042,242 @@ pub fn build_guard_pipeline(config: &GuardPolicyConfig) -> Result<GuardPipeline,
         }
     }
 
+    if let Some(sql_query) = &config.sql_query {
+        pipeline.add(Box::new(SqlQueryGuard::new(sql_query.clone())));
+    }
+
+    if let Some(vector_db) = &config.vector_db {
+        pipeline.add(Box::new(VectorDbGuard::new(vector_db.clone())));
+    }
+
+    if let Some(warehouse_cost) = &config.warehouse_cost {
+        pipeline.add(Box::new(WarehouseCostGuard::new(warehouse_cost.clone())));
+    }
+
+    if let Some(content_review) = &config.content_review {
+        pipeline.add(Box::new(
+            ContentReviewGuard::with_config(content_review.clone())
+                .map_err(|error| PolicyError::Invalid(error.to_string()))?,
+        ));
+    }
+
+    if let Some(cloud_guardrails) = &config.cloud_guardrails {
+        if let Some(azure) = &cloud_guardrails.azure_content_safety {
+            if azure.enabled {
+                pipeline.add(Box::new(build_azure_content_safety_guard(azure)?));
+            }
+        }
+    }
+
+    if let Some(threat_intel) = &config.threat_intel {
+        if let Some(safe_browsing) = &threat_intel.safe_browsing {
+            if safe_browsing.enabled {
+                pipeline.add(Box::new(build_safe_browsing_guard(safe_browsing)?));
+            }
+        }
+    }
+
     Ok(pipeline)
+}
+
+fn build_azure_content_safety_guard(
+    config: &AzureContentSafetyPolicyConfig,
+) -> Result<ScopedAsyncGuard<AzureContentSafetyGuard>, PolicyError> {
+    validate_required_secret("cloud_guardrails.azure_content_safety.api_key", &config.api_key)?;
+    validate_http_url(
+        "cloud_guardrails.azure_content_safety.endpoint",
+        &config.endpoint,
+    )?;
+
+    let mut guard_config = AzureContentSafetyConfig::new(config.api_key.clone(), config.endpoint.clone());
+    if let Some(api_version) = &config.api_version {
+        if api_version.trim().is_empty() {
+            return Err(PolicyError::Invalid(
+                "cloud_guardrails.azure_content_safety.api_version cannot be empty".to_string(),
+            ));
+        }
+        guard_config.api_version = api_version.clone();
+    }
+    if let Some(timeout_seconds) = config.timeout_seconds {
+        if timeout_seconds == 0 {
+            return Err(PolicyError::Invalid(
+                "cloud_guardrails.azure_content_safety.timeout_seconds must be greater than 0"
+                    .to_string(),
+            ));
+        }
+        guard_config.timeout = Duration::from_secs(timeout_seconds);
+    }
+    if let Some(severity_threshold) = config.severity_threshold {
+        if severity_threshold > 7 {
+            return Err(PolicyError::Invalid(
+                "cloud_guardrails.azure_content_safety.severity_threshold must be between 0 and 7"
+                    .to_string(),
+            ));
+        }
+        guard_config.severity_threshold = severity_threshold;
+    }
+    if !config.categories.is_empty() {
+        guard_config.categories = config
+            .categories
+            .iter()
+            .map(|category| parse_azure_category(category))
+            .collect::<Result<Vec<_>, _>>()?;
+    }
+
+    let guard = AzureContentSafetyGuard::new(guard_config)
+        .map_err(|error| PolicyError::Invalid(error.to_string()))?;
+    let adapter = configure_async_guard_adapter(
+        AsyncGuardAdapter::builder(Arc::new(guard)),
+        &config.adapter,
+        "cloud_guardrails.azure_content_safety.adapter",
+    )?;
+    Ok(ScopedAsyncGuard::new(adapter, config.tool_patterns.clone()))
+}
+
+fn build_safe_browsing_guard(
+    config: &SafeBrowsingPolicyConfig,
+) -> Result<ScopedAsyncGuard<SafeBrowsingGuard>, PolicyError> {
+    validate_required_secret("threat_intel.safe_browsing.api_key", &config.api_key)?;
+    if let Some(base_url) = &config.base_url {
+        validate_http_url("threat_intel.safe_browsing.base_url", base_url)?;
+    }
+
+    let mut guard_config = SafeBrowsingConfig::new(config.api_key.clone());
+    if let Some(base_url) = &config.base_url {
+        guard_config.base_url = Some(base_url.clone());
+    }
+    if let Some(client_id) = &config.client_id {
+        if client_id.trim().is_empty() {
+            return Err(PolicyError::Invalid(
+                "threat_intel.safe_browsing.client_id cannot be empty".to_string(),
+            ));
+        }
+        guard_config.client_id = client_id.clone();
+    }
+    if let Some(client_version) = &config.client_version {
+        if client_version.trim().is_empty() {
+            return Err(PolicyError::Invalid(
+                "threat_intel.safe_browsing.client_version cannot be empty".to_string(),
+            ));
+        }
+        guard_config.client_version = client_version.clone();
+    }
+    if !config.threat_types.is_empty() {
+        if config
+            .threat_types
+            .iter()
+            .any(|threat_type| threat_type.trim().is_empty())
+        {
+            return Err(PolicyError::Invalid(
+                "threat_intel.safe_browsing.threat_types cannot contain empty values"
+                    .to_string(),
+            ));
+        }
+        guard_config.threat_types = config.threat_types.clone();
+    }
+    if let Some(timeout_seconds) = config.timeout_seconds {
+        if timeout_seconds == 0 {
+            return Err(PolicyError::Invalid(
+                "threat_intel.safe_browsing.timeout_seconds must be greater than 0"
+                    .to_string(),
+            ));
+        }
+        guard_config.timeout = Duration::from_secs(timeout_seconds);
+    }
+
+    let guard = SafeBrowsingGuard::new(guard_config)
+        .map_err(|error| PolicyError::Invalid(error.to_string()))?;
+    let adapter = configure_async_guard_adapter(
+        AsyncGuardAdapter::builder(Arc::new(guard)),
+        &config.adapter,
+        "threat_intel.safe_browsing.adapter",
+    )?;
+    Ok(ScopedAsyncGuard::new(adapter, config.tool_patterns.clone()))
+}
+
+fn configure_async_guard_adapter<E>(
+    builder: arc_external_guards::AsyncGuardAdapterBuilder<E>,
+    config: &ExternalAdapterPolicyConfig,
+    field_prefix: &str,
+) -> Result<AsyncGuardAdapter<E>, PolicyError>
+where
+    E: arc_external_guards::ExternalGuard,
+{
+    if !config.rate_per_second.is_finite() || config.rate_per_second <= 0.0 {
+        return Err(PolicyError::Invalid(format!(
+            "{field_prefix}.rate_per_second must be greater than 0"
+        )));
+    }
+    if config.rate_burst == 0 {
+        return Err(PolicyError::Invalid(format!(
+            "{field_prefix}.rate_burst must be greater than 0"
+        )));
+    }
+    if config.cache_ttl_seconds == 0 {
+        return Err(PolicyError::Invalid(format!(
+            "{field_prefix}.cache_ttl_seconds must be greater than 0"
+        )));
+    }
+    if config.circuit_failure_threshold == 0 {
+        return Err(PolicyError::Invalid(format!(
+            "{field_prefix}.circuit_failure_threshold must be greater than 0"
+        )));
+    }
+
+    let mut circuit = CircuitBreakerConfig::default();
+    circuit.failure_threshold = config.circuit_failure_threshold;
+
+    let mut retry = RetryConfig::default();
+    retry.max_retries = config.retry_max_retries;
+    retry.strategy = BackoffStrategy::Exponential;
+
+    Ok(builder
+        .circuit(circuit)
+        .retry(retry)
+        .cache_ttl(Duration::from_secs(config.cache_ttl_seconds))
+        .rate_limit(config.rate_per_second, config.rate_burst)
+        .build())
+}
+
+fn validate_required_secret(field: &str, value: &str) -> Result<(), PolicyError> {
+    if value.trim().is_empty() {
+        return Err(PolicyError::Invalid(format!("{field} cannot be empty")));
+    }
+    Ok(())
+}
+
+fn validate_http_url(field: &str, value: &str) -> Result<(), PolicyError> {
+    let parsed = Url::parse(value)
+        .map_err(|error| PolicyError::Invalid(format!("{field} must be a valid URL: {error}")))?;
+    match parsed.scheme() {
+        "http" | "https" => Ok(()),
+        scheme => Err(PolicyError::Invalid(format!(
+            "{field} must use http or https, got {scheme}"
+        ))),
+    }
+}
+
+fn parse_azure_category(category: &str) -> Result<AzureCategory, PolicyError> {
+    match category.trim().to_ascii_lowercase().as_str() {
+        "hate" => Ok(AzureCategory::Hate),
+        "self_harm" | "selfharm" => Ok(AzureCategory::SelfHarm),
+        "sexual" => Ok(AzureCategory::Sexual),
+        "violence" => Ok(AzureCategory::Violence),
+        _ => Err(PolicyError::Invalid(format!(
+            "unsupported azure content safety category: {category}"
+        ))),
+    }
 }
 
 /// Build a `PostInvocationPipeline` from a policy's guard configuration.
 pub fn build_post_invocation_pipeline(config: &GuardPolicyConfig) -> PostInvocationPipeline {
     let mut pipeline = PostInvocationPipeline::new();
+
+    if let Some(query_result) = &config.query_result {
+        pipeline.add(Box::new(
+            QueryResultGuard::new(query_result.clone()).into_owned_hook(ArcScope::default()),
+        ));
+    }
 
     if let Some(secret_patterns) = &config.secret_patterns {
         if secret_patterns.enabled {
@@ -1057,19 +1442,23 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
 
     if tool_access.allow.is_empty() && tool_access.default_action == ToolAccessDefaultAction::Allow
     {
-        return Some(ArcScope {
-            grants: vec![ToolGrant {
-                server_id: "*".to_string(),
-                tool_name: "*".to_string(),
-                operations: vec![Operation::Invoke],
-                constraints: vec![],
-                max_invocations: None,
-                max_cost_per_invocation: None,
-                max_total_cost: None,
-                dpop_required: None,
-            }],
-            ..ArcScope::default()
-        });
+        return if tool_access_can_safely_widen_to_wildcard(tool_access) {
+            Some(ArcScope {
+                grants: vec![ToolGrant {
+                    server_id: "*".to_string(),
+                    tool_name: "*".to_string(),
+                    operations: vec![Operation::Invoke],
+                    constraints: vec![],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                ..ArcScope::default()
+            })
+        } else {
+            Some(ArcScope::default())
+        };
     }
 
     Some(ArcScope {
@@ -1080,7 +1469,7 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
                 server_id: "*".to_string(),
                 tool_name: tool_name.clone(),
                 operations: vec![Operation::Invoke],
-                constraints: vec![],
+                constraints: compile_tool_constraints(tool_access, tool_name),
                 max_invocations: None,
                 max_cost_per_invocation: None,
                 max_total_cost: None,
@@ -1089,6 +1478,96 @@ fn synthesize_tool_access_scope(config: &GuardPolicyConfig) -> Option<ArcScope> 
             .collect(),
         ..ArcScope::default()
     })
+}
+
+fn tool_access_can_safely_widen_to_wildcard(tool_access: &ToolAccessConfig) -> bool {
+    tool_access.allow.is_empty()
+        && tool_access.block.is_empty()
+        && tool_access.require_confirmation.is_empty()
+        && tool_access.max_args_size.is_none()
+}
+
+fn compile_tool_constraints(tool_access: &ToolAccessConfig, tool_pattern: &str) -> Vec<arc_core::capability::Constraint> {
+    let mut constraints = Vec::new();
+    if let Some(max_args_size) = tool_access.max_args_size {
+        constraints.push(arc_core::capability::Constraint::MaxArgsSize(max_args_size));
+    }
+    if confirmation_overlap(tool_pattern, &tool_access.require_confirmation) {
+        constraints.push(arc_core::capability::Constraint::RequireApprovalAbove {
+            threshold_units: 0,
+        });
+    }
+    constraints
+}
+
+fn confirmation_overlap(tool_pattern: &str, confirmation_patterns: &[String]) -> bool {
+    confirmation_patterns
+        .iter()
+        .any(|pattern| tool_patterns_overlap(tool_pattern, pattern))
+}
+
+fn tool_patterns_overlap(left: &str, right: &str) -> bool {
+    if left == "*" || right == "*" {
+        return true;
+    }
+    if !contains_wildcards(left) && !contains_wildcards(right) {
+        return left == right;
+    }
+    if glob_matches(left, right) || glob_matches(right, left) {
+        return true;
+    }
+    let left_prefix = literal_prefix(left);
+    let right_prefix = literal_prefix(right);
+    left_prefix.starts_with(&right_prefix) || right_prefix.starts_with(&left_prefix)
+}
+
+fn contains_wildcards(pattern: &str) -> bool {
+    pattern.contains('*') || pattern.contains('?')
+}
+
+fn literal_prefix(pattern: &str) -> String {
+    pattern
+        .chars()
+        .take_while(|ch| *ch != '*' && *ch != '?')
+        .collect()
+}
+
+fn glob_matches(pattern: &str, target: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let target = target.as_bytes();
+    let mut pattern_index = 0usize;
+    let mut target_index = 0usize;
+    let mut star_index: Option<usize> = None;
+    let mut match_index = 0usize;
+
+    while target_index < target.len() {
+        if pattern_index < pattern.len()
+            && (pattern[pattern_index] == b'?' || pattern[pattern_index] == target[target_index])
+        {
+            pattern_index += 1;
+            target_index += 1;
+            continue;
+        }
+        if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
+            star_index = Some(pattern_index);
+            pattern_index += 1;
+            match_index = target_index;
+            continue;
+        }
+        if let Some(star) = star_index {
+            pattern_index = star + 1;
+            match_index += 1;
+            target_index = match_index;
+            continue;
+        }
+        return false;
+    }
+
+    while pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
+        pattern_index += 1;
+    }
+
+    pattern_index == pattern.len()
 }
 
 fn parse_operations(operations: &[String]) -> Result<Vec<Operation>, PolicyError> {
@@ -1289,7 +1768,7 @@ kernel:
     fn build_pipeline_from_policy() {
         let policy = parse_policy(EXAMPLE_POLICY).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 4);
+        assert_eq!(pipeline.len(), 5);
     }
 
     #[test]
@@ -1308,7 +1787,7 @@ kernel:
     fn build_pipeline_from_full_guard_policy() {
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
         let pipeline = build_guard_pipeline(&policy.guards).unwrap();
-        assert_eq!(pipeline.len(), 7);
+        assert_eq!(pipeline.len(), 9);
     }
 
     #[test]
@@ -1366,6 +1845,138 @@ guards:
         let policy = parse_policy(FULL_GUARD_POLICY).unwrap();
         let pipeline = build_post_invocation_pipeline(&policy.guards);
         assert_eq!(pipeline.len(), 1);
+    }
+
+    #[test]
+    fn build_pipeline_from_data_guard_policy() {
+        let policy = parse_policy(
+            r#"
+guards:
+  sql_query:
+    operation_allowlist: [select]
+    table_allowlist: [orders]
+  vector_db:
+    collection_allowlist: [memories]
+  warehouse_cost:
+    max_bytes_scanned: 1000
+  query_result:
+    redact_pii_patterns:
+      - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+"#,
+        )
+        .unwrap();
+
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        let post_invocation = build_post_invocation_pipeline(&policy.guards);
+        assert_eq!(pipeline.len(), 3);
+        assert_eq!(post_invocation.len(), 1);
+    }
+
+    #[test]
+    fn build_pipeline_from_content_review_policy() {
+        let policy = parse_policy(
+            r#"
+guards:
+  content_review:
+    enabled: true
+    default_rules:
+      banned_words:
+        - "classified"
+"#,
+        )
+        .unwrap();
+
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        assert_eq!(pipeline.len(), 1);
+    }
+
+    #[test]
+    fn build_pipeline_from_external_guard_policy() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "https://example.cognitiveservices.azure.com"
+      api_key: "azure-key"
+      tool_patterns: ["slack_*"]
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: "sb-key"
+      base_url: "https://safebrowsing.googleapis.com/v4"
+      tool_patterns: ["fetch_url"]
+"#,
+        )
+        .unwrap();
+
+        let pipeline = build_guard_pipeline(&policy.guards).unwrap();
+        assert_eq!(pipeline.len(), 2);
+    }
+
+    #[test]
+    fn build_pipeline_rejects_invalid_external_guard_config() {
+        let policy = parse_policy(
+            r#"
+guards:
+  cloud_guardrails:
+    azure_content_safety:
+      enabled: true
+      endpoint: "not-a-url"
+      api_key: "azure-key"
+  threat_intel:
+    safe_browsing:
+      enabled: true
+      api_key: ""
+"#,
+        )
+        .unwrap();
+
+        let error = match build_guard_pipeline(&policy.guards) {
+            Ok(_) => panic!("invalid external guard config should fail"),
+            Err(error) => error,
+        };
+        assert!(
+            error
+                .to_string()
+                .contains("cloud_guardrails.azure_content_safety.endpoint must be a valid URL"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn query_result_policy_pipeline_redacts_wrapped_value_output() {
+        let policy = parse_policy(
+            r#"
+guards:
+  query_result:
+    redact_pii_patterns:
+      - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+"#,
+        )
+        .unwrap();
+
+        let pipeline = build_post_invocation_pipeline(&policy.guards);
+        let context = arc_guards::post_invocation::PostInvocationContext::synthetic("sql");
+        let outcome = pipeline.evaluate_with_context_and_evidence(
+            &context,
+            &serde_json::json!({
+                "kind": "value",
+                "value": {
+                    "rows": [
+                        {"email": "alice@example.com"}
+                    ]
+                }
+            }),
+        );
+
+        match outcome.verdict {
+            arc_kernel::PostInvocationVerdict::Redact(value) => {
+                assert_eq!(value["value"]["rows"][0]["email"], "[REDACTED]");
+            }
+            other => panic!("expected Redact, got {other:?}"),
+        }
     }
 
     #[test]
@@ -1449,6 +2060,64 @@ guards:
         assert_eq!(capabilities[0].scope.grants.len(), 2);
         assert_eq!(capabilities[0].scope.grants[0].tool_name, "read_file");
         assert_eq!(capabilities[0].scope.grants[1].tool_name, "list_directory");
+    }
+
+    #[test]
+    fn yaml_tool_access_synthesizes_security_constraints() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: block
+    allow:
+      - write_file
+      - read_file
+    max_args_size: 2048
+    require_confirmation:
+      - write_*
+"#,
+        )
+        .unwrap();
+
+        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        assert_eq!(capabilities.len(), 1);
+        assert_eq!(
+            capabilities[0].scope.grants[0].constraints,
+            vec![
+                arc_core::capability::Constraint::MaxArgsSize(2048),
+                arc_core::capability::Constraint::RequireApprovalAbove { threshold_units: 0 },
+            ]
+        );
+        assert_eq!(
+            capabilities[0].scope.grants[1].constraints,
+            vec![arc_core::capability::Constraint::MaxArgsSize(2048)]
+        );
+    }
+
+    #[test]
+    fn yaml_tool_access_default_allow_with_security_overrides_fails_closed() {
+        let policy = parse_policy(
+            r#"
+kernel:
+  max_capability_ttl: 3600
+guards:
+  tool_access:
+    enabled: true
+    default_action: allow
+    block:
+      - shell_exec
+    max_args_size: 2048
+    require_confirmation:
+      - git_push
+"#,
+        )
+        .unwrap();
+
+        let capabilities = build_runtime_default_capabilities(&policy).unwrap();
+        assert!(capabilities.is_empty());
     }
 
     #[test]
@@ -1788,6 +2457,25 @@ capabilities:
                 Operation::Delegate,
                 Operation::Subscribe,
             ]
+        );
+    }
+
+    #[test]
+    fn arc_yaml_guard_surface_matches_hushspec_fixture() {
+        let arc_policy = parse_policy(FULL_GUARD_POLICY).unwrap();
+        let arc_pipeline = build_guard_pipeline(&arc_policy.guards).unwrap();
+        let arc_post_invocation = build_post_invocation_pipeline(&arc_policy.guards);
+        let arc_capabilities = build_runtime_default_capabilities(&arc_policy).unwrap();
+
+        let hushspec = load_policy(&fixture_path("hushspec-guard-heavy.yaml")).unwrap();
+
+        assert_eq!(arc_pipeline.len(), hushspec.guard_pipeline.len());
+        assert_eq!(arc_post_invocation.len(), hushspec.post_invocation_pipeline.len());
+        assert_eq!(arc_capabilities.len(), hushspec.default_capabilities.len());
+        assert_eq!(arc_capabilities[0].ttl, hushspec.default_capabilities[0].ttl);
+        assert_eq!(
+            serde_json::to_value(&arc_capabilities[0].scope.grants).unwrap(),
+            serde_json::to_value(&hushspec.default_capabilities[0].scope.grants).unwrap()
         );
     }
 

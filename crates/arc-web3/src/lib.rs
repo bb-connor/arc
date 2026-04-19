@@ -16,13 +16,13 @@ use serde::{Deserialize, Serialize};
 use crate::canonical::canonical_json_bytes;
 use crate::capability::MonetaryAmount;
 use crate::credit::{
-    CapitalExecutionInstructionAction, CapitalExecutionRailKind, CapitalExecutionReconciledState,
-    CreditBondLifecycleState, SignedCapitalExecutionInstruction, SignedCreditBond,
-    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
+    CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CapitalExecutionInstructionAction,
+    CapitalExecutionRailKind, CapitalExecutionReconciledState, CreditBondLifecycleState,
+    SignedCapitalExecutionInstruction, SignedCreditBond,
 };
 use crate::crypto::{PublicKey, Signature};
 use crate::hashing::Hash;
-use crate::merkle::{leaf_hash, MerkleProof};
+use crate::merkle::{MerkleProof, leaf_hash};
 use crate::receipt::{ArcReceipt, SignedExportEnvelope};
 
 pub const ARC_KEY_BINDING_CERTIFICATE_SCHEMA: &str = "arc.key-binding-certificate.v1";
@@ -1192,6 +1192,7 @@ pub fn validate_web3_settlement_dispatch(
                 .to_string(),
         ));
     }
+    validate_transfer_completion_flow_binding(&dispatch.capital_instruction.body)?;
     if let Some(bond) = dispatch.bond.as_ref() {
         if bond.body.lifecycle_state != CreditBondLifecycleState::Active {
             return Err(Web3ContractError::InvalidSettlement(
@@ -1409,6 +1410,44 @@ fn ensure_non_empty(value: &str, field: &'static str) -> Result<(), Web3Contract
     }
 }
 
+fn validate_transfer_completion_flow_binding(
+    instruction: &crate::credit::CapitalExecutionInstructionArtifact,
+) -> Result<(), Web3ContractError> {
+    if instruction.action != CapitalExecutionInstructionAction::TransferFunds {
+        return Ok(());
+    }
+    let governed_receipt_id =
+        instruction
+            .governed_receipt_id
+            .as_deref()
+            .ok_or(Web3ContractError::MissingField(
+                "web3_settlement_dispatch.capital_instruction.governed_receipt_id",
+            ))?;
+    ensure_non_empty(
+        governed_receipt_id,
+        "web3_settlement_dispatch.capital_instruction.governed_receipt_id",
+    )?;
+    let completion_flow_row_id =
+        instruction
+            .completion_flow_row_id
+            .as_deref()
+            .ok_or(Web3ContractError::MissingField(
+                "web3_settlement_dispatch.capital_instruction.completion_flow_row_id",
+            ))?;
+    ensure_non_empty(
+        completion_flow_row_id,
+        "web3_settlement_dispatch.capital_instruction.completion_flow_row_id",
+    )?;
+    let expected_row_id = format!("economic-completion-flow:{governed_receipt_id}");
+    if completion_flow_row_id != expected_row_id {
+        return Err(Web3ContractError::InvalidSettlement(
+            "web3 settlement dispatch completion_flow_row_id must match governed_receipt_id"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn ensure_unique_strings(values: &[String], field: &'static str) -> Result<(), Web3ContractError> {
     let mut seen = HashSet::new();
     for value in values {
@@ -1453,14 +1492,14 @@ mod tests {
     use super::*;
     use crate::capability::MonetaryAmount;
     use crate::credit::{
-        CapitalBookEvidenceKind, CapitalBookEvidenceReference, CapitalBookQuery,
-        CapitalBookSourceKind, CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
+        CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA, CapitalBookEvidenceKind,
+        CapitalBookEvidenceReference, CapitalBookQuery, CapitalBookSourceKind,
+        CapitalExecutionAuthorityStep, CapitalExecutionInstructionAction,
         CapitalExecutionInstructionSupportBoundary, CapitalExecutionIntendedState,
         CapitalExecutionObservation, CapitalExecutionRail, CapitalExecutionRole,
         CapitalExecutionWindow, SignedCapitalExecutionInstruction,
-        CAPITAL_EXECUTION_INSTRUCTION_ARTIFACT_SCHEMA,
     };
-    use crate::crypto::{sha256_hex, Keypair};
+    use crate::crypto::{Keypair, sha256_hex};
     use crate::merkle::MerkleTree;
     use crate::receipt::{ArcReceipt, ArcReceiptBody, Decision, ToolCallAction};
 
@@ -1685,6 +1724,8 @@ mod tests {
                 subject_key: "subject-1".to_string(),
                 source_id: "capital-source:facility:facility-1".to_string(),
                 source_kind: CapitalBookSourceKind::FacilityCommitment,
+                governed_receipt_id: Some("rcpt-web3-1".to_string()),
+                completion_flow_row_id: Some("economic-completion-flow:rcpt-web3-1".to_string()),
                 action: CapitalExecutionInstructionAction::TransferFunds,
                 owner_role: CapitalExecutionRole::OperatorTreasury,
                 counterparty_role: CapitalExecutionRole::AgentCounterparty,
@@ -1856,6 +1897,29 @@ mod tests {
     fn web3_dispatch_requires_web3_rail_kind() {
         let mut dispatch = sample_dispatch();
         dispatch.capital_instruction.body.rail.kind = CapitalExecutionRailKind::Api;
+        assert!(matches!(
+            validate_web3_settlement_dispatch(&dispatch),
+            Err(Web3ContractError::InvalidSettlement(_))
+        ));
+    }
+
+    #[test]
+    fn web3_dispatch_requires_completion_flow_binding_for_transfers() {
+        let mut dispatch = sample_dispatch();
+        dispatch.capital_instruction.body.completion_flow_row_id = None;
+        assert!(matches!(
+            validate_web3_settlement_dispatch(&dispatch),
+            Err(Web3ContractError::MissingField(
+                "web3_settlement_dispatch.capital_instruction.completion_flow_row_id"
+            ))
+        ));
+    }
+
+    #[test]
+    fn web3_dispatch_rejects_mismatched_completion_flow_binding() {
+        let mut dispatch = sample_dispatch();
+        dispatch.capital_instruction.body.completion_flow_row_id =
+            Some("economic-completion-flow:other-receipt".to_string());
         assert!(matches!(
             validate_web3_settlement_dispatch(&dispatch),
             Err(Web3ContractError::InvalidSettlement(_))

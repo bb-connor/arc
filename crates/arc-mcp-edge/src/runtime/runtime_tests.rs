@@ -1,8 +1,8 @@
 #[allow(clippy::expect_used, clippy::unwrap_used)]
 use super::*;
 use arc_core::capability::{
-    ArcScope, Constraint, ModelMetadata, ModelSafetyTier, Operation, PromptGrant, ResourceGrant,
-    ToolGrant,
+    ArcScope, Constraint, ModelMetadata, ModelSafetyTier, Operation, PromptGrant,
+    ProvenanceEvidenceClass, ResourceGrant, ToolGrant,
 };
 use arc_core::crypto::Keypair;
 use arc_core::{
@@ -614,6 +614,87 @@ fn make_edge(page_size: usize) -> ArcMcpEdge {
     make_edge_with_config(page_size, false)
 }
 
+fn make_model_constrained_edge(page_size: usize) -> ArcMcpEdge {
+    let (kernel, _) = make_kernel();
+    let agent = Keypair::generate();
+    let capabilities = vec![issue_model_constrained_capability(&kernel, &agent)];
+    ArcMcpEdge::new(
+        McpEdgeConfig {
+            server_name: "ARC MCP Edge".to_string(),
+            server_version: "0.1.0".to_string(),
+            page_size,
+            tools_list_changed: false,
+            completion_enabled: None,
+            resources_subscribe: false,
+            resources_list_changed: false,
+            prompts_list_changed: false,
+            logging_enabled: false,
+        },
+        kernel,
+        agent.public_key().to_hex(),
+        capabilities,
+        vec![sample_manifest()],
+    )
+    .unwrap()
+}
+
+fn run_stdio_session(edge: &mut ArcMcpEdge, messages: &[Value]) -> Vec<Value> {
+    let mut input = String::new();
+    for message in messages {
+        input.push_str(&serde_json::to_string(message).unwrap());
+        input.push('\n');
+    }
+    let mut output = Vec::new();
+    edge.serve_stdio(Cursor::new(input.into_bytes()), &mut output)
+        .unwrap();
+    String::from_utf8(output)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect()
+}
+
+fn run_channel_session(edge: &mut ArcMcpEdge, messages: &[Value]) -> Vec<Value> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    for message in messages {
+        tx.send(message.clone()).unwrap();
+    }
+    drop(tx);
+
+    let mut output = Vec::new();
+    edge.serve_message_channels(rx, &mut output).unwrap();
+    String::from_utf8(output)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect()
+}
+
+fn normalize_transport_output(messages: &mut [Value]) {
+    for message in messages {
+        normalize_dynamic_transport_fields(message);
+    }
+}
+
+fn normalize_dynamic_transport_fields(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            if let Some(owner_session_id) = map.get_mut("ownerSessionId") {
+                *owner_session_id = json!("$session");
+            }
+            for child in map.values_mut() {
+                normalize_dynamic_transport_fields(child);
+            }
+        }
+        Value::Array(values) => {
+            for child in values {
+                normalize_dynamic_transport_fields(child);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn make_edge_with_config(page_size: usize, logging_enabled: bool) -> ArcMcpEdge {
     let (kernel, _) = make_kernel();
     let agent = Keypair::generate();
@@ -657,6 +738,7 @@ fn execute_bridge_mcp_tool_call_preserves_model_metadata() {
                 model_id: "gpt-5".to_string(),
                 safety_tier: Some(ModelSafetyTier::High),
                 provider: Some("openai".to_string()),
+                provenance_class: ProvenanceEvidenceClass::Asserted,
             }),
             route_selection_metadata: None,
             peer_supports_arc_tool_streaming: false,
@@ -665,6 +747,62 @@ fn execute_bridge_mcp_tool_call_preserves_model_metadata() {
     .unwrap();
 
     assert!(matches!(bridge.response.verdict, Verdict::Allow));
+}
+
+#[test]
+fn tools_call_uses_meta_model_metadata_and_records_asserted_provenance() {
+    let mut edge = make_model_constrained_edge(10);
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {}
+    }));
+    let _ = edge.handle_jsonrpc(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }));
+
+    let denied = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "read_file",
+                "arguments": { "path": "/tmp/demo.txt" }
+            }
+        }))
+        .unwrap();
+    assert_eq!(denied["result"]["isError"], true);
+
+    let allowed = edge
+        .handle_jsonrpc(json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": {
+                "name": "read_file",
+                "arguments": { "path": "/tmp/demo.txt" },
+                "_meta": {
+                    "modelMetadata": {
+                        "model_id": "gpt-5",
+                        "safety_tier": "high",
+                        "provider": "openai",
+                        "provenance_class": "verified"
+                    }
+                }
+            }
+        }))
+        .unwrap();
+    assert_eq!(allowed["result"]["isError"], false);
+
+    let receipt_log = edge.kernel.receipt_log();
+    let receipt = receipt_log.receipts().last().expect("tool call receipt");
+    let metadata = receipt.metadata.as_ref().expect("receipt metadata");
+    assert_eq!(metadata["model_metadata"]["model_id"], "gpt-5");
+    assert_eq!(metadata["model_metadata"]["provenance_class"], "asserted");
 }
 
 fn make_streaming_edge(page_size: usize) -> ArcMcpEdge {
@@ -1972,6 +2110,112 @@ fn serve_stdio_tasks_result_emits_stream_chunk_notifications_before_result() {
         responses[5]["result"]["_meta"][RELATED_TASK_META_KEY]["taskId"],
         "mcp-edge-task-1"
     );
+}
+
+#[test]
+fn serve_message_channels_matches_stdio_for_streaming_tasks_result_flow() {
+    let messages = vec![
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "capabilities": {
+                    "experimental": {
+                        "arcToolStreaming": {
+                            "toolCallChunkNotifications": true
+                        }
+                    }
+                }
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {}
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "stream_file",
+                "arguments": {},
+                "task": {}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tasks/result",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        }),
+    ];
+
+    let mut stdio_edge = make_streaming_edge(10);
+    let mut stdio = run_stdio_session(&mut stdio_edge, &messages);
+    let mut channel_edge = make_streaming_edge(10);
+    let mut channel = run_channel_session(&mut channel_edge, &messages);
+
+    normalize_transport_output(&mut stdio);
+    normalize_transport_output(&mut channel);
+
+    assert_eq!(channel, stdio);
+}
+
+#[test]
+fn serve_message_channels_matches_stdio_for_task_cancellation_flow() {
+    let messages = vec![
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {}
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/initialized",
+            "params": {}
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "stream_file",
+                "arguments": {},
+                "task": {}
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tasks/cancel",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        }),
+        json!({
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "tasks/result",
+            "params": {
+                "taskId": "mcp-edge-task-1"
+            }
+        }),
+    ];
+
+    let mut stdio_edge = make_streaming_edge(10);
+    let mut stdio = run_stdio_session(&mut stdio_edge, &messages);
+    let mut channel_edge = make_streaming_edge(10);
+    let mut channel = run_channel_session(&mut channel_edge, &messages);
+
+    normalize_transport_output(&mut stdio);
+    normalize_transport_output(&mut channel);
+
+    assert_eq!(channel, stdio);
 }
 
 #[test]

@@ -87,6 +87,7 @@ fn build_credit_provider_risk_package_from_store(
         exposure: signed_exposure,
         scorecard: signed_scorecard,
         facility_report,
+        compliance_score: underwriting_input.compliance_score.clone(),
         latest_facility,
         runtime_assurance: underwriting_input
             .runtime_assurance

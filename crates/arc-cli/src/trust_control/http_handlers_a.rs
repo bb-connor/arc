@@ -15,13 +15,16 @@ async fn handle_rotate_authority(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_authority_mutation_auth(&headers, &state, AUTHORITY_PATH) {
         return response;
     }
-    match forward_post_to_leader(&state, AUTHORITY_PATH, &json!({})).await {
+    match forward_authority_post_to_leader(&state, AUTHORITY_PATH, &json!({})).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
+    }
+    if let Err(response) = enforce_authority_mutation_fence(&state) {
+        return response;
     }
     match rotate_authority(&state.config) {
         Ok(status) => respond_after_leader_visible_write(
@@ -47,13 +50,18 @@ async fn handle_issue_capability(
     headers: HeaderMap,
     Json(payload): Json<IssueCapabilityRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) =
+        validate_authority_mutation_auth(&headers, &state, ISSUE_CAPABILITY_PATH)
+    {
         return response;
     }
-    match forward_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
+    match forward_authority_post_to_leader(&state, ISSUE_CAPABILITY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
+    }
+    if let Err(response) = enforce_authority_mutation_fence(&state) {
+        return response;
     }
     let subject = match PublicKey::from_hex(&payload.subject_public_key) {
         Ok(subject) => subject,

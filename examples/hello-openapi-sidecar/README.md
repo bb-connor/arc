@@ -4,6 +4,9 @@ Minimal spec-driven HTTP example using `arc api protect` directly in front of a 
 
 The upstream app has no ARC framework SDK or middleware. All governance, deny behavior, and receipt capture happen in the OpenAPI sidecar.
 
+This is the recommended first web-backend example. Start here before moving to
+framework-specific integrations.
+
 ## What It Demonstrates
 
 - `GET /hello` is allowed through the sidecar and returns an ARC receipt header
@@ -35,3 +38,12 @@ Run the full trust + sidecar smoke flow:
 ```bash
 ./smoke.sh
 ```
+
+Use the shared verification flow from
+[`docs/guides/WEB_BACKEND_QUICKSTART.md`](/Users/connor/Medica/backbay/standalone/arc/docs/guides/WEB_BACKEND_QUICKSTART.md):
+safe route allows, governed route denies without a capability, governed route
+allows with a capability, and receipts are persisted.
+
+This example is intentionally not an MCP session example. There is no
+`initialize` or `GET /mcp` replay stream here. It is the plain HTTP sidecar
+path for request evaluation and receipt persistence.

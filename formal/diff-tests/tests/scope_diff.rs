@@ -1,11 +1,15 @@
 //! Differential tests: scope subsumption logic.
 //!
-//! Compares the reference specification's `is_subset_of` against the production
-//! `arc_core::capability::ArcScope::is_subset_of` on randomly generated scopes.
+//! Compares the reference specification's `is_subset_of` against both the
+//! production `arc_core::capability::ArcScope::is_subset_of` logic and the
+//! normalized proof-facing AST in `arc-kernel-core`.
 
 use arc_formal_diff_tests::generators::{
-    arb_paired_grant, arb_paired_prompt_grant, arb_paired_resource_grant, arb_paired_scope_pair,
-    arb_spec_scope, arb_spec_tool_grant,
+    arb_paired_grant, arb_paired_normalized_grant, arb_paired_normalized_prompt_grant,
+    arb_paired_normalized_resource_grant, arb_paired_normalized_scope,
+    arb_paired_normalized_scope_pair, arb_paired_prompt_grant, arb_paired_resource_grant,
+    arb_paired_scope_pair, arb_spec_scope, arb_spec_tool_grant, spec_grant_to_normalized,
+    spec_prompt_grant_to_normalized, spec_resource_grant_to_normalized, spec_scope_to_normalized,
 };
 use arc_formal_diff_tests::spec::{SpecArcScope, SpecOperation, SpecToolGrant};
 
@@ -97,6 +101,97 @@ proptest! {
 
 proptest! {
     #![proptest_config(config())]
+
+    #[test]
+    fn normalized_scope_projection_matches_spec(
+        (spec, normalized) in arb_paired_normalized_scope()
+    ) {
+        let expected = spec_scope_to_normalized(&spec);
+        prop_assert_eq!(expected, normalized);
+    }
+
+    #[test]
+    fn normalized_scope_subset_spec_matches_impl(
+        ((spec_a, normalized_a), (spec_b, normalized_b)) in arb_paired_normalized_scope_pair()
+    ) {
+        let spec_result = spec_a.is_subset_of(&spec_b);
+        let normalized_result = normalized_a.is_subset_of(&normalized_b);
+
+        prop_assert_eq!(
+            spec_result, normalized_result,
+            "Normalized scope subset mismatch!\n  spec: {}\n  normalized: {}\n  child grants: {}\n  parent grants: {}",
+            spec_result, normalized_result, spec_a.grants.len(), spec_b.grants.len()
+        );
+    }
+
+    #[test]
+    fn normalized_grant_projection_matches_spec(
+        (spec, normalized) in arb_paired_normalized_grant()
+    ) {
+        let expected = spec_grant_to_normalized(&spec);
+        prop_assert_eq!(expected, normalized);
+    }
+
+    #[test]
+    fn normalized_grant_subset_spec_matches_impl(
+        (spec_parent, normalized_parent) in arb_paired_normalized_grant(),
+        (spec_child, normalized_child) in arb_paired_normalized_grant(),
+    ) {
+        let spec_result = spec_child.is_subset_of(&spec_parent);
+        let normalized_result = normalized_child.is_subset_of(&normalized_parent);
+
+        prop_assert_eq!(
+            spec_result, normalized_result,
+            "Normalized grant subset mismatch!\n  spec: {}\n  normalized: {}\n  child: {:?}\n  parent: {:?}",
+            spec_result, normalized_result, spec_child, spec_parent
+        );
+    }
+
+    #[test]
+    fn normalized_resource_projection_matches_spec(
+        (spec, normalized) in arb_paired_normalized_resource_grant()
+    ) {
+        let expected = spec_resource_grant_to_normalized(&spec);
+        prop_assert_eq!(expected, normalized);
+    }
+
+    #[test]
+    fn normalized_resource_subset_spec_matches_impl(
+        (spec_parent, normalized_parent) in arb_paired_normalized_resource_grant(),
+        (spec_child, normalized_child) in arb_paired_normalized_resource_grant(),
+    ) {
+        let spec_result = spec_child.is_subset_of(&spec_parent);
+        let normalized_result = normalized_child.is_subset_of(&normalized_parent);
+
+        prop_assert_eq!(
+            spec_result, normalized_result,
+            "Normalized resource subset mismatch!\n  spec: {}\n  normalized: {}\n  child: {:?}\n  parent: {:?}",
+            spec_result, normalized_result, spec_child, spec_parent
+        );
+    }
+
+    #[test]
+    fn normalized_prompt_projection_matches_spec(
+        (spec, normalized) in arb_paired_normalized_prompt_grant()
+    ) {
+        let expected = spec_prompt_grant_to_normalized(&spec);
+        prop_assert_eq!(expected, normalized);
+    }
+
+    #[test]
+    fn normalized_prompt_subset_spec_matches_impl(
+        (spec_parent, normalized_parent) in arb_paired_normalized_prompt_grant(),
+        (spec_child, normalized_child) in arb_paired_normalized_prompt_grant(),
+    ) {
+        let spec_result = spec_child.is_subset_of(&spec_parent);
+        let normalized_result = normalized_child.is_subset_of(&normalized_parent);
+
+        prop_assert_eq!(
+            spec_result, normalized_result,
+            "Normalized prompt subset mismatch!\n  spec: {}\n  normalized: {}\n  child: {:?}\n  parent: {:?}",
+            spec_result, normalized_result, spec_child, spec_parent
+        );
+    }
 
     /// P1: Empty scope is a subset of any scope.
     #[test]

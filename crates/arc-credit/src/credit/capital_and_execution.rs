@@ -414,6 +414,10 @@ pub struct CapitalExecutionInstructionArtifact {
     pub subject_key: String,
     pub source_id: String,
     pub source_kind: CapitalBookSourceKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governed_receipt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_flow_row_id: Option<String>,
     pub action: CapitalExecutionInstructionAction,
     pub owner_role: CapitalExecutionRole,
     pub counterparty_role: CapitalExecutionRole,
@@ -742,10 +746,12 @@ mod tests {
     #[test]
     fn exposure_ledger_query_requires_anchor() {
         let query = ExposureLedgerQuery::default();
-        assert!(query
-            .validate()
-            .unwrap_err()
-            .contains("require at least one anchor"));
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("require at least one anchor")
+        );
     }
 
     #[test]
@@ -755,10 +761,12 @@ mod tests {
             tool_name: Some("transfer".to_string()),
             ..ExposureLedgerQuery::default()
         };
-        assert!(query
-            .validate()
-            .unwrap_err()
-            .contains("must also specify --tool-server"));
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("must also specify --tool-server")
+        );
     }
 
     #[test]
@@ -769,10 +777,12 @@ mod tests {
             until: Some(10),
             ..ExposureLedgerQuery::default()
         };
-        assert!(query
-            .validate()
-            .unwrap_err()
-            .contains("less than or equal to --until"));
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("less than or equal to --until")
+        );
     }
 
     #[test]
@@ -781,10 +791,12 @@ mod tests {
             capability_id: Some("cap-1".to_string()),
             ..CreditBacktestQuery::default()
         };
-        assert!(query
-            .validate()
-            .unwrap_err()
-            .contains("require --agent-subject"));
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("require --agent-subject")
+        );
     }
 
     #[test]
@@ -821,10 +833,12 @@ mod tests {
             capability_id: Some("cap-1".to_string()),
             ..CreditProviderRiskPackageQuery::default()
         };
-        assert!(query
-            .validate()
-            .unwrap_err()
-            .contains("require --agent-subject"));
+        assert!(
+            query
+                .validate()
+                .unwrap_err()
+                .contains("require --agent-subject")
+        );
     }
 
     #[test]
@@ -1146,6 +1160,7 @@ mod tests {
                     }),
                     findings: Vec::new(),
                 },
+                compliance_score: None,
                 latest_facility: Some(CreditProviderFacilitySnapshot {
                     facility_id: "cfd-1".to_string(),
                     issued_at: 3,
@@ -1343,6 +1358,8 @@ mod tests {
                 subject_key: "subject-1".to_string(),
                 source_id: "capital-source:bond:cbd-1".to_string(),
                 source_kind: CapitalBookSourceKind::ReserveBook,
+                governed_receipt_id: None,
+                completion_flow_row_id: None,
                 action: CapitalExecutionInstructionAction::LockReserve,
                 owner_role: CapitalExecutionRole::OperatorTreasury,
                 counterparty_role: CapitalExecutionRole::AgentCounterparty,

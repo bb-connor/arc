@@ -20,6 +20,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use arc_core::underwriting::{
+    UnderwritingComplianceEvidence, UNDERWRITING_COMPLIANCE_EVIDENCE_SCHEMA,
+};
+
 use crate::operator_report::ComplianceReport;
 
 /// Maximum possible compliance score.
@@ -181,6 +185,23 @@ pub struct ComplianceScore {
     pub generated_at: u64,
     /// Snapshot of the inputs used to compute the score.
     pub inputs: ComplianceScoreInputs,
+}
+
+impl ComplianceScore {
+    #[must_use]
+    pub fn as_underwriting_evidence(&self) -> UnderwritingComplianceEvidence {
+        UnderwritingComplianceEvidence {
+            schema: UNDERWRITING_COMPLIANCE_EVIDENCE_SCHEMA.to_string(),
+            agent_id: self.agent_id.clone(),
+            score: self.score,
+            generated_at: self.generated_at,
+            total_receipts: self.inputs.total_receipts,
+            deny_receipts: self.inputs.deny_receipts,
+            observed_capabilities: self.inputs.observed_capabilities,
+            revoked_capabilities: self.inputs.revoked_capabilities,
+            attestation_age_secs: self.inputs.attestation_age_secs,
+        }
+    }
 }
 
 /// Options controlling scoring thresholds. Defaults match the

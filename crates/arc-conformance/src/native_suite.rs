@@ -320,6 +320,7 @@ pub fn fixture_messages_for_request(request: &AgentMessage) -> Vec<KernelMessage
                 runtime_assurance: None,
                 call_chain: None,
                 autonomy: None,
+                economic_authorization: None,
             })
             .ok()
             .map(|value| serde_json::json!({ "governed_transaction": value }));

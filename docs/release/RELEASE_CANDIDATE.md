@@ -65,9 +65,13 @@ Promotion from "qualified candidate" to an externally published ARC launch
 requires three gate classes:
 
 - local evidence gates: `./scripts/ci-workspace.sh`,
+  `./scripts/check-formal-proofs.sh`,
+  `./scripts/check-portable-kernel.sh`,
   `./scripts/check-sdk-parity.sh`, `./scripts/check-web3-contract-parity.sh`,
-  and `./scripts/qualify-release.sh` must all pass, and the release docs must
-  be updated together
+  `./scripts/qualify-release.sh`,
+  `./scripts/qualify-portable-browser.sh`, and
+  `./scripts/qualify-mobile-kernel.sh` must all pass, and the release docs
+  must be updated together
 - hosted publication gates: GitHub `CI` and `Release Qualification` workflows
   must be green on the exact candidate commit; the hosted `Release
   Qualification` workflow now also runs `./scripts/qualify-web3-runtime.sh`,
@@ -84,7 +88,7 @@ requires three gate classes:
 
 ## Current Decision Status
 
-As of `2026-04-02`, the local evidence gates are satisfied for the current ARC
+As of `2026-04-19`, the local evidence gates are satisfied for the current ARC
 candidate, including the underwriting surfaces added in `v2.10`, the
 portable-credential interop surfaces added in `v2.11`, the workload-identity
 and trusted-verifier surfaces added in `v2.12`, and the standards-native
@@ -137,7 +141,9 @@ wallet-routing, and identity-interop qualification surface added in phases
 External tag/publication remains on hold until the hosted workflow results are
 observed. The hosted release lane is now wired to publish the bounded web3
 qualification bundle, including the generated ops-control artifact family,
-alongside the existing release-qualification artifact corpus.
+alongside the existing release-qualification artifact corpus. The local gate
+now also includes the bounded formal-boundary checks plus the portable
+kernel/browser/mobile qualification lanes.
 
 ## Supported Guarantees
 

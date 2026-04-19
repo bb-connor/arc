@@ -26,6 +26,7 @@ use arc_core_types::crypto::Keypair;
 use arc_core_types::receipt::{ArcReceiptBody, Decision, ToolCallAction, TrustLevel};
 use arc_kernel_browser::wasm::{evaluate, mint_signing_seed_hex, sign_receipt, verify_capability};
 use serde_wasm_bindgen::from_value;
+use wasm_bindgen_test::console_log;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_bindgen_test::wasm_bindgen_test_configure;
 
@@ -89,6 +90,7 @@ fn evaluate_round_trip() {
         elapsed_ms < 50.0,
         "evaluate round-trip took {elapsed_ms} ms; expected <50 ms"
     );
+    console_log!("qualify_browser_evaluate_latency_ms={elapsed_ms}");
 
     let verdict: serde_json::Value = from_value(verdict_js).unwrap();
     assert_eq!(verdict["verdict"], "allow");

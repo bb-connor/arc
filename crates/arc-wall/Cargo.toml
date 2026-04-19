@@ -8,6 +8,7 @@ license.workspace = true
 repository.workspace = true
 default-run = "arc-wall"
 autobins = false
+publish = false
 
 [[bin]]
 name = "arc-wall"
