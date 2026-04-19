@@ -25,8 +25,8 @@ use arc_kernel::operator_report::{
 use arc_kernel::{
     is_supported_dpop_schema, ArcOAuthAuthorizationProfile, DpopConfig, DpopNonceStore, DpopProof,
     GovernedAuthorizationDetail, GovernedAuthorizationTransactionContext, KernelError,
-    PeerCapabilities,
-    RevocationStore, ToolServerConnection, ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
+    PeerCapabilities, RevocationStore, ToolServerConnection,
+    ARC_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
     ARC_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, ARC_OAUTH_AUTHORIZATION_PROFILE_ID,
     ARC_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, ARC_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
     ARC_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, ARC_OAUTH_SENDER_PROOF_ARC_DPOP,
@@ -124,6 +124,7 @@ const SESSION_REAPER_INTERVAL_ENV: &str = "ARC_MCP_SESSION_REAPER_INTERVAL_MILLI
 const LEGACY_SESSION_REAPER_INTERVAL_ENV: &str = "ARC_MCP_SESSION_REAPER_INTERVAL_MILLIS";
 const SESSION_TOMBSTONE_RETENTION_ENV: &str = "ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
 const LEGACY_SESSION_TOMBSTONE_RETENTION_ENV: &str = "ARC_MCP_SESSION_TOMBSTONE_RETENTION_MILLIS";
+const SESSION_TOUCH_PERSIST_INTERVAL_MILLIS: u64 = 5_000;
 
 type NotificationTapQueue = Arc<StdMutex<VecDeque<Value>>>;
 type NotificationTapWeak = Weak<StdMutex<VecDeque<Value>>>;
@@ -1726,13 +1727,15 @@ struct TokenRequestForm {
 impl RemoteSession {
     fn new(init: RemoteSessionInit) -> Self {
         let now = session_now_millis();
-        let lifecycle_snapshot = init.lifecycle_snapshot.unwrap_or(RemoteSessionLifecycleSnapshot {
-            state: RemoteSessionState::Initializing,
-            created_at: now,
-            last_seen_at: now,
-            idle_expires_at: now,
-            drain_deadline_at: None,
-        });
+        let lifecycle_snapshot =
+            init.lifecycle_snapshot
+                .unwrap_or(RemoteSessionLifecycleSnapshot {
+                    state: RemoteSessionState::Initializing,
+                    created_at: now,
+                    last_seen_at: now,
+                    idle_expires_at: now,
+                    drain_deadline_at: None,
+                });
         Self {
             session_id: init.session_id,
             agent_id: init.agent_id,
@@ -1955,11 +1958,13 @@ impl RemoteSession {
         let mut touched = false;
         if let Ok(mut guard) = self.lifecycle.lock() {
             if guard.state == RemoteSessionState::Ready {
-                guard.last_seen_at = session_now_millis();
+                let now = session_now_millis();
+                touched =
+                    now.saturating_sub(guard.last_seen_at) >= SESSION_TOUCH_PERSIST_INTERVAL_MILLIS;
+                guard.last_seen_at = now;
                 guard.idle_expires_at = guard
                     .last_seen_at
                     .saturating_add(self.lifecycle_policy.idle_expiry_millis);
-                touched = true;
             }
         }
         if touched {
@@ -2486,7 +2491,6 @@ impl RemoteSessionLedger {
     }
 
     async fn insert_active(&self, session: Arc<RemoteSession>) {
-        session.persist_resumable_record();
         self.active
             .lock()
             .await

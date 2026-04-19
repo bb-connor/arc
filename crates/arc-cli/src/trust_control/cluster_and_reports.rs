@@ -2189,6 +2189,7 @@ async fn forward_authority_post_to_leader<B: Serialize>(
             "cluster leader is unavailable for authority writes",
         ));
     };
+    let mut authority_term = authority_lease.term;
     if leader_url == self_url {
         return Ok(None);
     }
@@ -2198,7 +2199,7 @@ async fn forward_authority_post_to_leader<B: Serialize>(
             .map_err(|error| {
                 plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
             })?;
-        match client.post_internal_json::<_, Value>(path, body, Some(authority_lease.term)) {
+        match client.post_internal_json::<_, Value>(path, body, Some(authority_term)) {
             Ok(value) => return Ok(Some(Json(value).into_response())),
             Err(error) => {
                 update_peer_failure(state, &leader_url, error.to_string());
@@ -2226,7 +2227,20 @@ async fn forward_authority_post_to_leader<B: Serialize>(
                         &format!("failed to forward authority write to leader: {error}"),
                     ));
                 }
+                let Some(next_authority_lease) = cluster_authority_lease_view(state) else {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster authority lease is unavailable for authority writes",
+                    ));
+                };
+                if !next_authority_lease.lease_valid {
+                    return Err(plain_http_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "cluster authority lease expired before authority write forwarding",
+                    ));
+                }
                 leader_url = next_leader;
+                authority_term = next_authority_lease.term;
             }
         }
     }

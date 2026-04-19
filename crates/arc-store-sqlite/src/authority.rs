@@ -371,7 +371,16 @@ impl SqliteCapabilityAuthority {
     fn read_current_keypair(&self) -> Result<Keypair, AuthorityStoreError> {
         let connection = Self::open_connection(&self.path)?;
         let keypair = Self::read_keypair_from_connection(&connection)?;
-        self.update_cached_public_key(keypair.public_key());
+        let status = Self::read_status_from_connection(&connection)?;
+        self.update_cached_public_key(status.public_key.clone());
+        self.update_cached_trusted_public_keys(status.trusted_public_keys.clone());
+        if keypair.public_key() != status.public_key {
+            return Err(AuthorityStoreError::Fence(format!(
+                "local signing seed public key {} does not match replicated authority public key {}",
+                keypair.public_key().to_hex(),
+                status.public_key.to_hex(),
+            )));
+        }
         Ok(keypair)
     }
 
@@ -684,10 +693,12 @@ mod tests {
         let follower_status = follower.status().unwrap();
         assert_eq!(follower_status.public_key, rotated.public_key);
         assert_eq!(follower_status.generation, rotated.generation);
-        assert_eq!(
-            follower.current_keypair().unwrap().public_key(),
-            follower_local_key
-        );
+        let error = match follower.current_keypair() {
+            Ok(_) => panic!("mismatched follower keypair should be rejected"),
+            Err(error) => error.to_string(),
+        };
+        assert!(error.contains("does not match replicated authority public key"));
+        assert!(error.contains(&follower_local_key.to_hex()));
 
         let _ = fs::remove_file(source_path);
         let _ = fs::remove_file(follower_path);
