@@ -1597,7 +1597,9 @@ fn apply_cluster_snapshot(
                 .map_err(|error| CliError::Other(error.to_string()))?;
         }
         for event in &budget_mutation_events {
-            replay_budget_mutation_event(&mut store, event)?;
+            store
+                .import_mutation_record(&budget_mutation_record_from_view(event)?)
+                .map_err(|error| CliError::Other(error.to_string()))?;
             budget_cursor = Some(budget_cursor_from_event(event));
         }
     }
@@ -1879,6 +1881,41 @@ fn budget_event_authority_from_view(
         lease_id: authority.lease_id.clone(),
         lease_epoch: authority.lease_epoch,
     }
+}
+
+fn budget_mutation_record_from_view(
+    event: &BudgetMutationEventView,
+) -> Result<BudgetMutationRecord, CliError> {
+    let kind = BudgetMutationKind::parse(&event.kind).ok_or_else(|| {
+        CliError::Other(format!(
+            "unknown budget mutation kind `{}` in cluster snapshot",
+            event.kind
+        ))
+    })?;
+
+    Ok(BudgetMutationRecord {
+        event_id: event.event_id.clone(),
+        hold_id: event.hold_id.clone(),
+        capability_id: event.capability_id.clone(),
+        grant_index: event.grant_index,
+        kind,
+        allowed: event.allowed,
+        recorded_at: event.recorded_at,
+        event_seq: event.event_seq,
+        usage_seq: event.usage_seq,
+        exposure_units: event.exposure_units,
+        realized_spend_units: event.realized_spend_units,
+        max_invocations: event.max_invocations,
+        max_cost_per_invocation: event.max_cost_per_invocation,
+        max_total_cost_units: event.max_total_cost_units,
+        invocation_count_after: event.invocation_count_after,
+        total_cost_exposed_after: event.total_cost_exposed_after,
+        total_cost_realized_spend_after: event.total_cost_realized_spend_after,
+        authority: event
+            .authority
+            .as_ref()
+            .map(budget_event_authority_from_view),
+    })
 }
 
 fn replay_budget_mutation_event(
@@ -3693,6 +3730,7 @@ mod cluster_and_reports_tests {
 
     fn sample_tool_receipt(id: &str, capability_id: &str) -> ArcReceipt {
         let keypair = Keypair::generate();
+        let parameters = json!({"message": "cluster"});
         ArcReceipt::sign(
             ArcReceiptBody {
                 id: id.to_string(),
@@ -3700,10 +3738,7 @@ mod cluster_and_reports_tests {
                 capability_id: capability_id.to_string(),
                 tool_server: "wrapped-http-mock".to_string(),
                 tool_name: "echo_json".to_string(),
-                action: ToolCallAction {
-                    parameters: json!({"message": "cluster"}),
-                    parameter_hash: "param-hash".to_string(),
-                },
+                action: ToolCallAction::from_parameters(parameters).expect("hash parameters"),
                 decision: Decision::Allow,
                 content_hash: "content-hash".to_string(),
                 policy_hash: "policy-hash".to_string(),

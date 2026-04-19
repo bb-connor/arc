@@ -2462,8 +2462,6 @@ impl RemoteSessionFactory {
                 )));
             }
         }
-
-        let default_capabilities = loaded_policy.default_capabilities.clone();
         let issuance_policy = loaded_policy.issuance_policy.clone();
         let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
         let (upstream_server, upstream_notification_source) = if self.config.shared_hosted_owner {
@@ -2519,9 +2517,8 @@ impl RemoteSessionFactory {
             upstream_server.clone(),
         )));
 
-        let agent_public_key = PublicKey::from_hex(&record.agent_id)?;
-        let issued_capabilities =
-            issue_default_capabilities(&kernel, &agent_public_key, &default_capabilities)?;
+        let _agent_public_key = PublicKey::from_hex(&record.agent_id)?;
+        let issued_capabilities = record.issued_capabilities.clone();
         let session_capabilities = issued_capabilities
             .iter()
             .map(|capability| RemoteSessionCapability {

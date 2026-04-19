@@ -389,7 +389,7 @@ fn constraint_matches(
         | Constraint::ColumnDenylist(_)
         | Constraint::MaxRowsReturned(_)
         | Constraint::OperationClass(_) => Ok(true),
-        Constraint::ContentReviewTier(_) => Ok(true),
+        Constraint::ContentReviewTier(_) => Ok(false),
         Constraint::MaxTransactionAmountUsd(_) | Constraint::RequireDualApproval(_) => Ok(false),
 
         // Phase 2.3 / RTC-08: evaluate the model-routing constraint
@@ -457,18 +457,19 @@ mod tests {
     }
 
     #[test]
-    fn content_review_tier_is_deferred_to_runtime_guard() {
-        let capability =
-            capability_with_constraints(vec![Constraint::ContentReviewTier(ContentReviewTier::Strict)]);
+    fn content_review_tier_fails_closed_without_review_guard_context() {
+        let capability = capability_with_constraints(vec![Constraint::ContentReviewTier(
+            ContentReviewTier::Strict,
+        )]);
         assert!(
-            capability_matches_request(
+            !capability_matches_request(
                 &capability,
                 "tool",
                 "srv",
                 &serde_json::json!({"text": "review this outbound message"}),
             )
             .expect("evaluate request match"),
-            "content review tier should defer to runtime guard enforcement"
+            "content review tier should deny until a review guard supplies runtime context"
         );
     }
 
